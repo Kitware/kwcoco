@@ -42,7 +42,12 @@
         -----
 
         * This script will require matainence for new releases of Python
-        
+
+        * Make sure you add Runners to your project 
+        https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/ci_cd 
+        in Runners-> Shared Runners
+        and Runners-> Available specific runners
+
 
         GITLAB SECRETS
         --------------
