@@ -1,4 +1,6 @@
 ubelt
+scriptconfig
+
 kwimage
 kwarray
 kwplot
