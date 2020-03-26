@@ -12,7 +12,7 @@ class CocoStatsCLI:
         Compute summary statistics about a COCO dataset
         """
         default = {
-            'src': scfg.Value(None, help='path to dataset'),
+            'src': scfg.Value('special:shapes8', help='path to dataset'),
             'basic': scfg.Value(True, help='show basic stats'),
             'extended': scfg.Value(True, help='show extended stats'),
             'catfreq': scfg.Value(True, help='show category frequency stats'),
