@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import ubelt as ub
+import scriptconfig as scfg
+
+
+class CocoUnionCLI(object):
+    name = 'union'
+
+    class CLIConfig(scfg.Config):
+        """
+        Combine multiple coco datasets into a single merged dataset.
+        """
+        default = {
+            'src': scfg.Value([], nargs='+', help='path to multiple input datasets'),
+            'dst': scfg.Value('combo.mscoco.json', help='path to output dataset'),
+        }
+
+    @classmethod
+    def main(cls, cmdline=True, **kw):
+        """
+        Example:
+            >>> kw = {'src': ['special:shapes8', 'special:shapes1']}
+            >>> cmdline = False
+            >>> cls = CocoUnionCLI
+            >>> cls.main(cmdline, **kw)
+        """
+        import ndsampler
+        config = cls.CLIConfig(kw, cmdline=cmdline)
+        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+
+        if config['src'] is None:
+            raise Exception('must specify sources: '.format(config['src']))
+
+        if len(config['src']) == 0:
+            raise ValueError('Must provide at least one input dataset')
+
+        datasets = []
+        for fpath in ub.ProgIter(config['src'], desc='reading datasets',
+                                 verbose=1):
+            print('reading fpath = {!r}'.format(fpath))
+            dset = ndsampler.CocoDataset.coerce(fpath)
+            datasets.append(dset)
+
+        combo = ndsampler.CocoDataset.union(*datasets)
+
+        out_fpath = config['dst']
+        print('Writing to out_fpath = {!r}'.format(out_fpath))
+        combo.fpath = out_fpath
+        combo.dump(combo.fpath, newlines=True)
+
+_CLI = CocoUnionCLI
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python -m kwcoco.cli.coco_union
+    """
+    _CLI._main()
