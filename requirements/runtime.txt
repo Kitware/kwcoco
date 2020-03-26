@@ -1,1 +1,9 @@
 ubelt
+kwimage
+kwarray
+kwplot
+
+
+ndsampler  # for now
+six
+numpy
