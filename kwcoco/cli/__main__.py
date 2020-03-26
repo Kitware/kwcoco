@@ -1,3 +1,6 @@
+import sys
+
+
 def main(cmdline=True, **kw):
     """
     kw = dict(command='stats')
@@ -25,8 +28,7 @@ def main(cmdline=True, **kw):
         description='The Kitware COCO CLI',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    subparsers = parser.add_subparsers(
-        help='specify a command to run', required=True)
+    subparsers = parser.add_subparsers(help='specify a command to run')
 
     for cli_module in cli_modules:
         cli_cls = cli_module._CLI
@@ -41,8 +43,21 @@ def main(cmdline=True, **kw):
 
     # Execute the subcommand without additional CLI parsing
     kw = ns.__dict__
-    main = kw.pop('main')
-    main(cmdline=False, **kw)
+    main = kw.pop('main', None)
+    if main is None:
+        parser.print_help()
+        raise ValueError('no command given')
+        return 1
+
+    try:
+        ret = main(cmdline=False, **kw)
+    except Exception as ex:
+        print('ERROR ex = {!r}'.format(ex))
+        return 1
+    else:
+        if ret is None:
+            ret = 0
+        return ret
 
 
 if __name__ == '__main__':
@@ -53,4 +68,4 @@ if __name__ == '__main__':
 
         python ~/code/ndsampler/coco_cli/__main__.py
     """
-    main()
+    sys.exit(main())

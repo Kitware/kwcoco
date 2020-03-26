@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from os.path import dirname
 import ubelt as ub
 import scriptconfig as scfg
 
@@ -45,6 +46,9 @@ class CocoUnionCLI(object):
         combo = ndsampler.CocoDataset.union(*datasets)
 
         out_fpath = config['dst']
+        out_dpath = dirname(out_fpath)
+        if out_dpath:
+            ub.ensuredir(out_dpath)
         print('Writing to out_fpath = {!r}'.format(out_fpath))
         combo.fpath = out_fpath
         combo.dump(combo.fpath, newlines=True)
