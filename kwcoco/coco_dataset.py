@@ -3502,7 +3502,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> from kwcoco.coco_dataset import *
             >>> import json
             >>> self = CocoDataset.demo()
-            >>> text = self.dumps()
+            >>> text = self.dumps(newlines=True)
             >>> print(text)
             >>> self2 = CocoDataset(json.loads(text), tag='demo2')
             >>> assert self2.dataset == self.dataset
