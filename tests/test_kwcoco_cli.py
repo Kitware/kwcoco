@@ -41,7 +41,7 @@ def test_kwcoco_cli():
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/ndsampler/tests/test_kwcoco_cli.py
+        python ~/code/kwcoco/tests/test_kwcoco_cli.py
     """
     import xdoctest
     xdoctest.doctest_module(__file__)

@@ -29,7 +29,7 @@ class CocoSplitCLI(object):
             >>> cls = CocoSplitCLI
             >>> cls.main(cmdline, **kw)
         """
-        import ndsampler
+        import kwcoco
         import kwarray
         from ndsampler.utils import util_sklearn
 
@@ -40,7 +40,7 @@ class CocoSplitCLI(object):
             raise Exception('must specify source: '.format(config['src']))
 
         print('reading fpath = {!r}'.format(config['src']))
-        dset = ndsampler.CocoDataset.coerce(config['src'])
+        dset = kwcoco.CocoDataset.coerce(config['src'])
         annots = dset.annots()
         gids = annots.gids
         cids = annots.cids

@@ -28,14 +28,14 @@ class CocoStatsCLI:
             >>> cls = CocoStatsCLI
             >>> cls.main(cmdline, **kw)
         """
-        import ndsampler
+        import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: '.format(config['src']))
 
-        dset = ndsampler.CocoDataset.coerce(config['src'])
+        dset = kwcoco.CocoDataset.coerce(config['src'])
         print('dset.fpath = {!r}'.format(dset.fpath))
 
         if config['basic']:

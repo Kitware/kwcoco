@@ -5,14 +5,20 @@ The Kitware COCO Module
 
 |GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |Downloads| |ReadTheDocs|
 
-Contains a ``kwcoco.coco_dataset.CocoDataset`` class capable of dynamic
-addition and removal of categories, images, and annotations. Has better support
-for keypoints and segmentation formats. Despite being written in Python, this
-data structure is reasonably efficient.
+The Kitware COCO module defines a variant of the Microsoft COCO format,
+originally developed for the "collected images in context" object detection
+challenge. We are backwards compatible with the original module, but we also
+have improved implementations in seval places, including segmentations and
+keypoints.
 
-Also contains the ``kwcoco`` command line tool using a ``scriptconfig`` /
-``argparse`` CLI interface. Running ``kwcoco --help`` should provide a good
-starting point.
+The ``kwcoco.coco_dataset.CocoDataset`` class is capable of dynamic
+addition and removal of categories, images, and annotations. Has better support
+for keypoints and segmentation formats than the original COCO format. Despite
+being written in Python, this data structure is reasonably efficient.
+
+After installing kwcoco, you will also have the ``kwcoco`` command line tool. 
+This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
+--help`` should provide a good starting point.
 
 .. code:: 
 
@@ -35,6 +41,15 @@ starting point.
 
 The JSON Spec
 -------------
+
+A COCO file is a json file that follows a particular spec. It is used for
+storing computer vision datasets: namely images, categories, and annotations.
+Images have an id and a file name, which holds a relative or absolute path to
+the image data. Images can also have auxillary files (e.g. for depth masks,
+infared, or motion). A category has an id, a name, and an optional
+supercategory.  Annotations always have an id, an image-id, and a bounding box.
+Usually they also contain a category-id. Sometimes they contain keypoints,
+segmentations. 
 
 An implementation and extension of the original MS-COCO API [1]_.
 
