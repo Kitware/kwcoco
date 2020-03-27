@@ -9,7 +9,7 @@ class CocoSplitCLI(object):
 
     class CLIConfig(scfg.Config):
         """
-        Split a single coco dataset into two sub-datasets.
+        Split a single COCO dataset into two sub-datasets.
         """
         default = {
             'src': scfg.Value(None, help='input dataset to split'),

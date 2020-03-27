@@ -10,7 +10,7 @@ class CocoUnionCLI(object):
 
     class CLIConfig(scfg.Config):
         """
-        Combine multiple coco datasets into a single merged dataset.
+        Combine multiple COCO datasets into a single merged dataset.
         """
         default = {
             'src': scfg.Value([], nargs='+', help='path to multiple input datasets'),

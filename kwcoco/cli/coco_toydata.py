@@ -6,7 +6,7 @@ class CocoToyDataCLI(object):
 
     class CLIConfig(scfg.Config):
         """
-        Create coco toydata
+        Create COCO toydata
         """
         default = {
             'key': scfg.Value('shapes8', help='special demodata code'),

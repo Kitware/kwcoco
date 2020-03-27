@@ -8,8 +8,23 @@ The Kitware COCO Module
 The Kitware COCO module defines a variant of the Microsoft COCO format,
 originally developed for the "collected images in context" object detection
 challenge. We are backwards compatible with the original module, but we also
-have improved implementations in seval places, including segmentations and
+have improved implementations in several places, including segmentations and
 keypoints.
+
+
+The main data structure in this model is largely based on the implementation in
+https://github.com/cocodataset/cocoapi It uses the same efficient core indexing
+data structures, but in our implementation the indexing can be optionally
+turned off, functions are silent by default (with the exception of long running
+processes, which optionally show progress by default). We support helper
+functions that add and remove images, categories, and annotations. 
+
+We do not reimplement the scoring code fro pycocotools in this module. Instead
+that functionality currently lives in netharn:
+https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/metrics/detect_metrics.py
+We may move that file either this repo or kwannot in the future. This module is
+more focused on efficient access and modification of a COCO dataset.
+
 
 The kwcoco CLI
 --------------
@@ -28,10 +43,10 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
       {stats,union,split,show,toydata}
                             specify a command to run
         stats               Compute summary statistics about a COCO dataset
-        union               Combine multiple coco datasets into a single merged dataset.
-        split               Split a single coco dataset into two sub-datasets.
+        union               Combine multiple COCO datasets into a single merged dataset.
+        split               Split a single COCO dataset into two sub-datasets.
         show                Visualize a COCO image
-        toydata             Create coco toydata
+        toydata             Create COCO toydata
 
     optional arguments:
       -h, --help            show this help message and exit
@@ -39,7 +54,7 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 
 This should help you inspect (via stats and show), combine (via union), and
 make training splits (via split) using the command line. Also ships with
-toydata, which generates a coco file you can use for testing.
+toydata, which generates a COCO file you can use for testing.
 
 
 The CocoDataset object
@@ -206,7 +221,7 @@ Dataset Spec:
         or a list of flattned list of xy coordinates if the CCs are disjoint
         [[x1, y1, x2, y2, ..., xn, yn], [x1, y1, ..., xm, ym],]
 
-        Note: the original coco spec does not allow for holes in polygons.
+        Note: the original COCO spec does not allow for holes in polygons.
 
         (PENDING) We also allow a non-standard dictionary encoding of polygons
             {'exterior': [(x1, y1)...],
