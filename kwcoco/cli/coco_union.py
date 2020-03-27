@@ -26,7 +26,7 @@ class CocoUnionCLI(object):
             >>> cls = CocoUnionCLI
             >>> cls.main(cmdline, **kw)
         """
-        import ndsampler
+        import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
@@ -40,10 +40,10 @@ class CocoUnionCLI(object):
         for fpath in ub.ProgIter(config['src'], desc='reading datasets',
                                  verbose=1):
             print('reading fpath = {!r}'.format(fpath))
-            dset = ndsampler.CocoDataset.coerce(fpath)
+            dset = kwcoco.CocoDataset.coerce(fpath)
             datasets.append(dset)
 
-        combo = ndsampler.CocoDataset.union(*datasets)
+        combo = kwcoco.CocoDataset.union(*datasets)
 
         out_fpath = config['dst']
         out_dpath = dirname(out_fpath)

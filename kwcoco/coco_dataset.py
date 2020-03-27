@@ -178,8 +178,8 @@ class ObjectList1D(ub.NiceRepr):
         ObjectList1D gives us access to a List[ObjT]
 
     Example:
-        >>> import ndsampler
-        >>> dset = ndsampler.CocoDataset.demo()
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo()
         >>> # Both annots and images are object lists
         >>> self = dset.annots()
         >>> self = dset.images()
@@ -253,8 +253,8 @@ class ObjectList1D(ub.NiceRepr):
             Dict[str, ObjT]
 
         Example:
-            >>> import ndsampler
-            >>> dset = ndsampler.CocoDataset.demo()
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo()
             >>> self = dset.annots()
             >>> self.lookup('id')
             >>> key = ['id']
@@ -322,8 +322,8 @@ class ObjectList1D(ub.NiceRepr):
     def _lookup(self, key, default=ub.NoParam):
         """
         Benchmark:
-            >>> import ndsampler
-            >>> dset = ndsampler.CocoDataset.demo('shapes256')
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('shapes256')
             >>> self = annots = dset.annots()
 
             >>> import timerit
@@ -426,7 +426,7 @@ class Images(ObjectList1D):
     def size(self):
         """
         Example:
-            >>> from ndsampler.coco_dataset import *
+            >>> from kwcoco.coco_dataset import *
             >>> self = CocoDataset.demo().images()
             >>> self._dset._ensure_imgsize()
             >>> print(self.size)
@@ -438,7 +438,7 @@ class Images(ObjectList1D):
     def area(self):
         """
         Example:
-            >>> from ndsampler.coco_dataset import *
+            >>> from kwcoco.coco_dataset import *
             >>> self = CocoDataset.demo().images()
             >>> self._dset._ensure_imgsize()
             >>> print(self.area)
@@ -545,7 +545,7 @@ class Annots(ObjectList1D):
             cnames (List[str]):
 
         Example:
-            >>> from ndsampler.coco_dataset import *  # NOQA
+            >>> from kwcoco.coco_dataset import *  # NOQA
             >>> self = CocoDataset.demo().annots([1, 2, 11])
             >>> print('self.cnames = {!r}'.format(self.cnames))
             >>> print('self.cids = {!r}'.format(self.cids))
@@ -568,7 +568,7 @@ class Annots(ObjectList1D):
             kwimage.Detections
 
         Example:
-            >>> from ndsampler.coco_dataset import *  # NOQA
+            >>> from kwcoco.coco_dataset import *  # NOQA
             >>> self = CocoDataset.demo('shapes32').annots([1, 2, 11])
             >>> dets = self.detections
             >>> print('dets.data = {!r}'.format(dets.data))
@@ -606,7 +606,7 @@ class Annots(ObjectList1D):
 
         Example:
             >>> import kwimage
-            >>> from ndsampler.coco_dataset import *  # NOQA
+            >>> from kwcoco.coco_dataset import *  # NOQA
             >>> self = CocoDataset.demo().annots([1, 2, 11])
             >>> print('self.boxes = {!r}'.format(self.boxes))
             >>> boxes = kwimage.Boxes.random(3).scale(512).astype(np.int)
@@ -852,8 +852,8 @@ class MixinCocoExtras(object):
             channels (str): the auxillary channel to load (e.g. disparity)
 
         Example:
-            >>> import ndsampler
-            >>> self = ndsampler.CocoDataset.demo('shapes8', aux=True)
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
             >>> self.get_auxillary_fpath(1, 'disparity')
         """
         aux = self._get_img_auxillary(gid_or_img, channels)
@@ -871,8 +871,8 @@ class MixinCocoExtras(object):
                 (note: this process is inefficient unless image is specified)
 
         Example:
-            >>> import ndsampler
-            >>> self = ndsampler.CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> sample = self.load_annot_sample(2, pad=100)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
@@ -1839,8 +1839,8 @@ class MixinCocoExtras(object):
                 if True, checks that the images all exist
 
         Example:
-            >>> import ndsampler
-            >>> self = ndsampler.CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
 
             >>> # Change base relative directory
             >>> img_root = ub.expandpath('~')
@@ -1857,8 +1857,8 @@ class MixinCocoExtras(object):
 
         Example:
             >>> # demo with auxillary data
-            >>> import ndsampler
-            >>> self = ndsampler.CocoDataset.demo('shapes8', aux=True)
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
             >>> img_root = ub.expandpath('~')
             >>> self.rebase(img_root)
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
@@ -1950,7 +1950,7 @@ class MixinCocoStats(object):
     def keypoint_annotation_frequency(self):
         """
         Example:
-            >>> from ndsampler.coco_dataset import *
+            >>> from kwcoco.coco_dataset import *
             >>> self = CocoDataset.demo('shapes', rng=0)
             >>> hist = self.keypoint_annotation_frequency()
             >>> hist = ub.odict(sorted(hist.items()))
@@ -1979,7 +1979,7 @@ class MixinCocoStats(object):
         Reports the number of annotations of each category
 
         Example:
-            >>> from ndsampler.coco_dataset import *
+            >>> from kwcoco.coco_dataset import *
             >>> self = CocoDataset.demo()
             >>> hist = self.category_annotation_frequency()
             >>> print(ub.repr2(hist))
@@ -2078,8 +2078,8 @@ class MixinCocoStats(object):
             Dict[str, Dict[str, Dict | ndarray]
 
         Example:
-            >>> import ndsampler
-            >>> self = ndsampler.CocoDataset.demo('shapes32')
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('shapes32')
             >>> infos = self.boxsize_stats(anchors=4, perclass=False)
             >>> print(ub.repr2(infos, nl=-1, precision=2))
 
@@ -2201,7 +2201,7 @@ class MixinCocoDraw(object):
         Ignore:
             # Programatically collect the kwargs for docs generation
             import xinspect
-            kwargs = xinspect.get_kwargs(ndsampler.CocoDataset.show_image)
+            kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
             print(ub.repr2(list(kwargs.keys()), nl=1, si=1))
 
         """
@@ -2711,8 +2711,8 @@ class MixinCocoAddRemove(object):
         them in batch with `self.remove_annotations`
 
         Example:
-            >>> import ndsampler
-            >>> self = ndsampler.CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> aids_or_anns = [self.anns[2], 3, 4, self.anns[1]]
             >>> self.remove_annotations(aids_or_anns)
             >>> assert len(self.dataset['annotations']) == 7
@@ -2738,8 +2738,8 @@ class MixinCocoAddRemove(object):
             Dict: num_removed: information on the number of items removed
 
         Example:
-            >>> import ndsampler
-            >>> self = ndsampler.CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> prev_n_annots = self.n_annots
             >>> aids_or_anns = [self.anns[2], 3, 4, self.anns[1]]
             >>> self.remove_annotations(aids_or_anns)  # xdoc: +IGNORE_WANT
@@ -2859,7 +2859,7 @@ class MixinCocoAddRemove(object):
             Dict: num_removed: information on the number of items removed
 
         Example:
-            >>> from ndsampler.coco_dataset import *
+            >>> from kwcoco.coco_dataset import *
             >>> self = CocoDataset.demo()
             >>> assert len(self.dataset['images']) == 3
             >>> gids_or_imgs = [self.imgs[2], 'astro.png']
@@ -3039,12 +3039,12 @@ class CocoIndex(object):
         Ignore:
             # If we did do checks, what would be the fastest way?
 
-            import ndsampler
-            x = ndsampler.CocoDataset()
+            import kwcoco
+            x = kwcoco.CocoDataset()
             for i in range(1000):
                 x.add_image(file_name=str(i))
 
-            y = ndsampler.CocoDataset()
+            y = kwcoco.CocoDataset()
             for i in range(1000, 2000):
                 y.add_image(file_name=str(i))
 
@@ -3461,7 +3461,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         Deep copies this object
 
         Example:
-            >>> from ndsampler.coco_dataset import *
+            >>> from kwcoco.coco_dataset import *
             >>> self = CocoDataset.demo()
             >>> new = self.copy()
             >>> assert new.imgs[1] is new.dataset['images'][0]
@@ -3499,10 +3499,10 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 ndarrays.
 
         Example:
-            >>> from ndsampler.coco_dataset import *
+            >>> from kwcoco.coco_dataset import *
             >>> import json
             >>> self = CocoDataset.demo()
-            >>> text = self.dumps()
+            >>> text = self.dumps(newlines=True)
             >>> print(text)
             >>> self2 = CocoDataset(json.loads(text), tag='demo2')
             >>> assert self2.dataset == self.dataset
@@ -3583,7 +3583,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         Example:
             >>> import tempfile
-            >>> from ndsampler.coco_dataset import *
+            >>> from kwcoco.coco_dataset import *
             >>> self = CocoDataset.demo()
             >>> file = tempfile.NamedTemporaryFile('w')
             >>> self.dump(file)
@@ -3710,8 +3710,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> assert kpfreq_want == kpfreq_got2
 
             >>> # Test disjoint gid datasets
-            >>> import ndsampler
-            >>> dset1 = ndsampler.CocoDataset.demo('shapes3')
+            >>> import kwcoco
+            >>> dset1 = kwcoco.CocoDataset.demo('shapes3')
             >>> for new_gid, img in enumerate(dset1.dataset['images'], start=10):
             >>>     for aid in dset1.gid_to_aids[img['id']]:
             >>>         dset1.anns[aid]['image_id'] = new_gid
@@ -3719,7 +3719,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> dset1._clear_index()
             >>> dset1._build_index()
             >>> # ------
-            >>> dset2 = ndsampler.CocoDataset.demo('shapes2')
+            >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
             >>> for new_gid, img in enumerate(dset2.dataset['images'], start=100):
             >>>     for aid in dset2.gid_to_aids[img['id']]:
             >>>         dset2.anns[aid]['image_id'] = new_gid
@@ -3727,16 +3727,16 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> dset2._clear_index()
             >>> dset2._build_index()
             >>> others = [dset1, dset2]
-            >>> merged = ndsampler.CocoDataset.union(*others)
+            >>> merged = kwcoco.CocoDataset.union(*others)
             >>> print('merged = {!r}'.format(merged))
             >>> print('merged.imgs = {}'.format(ub.repr2(merged.imgs, nl=1)))
             >>> assert set(merged.imgs) & set([10, 11, 12, 100, 101]) == set(merged.imgs)
 
             >>> # Test data is not preserved
-            >>> dset2 = ndsampler.CocoDataset.demo('shapes2')
-            >>> dset1 = ndsampler.CocoDataset.demo('shapes3')
+            >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
+            >>> dset1 = kwcoco.CocoDataset.demo('shapes3')
             >>> others = (dset1, dset2)
-            >>> cls = self = ndsampler.CocoDataset
+            >>> cls = self = kwcoco.CocoDataset
             >>> merged = cls.union(*others)
             >>> print('merged = {!r}'.format(merged))
             >>> print('merged.imgs = {}'.format(ub.repr2(merged.imgs, nl=1)))

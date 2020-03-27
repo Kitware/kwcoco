@@ -1,17 +1,12 @@
 """
-mkinit ~/code/ndsampler/kwcoco/__init__.py
+mkinit ~/code/kwcoco/kwcoco/__init__.py -w
 """
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
-# from kwcoco.coco_dataset import CocoDataset
+__submodules__ = ['coco_dataset']
 
-# ##
+from kwcoco import coco_dataset
 
-# from kwcoco import coco_dataset
-# from kwcoco import coco_stats
+from kwcoco.coco_dataset import (CocoDataset,)
 
-# from kwcoco.coco_stats import (CocoStatsCLI, CocoStatsConfig)
-
-
-# __all__ = ['CocoStatsCLI', 'CocoStatsConfig', 'coco_dataset', 'coco_stats',
-#            'CocoDataset']
+__all__ = ['CocoDataset', 'coco_dataset']

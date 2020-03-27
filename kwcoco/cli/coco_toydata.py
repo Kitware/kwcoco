@@ -22,10 +22,10 @@ class CocoToyDataCLI(object):
             >>> cls = CocoToyDataCLI
             >>> cls.main(cmdline, **kw)
         """
-        import ndsampler
+        import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
 
-        dset = ndsampler.CocoDataset.demo(config['key'])
+        dset = kwcoco.CocoDataset.demo(config['key'])
         out_fpath = config['dst']
         print('Writing to out_fpath = {!r}'.format(out_fpath))
         dset.fpath = out_fpath

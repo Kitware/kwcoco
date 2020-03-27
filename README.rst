@@ -5,14 +5,18 @@ The Kitware COCO Module
 
 |GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |Downloads| |ReadTheDocs|
 
-Contains a ``kwcoco.coco_dataset.CocoDataset`` class capable of dynamic
-addition and removal of categories, images, and annotations. Has better support
-for keypoints and segmentation formats. Despite being written in Python, this
-data structure is reasonably efficient.
+The Kitware COCO module defines a variant of the Microsoft COCO format,
+originally developed for the "collected images in context" object detection
+challenge. We are backwards compatible with the original module, but we also
+have improved implementations in seval places, including segmentations and
+keypoints.
 
-Also contains the ``kwcoco`` command line tool using a ``scriptconfig`` /
-``argparse`` CLI interface. Running ``kwcoco --help`` should provide a good
-starting point.
+The kwcoco CLI
+--------------
+
+After installing kwcoco, you will also have the ``kwcoco`` command line tool. 
+This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
+--help`` should provide a good starting point.
 
 .. code:: 
 
@@ -33,8 +37,119 @@ starting point.
       -h, --help            show this help message and exit
 
 
+This should help you inspect (via stats and show), combine (via union), and
+make training splits (via split) using the command line. Also ships with
+toydata, which generates a coco file you can use for testing.
+
+
+The CocoDataset object
+----------------------
+
+The ``kwcoco.CocoDataset`` class is capable of dynamic addition and removal of
+categories, images, and annotations. Has better support for keypoints and
+segmentation formats than the original COCO format. Despite being written in
+Python, this data structure is reasonably efficient.
+
+
+.. code:: python
+
+        >>> import kwcoco
+        >>> import json
+        >>> # Create demo data
+        >>> demo = CocoDataset.demo()
+        >>> # could also use demo.dump / demo.dumps, but this is more explicit
+        >>> text = json.dumps(demo.dataset)
+        >>> with open('demo.json', 'w') as file:
+        >>>    file.write(text)
+
+        >>> # Read from disk
+        >>> self = CocoDataset('demo.json')
+
+        >>> # Add data
+        >>> cid = self.add_category('Cat')
+        >>> gid = self.add_image('new-img.jpg')
+        >>> aid = self.add_annotation(image_id=gid, category_id=cid, bbox=[0, 0, 100, 100])
+
+        >>> # Remove data
+        >>> self.remove_annotations([aid])
+        >>> self.remove_images([gid])  
+        >>> self.remove_categories([cid])
+
+        >>> # Look at data
+        >>> print(ub.repr2(self.basic_stats(), nl=1))
+        >>> print(ub.repr2(self.extended_stats(), nl=2))
+        >>> print(ub.repr2(self.boxsize_stats(), nl=3))
+        >>> print(ub.repr2(self.category_annotation_frequency()))
+        
+
+        >>> # Inspect data
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> self.show_image(gid=1)
+
+        >>> # Access single-item data via imgs, cats, anns
+        >>> cid = 1
+        >>> self.cats[cid]
+        {'id': 1, 'name': 'astronaut', 'supercategory': 'human'}
+
+        >>> gid = 1
+        >>> self.imgs[gid]
+        {'id': 1, 'file_name': 'astro.png', 'url': 'https://i.imgur.com/KXhKM72.png'}
+
+        >>> aid = 3
+        >>> self.anns[aid]
+        {'id': 3, 'image_id': 1, 'category_id': 3, 'line': [326, 369, 500, 500]}
+
+        # Access multi-item data via the annots and images helper objects
+        >>> aids = self.index.gid_to_aids[2]
+        >>> annots = self.annots(aids)
+
+        >>> print('annots = {}'.format(ub.repr2(annots, nl=1, sv=1)))
+        annots = <Annots(num=2)>
+
+        >>> annots.lookup('category_id')
+        [6, 4]
+
+        >>> annots.lookup('bbox')
+        [[37, 6, 230, 240], [124, 96, 45, 18]]
+
+        >>> # built in conversions to efficient kwimage array DataStructures
+        >>> print(ub.repr2(annots.detections.data))
+        {
+            'boxes': <Boxes(xywh,
+                         array([[ 37.,   6., 230., 240.],
+                                [124.,  96.,  45.,  18.]], dtype=float32))>,
+            'class_idxs': np.array([5, 3], dtype=np.int64),
+            'keypoints': <PointsList(n=2) at 0x7f07eda33220>,
+            'segmentations': <PolygonList(n=2) at 0x7f086365aa60>,
+        }
+        
+        >>> gids = list(self.imgs.keys())
+        >>> images = self.images(gids)
+        >>> print('images = {}'.format(ub.repr2(images, nl=1, sv=1)))
+        images = <Images(num=3)>
+
+        >>> images.lookup('file_name')
+        ['astro.png', 'carl.png', 'stars.png']
+
+        >>> print('images.annots = {}'.format(images.annots))
+        images.annots = <AnnotGroups(n=3, m=3.7, s=3.9)>
+
+        >>> print('images.annots.cids = {!r}'.format(images.annots.cids))
+        images.annots.cids = [[1, 2, 3, 4, 5, 5, 5, 5, 5], [6, 4], []]
+
+
 The JSON Spec
 -------------
+
+A COCO file is a json file that follows a particular spec. It is used for
+storing computer vision datasets: namely images, categories, and annotations.
+Images have an id and a file name, which holds a relative or absolute path to
+the image data. Images can also have auxillary files (e.g. for depth masks,
+infared, or motion). A category has an id, a name, and an optional
+supercategory.  Annotations always have an id, an image-id, and a bounding box.
+Usually they also contain a category-id. Sometimes they contain keypoints,
+segmentations. 
 
 An implementation and extension of the original MS-COCO API [1]_.
 
