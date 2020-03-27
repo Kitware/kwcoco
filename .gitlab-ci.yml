@@ -205,9 +205,9 @@
 
 stages:
   - build
-  - test
+  #- test
   - gpgsign
-  - deploy
+  #- deploy
 
 
 ### TEMPLATES ###
