@@ -1892,6 +1892,7 @@ class MixinCocoExtras(object):
                     aux['file_name'] = relpath(abs_file_path, new_img_root)
 
         self.img_root = new_img_root
+        return self
 
 
 class MixinCocoAttrs(object):
