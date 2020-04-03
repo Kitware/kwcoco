@@ -1838,6 +1838,9 @@ class MixinCocoExtras(object):
             check (bool, default=True):
                 if True, checks that the images all exist
 
+        CommandLine:
+            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.rebase
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()

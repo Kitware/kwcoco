@@ -5,6 +5,21 @@ import scriptconfig as scfg
 
 
 class CocoRebaseCLI:
+    """
+
+    NOT WORKING YET. NEED TO WORK THROUGH DETAILS IN A CASE-BY-CASE BASIS
+
+    What happens when:
+
+        * Existing file paths are absolute, but are not correct.
+
+        * Existing file paths are absolute, and correct.
+
+        * Existing file paths are relative, but the original directory is
+          unknown, but the new image root correctly places them.
+
+        * todo: enumerate the rest
+    """
     name = 'rebase'
 
     class CLIConfig(scfg.Config):
@@ -52,7 +67,6 @@ class CocoRebaseCLI:
             raise Exception('must specify source: '.format(config['src']))
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
-        print('dset.fpath = {!r}'.format(dset.fpath))
 
         dset.rebase(
             img_root=config['img_root'],

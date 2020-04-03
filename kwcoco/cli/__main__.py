@@ -12,7 +12,7 @@ def main(cmdline=True, **kw):
     from kwcoco.cli import coco_split
     from kwcoco.cli import coco_show
     from kwcoco.cli import coco_toydata
-    from kwcoco.cli import coco_rebase
+    # from kwcoco.cli import coco_rebase
 
     # Create a list of all submodules with CLI interfaces
     cli_modules = [
@@ -20,7 +20,7 @@ def main(cmdline=True, **kw):
         coco_union,
         coco_split,
         coco_show,
-        coco_rebase,
+        # coco_rebase,
         coco_toydata,
     ]
 

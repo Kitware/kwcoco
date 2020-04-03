@@ -19,7 +19,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Example usage section in CLI help
-* Exposed rebase command
 
 ### Fixed
 * Multipolygon segmentations are now displayed correctly.
