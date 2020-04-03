@@ -2351,7 +2351,7 @@ class MixinCocoDraw(object):
                         # TODO: interior
                         multipoly = sseg.to_multi_polygon()
                         for poly in multipoly.data:
-                            poly_xys = sseg.data['exterior'].data
+                            poly_xys = poly.data['exterior'].data
                             polykw = {}
                             if catcolor is not None:
                                 polykw['color'] = catcolor

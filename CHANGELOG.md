@@ -16,3 +16,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.0.4 - Unreleased
 
 ## Version 0.0.5 - Unreleased
+
+### Added
+* Example usage section in CLI help
+
+### Fixed
+* Multipolygon segmentations are now displayed correctly.
+* Tracebacks on errors are now displayed.
