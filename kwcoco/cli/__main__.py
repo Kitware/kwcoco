@@ -34,8 +34,11 @@ def main(cmdline=True, **kw):
         cli_cls = cli_module._CLI
         subconfig = cli_cls.CLIConfig()
 
+        # TODO: make subparser.add_parser args consistent with what
+        # scriptconfig generates when parser=None
+        epilog = getattr(cli_cls, 'epilog', None)
         subparser = subparsers.add_parser(
-                cli_cls.name, help=subconfig.__class__.__doc__)
+                cli_cls.name, help=subconfig.__class__.__doc__, epilog=epilog)
         subparser = subconfig.argparse(subparser)
         subparser.set_defaults(main=cli_cls.main)
 
@@ -53,6 +56,7 @@ def main(cmdline=True, **kw):
         ret = main(cmdline=False, **kw)
     except Exception as ex:
         print('ERROR ex = {!r}'.format(ex))
+        raise
         return 1
     else:
         if ret is None:
