@@ -18,6 +18,11 @@ class CocoStatsCLI:
             'catfreq': scfg.Value(True, help='show category frequency stats'),
             'boxes': scfg.Value(False, help='show bounding box stats'),
         }
+        epilog = """
+        Example Usage:
+            kwcoco stats --src=special:shapes8
+            kwcoco stats --src=special:shapes8 --boxes=True
+        """
 
     @classmethod
     def main(cls, cmdline=True, **kw):

@@ -12,6 +12,10 @@ class CocoToyDataCLI(object):
             'key': scfg.Value('shapes8', help='special demodata code'),
             'dst': scfg.Value('test.mscoco.json', help='output path'),
         }
+        epilog = """
+        Example Usage:
+            kwcoco toydata --key=shapes8 --dst=toydata.mscoco.json
+        """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
