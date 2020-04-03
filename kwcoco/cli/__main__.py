@@ -26,7 +26,8 @@ def main(cmdline=True, **kw):
     # the previous CLI interfaces.
     parser = argparse.ArgumentParser(
         description='The Kitware COCO CLI',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        # formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(help='specify a command to run')
 
@@ -36,9 +37,15 @@ def main(cmdline=True, **kw):
 
         # TODO: make subparser.add_parser args consistent with what
         # scriptconfig generates when parser=None
-        epilog = getattr(cli_cls, 'epilog', None)
-        subparser = subparsers.add_parser(
-                cli_cls.name, help=subconfig.__class__.__doc__, epilog=epilog)
+        if hasattr(subconfig, '_parserkw'):
+            parserkw = subconfig._parserkw()
+        else:
+            # for older versions of scriptconfig
+            parserkw = dict(
+                description=subconfig.__class__.__doc__
+            )
+        parserkw['help'] = parserkw['description']
+        subparser = subparsers.add_parser(cli_cls.name, **parserkw)
         subparser = subconfig.argparse(subparser)
         subparser.set_defaults(main=cli_cls.main)
 

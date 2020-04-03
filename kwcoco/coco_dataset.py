@@ -2349,17 +2349,19 @@ class MixinCocoDraw(object):
                         sseg_masks.append((m.data, catcolor))
                     else:
                         # TODO: interior
-                        poly_xys = sseg.data['exterior'].data
-                        polykw = {}
-                        if catcolor is not None:
-                            polykw['color'] = catcolor
-                        poly = mpl.patches.Polygon(poly_xys, **polykw)
-                        try:
-                            # hack
-                            poly.area = sseg.to_shapely().area
-                        except Exception:
-                            pass
-                        sseg_polys.append(poly)
+                        multipoly = sseg.to_multi_polygon()
+                        for poly in multipoly.data:
+                            poly_xys = sseg.data['exterior'].data
+                            polykw = {}
+                            if catcolor is not None:
+                                polykw['color'] = catcolor
+                            poly = mpl.patches.Polygon(poly_xys, **polykw)
+                            try:
+                                # hack
+                                poly.area = sseg.to_shapely().area
+                            except Exception:
+                                pass
+                            sseg_polys.append(poly)
                 else:
                     # print('sseg = {!r}'.format(sseg))
                     if isinstance(sseg, dict):

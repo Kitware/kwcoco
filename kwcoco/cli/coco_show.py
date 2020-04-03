@@ -11,6 +11,12 @@ class CocoShowCLI:
         """
         Visualize a COCO image using matplotlib, optionally writing it to disk
         """
+        epilog = """
+        Example Usage:
+            kwcoco show --help
+            kwcoco show --src=special:shapes8 --gid=1
+            kwcoco show --src=special:shapes8 --gid=1 --dst out.png
+        """
         default = {
             'src': scfg.Value(None, help=(
                 'Path to the coco dataset')),
