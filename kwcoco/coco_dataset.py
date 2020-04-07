@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 """
 An implementation and extension of the original MS-COCO API [1]_.
 
@@ -3912,11 +3911,21 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                     merged['annotations'].append(new_annot)
             return merged
 
+        # handle soft data roots
         from os.path import normpath
-        dset_roots = [dset.dataset.get('img_root', None) for dset in others]
-        dset_roots = [normpath(r) if r is not None else None for r in dset_roots]
-        if ub.allsame(dset_roots):
-            common_root = ub.peek(dset_roots)
+        soft_dset_roots = [dset.img_root for dset in others]
+        soft_dset_roots = [normpath(r) if r is not None else None for r in soft_dset_roots]
+        if ub.allsame(soft_dset_roots):
+            soft_img_root = ub.peek(soft_dset_roots)
+        else:
+            soft_img_root = None
+
+        # Handle hard coded data roots
+        from os.path import normpath
+        hard_dset_roots = [dset.dataset.get('img_root', None) for dset in others]
+        hard_dset_roots = [normpath(r) if r is not None else None for r in hard_dset_roots]
+        if ub.allsame(hard_dset_roots):
+            common_root = ub.peek(hard_dset_roots)
             relative_dsets = [('', d.dataset) for d in others]
         else:
             common_root = None
@@ -3928,6 +3937,9 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             merged['img_root'] = common_root
 
         new_dset = cls(merged, **kwargs)
+
+        if common_root is None and soft_img_root is not None:
+            new_dset.img_root = soft_img_root
         return new_dset
 
     def subset(self, gids, copy=False):
