@@ -9,14 +9,24 @@ class CocoShowCLI:
 
     class CLIConfig(scfg.Config):
         """
-        Visualize a COCO image
+        Visualize a COCO image using matplotlib, optionally writing it to disk
+        """
+        epilog = """
+        Example Usage:
+            kwcoco show --help
+            kwcoco show --src=special:shapes8 --gid=1
+            kwcoco show --src=special:shapes8 --gid=1 --dst out.png
         """
         default = {
-            'src': scfg.Value(None, help='path to dataset'),
-            'gid': scfg.Value(None, help='image id to show'),
-            'aid': scfg.Value(None, help='annotation id to show'),
-
-            'dst': scfg.Value(None, help='write image to file if specified'),
+            'src': scfg.Value(None, help=(
+                'Path to the coco dataset')),
+            'gid': scfg.Value(None, help=(
+                'Image id to show, if unspecified the first image is shown')),
+            'aid': scfg.Value(None, help=(
+                'Annotation id to show, mutually exclusive with gid')),
+            'dst': scfg.Value(None, help=(
+                'Save the image to the specified file. '
+                'If unspecified, the image is shown with pyplot'))
         }
 
     @classmethod
@@ -51,7 +61,6 @@ class CocoShowCLI:
             gid = ub.peek(dset.imgs)
 
         ax = dset.show_image(gid=gid, aid=aid)
-        print('ax.figure = {!r}'.format(ax.figure))
         if out_fpath is None:
             plt.show()
         else:

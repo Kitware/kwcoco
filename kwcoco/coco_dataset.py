@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 """
 An implementation and extension of the original MS-COCO API [1]_.
 
@@ -568,6 +567,7 @@ class Annots(ObjectList1D):
             kwimage.Detections
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.coco_dataset import *  # NOQA
             >>> self = CocoDataset.demo('shapes32').annots([1, 2, 11])
             >>> dets = self.detections
@@ -871,6 +871,7 @@ class MixinCocoExtras(object):
                 (note: this process is inefficient unless image is specified)
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> sample = self.load_annot_sample(2, pad=100)
@@ -926,7 +927,7 @@ class MixinCocoExtras(object):
             >>> print(CocoDataset.demo('shapes-8', verbose=0))
         """
         if key.startswith('shapes'):
-            from ndsampler import toydata
+            from kwcoco import toydata
             import parse
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:
@@ -1139,7 +1140,7 @@ class MixinCocoExtras(object):
         if any('width' not in img or 'height' not in img
                for img in self.dataset['images']):
             import kwimage
-            from ndsampler.utils import util_futures
+            from kwcoco.util import util_futures
 
             if self.tag:
                 desc = 'populate imgsize for ' + self.tag
@@ -1428,6 +1429,7 @@ class MixinCocoExtras(object):
             nsampler.CategoryTree:
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> self = CocoDataset.demo()
             >>> classes = self.object_categories()
             >>> print('classes = {}'.format(classes))
@@ -1445,6 +1447,7 @@ class MixinCocoExtras(object):
             nsampler.CategoryTree:
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> self = CocoDataset.demo()
             >>> classes = self.keypoint_categories()
             >>> print('classes = {}'.format(classes))
@@ -1838,6 +1841,9 @@ class MixinCocoExtras(object):
             check (bool, default=True):
                 if True, checks that the images all exist
 
+        CommandLine:
+            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.rebase
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
@@ -1892,6 +1898,7 @@ class MixinCocoExtras(object):
                     aux['file_name'] = relpath(abs_file_path, new_img_root)
 
         self.img_root = new_img_root
+        return self
 
 
 class MixinCocoAttrs(object):
@@ -2349,17 +2356,19 @@ class MixinCocoDraw(object):
                         sseg_masks.append((m.data, catcolor))
                     else:
                         # TODO: interior
-                        poly_xys = sseg.data['exterior'].data
-                        polykw = {}
-                        if catcolor is not None:
-                            polykw['color'] = catcolor
-                        poly = mpl.patches.Polygon(poly_xys, **polykw)
-                        try:
-                            # hack
-                            poly.area = sseg.to_shapely().area
-                        except Exception:
-                            pass
-                        sseg_polys.append(poly)
+                        multipoly = sseg.to_multi_polygon()
+                        for poly in multipoly.data:
+                            poly_xys = poly.data['exterior'].data
+                            polykw = {}
+                            if catcolor is not None:
+                                polykw['color'] = catcolor
+                            poly = mpl.patches.Polygon(poly_xys, **polykw)
+                            try:
+                                # hack
+                                poly.area = sseg.to_shapely().area
+                            except Exception:
+                                pass
+                            sseg_polys.append(poly)
                 else:
                     # print('sseg = {!r}'.format(sseg))
                     if isinstance(sseg, dict):
@@ -2557,9 +2566,6 @@ class MixinCocoAddRemove(object):
             name (str): name of the new category
             supercategory (str, optional): parent of this category
             id (int, optional): use this category id, if it was not taken
-
-        CommandLine:
-            xdoctest -m ndsampler.coco_dataset MixinCocoAddRemove.add_category
 
         Example:
             >>> self = CocoDataset.demo()
@@ -2943,9 +2949,6 @@ class MixinCocoAddRemove(object):
 
         Returns:
             Dict: num_removed: information on the number of items removed
-
-        CommandLine:
-            xdoctest -m ~/code/ndsampler/ndsampler/coco_dataset.py MixinCocoAddRemove.remove_keypoint_categories
 
         Example:
             >>> self = CocoDataset.demo('shapes', rng=0)
@@ -3362,7 +3365,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         http://cocodataset.org/#download
 
     CommandLine:
-        python -m ndsampler.coco_dataset CocoDataset --show
+        python -m kwcoco.coco_dataset CocoDataset --show
 
     Example:
         >>> dataset = demo_coco_data()
@@ -3906,11 +3909,21 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                     merged['annotations'].append(new_annot)
             return merged
 
+        # handle soft data roots
         from os.path import normpath
-        dset_roots = [dset.dataset.get('img_root', None) for dset in others]
-        dset_roots = [normpath(r) if r is not None else None for r in dset_roots]
-        if ub.allsame(dset_roots):
-            common_root = ub.peek(dset_roots)
+        soft_dset_roots = [dset.img_root for dset in others]
+        soft_dset_roots = [normpath(r) if r is not None else None for r in soft_dset_roots]
+        if ub.allsame(soft_dset_roots):
+            soft_img_root = ub.peek(soft_dset_roots)
+        else:
+            soft_img_root = None
+
+        # Handle hard coded data roots
+        from os.path import normpath
+        hard_dset_roots = [dset.dataset.get('img_root', None) for dset in others]
+        hard_dset_roots = [normpath(r) if r is not None else None for r in hard_dset_roots]
+        if ub.allsame(hard_dset_roots):
+            common_root = ub.peek(hard_dset_roots)
             relative_dsets = [('', d.dataset) for d in others]
         else:
             common_root = None
@@ -3922,6 +3935,9 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             merged['img_root'] = common_root
 
         new_dset = cls(merged, **kwargs)
+
+        if common_root is None and soft_img_root is not None:
+            new_dset.img_root = soft_img_root
         return new_dset
 
     def subset(self, gids, copy=False):
@@ -4006,7 +4022,7 @@ def demo_coco_data():
 
     Example:
         >>> # xdoctest: +REQUIRES(--show)
-        >>> from ndsampler.coco_dataset import demo_coco_data, CocoDataset
+        >>> from kwcoco.coco_dataset import demo_coco_data, CocoDataset
         >>> dataset = demo_coco_data()
         >>> self = CocoDataset(dataset, tag='demo')
         >>> import kwplot
@@ -4127,7 +4143,7 @@ def demo_coco_data():
 if __name__ == '__main__':
     r"""
     CommandLine:
-        xdoctest ndsampler.coco_dataset all
+        xdoctest kwcoco.coco_dataset all
     """
     import xdoctest
     xdoctest.doctest_module(__file__)

@@ -16,6 +16,10 @@ class CocoUnionCLI(object):
             'src': scfg.Value([], nargs='+', help='path to multiple input datasets'),
             'dst': scfg.Value('combo.mscoco.json', help='path to output dataset'),
         }
+        epilog = """
+        Example Usage:
+            kwcoco union --src special:shapes8 special:shapes1 --dst=combo.mscoco.json
+        """
 
     @classmethod
     def main(cls, cmdline=True, **kw):

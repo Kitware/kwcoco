@@ -18,6 +18,10 @@ class CocoSplitCLI(object):
             'factor': scfg.Value(3, help='ratio of items put in dset1 vs dset2'),
             'rng': scfg.Value(None, help='random seed'),
         }
+        epilog = """
+        Example Usage:
+            kwcoco split --src special:shapes8 --dst1=learn.mscoco.json --dst2=test.mscoco.json --factor=3 --rng=42
+        """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -31,7 +35,7 @@ class CocoSplitCLI(object):
         """
         import kwcoco
         import kwarray
-        from ndsampler.utils import util_sklearn
+        from kwcoco.util import util_sklearn
 
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))

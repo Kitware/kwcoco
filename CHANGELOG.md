@@ -14,3 +14,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.0.3 - Unreleased
 
 ## Version 0.0.4 - Unreleased
+
+## Version 0.1.0 - Released 2020-04-08
+
+### Added
+* Example usage section in CLI help
+* Moved toydata from ndsampler to kwcoco
+
+### Fixed
+* Multipolygon segmentations are now displayed correctly.
+* Tracebacks on errors are now displayed.
