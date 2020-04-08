@@ -24,3 +24,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 * Multipolygon segmentations are now displayed correctly.
 * Tracebacks on errors are now displayed.
+
+## Version 0.1.1 - Unreleased
