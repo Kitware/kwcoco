@@ -1,7 +1,8 @@
-ubelt
-scriptconfig
-kwimage
-kwarray
-kwplot
-six
-numpy
+ubelt >= 0.8.2
+parse >= 1.12.0
+scriptconfig >= 0.5.6
+kwarray >= 0.4.0
+kwimage >= 0.4.0
+kwplot >= 0.4.0
+six >= 1.11.0
+numpy >= 1.9.0
