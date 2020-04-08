@@ -1,11 +1,7 @@
 ubelt
 scriptconfig
-
 kwimage
 kwarray
 kwplot
-
-
-ndsampler  # for now
 six
 numpy
