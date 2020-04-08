@@ -870,6 +870,7 @@ class MixinCocoExtras(object):
                 (note: this process is inefficient unless image is specified)
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> sample = self.load_annot_sample(2, pad=100)
@@ -925,7 +926,7 @@ class MixinCocoExtras(object):
             >>> print(CocoDataset.demo('shapes-8', verbose=0))
         """
         if key.startswith('shapes'):
-            from ndsampler import toydata
+            from kwcoco import toydata
             import parse
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:
@@ -1138,7 +1139,7 @@ class MixinCocoExtras(object):
         if any('width' not in img or 'height' not in img
                for img in self.dataset['images']):
             import kwimage
-            from ndsampler.utils import util_futures
+            from kwcoco.util import util_futures
 
             if self.tag:
                 desc = 'populate imgsize for ' + self.tag
@@ -1427,6 +1428,7 @@ class MixinCocoExtras(object):
             nsampler.CategoryTree:
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> self = CocoDataset.demo()
             >>> classes = self.object_categories()
             >>> print('classes = {}'.format(classes))
@@ -1444,6 +1446,7 @@ class MixinCocoExtras(object):
             nsampler.CategoryTree:
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> self = CocoDataset.demo()
             >>> classes = self.keypoint_categories()
             >>> print('classes = {}'.format(classes))
@@ -2563,9 +2566,6 @@ class MixinCocoAddRemove(object):
             supercategory (str, optional): parent of this category
             id (int, optional): use this category id, if it was not taken
 
-        CommandLine:
-            xdoctest -m ndsampler.coco_dataset MixinCocoAddRemove.add_category
-
         Example:
             >>> self = CocoDataset.demo()
             >>> prev_n_cats = self.n_cats
@@ -2948,9 +2948,6 @@ class MixinCocoAddRemove(object):
 
         Returns:
             Dict: num_removed: information on the number of items removed
-
-        CommandLine:
-            xdoctest -m ~/code/ndsampler/ndsampler/coco_dataset.py MixinCocoAddRemove.remove_keypoint_categories
 
         Example:
             >>> self = CocoDataset.demo('shapes', rng=0)
@@ -3367,7 +3364,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         http://cocodataset.org/#download
 
     CommandLine:
-        python -m ndsampler.coco_dataset CocoDataset --show
+        python -m kwcoco.coco_dataset CocoDataset --show
 
     Example:
         >>> dataset = demo_coco_data()
@@ -4024,7 +4021,7 @@ def demo_coco_data():
 
     Example:
         >>> # xdoctest: +REQUIRES(--show)
-        >>> from ndsampler.coco_dataset import demo_coco_data, CocoDataset
+        >>> from kwcoco.coco_dataset import demo_coco_data, CocoDataset
         >>> dataset = demo_coco_data()
         >>> self = CocoDataset(dataset, tag='demo')
         >>> import kwplot
@@ -4145,7 +4142,7 @@ def demo_coco_data():
 if __name__ == '__main__':
     r"""
     CommandLine:
-        xdoctest ndsampler.coco_dataset all
+        xdoctest kwcoco.coco_dataset all
     """
     import xdoctest
     xdoctest.doctest_module(__file__)
