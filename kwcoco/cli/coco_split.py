@@ -35,7 +35,7 @@ class CocoSplitCLI(object):
         """
         import kwcoco
         import kwarray
-        from kwcoco.utils import util_sklearn
+        from kwcoco.util import util_sklearn
 
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
