@@ -3,7 +3,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import concurrent.futures
 from concurrent.futures import as_completed
 
-__all__ = ['Executor', 'SerialExecutor', 'as_completed']
+__all__ = ['Executor', 'SerialExecutor']
 
 
 # class FakeCondition(object):
@@ -156,7 +156,6 @@ class JobPool(object):
         self.executor.__exit__(a, b, c)
 
     def as_completed(self):
-        from concurrent.futures import as_completed
         for job in as_completed(self.jobs):
             yield job
 

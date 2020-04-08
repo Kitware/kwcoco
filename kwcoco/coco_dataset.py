@@ -567,6 +567,7 @@ class Annots(ObjectList1D):
             kwimage.Detections
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.coco_dataset import *  # NOQA
             >>> self = CocoDataset.demo('shapes32').annots([1, 2, 11])
             >>> dets = self.detections
