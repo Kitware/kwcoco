@@ -1826,7 +1826,15 @@ class MixinCocoExtras(object):
         pycoco.createIndex()
         return pycoco
 
-    def rebase(self, img_root=None, absolute=False, check=True):
+    def rebase(self, *args, **kw):
+        """ Deprecated use reroot instead """
+        import warnings
+        warnings.warn(
+            'Deprecated rebase renamed to reroot. Use reroot instead',
+            DeprecationWarning)
+        return self.reroot(*args, **kw)
+
+    def reroot(self, img_root=None, absolute=False, check=True):
         """
         Rebase image paths onto a new image root.
 
@@ -1842,7 +1850,55 @@ class MixinCocoExtras(object):
                 if True, checks that the images all exist
 
         CommandLine:
-            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.rebase
+            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.reroot
+
+        Ignore:
+            >>> # There might not be a way to easilly handle the cases that I
+            >>> # want to here. Might need to discuss this.
+            >>> import kwcoco
+            >>> gname = 'images/foo.png'
+            >>> remote = '/remote/path'
+            >>> host = ub.ensure_app_cache_dir('kwcoco/tests/reroot')
+            >>> fpath = join(host, gname)
+            >>> ub.ensuredir(dirname(fpath))
+            >>> import kwimage
+            >>> kwimage.imwrite(fpath, np.random.rand(8, 8))
+            >>> #
+            >>> cases = {}
+            >>> # * given absolute paths on current machine
+            >>> cases['abs_curr'] = kwcoco.CocoDataset.from_image_paths([join(host, gname)])
+            >>> # * given rooted relative paths on current machine
+            >>> cases['rel_rooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], img_root=host)
+            >>> # * given unrooted relative paths on current machine
+            >>> cases['rel_unrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname])
+            >>> # * given absolute paths on another machine
+            >>> cases['abs_remote'] = kwcoco.CocoDataset.from_image_paths([join(remote, gname)])
+            >>> for key, dset in cases.items():
+            >>>     print('----')
+            >>>     self = dset
+            >>>     print('key = {!r}'.format(key))
+            >>>     gids = dset.missing_images()
+            >>>     print('gids = {!r}'.format(gids))
+            >>>     print('ORIG = {!r}'.format(dset.imgs[1]['file_name']))
+            >>>     print('dset.img_root = {!r}'.format(dset.img_root))
+            >>>     #
+            >>>     dset_None_rel = dset.copy().reroot(absolute=False, check=0)
+            >>>     print('dset_None_rel = {!r}'.format(dset_None_rel.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_remote_rel = dset.copy().reroot(remote, absolute=False, check=0)
+            >>>     print('dset_remote_rel = {!r}'.format(dset_remote_rel.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_host_rel = dset.copy().reroot(host, absolute=False, check=0)
+            >>>     print('dset_host_rel = {!r}'.format(dset_host_rel.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_None_abs = dset.copy().reroot(absolute=True, check=0)
+            >>>     print('dset_None_abs = {!r}'.format(dset_None_abs.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_remote_abs = dset.copy().reroot(remote, absolute=True, check=0)
+            >>>     print('dset_remote_abs = {!r}'.format(dset_remote_abs.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_host_abs = dset.copy().reroot(host, absolute=True, check=0)
+            >>>     print('dset_host_abs = {!r}'.format(dset_host_abs.imgs[1]['file_name']))
 
         Example:
             >>> import kwcoco
@@ -1850,15 +1906,15 @@ class MixinCocoExtras(object):
 
             >>> # Change base relative directory
             >>> img_root = ub.expandpath('~')
-            >>> self.rebase(img_root)
+            >>> self.reroot(img_root)
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
             >>> # Use absolute paths
-            >>> self.rebase(absolute=True)
+            >>> self.reroot(absolute=True)
             >>> assert self.imgs[1]['file_name'].startswith(img_root)
 
             >>> # Switch back to relative paths
-            >>> self.rebase()
+            >>> self.reroot()
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
         Example:
@@ -1866,7 +1922,7 @@ class MixinCocoExtras(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
             >>> img_root = ub.expandpath('~')
-            >>> self.rebase(img_root)
+            >>> self.reroot(img_root)
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
             >>> assert self.imgs[1]['auxillary'][0]['file_name'].startswith('.cache')
         """
@@ -1877,25 +1933,29 @@ class MixinCocoExtras(object):
         if new_img_root is None:
             new_img_root = old_img_root
 
-        for img in self.imgs.values():
-            abs_file_path = join(old_img_root, img['file_name'])
+        # from os.path import commonprefix
+        # commonprefix([img['file_name'] for img in self.imgs.values()])
+        # common_prefix = dirname(commonprefix([normpath(img['file_name']) for img in self.imgs.values()]))
+
+        def _reroot_path(file_name):
+            old_gpath = join(old_img_root, file_name)
+
             if absolute:
-                img['file_name'] = abs_file_path
+                new_file_name = old_gpath
             else:
-                img['file_name'] = relpath(abs_file_path, new_img_root)
+                new_file_name = relpath(old_gpath, new_img_root)
 
             if check:
-                abs_gpath = join(new_img_root, img['file_name'])
-                if not exists(abs_gpath):
+                new_gpath = join(new_img_root, new_file_name)
+                if not exists(new_gpath):
                     raise Exception(
-                        'Image does not exist: {!r}'.format(abs_gpath))
+                        'Image does not exist: {!r}'.format(new_gpath))
+            return new_file_name
 
+        for img in self.imgs.values():
+            img['file_name'] = _reroot_path(img['file_name'])
             for aux in img.get('auxillary', []):
-                abs_file_path = join(old_img_root, aux['file_name'])
-                if absolute:
-                    aux['file_name'] = abs_file_path
-                else:
-                    aux['file_name'] = relpath(abs_file_path, new_img_root)
+                aux['file_name'] = _reroot_path(aux['file_name'])
 
         self.img_root = new_img_root
         return self
@@ -3446,7 +3506,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             self._build_index()
 
     @classmethod
-    def from_image_paths(cls, gpaths):
+    def from_image_paths(cls, gpaths, img_root=None):
         """
         Create a coco dataset from a list of images paths
 
@@ -3454,7 +3514,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> coco_dset = CocoDataset.from_image_paths(['a.png', 'b.png'])
             >>> assert coco_dset.n_images == 2
         """
-        coco_dset = cls()
+        coco_dset = cls(img_root=img_root)
         for gpath in gpaths:
             coco_dset.add_image(gpath)
         return coco_dset
