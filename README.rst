@@ -71,8 +71,11 @@ segmentations, and keypoint annotations. The following example illustrates a
 generated toy image with and without overlaid annotations. 
 
 
-.. image:: https://i.imgur.com/2K17R2U.png
-   :align: center
+..  ..image:: https://i.imgur.com/2K17R2U.png
+
+.. image:: https://i.imgur.com/Vk0zUH1.png
+   :height: 100px
+   :align: left
 
 
 
