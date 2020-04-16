@@ -1960,6 +1960,62 @@ class MixinCocoExtras(object):
         self.img_root = new_img_root
         return self
 
+    def find_representative_images(self):
+        r"""
+        Find images that have a wide array of categories
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> gids = self.find_representative_images()
+            >>> print('gids = {!r}'.format(gids))
+        """
+        # Select representative images to draw such that each category
+        # appears at least once.
+        gid_to_cidfreq = ub.map_vals(
+            lambda aids: ub.dict_hist([self.anns[aid]['category_id']
+                                       for aid in aids]),
+            self.gid_to_aids)
+
+        gid_to_nannots = ub.map_vals(len, self.gid_to_aids)
+
+        gid_to_cids = {
+            gid: list(cidfreq.keys())
+            for gid, cidfreq in gid_to_cidfreq.items()
+        }
+        # Solve setcover with different weight schemes to get a better
+        # representative sample.
+        all_cids = list(self.cid_to_aids.keys())
+
+        candidate_sets = gid_to_cids.copy()
+
+        selected = {}
+
+        large_image_weights = gid_to_nannots
+        small_image_weights = ub.map_vals(lambda x: 1 / (x + 1), gid_to_nannots)
+
+        import kwarray
+        cover1 = kwarray.setcover(candidate_sets, items=all_cids)
+        selected.update(cover1)
+        candidate_sets = ub.dict_diff(candidate_sets, cover1)
+
+        cover2 = kwarray.setcover(
+                candidate_sets,
+                items=all_cids,
+                set_weights=large_image_weights)
+        selected.update(cover2)
+        candidate_sets = ub.dict_diff(candidate_sets, cover2)
+
+        cover3 = kwarray.setcover(
+                candidate_sets,
+                items=all_cids,
+                set_weights=small_image_weights)
+        selected.update(cover3)
+        candidate_sets = ub.dict_diff(candidate_sets, cover3)
+
+        selected_gids = sorted(selected.keys())
+        return selected_gids
+
 
 class MixinCocoAttrs(object):
     """
