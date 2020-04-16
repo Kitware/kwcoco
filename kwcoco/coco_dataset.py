@@ -1533,6 +1533,9 @@ class MixinCocoExtras(object):
                 raise Exception('missing image, but no url')
 
     def missing_images(self, verbose=0):
+        """
+        Check for images that don't exist
+        """
         import os
         bad_paths = []
         for index in ub.ProgIter(range(len(self.dataset['images'])),
@@ -1546,6 +1549,26 @@ class MixinCocoExtras(object):
         #     print('bad paths:')
         #     print(ub.repr2(bad_paths, nl=1))
         # raise AssertionError('missing images')
+
+    def corrupted_images(self, verbose=0):
+        """
+        Check for images that don't exist or can't be opened
+        """
+        import os
+        bad_paths = []
+        for index in ub.ProgIter(range(len(self.dataset['images'])),
+                                 verbose=verbose):
+            img = self.dataset['images'][index]
+            gpath = join(self.img_root, img['file_name'])
+            if not os.path.exists(gpath):
+                bad_paths.append((index, gpath))
+
+            try:
+                import kwimage
+                kwimage.imread(gpath)
+            except Exception:
+                bad_paths.append((index, gpath))
+        return bad_paths
 
     def rename_categories(self, mapper, strict=False, preserve=False,
                           rebuild=True, simple=True, merge_policy='ignore'):
