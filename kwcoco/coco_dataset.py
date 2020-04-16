@@ -1557,12 +1557,12 @@ class MixinCocoExtras(object):
         import os
         bad_paths = []
         for index in ub.ProgIter(range(len(self.dataset['images'])),
-                                 verbose=verbose):
+                                 verbose=verbose, desc='check corrupted images'):
             img = self.dataset['images'][index]
             gpath = join(self.img_root, img['file_name'])
             if not os.path.exists(gpath):
                 bad_paths.append((index, gpath))
-
+            # TODO: parallelize
             try:
                 import kwimage
                 kwimage.imread(gpath)
