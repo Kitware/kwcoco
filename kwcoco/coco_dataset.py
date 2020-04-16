@@ -2342,11 +2342,15 @@ class MixinCocoDraw(object):
             aids (list): aids to highlight within the image
             aid (int): a specific aid to focus on. If gid is not give,
                 look up gid based on this aid.
-            **kwargs: show_all, show_aid, show_catname, show_kpname,
+            **kwargs:
+                show_annots, show_aid, show_catname, show_kpname,
+                show_segmentation, title, show_gid, show_filename,
+                show_boxes,
 
         Ignore:
             # Programatically collect the kwargs for docs generation
             import xinspect
+            import kwcoco
             kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
             print(ub.repr2(list(kwargs.keys()), nl=1, si=1))
 
@@ -2366,7 +2370,8 @@ class MixinCocoDraw(object):
             primary_ann = self.anns[aid]
             gid = primary_ann['image_id']
 
-        show_all = kwargs.get('show_all', False)
+        show_all = kwargs.get('show_all', True)
+        show_annots = kwargs.get('show_annots', True)
 
         highlight_aids = set()
         if aid is not None:
@@ -2386,157 +2391,158 @@ class MixinCocoDraw(object):
         sseg_masks = []
         sseg_polys = []
 
-        for aid in aids:
-            ann = self.anns[aid]
+        if show_annots:
+            for aid in aids:
+                ann = self.anns[aid]
 
-            if 'keypoints' in ann:
-                cid = ann['category_id']
-                if ann['keypoints'] is not None and len(ann['keypoints']) > 0:
-                    # TODO: rely on kwimage.Points to parse multiple format info?
-                    kpts_data = ann['keypoints']
-                    if isinstance(ub.peek(kpts_data), dict):
-                        xys = np.array([p['xy'] for p in kpts_data])
-                        isvisible = np.array([p.get('visible', True) for p in kpts_data])
-                        kpnames = None
-                        # kpnames = []
-                        # for p in kpts_data:
-                        #     if 'keypoint_category_id' in p:
-                        #         pass
-                        #     pass
-                        isvisible = np.array([p.get('visible', True) for p in kpts_data])
-                    else:
-                        try:
-                            kpnames = self._lookup_kpnames(cid)
-                        except KeyError:
+                if 'keypoints' in ann:
+                    cid = ann['category_id']
+                    if ann['keypoints'] is not None and len(ann['keypoints']) > 0:
+                        # TODO: rely on kwimage.Points to parse multiple format info?
+                        kpts_data = ann['keypoints']
+                        if isinstance(ub.peek(kpts_data), dict):
+                            xys = np.array([p['xy'] for p in kpts_data])
+                            isvisible = np.array([p.get('visible', True) for p in kpts_data])
                             kpnames = None
-                        kpts = np.array(ann['keypoints']).reshape(-1, 3)
-                        isvisible = kpts.T[2] > 0
-                        xys = kpts.T[0:2].T[isvisible]
+                            # kpnames = []
+                            # for p in kpts_data:
+                            #     if 'keypoint_category_id' in p:
+                            #         pass
+                            #     pass
+                            isvisible = np.array([p.get('visible', True) for p in kpts_data])
+                        else:
+                            try:
+                                kpnames = self._lookup_kpnames(cid)
+                            except KeyError:
+                                kpnames = None
+                            kpts = np.array(ann['keypoints']).reshape(-1, 3)
+                            isvisible = kpts.T[2] > 0
+                            xys = kpts.T[0:2].T[isvisible]
+                    else:
+                        kpnames = None
+                        xys = None
                 else:
                     kpnames = None
                     xys = None
-            else:
-                kpnames = None
-                xys = None
 
-            # Note standard coco bbox is [x,y,width,height]
-            if 'bbox' in ann:
-                x1, y1 = ann['bbox'][0:2]
-            elif 'line' in ann:
-                x1, y1 = ann['line'][0:2]
-            elif 'keypoints' in ann:
-                x1, y1 = xys.min(axis=0)
-            else:
-                raise Exception('no bbox, line, or keypoint position')
+                # Note standard coco bbox is [x,y,width,height]
+                if 'bbox' in ann:
+                    x1, y1 = ann['bbox'][0:2]
+                elif 'line' in ann:
+                    x1, y1 = ann['line'][0:2]
+                elif 'keypoints' in ann:
+                    x1, y1 = xys.min(axis=0)
+                else:
+                    raise Exception('no bbox, line, or keypoint position')
 
-            cid = ann.get('category_id', None)
-            if cid is not None:
-                cat = self.cats[cid]
-                catname = cat['name']
-            else:
-                cat = None
-                catname = ann.get('category_name', 'None')
-            textkw = {
-                'horizontalalignment': 'left',
-                'verticalalignment': 'top',
-                'backgroundcolor': (0, 0, 0, .3),
-                'color': 'white',
-                'fontproperties': mpl.font_manager.FontProperties(
-                    size=6, family='monospace'),
-            }
-            annot_text_parts = []
-            if kwargs.get('show_aid', show_all):
-                annot_text_parts.append('aid={}'.format(aid))
-            if kwargs.get('show_catname', True):
-                annot_text_parts.append(catname)
-            annot_text = ' '.join(annot_text_parts)
-            texts.append((x1, y1, annot_text, textkw))
+                cid = ann.get('category_id', None)
+                if cid is not None:
+                    cat = self.cats[cid]
+                    catname = cat['name']
+                else:
+                    cat = None
+                    catname = ann.get('category_name', 'None')
+                textkw = {
+                    'horizontalalignment': 'left',
+                    'verticalalignment': 'top',
+                    'backgroundcolor': (0, 0, 0, .3),
+                    'color': 'white',
+                    'fontproperties': mpl.font_manager.FontProperties(
+                        size=6, family='monospace'),
+                }
+                annot_text_parts = []
+                if kwargs.get('show_aid', show_all):
+                    annot_text_parts.append('aid={}'.format(aid))
+                if kwargs.get('show_catname', show_all):
+                    annot_text_parts.append(catname)
+                annot_text = ' '.join(annot_text_parts)
+                texts.append((x1, y1, annot_text, textkw))
 
-            color = 'orange' if aid in highlight_aids else 'blue'
-            if 'obox' in ann:
-                # Oriented bounding box
-                segs = np.array(ann['obox']).reshape(-1, 3)[:, 0:2]
-                for pt1, pt2 in ub.iter_window(segs, wrap=True):
+                color = 'orange' if aid in highlight_aids else 'blue'
+                if 'obox' in ann:
+                    # Oriented bounding box
+                    segs = np.array(ann['obox']).reshape(-1, 3)[:, 0:2]
+                    for pt1, pt2 in ub.iter_window(segs, wrap=True):
+                        colored_segments[color].append([pt1, pt2])
+                elif 'bbox' in ann:
+                    [x, y, w, h] = ann['bbox']
+                    rect = mpl.patches.Rectangle((x, y), w, h, facecolor='none',
+                                                 edgecolor=color)
+                    rects.append(rect)
+                if 'line' in ann:
+                    x1, y1, x2, y2 = ann['line']
+                    pt1, pt2 = (x1, y1), (x2, y2)
                     colored_segments[color].append([pt1, pt2])
-            elif 'bbox' in ann:
-                [x, y, w, h] = ann['bbox']
-                rect = mpl.patches.Rectangle((x, y), w, h, facecolor='none',
-                                             edgecolor=color)
-                rects.append(rect)
-            if 'line' in ann:
-                x1, y1, x2, y2 = ann['line']
-                pt1, pt2 = (x1, y1), (x2, y2)
-                colored_segments[color].append([pt1, pt2])
-            if 'keypoints' in ann:
-                if xys is not None and len(xys):
-                    keypoints.append(xys)
-                    if kwargs.get('show_kpname', show_all):
-                        if kpnames is not None:
-                            for (kp_x, kp_y), kpname in zip(xys, kpnames):
-                                texts.append((kp_x, kp_y, kpname, textkw))
+                if 'keypoints' in ann:
+                    if xys is not None and len(xys):
+                        keypoints.append(xys)
+                        if kwargs.get('show_kpname', True):
+                            if kpnames is not None:
+                                for (kp_x, kp_y), kpname in zip(xys, kpnames):
+                                    texts.append((kp_x, kp_y, kpname, textkw))
 
-            if 'segmentation' in ann and kwargs.get('show_segmentation', True):
-                sseg = ann['segmentation']
-                # Respect the 'color' attribute of categories
-                if cat is not None:
-                    catcolor = cat.get('color', None)
-                else:
-                    catcolor = None
-
-                HAVE_KWIMAGE = True
-                if HAVE_KWIMAGE:
-                    if catcolor is not None:
-                        catcolor = kwplot.Color(catcolor).as01()
-                    # TODO: Unify masks and polygons into a kwimage
-                    # segmentation class
-                    sseg = kwimage.Segmentation.coerce(sseg).data
-                    if isinstance(sseg, kwimage.Mask):
-                        m = sseg.to_c_mask()
-                        sseg_masks.append((m.data, catcolor))
+                if 'segmentation' in ann and kwargs.get('show_segmentation', True):
+                    sseg = ann['segmentation']
+                    # Respect the 'color' attribute of categories
+                    if cat is not None:
+                        catcolor = cat.get('color', None)
                     else:
-                        # TODO: interior
-                        multipoly = sseg.to_multi_polygon()
-                        for poly in multipoly.data:
-                            poly_xys = poly.data['exterior'].data
-                            polykw = {}
-                            if catcolor is not None:
-                                polykw['color'] = catcolor
-                            poly = mpl.patches.Polygon(poly_xys, **polykw)
-                            try:
-                                # hack
-                                poly.area = sseg.to_shapely().area
-                            except Exception:
-                                pass
-                            sseg_polys.append(poly)
-                else:
-                    # print('sseg = {!r}'.format(sseg))
-                    if isinstance(sseg, dict):
-                        # Handle COCO-RLE-segmentations; convert to raw binary masks
-                        sseg = dict(sseg)
-                        if 'shape' not in sseg and 'size' in sseg:
-                            # NOTE: size here is actually h/w unlike almost
-                            # everywhere else
-                            sseg['shape'] = sseg['size']
-                        if isinstance(sseg['counts'], (six.binary_type, six.text_type)):
-                            mask = kwimage.Mask(sseg, 'bytes_rle').to_c_mask().data
+                        catcolor = None
+
+                    HAVE_KWIMAGE = True
+                    if HAVE_KWIMAGE:
+                        if catcolor is not None:
+                            catcolor = kwplot.Color(catcolor).as01()
+                        # TODO: Unify masks and polygons into a kwimage
+                        # segmentation class
+                        sseg = kwimage.Segmentation.coerce(sseg).data
+                        if isinstance(sseg, kwimage.Mask):
+                            m = sseg.to_c_mask()
+                            sseg_masks.append((m.data, catcolor))
                         else:
-                            mask = kwimage.Mask(sseg, 'array_rle').to_c_mask().data
-                        sseg_masks.append((mask, catcolor))
-                    elif isinstance(sseg, list):
-                        # Handle COCO-polygon-segmentation
-                        # If the segmentation is a list of polygons
-                        if not (len(sseg) and isinstance(sseg[0], list)):
-                            sseg = [sseg]
-                        for flat in sseg:
-                            poly_xys = np.array(flat).reshape(-1, 2)
-                            polykw = {}
-                            if catcolor is not None:
-                                polykw['color'] = catcolor
-
-                            poly = mpl.patches.Polygon(poly_xys, **polykw)
-                            sseg_polys.append(poly)
+                            # TODO: interior
+                            multipoly = sseg.to_multi_polygon()
+                            for poly in multipoly.data:
+                                poly_xys = poly.data['exterior'].data
+                                polykw = {}
+                                if catcolor is not None:
+                                    polykw['color'] = catcolor
+                                poly = mpl.patches.Polygon(poly_xys, **polykw)
+                                try:
+                                    # hack
+                                    poly.area = sseg.to_shapely().area
+                                except Exception:
+                                    pass
+                                sseg_polys.append(poly)
                     else:
-                        raise TypeError(type(sseg))
+                        # print('sseg = {!r}'.format(sseg))
+                        if isinstance(sseg, dict):
+                            # Handle COCO-RLE-segmentations; convert to raw binary masks
+                            sseg = dict(sseg)
+                            if 'shape' not in sseg and 'size' in sseg:
+                                # NOTE: size here is actually h/w unlike almost
+                                # everywhere else
+                                sseg['shape'] = sseg['size']
+                            if isinstance(sseg['counts'], (six.binary_type, six.text_type)):
+                                mask = kwimage.Mask(sseg, 'bytes_rle').to_c_mask().data
+                            else:
+                                mask = kwimage.Mask(sseg, 'array_rle').to_c_mask().data
+                            sseg_masks.append((mask, catcolor))
+                        elif isinstance(sseg, list):
+                            # Handle COCO-polygon-segmentation
+                            # If the segmentation is a list of polygons
+                            if not (len(sseg) and isinstance(sseg[0], list)):
+                                sseg = [sseg]
+                            for flat in sseg:
+                                poly_xys = np.array(flat).reshape(-1, 2)
+                                polykw = {}
+                                if catcolor is not None:
+                                    polykw['color'] = catcolor
+
+                                poly = mpl.patches.Polygon(poly_xys, **polykw)
+                                sseg_polys.append(poly)
+                        else:
+                            raise TypeError(type(sseg))
 
         # Show image
         np_img = self.load_image(img)

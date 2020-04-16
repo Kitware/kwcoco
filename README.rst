@@ -5,6 +5,8 @@ The Kitware COCO Module
 
 |GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |Downloads| |ReadTheDocs|
 
+The main webpage for this project is: https://gitlab.kitware.com/computer-vision/kwcoco
+
 The Kitware COCO module defines a variant of the Microsoft COCO format,
 originally developed for the "collected images in context" object detection
 challenge. We are backwards compatible with the original module, but we also
@@ -55,6 +57,26 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 This should help you inspect (via stats and show), combine (via union), and
 make training splits (via split) using the command line. Also ships with
 toydata, which generates a COCO file you can use for testing.
+
+
+Toy Data
+--------
+
+Don't have a dataset with you, but you still want to test out your algorithms?
+Try the kwcoco shapes demo dataset, and generate an arbitrarilly large dataset.
+
+The toydata submodule renders simple objects on a noisy background ---
+optionally with auxillary channels --- and provides bounding boxes,
+segmentations, and keypoint annotations. The following example illustrates a
+generated toy image with and without overlaid annotations. 
+
+
+..  ..image:: https://i.imgur.com/2K17R2U.png
+
+.. image:: https://i.imgur.com/Vk0zUH1.png
+   :height: 100px
+   :align: left
+
 
 
 The CocoDataset object
