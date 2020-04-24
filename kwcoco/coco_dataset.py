@@ -134,11 +134,12 @@ References:
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
-from os.path import dirname
 import warnings
+from os.path import dirname
 from os.path import splitext
 from os.path import basename
 from os.path import join
+from os.path import exists
 from collections import OrderedDict
 import json
 import numpy as np
@@ -1507,11 +1508,10 @@ class MixinCocoExtras(object):
         return kpnames
 
     def _ensure_image_data(self, verbose=1):
-        import os
         def _gen_missing_imgs():
             for img in self.dataset['images']:
                 gpath = join(self.img_root, img['file_name'])
-                if not os.path.exists(gpath):
+                if not exists(gpath):
                     yield img
 
         def _has_download_permission(_HAS_PREMISSION=[False]):
@@ -1525,42 +1525,52 @@ class MixinCocoExtras(object):
             if 'url' in img:
                 if _has_download_permission():
                     gpath = join(self.img_root, img['file_name'])
-                    ub.ensuredir(os.path.dirname(gpath))
+                    ub.ensuredir(dirname(gpath))
                     ub.grabdata(img['url'], gpath)
                 else:
                     raise Exception('no permission, abort')
             else:
                 raise Exception('missing image, but no url')
 
-    def missing_images(self, verbose=0):
+    def missing_images(self, check_aux=False, verbose=0):
         """
         Check for images that don't exist
+
+        Args:
+            check_aux (bool, default=Fasle):
+                if specified also checks auxillary images
+
+        Returns:
+            List[Tuple[int, str]]: bad indexes and paths
         """
-        import os
         bad_paths = []
         for index in ub.ProgIter(range(len(self.dataset['images'])),
                                  verbose=verbose):
             img = self.dataset['images'][index]
             gpath = join(self.img_root, img['file_name'])
-            if not os.path.exists(gpath):
+            if not exists(gpath):
                 bad_paths.append((index, gpath))
+
+            if check_aux:
+                for aux in img.get('aux', []):
+                    gpath = join(self.img_root, aux['file_name'])
+                    if not exists(gpath):
+                        bad_paths.append((index, gpath))
         return bad_paths
-        # if bad_paths:
-        #     print('bad paths:')
-        #     print(ub.repr2(bad_paths, nl=1))
-        # raise AssertionError('missing images')
 
     def corrupted_images(self, verbose=0):
         """
         Check for images that don't exist or can't be opened
+
+        Returns:
+            List[Tuple[int, str]]: bad indexes and paths
         """
-        import os
         bad_paths = []
         for index in ub.ProgIter(range(len(self.dataset['images'])),
                                  verbose=verbose, desc='check corrupted images'):
             img = self.dataset['images'][index]
             gpath = join(self.img_root, img['file_name'])
-            if not os.path.exists(gpath):
+            if not exists(gpath):
                 bad_paths.append((index, gpath))
             # TODO: parallelize
             try:
@@ -3556,9 +3566,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 if _root is None:
                     _root = ''
                 elif isinstance(_root, six.string_types):
-                    import os
                     _tmp = ub.expandpath(_root)
-                    if os.path.exists(_tmp):
+                    if exists(_tmp):
                         _root = _tmp
                 else:
                     if isinstance(_root, list) and _root == []:
