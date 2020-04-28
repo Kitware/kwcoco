@@ -378,7 +378,9 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                 dataset['keypoint_categories'].append(kpcat)
                 kpname_to_id[kpcat['name']] = kpcat['id']
 
-        for i in ub.ProgIter(range(n_imgs), label='creating data'):
+        for __ in ub.ProgIter(range(n_imgs), label='creating data'):
+
+            # TODO: parallelize
             img, anns = demodata_toy_img(anchors, gsize=gsize,
                                          categories=catpats,
                                          newstyle=newstyle, fg_scale=fg_scale,

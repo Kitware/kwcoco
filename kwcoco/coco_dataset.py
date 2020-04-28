@@ -3139,6 +3139,40 @@ class MixinCocoAddRemove(object):
         remove_info['keypoint_categories'] = len(remove_kpcats)
         return remove_info
 
+    def set_annotation_category(self, aid_or_ann, cid_or_cat):
+        """
+        Sets the category of a single annotation
+
+        Args:
+            aid_or_ann (dict | int): annotation dict or id
+
+            cid_or_cat (dict | int): category dict or id
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> old_freq = self.category_annotation_frequency()
+            >>> aid_or_ann = aid = 2
+            >>> cid_or_cat = new_cid = self.ensure_category('kitten')
+            >>> self.set_annotation_category(aid, new_cid)
+            >>> new_freq = self.category_annotation_frequency()
+            >>> print('new_freq = {}'.format(ub.repr2(new_freq, nl=1)))
+            >>> print('old_freq = {}'.format(ub.repr2(old_freq, nl=1)))
+            >>> assert sum(new_freq.values()) == sum(old_freq.values())
+            >>> assert new_freq['kitten'] == 1
+        """
+        new_cid = self._resolve_to_cid(cid_or_cat)
+        ann = self._resolve_to_ann(aid_or_ann)
+        aid = ann['id']
+        if self.index:
+            if 'category_id' in ann:
+                old_cid = ann['category_id']
+                self.cid_to_aids[old_cid].remove(aid)
+        ann['category_id'] = new_cid
+        if self.index:
+            self.cid_to_aids[new_cid].add(aid)
+        self._invalidate_hashid(['annotations'])
+
 
 class CocoIndex(object):
     """
