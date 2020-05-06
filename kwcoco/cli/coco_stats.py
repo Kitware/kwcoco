@@ -12,7 +12,7 @@ class CocoStatsCLI:
         Compute summary statistics about a COCO dataset
         """
         default = {
-            'src': scfg.Value('special:shapes8', nargs='+', help='path to dataset'),
+            'src': scfg.Value(['special:shapes8'], nargs='+', help='path to dataset'),
             'basic': scfg.Value(True, help='show basic stats'),
             'extended': scfg.Value(True, help='show extended stats'),
             'catfreq': scfg.Value(True, help='show category frequency stats'),
@@ -40,9 +40,13 @@ class CocoStatsCLI:
         if config['src'] is None:
             raise Exception('must specify source: '.format(config['src']))
 
+        if isinstance(config['src'], str):
+            fpaths = [config['src']]
+        else:
+            fpaths = config['src']
+
         datasets = []
-        for fpath in ub.ProgIter(config['src'], desc='reading datasets',
-                                 verbose=1):
+        for fpath in ub.ProgIter(fpaths, desc='reading datasets', verbose=1):
             print('reading fpath = {!r}'.format(fpath))
             dset = kwcoco.CocoDataset.coerce(fpath)
             datasets.append(dset)
