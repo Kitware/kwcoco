@@ -314,6 +314,78 @@ Dataset Spec:
         }
 
 
+Converting your data to COCO
+----------------------------
+
+Assuming you have programmatic access to your dataset you can easily convert to
+a coco file using process similar to the following code:
+
+.. code:: python
+
+    # ASSUME INPUTS 
+    # my_classes: a list of category names
+    # my_annots: a list of annotation objects with bounding boxes, images, and categories
+    # my_images: a list of image files.
+
+    my_images = [
+        'image1.png',
+        'image2.png',
+        'image3.png',
+    ]
+
+    my_classes = [
+        'spam', 'eggs', 'ham', 'jam'
+    ]
+
+    my_annots = [
+        {'image': 'image1.png', 'box': {'tl_x':  2, 'tl_y':  3, 'br_x':  5, 'br_y':  7}, 'category': 'spam'},
+        {'image': 'image1.png', 'box': {'tl_x': 11, 'tl_y': 13, 'br_x': 17, 'br_y': 19}, 'category': 'spam'},
+        {'image': 'image3.png', 'box': {'tl_x': 23, 'tl_y': 29, 'br_x': 31, 'br_y': 37}, 'category': 'eggs'},
+        {'image': 'image3.png', 'box': {'tl_x': 41, 'tl_y': 43, 'br_x': 47, 'br_y': 53}, 'category': 'spam'},
+        {'image': 'image3.png', 'box': {'tl_x': 59, 'tl_y': 61, 'br_x': 67, 'br_y': 71}, 'category': 'jam'},
+        {'image': 'image3.png', 'box': {'tl_x': 73, 'tl_y': 79, 'br_x': 83, 'br_y': 89}, 'category': 'spam'},
+    ]
+
+    # The above is just an example input, it is left as an exercise for the
+    # reader to translate that to your own dataset.
+
+    import kwcoco
+    import kwimage
+
+    # A kwcoco.CocoDataset is simply an object that manages an underlying
+    # `dataset` json object. It contains methods to dynamically, add, remove,
+    # and modify these data structures, efficient lookup tables, and many more
+    # conveniences when working and playing with vision datasets.
+    my_dset = kwcoco.CocoDataset()
+
+    for catname in my_classes:
+        my_dset.add_category(name=catname)
+
+    for image_path in my_images:
+        my_dset.add_image(file_name=image_path)
+
+    for annot in my_annots:
+        # The index property provides fast lookups into the json data structure
+        cat = my_dset.index.name_to_cat[annot['category']]
+        img = my_dset.index.file_name_to_img[annot['image']]
+        # One quirk of the coco format is you need to be aware that
+        # boxes are in <top-left-x, top-left-y, width-w, height-h> format.
+        box = annot['box']
+        # Use kwimage.Boxes to preform quick, reliable, and readable
+        # conversions between common bounding box formats.
+        tlbr = [box['tl_x'], box['tl_y'], box['br_x'], box['br_y']]
+        xywh = kwimage.Boxes([tlbr], 'tlbr').toformat('xywh').data[0].tolist()
+        my_dset.add_annotation(bbox=xywh, image_id=img['id'], category_id=cat['id'])
+
+    # Dump the underlying json `dataset` object to a file
+    my_dset.fpath = 'my-converted-dataset.mscoco.json'
+    my_dset.dump(my_dset.fpath, newlines=True)
+
+    # Dump the underlying json `dataset` object to a string
+    print(my_dset.dumps(newlines=True))
+
+
+
 .. [1] http://cocodataset.org/#format-data
 
 .. [2] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py

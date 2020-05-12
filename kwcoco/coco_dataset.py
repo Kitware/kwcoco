@@ -23,7 +23,8 @@ Dataset Spec:
         ],
         'images': [
             {
-                'id': int, 'file_name': str
+                'id': int,
+                'file_name': str
             },
             ...
         ],
@@ -54,7 +55,7 @@ Dataset Spec:
 
         Note: the original coco spec does not allow for holes in polygons.
 
-        (PENDING) We also allow a non-standard dictionary encoding of polygons
+        We also allow a non-standard dictionary encoding of polygons
             {'exterior': [(x1, y1)...],
              'interiors': [[(x1, y1), ...], ...]}
 
@@ -73,7 +74,6 @@ Dataset Spec:
             for these functions are set to true.
 
     Keypoints:
-        (PENDING)
         Annotation keypoints may also be specified in this non-standard (but
         ultimately more general) way:
 
@@ -120,6 +120,21 @@ Dataset Spec:
                     'channels': <spec>
                 }, ... # can have many auxillary channels with unique specs
             ]
+        }
+
+    Video Sequences:
+        For video sequences, image dictionaries are augmented as follows:
+
+        {
+            'video_id': str  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
+            'timestamp': int  # optional, timestamp (ideally in flicks), used to identify the timestamp of the frame. Only applicable video inputs.
+            'frame_index': int  # optional, ordinal frame index which can be used if timestamp is unknown.
+        }
+
+        And annotations are augmented as follows:
+
+        {
+            "track_id": <int | str | uuid>  # optional, indicates association between annotations across frames
         }
 
 
