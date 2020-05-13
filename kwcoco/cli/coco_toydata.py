@@ -15,6 +15,9 @@ class CocoToyDataCLI(object):
         epilog = """
         Example Usage:
             kwcoco toydata --key=shapes8 --dst=toydata.mscoco.json
+
+        TODO:
+            - [ ] allow specification of images directory
         """
 
     @classmethod

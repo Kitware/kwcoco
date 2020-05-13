@@ -1,7 +1,7 @@
 """
 mkinit ~/code/kwcoco/kwcoco/__init__.py -w
 """
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 __submodules__ = ['coco_dataset']
 

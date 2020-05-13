@@ -4,16 +4,14 @@ We are currently working on porting this changelog to the specifications in
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Version 0.0.1] - 
+## Version 0.1.1 - Unreleased
 
 ### Added
-* Initial version
+* stats CLI can now accept multiple datasets.
+* ported `data.grab_voc` and `data.grab_camvid` from netharn.
 
-## Version 0.0.2 - Unreleased
-
-## Version 0.0.3 - Unreleased
-
-## Version 0.0.4 - Unreleased
+### Fixed
+* Python2 error with json dump
 
 ## Version 0.1.0 - Released 2020-04-08
 
@@ -24,3 +22,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 * Multipolygon segmentations are now displayed correctly.
 * Tracebacks on errors are now displayed.
+
+## [Version 0.0.1] - 
+
+### Added
+* Initial version

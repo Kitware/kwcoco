@@ -23,7 +23,8 @@ Dataset Spec:
         ],
         'images': [
             {
-                'id': int, 'file_name': str
+                'id': int,
+                'file_name': str
             },
             ...
         ],
@@ -54,7 +55,7 @@ Dataset Spec:
 
         Note: the original coco spec does not allow for holes in polygons.
 
-        (PENDING) We also allow a non-standard dictionary encoding of polygons
+        We also allow a non-standard dictionary encoding of polygons
             {'exterior': [(x1, y1)...],
              'interiors': [[(x1, y1), ...], ...]}
 
@@ -73,7 +74,6 @@ Dataset Spec:
             for these functions are set to true.
 
     Keypoints:
-        (PENDING)
         Annotation keypoints may also be specified in this non-standard (but
         ultimately more general) way:
 
@@ -122,6 +122,21 @@ Dataset Spec:
             ]
         }
 
+    Video Sequences:
+        For video sequences, image dictionaries are augmented as follows:
+
+        {
+            'video_id': str  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
+            'timestamp': int  # optional, timestamp (ideally in flicks), used to identify the timestamp of the frame. Only applicable video inputs.
+            'frame_index': int  # optional, ordinal frame index which can be used if timestamp is unknown.
+        }
+
+        And annotations are augmented as follows:
+
+        {
+            "track_id": <int | str | uuid>  # optional, indicates association between annotations across frames
+        }
+
 
 Notes:
     The main object in this file is `class`:CocoDataset, which is composed of
@@ -134,11 +149,12 @@ References:
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
-from os.path import dirname
 import warnings
+from os.path import dirname
 from os.path import splitext
 from os.path import basename
 from os.path import join
+from os.path import exists
 from collections import OrderedDict
 import json
 import numpy as np
@@ -1507,11 +1523,10 @@ class MixinCocoExtras(object):
         return kpnames
 
     def _ensure_image_data(self, verbose=1):
-        import os
         def _gen_missing_imgs():
             for img in self.dataset['images']:
                 gpath = join(self.img_root, img['file_name'])
-                if not os.path.exists(gpath):
+                if not exists(gpath):
                     yield img
 
         def _has_download_permission(_HAS_PREMISSION=[False]):
@@ -1525,27 +1540,60 @@ class MixinCocoExtras(object):
             if 'url' in img:
                 if _has_download_permission():
                     gpath = join(self.img_root, img['file_name'])
-                    ub.ensuredir(os.path.dirname(gpath))
+                    ub.ensuredir(dirname(gpath))
                     ub.grabdata(img['url'], gpath)
                 else:
                     raise Exception('no permission, abort')
             else:
                 raise Exception('missing image, but no url')
 
-    def missing_images(self, verbose=0):
-        import os
+    def missing_images(self, check_aux=False, verbose=0):
+        """
+        Check for images that don't exist
+
+        Args:
+            check_aux (bool, default=Fasle):
+                if specified also checks auxillary images
+
+        Returns:
+            List[Tuple[int, str]]: bad indexes and paths
+        """
         bad_paths = []
         for index in ub.ProgIter(range(len(self.dataset['images'])),
                                  verbose=verbose):
             img = self.dataset['images'][index]
             gpath = join(self.img_root, img['file_name'])
-            if not os.path.exists(gpath):
+            if not exists(gpath):
+                bad_paths.append((index, gpath))
+
+            if check_aux:
+                for aux in img.get('aux', []):
+                    gpath = join(self.img_root, aux['file_name'])
+                    if not exists(gpath):
+                        bad_paths.append((index, gpath))
+        return bad_paths
+
+    def corrupted_images(self, verbose=0):
+        """
+        Check for images that don't exist or can't be opened
+
+        Returns:
+            List[Tuple[int, str]]: bad indexes and paths
+        """
+        bad_paths = []
+        for index in ub.ProgIter(range(len(self.dataset['images'])),
+                                 verbose=verbose, desc='check corrupted images'):
+            img = self.dataset['images'][index]
+            gpath = join(self.img_root, img['file_name'])
+            if not exists(gpath):
+                bad_paths.append((index, gpath))
+            # TODO: parallelize
+            try:
+                import kwimage
+                kwimage.imread(gpath)
+            except Exception:
                 bad_paths.append((index, gpath))
         return bad_paths
-        # if bad_paths:
-        #     print('bad paths:')
-        #     print(ub.repr2(bad_paths, nl=1))
-        # raise AssertionError('missing images')
 
     def rename_categories(self, mapper, strict=False, preserve=False,
                           rebuild=True, simple=True, merge_policy='ignore'):
@@ -1826,7 +1874,15 @@ class MixinCocoExtras(object):
         pycoco.createIndex()
         return pycoco
 
-    def rebase(self, img_root=None, absolute=False, check=True):
+    def rebase(self, *args, **kw):
+        """ Deprecated use reroot instead """
+        import warnings
+        warnings.warn(
+            'Deprecated rebase renamed to reroot. Use reroot instead',
+            DeprecationWarning)
+        return self.reroot(*args, **kw)
+
+    def reroot(self, img_root=None, absolute=False, check=True):
         """
         Rebase image paths onto a new image root.
 
@@ -1842,7 +1898,55 @@ class MixinCocoExtras(object):
                 if True, checks that the images all exist
 
         CommandLine:
-            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.rebase
+            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.reroot
+
+        Ignore:
+            >>> # There might not be a way to easilly handle the cases that I
+            >>> # want to here. Might need to discuss this.
+            >>> import kwcoco
+            >>> gname = 'images/foo.png'
+            >>> remote = '/remote/path'
+            >>> host = ub.ensure_app_cache_dir('kwcoco/tests/reroot')
+            >>> fpath = join(host, gname)
+            >>> ub.ensuredir(dirname(fpath))
+            >>> import kwimage
+            >>> kwimage.imwrite(fpath, np.random.rand(8, 8))
+            >>> #
+            >>> cases = {}
+            >>> # * given absolute paths on current machine
+            >>> cases['abs_curr'] = kwcoco.CocoDataset.from_image_paths([join(host, gname)])
+            >>> # * given rooted relative paths on current machine
+            >>> cases['rel_rooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], img_root=host)
+            >>> # * given unrooted relative paths on current machine
+            >>> cases['rel_unrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname])
+            >>> # * given absolute paths on another machine
+            >>> cases['abs_remote'] = kwcoco.CocoDataset.from_image_paths([join(remote, gname)])
+            >>> for key, dset in cases.items():
+            >>>     print('----')
+            >>>     self = dset
+            >>>     print('key = {!r}'.format(key))
+            >>>     gids = dset.missing_images()
+            >>>     print('gids = {!r}'.format(gids))
+            >>>     print('ORIG = {!r}'.format(dset.imgs[1]['file_name']))
+            >>>     print('dset.img_root = {!r}'.format(dset.img_root))
+            >>>     #
+            >>>     dset_None_rel = dset.copy().reroot(absolute=False, check=0)
+            >>>     print('dset_None_rel = {!r}'.format(dset_None_rel.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_remote_rel = dset.copy().reroot(remote, absolute=False, check=0)
+            >>>     print('dset_remote_rel = {!r}'.format(dset_remote_rel.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_host_rel = dset.copy().reroot(host, absolute=False, check=0)
+            >>>     print('dset_host_rel = {!r}'.format(dset_host_rel.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_None_abs = dset.copy().reroot(absolute=True, check=0)
+            >>>     print('dset_None_abs = {!r}'.format(dset_None_abs.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_remote_abs = dset.copy().reroot(remote, absolute=True, check=0)
+            >>>     print('dset_remote_abs = {!r}'.format(dset_remote_abs.imgs[1]['file_name']))
+            >>>     #
+            >>>     dset_host_abs = dset.copy().reroot(host, absolute=True, check=0)
+            >>>     print('dset_host_abs = {!r}'.format(dset_host_abs.imgs[1]['file_name']))
 
         Example:
             >>> import kwcoco
@@ -1850,15 +1954,15 @@ class MixinCocoExtras(object):
 
             >>> # Change base relative directory
             >>> img_root = ub.expandpath('~')
-            >>> self.rebase(img_root)
+            >>> self.reroot(img_root)
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
             >>> # Use absolute paths
-            >>> self.rebase(absolute=True)
+            >>> self.reroot(absolute=True)
             >>> assert self.imgs[1]['file_name'].startswith(img_root)
 
             >>> # Switch back to relative paths
-            >>> self.rebase()
+            >>> self.reroot()
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
         Example:
@@ -1866,7 +1970,7 @@ class MixinCocoExtras(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
             >>> img_root = ub.expandpath('~')
-            >>> self.rebase(img_root)
+            >>> self.reroot(img_root)
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
             >>> assert self.imgs[1]['auxillary'][0]['file_name'].startswith('.cache')
         """
@@ -1877,28 +1981,88 @@ class MixinCocoExtras(object):
         if new_img_root is None:
             new_img_root = old_img_root
 
-        for img in self.imgs.values():
-            abs_file_path = join(old_img_root, img['file_name'])
+        # from os.path import commonprefix
+        # commonprefix([img['file_name'] for img in self.imgs.values()])
+        # common_prefix = dirname(commonprefix([normpath(img['file_name']) for img in self.imgs.values()]))
+
+        def _reroot_path(file_name):
+            old_gpath = join(old_img_root, file_name)
+
             if absolute:
-                img['file_name'] = abs_file_path
+                new_file_name = old_gpath
             else:
-                img['file_name'] = relpath(abs_file_path, new_img_root)
+                new_file_name = relpath(old_gpath, new_img_root)
 
             if check:
-                abs_gpath = join(new_img_root, img['file_name'])
-                if not exists(abs_gpath):
+                new_gpath = join(new_img_root, new_file_name)
+                if not exists(new_gpath):
                     raise Exception(
-                        'Image does not exist: {!r}'.format(abs_gpath))
+                        'Image does not exist: {!r}'.format(new_gpath))
+            return new_file_name
 
+        for img in self.imgs.values():
+            img['file_name'] = _reroot_path(img['file_name'])
             for aux in img.get('auxillary', []):
-                abs_file_path = join(old_img_root, aux['file_name'])
-                if absolute:
-                    aux['file_name'] = abs_file_path
-                else:
-                    aux['file_name'] = relpath(abs_file_path, new_img_root)
+                aux['file_name'] = _reroot_path(aux['file_name'])
 
         self.img_root = new_img_root
         return self
+
+    def find_representative_images(self):
+        r"""
+        Find images that have a wide array of categories
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> gids = self.find_representative_images()
+            >>> print('gids = {!r}'.format(gids))
+        """
+        # Select representative images to draw such that each category
+        # appears at least once.
+        gid_to_cidfreq = ub.map_vals(
+            lambda aids: ub.dict_hist([self.anns[aid]['category_id']
+                                       for aid in aids]),
+            self.gid_to_aids)
+
+        gid_to_nannots = ub.map_vals(len, self.gid_to_aids)
+
+        gid_to_cids = {
+            gid: list(cidfreq.keys())
+            for gid, cidfreq in gid_to_cidfreq.items()
+        }
+        # Solve setcover with different weight schemes to get a better
+        # representative sample.
+        all_cids = list(self.cid_to_aids.keys())
+
+        candidate_sets = gid_to_cids.copy()
+
+        selected = {}
+
+        large_image_weights = gid_to_nannots
+        small_image_weights = ub.map_vals(lambda x: 1 / (x + 1), gid_to_nannots)
+
+        import kwarray
+        cover1 = kwarray.setcover(candidate_sets, items=all_cids)
+        selected.update(cover1)
+        candidate_sets = ub.dict_diff(candidate_sets, cover1)
+
+        cover2 = kwarray.setcover(
+                candidate_sets,
+                items=all_cids,
+                set_weights=large_image_weights)
+        selected.update(cover2)
+        candidate_sets = ub.dict_diff(candidate_sets, cover2)
+
+        cover3 = kwarray.setcover(
+                candidate_sets,
+                items=all_cids,
+                set_weights=small_image_weights)
+        selected.update(cover3)
+        candidate_sets = ub.dict_diff(candidate_sets, cover3)
+
+        selected_gids = sorted(selected.keys())
+        return selected_gids
 
 
 class MixinCocoAttrs(object):
@@ -2203,11 +2367,15 @@ class MixinCocoDraw(object):
             aids (list): aids to highlight within the image
             aid (int): a specific aid to focus on. If gid is not give,
                 look up gid based on this aid.
-            **kwargs: show_all, show_aid, show_catname, show_kpname,
+            **kwargs:
+                show_annots, show_aid, show_catname, show_kpname,
+                show_segmentation, title, show_gid, show_filename,
+                show_boxes,
 
         Ignore:
             # Programatically collect the kwargs for docs generation
             import xinspect
+            import kwcoco
             kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
             print(ub.repr2(list(kwargs.keys()), nl=1, si=1))
 
@@ -2227,7 +2395,8 @@ class MixinCocoDraw(object):
             primary_ann = self.anns[aid]
             gid = primary_ann['image_id']
 
-        show_all = kwargs.get('show_all', False)
+        show_all = kwargs.get('show_all', True)
+        show_annots = kwargs.get('show_annots', True)
 
         highlight_aids = set()
         if aid is not None:
@@ -2247,157 +2416,158 @@ class MixinCocoDraw(object):
         sseg_masks = []
         sseg_polys = []
 
-        for aid in aids:
-            ann = self.anns[aid]
+        if show_annots:
+            for aid in aids:
+                ann = self.anns[aid]
 
-            if 'keypoints' in ann:
-                cid = ann['category_id']
-                if ann['keypoints'] is not None and len(ann['keypoints']) > 0:
-                    # TODO: rely on kwimage.Points to parse multiple format info?
-                    kpts_data = ann['keypoints']
-                    if isinstance(ub.peek(kpts_data), dict):
-                        xys = np.array([p['xy'] for p in kpts_data])
-                        isvisible = np.array([p.get('visible', True) for p in kpts_data])
-                        kpnames = None
-                        # kpnames = []
-                        # for p in kpts_data:
-                        #     if 'keypoint_category_id' in p:
-                        #         pass
-                        #     pass
-                        isvisible = np.array([p.get('visible', True) for p in kpts_data])
-                    else:
-                        try:
-                            kpnames = self._lookup_kpnames(cid)
-                        except KeyError:
+                if 'keypoints' in ann:
+                    cid = ann['category_id']
+                    if ann['keypoints'] is not None and len(ann['keypoints']) > 0:
+                        # TODO: rely on kwimage.Points to parse multiple format info?
+                        kpts_data = ann['keypoints']
+                        if isinstance(ub.peek(kpts_data), dict):
+                            xys = np.array([p['xy'] for p in kpts_data])
+                            isvisible = np.array([p.get('visible', True) for p in kpts_data])
                             kpnames = None
-                        kpts = np.array(ann['keypoints']).reshape(-1, 3)
-                        isvisible = kpts.T[2] > 0
-                        xys = kpts.T[0:2].T[isvisible]
+                            # kpnames = []
+                            # for p in kpts_data:
+                            #     if 'keypoint_category_id' in p:
+                            #         pass
+                            #     pass
+                            isvisible = np.array([p.get('visible', True) for p in kpts_data])
+                        else:
+                            try:
+                                kpnames = self._lookup_kpnames(cid)
+                            except KeyError:
+                                kpnames = None
+                            kpts = np.array(ann['keypoints']).reshape(-1, 3)
+                            isvisible = kpts.T[2] > 0
+                            xys = kpts.T[0:2].T[isvisible]
+                    else:
+                        kpnames = None
+                        xys = None
                 else:
                     kpnames = None
                     xys = None
-            else:
-                kpnames = None
-                xys = None
 
-            # Note standard coco bbox is [x,y,width,height]
-            if 'bbox' in ann:
-                x1, y1 = ann['bbox'][0:2]
-            elif 'line' in ann:
-                x1, y1 = ann['line'][0:2]
-            elif 'keypoints' in ann:
-                x1, y1 = xys.min(axis=0)
-            else:
-                raise Exception('no bbox, line, or keypoint position')
+                # Note standard coco bbox is [x,y,width,height]
+                if 'bbox' in ann:
+                    x1, y1 = ann['bbox'][0:2]
+                elif 'line' in ann:
+                    x1, y1 = ann['line'][0:2]
+                elif 'keypoints' in ann:
+                    x1, y1 = xys.min(axis=0)
+                else:
+                    raise Exception('no bbox, line, or keypoint position')
 
-            cid = ann.get('category_id', None)
-            if cid is not None:
-                cat = self.cats[cid]
-                catname = cat['name']
-            else:
-                cat = None
-                catname = ann.get('category_name', 'None')
-            textkw = {
-                'horizontalalignment': 'left',
-                'verticalalignment': 'top',
-                'backgroundcolor': (0, 0, 0, .3),
-                'color': 'white',
-                'fontproperties': mpl.font_manager.FontProperties(
-                    size=6, family='monospace'),
-            }
-            annot_text_parts = []
-            if kwargs.get('show_aid', show_all):
-                annot_text_parts.append('aid={}'.format(aid))
-            if kwargs.get('show_catname', True):
-                annot_text_parts.append(catname)
-            annot_text = ' '.join(annot_text_parts)
-            texts.append((x1, y1, annot_text, textkw))
+                cid = ann.get('category_id', None)
+                if cid is not None:
+                    cat = self.cats[cid]
+                    catname = cat['name']
+                else:
+                    cat = None
+                    catname = ann.get('category_name', 'None')
+                textkw = {
+                    'horizontalalignment': 'left',
+                    'verticalalignment': 'top',
+                    'backgroundcolor': (0, 0, 0, .3),
+                    'color': 'white',
+                    'fontproperties': mpl.font_manager.FontProperties(
+                        size=6, family='monospace'),
+                }
+                annot_text_parts = []
+                if kwargs.get('show_aid', show_all):
+                    annot_text_parts.append('aid={}'.format(aid))
+                if kwargs.get('show_catname', show_all):
+                    annot_text_parts.append(catname)
+                annot_text = ' '.join(annot_text_parts)
+                texts.append((x1, y1, annot_text, textkw))
 
-            color = 'orange' if aid in highlight_aids else 'blue'
-            if 'obox' in ann:
-                # Oriented bounding box
-                segs = np.array(ann['obox']).reshape(-1, 3)[:, 0:2]
-                for pt1, pt2 in ub.iter_window(segs, wrap=True):
+                color = 'orange' if aid in highlight_aids else 'blue'
+                if 'obox' in ann:
+                    # Oriented bounding box
+                    segs = np.array(ann['obox']).reshape(-1, 3)[:, 0:2]
+                    for pt1, pt2 in ub.iter_window(segs, wrap=True):
+                        colored_segments[color].append([pt1, pt2])
+                elif 'bbox' in ann:
+                    [x, y, w, h] = ann['bbox']
+                    rect = mpl.patches.Rectangle((x, y), w, h, facecolor='none',
+                                                 edgecolor=color)
+                    rects.append(rect)
+                if 'line' in ann:
+                    x1, y1, x2, y2 = ann['line']
+                    pt1, pt2 = (x1, y1), (x2, y2)
                     colored_segments[color].append([pt1, pt2])
-            elif 'bbox' in ann:
-                [x, y, w, h] = ann['bbox']
-                rect = mpl.patches.Rectangle((x, y), w, h, facecolor='none',
-                                             edgecolor=color)
-                rects.append(rect)
-            if 'line' in ann:
-                x1, y1, x2, y2 = ann['line']
-                pt1, pt2 = (x1, y1), (x2, y2)
-                colored_segments[color].append([pt1, pt2])
-            if 'keypoints' in ann:
-                if xys is not None and len(xys):
-                    keypoints.append(xys)
-                    if kwargs.get('show_kpname', show_all):
-                        if kpnames is not None:
-                            for (kp_x, kp_y), kpname in zip(xys, kpnames):
-                                texts.append((kp_x, kp_y, kpname, textkw))
+                if 'keypoints' in ann:
+                    if xys is not None and len(xys):
+                        keypoints.append(xys)
+                        if kwargs.get('show_kpname', True):
+                            if kpnames is not None:
+                                for (kp_x, kp_y), kpname in zip(xys, kpnames):
+                                    texts.append((kp_x, kp_y, kpname, textkw))
 
-            if 'segmentation' in ann and kwargs.get('show_segmentation', True):
-                sseg = ann['segmentation']
-                # Respect the 'color' attribute of categories
-                if cat is not None:
-                    catcolor = cat.get('color', None)
-                else:
-                    catcolor = None
-
-                HAVE_KWIMAGE = True
-                if HAVE_KWIMAGE:
-                    if catcolor is not None:
-                        catcolor = kwplot.Color(catcolor).as01()
-                    # TODO: Unify masks and polygons into a kwimage
-                    # segmentation class
-                    sseg = kwimage.Segmentation.coerce(sseg).data
-                    if isinstance(sseg, kwimage.Mask):
-                        m = sseg.to_c_mask()
-                        sseg_masks.append((m.data, catcolor))
+                if 'segmentation' in ann and kwargs.get('show_segmentation', True):
+                    sseg = ann['segmentation']
+                    # Respect the 'color' attribute of categories
+                    if cat is not None:
+                        catcolor = cat.get('color', None)
                     else:
-                        # TODO: interior
-                        multipoly = sseg.to_multi_polygon()
-                        for poly in multipoly.data:
-                            poly_xys = poly.data['exterior'].data
-                            polykw = {}
-                            if catcolor is not None:
-                                polykw['color'] = catcolor
-                            poly = mpl.patches.Polygon(poly_xys, **polykw)
-                            try:
-                                # hack
-                                poly.area = sseg.to_shapely().area
-                            except Exception:
-                                pass
-                            sseg_polys.append(poly)
-                else:
-                    # print('sseg = {!r}'.format(sseg))
-                    if isinstance(sseg, dict):
-                        # Handle COCO-RLE-segmentations; convert to raw binary masks
-                        sseg = dict(sseg)
-                        if 'shape' not in sseg and 'size' in sseg:
-                            # NOTE: size here is actually h/w unlike almost
-                            # everywhere else
-                            sseg['shape'] = sseg['size']
-                        if isinstance(sseg['counts'], (six.binary_type, six.text_type)):
-                            mask = kwimage.Mask(sseg, 'bytes_rle').to_c_mask().data
+                        catcolor = None
+
+                    HAVE_KWIMAGE = True
+                    if HAVE_KWIMAGE:
+                        if catcolor is not None:
+                            catcolor = kwplot.Color(catcolor).as01()
+                        # TODO: Unify masks and polygons into a kwimage
+                        # segmentation class
+                        sseg = kwimage.Segmentation.coerce(sseg).data
+                        if isinstance(sseg, kwimage.Mask):
+                            m = sseg.to_c_mask()
+                            sseg_masks.append((m.data, catcolor))
                         else:
-                            mask = kwimage.Mask(sseg, 'array_rle').to_c_mask().data
-                        sseg_masks.append((mask, catcolor))
-                    elif isinstance(sseg, list):
-                        # Handle COCO-polygon-segmentation
-                        # If the segmentation is a list of polygons
-                        if not (len(sseg) and isinstance(sseg[0], list)):
-                            sseg = [sseg]
-                        for flat in sseg:
-                            poly_xys = np.array(flat).reshape(-1, 2)
-                            polykw = {}
-                            if catcolor is not None:
-                                polykw['color'] = catcolor
-
-                            poly = mpl.patches.Polygon(poly_xys, **polykw)
-                            sseg_polys.append(poly)
+                            # TODO: interior
+                            multipoly = sseg.to_multi_polygon()
+                            for poly in multipoly.data:
+                                poly_xys = poly.data['exterior'].data
+                                polykw = {}
+                                if catcolor is not None:
+                                    polykw['color'] = catcolor
+                                poly = mpl.patches.Polygon(poly_xys, **polykw)
+                                try:
+                                    # hack
+                                    poly.area = sseg.to_shapely().area
+                                except Exception:
+                                    pass
+                                sseg_polys.append(poly)
                     else:
-                        raise TypeError(type(sseg))
+                        # print('sseg = {!r}'.format(sseg))
+                        if isinstance(sseg, dict):
+                            # Handle COCO-RLE-segmentations; convert to raw binary masks
+                            sseg = dict(sseg)
+                            if 'shape' not in sseg and 'size' in sseg:
+                                # NOTE: size here is actually h/w unlike almost
+                                # everywhere else
+                                sseg['shape'] = sseg['size']
+                            if isinstance(sseg['counts'], (six.binary_type, six.text_type)):
+                                mask = kwimage.Mask(sseg, 'bytes_rle').to_c_mask().data
+                            else:
+                                mask = kwimage.Mask(sseg, 'array_rle').to_c_mask().data
+                            sseg_masks.append((mask, catcolor))
+                        elif isinstance(sseg, list):
+                            # Handle COCO-polygon-segmentation
+                            # If the segmentation is a list of polygons
+                            if not (len(sseg) and isinstance(sseg[0], list)):
+                                sseg = [sseg]
+                            for flat in sseg:
+                                poly_xys = np.array(flat).reshape(-1, 2)
+                                polykw = {}
+                                if catcolor is not None:
+                                    polykw['color'] = catcolor
+
+                                poly = mpl.patches.Polygon(poly_xys, **polykw)
+                                sseg_polys.append(poly)
+                        else:
+                            raise TypeError(type(sseg))
 
         # Show image
         np_img = self.load_image(img)
@@ -2984,6 +3154,40 @@ class MixinCocoAddRemove(object):
         remove_info['keypoint_categories'] = len(remove_kpcats)
         return remove_info
 
+    def set_annotation_category(self, aid_or_ann, cid_or_cat):
+        """
+        Sets the category of a single annotation
+
+        Args:
+            aid_or_ann (dict | int): annotation dict or id
+
+            cid_or_cat (dict | int): category dict or id
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> old_freq = self.category_annotation_frequency()
+            >>> aid_or_ann = aid = 2
+            >>> cid_or_cat = new_cid = self.ensure_category('kitten')
+            >>> self.set_annotation_category(aid, new_cid)
+            >>> new_freq = self.category_annotation_frequency()
+            >>> print('new_freq = {}'.format(ub.repr2(new_freq, nl=1)))
+            >>> print('old_freq = {}'.format(ub.repr2(old_freq, nl=1)))
+            >>> assert sum(new_freq.values()) == sum(old_freq.values())
+            >>> assert new_freq['kitten'] == 1
+        """
+        new_cid = self._resolve_to_cid(cid_or_cat)
+        ann = self._resolve_to_ann(aid_or_ann)
+        aid = ann['id']
+        if self.index:
+            if 'category_id' in ann:
+                old_cid = ann['category_id']
+                self.cid_to_aids[old_cid].remove(aid)
+        ann['category_id'] = new_cid
+        if self.index:
+            self.cid_to_aids[new_cid].add(aid)
+        self._invalidate_hashid(['annotations'])
+
 
 class CocoIndex(object):
     """
@@ -3411,9 +3615,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 if _root is None:
                     _root = ''
                 elif isinstance(_root, six.string_types):
-                    import os
                     _tmp = ub.expandpath(_root)
-                    if os.path.exists(_tmp):
+                    if exists(_tmp):
                         _root = _tmp
                 else:
                     if isinstance(_root, list) and _root == []:
@@ -3446,7 +3649,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             self._build_index()
 
     @classmethod
-    def from_image_paths(cls, gpaths):
+    def from_image_paths(cls, gpaths, img_root=None):
         """
         Create a coco dataset from a list of images paths
 
@@ -3454,7 +3657,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> coco_dset = CocoDataset.from_image_paths(['a.png', 'b.png'])
             >>> assert coco_dset.n_images == 2
         """
-        coco_dset = cls()
+        coco_dset = cls(img_root=img_root)
         for gpath in gpaths:
             coco_dset.add_image(gpath)
         return coco_dset

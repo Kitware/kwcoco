@@ -26,7 +26,10 @@ class CocoShowCLI:
                 'Annotation id to show, mutually exclusive with gid')),
             'dst': scfg.Value(None, help=(
                 'Save the image to the specified file. '
-                'If unspecified, the image is shown with pyplot'))
+                'If unspecified, the image is shown with pyplot')),
+
+            'show_annots': scfg.Value(True, help=(
+                'Overlay annotations on dispaly')),
         }
 
     @classmethod
@@ -60,7 +63,18 @@ class CocoShowCLI:
         if gid is None and aid is None:
             gid = ub.peek(dset.imgs)
 
-        ax = dset.show_image(gid=gid, aid=aid)
+        show_kw = {
+            'show_annots': config['show_annots'],
+        }
+        if config['show_annots'] == 'both':
+            show_kw.pop('show_annots')
+            show_kw['title'] = ''
+            ax = dset.show_image(gid=gid, aid=aid, pnum=(1, 2, 1),
+                                 show_annots=False, **show_kw)
+            ax = dset.show_image(gid=gid, aid=aid, pnum=(1, 2, 2),
+                                 show_annots=True, **show_kw)
+        else:
+            ax = dset.show_image(gid=gid, aid=aid, **show_kw)
         if out_fpath is None:
             plt.show()
         else:

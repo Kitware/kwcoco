@@ -44,7 +44,7 @@ class StratifiedGroupKFold(_BaseKFold):
             >>> groups = [1, 1, 3, 4, 2, 2, 7, 8, 8]
             >>> y      = [1, 1, 1, 1, 2, 2, 2, 3, 3]
             >>> X = np.empty((len(y), 0))
-            >>> self = StratifiedGroupKFold(random_state=rng)
+            >>> self = StratifiedGroupKFold(random_state=rng, shuffle=True)
             >>> skf_list = list(self.split(X=X, y=y, groups=groups))
             ...
             >>> import ubelt as ub
@@ -134,3 +134,11 @@ class StratifiedGroupKFold(_BaseKFold):
         """
         y = check_array(y, ensure_2d=False, dtype=None)
         return super(StratifiedGroupKFold, self).split(X, y, groups)
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/kwcoco/util/util_sklearn.py all
+    """
+    import xdoctest
+    xdoctest.doctest_module(__file__)

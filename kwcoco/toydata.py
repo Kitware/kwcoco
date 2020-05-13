@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import absolute_import, division, print_function
 from os.path import join
+import six
 import glob
 import numpy as np
 import ubelt as ub
@@ -378,7 +379,9 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                 dataset['keypoint_categories'].append(kpcat)
                 kpname_to_id[kpcat['name']] = kpcat['id']
 
-        for i in ub.ProgIter(range(n_imgs), label='creating data'):
+        for __ in ub.ProgIter(range(n_imgs), label='creating data'):
+
+            # TODO: parallelize
             img, anns = demodata_toy_img(anchors, gsize=gsize,
                                          categories=catpats,
                                          newstyle=newstyle, fg_scale=fg_scale,
@@ -433,7 +436,10 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
 
         import json
         with open(join(dpath, 'toy_dset.mscoco.json'), 'w') as file:
-            json.dump(dataset, file, indent='    ')
+            if six.PY2:
+                json.dump(dataset, file, indent=4)
+            else:
+                json.dump(dataset, file, indent='    ')
 
         cacher.enabled = True
         cacher.save(dataset)
