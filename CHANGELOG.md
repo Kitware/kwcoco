@@ -10,6 +10,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * stats CLI can now accept multiple datasets.
 * ported `data.grab_voc` and `data.grab_camvid` from netharn.
 
+### Fixed
+* Python2 error with json dump
+
 ## Version 0.1.0 - Released 2020-04-08
 
 ### Added
