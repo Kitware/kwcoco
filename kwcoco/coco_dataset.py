@@ -123,7 +123,18 @@ Dataset Spec:
         }
 
     Video Sequences:
-        For video sequences, image dictionaries are augmented as follows:
+        For video sequences, we add the following video level index:
+
+        "videos": [
+            { "id": <int>, "name": <video_name:str> },
+        ]
+
+        Note that the videos might be given as encoded mp4/avi/etc.. files (in
+        which case the name should correspond to a path) or as a series of
+        frames in which case the images should be used to index the extracted
+        frames and information in them.
+
+        Then image dictionaries are augmented as follows:
 
         {
             'video_id': str  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
@@ -136,6 +147,7 @@ Dataset Spec:
         {
             "track_id": <int | str | uuid>  # optional, indicates association between annotations across frames
         }
+
 
 
 Notes:
@@ -3745,8 +3757,11 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             if isinstance(indent, int):
                 indent = ' ' * indent
             dict_lines = []
-            main_keys = ['info', 'licenses', 'categories',
-                         'keypoint_categories', 'images', 'annotations']
+            main_keys = [
+                'info', 'licenses',
+                'categories', 'images', 'annotations',
+                'keypoint_categories', 'videos'
+            ]
             other_keys = sorted(set(self.dataset.keys()) - set(main_keys))
             for key in main_keys:
                 if key not in self.dataset:
