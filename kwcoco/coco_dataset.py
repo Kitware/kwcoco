@@ -3418,6 +3418,10 @@ class CocoIndex(object):
                         parent, anns[aid], ann))
             anns[aid] = ann
 
+        for video in parent.dataset.get('videos', []):
+            # TODO:
+            video['id']
+
         # Build one-to-many lookup maps
         for ann in anns.values():
             try:
@@ -3759,8 +3763,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             dict_lines = []
             main_keys = [
                 'info', 'licenses',
-                'categories', 'images', 'annotations',
-                'keypoint_categories', 'videos'
+                'categories', 'videos', 'images', 'annotations',
+                'keypoint_categories',
             ]
             other_keys = sorted(set(self.dataset.keys()) - set(main_keys))
             for key in main_keys:
@@ -4194,6 +4198,10 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         if 'keypoint_categories' in self.dataset:
             new_dataset['keypoint_categories'] = self.dataset['keypoint_categories']
+
+        if 'videos' in self.dataset:
+            # TODO: Handle this case
+            pass
 
         gids = sorted(set(gids))
         sub_aids = sorted([aid for gid in gids
