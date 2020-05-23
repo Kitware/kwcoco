@@ -928,14 +928,15 @@ class MixinCocoExtras(object):
         return sample
 
     @classmethod
-    def coerce(cls, key):
+    def coerce(cls, key, **kw):
         from os.path import exists
         if key.startswith('special:'):
-            self = cls.demo(key=key.split(':')[1])
+            demokey = key.split(':')[1]
+            self = cls.demo(key=demokey, **kw)
         elif exists(key):
-            self = cls(key)
+            self = cls(key, **kw)
         else:
-            self = cls.demo(key=key)
+            self = cls.demo(key=key, **kw)
         return self
 
     @classmethod
