@@ -15,6 +15,12 @@ class CocoEvalConfig(scfg.Config):
     default = {
         'true_dataset': scfg.Value(None, help='coercable true detections'),
         'pred_dataset': scfg.Value(None, help='coercable predicted detections'),
+
+        'classes_of_interest': scfg.Value([], help='if specified only these classes are given weight'),
+
+        'draw': scfg.Value(True, help='draw metric plots'),
+
+        'out_dpath': scfg.Value('./coco_metrics'),
     }
 
 
@@ -26,19 +32,24 @@ class CocoEvaluator(object):
     to the true and predited dataset explicitly, or this can be used by a
     higher level script that produces the predictions and then sends them to
     this evaluator.
+
+    Ignore:
+        config = {
+            'true_dataset': ub.expandpath('$HOME/remote/namek/data/noaa_habcam/combos/habcam_cfarm_v8_vali.mscoco.json'),
+            'pred_dataset': ub.expandpath("$HOME/remote/viame/work/bioharn/fit/nice/bioharn-det-mc-cascade-rgb-fine-coi-v43/eval/may_priority_habcam_cfarm_v7_test.mscoc/bioharn-det-mc-cascade-rgb-fine-coi-v43__epoch_00000007/c=0.1,i=window,n=0.8,window_d=512,512,window_o=0.0/all_pred.mscoco.json"),
+        }
+
     """
 
-    def __init__(coco_eval, true_dataset, pred_dataset, config):
-        coco_eval._true_dataset = true_dataset
-        coco_eval._pred_dataset = pred_dataset
+    def __init__(coco_eval, config):
         coco_eval.config = config
 
     def _init(coco_eval):
         print('init truth dset')
-        gid_to_true = CocoEvaluator._coerce_dets(coco_eval._true_dataset)
+        gid_to_true = CocoEvaluator._coerce_dets(coco_eval.config['true_dataset'])
 
         print('init pred dset')
-        gid_to_pred = CocoEvaluator._coerce_dets(coco_eval._pred_dataset)
+        gid_to_pred = CocoEvaluator._coerce_dets(coco_eval.config['pred_dataset'])
 
         gids = sorted(gid_to_pred.keys())
 
