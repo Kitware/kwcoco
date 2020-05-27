@@ -2021,7 +2021,7 @@ class MixinCocoExtras(object):
         self.img_root = new_img_root
         return self
 
-    def find_representative_images(self):
+    def find_representative_images(self, gids=None):
         r"""
         Find images that have a wide array of categories
 
@@ -2031,6 +2031,9 @@ class MixinCocoExtras(object):
             >>> gids = self.find_representative_images()
             >>> print('gids = {!r}'.format(gids))
         """
+        if gids is None:
+            gids = sorted(self.imgs.keys())
+
         # Select representative images to draw such that each category
         # appears at least once.
         gid_to_cidfreq = ub.map_vals(
