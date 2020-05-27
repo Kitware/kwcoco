@@ -1,3 +1,8 @@
+"""
+Evaluates a predicted coco dataset against a truth coco dataset.
+
+The components in this module work programatically or as a command line script.
+"""
 import glob
 import numpy as np
 import six
@@ -16,10 +21,10 @@ class CocoEvalConfig(scfg.Config):
         'true_dataset': scfg.Value(None, help='coercable true detections'),
         'pred_dataset': scfg.Value(None, help='coercable predicted detections'),
 
-        'classes_of_interest': scfg.Value([], help='if specified only these classes are given weight'),
+        'classes_of_interest': scfg.Value(None, type=list, help='if specified only these classes are given weight'),
+        'ignore_classes': scfg.Value(None, type=list, help='classes to ignore'),
 
         'draw': scfg.Value(True, help='draw metric plots'),
-
         'out_dpath': scfg.Value('./coco_metrics'),
     }
 
@@ -34,10 +39,15 @@ class CocoEvaluator(object):
     this evaluator.
 
     Ignore:
-        config = {
-            'true_dataset': ub.expandpath('$HOME/remote/namek/data/noaa_habcam/combos/habcam_cfarm_v8_vali.mscoco.json'),
-            'pred_dataset': ub.expandpath("$HOME/remote/viame/work/bioharn/fit/nice/bioharn-det-mc-cascade-rgb-fine-coi-v43/eval/may_priority_habcam_cfarm_v7_test.mscoc/bioharn-det-mc-cascade-rgb-fine-coi-v43__epoch_00000007/c=0.1,i=window,n=0.8,window_d=512,512,window_o=0.0/all_pred.mscoco.json"),
-        }
+        >>> pred_fpath1 = ub.expandpath("$HOME/remote/viame/work/bioharn/fit/nice/bioharn-det-mc-cascade-rgb-fine-coi-v43/eval/may_priority_habcam_cfarm_v7_test.mscoc/bioharn-det-mc-cascade-rgb-fine-coi-v43__epoch_00000007/c=0.1,i=window,n=0.8,window_d=512,512,window_o=0.0/all_pred.mscoco.json")
+        >>> pred_fpath2 = ub.expandpath('$HOME/remote/namek/cached_clf_out/reclassified.mscoco.json')
+        >>> true_fpath = ub.expandpath('$HOME/remote/namek/data/noaa_habcam/combos/habcam_cfarm_v8_vali.mscoco.json')
+        >>> config = {
+        >>>     'true_dataset': true_fpath,
+        >>>     'pred_dataset': pred_fpath2,
+        >>>     'out_dpath': ub.expandpath('$HOME/remote/namek/tmp/reclassified_eval'),
+        >>> }
+        >>> coco_eval = CocoEvaluator(config)
 
     """
 
@@ -45,16 +55,24 @@ class CocoEvaluator(object):
         coco_eval.config = config
 
     def _init(coco_eval):
+        # TODO: coerce into a cocodataset form if possible
+
         print('init truth dset')
         gid_to_true = CocoEvaluator._coerce_dets(coco_eval.config['true_dataset'])
 
         print('init pred dset')
         gid_to_pred = CocoEvaluator._coerce_dets(coco_eval.config['pred_dataset'])
 
-        gids = sorted(gid_to_pred.keys())
+        pred_gids = sorted(gid_to_pred.keys())
+        true_gids = sorted(gid_to_true.keys())
+        gids = list(set(pred_gids) & set(true_gids))
 
         true_classes = ub.peek(gid_to_true.values()).classes
         pred_classes = ub.peek(gid_to_pred.values()).classes
+
+        if 0:
+            import xdev
+            xdev.set_overlaps(set(true_gids), set(pred_gids), 'true', 'pred')
 
         classes, unified_cid_maps = CocoEvaluator._rectify_classes(
             true_classes, pred_classes)
@@ -62,7 +80,7 @@ class CocoEvaluator(object):
         true_to_unified_cid = unified_cid_maps['true']
         pred_to_unified_cid = unified_cid_maps['pred']
 
-        # Move truth to the same class indices as predictions
+        # Move truth to the unified class indices
         for gid in ub.ProgIter(gids, desc='Rectify truth class idxs'):
             det = gid_to_true[gid]
             new_classes = classes
@@ -74,7 +92,7 @@ class CocoEvaluator(object):
             det.meta['classes'] = new_classes
             det.data['class_idxs'] = new_cidxs
 
-        # Move truth to the same class indices as predictions
+        # Move predictions to the unified class indices
         for gid in ub.ProgIter(gids, desc='Rectify pred class idxs'):
             det = gid_to_pred[gid]
             new_classes = classes
@@ -86,12 +104,15 @@ class CocoEvaluator(object):
             det.meta['classes'] = new_classes
             det.data['class_idxs'] = new_cidxs
 
+        coco_eval.gids = gids
         coco_eval.classes = classes
         coco_eval.gid_to_true = gid_to_true
         coco_eval.gid_to_pred = gid_to_pred
 
-    def evaluate(coco_eval, classes_of_interest=[], ignore_classes=None,
-                 expt_title='', metrics_dpath='.'):
+    def evaluate(coco_eval):
+
+        classes_of_interest = coco_eval.config['classes_of_interest']
+        ignore_classes = coco_eval.config['ignore_classes']
 
         classes = coco_eval.classes
         gid_to_true = coco_eval.gid_to_true
@@ -119,7 +140,7 @@ class CocoEvaluator(object):
 
         from netharn.metrics import DetectionMetrics
         dmet = DetectionMetrics(classes=classes)
-        for gid in ub.ProgIter(list(gid_to_pred.keys())):
+        for gid in ub.ProgIter(coco_eval.gids):
             pred_dets = gid_to_pred[gid]
             true_dets = gid_to_true[gid]
             dmet.add_predictions(pred_dets, gid=gid)
@@ -201,135 +222,165 @@ class CocoEvaluator(object):
             print('ovr_pr_result2 = {!r}'.format(ovr_pr_result2))
             # print('ovr_thresh_result2 = {!r}'.format(ovr_thresh_result2))
 
+        # FIXME: there is a lot of redundant information here,
+        # this needs to be consolidated both here and in netharn metrics
+        results = {
+            'cfsn_vecs': cfsn_vecs,
+
+            'roc_result': roc_result,
+            'pr_result': pr_result,
+            'thresh_result': thresh_result,
+
+            'ovr_roc_result': ovr_roc_result,
+            'ovr_pr_result': ovr_pr_result,
+            'ovr_thresh_result': ovr_thresh_result,
+
+            'ovr_roc_result2': ovr_roc_result2,
+            'ovr_pr_result2': ovr_pr_result2,
+        }
+
+        # metrics_dpath = coco_eval.config['out_dpath']
+        if coco_eval.config['draw']:
+            coco_eval.plot_results(results)
+        return results
+
+    def plot_results(coco_eval, results, expt_title):
+        # classes_of_interest=[], ignore_classes=None,
         # if 0:
         #     cname = 'flatfish'
         #     cx = cfsn_vecs.classes.index(cname)
         #     is_true = (cfsn_vecs.data['true'] == cx)
         #     num_localized = (cfsn_vecs.data['pred'][is_true] != -1).sum()
         #     num_missed = is_true.sum() - num_localized
+        metrics_dpath = coco_eval.config['out_dpath']
 
-        if coco_eval.config['draw']:
-            # TODO: separate into standalone method that is able to run on
-            # serialized / cached metrics on disk.
-            print('drawing evaluation metrics')
+        classes_of_interest = coco_eval.config['classes_of_interest']
+        metrics_dpath = coco_eval.config['out_dpath']
+
+        pr_result = results['pr_result']
+        roc_result = results['roc_result']
+        thresh_result = results['thresh_result']
+
+        ovr_pr_result = results['ovr_pr_result']
+        ovr_roc_result = results['ovr_roc_result']
+        ovr_thresh_result = results['ovr_thresh_result']
+
+        ovr_pr_result2 = results['ovr_pr_result2']
+        ovr_roc_result2 = results['ovr_roc_result2']
+        cfsn_vecs = results['cfsn_vecs']
+
+        # TODO: separate into standalone method that is able to run on
+        # serialized / cached metrics on disk.
+        print('drawing evaluation metrics')
+        import kwplot
+        kwplot.autompl()
+
+        import seaborn
+        seaborn.set()
+
+        figsize = (9, 7)
+
+        fig = kwplot.figure(fnum=1, pnum=(1, 2, 1), doclf=True,
+                            figtitle=expt_title)
+        fig.set_size_inches(figsize)
+        pr_result.draw()
+        kwplot.figure(fnum=1, pnum=(1, 2, 2))
+        roc_result.draw()
+        fig_fpath = join(metrics_dpath, 'loc_pr_roc.png')
+        print('write fig_fpath = {!r}'.format(fig_fpath))
+        fig.savefig(fig_fpath)
+
+        fig = kwplot.figure(fnum=1, pnum=(1, 1, 1), doclf=True,
+                            figtitle=expt_title)
+        fig.set_size_inches(figsize)
+        thresh_result.draw()
+        fig_fpath = join(metrics_dpath, 'loc_thresh.png')
+        print('write fig_fpath = {!r}'.format(fig_fpath))
+        fig.savefig(fig_fpath)
+
+        fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
+                            figtitle=expt_title)
+        fig.set_size_inches(figsize)
+        ovr_roc_result.draw(fnum=2)
+
+        fig_fpath = join(metrics_dpath, 'perclass_roc.png')
+        print('write fig_fpath = {!r}'.format(fig_fpath))
+        fig.savefig(fig_fpath)
+
+        fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
+                            figtitle=expt_title)
+        fig.set_size_inches(figsize)
+        ovr_pr_result.draw(fnum=2)
+        fig_fpath = join(metrics_dpath, 'perclass_pr.png')
+        print('write fig_fpath = {!r}'.format(fig_fpath))
+        fig.savefig(fig_fpath)
+
+        if classes_of_interest:
+            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
+                                figtitle=expt_title)
+            fig.set_size_inches(figsize)
+            ovr_pr_result2.draw(fnum=2, prefix='coi-vs-bg-only')
+            fig_fpath = join(metrics_dpath, 'perclass_pr_coi_vs_bg.png')
+            print('write fig_fpath = {!r}'.format(fig_fpath))
+            fig.savefig(fig_fpath)
+
+            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
+                                figtitle=expt_title)
+            fig.set_size_inches(figsize)
+            ovr_roc_result2.draw(fnum=2, prefix='coi-vs-bg-only')
+            fig_fpath = join(metrics_dpath, 'perclass_roc_coi_vs_bg.png')
+            print('write fig_fpath = {!r}'.format(fig_fpath))
+            fig.savefig(fig_fpath)
+
+        # keys = ['mcc', 'g1', 'f1', 'acc', 'ppv', 'tpr', 'mk', 'bm']
+        keys = ['mcc', 'f1', 'ppv', 'tpr']
+        for key in keys:
+            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
+                                figtitle=expt_title)
+            fig.set_size_inches(figsize)
+            ovr_thresh_result.draw(fnum=2, key=key)
+            fig_fpath = join(metrics_dpath, 'perclass_{}.png'.format(key))
+            print('write fig_fpath = {!r}'.format(fig_fpath))
+            fig.savefig(fig_fpath)
+
+        # NOTE: The threshold on these confusion matrices is VERY low.
+        # FIXME: robustly skip in cases where predictions have no class information
+        try:
+            fig = kwplot.figure(fnum=3, doclf=True)
+            confusion = cfsn_vecs.confusion_matrix()
             import kwplot
-            kwplot.autompl()
-
-            import seaborn
-            seaborn.set()
-
-            figsize = (9, 7)
-
-            fig = kwplot.figure(fnum=1, pnum=(1, 2, 1), doclf=True,
-                                figtitle=expt_title)
-            fig.set_size_inches(figsize)
-            pr_result.draw()
-            kwplot.figure(fnum=1, pnum=(1, 2, 2))
-            roc_result.draw()
-            fig_fpath = join(metrics_dpath, 'loc_pr_roc.png')
+            ax = kwplot.plot_matrix(confusion, fnum=3, showvals=0, logscale=True)
+            fig_fpath = join(metrics_dpath, 'confusion.png')
             print('write fig_fpath = {!r}'.format(fig_fpath))
-            fig.savefig(fig_fpath)
-
-            fig = kwplot.figure(fnum=1, pnum=(1, 1, 1), doclf=True,
-                                figtitle=expt_title)
-            fig.set_size_inches(figsize)
-            thresh_result.draw()
-            fig_fpath = join(metrics_dpath, 'loc_thresh.png')
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            fig.savefig(fig_fpath)
-
-            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                                figtitle=expt_title)
-            fig.set_size_inches(figsize)
-            ovr_roc_result.draw(fnum=2)
-
-            fig_fpath = join(metrics_dpath, 'perclass_roc.png')
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            fig.savefig(fig_fpath)
-
-            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                                figtitle=expt_title)
-            fig.set_size_inches(figsize)
-            ovr_pr_result.draw(fnum=2)
-            fig_fpath = join(metrics_dpath, 'perclass_pr.png')
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            fig.savefig(fig_fpath)
+            ax.figure.savefig(fig_fpath)
 
             if classes_of_interest:
-                fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                                    figtitle=expt_title)
-                fig.set_size_inches(figsize)
-                ovr_pr_result2.draw(fnum=2, prefix='coi-vs-bg-only')
-                fig_fpath = join(metrics_dpath, 'perclass_pr_coi_vs_bg.png')
-                print('write fig_fpath = {!r}'.format(fig_fpath))
-                fig.savefig(fig_fpath)
-
-                fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                                    figtitle=expt_title)
-                fig.set_size_inches(figsize)
-                ovr_roc_result2.draw(fnum=2, prefix='coi-vs-bg-only')
-                fig_fpath = join(metrics_dpath, 'perclass_roc_coi_vs_bg.png')
-                print('write fig_fpath = {!r}'.format(fig_fpath))
-                fig.savefig(fig_fpath)
-
-            # keys = ['mcc', 'g1', 'f1', 'acc', 'ppv', 'tpr', 'mk', 'bm']
-            keys = ['mcc', 'f1', 'ppv', 'tpr']
-            for key in keys:
-                fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                                    figtitle=expt_title)
-                fig.set_size_inches(figsize)
-                ovr_thresh_result.draw(fnum=2, key=key)
-                fig_fpath = join(metrics_dpath, 'perclass_{}.png'.format(key))
-                print('write fig_fpath = {!r}'.format(fig_fpath))
-                fig.savefig(fig_fpath)
-
-            # NOTE: The threshold on these confusion matrices is VERY low.
-            # FIXME: robustly skip in cases where predictions have no class information
-            try:
-                fig = kwplot.figure(fnum=3, doclf=True)
-                confusion = cfsn_vecs.confusion_matrix()
-                import kwplot
-                ax = kwplot.plot_matrix(confusion, fnum=3, showvals=0, logscale=True)
-                fig_fpath = join(metrics_dpath, 'confusion.png')
+                subkeys = ['background'] + classes_of_interest
+                coi_confusion = confusion[subkeys].loc[subkeys]
+                ax = kwplot.plot_matrix(coi_confusion, fnum=3, showvals=0, logscale=True)
+                fig_fpath = join(metrics_dpath, 'confusion_coi.png')
                 print('write fig_fpath = {!r}'.format(fig_fpath))
                 ax.figure.savefig(fig_fpath)
 
-                if classes_of_interest:
-                    subkeys = ['background'] + classes_of_interest
-                    coi_confusion = confusion[subkeys].loc[subkeys]
-                    ax = kwplot.plot_matrix(coi_confusion, fnum=3, showvals=0, logscale=True)
-                    fig_fpath = join(metrics_dpath, 'confusion_coi.png')
-                    print('write fig_fpath = {!r}'.format(fig_fpath))
-                    ax.figure.savefig(fig_fpath)
+            fig = kwplot.figure(fnum=3, doclf=True)
+            row_norm_cfsn = confusion / confusion.values.sum(axis=1, keepdims=True)
+            row_norm_cfsn = row_norm_cfsn.fillna(0)
+            ax = kwplot.plot_matrix(row_norm_cfsn, fnum=3, showvals=0, logscale=0)
+            ax.set_title('Row (truth) normalized confusions')
+            fig_fpath = join(metrics_dpath, 'row_confusion.png')
+            print('write fig_fpath = {!r}'.format(fig_fpath))
+            ax.figure.savefig(fig_fpath)
 
-                fig = kwplot.figure(fnum=3, doclf=True)
-                row_norm_cfsn = confusion / confusion.values.sum(axis=1, keepdims=True)
-                row_norm_cfsn = row_norm_cfsn.fillna(0)
-                ax = kwplot.plot_matrix(row_norm_cfsn, fnum=3, showvals=0, logscale=0)
-                ax.set_title('Row (truth) normalized confusions')
-                fig_fpath = join(metrics_dpath, 'row_confusion.png')
-                print('write fig_fpath = {!r}'.format(fig_fpath))
-                ax.figure.savefig(fig_fpath)
-
-                fig = kwplot.figure(fnum=3, doclf=True)
-                col_norm_cfsn = confusion / confusion.values.sum(axis=0, keepdims=True)
-                col_norm_cfsn = col_norm_cfsn.fillna(0)
-                ax = kwplot.plot_matrix(col_norm_cfsn, fnum=3, showvals=0, logscale=0)
-                ax.set_title('Column (pred) normalized confusions')
-                fig_fpath = join(metrics_dpath, 'col_confusion.png')
-                print('write fig_fpath = {!r}'.format(fig_fpath))
-                ax.figure.savefig(fig_fpath)
-            except Exception:
-                pass
-
-        results = {
-            'roc_result': roc_result,
-            'pr_result': pr_result,
-
-            'ovr_roc_result': ovr_roc_result,
-            'ovr_pr_result': ovr_pr_result,
-        }
-        return results
+            fig = kwplot.figure(fnum=3, doclf=True)
+            col_norm_cfsn = confusion / confusion.values.sum(axis=0, keepdims=True)
+            col_norm_cfsn = col_norm_cfsn.fillna(0)
+            ax = kwplot.plot_matrix(col_norm_cfsn, fnum=3, showvals=0, logscale=0)
+            ax.set_title('Column (pred) normalized confusions')
+            fig_fpath = join(metrics_dpath, 'col_confusion.png')
+            print('write fig_fpath = {!r}'.format(fig_fpath))
+            ax.figure.savefig(fig_fpath)
+        except Exception:
+            pass
 
     @classmethod
     def _rectify_classes(coco_eval, true_classes, pred_classes):

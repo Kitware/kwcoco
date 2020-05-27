@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * stats CLI can now accept multiple datasets.
 * ported `data.grab_voc` and `data.grab_camvid` from netharn.
 * Add `kwcoco.coco_evaluator.CocoEvaluator`
+* Add `safe` kwarg to `CocoDataset.reroot`
 
 ### Fixed
 * Python2 error with json dump

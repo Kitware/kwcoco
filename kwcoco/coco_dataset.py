@@ -1895,7 +1895,7 @@ class MixinCocoExtras(object):
             DeprecationWarning)
         return self.reroot(*args, **kw)
 
-    def reroot(self, img_root=None, absolute=False, check=True):
+    def reroot(self, img_root=None, absolute=False, check=True, safe=True):
         """
         Rebase image paths onto a new image root.
 
@@ -1909,6 +1909,9 @@ class MixinCocoExtras(object):
 
             check (bool, default=True):
                 if True, checks that the images all exist
+
+            safe (bool, default=True):
+                if True, does not overwrite values until all checks pass
 
         CommandLine:
             xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.reroot
@@ -1989,14 +1992,10 @@ class MixinCocoExtras(object):
         """
         from os.path import exists, relpath
 
-        old_img_root = self.img_root
         new_img_root = img_root
+        old_img_root = self.img_root
         if new_img_root is None:
             new_img_root = old_img_root
-
-        # from os.path import commonprefix
-        # commonprefix([img['file_name'] for img in self.imgs.values()])
-        # common_prefix = dirname(commonprefix([normpath(img['file_name']) for img in self.imgs.values()]))
 
         def _reroot_path(file_name):
             old_gpath = join(old_img_root, file_name)
@@ -2009,14 +2008,43 @@ class MixinCocoExtras(object):
             if check:
                 new_gpath = join(new_img_root, new_file_name)
                 if not exists(new_gpath):
+                    print('new_file_name = {!r}'.format(new_file_name))
+                    print('new_img_root = {!r}'.format(new_img_root))
                     raise Exception(
                         'Image does not exist: {!r}'.format(new_gpath))
             return new_file_name
 
-        for img in self.imgs.values():
-            img['file_name'] = _reroot_path(img['file_name'])
-            for aux in img.get('auxillary', []):
-                aux['file_name'] = _reroot_path(aux['file_name'])
+        if safe:
+            gid_to_new = {}
+            for gid, img in self.imgs.items():
+                try:
+                    # _reroot_path(img['file_name'])
+                    gid_to_new[gid] = new = {
+                        'file_name': _reroot_path(img['file_name'])
+                    }
+                    if 'auxillary' in img:
+                        new['aux_fname'] = aux_fname = []
+                        for aux in img.get('auxillary', []):
+                            aux_fname.append(_reroot_path(aux['file_name']))
+                except Exception:
+                    raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
+
+            # Overwrite old values
+            for gid, new in gid_to_new.items():
+                img = self.imgs[gid]
+                img['file_name'] = new['file_name']
+                if 'auxillary' in new:
+                    for aux_fname, aux in zip(new['aux_fname'], img['auxillary']):
+                        aux['file_name'] = aux_fname
+        else:
+            for img in self.imgs.values():
+                try:
+                    # _reroot_path(img['file_name'])
+                    img['file_name'] = _reroot_path(img['file_name'])
+                    for aux in img.get('auxillary', []):
+                        aux['file_name'] = _reroot_path(aux['file_name'])
+                except Exception:
+                    raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
 
         self.img_root = new_img_root
         return self
