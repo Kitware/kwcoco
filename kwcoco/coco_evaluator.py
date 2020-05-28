@@ -51,7 +51,9 @@ class CocoEvaluator(object):
         >>>     'classes_of_interest': [],
         >>> }
         >>> coco_eval = CocoEvaluator(config)
-        >>> config = coco_eval
+        >>> config = coco_eval.config
+        >>> coco_eval._init()
+        >>> coco_eval.evaluate()
     """
 
     def __init__(coco_eval, config):
@@ -127,8 +129,9 @@ class CocoEvaluator(object):
             if needs_prob_remap and 'probs' in det.data:
                 # Ensure predicted probabilities are in the unified class space
                 old_probs = det.data['probs']
-                new_probs = np.zeros_like(old_probs)
-                new_probs[:, pred_new_idxs] = old_probs[:, pred_old_idxs]
+                new_probs = np.zeros_like(old_probs, shape=(len(old_probs), len(classes)))
+                if len(new_probs):
+                    new_probs[:, pred_new_idxs] = old_probs[:, pred_old_idxs]
                 det.data['probs'] = new_probs
 
         coco_eval.gids = gids
