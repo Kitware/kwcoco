@@ -275,7 +275,7 @@ class CocoEvaluator(object):
             coco_eval.plot_results(results)
         return results
 
-    def plot_results(coco_eval, results, expt_title):
+    def plot_results(coco_eval, results, expt_title=''):
         # classes_of_interest=[], ignore_classes=None,
         # if 0:
         #     cname = 'flatfish'
