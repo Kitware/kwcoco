@@ -3692,7 +3692,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             if not isinstance(data, dict):
                 raise TypeError(
                     'data must be a dict or path to json file, '
-                    'but got: {!r}'.format(type(data))
+                    'but got: {!r}'.format(type(data)))
 
         if img_root is None:
             if 'img_root' in data:
