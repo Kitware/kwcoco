@@ -465,7 +465,7 @@ class CocoEvaluator(object):
         return classes, unified_cid_maps
 
     @classmethod
-    def _coerce_dets(cls, dataset, verbose=0):
+    def _coerce_dets(CocoEvaluator, dataset, verbose=0):
         """
         Coerce the input to a mapping from image-id to kwimage.Detection
 
@@ -539,7 +539,7 @@ class CocoEvaluator(object):
             # Input is an ndsampler object
             extra['sampler'] = sampler = dataset
             coco_dset = sampler.dset
-            gid_to_det, _extra = cls._coerce_dets(coco_dset, verbose)
+            gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
             extra.update(_extra)
         elif isinstance(dataset, six.string_types):
             if exists(dataset):
@@ -559,10 +559,12 @@ class CocoEvaluator(object):
                         print('Loading mscoco file')
                     extra['dataset_fpath'] = coco_fpath = dataset
                     coco_dset = kwcoco.CocoDataset(coco_fpath)
-                    gid_to_det, _extra = cls._coerce_dets(coco_dset, verbose)
+                    gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
                     extra.update(_extra)
                 else:
                     raise NotImplementedError
+            else:
+                raise Exception('{!r} does not exist'.format(dataset))
         else:
             raise NotImplementedError
 
