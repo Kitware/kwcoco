@@ -5,36 +5,38 @@ An implementation and extension of the original MS-COCO API [1]_.
 Extends the format to also include line annotations.
 
 Dataset Spec:
+
+    category = {
+        'id': int,
+        'name': str,
+        'supercategory': Optional[str],
+        'keypoints': Optional(List[str]),
+        'skeleton': Optional(List[Tuple[Int, Int]]),
+    }
+
+    image = {
+        'id': int,
+        'file_name': str
+    }
+
     dataset = {
         # these are object level categories
-        'categories': [
-            {
-                'id': <int:category_id>,
-                'name': <str:>,
-                'supercategory': str  # optional
-
-                # Note: this is the original way to specify keypoint
-                # categories, but our implementation supports a more general
-                # alternative schema
-                "keypoints": [kpname_1, ..., kpname_K], # length <k> array of keypoint names
-                "skeleton": [(kx_a1, kx_b1), ..., (kx_aE, kx_bE)], # list of edge pairs (of keypoint indices), defining connectivity of keypoints.
-            },
-            ...
-        ],
-        'images': [
-            {
-                'id': int,
-                'file_name': str
-            },
+        'categories': [category],
+        'images': [image]
             ...
         ],
         'annotations': [
             {
-                'id': int,
-                'image_id': int,
-                'category_id': int,
+                'id': Int,
+                'image_id': Int,
+                'category_id': Int,
+                'track_id': Optional[Int],
+
                 'bbox': [tl_x, tl_y, w, h],  # optional (xywh format)
                 "score" : float,
+                "prob" : List[float],
+                "weight" : float,
+
                 "caption": str,  # an optional text caption for this annotation
                 "iscrowd" : <0 or 1>,  # denotes if the annotation covers a single object (0) or multiple objects (1)
                 "keypoints" : [x1,y1,v1,...,xk,yk,vk], # or new dict-based format
@@ -62,7 +64,7 @@ Dataset Spec:
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
         encoding. We reuse the original C functions are in [2]_ in
-        `kwimage.structs.Mask` to provide a convinient way to abstract this
+        ``kwimage.structs.Mask`` to provide a convinient way to abstract this
         rather esoteric bytes encoding.
 
         For pure python implementations see kwimage:
@@ -151,7 +153,7 @@ Dataset Spec:
 
 
 Notes:
-    The main object in this file is `class`:CocoDataset, which is composed of
+    The main object in this file is class:`CocoDataset`, which is composed of
     several mixin classes. See the class and method documentation for more
     details.
 
@@ -183,12 +185,31 @@ __all__ = [
 _dict = OrderedDict
 
 
+# TODO
+# Programatically layout the extended Kitware MS-COCO specification.
+"""
+
+In the meantime, here is a draft of what it may look like
+
+mkdir -p $HOME/tmp/dummy_typing
+touch $HOME/tmp/dummy_typing/__init__.py
+cp /home/joncrall/.local/conda/envs/py38/lib/python3.8/typing.py $HOME/tmp/dummy_typing/dummy.py
+
+python -c "import typing; print(typing.__all__)"
+
+mkinit $HOME/tmp/dummy_typing
+
+see ~/code/kwcoco/kwcoco/spec.py
+
+
+"""
+
 INT_TYPES = (int, np.integer)
 
 
 def _annot_type(ann):
     """
-    Returns what type of annotation `ann` is.
+    Returns what type of annotation ``ann`` is.
     """
     return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
 
@@ -395,7 +416,7 @@ class ObjectList1D(ub.NiceRepr):
 
 class ObjectGroups(ub.NiceRepr):
     """
-    An object for holding a groups of `ObjectList1D` objects
+    An object for holding a groups of :class:`ObjectList1D` objects
     """
     def __init__(self, groups, dset):
         self._groups = groups
@@ -1375,7 +1396,7 @@ class MixinCocoExtras(object):
     def _alias_to_cat(self, alias_catname):
         """
         Lookup a coco-category via its name or an "alias" name.
-        In production code, use `_resolve_to_cat` instead.
+        In production code, use :method:`_resolve_to_cat` instead.
 
         Args:
             alias_catname (str): category name or alias
@@ -1615,7 +1636,7 @@ class MixinCocoExtras(object):
 
         Note: this function has been unstable in the past, and has not yet been
         properly stabalized. Either avoid or use with care.
-        Ensuring `simple=True` should result in newer saner behavior that will
+        Ensuring ``simple=True`` should result in newer saner behavior that will
         likely be backwards compatible.
 
         TODO:
@@ -2964,7 +2985,7 @@ class MixinCocoAddRemove(object):
         Remove a single annotation from the dataset
 
         If you have multiple annotations to remove its more efficient to remove
-        them in batch with `self.remove_annotations`
+        them in batch with ``self.remove_annotations``
 
         Example:
             >>> import kwcoco
@@ -3596,7 +3617,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 "keypoints" : [x1,y1,v1,...,xk,yk,vk],
                 "score" : float,
             }
-            Note that `v[i]` is a visibility flag, where v=0: not labeled,
+            Note that ``v[i]`` is a visibility flag, where v=0: not labeled,
                 v=1: labeled but not visible, and v=2: labeled and visible.
 
         A bounding box annotation
@@ -3631,7 +3652,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         index (CocoIndex): an efficient lookup index into the coco data
             structure. The index defines its own attributes like
-            `anns`, `cats`, `imgs`, etc. See :class:`CocoIndex` for more
+            ``anns``, ``cats``, ``imgs``, etc. See :class:`CocoIndex` for more
             details on which attributes are available.
 
         fpath (PathLike | None):
@@ -3665,6 +3686,19 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
     """
 
     def __init__(self, data=None, tag=None, img_root=None, autobuild=True):
+        """
+        Args:
+
+            data : semi-coercable data (note use :func:`CocoDataset.coerce` for
+                   a generally coercable constructor)
+
+            tag : semi-coercable dataset tag. This is mostly for display
+                purposes, and does not influence behavior of the underlying
+                data structure, although it may be used via convinience
+                methods.
+
+            img_root (str | None):
+        """
         if data is None:
             data = {
                 'categories': [],
@@ -3676,47 +3710,48 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         fpath = None
 
-        if isinstance(data, six.string_types):
+        if isinstance(data, dict):
+            # Assumption: If data is a dict and are not explicitly given
+            # img_root, then we assume it is relative to the cwd.
+            assumed_root = '.'
+        elif isinstance(data, six.string_types):
             fpath = data
             key = basename(fpath)
             data = json.load(open(fpath, 'r'))
 
             # If data is a path it gives us the absolute location of the root
-            root = dirname(fpath)
+            assumed_root = dirname(fpath)
             if tag is None:
                 tag = key
         else:
-            # If data is a dict, we dont know where the root is, so assume its
-            # relative to the cwd.
-            root = '.'
-            if not isinstance(data, dict):
-                raise TypeError(
-                    'data must be a dict or path to json file, '
-                    'but got: {!r}'.format(type(data)))
+            raise TypeError(
+                'data must be a dict or path to json file, '
+                'but got: {!r}'.format(type(data)))
 
         if img_root is None:
             if 'img_root' in data:
                 # allow image root to be specified in the dataset
-                _root = data['img_root']
-                if _root is None:
-                    _root = ''
-                elif isinstance(_root, six.string_types):
-                    _tmp = ub.expandpath(_root)
+                # we refer to this as a json data "body root".
+                body_root = data['img_root']
+                if body_root is None:
+                    body_root = ''
+                elif isinstance(body_root, six.string_types):
+                    _tmp = ub.expandpath(body_root)
                     if exists(_tmp):
-                        _root = _tmp
+                        body_root = _tmp
                 else:
-                    if isinstance(_root, list) and _root == []:
-                        _root = ''
+                    if isinstance(body_root, list) and body_root == []:
+                        body_root = ''
                     else:
-                        raise TypeError('_root = {!r}'.format(_root))
+                        raise TypeError('body_root = {!r}'.format(body_root))
                 try:
-                    img_root = join(root, _root)
+                    img_root = join(assumed_root, body_root)
                 except Exception:
-                    print('_root = {!r}'.format(_root))
-                    print('root = {!r}'.format(root))
+                    print('body_root = {!r}'.format(body_root))
+                    print('assumed_root = {!r}'.format(assumed_root))
                     raise
             else:
-                img_root = root
+                img_root = assumed_root
 
         self.index = CocoIndex()
 
@@ -3735,18 +3770,36 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             self._build_index()
 
     @classmethod
-    def from_image_paths(cls, gpaths, img_root=None):
+    def from_data(CocoDataset, data, img_root=None):
         """
-        Create a coco dataset from a list of images paths
+        Constructor from a json dictionary
+        """
+        coco_dset = CocoDataset(data, img_root=img_root)
+        return coco_dset
+
+    @classmethod
+    def from_image_paths(CocoDataset, gpaths, img_root=None):
+        """
+        Constructor from a list of images paths
 
         Example:
             >>> coco_dset = CocoDataset.from_image_paths(['a.png', 'b.png'])
             >>> assert coco_dset.n_images == 2
         """
-        coco_dset = cls(img_root=img_root)
+        coco_dset = CocoDataset(img_root=img_root)
         for gpath in gpaths:
             coco_dset.add_image(gpath)
         return coco_dset
+
+    @classmethod
+    def from_coco_paths(CocoDataset, fpaths, workers=0):
+        """
+        Constructor from multiple coco file paths.
+
+        Loads multiple coco datasets and unions the result
+        """
+
+        pass
 
     def copy(self):
         """
@@ -3972,13 +4025,14 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
     def union(self, *others, **kwargs):
         """
-        Merges multiple `CocoDataset` items into one. Names and associations
+        Merges multiple :class:`CocoDataset` items into one. Names and associations
         are retained, but ids may be different.
 
         Args:
-            self : note that `union` can be called as an instance method or a class method.
-                If it is a class method, then this is the class type, otherwise the instance
-                will also be unioned with `others`.
+            self : note that :func:`union` can be called as an instance method
+                or a class method.  If it is a class method, then this is the
+                class type, otherwise the instance will also be unioned with
+                ``others``.
             *others : a series of CocoDatasets that we will merge
             **kwargs : constructor options for the new merged CocoDataset
 
