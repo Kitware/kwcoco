@@ -48,7 +48,6 @@ class CocoEvaluator(object):
         >>>     'out_dpath': ub.expandpath('$HOME/remote/namek/tmp/reclassified_eval'),
         >>> }
         >>> coco_eval = CocoEvaluator(config)
-
     """
 
     def __init__(coco_eval, config):
