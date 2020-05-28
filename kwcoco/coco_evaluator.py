@@ -26,6 +26,8 @@ class CocoEvalConfig(scfg.Config):
 
         'draw': scfg.Value(True, help='draw metric plots'),
         'out_dpath': scfg.Value('./coco_metrics'),
+
+        'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
     }
 
 
@@ -40,27 +42,31 @@ class CocoEvaluator(object):
 
     Ignore:
         >>> pred_fpath1 = ub.expandpath("$HOME/remote/viame/work/bioharn/fit/nice/bioharn-det-mc-cascade-rgb-fine-coi-v43/eval/may_priority_habcam_cfarm_v7_test.mscoc/bioharn-det-mc-cascade-rgb-fine-coi-v43__epoch_00000007/c=0.1,i=window,n=0.8,window_d=512,512,window_o=0.0/all_pred.mscoco.json")
-        >>> pred_fpath2 = ub.expandpath('$HOME/remote/namek/cached_clf_out/reclassified.mscoco.json')
-        >>> true_fpath = ub.expandpath('$HOME/remote/namek/data/noaa_habcam/combos/habcam_cfarm_v8_vali.mscoco.json')
+        >>> pred_fpath2 = ub.expandpath('$HOME/tmp/cached_clf_out_cli/reclassified.mscoco.json')
+        >>> true_fpath = ub.expandpath('$HOME/remote/namek/data/noaa_habcam/combos/habcam_cfarm_v8_test.mscoco.json')
         >>> config = {
         >>>     'true_dataset': true_fpath,
         >>>     'pred_dataset': pred_fpath2,
         >>>     'out_dpath': ub.expandpath('$HOME/remote/namek/tmp/reclassified_eval'),
+        >>>     'classes_of_interest': [],
         >>> }
         >>> coco_eval = CocoEvaluator(config)
+        >>> config = coco_eval
     """
 
     def __init__(coco_eval, config):
-        coco_eval.config = config
+        coco_eval.config = CocoEvalConfig(config)
 
     def _init(coco_eval):
         # TODO: coerce into a cocodataset form if possible
 
         print('init truth dset')
-        gid_to_true = CocoEvaluator._coerce_dets(coco_eval.config['true_dataset'])
+        gid_to_true, true_extra = CocoEvaluator._coerce_dets(
+            coco_eval.config['true_dataset'])
 
         print('init pred dset')
-        gid_to_pred = CocoEvaluator._coerce_dets(coco_eval.config['pred_dataset'])
+        gid_to_pred, pred_extra = CocoEvaluator._coerce_dets(
+            coco_eval.config['pred_dataset'])
 
         pred_gids = sorted(gid_to_pred.keys())
         true_gids = sorted(gid_to_true.keys())
@@ -107,6 +113,8 @@ class CocoEvaluator(object):
         coco_eval.classes = classes
         coco_eval.gid_to_true = gid_to_true
         coco_eval.gid_to_pred = gid_to_pred
+        coco_eval.true_extra = true_extra
+        coco_eval.pred_extra = pred_extra
 
     def evaluate(coco_eval):
 
@@ -134,7 +142,7 @@ class CocoEvaluator(object):
 
         # n_true_annots = sum(map(len, gid_to_true.values()))
         # fp_cutoff = n_true_annots
-        fp_cutoff = 10000
+        fp_cutoff = coco_eval.config['fp_cutoff']
         # fp_cutoff = None
 
         from netharn.metrics import DetectionMetrics
@@ -170,8 +178,6 @@ class CocoEvaluator(object):
         # Get pure per-item detection results
         binvecs = cfsn_vecs.binarize_peritem(negative_classes=negative_classes)
 
-        fp_cutoff = None
-
         roc_result = binvecs.roc(fp_cutoff=fp_cutoff)
         pr_result = binvecs.precision_recall()
         thresh_result = binvecs.threshold_curves()
@@ -189,6 +195,18 @@ class CocoEvaluator(object):
         print('ovr_roc_result = {!r}'.format(ovr_roc_result))
         print('ovr_pr_result = {!r}'.format(ovr_pr_result))
         # print('ovr_thresh_result = {!r}'.format(ovr_thresh_result))
+
+        results = {
+            'cfsn_vecs': cfsn_vecs,
+
+            'roc_result': roc_result,
+            'pr_result': pr_result,
+            'thresh_result': thresh_result,
+
+            'ovr_roc_result': ovr_roc_result,
+            'ovr_pr_result': ovr_pr_result,
+            'ovr_thresh_result': ovr_thresh_result,
+        }
 
         # TODO: when making the ovr localization curves, it might be a good
         # idea to include a second version where any COI prediction assigned
@@ -220,24 +238,13 @@ class CocoEvaluator(object):
             print('ovr_roc_result2 = {!r}'.format(ovr_roc_result2))
             print('ovr_pr_result2 = {!r}'.format(ovr_pr_result2))
             # print('ovr_thresh_result2 = {!r}'.format(ovr_thresh_result2))
+            results.update({
+                'ovr_roc_result2': ovr_roc_result2,
+                'ovr_pr_result2': ovr_pr_result2,
+            })
 
         # FIXME: there is a lot of redundant information here,
         # this needs to be consolidated both here and in netharn metrics
-        results = {
-            'cfsn_vecs': cfsn_vecs,
-
-            'roc_result': roc_result,
-            'pr_result': pr_result,
-            'thresh_result': thresh_result,
-
-            'ovr_roc_result': ovr_roc_result,
-            'ovr_pr_result': ovr_pr_result,
-            'ovr_thresh_result': ovr_thresh_result,
-
-            'ovr_roc_result2': ovr_roc_result2,
-            'ovr_pr_result2': ovr_pr_result2,
-        }
-
         # metrics_dpath = coco_eval.config['out_dpath']
         if coco_eval.config['draw']:
             coco_eval.plot_results(results)
@@ -251,10 +258,9 @@ class CocoEvaluator(object):
         #     is_true = (cfsn_vecs.data['true'] == cx)
         #     num_localized = (cfsn_vecs.data['pred'][is_true] != -1).sum()
         #     num_missed = is_true.sum() - num_localized
-        metrics_dpath = coco_eval.config['out_dpath']
+        metrics_dpath = ub.ensuredir(coco_eval.config['out_dpath'])
 
         classes_of_interest = coco_eval.config['classes_of_interest']
-        metrics_dpath = coco_eval.config['out_dpath']
 
         pr_result = results['pr_result']
         roc_result = results['roc_result']
@@ -264,8 +270,6 @@ class CocoEvaluator(object):
         ovr_roc_result = results['ovr_roc_result']
         ovr_thresh_result = results['ovr_thresh_result']
 
-        ovr_pr_result2 = results['ovr_pr_result2']
-        ovr_roc_result2 = results['ovr_roc_result2']
         cfsn_vecs = results['cfsn_vecs']
 
         # TODO: separate into standalone method that is able to run on
@@ -314,7 +318,9 @@ class CocoEvaluator(object):
         print('write fig_fpath = {!r}'.format(fig_fpath))
         fig.savefig(fig_fpath)
 
-        if classes_of_interest:
+        if 'ovr_pr_result2' in results:
+            ovr_pr_result2 = results['ovr_pr_result2']
+            ovr_roc_result2 = results['ovr_roc_result2']
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
                                 figtitle=expt_title)
             fig.set_size_inches(figsize)
@@ -437,16 +443,23 @@ class CocoEvaluator(object):
         return classes, unified_cid_maps
 
     @classmethod
-    def _coerce_dets(cls, dataset):
+    def _coerce_dets(cls, dataset, verbose=0):
         """
         Coerce the input to a mapping from image-id to kwimage.Detection
 
         Returns:
-            Dict[int, Detections]: gid_to_det: mapping from gid to dets
+            Tuple[Dict[int, Detections], Dict]:
+                gid_to_det: mapping from gid to dets
+                extra: any extra information we gathered via coercion
+
+        Example:
+            >>> import kwcoco
+            >>> coco_dset = kwcoco.CocoDataset.demo('shapes8')
+            >>> gid_to_det, extras = CocoEvaluator._coerce_dets(coco_dset)
 
         Ignore:
-            true_dataset = dataset = truth_sampler
-            pred_dataset = dataset = gid_to_pred
+            >>> dataset = ub.expandpath('$HOME/remote/namek/tmp/cached_clf_out_cli/reclassified.mscoco.json')
+            >>> gid_to_pred, extras = CocoEvaluator._coerce_dets(dataset)
         """
         # coerce the input into dictionary of detection objects.
         import kwcoco
@@ -454,6 +467,10 @@ class CocoEvaluator(object):
         if 1:
             # hack
             isinstance = kwimage.structs._generic._isinstance2
+
+        # We only need the box locations, but if we can coerce extra
+        # information we will maintain that as well.
+        extra = {}
 
         if isinstance(dataset, dict):
             if len(dataset):
@@ -466,7 +483,7 @@ class CocoEvaluator(object):
             else:
                 gid_to_det = {}
         elif isinstance(dataset, kwcoco.CocoDataset):
-            coco_dset = dataset
+            extra['coco_dset'] = coco_dset = dataset
             gid_to_det = {}
             gids = sorted(coco_dset.imgs.keys())
             classes = coco_dset.object_categories()
@@ -482,6 +499,10 @@ class CocoEvaluator(object):
                 weights = [a.get('weight', 1) for a in anns]
                 scores = [a.get('score', np.nan) for a in anns]
 
+                kw = {}
+                if all('prob' in a for a in anns):
+                    kw['probs'] = [a['prob'] for a in anns]
+
                 dets = kwimage.Detections(
                     boxes=kwimage.Boxes([a['bbox'] for a in anns], 'xywh'),
                     segmentations=ssegs,
@@ -489,34 +510,41 @@ class CocoEvaluator(object):
                     classes=classes,
                     weights=np.array(weights),
                     scores=np.array(scores),
+                    **kw,
                 ).numpy()
                 gid_to_det[gid] = dets
         elif isinstance(dataset, ndsampler.CocoSampler):
             # Input is an ndsampler object
-            sampler = dataset
+            extra['sampler'] = sampler = dataset
             coco_dset = sampler.dset
-            gid_to_det = cls._coerce_dets(coco_dset)
+            gid_to_det, _extra = cls._coerce_dets(coco_dset, verbose)
+            extra.update(_extra)
         elif isinstance(dataset, six.string_types):
             if exists(dataset):
                 # on-disk detections
                 if isdir(dataset):
+                    if verbose:
+                        print('Loading mscoco directory')
                     # directory of predictions
-                    pred_fpaths = sorted(glob.glob(join(dataset, '*.json')))
-                    dets = _load_dets(pred_fpaths)
+                    extra['coco_dpath'] = coco_dpath = dataset
+                    coco_fpaths = sorted(glob.glob(join(coco_dpath, '*.json')))
+                    dets = _load_dets(coco_fpaths)
                     gid_to_det = {d.meta['gid']: d for d in dets}
                     pass
                 elif isfile(dataset):
                     # mscoco file
-                    print('Loading mscoco file')
-                    coco_fpath = dataset
+                    if verbose:
+                        print('Loading mscoco file')
+                    extra['dataset_fpath'] = coco_fpath = dataset
                     coco_dset = kwcoco.CocoDataset(coco_fpath)
-                    gid_to_det = cls._coerce_dets(coco_dset)
+                    gid_to_det, _extra = cls._coerce_dets(coco_dset, verbose)
+                    extra.update(_extra)
                 else:
                     raise NotImplementedError
         else:
             raise NotImplementedError
 
-        return gid_to_det
+        return gid_to_det, extra
 
 
 def _load_dets(pred_fpaths, workers=6):
