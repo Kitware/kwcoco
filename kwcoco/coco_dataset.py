@@ -2020,11 +2020,23 @@ class MixinCocoExtras(object):
 
         Example:
             >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
-
+            >>> def report(dset, name):
+            >>>     gid = 1
+            >>>     abs_fpath = dset.get_image_fpath(gid)
+            >>>     rel_fpath = dset.imgs[gid]['file_name']
+            >>>     color = 'green' if exists(abs_fpath) else 'red'
+            >>>     print('strategy_name = {!r}'.format(name))
+            >>>     print(ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
+            >>>     print('rel_fpath = {!r}'.format(rel_fpath))
+            >>> dset = self = kwcoco.CocoDataset.demo()
             >>> # Change base relative directory
             >>> img_root = ub.expandpath('~')
+            >>> print('ORIG self.imgs = {!r}'.format(self.imgs))
+            >>> print('ORIG dset.img_root = {!r}'.format(dset.img_root))
+            >>> print('NEW img_root       = {!r}'.format(img_root))
             >>> self.reroot(img_root)
+            >>> report(self, 'self')
+            >>> print('NEW self.imgs = {!r}'.format(self.imgs))
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
             >>> # Use absolute paths
@@ -2040,7 +2052,11 @@ class MixinCocoExtras(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
             >>> img_root = ub.expandpath('~')
+            >>> print(self.imgs[1]['file_name'])
+            >>> print(self.imgs[1]['auxillary'][0]['file_name'])
             >>> self.reroot(img_root)
+            >>> print(self.imgs[1]['file_name'])
+            >>> print(self.imgs[1]['auxillary'][0]['file_name'])
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
             >>> assert self.imgs[1]['auxillary'][0]['file_name'].startswith('.cache')
         """
@@ -2080,7 +2096,7 @@ class MixinCocoExtras(object):
                         'file_name': _reroot_path(img['file_name'])
                     }
                     if 'auxillary' in img:
-                        new['aux_fname'] = aux_fname = []
+                        new['auxillary'] = aux_fname = []
                         for aux in img.get('auxillary', []):
                             aux_fname.append(_reroot_path(aux['file_name']))
                 except Exception:
@@ -2091,7 +2107,7 @@ class MixinCocoExtras(object):
                 img = self.imgs[gid]
                 img['file_name'] = new['file_name']
                 if 'auxillary' in new:
-                    for aux_fname, aux in zip(new['aux_fname'], img['auxillary']):
+                    for aux_fname, aux in zip(new['auxillary'], img['auxillary']):
                         aux['file_name'] = aux_fname
         else:
             for img in self.imgs.values():
