@@ -85,6 +85,21 @@ class CocoEvaluator(object):
         true_to_unified_cid = unified_cid_maps['true']
         pred_to_unified_cid = unified_cid_maps['pred']
 
+        # Helper infor for mapping predicted probabilities
+        pred_new_idxs = []
+        pred_old_idxs = []
+        for old_idx, old_node in enumerate(pred_classes.idx_to_node):
+            old_cid = pred_classes.node_to_id[old_node]
+            new_cid = pred_to_unified_cid[old_cid]
+            new_idx = classes.id_to_idx[new_cid]
+            pred_old_idxs.append(old_idx)
+            pred_new_idxs.append(new_idx)
+
+        needs_prob_remap = (
+            (pred_new_idxs == pred_old_idxs) or
+            (len(classes) != len(pred_classes))
+        ) or True
+
         # Move truth to the unified class indices
         for gid in ub.ProgIter(gids, desc='Rectify truth class idxs'):
             det = gid_to_true[gid]
@@ -108,6 +123,13 @@ class CocoEvaluator(object):
             new_cidxs = np.array([new_classes.id_to_idx[c] for c in new_cids])
             det.meta['classes'] = new_classes
             det.data['class_idxs'] = new_cidxs
+
+            if needs_prob_remap and 'probs' in det.data:
+                # Ensure predicted probabilities are in the unified class space
+                old_probs = det.data['probs']
+                new_probs = np.zeros_like(old_probs)
+                new_probs[:, pred_new_idxs] = old_probs[:, pred_old_idxs]
+                det.data['probs'] = new_probs
 
         coco_eval.gids = gids
         coco_eval.classes = classes
