@@ -157,6 +157,12 @@ Notes:
     several mixin classes. See the class and method documentation for more
     details.
 
+
+TODO:
+    - [ ] Use ijson to lazilly load pieces of the dataset in the background or
+      on demand. This will give us faster access to categories / images,
+      whereas we will always have to wait for annotations etc...
+
 References:
     .. [1] http://cocodataset.org/#format-data
     .. [2] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py

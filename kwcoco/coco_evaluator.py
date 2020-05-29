@@ -599,3 +599,17 @@ def _load_dets_worker(single_pred_fpath):
                                                dset=single_img_coco)
     dets.meta['gid'] = gid
     return dets
+
+
+def main(**kw):
+    config = CocoEvalConfig(cmdline=True, default=kw)
+    coco_eval = CocoEvaluator(config)
+
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/kwcoco/coco_evaluator.py
+    """
+    import xdoctest
+    xdoctest.doctest_module(__file__)
