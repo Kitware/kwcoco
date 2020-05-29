@@ -3808,14 +3808,23 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         return coco_dset
 
     @classmethod
-    def from_coco_paths(CocoDataset, fpaths, workers=0):
+    def from_coco_paths(CocoDataset, fpaths, max_workers=0, verbose=1):
         """
         Constructor from multiple coco file paths.
 
         Loads multiple coco datasets and unions the result
         """
-
-        pass
+        # Can this be done better with asyncio?
+        from kwcoco.util import util_futures
+        verbose = 1
+        max_workers = 0
+        jobs = util_futures.JobPool('thread', max_workers=max_workers)
+        for fpath in ub.ProgIter(fpaths, desc='submit load jobs', verbose=verbose):
+            jobs.submit(CocoDataset, fpath)
+        results = [f.result() for f in ub.ProgIter(jobs.as_completed(),
+                   desc='collect load jobs', total=len(jobs), verbose=verbose)]
+        coco_dset = CocoDataset.union(*results)
+        return coco_dset
 
     def copy(self):
         """
