@@ -604,6 +604,8 @@ def _load_dets_worker(single_pred_fpath):
 def main(**kw):
     config = CocoEvalConfig(cmdline=True, default=kw)
     coco_eval = CocoEvaluator(config)
+    coco_eval._init()
+    coco_eval.evaluate()
 
 
 if __name__ == '__main__':
@@ -611,5 +613,4 @@ if __name__ == '__main__':
     CommandLine:
         python ~/code/kwcoco/kwcoco/coco_evaluator.py
     """
-    import xdoctest
-    xdoctest.doctest_module(__file__)
+    main()
