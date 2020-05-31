@@ -18,8 +18,8 @@ import scriptconfig as scfg
 
 class CocoEvalConfig(scfg.Config):
     default = {
-        'true_dataset': scfg.Value(None, help='coercable true detections'),
-        'pred_dataset': scfg.Value(None, help='coercable predicted detections'),
+        'true_dataset': scfg.Value(None, type=str, help='coercable true detections'),
+        'pred_dataset': scfg.Value(None, type=str, help='coercable predicted detections'),
 
         'classes_of_interest': scfg.Value(None, type=list, help='if specified only these classes are given weight'),
         'ignore_classes': scfg.Value(None, type=list, help='classes to ignore'),
