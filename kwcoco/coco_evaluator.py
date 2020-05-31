@@ -569,7 +569,7 @@ class CocoEvaluator(object):
             else:
                 raise Exception('{!r} does not exist'.format(dataset))
         else:
-            raise NotImplementedError
+            raise TypeError('Unknown dataset type: {!r}'.format(type(dataset)))
 
         return gid_to_det, extra
 
