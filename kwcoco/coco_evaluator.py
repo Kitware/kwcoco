@@ -22,12 +22,17 @@ class CocoEvalConfig(scfg.Config):
         'pred_dataset': scfg.Value(None, type=str, help='coercable predicted detections'),
 
         'classes_of_interest': scfg.Value(None, type=list, help='if specified only these classes are given weight'),
-        'ignore_classes': scfg.Value(None, type=list, help='classes to ignore'),
+        'ignore_classes': scfg.Value(None, type=list, help='classes to ignore (give them zero weight)'),
+
+        # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
 
         'draw': scfg.Value(True, help='draw metric plots'),
         'out_dpath': scfg.Value('./coco_metrics'),
 
         'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
+
+        'implicit_negative_classes': scfg.Value(['background']),
+        'implicit_ignore_classes': scfg.Value(['ignore']),
     }
 
 
@@ -54,19 +59,45 @@ class CocoEvaluator(object):
         >>> config = coco_eval.config
         >>> coco_eval._init()
         >>> coco_eval.evaluate()
+
+    Example:
+        >>> from kwcoco.coco_evaluator import CocoEvaluator
+        >>> import kwcoco
+        >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
+        >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
+        >>> pred_dset = true_dset.copy()  # todo perterb
+        >>> import kwarray
+        >>> rng = kwarray.ensure_rng(0)
+        >>> for ann in pred_dset.anns.values():
+        >>>     ann['score'] = rng.rand()
+        >>> config = {
+        >>>     'true_dataset': true_dset,
+        >>>     'pred_dataset': pred_dset,
+        >>>     'out_dpath': dpath,
+        >>>     'classes_of_interest': [],
+        >>> }
+        >>> coco_eval = CocoEvaluator(config)
+        >>> results = coco_eval.evaluate()
     """
 
     def __init__(coco_eval, config):
         coco_eval.config = CocoEvalConfig(config)
+        coco_eval._is_init = False
+        coco_eval._logs = []
+        coco_eval._verbose = 1
+
+    def log(coco_eval, msg, level='INFO'):
+        if coco_eval._verbose:
+            print(msg)
+        coco_eval._logs.append((level, msg))
 
     def _init(coco_eval):
         # TODO: coerce into a cocodataset form if possible
-
-        print('init truth dset')
+        coco_eval.log('init truth dset')
         gid_to_true, true_extra = CocoEvaluator._coerce_dets(
             coco_eval.config['true_dataset'])
 
-        print('init pred dset')
+        coco_eval.log('init pred dset')
         gid_to_pred, pred_extra = CocoEvaluator._coerce_dets(
             coco_eval.config['pred_dataset'])
 
@@ -140,13 +171,29 @@ class CocoEvaluator(object):
         coco_eval.gid_to_pred = gid_to_pred
         coco_eval.true_extra = true_extra
         coco_eval.pred_extra = pred_extra
+        coco_eval._is_init = True
+
+    def _ensure_init(coco_eval):
+        if not coco_eval._is_init:
+            coco_eval._init()
 
     def evaluate(coco_eval):
-
-        classes_of_interest = coco_eval.config['classes_of_interest']
-        ignore_classes = coco_eval.config['ignore_classes']
-
+        coco_eval.log('evaluating')
+        coco_eval._ensure_init()
         classes = coco_eval.classes
+
+        # Ignore any categories with too few tests instances
+        negative_classes = coco_eval.config['implicit_negative_classes']
+        classes_of_interest = coco_eval.config['classes_of_interest']
+        ignore_classes = set(coco_eval.config['implicit_ignore_classes'])
+        if coco_eval.config['ignore_classes']:
+            ignore_classes.update(coco_eval.config['ignore_classes'])
+        if classes_of_interest:
+            ignore_classes.update(set(classes) - set(classes_of_interest))
+        coco_eval.log('negative_classes = {!r}'.format(negative_classes))
+        coco_eval.log('classes_of_interest = {!r}'.format(classes_of_interest))
+        coco_eval.log('ignore_classes = {!r}'.format(ignore_classes))
+
         gid_to_true = coco_eval.gid_to_true
         gid_to_pred = coco_eval.gid_to_pred
 
@@ -165,10 +212,7 @@ class CocoEvaluator(object):
                 pred_names += cnames
             ub.dict_hist(pred_names)
 
-        # n_true_annots = sum(map(len, gid_to_true.values()))
-        # fp_cutoff = n_true_annots
         fp_cutoff = coco_eval.config['fp_cutoff']
-        # fp_cutoff = None
 
         from kwcoco.metrics import DetectionMetrics
         dmet = DetectionMetrics(classes=classes)
@@ -182,23 +226,10 @@ class CocoEvaluator(object):
             voc_info = dmet.score_voc(ignore_classes='ignore')
             print('voc_info = {!r}'.format(voc_info))
 
-        # Ignore any categories with too few tests instances
-        if ignore_classes is None:
-            ignore_classes = {'ignore'}
-
-        if classes_of_interest:
-            ignore_classes.update(set(classes) - set(classes_of_interest))
-
         # Detection only scoring
         print('Building confusion vectors')
         cfsn_vecs = dmet.confusion_vectors(ignore_classes=ignore_classes,
                                            workers=8)
-
-        negative_classes = ['background']
-
-        print('negative_classes = {!r}'.format(negative_classes))
-        print('classes_of_interest = {!r}'.format(classes_of_interest))
-        print('ignore_classes = {!r}'.format(ignore_classes))
 
         # Get pure per-item detection results
         binvecs = cfsn_vecs.binarize_peritem(negative_classes=negative_classes)
@@ -304,6 +335,7 @@ class CocoEvaluator(object):
         # serialized / cached metrics on disk.
         print('drawing evaluation metrics')
         import kwplot
+        # TODO: kwcoco matplotlib backend context
         kwplot.autompl()
 
         import seaborn
@@ -529,6 +561,8 @@ class CocoEvaluator(object):
 
                 kw = {}
                 if all('prob' in a for a in anns):
+                    # TODO: can we ensure the probs are always in the proper
+                    # order here? I think they are, but I'm not 100% sure.
                     kw['probs'] = [a['prob'] for a in anns]
 
                 dets = kwimage.Detections(
@@ -578,30 +612,72 @@ class CocoEvaluator(object):
 
 
 def _load_dets(pred_fpaths, workers=6):
+    """
+    Example:
+        >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
+        >>> import ubelt as ub
+        >>> import kwcoco
+        >>> from os.path import join
+        >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/load_dets')
+        >>> N = 4
+        >>> pred_fpaths = []
+        >>> for i in range(1, N + 1):
+        >>>     dset = kwcoco.CocoDataset.demo('shapes{}'.format(i))
+        >>>     dset.fpath = join(dpath, 'shapes_{}.mscoco.json'.format(i))
+        >>>     dset.dump(dset.fpath)
+        >>>     pred_fpaths.append(dset.fpath)
+        >>> dets, coco_dset = _load_dets(pred_fpaths)
+        >>> print('dets = {!r}'.format(dets))
+        >>> print('coco_dset = {!r}'.format(coco_dset))
+    """
     # Process mode is much faster than thread.
-    from kwcoco.utils import util_futures
+    import kwcoco
+    from kwcoco.util import util_futures
     jobs = util_futures.JobPool(mode='process', max_workers=workers)
     for single_pred_fpath in ub.ProgIter(pred_fpaths, desc='submit load dets jobs'):
-        job = jobs.submit(_load_dets_worker, single_pred_fpath)
-    dets = []
+        job = jobs.submit(_load_dets_worker, single_pred_fpath, with_coco=True)
+    results = []
     for job in ub.ProgIter(jobs.jobs, total=len(jobs), desc='loading cached dets'):
-        dets.append(job.result())
-    return dets
+        results.append(job.result())
+    dets = [r[0] for r in results]
+    pred_cocos = [r[1] for r in results]
+    coco_dset = kwcoco.CocoDataset.union(*pred_cocos)
+    return dets, coco_dset
 
 
-def _load_dets_worker(single_pred_fpath):
+def _load_dets_worker(single_pred_fpath, with_coco=True):
     """
     single_pred_fpath = ub.expandpath('$HOME/remote/namek/work/bioharn/fit/runs/bioharn-det-mc-cascade-rgbd-v36/brekugqz/eval/habcam_cfarm_v6_test.mscoc/bioharn-det-mc-cascade-rgbd-v36__epoch_00000018/c=0.2,i=window,n=0.5,window_d=512,512,window_o=0.0/pred/dets_gid_00004070_v2.mscoco.json')
+
+        >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
+        >>> import ubelt as ub
+        >>> import kwcoco
+        >>> from os.path import join
+        >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/load_dets')
+        >>> dset = kwcoco.CocoDataset.demo('shapes8')
+        >>> dset.fpath = join(dpath, 'shapes8.mscoco.json')
+        >>> dset.dump(dset.fpath)
+        >>> single_pred_fpath = dset.fpath
+        >>> dets, coco = _load_dets_worker(single_pred_fpath)
+        >>> print('dets = {!r}'.format(dets))
+        >>> print('coco = {!r}'.format(coco))
     """
     import kwcoco
     single_img_coco = kwcoco.CocoDataset(single_pred_fpath, autobuild=False)
-    if len(single_img_coco.dataset['images']) != 1:
-        raise Exception('Expected predictions for a single image only')
-    gid = single_img_coco.dataset['images'][0]['id']
     dets = kwimage.Detections.from_coco_annots(single_img_coco.dataset['annotations'],
                                                dset=single_img_coco)
-    dets.meta['gid'] = gid
-    return dets
+    if len(single_img_coco.dataset['images']) != 1:
+        # raise Exception('Expected predictions for a single image only')
+        gid = single_img_coco.dataset['images'][0]['id']
+        dets.meta['gid'] = gid
+    else:
+        import warnings
+        warnings.warn('Loading dets with muliple images, must track gids carefully')
+
+    if with_coco:
+        return dets, single_img_coco
+    else:
+        return dets
 
 
 def main(**kw):
