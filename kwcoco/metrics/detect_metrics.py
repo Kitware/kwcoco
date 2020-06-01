@@ -418,16 +418,10 @@ class DetectionMetrics(ub.NiceRepr):
                                            gids=gids,
                                            compat=compat,
                                            prioritize=prioritize)
-
-        # THE BINARIZE_PERITEM IS BROKEN
-        # cfsn_peritem = cfsn_vecs.binarize_peritem()
-        # peritem = cfsn_peritem.precision_recall()
-
         info = {}
-        # info['peritem'] = peritem
         try:
             cfsn_perclass = cfsn_vecs.binarize_ovr(mode=1)
-            perclass = cfsn_perclass.precision_recall()
+            perclass = cfsn_perclass.measures()
         except Exception as ex:
             print('warning: ex = {!r}'.format(ex))
         else:
@@ -624,15 +618,15 @@ class DetectionMetrics(ub.NiceRepr):
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> binvecs_ovr = cfsn_vecs.binarize_ovr()
             >>> binvecs_per = cfsn_vecs.binarize_peritem()
-            >>> pr_per = binvecs_per.precision_recall()
-            >>> pr_ovr = binvecs_ovr.precision_recall()
-            >>> print('pr_per = {!r}'.format(pr_per))
-            >>> print('pr_ovr = {!r}'.format(pr_ovr))
+            >>> measures_per = binvecs_per.measures()
+            >>> measures_ovr = binvecs_ovr.measures()
+            >>> print('measures_per = {!r}'.format(measures_per))
+            >>> print('measures_ovr = {!r}'.format(measures_ovr))
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
             >>> pr_per.draw(fnum=1)
-            >>> pr_ovr['perclass'].draw(fnum=2)
+            >>> measures_ovr['perclass'].draw(key='pr', fnum=2)
         """
         import kwimage
         import kwarray

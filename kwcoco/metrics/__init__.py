@@ -16,13 +16,9 @@ from . import confusion_vectors
 
 from .detect_metrics import (DetectionMetrics, eval_detections_cli,)
 from .confusion_vectors import (BinaryConfusionVectors, ConfusionVectors,
-                                DictProxy, OneVsRestConfusionVectors,
-                                PR_Result, PerClass_PR_Result,
-                                PerClass_ROC_Result, PerClass_Threshold_Result,
-                                ROC_Result, Threshold_Result,)
+                                Measures, OneVsRestConfusionVectors,
+                                PerClass_Measures,)
 
 __all__ = ['BinaryConfusionVectors', 'ConfusionVectors', 'DetectionMetrics',
-           'DictProxy', 'OneVsRestConfusionVectors', 'PR_Result',
-           'PerClass_PR_Result', 'PerClass_ROC_Result',
-           'PerClass_Threshold_Result', 'ROC_Result', 'Threshold_Result',
+           'Measures', 'OneVsRestConfusionVectors', 'PerClass_Measures',
            'confusion_vectors', 'detect_metrics', 'eval_detections_cli']

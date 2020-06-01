@@ -19,7 +19,7 @@ def draw_roc(roc_info, prefix='', fnum=1, **kw):
         >>> cfsn_vecs = dmet.confusion_vectors(compat='mutex', prioritize='iou', bias=0)
         >>> print(cfsn_vecs.data._pandas().sort_values('score'))
         >>> classes = cfsn_vecs.classes
-        >>> roc_info = ub.peek(cfsn_vecs.binarize_ovr().roc()['perclass'].values())
+        >>> roc_info = ub.peek(cfsn_vecs.binarize_ovr().measures()['perclass'].values())
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> kwplot.autompl()
@@ -135,7 +135,7 @@ def draw_perclass_prcurve(cx_to_peritem, classes=None, prefix='', fnum=1, **kw):
         >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
         >>> cfsn_vecs = dmet.confusion_vectors()
         >>> classes = cfsn_vecs.classes
-        >>> cx_to_peritem = cfsn_vecs.binarize_ovr().precision_recall()['perclass']
+        >>> cx_to_peritem = cfsn_vecs.binarize_ovr().measures()['perclass']
         >>> import kwplot
         >>> kwplot.autompl()
         >>> draw_perclass_prcurve(cx_to_peritem, classes)
@@ -214,7 +214,7 @@ def draw_perclass_thresholds(cx_to_peritem, key='mcc', classes=None, prefix='', 
         >>> cfsn_vecs = ConfusionVectors.demo()
         >>> classes = cfsn_vecs.classes
         >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
-        >>> cx_to_peritem = ovr_cfsn.threshold_curves()['perclass']
+        >>> cx_to_peritem = ovr_cfsn.measures()['perclass']
         >>> import kwplot
         >>> kwplot.autompl()
         >>> key = 'mcc'
@@ -286,7 +286,7 @@ def draw_prcurve(peritem, prefix='', fnum=1, **kw):
         >>> cfsn_vecs = dmet.confusion_vectors()
 
         >>> classes = cfsn_vecs.classes
-        >>> peritem = cfsn_vecs.binarize_peritem().precision_recall()
+        >>> peritem = cfsn_vecs.binarize_peritem().measures()
         >>> import kwplot
         >>> kwplot.autompl()
         >>> draw_prcurve(peritem)
@@ -346,7 +346,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         >>> dmet = DetectionMetrics.demo(
         >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
         >>> cfsn_vecs = dmet.confusion_vectors()
-        >>> info = cfsn_vecs.binarize_peritem().threshold_curves()
+        >>> info = cfsn_vecs.binarize_peritem().measures()
         >>> keys = None
         >>> import kwplot
         >>> kwplot.autompl()

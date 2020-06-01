@@ -236,12 +236,6 @@ class CocoEvaluator(object):
 
         measures = binvecs.measures(fp_cutoff=fp_cutoff)
         print('measures = {}'.format(ub.repr2(measures, nl=1)))
-        # roc_result = measures
-        # pr_result = measures
-        # thresh_result = measures
-        # print('roc_result = {!r}'.format(roc_result))
-        # print('pr_result = {!r}'.format(pr_result))
-        # print('thresh_result = {!r}'.format(thresh_result))
 
         # Get per-class detection results
         ovr_binvecs = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
@@ -398,6 +392,7 @@ class CocoEvaluator(object):
             ax.figure.savefig(fig_fpath)
 
             if classes_of_interest:
+                # coco_eval.config['implicit_negative_classes']
                 subkeys = ['background'] + classes_of_interest
                 coi_confusion = confusion[subkeys].loc[subkeys]
                 ax = kwplot.plot_matrix(coi_confusion, fnum=3, showvals=0, logscale=True)

@@ -83,8 +83,8 @@ class VOC_Metrics(ub.NiceRepr):
             kwplot.autoplt().gca().set_xlim(0, 100)
             kwplot.autoplt().gca().set_ylim(0, 100)
         """
-        from kwcoco.metrics.confusion_vectors import PR_Result
-        from kwcoco.metrics.confusion_vectors import PerClass_PR_Result
+        from kwcoco.metrics.confusion_vectors import Measures
+        from kwcoco.metrics.confusion_vectors import PerClass_Measures
         perclass = {}
         for cx in self.cx_to_lines.keys():
             lines = self.cx_to_lines[cx]
@@ -97,12 +97,11 @@ class VOC_Metrics(ub.NiceRepr):
                 roc_info.update({
                     'node': catname,
                 })
-                perclass[catname] = PR_Result(roc_info)
+                perclass[catname] = Measures(roc_info)
             else:
-                perclass[cx] = PR_Result(roc_info)
+                perclass[cx] = Measures(roc_info)
 
-        perclass = PerClass_PR_Result(perclass)
-
+        perclass = PerClass_Measures(perclass)
         mAP = np.nanmean([d['ap'] for d in perclass.values()])
         voc_scores = {
             'mAP': mAP,

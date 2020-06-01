@@ -669,68 +669,23 @@ class BinaryConfusionVectors(ub.NiceRepr):
         import kwplot
         return kwplot.multi_plot(xdata=xdata, ydata=ydata, color=color)
 
-    # @ub.memoize_method
     def precision_recall(self, stabalize_thresh=7, stabalize_pad=7, method='sklearn'):
         """
-        Example:
-            >>> self = BinaryConfusionVectors.demo(n=11)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-            >>> self = BinaryConfusionVectors.demo(n=7)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-            >>> self = BinaryConfusionVectors.demo(n=5)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-            >>> self = BinaryConfusionVectors.demo(n=3)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-            >>> self = BinaryConfusionVectors.demo(n=2)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-            >>> self = BinaryConfusionVectors.demo(n=1)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-
-            >>> self = BinaryConfusionVectors.demo(n=0)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-
-            >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-
-
-            >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
-            >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
-
-            import kwplot
-            kwplot.autompl()
-            self = BinaryConfusionVectors.demo(n=128, p_true=0.8, p_error=0.2, rng=0)
-            pr_result = self.precision_recall()
-            pr_result.draw()
-
-            roc_result = self.roc()
-            roc_result.draw()
-
+        Deprecated, all information lives in measures now
         """
         pr_info = self.measures(
             fp_cutoff=None, stabalize_thresh=stabalize_thresh,
             stabalize_pad=stabalize_pad)
-        return PR_Result(pr_info)
+        return pr_info
 
-    # @ub.memoize_method
     def roc(self, fp_cutoff=None, stabalize_thresh=7, stabalize_pad=7):
         """
-        Example:
-            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-            >>> self = BinaryConfusionVectors.demo(n=0)
-            >>> print('roc = {}'.format(ub.repr2(self.roc())))
-            >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
-            >>> print('roc = {}'.format(ub.repr2(self.roc())))
-            >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
-            >>> print('roc = {}'.format(ub.repr2(self.roc())))
-
-        Ignore:
-            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.roc))
+        Deprecated, all information lives in measures now
         """
-        # All information lives in threshold curves now.
         roc_info = self.measures(
             fp_cutoff=fp_cutoff, stabalize_thresh=stabalize_thresh,
             stabalize_pad=stabalize_pad)
-        return ROC_Result(roc_info)
+        return roc_info
 
     @ub.memoize_method
     def measures(self, stabalize_thresh=7, stabalize_pad=7, fp_cutoff=None):
@@ -738,8 +693,16 @@ class BinaryConfusionVectors(ub.NiceRepr):
         Get statistics (F1, G1, MCC) versus thresholds
 
         Example:
-            >>> self = BinaryConfusionVectors.demo(n=100)
-            >>> self.measures()
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> self = BinaryConfusionVectors.demo(n=0)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+
+        Ignore:
+            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.measures))
         """
         # compute tp, fp, tn, fn at each point
         # compute mcc, f1, g1, etc
