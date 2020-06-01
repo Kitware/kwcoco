@@ -27,10 +27,16 @@ def draw_roc(roc_info, prefix='', fnum=1, **kw):
         >>> kwplot.show_if_requested()
     """
     import kwplot
-    fp_count = roc_info['fp_count']
-    fp_rate = roc_info['fpr']
-    tp_rate = roc_info['tpr']
-    auc = roc_info['auc']
+    try:
+        fp_count = roc_info['trunc_fp_count']
+        fp_rate = roc_info['trunc_fpr']
+        tp_rate = roc_info['trunc_tpr']
+        auc = roc_info['trunc_auc']
+    except KeyError:
+        fp_count = roc_info['fp_count']
+        fp_rate = roc_info['fpr']
+        tp_rate = roc_info['tpr']
+        auc = roc_info['auc']
     realpos_total = roc_info['realpos_total']
 
     title = prefix + 'AUC*: {:.4f}'.format(auc)
@@ -82,8 +88,16 @@ def draw_perclass_roc(cx_to_rocinfo, classes=None, prefix='', fnum=1,
 
         catname = classes[cx] if isinstance(cx, int) else cx
 
-        auc = peritem['auc']
-        tpr = peritem['tpr']
+        try:
+            auc = peritem['trunc_auc']
+            tpr = peritem['trunc_tpr']
+            fp_count = peritem['trunc_fp_count']
+            fpr = peritem['trunc_fpr']
+        except KeyError:
+            auc = peritem['auc']
+            tpr = peritem['tpr']
+            fp_count = peritem['fp_count']
+            fpr = peritem['fpr']
 
         nsupport = int(peritem['nsupport'])
         if 'realpos_total' in peritem:
@@ -96,10 +110,8 @@ def draw_perclass_roc(cx_to_rocinfo, classes=None, prefix='', fnum=1,
             label = 'auc={:0.2f}: {} ({:d})'.format(auc, catname, round(nsupport, 2))
 
         if fp_axis == 'count':
-            fp_count = peritem['fp_count']
             xydata[label] = (fp_count, tpr)
         elif fp_axis == 'rate':
-            fpr = peritem['fpr']
             xydata[label] = (fpr, tpr)
 
     ax = kwplot.multi_plot(

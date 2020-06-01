@@ -18,33 +18,54 @@ class ConfusionVectors(ub.NiceRepr):
 
     Example:
         >>> # xdoctest: +REQUIRES(module:ndsampler)
+        >>> # xdoctest: IGNORE_WANT
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
         >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
         >>> cfsn_vecs = dmet.confusion_vectors()
-        >>> print(cfsn_vecs.data._pandas())  # xdoctest: IGNORE_WANT
-            pred_raw  pred  true   score  weight     iou  txs  pxs  gid
-        0          2     2     2 10.0000  1.0000  1.0000    0    4    0
-        1          2     2     2  7.5025  1.0000  1.0000    1    3    0
-        2          1     1     1  5.0050  1.0000  1.0000    2    2    0
-        3          3     3    -1  2.5075  1.0000 -1.0000   -1    1    0
-        4          2     2    -1  0.0100  1.0000 -1.0000   -1    0    0
-        5         -1    -1     2  0.0000  1.0000 -1.0000    3   -1    0
-        6         -1    -1     2  0.0000  1.0000 -1.0000    4   -1    0
-        7          2     2     2 10.0000  1.0000  1.0000    0    5    1
-        8          2     2     2  8.0020  1.0000  1.0000    1    4    1
-        9          1     1     1  6.0040  1.0000  1.0000    2    3    1
-        ..       ...   ...   ...     ...     ...     ...  ...  ...  ...
-        62        -1    -1     2  0.0000  1.0000 -1.0000    7   -1    7
-        63        -1    -1     3  0.0000  1.0000 -1.0000    8   -1    7
-        64        -1    -1     1  0.0000  1.0000 -1.0000    9   -1    7
-        65         1     1    -1 10.0000  1.0000 -1.0000   -1    0    8
-        66         1     1     1  0.0100  1.0000  1.0000    0    1    8
-        67         3     3    -1 10.0000  1.0000 -1.0000   -1    3    9
-        68         2     2     2  6.6700  1.0000  1.0000    0    2    9
-        69         2     2     2  3.3400  1.0000  1.0000    1    1    9
-        70         3     3    -1  0.0100  1.0000 -1.0000   -1    0    9
-        71        -1    -1     2  0.0000  1.0000 -1.0000    2   -1    9
+        >>> print(cfsn_vecs.data._pandas())
+             pred  true   score  weight     iou  txs  pxs  gid
+        0       2     2 10.0000  1.0000  1.0000    0    4    0
+        1       2     2  7.5025  1.0000  1.0000    1    3    0
+        2       1     1  5.0050  1.0000  1.0000    2    2    0
+        3       3    -1  2.5075  1.0000 -1.0000   -1    1    0
+        4       2    -1  0.0100  1.0000 -1.0000   -1    0    0
+        5      -1     2  0.0000  1.0000 -1.0000    3   -1    0
+        6      -1     2  0.0000  1.0000 -1.0000    4   -1    0
+        7       2     2 10.0000  1.0000  1.0000    0    5    1
+        8       2     2  8.0020  1.0000  1.0000    1    4    1
+        9       1     1  6.0040  1.0000  1.0000    2    3    1
+        ..    ...   ...     ...     ...     ...  ...  ...  ...
+        62     -1     2  0.0000  1.0000 -1.0000    7   -1    7
+        63     -1     3  0.0000  1.0000 -1.0000    8   -1    7
+        64     -1     1  0.0000  1.0000 -1.0000    9   -1    7
+        65      1    -1 10.0000  1.0000 -1.0000   -1    0    8
+        66      1     1  0.0100  1.0000  1.0000    0    1    8
+        67      3    -1 10.0000  1.0000 -1.0000   -1    3    9
+        68      2     2  6.6700  1.0000  1.0000    0    2    9
+        69      2     2  3.3400  1.0000  1.0000    1    1    9
+        70      3    -1  0.0100  1.0000 -1.0000   -1    0    9
+        71     -1     2  0.0000  1.0000 -1.0000    2   -1    9
+
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> from kwcoco.metrics.confusion_vectors import ConfusionVectors
+        >>> cfsn_vecs = ConfusionVectors.demo(
+        >>>     nimgs=128, nboxes=(0, 10), n_fp=(0, 3), n_fn=(0, 3), nclasses=3)
+        >>> cx_to_binvecs = cfsn_vecs.binarize_ovr()
+        >>> measures = cx_to_binvecs.measures()['perclass']
+        >>> print('measures = {!r}'.format(measures))
+        measures = <PerClass_Measures({
+            'cat_1': <Measures({'ap': 0.7501, 'auc': 0.7170, 'catname': cat_1, 'max_f1': f1=0.77@0.41, 'max_mcc': mcc=0.71@0.44, 'nsupport': 787.0000, 'realneg_total': 594.0000, 'realpos_total': 193.0000})>,
+            'cat_2': <Measures({'ap': 0.8288, 'auc': 0.8137, 'catname': cat_2, 'max_f1': f1=0.83@0.40, 'max_mcc': mcc=0.78@0.40, 'nsupport': 787.0000, 'realneg_total': 589.0000, 'realpos_total': 198.0000})>,
+            'cat_3': <Measures({'ap': 0.7536, 'auc': 0.7150, 'catname': cat_3, 'max_f1': f1=0.77@0.40, 'max_mcc': mcc=0.71@0.42, 'nsupport': 787.0000, 'realneg_total': 578.0000, 'realpos_total': 209.0000})>,
+        }) at 0x7f1b9b0d6130>
+
+        >>> kwplot.figure(fnum=1, doclf=True)
+        >>> measures.draw(key='pr', fnum=1, pnum=(1, 3, 1))
+        >>> measures.draw(key='roc', fnum=1, pnum=(1, 3, 2))
+        >>> measures.draw(key='mcc', fnum=1, pnum=(1, 3, 3))
         ...
     """
 
@@ -57,7 +78,7 @@ class ConfusionVectors(ub.NiceRepr):
         return cfsn_vecs.data.__nice__()
 
     @classmethod
-    def demo(cfsn_vecs):
+    def demo(cfsn_vecs, **kw):
         """
         Example:
             >>> # xdoctest: +REQUIRES(module:ndsampler)
@@ -67,8 +88,16 @@ class ConfusionVectors(ub.NiceRepr):
             >>> print('cx_to_binvecs = {!r}'.format(cx_to_binvecs))
         """
         from kwcoco.metrics import DetectionMetrics
-        dmet = DetectionMetrics.demo(
-            nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
+        default = {
+            'nimgs': 10,
+            'nboxes': (0, 10),
+            'n_fp': (0, 1),
+            'n_fn': 0,
+            'nclasses': 3,
+        }
+        demokw = default.copy()
+        demokw.update(kw)
+        dmet = DetectionMetrics.demo(**demokw)
         # print('dmet = {!r}'.format(dmet))
         cfsn_vecs = dmet.confusion_vectors()
         cfsn_vecs.data._data = ub.dict_isect(cfsn_vecs.data._data, [
@@ -506,44 +535,24 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
     def __getitem__(self, cx):
         return self.cx_to_binvecs[cx]
 
-    def precision_recall(self, **kwargs):
-        perclass = PerClass_PR_Result({
-            cx: binvecs.precision_recall(**kwargs)
-            for cx, binvecs in self.cx_to_binvecs.items()
-        })
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='Mean of empty slice')
-            mAP = np.nanmean([item['ap'] for item in perclass.values()])
-        return {
-            'mAP': mAP,
-            'perclass': perclass,
-        }
-
-    def roc(self, **kwargs):
-        perclass = PerClass_ROC_Result({
-            cx: binvecs.roc(**kwargs)
-            for cx, binvecs in self.cx_to_binvecs.items()
-        })
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='Mean of empty slice')
-            mAUC = np.nanmean([item['auc'] for item in perclass.values()])
-        return {
-            'mAUC': mAUC,
-            'perclass': perclass,
-        }
-
-    def threshold_curves(self, **kwargs):
+    def measures(self, **kwargs):
         """
         Example:
             >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> self = OneVsRestConfusionVectors.demo()
-            >>> thresh_result = self.threshold_curves()['perclass']
+            >>> thresh_result = self.measures()['perclass']
         """
-        perclass = PerClass_Threshold_Result({
-            cx: binvecs.threshold_curves(**kwargs)
+        perclass = PerClass_Measures({
+            cx: binvecs.measures(**kwargs)
             for cx, binvecs in self.cx_to_binvecs.items()
         })
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+            mAUC = np.nanmean([item['trunc_auc'] for item in perclass.values()])
+            mAP = np.nanmean([item['ap'] for item in perclass.values()])
         return {
+            'mAUC': mAUC,
+            'mAP': mAP,
             'perclass': perclass,
         }
 
@@ -687,291 +696,67 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
             >>> print('precision_recall = {}'.format(ub.repr2(self.precision_recall())))
 
+            import kwplot
+            kwplot.autompl()
+            self = BinaryConfusionVectors.demo(n=128, p_true=0.8, p_error=0.2, rng=0)
+            pr_result = self.precision_recall()
+            pr_result.draw()
+
+            roc_result = self.roc()
+            roc_result.draw()
+
         """
-        import sklearn
-        import sklearn.metrics  # NOQA
-        try:
-            from sklearn.metrics._ranking import _binary_clf_curve
-        except ImportError:
-            from sklearn.metrics.ranking import _binary_clf_curve
-
-        data = self.data
-        y_true = data['is_true'].astype(np.uint8)
-        y_score = data['pred_score']
-        sample_weight = data._data.get('weight', None)
-
-        npad = 0
-        if len(self) == 0:
-            ap = np.nan
-            prec = [np.nan]
-            rec = [np.nan]
-            fps = [np.nan]
-            fns = [np.nan]
-            tps = [np.nan]
-            thresholds = [np.nan]
-
-            realpos_total = 0
-            realneg_total = 0
-            nsupport = 0
-        else:
-            if len(self) <= stabalize_thresh:
-                # add dummy data to stabalize the computation
-                if sample_weight is None:
-                    sample_weight = np.ones(len(self))
-                npad = stabalize_pad
-                y_true, y_score, sample_weight = _stabalilze_data(
-                    y_true, y_score, sample_weight, npad=npad)
-
-            # Get the total weight (typically number of) positive and negative
-            # examples of this class
-            if sample_weight is None:
-                weight = 1
-                nsupport = len(y_true) - bool(npad)
-            else:
-                weight = sample_weight
-                nsupport = sample_weight.sum() - bool(npad)
-
-            realpos_total = (y_true * weight).sum()
-            realneg_total = ((1 - y_true) * weight).sum()
-
-            """
-            Notes:
-                Apparently, consistent scoring is really hard to get right.
-
-                For detection problems scoring via
-                confusion_vectors+sklearn produces noticably different
-                results than the VOC method. There are a few reasons for
-                this.  The VOC method stops counting true positives after
-                all assigned predicted boxes have been counted. It simply
-                remembers the amount of original true positives to
-                normalize the true positive reate. On the other hand,
-                confusion vectors maintains a list of these unassigned true
-                boxes and gives them a predicted index of -1 and a score of
-                zero. This means that this function sees them as having a
-                y_true of 1 and a y_score of 0, which allows the
-                scikit-learn fps and tps counts to effectively get up to
-                100% recall when the threshold is zero. The VOC method
-                simply ignores these and handles them implicitly. The
-                problem is that if you remove these from the scikit-learn
-                inputs, it wont see the correct number of positives and it
-                will incorrectly normalize the recall.  In summary:
-
-                    VOC:
-                        * remembers realpos_total
-                        * doesn't count unassigned truths as TP when the
-                        threshold is zero.
-
-                    CV+SKL:
-                        * counts unassigned truths as TP with score=0.
-                        * Always ensure tpr=1, ppv=0 and ppv=1, tpr=0 cases
-                        exist.
-            """
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', message='invalid .* true_divide')
-
-                if method.startswith('voc'):
-                    y_score_ = y_score[y_score > 0]
-                    y_true_ = y_true[y_score > 0]
-                    fps, tps, _thresholds = _binary_clf_curve(
-                        y_true_, y_score_, pos_label=1.0,
-                        sample_weight=sample_weight)
-                elif method == 'sklearn':
-                    fps, tps, _thresholds = _binary_clf_curve(
-                        y_true, y_score, pos_label=1.0,
-                        sample_weight=sample_weight)
-                else:
-                    raise KeyError(method)
-
-                # Slight tweak to sklearn.metrics.precision_recall_curve
-                fns = realpos_total - tps
-
-                precision = tps / (tps + fps)
-                precision[np.isnan(precision)] = 0
-                recall = tps / realpos_total
-
-                # stop when full recall attained
-                # and reverse the outputs so recall is decreasing
-                last_ind = tps.searchsorted(tps[-1])
-                sl = slice(last_ind, None, -1)
-                prec, rec, thresholds = (
-                    np.r_[precision[sl], 1],
-                    np.r_[recall[sl], 0],
-                    _thresholds[sl])
-
-                if method.startswith('voc'):
-                    from kwcoco.metrics.voc_metrics import _voc_ave_precision
-                    ap = _voc_ave_precision(rec[::-1], prec[::-1], method=method)
-                elif method == 'sklearn':
-                    ap = sklearn.metrics.average_precision_score(
-                        y_score=y_score, y_true=y_true,
-                        sample_weight=sample_weight)
-
-        prs_info = {
-            'ap': ap,
-            'ppv': prec,   # (positive predictive value) == (precision)
-            'tpr': rec,    # (true positive rate) == (recall)
-            'fp_count': fps,
-            'tp_count': tps,
-            'fn_count': fns,
-            'thresholds': thresholds,
-            'nsupport': nsupport,
-            'realpos_total': realpos_total,
-            'realneg_total': realneg_total,
-        }
-        if self.cx is not None:
-            prs_info.update({
-                'cx': self.cx,
-                'node': self.classes[self.cx],
-            })
-        return PR_Result(prs_info)
+        pr_info = self.measures(
+            fp_cutoff=None, stabalize_thresh=stabalize_thresh,
+            stabalize_pad=stabalize_pad)
+        return PR_Result(pr_info)
 
     # @ub.memoize_method
     def roc(self, fp_cutoff=None, stabalize_thresh=7, stabalize_pad=7):
         """
         Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> self = BinaryConfusionVectors.demo(n=0)
             >>> print('roc = {}'.format(ub.repr2(self.roc())))
             >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
             >>> print('roc = {}'.format(ub.repr2(self.roc())))
             >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
             >>> print('roc = {}'.format(ub.repr2(self.roc())))
+
+        Ignore:
+            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.roc))
         """
-        import sklearn
-        import sklearn.metrics  # NOQA
-        try:
-            from sklearn.metrics._ranking import _binary_clf_curve
-        except ImportError:
-            from sklearn.metrics.ranking import _binary_clf_curve
-
-        data = self.data
-        y_true = data['is_true'].astype(np.uint8)
-        y_score = data['pred_score']
-        sample_weight = data._data.get('weight', None)
-
-        npad = 0
-        if len(self) > 0:
-            if len(self) <= stabalize_thresh:
-                # add dummy data to stabalize the computation
-                if sample_weight is None:
-                    sample_weight = np.ones(len(self))
-                npad = stabalize_pad
-                y_true, y_score, sample_weight = _stabalilze_data(
-                    y_true, y_score, sample_weight, npad=npad)
-
-        if sample_weight is None:
-            weight = 1
-            nsupport = len(y_true) - bool(npad)
-        else:
-            weight = sample_weight
-            nsupport = sample_weight.sum() - bool(npad)
-
-        # y_true[y_true == -1] = 0
-
-        # < TRUCNATED PART >
-        # GET ROC CURVES AT A PARTICULAR FALSE POSITIVE COUNT CUTOFF
-        # This will let different runs be more comparable
-
-        # Get the total weight (typically number of) positive and negative
-        # examples of this class
-        realpos_total = (y_true * weight).sum()
-        realneg_total = ((1 - y_true) * weight).sum()
-
-        if len(self) == 0:
-            fp_count = np.array([np.nan])
-            tp_count = np.array([np.nan])
-            count_thresholds = np.array([np.nan])
-        else:
-            fp_count, tp_count, count_thresholds = _binary_clf_curve(
-                y_true, y_score, pos_label=1, sample_weight=sample_weight)
-
-        if len(count_thresholds) > 0 and count_thresholds[-1] == 0:
-            # Chop off the last entry where it will jump
-            count_thresholds = count_thresholds[:-1]
-            tp_count = tp_count[:-1]
-            fp_count = fp_count[:-1]
-
-        # Cutoff the curves at a comparable point
-        if fp_cutoff is None:
-            fp_cutoff = np.inf
-        elif isinstance(fp_cutoff, str):
-            if fp_cutoff == 'num_true':
-                fp_cutoff = int(np.ceil(realpos_total))
-            else:
-                raise KeyError(fp_cutoff)
-
-        idxs = np.where(fp_count > fp_cutoff)[0]
-        if len(idxs) == 0:
-            idx = len(fp_count)
-        else:
-            idx = idxs[0]
-        trunc_fp_count = fp_count[:idx]
-        trunc_tp_count = tp_count[:idx]
-        trunc_thresholds = count_thresholds[:idx]
-
-        # if the cuttoff was not reached, horizontally extend the curve
-        # This will hurt the scores (aka we may be bias against small
-        # scenes), but this will ensure that big scenes are comparable
-        if len(fp_count) == 0:
-            trunc_fp_count = np.array([fp_cutoff])
-            trunc_tp_count = np.array([0])
-            trunc_thresholds = np.array([0])
-            # THIS WILL CAUSE AUC TO RAISE AN ERROR IF IT GETS HIT
-        elif fp_count[-1] < fp_cutoff and np.isfinite(fp_cutoff):
-            trunc_fp_count = np.hstack([trunc_fp_count, [fp_cutoff]])
-            trunc_tp_count = np.hstack([trunc_tp_count, [trunc_tp_count[-1]]])
-            trunc_thresholds = np.hstack([trunc_thresholds, [0]])
-
-        falsepos_total = trunc_fp_count[-1]
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='invalid .* true_divide')
-            trunc_tpr = trunc_tp_count / realpos_total
-            trunc_fpr = trunc_fp_count / falsepos_total
-            try:
-                trunc_auc = sklearn.metrics.auc(trunc_fpr, trunc_tpr)
-            except ValueError:
-                # At least 2 points are needed to compute area under curve, but x.shape = 1
-                trunc_auc = np.nan
-        # < /TRUCNATED PART >
-        roc_info = {
-            'fp_cutoff': fp_cutoff,
-            'realpos_total': realpos_total,
-            'realneg_total': realneg_total,
-            'nsupport': nsupport,
-            'tpr': trunc_tpr,
-            'fpr': trunc_fpr,
-            'fp_count': trunc_fp_count,
-            'tp_count': trunc_tp_count,
-            'thresholds': trunc_thresholds,
-            'auc': trunc_auc,
-        }
-        if self.cx is not None:
-            roc_info.update({
-                'cx': self.cx,
-                'node': self.classes[self.cx],
-            })
+        # All information lives in threshold curves now.
+        roc_info = self.measures(
+            fp_cutoff=fp_cutoff, stabalize_thresh=stabalize_thresh,
+            stabalize_pad=stabalize_pad)
         return ROC_Result(roc_info)
 
-    def threshold_curves(self, stabalize_thresh=7, stabalize_pad=7):
+    @ub.memoize_method
+    def measures(self, stabalize_thresh=7, stabalize_pad=7, fp_cutoff=None):
         """
         Get statistics (F1, G1, MCC) versus thresholds
 
         Example:
             >>> self = BinaryConfusionVectors.demo(n=100)
-            >>> self.threshold_curves()
+            >>> self.measures()
         """
         # compute tp, fp, tn, fn at each point
         # compute mcc, f1, g1, etc
         # write plot functions
-        info = self._binary_clf_curves(stabalize_thresh, stabalize_pad)
+        info = self._binary_clf_curves(stabalize_thresh=stabalize_thresh,
+                                       stabalize_pad=stabalize_pad,
+                                       fp_cutoff=fp_cutoff)
 
         tp = info['tp_count']
         fp = info['fp_count']
         tn = info['tn_count']
         fn = info['fn_count']
 
-        ppv = tp / (tp + fp)
-        tpr = tp / (tp + fn)
+        ppv = tp / (tp + fp)  # precision
+        ppv[np.isnan(ppv)] = 0
+
+        tpr = tp / (tp + fn)  # recall
 
         # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
         mcc_numer = (tp * tn) - (fp * fn)
@@ -1015,14 +800,78 @@ class BinaryConfusionVectors(ub.NiceRepr):
             info['max_{}'.format(key)] = best_label
             info['_max_{}'.format(key)] = (best_measure, best_thresh)
 
-        return Threshold_Result(info)
+        import sklearn.metrics  # NOQA
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='invalid .* true_divide')
+            info['trunc_tpr'] = info['trunc_tp_count'] / info['realpos_total']
+            info['trunc_fpr'] = info['trunc_fp_count'] / info['trunc_fp_count'][-1]
+            try:
+                info['trunc_auc'] = sklearn.metrics.auc(info['trunc_fpr'], info['trunc_tpr'])
+            except ValueError:
+                # At least 2 points are needed to compute area under curve, but x.shape = 1
+                info['trunc_auc'] = np.nan
 
-    def _binary_clf_curves(self, stabalize_thresh=7, stabalize_pad=7):
+            info['auc'] = info['trunc_auc']
+            """
+            Notes:
+                Apparently, consistent scoring is really hard to get right.
+
+                For detection problems scoring via
+                confusion_vectors+sklearn produces noticably different
+                results than the VOC method. There are a few reasons for
+                this.  The VOC method stops counting true positives after
+                all assigned predicted boxes have been counted. It simply
+                remembers the amount of original true positives to
+                normalize the true positive reate. On the other hand,
+                confusion vectors maintains a list of these unassigned true
+                boxes and gives them a predicted index of -1 and a score of
+                zero. This means that this function sees them as having a
+                y_true of 1 and a y_score of 0, which allows the
+                scikit-learn fps and tps counts to effectively get up to
+                100% recall when the threshold is zero. The VOC method
+                simply ignores these and handles them implicitly. The
+                problem is that if you remove these from the scikit-learn
+                inputs, it wont see the correct number of positives and it
+                will incorrectly normalize the recall.  In summary:
+
+                    VOC:
+                        * remembers realpos_total
+                        * doesn't count unassigned truths as TP when the
+                        threshold is zero.
+
+                    CV+SKL:
+                        * counts unassigned truths as TP with score=0.
+                        * Always ensure tpr=1, ppv=0 and ppv=1, tpr=0 cases
+                        exist.
+            """
+            warnings.filterwarnings('ignore', message='invalid .* true_divide')
+
+            # sklearn definition
+            # AP = sum((R[n] - R[n - 1]) * P[n] for n in range(len(thresholds)))
+            # stop when full recall attained
+            last_ind = tpr.searchsorted(tpr[-1])
+            rec = np.r_[0, tpr[:last_ind + 1]]
+            prec = np.r_[1, ppv[:last_ind + 1]]
+            ap = ((rec - np.r_[0, rec[:-1]]) * prec).sum()
+            info['ap'] = ap
+
+        return Measures(info)
+
+    def _binary_clf_curves(self, stabalize_thresh=7, stabalize_pad=7,
+                           fp_cutoff=None):
         """
         Code common to ROC, PR, and threshold measures
 
         TODO: refactor ROC and PR curves to use this code, perhaps even
         memoizing it.
+
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
+            >>> self._binary_clf_curves()
+
+            >>> self = BinaryConfusionVectors.demo(n=0, p_true=0.5, p_error=0.5)
+            >>> self._binary_clf_curves()
         """
         try:
             from sklearn.metrics._ranking import _binary_clf_curve
@@ -1035,10 +884,10 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
         npad = 0
         if len(self) == 0:
-            fps = [np.nan]
-            fns = [np.nan]
-            tps = [np.nan]
-            thresholds = [np.nan]
+            fps = np.array([np.nan])
+            fns = np.array([np.nan])
+            tps = np.array([np.nan])
+            thresholds = np.array([np.nan])
 
             realpos_total = 0
             realneg_total = 0
@@ -1077,6 +926,44 @@ class BinaryConfusionVectors(ub.NiceRepr):
         tns = realneg_total - fps
         fns = realpos_total - tps
 
+        trunc_fps = fps
+        # Cutoff the curves at a comparable point
+        if fp_cutoff is None:
+            fp_cutoff = np.inf
+        elif isinstance(fp_cutoff, str):
+            if fp_cutoff == 'num_true':
+                fp_cutoff = int(np.ceil(realpos_total))
+            else:
+                raise KeyError(fp_cutoff)
+
+        if np.isfinite(fp_cutoff):
+            idxs = np.where(trunc_fps > fp_cutoff)[0]
+            if len(idxs) == 0:
+                trunc_idx = len(trunc_fps)
+            else:
+                trunc_idx = idxs[0]
+            trunc_fps = fps[:trunc_idx]
+            trunc_tps = tps[:trunc_idx]
+            trunc_thresholds = thresholds[:trunc_idx]
+        else:
+            trunc_idx = None
+            trunc_fps = fps
+            trunc_tps = tps
+            trunc_thresholds = thresholds
+
+        # if the cuttoff was not reached, horizontally extend the curve
+        # This will hurt the scores (aka we may be bias against small
+        # scenes), but this will ensure that big scenes are comparable
+        if len(trunc_fps) == 0:
+            trunc_fps = np.array([fp_cutoff])
+            trunc_tps = np.array([0])
+            trunc_thresholds = np.array([0])
+            # THIS WILL CAUSE AUC TO RAISE AN ERROR IF IT GETS HIT
+        elif trunc_fps[-1] < fp_cutoff and np.isfinite(fp_cutoff):
+            trunc_fps = np.hstack([trunc_fps, [fp_cutoff]])
+            trunc_tps = np.hstack([trunc_tps, [trunc_tps[-1]]])
+            trunc_thresholds = np.hstack([trunc_thresholds, [0]])
+
         info = {
             'fp_count': fps,
             'tp_count': tps,
@@ -1085,7 +972,17 @@ class BinaryConfusionVectors(ub.NiceRepr):
             'thresholds': thresholds,
             'realpos_total': realpos_total,
             'realneg_total': realneg_total,
+
+            'trunc_idx': trunc_idx,
+            'trunc_fp_count': trunc_fps,
+            'trunc_tp_count': trunc_tps,
+            'trunc_thresholds': trunc_thresholds,
+
             'nsupport': nsupport,
+
+            'fp_cutoff': fp_cutoff,
+            'stabalize_thresh': fp_cutoff,
+            'stabalize_pad': stabalize_pad,
         }
         if self.cx is not None:
             info.update({
@@ -1095,59 +992,19 @@ class BinaryConfusionVectors(ub.NiceRepr):
         return info
 
 
-class ROC_Result(ub.NiceRepr, DictProxy):
-    """
-    Example:
-        >>> self = BinaryConfusionVectors.demo(n=300, p_true=0.1, p_error=0.5).roc()
-        >>> print('self = {!r}'.format(self))
-        >>> # xdoctest: +REQUIRES(--show)
-        >>> import kwplot
-        >>> kwplot.autompl()
-        >>> kwplot.figure(fnum=1, doclf=1)
-        >>> self.draw()
-        >>> kwplot.show_if_requested()
-    """
-    def __init__(self, roc_info):
-        self.proxy = roc_info
-
-    @property
-    def catname(self):
-        return self.get('node', None)
-
-    def __nice__(self):
-        return ub.repr2({
-            'auc': self['auc'],
-            'nsupport': self['nsupport'],
-            'realpos_total': self['realpos_total'],
-            'realneg_total': self['realneg_total'],
-            'catname': self.get('node', None),
-        }, nl=0, precision=4, strvals=True)
-
-    def draw(self, prefix='', **kw):
-        """
-        Example:
-            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-            >>> self = BinaryConfusionVectors.demo(n=100).roc()
-            >>> # xdoctest: +REQUIRES(--show)
-            >>> import kwplot
-            >>> kwplot.autompl()
-            >>> self.draw()
-            >>> kwplot.show_if_requested()
-        """
-        from kwcoco.metrics import drawing
-        return drawing.draw_roc(self, prefix=prefix, **kw)
-
-
-class PR_Result(ub.NiceRepr, DictProxy):
+class Measures(ub.NiceRepr, DictProxy):
     """
     Example:
         >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-        >>> self = BinaryConfusionVectors.demo(n=100, p_error=0.5).precision_recall()
+        >>> binvecs = BinaryConfusionVectors.demo(n=100, p_error=0.5)
+        >>> self = binvecs.measures()
         >>> print('self = {!r}'.format(self))
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> kwplot.autompl()
-        >>> self.draw()
+        >>> self.draw(doclf=True)
+        >>> self.draw(key='pr', doclf=True)
+        >>> self.draw(key='roc', doclf=True)
         >>> kwplot.show_if_requested()
     """
     def __init__(self, roc_info):
@@ -1160,82 +1017,37 @@ class PR_Result(ub.NiceRepr, DictProxy):
     def __nice__(self):
         return ub.repr2({
             'ap': self['ap'],
-            'nsupport': self['nsupport'],
-            'realpos_total': self['realpos_total'],
-            'realneg_total': self['realneg_total'],
-            'catname': self.get('node', None),
-        }, nl=0, precision=4, strvals=True)
-
-    def draw(self, prefix='', **kw):
-        from kwcoco.metrics import drawing
-        return drawing.draw_prcurve(self, prefix=prefix, **kw)
-
-
-class Threshold_Result(ub.NiceRepr, DictProxy):
-    """
-    Example:
-        >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-        >>> binvecs = BinaryConfusionVectors.demo(n=100, p_error=0.5)
-        >>> self = binvecs.threshold_curves()
-        >>> print('self = {!r}'.format(self))
-        >>> # xdoctest: +REQUIRES(--show)
-        >>> import kwplot
-        >>> kwplot.autompl()
-        >>> self.draw()
-        >>> kwplot.show_if_requested()
-    """
-    def __init__(self, roc_info):
-        self.proxy = roc_info
-
-    @property
-    def catname(self):
-        return self.get('node', None)
-
-    def __nice__(self):
-        return ub.repr2({
+            'auc': self['auc'],
             'max_mcc': self['max_mcc'],
-            'max_g1': self['max_g1'],
-            # 'max_f1': self['max_f1'],
+            'max_f1': self['max_f1'],
+            # 'max_g1': self['max_g1'],
             'nsupport': self['nsupport'],
             'realpos_total': self['realpos_total'],
             'realneg_total': self['realneg_total'],
             'catname': self.get('node', None),
         }, nl=0, precision=4, strvals=True)
 
-    def draw(self, prefix='', **kw):
+    def draw(self, key=None, prefix='', **kw):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> cfsn_vecs = ConfusionVectors.demo()
+            >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
+            >>> self = ovr_cfsn.measures()['perclass']
+            >>> self.draw('mcc', doclf=True, fnum=1)
+            >>> self.draw('pr', doclf=1, fnum=2)
+            >>> self.draw('roc', doclf=1, fnum=3)
+        """
         from kwcoco.metrics import drawing
-        return drawing.draw_threshold_curves(self, prefix=prefix, **kw)
+        if key is None or key == 'thresh':
+            return drawing.draw_threshold_curves(self, prefix=prefix, **kw)
+        elif key == 'pr':
+            return drawing.draw_prcurve(self, prefix=prefix, **kw)
+        elif key == 'roc':
+            return drawing.draw_roc(self, prefix=prefix, **kw)
 
 
-class PerClass_ROC_Result(ub.NiceRepr, DictProxy):
-    """
-    """
-    def __init__(self, cx_to_roc):
-        self.proxy = cx_to_roc
-
-    def __nice__(self):
-        return ub.repr2(self.proxy, nl=2, strvals=True)
-
-    def draw(self, prefix='', **kw):
-        from kwcoco.metrics import drawing
-        return drawing.draw_perclass_roc(self, prefix=prefix, **kw)
-
-
-class PerClass_PR_Result(ub.NiceRepr, DictProxy):
-    """
-    """
-    def __init__(self, cx_to_pr):
-        self.proxy = cx_to_pr
-
-    def __nice__(self):
-        return ub.repr2(self.proxy, nl=2, strvals=True)
-
-    def draw(self, prefix='', **kw):
-        from kwcoco.metrics import drawing
-        return drawing.draw_perclass_prcurve(self, prefix=prefix, **kw)
-
-
-class PerClass_Threshold_Result(ub.NiceRepr, DictProxy):
+class PerClass_Measures(ub.NiceRepr, DictProxy):
     """
     """
     def __init__(self, cx_to_info):
@@ -1244,17 +1056,33 @@ class PerClass_Threshold_Result(ub.NiceRepr, DictProxy):
     def __nice__(self):
         return ub.repr2(self.proxy, nl=2, strvals=True)
 
-    def draw(self, prefix='', **kw):
+    def draw(self, key='mcc', prefix='', **kw):
         """
         Example:
             >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
-            >>> self = ovr_cfsn.threshold_curves()['perclass']
-            >>> self.draw()
+            >>> self = ovr_cfsn.measures()['perclass']
+            >>> self.draw('mcc', doclf=True, fnum=1)
+            >>> self.draw('pr', doclf=1, fnum=2)
+            >>> self.draw('roc', doclf=1, fnum=3)
         """
         from kwcoco.metrics import drawing
-        return drawing.draw_perclass_thresholds(self, prefix=prefix, **kw)
+        if key == 'pr':
+            return drawing.draw_perclass_prcurve(self, prefix=prefix, **kw)
+        elif key == 'roc':
+            return drawing.draw_perclass_roc(self, prefix=prefix, **kw)
+        else:
+            return drawing.draw_perclass_thresholds(
+                self, key=key, prefix=prefix, **kw)
+
+    def draw_roc(self, prefix='', **kw):
+        from kwcoco.metrics import drawing
+        return drawing.draw_perclass_roc(self, prefix=prefix, **kw)
+
+    def draw_pr(self, prefix='', **kw):
+        from kwcoco.metrics import drawing
+        return drawing.draw_perclass_prcurve(self, prefix=prefix, **kw)
 
 
 def _stabalilze_data(y_true, y_score, sample_weight, npad=7):

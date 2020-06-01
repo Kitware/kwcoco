@@ -234,34 +234,24 @@ class CocoEvaluator(object):
         # Get pure per-item detection results
         binvecs = cfsn_vecs.binarize_peritem(negative_classes=negative_classes)
 
-        roc_result = binvecs.roc(fp_cutoff=fp_cutoff)
-        pr_result = binvecs.precision_recall()
-        thresh_result = binvecs.threshold_curves()
-
-        print('roc_result = {!r}'.format(roc_result))
-        print('pr_result = {!r}'.format(pr_result))
-        print('thresh_result = {!r}'.format(thresh_result))
+        measures = binvecs.measures(fp_cutoff=fp_cutoff)
+        print('measures = {}'.format(ub.repr2(measures, nl=1)))
+        # roc_result = measures
+        # pr_result = measures
+        # thresh_result = measures
+        # print('roc_result = {!r}'.format(roc_result))
+        # print('pr_result = {!r}'.format(pr_result))
+        # print('thresh_result = {!r}'.format(thresh_result))
 
         # Get per-class detection results
         ovr_binvecs = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
-        ovr_roc_result = ovr_binvecs.roc(fp_cutoff=fp_cutoff)['perclass']
-        ovr_pr_result = ovr_binvecs.precision_recall()['perclass']
-        ovr_thresh_result = ovr_binvecs.threshold_curves()['perclass']
-
-        print('ovr_roc_result = {!r}'.format(ovr_roc_result))
-        print('ovr_pr_result = {!r}'.format(ovr_pr_result))
-        # print('ovr_thresh_result = {!r}'.format(ovr_thresh_result))
+        ovr_measures = ovr_binvecs.measures(fp_cutoff=fp_cutoff)['perclass']
+        print('ovr_measures = {!r}'.format(ovr_measures))
 
         results = {
             'cfsn_vecs': cfsn_vecs,
-
-            'roc_result': roc_result,
-            'pr_result': pr_result,
-            'thresh_result': thresh_result,
-
-            'ovr_roc_result': ovr_roc_result,
-            'ovr_pr_result': ovr_pr_result,
-            'ovr_thresh_result': ovr_thresh_result,
+            'measures': measures,
+            'ovr_measures': ovr_measures,
         }
 
         # TODO: when making the ovr localization curves, it might be a good
@@ -288,15 +278,10 @@ class CocoEvaluator(object):
                 ignore_flags = (pred_coi & (~true_coi_or_bg))
                 vecs.data['weight'][ignore_flags] = 0
 
-            ovr_roc_result2 = ovr_binvecs2.roc(fp_cutoff=fp_cutoff)['perclass']
-            ovr_pr_result2 = ovr_binvecs2.precision_recall()['perclass']
-            # ovr_thresh_result2 = ovr_binvecs2.threshold_curves()['perclass']
-            print('ovr_roc_result2 = {!r}'.format(ovr_roc_result2))
-            print('ovr_pr_result2 = {!r}'.format(ovr_pr_result2))
-            # print('ovr_thresh_result2 = {!r}'.format(ovr_thresh_result2))
+            ovr_measures2 = ovr_binvecs2.measures(fp_cutoff=fp_cutoff)['perclass']
+            print('ovr_measures2 = {!r}'.format(ovr_measures2))
             results.update({
-                'ovr_roc_result2': ovr_roc_result2,
-                'ovr_pr_result2': ovr_pr_result2,
+                'ovr_measures2': ovr_measures2,
             })
 
         # FIXME: there is a lot of redundant information here,
@@ -321,14 +306,8 @@ class CocoEvaluator(object):
 
         classes_of_interest = coco_eval.config['classes_of_interest']
 
-        pr_result = results['pr_result']
-        roc_result = results['roc_result']
-        thresh_result = results['thresh_result']
-
-        ovr_pr_result = results['ovr_pr_result']
-        ovr_roc_result = results['ovr_roc_result']
-        ovr_thresh_result = results['ovr_thresh_result']
-
+        measures = results['measures']
+        ovr_measures = results['ovr_measures']
         cfsn_vecs = results['cfsn_vecs']
 
         # TODO: separate into standalone method that is able to run on
@@ -346,9 +325,9 @@ class CocoEvaluator(object):
         fig = kwplot.figure(fnum=1, pnum=(1, 2, 1), doclf=True,
                             figtitle=expt_title)
         fig.set_size_inches(figsize)
-        pr_result.draw()
+        measures.draw(key='pr')
         kwplot.figure(fnum=1, pnum=(1, 2, 2))
-        roc_result.draw()
+        measures.draw(key='roc')
         fig_fpath = join(metrics_dpath, 'loc_pr_roc.png')
         print('write fig_fpath = {!r}'.format(fig_fpath))
         fig.savefig(fig_fpath)
@@ -356,7 +335,7 @@ class CocoEvaluator(object):
         fig = kwplot.figure(fnum=1, pnum=(1, 1, 1), doclf=True,
                             figtitle=expt_title)
         fig.set_size_inches(figsize)
-        thresh_result.draw()
+        measures.draw(key='thresh')
         fig_fpath = join(metrics_dpath, 'loc_thresh.png')
         print('write fig_fpath = {!r}'.format(fig_fpath))
         fig.savefig(fig_fpath)
@@ -364,7 +343,7 @@ class CocoEvaluator(object):
         fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
                             figtitle=expt_title)
         fig.set_size_inches(figsize)
-        ovr_roc_result.draw(fnum=2)
+        ovr_measures.draw(key='roc', fnum=2)
 
         fig_fpath = join(metrics_dpath, 'perclass_roc.png')
         print('write fig_fpath = {!r}'.format(fig_fpath))
@@ -373,18 +352,17 @@ class CocoEvaluator(object):
         fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
                             figtitle=expt_title)
         fig.set_size_inches(figsize)
-        ovr_pr_result.draw(fnum=2)
+        ovr_measures.draw(key='pr', fnum=2)
         fig_fpath = join(metrics_dpath, 'perclass_pr.png')
         print('write fig_fpath = {!r}'.format(fig_fpath))
         fig.savefig(fig_fpath)
 
-        if 'ovr_pr_result2' in results:
-            ovr_pr_result2 = results['ovr_pr_result2']
-            ovr_roc_result2 = results['ovr_roc_result2']
+        if 'ovr_measures2' in results:
+            ovr_measures2 = results['ovr_measures2']
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
                                 figtitle=expt_title)
             fig.set_size_inches(figsize)
-            ovr_pr_result2.draw(fnum=2, prefix='coi-vs-bg-only')
+            ovr_measures2.draw(key='pr', fnum=2, prefix='coi-vs-bg-only')
             fig_fpath = join(metrics_dpath, 'perclass_pr_coi_vs_bg.png')
             print('write fig_fpath = {!r}'.format(fig_fpath))
             fig.savefig(fig_fpath)
@@ -392,7 +370,7 @@ class CocoEvaluator(object):
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
                                 figtitle=expt_title)
             fig.set_size_inches(figsize)
-            ovr_roc_result2.draw(fnum=2, prefix='coi-vs-bg-only')
+            ovr_measures2.draw(key='roc', fnum=2, prefix='coi-vs-bg-only')
             fig_fpath = join(metrics_dpath, 'perclass_roc_coi_vs_bg.png')
             print('write fig_fpath = {!r}'.format(fig_fpath))
             fig.savefig(fig_fpath)
@@ -403,7 +381,7 @@ class CocoEvaluator(object):
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
                                 figtitle=expt_title)
             fig.set_size_inches(figsize)
-            ovr_thresh_result.draw(fnum=2, key=key)
+            ovr_measures.draw(fnum=2, key=key)
             fig_fpath = join(metrics_dpath, 'perclass_{}.png'.format(key))
             print('write fig_fpath = {!r}'.format(fig_fpath))
             fig.savefig(fig_fpath)
