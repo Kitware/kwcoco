@@ -485,6 +485,8 @@ class CocoEvaluator(object):
         """
         Coerce the input to a mapping from image-id to kwimage.Detection
 
+        Also capture a CocoDataset if possible.
+
         Returns:
             Tuple[Dict[int, Detections], Dict]:
                 gid_to_det: mapping from gid to dets
