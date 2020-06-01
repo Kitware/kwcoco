@@ -170,7 +170,7 @@ class CocoEvaluator(object):
         fp_cutoff = coco_eval.config['fp_cutoff']
         # fp_cutoff = None
 
-        from netharn.metrics import DetectionMetrics
+        from kwcoco.metrics import DetectionMetrics
         dmet = DetectionMetrics(classes=classes)
         for gid in ub.ProgIter(coco_eval.gids):
             pred_dets = gid_to_pred[gid]
@@ -272,8 +272,11 @@ class CocoEvaluator(object):
         # this needs to be consolidated both here and in netharn metrics
         # metrics_dpath = coco_eval.config['out_dpath']
         if coco_eval.config['draw']:
-            coco_eval.plot_results(results)
+            coco_eval.plot_results(results, expt_title=coco_eval.config)
         return results
+
+    def _init_paths():
+        pass
 
     def plot_results(coco_eval, results, expt_title=''):
         # classes_of_interest=[], ignore_classes=None,
@@ -489,9 +492,9 @@ class CocoEvaluator(object):
         # coerce the input into dictionary of detection objects.
         import kwcoco
         import ndsampler
-        if 1:
-            # hack
-            isinstance = kwimage.structs._generic._isinstance2
+        # if 0:
+        #     # hack
+        #     isinstance = kwimage.structs._generic._isinstance2
 
         # We only need the box locations, but if we can coerce extra
         # information we will maintain that as well.
