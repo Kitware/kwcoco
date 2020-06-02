@@ -983,7 +983,7 @@ class MixinCocoExtras(object):
             >>> print(CocoDataset.demo('shapes-8', verbose=0))
         """
         if key.startswith('shapes'):
-            from kwcoco import toydata
+            from kwcoco.demo import toydata
             import parse
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:

@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added 
 * ported metrics from netharn, might be moved in the future.
+* Add `perterb_coco`
+* Add `CocoEvaluator` and CLI `kwcoco eval`
 
 ## Version 0.1.1 - Unreleased
 

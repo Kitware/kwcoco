@@ -17,6 +17,9 @@ import scriptconfig as scfg
 
 
 class CocoEvalConfig(scfg.Config):
+    """
+    Evaluate and score predicted versus truth detections / classifications in a COCO dataset
+    """
     default = {
         'true_dataset': scfg.Value(None, type=str, help='coercable true detections'),
         'pred_dataset': scfg.Value(None, type=str, help='coercable predicted detections'),
@@ -65,11 +68,13 @@ class CocoEvaluator(object):
         >>> import kwcoco
         >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
         >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
-        >>> pred_dset = true_dset.copy()  # todo perterb
-        >>> import kwarray
-        >>> rng = kwarray.ensure_rng(0)
-        >>> for ann in pred_dset.anns.values():
-        >>>     ann['score'] = rng.rand()
+        >>> from kwcoco.demo.perterb import perterb_coco
+        >>> kwargs = {
+        >>>     'box_noise': 0.5,
+        >>>     'n_fp': (0, 10),
+        >>>     'n_fn': (0, 10),
+        >>> }
+        >>> pred_dset = perterb_coco(true_dset, **kwargs)
         >>> config = {
         >>>     'true_dataset': true_dset,
         >>>     'pred_dataset': pred_dset,
@@ -655,8 +660,8 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
         return dets
 
 
-def main(**kw):
-    config = CocoEvalConfig(cmdline=True, default=kw)
+def main(cmdline=True, **kw):
+    config = CocoEvalConfig(cmdline=cmdline, default=kw)
     coco_eval = CocoEvaluator(config)
     coco_eval._init()
     coco_eval.evaluate()
