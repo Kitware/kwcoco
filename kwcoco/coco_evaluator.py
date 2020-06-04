@@ -35,7 +35,10 @@ class CocoEvalConfig(scfg.Config):
         'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
 
         'implicit_negative_classes': scfg.Value(['background']),
+
         'implicit_ignore_classes': scfg.Value(['ignore']),
+
+        'expt_title': scfg.Value('', help='title for plots'),
     }
 
 
@@ -287,7 +290,7 @@ class CocoEvaluator(object):
         # this needs to be consolidated both here and in netharn metrics
         # metrics_dpath = coco_eval.config['out_dpath']
         if coco_eval.config['draw']:
-            coco_eval.plot_results(results, expt_title=coco_eval.config)
+            coco_eval.plot_results(results, expt_title=coco_eval.config['expt_title'])
         return results
 
     def _init_paths():
