@@ -702,7 +702,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> print('measures = {}'.format(ub.repr2(self.measures())))
 
         Ignore:
-            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.measures))
+            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.measures._func))
         """
         # compute tp, fp, tn, fn at each point
         # compute mcc, f1, g1, etc
@@ -716,10 +716,21 @@ class BinaryConfusionVectors(ub.NiceRepr):
         tn = info['tn_count']
         fn = info['fn_count']
 
-        ppv = tp / (tp + fp)  # precision
+        pred_pos = (tp + fp)  # number of predicted positives
+        ppv = tp / pred_pos  # precision
         ppv[np.isnan(ppv)] = 0
 
-        tpr = tp / (tp + fn)  # recall
+        # can set tpr_denom denominator to one
+        tpr_denom = (tp + fn)  #
+        tpr_denom[~(tpr_denom > 0)] = 1
+        tpr = tp / tpr_denom  # recall
+
+        debug = 0
+        if debug:
+            assert ub.allsame(tpr_denom), 'tpr denom should be constant'
+            # tpr_denom should be equal to info['realpos_total']
+            if np.any(tpr_denom != info['realpos_total']):
+                warnings.warn('realpos_total is inconsistent')
 
         # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
         mcc_numer = (tp * tn) - (fp * fn)
