@@ -191,6 +191,7 @@ class CocoEvaluator(object):
         classes = coco_eval.classes
 
         # Ignore any categories with too few tests instances
+        print('coco_eval.config = {}'.format(ub.repr2(dict(coco_eval.config), nl=1)))
         negative_classes = coco_eval.config['implicit_negative_classes']
         classes_of_interest = coco_eval.config['classes_of_interest']
         ignore_classes = set(coco_eval.config['implicit_ignore_classes'])
