@@ -262,6 +262,9 @@ class ConfusionVectors(ub.NiceRepr):
                 idxs, by default chooses any class with a true class index of
                 -1. These classes should ideally have low scores.
 
+        Returns:
+            BinaryConfusionVectors
+
         Example:
             >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics import DetectionMetrics
@@ -574,20 +577,20 @@ class BinaryConfusionVectors(ub.NiceRepr):
     Example:
         >>> self = BinaryConfusionVectors.demo(n=10)
         >>> print('self = {!r}'.format(self))
-        >>> print('pr = {}'.format(ub.repr2(self.precision_recall())))
+        >>> print('pr = {}'.format(ub.repr2(self.measures())))
         >>> print('roc = {}'.format(ub.repr2(self.roc())))
 
         >>> self = BinaryConfusionVectors.demo(n=0)
-        >>> print('pr = {}'.format(ub.repr2(self.precision_recall())))
+        >>> print('pr = {}'.format(ub.repr2(self.measures())))
         >>> print('roc = {}'.format(ub.repr2(self.roc())))
 
         >>> self = BinaryConfusionVectors.demo(n=1)
-        >>> print('pr = {}'.format(ub.repr2(self.precision_recall())))
+        >>> print('pr = {}'.format(ub.repr2(self.measures())))
         >>> print('roc = {}'.format(ub.repr2(self.roc())))
 
         >>> self = BinaryConfusionVectors.demo(n=2)
         >>> print('self = {!r}'.format(self))
-        >>> print('pr = {}'.format(ub.repr2(self.precision_recall())))
+        >>> print('pr = {}'.format(ub.repr2(self.measures())))
         >>> print('roc = {}'.format(ub.repr2(self.roc())))
     """
 
@@ -602,19 +605,17 @@ class BinaryConfusionVectors(ub.NiceRepr):
         Create random data for tests
 
         Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> cfsn = BinaryConfusionVectors.demo(n=1000, p_error=0.1)
-            >>> print(cfsn.data._pandas())
-            >>> roc_info = cfsn.roc()
-            >>> pr_info = cfsn.precision_recall()
-            >>> print('roc_info = {!r}'.format(roc_info))
-            >>> print('pr_info = {!r}'.format(pr_info))
+            >>> measures = cfsn.measures()
+            >>> print('measures = {}'.format(ub.repr2(measures, nl=1)))
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
             >>> kwplot.figure(fnum=1, pnum=(1, 2, 1))
-            >>> pr_info.draw()
+            >>> measures.draw('pr')
             >>> kwplot.figure(fnum=1, pnum=(1, 2, 2))
-            >>> roc_info.draw()
+            >>> measures.draw('roc')
         """
         import kwarray
         rng = kwarray.ensure_rng(rng)
@@ -673,19 +674,90 @@ class BinaryConfusionVectors(ub.NiceRepr):
         """
         Deprecated, all information lives in measures now
         """
-        pr_info = self.measures(
+        warnings.warn('use measures instead', DeprecationWarning)
+        measures = self.measures(
             fp_cutoff=None, stabalize_thresh=stabalize_thresh,
             stabalize_pad=stabalize_pad)
-        return pr_info
+        return measures
 
     def roc(self, fp_cutoff=None, stabalize_thresh=7, stabalize_pad=7):
         """
         Deprecated, all information lives in measures now
         """
+        warnings.warn('use measures instead', DeprecationWarning)
         roc_info = self.measures(
             fp_cutoff=fp_cutoff, stabalize_thresh=stabalize_thresh,
             stabalize_pad=stabalize_pad)
         return roc_info
+
+    def _3dplot(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
+            >>> dmet = DetectionMetrics.demo(
+            >>>     n_fp=(0, 1), n_fn=(0, 2), nimgs=256, nboxes=(0, 10),
+            >>>     nclasses=1)
+            >>> cfsn_vecs = dmet.confusion_vectors()
+            >>> self = bin_cfsn = cfsn_vecs.binarize_peritem()
+            >>> dmet.summarize(plot=True)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> kwplot.figure(fnum=3)
+            >>> self._3dplot()
+        """
+        # import kwplot
+        from mpl_toolkits.mplot3d import Axes3D  # NOQA
+        import matplotlib.pyplot as plt
+        # import scipy
+        import matplotlib as mpl
+        info = self.measures()
+
+        tpr = info['tpr']
+        fpr = info['fpr']
+        ppv = info['ppv']
+        # thresholds = info['thresholds']
+
+        # tpr_to_fpr = scipy.interpolate.interp1d(tpr, fpr)
+        # tpr_to_ppv = scipy.interpolate.interp1d(tpr, ppv)
+        # tpr_range = np.linspace(tpr.min(), tpr.max(), 16)
+        # fpr_range = tpr_to_fpr(tpr_range)
+        # ppv_range = tpr_to_ppv(tpr_range)
+
+        kwargs = {}
+        cmap = kwargs.get('cmap', mpl.cm.coolwarm)
+        # cmap = kwargs.get('cmap', mpl.cm.plasma)
+        # cmap = kwargs.get('cmap', mpl.cm.hot)
+        # cmap = kwargs.get('cmap', mpl.cm.magma)
+        fig = plt.gcf()
+        fig.clf()
+        ax = fig.add_subplot('111', projection='3d')
+
+        x = tpr
+        y = fpr
+        z = ppv
+
+        mcc_color = cmap(np.maximum(info['mcc'], 0))[:, 0:3]
+
+        ax.plot3D(xs=x, ys=y, zs=z, c='blue')
+        ax.plot3D(xs=x, ys=[0] * len(y), zs=z, c='lightblue')
+        ax.plot3D(xs=x, ys=y, zs=0, c='lightblue')
+
+        ax.scatter(x, y, z, c=mcc_color)
+        ax.scatter(x, [0] * len(y), z, c=mcc_color)
+        ax.scatter(x, y, [0] * len(z), c=mcc_color)
+
+        ax.set_title('roc + auc')
+        ax.set_xlabel('tpr')
+        ax.set_ylabel('fpr')
+        ax.set_zlabel('ppv')
+
+        # TODO: improve this visualization, can we color the lines better /
+        # fill in the meshes with something meaningful?
+        # Color the main contour line by MCC,
+        # Color the ROC line by PPV
+        # color the PR line by FPR
 
     @ub.memoize_method
     def measures(self, stabalize_thresh=7, stabalize_pad=7, fp_cutoff=None):
@@ -700,8 +772,24 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> print('measures = {}'.format(ub.repr2(self.measures())))
             >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
             >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.7, p_error=0.3)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
 
         Ignore:
+
+            # import matplotlib.cm as cm
+            # kwargs = {}
+            # cmap = kwargs.get('cmap', mpl.cm.coolwarm)
+            # n = len(x)
+            # xgrid = np.tile(x[None, :], (n, 1))
+            # ygrid = np.tile(y[None, :], (n, 1))
+            # zdata = np.tile(z[None, :], (n, 1))
+            # ax.contour(xgrid, ygrid, zdata, zdir='x', cmap=cmap)
+            # ax.contour(xgrid, ygrid, zdata, zdir='y', cmap=cmap)
+            # ax.contour(xgrid, ygrid, zdata, zdir='z', cmap=cmap)
+
+        Ignore:
+            self.measures().summary_plot()
             globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.measures._func))
         """
         # compute tp, fp, tn, fn at each point
@@ -757,6 +845,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         info['ppv'] = ppv
 
         info['tpr'] = tpr
+        info['fpr'] = info['fp_count'] / info['fp_count'][-1]
 
         info['acc'] = (tp + tn) / (tp + tn + fp + fn)
 
@@ -826,7 +915,51 @@ class BinaryConfusionVectors(ub.NiceRepr):
             last_ind = tpr.searchsorted(tpr[-1])
             rec = np.r_[0, tpr[:last_ind + 1]]
             prec = np.r_[1, ppv[:last_ind + 1]]
-            ap = ((rec - np.r_[0, rec[:-1]]) * prec).sum()
+
+            EXPERIMENTAL_AP = 1
+
+            # Precisions are weighted by the change in recall
+            diff_items = np.diff(rec)
+            prec_items = prec[1:]
+
+            # basline way
+            ap = info['sklish_ap'] = np.sum(diff_items * prec_items)
+
+            if EXPERIMENTAL_AP:
+                # Remove extreme outliers from ap calculation
+                # only do this on the first or last 2 items.
+                # Hueristically chosen.
+                flags = diff_items > 0.1
+                idxs = np.where(flags)[0]
+                max_idx = len(flags) - 1
+                thresh = 2
+                try:
+                    idx_dist = np.minimum(idxs, max_idx - idxs)
+                    outlier_idxs = idxs[idx_dist < thresh]
+                    import kwarray
+                    outlier_flags = kwarray.boolmask(outlier_idxs, len(diff_items))
+                    inlier_flags = ~outlier_flags
+
+                    score = prec_items.copy()
+                    score[outlier_flags] = score[inlier_flags].min()
+                    score[outlier_flags] = 0
+
+                    ap = expt1_ap = np.sum(score * diff_items)
+
+                    # prec_items[inlier_flags]
+                    # Renormalize AP calculation within inlier area
+                    # weight = diff_items[inlier_flags]
+                    # score = prec_items[inlier_flags]
+                    # weight = weight / weight.sum()
+                    # expt2_ap = (weight * score).sum()
+
+                    info['expt_ap'] = expt1_ap
+                except Exception:
+                    pass
+
+            # print('ap = {!r}'.format(ap))
+            # print('ap = {!r}'.format(ap))
+            # ap = np.sum(np.diff(rec) * prec[1:])
             info['ap'] = ap
 
         return Measures(info)
@@ -958,6 +1091,13 @@ class BinaryConfusionVectors(ub.NiceRepr):
             'stabalize_thresh': fp_cutoff,
             'stabalize_pad': stabalize_pad,
         }
+
+        # if True:
+        #     # hack
+        #     import sklearn
+        #     info['_ap'] = sklearn.metrics.average_precision_score(
+        #         y_score=y_score, y_true=y_true,
+        #         sample_weight=sample_weight)
         if self.cx is not None:
             info.update({
                 'cx': self.cx,
@@ -977,8 +1117,8 @@ class Measures(ub.NiceRepr, DictProxy):
         >>> import kwplot
         >>> kwplot.autompl()
         >>> self.draw(doclf=True)
-        >>> self.draw(key='pr', doclf=True)
-        >>> self.draw(key='roc', doclf=True)
+        >>> self.draw(key='pr',  pnum=(1, 2, 1))
+        >>> self.draw(key='roc', pnum=(1, 2, 2))
         >>> kwplot.show_if_requested()
     """
     def __init__(self, roc_info):
@@ -1020,6 +1160,29 @@ class Measures(ub.NiceRepr, DictProxy):
         elif key == 'roc':
             return drawing.draw_roc(self, prefix=prefix, **kw)
 
+    def summary_plot(self, fnum=1, title=''):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> cfsn_vecs = ConfusionVectors.demo(n=100, p_error=0.5)
+            >>> binvecs = cfsn_vecs.binarize_peritem()
+            >>> self = binvecs.measures()
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> self.summary_plot()
+            >>> kwplot.show_if_requested()
+        """
+        import kwplot
+        kwplot.figure(fnum=fnum, figtitle=title)
+        kwplot.figure(fnum=fnum, pnum=(1, 3, 1))
+        self.draw('pr')
+        kwplot.figure(fnum=fnum, pnum=(1, 3, 2))
+        self.draw('roc')
+        kwplot.figure(fnum=fnum, pnum=(1, 3, 3))
+        self.draw('thresh', keys=['mcc', 'f1', 'acc'])
+
 
 class PerClass_Measures(ub.NiceRepr, DictProxy):
     """
@@ -1057,6 +1220,34 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
     def draw_pr(self, prefix='', **kw):
         from kwcoco.metrics import drawing
         return drawing.draw_perclass_prcurve(self, prefix=prefix, **kw)
+
+    def summary_plot(self, fnum=1, title=''):
+        """
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
+            >>> dmet = DetectionMetrics.demo(
+            >>>     n_fp=(0, 20), n_fn=(0, 20), nimgs=128, nboxes=(0, 10),
+            >>>     nclasses=3)
+            >>> cfsn_vecs = dmet.confusion_vectors()
+            >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
+            >>> self = ovr_cfsn.measures()['perclass']
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> self.summary_plot(title='demo summary_plot ovr')
+            >>> kwplot.show_if_requested()
+        """
+        import kwplot
+        pnum_ = kwplot.PlotNums(nSubplots=5)
+        kwplot.figure(fnum=fnum, doclf=True, figtitle=title)
+        self.draw('pr', fnum=fnum, pnum=pnum_())
+        self.draw('roc', fnum=fnum, pnum=pnum_())
+        self.draw('mcc', fnum=fnum, pnum=pnum_())
+        self.draw('f1', fnum=fnum, pnum=pnum_())
+        self.draw('acc', fnum=fnum, pnum=pnum_())
 
 
 def _stabalilze_data(y_true, y_score, sample_weight, npad=7):

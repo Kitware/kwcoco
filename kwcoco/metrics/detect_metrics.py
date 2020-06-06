@@ -337,7 +337,7 @@ class DetectionMetrics(ub.NiceRepr):
         except ImportError:
             raise RuntimeError('kwant is not available')
 
-        from kwil import kw18
+        import kw18
         gids = list(dmet.gid_to_true_dets.keys())
         true_kw18s = []
         pred_kw18s = []
@@ -779,6 +779,50 @@ class DetectionMetrics(ub.NiceRepr):
             dmet.add_predictions(pred_dets, imgname=imgname)
 
         return dmet
+
+    def summarize(dmet, out_dpath=None, plot=False, title=''):
+        """
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
+            >>> dmet = DetectionMetrics.demo(
+            >>>     n_fp=(0, 128), n_fn=(0, 4), nimgs=512, nboxes=(0, 32),
+            >>>     nclasses=3, rng=0)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> dmet.summarize(plot=True, title='DetectionMetrics summary demo')
+            >>> kwplot.show_if_requested()
+        """
+        cfsn_vecs = dmet.confusion_vectors()
+        ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
+        bin_cfsn = cfsn_vecs.binarize_peritem()
+
+        ovr_measures = ovr_cfsn.measures()
+        bin_measures = bin_cfsn.measures()
+        summary = {
+            'ovr_measures': ovr_measures,
+            'bin_measures': bin_measures,
+        }
+        if plot:
+            print('summary = {}'.format(ub.repr2(summary, nl=1)))
+            print('out_dpath = {!r}'.format(out_dpath))
+
+            ovr_measures['perclass']
+
+            if out_dpath:
+                pass
+
+            perclass = ovr_measures['perclass']
+            ovr_measures['mAUC']
+            ovr_measures['mAP']
+
+            bin_measures.summary_plot(title=title, fnum=1)
+            perclass.summary_plot(title=title, fnum=2)
+            # # Is this micro-versus-macro average?
+            # bin_measures['ap']
+            # bin_measures['auc']
+        return summary
 
 
 def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):

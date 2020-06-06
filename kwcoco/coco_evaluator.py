@@ -39,6 +39,8 @@ class CocoEvalConfig(scfg.Config):
         'implicit_ignore_classes': scfg.Value(['ignore']),
 
         'expt_title': scfg.Value('', help='title for plots'),
+
+        # 'TODO: OPTION FOR CLASSLESS-LOCALIZATION SCOREING ONLY'
     }
 
 
@@ -147,9 +149,9 @@ class CocoEvaluator(object):
             new_classes = classes
             old_classes = det.meta['classes']
             old_cidxs = det.data['class_idxs']
-            old_cids = [old_classes.idx_to_id[cx] for cx in old_cidxs]
-            new_cids = [true_to_unified_cid.get(cid, cid) for cid in old_cids]
-            new_cidxs = np.array([new_classes.id_to_idx[c] for c in new_cids])
+            old_cids = [None if cx is None else old_classes.idx_to_id[cx] for cx in old_cidxs]
+            new_cids = [None if cid is None else true_to_unified_cid.get(cid, cid) for cid in old_cids]
+            new_cidxs = np.array([None if c is None else new_classes.id_to_idx[c] for c in new_cids])
             det.meta['classes'] = new_classes
             det.data['class_idxs'] = new_cidxs
 
@@ -159,9 +161,9 @@ class CocoEvaluator(object):
             new_classes = classes
             old_classes = det.meta['classes']
             old_cidxs = det.data['class_idxs']
-            old_cids = [old_classes.idx_to_id[cx] for cx in old_cidxs]
-            new_cids = [pred_to_unified_cid.get(cid, cid) for cid in old_cids]
-            new_cidxs = np.array([new_classes.id_to_idx[c] for c in new_cids])
+            old_cids = [None if cx is None else old_classes.idx_to_id[cx] for cx in old_cidxs]
+            new_cids = [None if cid is None else pred_to_unified_cid.get(cid, cid) for cid in old_cids]
+            new_cidxs = np.array([None if c is None else new_classes.id_to_idx[c] for c in new_cids])
             det.meta['classes'] = new_classes
             det.data['class_idxs'] = new_cidxs
 
@@ -239,6 +241,7 @@ class CocoEvaluator(object):
         # Detection only scoring
         print('Building confusion vectors')
         cfsn_vecs = dmet.confusion_vectors(ignore_classes=ignore_classes,
+                                           ovthresh=0.5,  # compute AP@0.5iou
                                            workers=8)
 
         # Get pure per-item detection results
@@ -462,6 +465,7 @@ class CocoEvaluator(object):
             return name.lower().replace(' ', '_')
         pred_norm = {_normalize_name(name): name for name in pred_classes}
         true_norm = {_normalize_name(name): name for name in true_classes}
+        # TODO: remove background hack, use "implicit_negative_classes" or "negative_classes"
         unified_names = list(ub.unique(['background'] + list(pred_norm) + list(true_norm)))
         classes = ndsampler.CategoryTree.coerce(unified_names)
 
@@ -539,7 +543,7 @@ class CocoEvaluator(object):
                 # remap truth cids to be consistent with "classes"
                 # cids = [cid_true_to_pred.get(cid, cid) for cid in cids]
 
-                cxs = np.array([classes.id_to_idx[c] for c in cids])
+                cxs = np.array([None if c is None else classes.id_to_idx[c] for c in cids])
                 ssegs = [a.get('segmentation') for a in anns]
                 weights = [a.get('weight', 1) for a in anns]
                 scores = [a.get('score', np.nan) for a in anns]
@@ -574,10 +578,12 @@ class CocoEvaluator(object):
                         print('Loading mscoco directory')
                     # directory of predictions
                     extra['coco_dpath'] = coco_dpath = dataset
-                    coco_fpaths = sorted(glob.glob(join(coco_dpath, '*.json')))
-                    dets = _load_dets(coco_fpaths)
+                    pat = join(coco_dpath, '**/*.json')
+                    coco_fpaths = sorted(glob.glob(pat, recursive=True))
+                    dets, coco_dset = _load_dets(coco_fpaths)
+                    # coco_dset = kwcoco.CocoDataset.from_coco_paths(
+                    #     coco_fpaths, max_workers=6, verbose=1, mode='process')
                     gid_to_det = {d.meta['gid']: d for d in dets}
-                    pass
                 elif isfile(dataset):
                     # mscoco file
                     if verbose:

@@ -3814,23 +3814,58 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         return coco_dset
 
     @classmethod
-    def from_coco_paths(CocoDataset, fpaths, max_workers=0, verbose=1):
+    def from_coco_paths(CocoDataset, fpaths, max_workers=0, verbose=1,
+                        mode='thread', union='try'):
         """
         Constructor from multiple coco file paths.
 
         Loads multiple coco datasets and unions the result
+
+        Notes:
+            if the union operation fails, the list of individually loaded files
+            is returned instead.
+
+        Args:
+            fpaths (List[str]): list of paths to multiple coco files to be
+                loaded and unioned.
+
+            max_workers (int, default=0): number of worker threads / processes
+
+            verbose (int): verbosity level
+
+            mode (str): thread, process, or serial
+
+            union (str | bool, default='try'): If True, unions the result
+                datasets after loading. If False, just returns the result list.
+                If 'try', then try to preform the union, but return the result
+                list if it fails.
         """
         # Can this be done better with asyncio?
         from kwcoco.util import util_futures
-        verbose = 1
-        max_workers = 0
-        jobs = util_futures.JobPool('thread', max_workers=max_workers)
-        for fpath in ub.ProgIter(fpaths, desc='submit load jobs', verbose=verbose):
-            jobs.submit(CocoDataset, fpath)
+        jobs = util_futures.JobPool(mode, max_workers=max_workers)
+        for fpath in ub.ProgIter(fpaths, desc='submit load coco jobs', verbose=verbose):
+            jobs.submit(CocoDataset, fpath, autobuild=False)
         results = [f.result() for f in ub.ProgIter(jobs.as_completed(),
-                   desc='collect load jobs', total=len(jobs), verbose=verbose)]
-        coco_dset = CocoDataset.union(*results)
-        return coco_dset
+                   desc='collect load coco jobs', total=len(jobs), verbose=verbose)]
+
+        if union:
+            try:
+                if verbose:
+                    # TODO: it would be nice if we had a way to combine results on
+                    # the fly, so we can work while the remaining io jobs are
+                    # loading
+                    print('combining results')
+                coco_dset = CocoDataset.union(*results)
+            except Exception as ex:
+                if union == 'try':
+                    warnings.warn('Failed to union coco results: {!r}'.format(ex))
+                    return results
+                else:
+                    raise
+            else:
+                return coco_dset
+        else:
+            return results
 
     def copy(self):
         """
