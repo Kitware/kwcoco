@@ -5,7 +5,12 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.2 - Unreleased
+## Version 0.1.3 - Unreleased
+
+### Added
+* Basic KW18 read/write/from-COCO support
+
+## Version 0.1.2 - Released 2020-06-11
 
 ### Added 
 * ported metrics from netharn, might be moved in the future.
