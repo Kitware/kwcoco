@@ -5,36 +5,38 @@ An implementation and extension of the original MS-COCO API [1]_.
 Extends the format to also include line annotations.
 
 Dataset Spec:
+
+    category = {
+        'id': int,
+        'name': str,
+        'supercategory': Optional[str],
+        'keypoints': Optional(List[str]),
+        'skeleton': Optional(List[Tuple[Int, Int]]),
+    }
+
+    image = {
+        'id': int,
+        'file_name': str
+    }
+
     dataset = {
         # these are object level categories
-        'categories': [
-            {
-                'id': <int:category_id>,
-                'name': <str:>,
-                'supercategory': str  # optional
-
-                # Note: this is the original way to specify keypoint
-                # categories, but our implementation supports a more general
-                # alternative schema
-                "keypoints": [kpname_1, ..., kpname_K], # length <k> array of keypoint names
-                "skeleton": [(kx_a1, kx_b1), ..., (kx_aE, kx_bE)], # list of edge pairs (of keypoint indices), defining connectivity of keypoints.
-            },
-            ...
-        ],
-        'images': [
-            {
-                'id': int,
-                'file_name': str
-            },
+        'categories': [category],
+        'images': [image]
             ...
         ],
         'annotations': [
             {
-                'id': int,
-                'image_id': int,
-                'category_id': int,
+                'id': Int,
+                'image_id': Int,
+                'category_id': Int,
+                'track_id': Optional[Int],
+
                 'bbox': [tl_x, tl_y, w, h],  # optional (xywh format)
                 "score" : float,
+                "prob" : List[float],
+                "weight" : float,
+
                 "caption": str,  # an optional text caption for this annotation
                 "iscrowd" : <0 or 1>,  # denotes if the annotation covers a single object (0) or multiple objects (1)
                 "keypoints" : [x1,y1,v1,...,xk,yk,vk], # or new dict-based format
@@ -62,7 +64,7 @@ Dataset Spec:
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
         encoding. We reuse the original C functions are in [2]_ in
-        `kwimage.structs.Mask` to provide a convinient way to abstract this
+        ``kwimage.structs.Mask`` to provide a convinient way to abstract this
         rather esoteric bytes encoding.
 
         For pure python implementations see kwimage:
@@ -123,7 +125,18 @@ Dataset Spec:
         }
 
     Video Sequences:
-        For video sequences, image dictionaries are augmented as follows:
+        For video sequences, we add the following video level index:
+
+        "videos": [
+            { "id": <int>, "name": <video_name:str> },
+        ]
+
+        Note that the videos might be given as encoded mp4/avi/etc.. files (in
+        which case the name should correspond to a path) or as a series of
+        frames in which case the images should be used to index the extracted
+        frames and information in them.
+
+        Then image dictionaries are augmented as follows:
 
         {
             'video_id': str  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
@@ -138,10 +151,17 @@ Dataset Spec:
         }
 
 
+
 Notes:
-    The main object in this file is `class`:CocoDataset, which is composed of
+    The main object in this file is class:`CocoDataset`, which is composed of
     several mixin classes. See the class and method documentation for more
     details.
+
+
+TODO:
+    - [ ] Use ijson to lazilly load pieces of the dataset in the background or
+      on demand. This will give us faster access to categories / images,
+      whereas we will always have to wait for annotations etc...
 
 References:
     .. [1] http://cocodataset.org/#format-data
@@ -171,12 +191,31 @@ __all__ = [
 _dict = OrderedDict
 
 
+# TODO
+# Programatically layout the extended Kitware MS-COCO specification.
+"""
+
+In the meantime, here is a draft of what it may look like
+
+mkdir -p $HOME/tmp/dummy_typing
+touch $HOME/tmp/dummy_typing/__init__.py
+cp /home/joncrall/.local/conda/envs/py38/lib/python3.8/typing.py $HOME/tmp/dummy_typing/dummy.py
+
+python -c "import typing; print(typing.__all__)"
+
+mkinit $HOME/tmp/dummy_typing
+
+see ~/code/kwcoco/kwcoco/spec.py
+
+
+"""
+
 INT_TYPES = (int, np.integer)
 
 
 def _annot_type(ann):
     """
-    Returns what type of annotation `ann` is.
+    Returns what type of annotation ``ann`` is.
     """
     return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
 
@@ -383,7 +422,7 @@ class ObjectList1D(ub.NiceRepr):
 
 class ObjectGroups(ub.NiceRepr):
     """
-    An object for holding a groups of `ObjectList1D` objects
+    An object for holding a groups of :class:`ObjectList1D` objects
     """
     def __init__(self, groups, dset):
         self._groups = groups
@@ -916,14 +955,15 @@ class MixinCocoExtras(object):
         return sample
 
     @classmethod
-    def coerce(cls, key):
+    def coerce(cls, key, **kw):
         from os.path import exists
         if key.startswith('special:'):
-            self = cls.demo(key=key.split(':')[1])
+            demokey = key.split(':')[1]
+            self = cls.demo(key=demokey, **kw)
         elif exists(key):
-            self = cls(key)
+            self = cls(key, **kw)
         else:
-            self = cls.demo(key=key)
+            self = cls.demo(key=key, **kw)
         return self
 
     @classmethod
@@ -943,7 +983,7 @@ class MixinCocoExtras(object):
             >>> print(CocoDataset.demo('shapes-8', verbose=0))
         """
         if key.startswith('shapes'):
-            from kwcoco import toydata
+            from kwcoco.demo import toydata
             import parse
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:
@@ -1362,7 +1402,7 @@ class MixinCocoExtras(object):
     def _alias_to_cat(self, alias_catname):
         """
         Lookup a coco-category via its name or an "alias" name.
-        In production code, use `_resolve_to_cat` instead.
+        In production code, use :method:`_resolve_to_cat` instead.
 
         Args:
             alias_catname (str): category name or alias
@@ -1602,7 +1642,7 @@ class MixinCocoExtras(object):
 
         Note: this function has been unstable in the past, and has not yet been
         properly stabalized. Either avoid or use with care.
-        Ensuring `simple=True` should result in newer saner behavior that will
+        Ensuring ``simple=True`` should result in newer saner behavior that will
         likely be backwards compatible.
 
         TODO:
@@ -1882,7 +1922,8 @@ class MixinCocoExtras(object):
             DeprecationWarning)
         return self.reroot(*args, **kw)
 
-    def reroot(self, img_root=None, absolute=False, check=True):
+    def reroot(self, img_root=None, absolute=False, check=True, safe=True,
+               smart=False):
         """
         Rebase image paths onto a new image root.
 
@@ -1895,13 +1936,37 @@ class MixinCocoExtras(object):
                 they are relative to the image root.
 
             check (bool, default=True):
-                if True, checks that the images all exist
+                if True, checks that the images all exist.
+
+            safe (bool, default=True):
+                if True, does not overwrite values until all checks pass
+
+            smart (bool, default=False):
+                If True, we can try different reroot strategies and choose the
+                one that works. Note, always be wary when algorithms try to be
+                smart.
 
         CommandLine:
             xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.reroot
 
+        Notes:
+
+            Cases:
+
+                - [ ]
+                    * The COCO dataset contains relative image paths
+                    * The current ``old_img_root`` is incorrect
+                    * The new ``new_img_root`` is correct
+
+                - [ ]
+                    * The COCO dataset contains relative image paths
+                    * The current ``old_img_root`` is correct
+                    * The new ``new_img_root`` is a new desired location
+
+                - [ ] todo, enumerate the rest of the cases.
+
         Ignore:
-            >>> # There might not be a way to easilly handle the cases that I
+            >>> # There might not be a way to easily handle the cases that I
             >>> # want to here. Might need to discuss this.
             >>> import kwcoco
             >>> gname = 'images/foo.png'
@@ -1909,52 +1974,75 @@ class MixinCocoExtras(object):
             >>> host = ub.ensure_app_cache_dir('kwcoco/tests/reroot')
             >>> fpath = join(host, gname)
             >>> ub.ensuredir(dirname(fpath))
+            >>> # In this test the image exists on the host path
             >>> import kwimage
             >>> kwimage.imwrite(fpath, np.random.rand(8, 8))
             >>> #
             >>> cases = {}
             >>> # * given absolute paths on current machine
             >>> cases['abs_curr'] = kwcoco.CocoDataset.from_image_paths([join(host, gname)])
-            >>> # * given rooted relative paths on current machine
-            >>> cases['rel_rooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], img_root=host)
+            >>> # * given "remote" rooted relative paths on current machine
+            >>> cases['rel_remoterooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], img_root=remote)
+            >>> # * given "host" rooted relative paths on current machine
+            >>> cases['rel_hostrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], img_root=host)
             >>> # * given unrooted relative paths on current machine
             >>> cases['rel_unrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname])
             >>> # * given absolute paths on another machine
             >>> cases['abs_remote'] = kwcoco.CocoDataset.from_image_paths([join(remote, gname)])
+            >>> def report(dset, name):
+            >>>     gid = 1
+            >>>     abs_fpath = dset.get_image_fpath(gid)
+            >>>     rel_fpath = dset.imgs[gid]['file_name']
+            >>>     color = 'green' if exists(abs_fpath) else 'red'
+            >>>     print('strategy_name = {!r}'.format(name))
+            >>>     print(ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
+            >>>     print('rel_fpath = {!r}'.format(rel_fpath))
             >>> for key, dset in cases.items():
             >>>     print('----')
             >>>     self = dset
-            >>>     print('key = {!r}'.format(key))
-            >>>     gids = dset.missing_images()
-            >>>     print('gids = {!r}'.format(gids))
+            >>>     print('case key = {!r}'.format(key))
+            >>>     missing_gids = dset.missing_images()
+            >>>     print('missing_gids = {!r}'.format(missing_gids))
             >>>     print('ORIG = {!r}'.format(dset.imgs[1]['file_name']))
             >>>     print('dset.img_root = {!r}'.format(dset.img_root))
             >>>     #
             >>>     dset_None_rel = dset.copy().reroot(absolute=False, check=0)
-            >>>     print('dset_None_rel = {!r}'.format(dset_None_rel.imgs[1]['file_name']))
+            >>>     report(dset_None_rel, 'dset_None_rel')
             >>>     #
-            >>>     dset_remote_rel = dset.copy().reroot(remote, absolute=False, check=0)
-            >>>     print('dset_remote_rel = {!r}'.format(dset_remote_rel.imgs[1]['file_name']))
+            >>>     #dset_remote_rel = dset.copy().reroot(remote, absolute=False, check=0)
+            >>>     #report(dset_remote_rel, 'dset_remote_rel')
             >>>     #
             >>>     dset_host_rel = dset.copy().reroot(host, absolute=False, check=0)
-            >>>     print('dset_host_rel = {!r}'.format(dset_host_rel.imgs[1]['file_name']))
+            >>>     report(dset_host_rel, 'dset_host_rel')
             >>>     #
             >>>     dset_None_abs = dset.copy().reroot(absolute=True, check=0)
-            >>>     print('dset_None_abs = {!r}'.format(dset_None_abs.imgs[1]['file_name']))
+            >>>     report(dset_None_abs, 'dset_None_abs')
             >>>     #
-            >>>     dset_remote_abs = dset.copy().reroot(remote, absolute=True, check=0)
-            >>>     print('dset_remote_abs = {!r}'.format(dset_remote_abs.imgs[1]['file_name']))
+            >>>     #dset_remote_abs = dset.copy().reroot(remote, absolute=True, check=0)
+            >>>     #report(dset_remote_abs, 'dset_remote_abs')
             >>>     #
             >>>     dset_host_abs = dset.copy().reroot(host, absolute=True, check=0)
-            >>>     print('dset_host_abs = {!r}'.format(dset_host_abs.imgs[1]['file_name']))
+            >>>     report(dset_host_abs, 'dset_host_abs')
 
         Example:
             >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
-
+            >>> def report(dset, name):
+            >>>     gid = 1
+            >>>     abs_fpath = dset.get_image_fpath(gid)
+            >>>     rel_fpath = dset.imgs[gid]['file_name']
+            >>>     color = 'green' if exists(abs_fpath) else 'red'
+            >>>     print('strategy_name = {!r}'.format(name))
+            >>>     print(ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
+            >>>     print('rel_fpath = {!r}'.format(rel_fpath))
+            >>> dset = self = kwcoco.CocoDataset.demo()
             >>> # Change base relative directory
             >>> img_root = ub.expandpath('~')
+            >>> print('ORIG self.imgs = {!r}'.format(self.imgs))
+            >>> print('ORIG dset.img_root = {!r}'.format(dset.img_root))
+            >>> print('NEW img_root       = {!r}'.format(img_root))
             >>> self.reroot(img_root)
+            >>> report(self, 'self')
+            >>> print('NEW self.imgs = {!r}'.format(self.imgs))
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
             >>> # Use absolute paths
@@ -1970,45 +2058,77 @@ class MixinCocoExtras(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
             >>> img_root = ub.expandpath('~')
+            >>> print(self.imgs[1]['file_name'])
+            >>> print(self.imgs[1]['auxillary'][0]['file_name'])
             >>> self.reroot(img_root)
+            >>> print(self.imgs[1]['file_name'])
+            >>> print(self.imgs[1]['auxillary'][0]['file_name'])
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
             >>> assert self.imgs[1]['auxillary'][0]['file_name'].startswith('.cache')
         """
         from os.path import exists, relpath
 
-        old_img_root = self.img_root
         new_img_root = img_root
+        old_img_root = self.img_root
         if new_img_root is None:
             new_img_root = old_img_root
 
-        # from os.path import commonprefix
-        # commonprefix([img['file_name'] for img in self.imgs.values()])
-        # common_prefix = dirname(commonprefix([normpath(img['file_name']) for img in self.imgs.values()]))
+        if smart:
+            raise NotImplementedError('we are not smart yet (probably a good thing)')
 
         def _reroot_path(file_name):
             old_gpath = join(old_img_root, file_name)
 
             if absolute:
-                new_file_name = old_gpath
+                new_file_name = join(new_img_root, file_name)
             else:
                 new_file_name = relpath(old_gpath, new_img_root)
 
             if check:
                 new_gpath = join(new_img_root, new_file_name)
                 if not exists(new_gpath):
+                    print('new_file_name = {!r}'.format(new_file_name))
+                    print('new_img_root = {!r}'.format(new_img_root))
                     raise Exception(
                         'Image does not exist: {!r}'.format(new_gpath))
             return new_file_name
 
-        for img in self.imgs.values():
-            img['file_name'] = _reroot_path(img['file_name'])
-            for aux in img.get('auxillary', []):
-                aux['file_name'] = _reroot_path(aux['file_name'])
+        if safe:
+            gid_to_new = {}
+            for gid, img in self.imgs.items():
+                try:
+                    # _reroot_path(img['file_name'])
+                    gid_to_new[gid] = new = {
+                        'file_name': _reroot_path(img['file_name'])
+                    }
+                    if 'auxillary' in img:
+                        new['auxillary'] = aux_fname = []
+                        for aux in img.get('auxillary', []):
+                            aux_fname.append(_reroot_path(aux['file_name']))
+                except Exception:
+                    raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
+
+            # Overwrite old values
+            for gid, new in gid_to_new.items():
+                img = self.imgs[gid]
+                img['file_name'] = new['file_name']
+                if 'auxillary' in new:
+                    for aux_fname, aux in zip(new['auxillary'], img['auxillary']):
+                        aux['file_name'] = aux_fname
+        else:
+            for img in self.imgs.values():
+                try:
+                    # _reroot_path(img['file_name'])
+                    img['file_name'] = _reroot_path(img['file_name'])
+                    for aux in img.get('auxillary', []):
+                        aux['file_name'] = _reroot_path(aux['file_name'])
+                except Exception:
+                    raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
 
         self.img_root = new_img_root
         return self
 
-    def find_representative_images(self):
+    def find_representative_images(self, gids=None):
         r"""
         Find images that have a wide array of categories
 
@@ -2018,6 +2138,9 @@ class MixinCocoExtras(object):
             >>> gids = self.find_representative_images()
             >>> print('gids = {!r}'.format(gids))
         """
+        if gids is None:
+            gids = sorted(self.imgs.keys())
+
         # Select representative images to draw such that each category
         # appears at least once.
         gid_to_cidfreq = ub.map_vals(
@@ -2884,7 +3007,7 @@ class MixinCocoAddRemove(object):
         Remove a single annotation from the dataset
 
         If you have multiple annotations to remove its more efficient to remove
-        them in batch with `self.remove_annotations`
+        them in batch with ``self.remove_annotations``
 
         Example:
             >>> import kwcoco
@@ -3406,6 +3529,10 @@ class CocoIndex(object):
                         parent, anns[aid], ann))
             anns[aid] = ann
 
+        for video in parent.dataset.get('videos', []):
+            # TODO:
+            video['id']
+
         # Build one-to-many lookup maps
         for ann in anns.values():
             try:
@@ -3512,7 +3639,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 "keypoints" : [x1,y1,v1,...,xk,yk,vk],
                 "score" : float,
             }
-            Note that `v[i]` is a visibility flag, where v=0: not labeled,
+            Note that ``v[i]`` is a visibility flag, where v=0: not labeled,
                 v=1: labeled but not visible, and v=2: labeled and visible.
 
         A bounding box annotation
@@ -3547,7 +3674,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         index (CocoIndex): an efficient lookup index into the coco data
             structure. The index defines its own attributes like
-            `anns`, `cats`, `imgs`, etc. See :class:`CocoIndex` for more
+            ``anns``, ``cats``, ``imgs``, etc. See :class:`CocoIndex` for more
             details on which attributes are available.
 
         fpath (PathLike | None):
@@ -3581,6 +3708,19 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
     """
 
     def __init__(self, data=None, tag=None, img_root=None, autobuild=True):
+        """
+        Args:
+
+            data : semi-coercable data (note use :func:`CocoDataset.coerce` for
+                   a generally coercable constructor)
+
+            tag : semi-coercable dataset tag. This is mostly for display
+                purposes, and does not influence behavior of the underlying
+                data structure, although it may be used via convinience
+                methods.
+
+            img_root (str | None):
+        """
         if data is None:
             data = {
                 'categories': [],
@@ -3592,45 +3732,48 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         fpath = None
 
-        if isinstance(data, six.string_types):
+        if isinstance(data, dict):
+            # Assumption: If data is a dict and are not explicitly given
+            # img_root, then we assume it is relative to the cwd.
+            assumed_root = '.'
+        elif isinstance(data, six.string_types):
             fpath = data
             key = basename(fpath)
             data = json.load(open(fpath, 'r'))
 
             # If data is a path it gives us the absolute location of the root
-            root = dirname(fpath)
+            assumed_root = dirname(fpath)
             if tag is None:
                 tag = key
         else:
-            # If data is a dict, we dont know where the root is, so assume its
-            # relative to the cwd.
-            root = '.'
-            if not isinstance(data, dict):
-                raise TypeError('data must be a dict or path to json file')
+            raise TypeError(
+                'data must be a dict or path to json file, '
+                'but got: {!r}'.format(type(data)))
 
         if img_root is None:
             if 'img_root' in data:
                 # allow image root to be specified in the dataset
-                _root = data['img_root']
-                if _root is None:
-                    _root = ''
-                elif isinstance(_root, six.string_types):
-                    _tmp = ub.expandpath(_root)
+                # we refer to this as a json data "body root".
+                body_root = data['img_root']
+                if body_root is None:
+                    body_root = ''
+                elif isinstance(body_root, six.string_types):
+                    _tmp = ub.expandpath(body_root)
                     if exists(_tmp):
-                        _root = _tmp
+                        body_root = _tmp
                 else:
-                    if isinstance(_root, list) and _root == []:
-                        _root = ''
+                    if isinstance(body_root, list) and body_root == []:
+                        body_root = ''
                     else:
-                        raise TypeError('_root = {!r}'.format(_root))
+                        raise TypeError('body_root = {!r}'.format(body_root))
                 try:
-                    img_root = join(root, _root)
+                    img_root = join(assumed_root, body_root)
                 except Exception:
-                    print('_root = {!r}'.format(_root))
-                    print('root = {!r}'.format(root))
+                    print('body_root = {!r}'.format(body_root))
+                    print('assumed_root = {!r}'.format(assumed_root))
                     raise
             else:
-                img_root = root
+                img_root = assumed_root
 
         self.index = CocoIndex()
 
@@ -3649,18 +3792,80 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             self._build_index()
 
     @classmethod
-    def from_image_paths(cls, gpaths, img_root=None):
+    def from_data(CocoDataset, data, img_root=None):
         """
-        Create a coco dataset from a list of images paths
+        Constructor from a json dictionary
+        """
+        coco_dset = CocoDataset(data, img_root=img_root)
+        return coco_dset
+
+    @classmethod
+    def from_image_paths(CocoDataset, gpaths, img_root=None):
+        """
+        Constructor from a list of images paths
 
         Example:
             >>> coco_dset = CocoDataset.from_image_paths(['a.png', 'b.png'])
             >>> assert coco_dset.n_images == 2
         """
-        coco_dset = cls(img_root=img_root)
+        coco_dset = CocoDataset(img_root=img_root)
         for gpath in gpaths:
             coco_dset.add_image(gpath)
         return coco_dset
+
+    @classmethod
+    def from_coco_paths(CocoDataset, fpaths, max_workers=0, verbose=1,
+                        mode='thread', union='try'):
+        """
+        Constructor from multiple coco file paths.
+
+        Loads multiple coco datasets and unions the result
+
+        Notes:
+            if the union operation fails, the list of individually loaded files
+            is returned instead.
+
+        Args:
+            fpaths (List[str]): list of paths to multiple coco files to be
+                loaded and unioned.
+
+            max_workers (int, default=0): number of worker threads / processes
+
+            verbose (int): verbosity level
+
+            mode (str): thread, process, or serial
+
+            union (str | bool, default='try'): If True, unions the result
+                datasets after loading. If False, just returns the result list.
+                If 'try', then try to preform the union, but return the result
+                list if it fails.
+        """
+        # Can this be done better with asyncio?
+        from kwcoco.util import util_futures
+        jobs = util_futures.JobPool(mode, max_workers=max_workers)
+        for fpath in ub.ProgIter(fpaths, desc='submit load coco jobs', verbose=verbose):
+            jobs.submit(CocoDataset, fpath, autobuild=False)
+        results = [f.result() for f in ub.ProgIter(jobs.as_completed(),
+                   desc='collect load coco jobs', total=len(jobs), verbose=verbose)]
+
+        if union:
+            try:
+                if verbose:
+                    # TODO: it would be nice if we had a way to combine results on
+                    # the fly, so we can work while the remaining io jobs are
+                    # loading
+                    print('combining results')
+                coco_dset = CocoDataset.union(*results)
+            except Exception as ex:
+                if union == 'try':
+                    warnings.warn('Failed to union coco results: {!r}'.format(ex))
+                    return results
+                else:
+                    raise
+            else:
+                return coco_dset
+        else:
+            return results
 
     def copy(self):
         """
@@ -3745,8 +3950,11 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             if isinstance(indent, int):
                 indent = ' ' * indent
             dict_lines = []
-            main_keys = ['info', 'licenses', 'categories',
-                         'keypoint_categories', 'images', 'annotations']
+            main_keys = [
+                'info', 'licenses',
+                'categories', 'videos', 'images', 'annotations',
+                'keypoint_categories',
+            ]
             other_keys = sorted(set(self.dataset.keys()) - set(main_keys))
             for key in main_keys:
                 if key not in self.dataset:
@@ -3883,13 +4091,14 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
     def union(self, *others, **kwargs):
         """
-        Merges multiple `CocoDataset` items into one. Names and associations
+        Merges multiple :class:`CocoDataset` items into one. Names and associations
         are retained, but ids may be different.
 
         Args:
-            self : note that `union` can be called as an instance method or a class method.
-                If it is a class method, then this is the class type, otherwise the instance
-                will also be unioned with `others`.
+            self : note that :func:`union` can be called as an instance method
+                or a class method.  If it is a class method, then this is the
+                class type, otherwise the instance will also be unioned with
+                ``others``.
             *others : a series of CocoDatasets that we will merge
             **kwargs : constructor options for the new merged CocoDataset
 
@@ -4179,6 +4388,10 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         if 'keypoint_categories' in self.dataset:
             new_dataset['keypoint_categories'] = self.dataset['keypoint_categories']
+
+        if 'videos' in self.dataset:
+            # TODO: Handle this case
+            pass
 
         gids = sorted(set(gids))
         sub_aids = sorted([aid for gid in gids
