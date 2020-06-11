@@ -783,6 +783,7 @@ class DetectionMetrics(ub.NiceRepr):
     def summarize(dmet, out_dpath=None, plot=False, title=''):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
