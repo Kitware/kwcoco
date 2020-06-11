@@ -69,6 +69,7 @@ class CocoEvaluator(object):
         >>> coco_eval.evaluate()
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> import kwcoco
         >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
@@ -502,13 +503,10 @@ class CocoEvaluator(object):
                 extra: any extra information we gathered via coercion
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwcoco
             >>> coco_dset = kwcoco.CocoDataset.demo('shapes8')
             >>> gid_to_det, extras = CocoEvaluator._coerce_dets(coco_dset)
-
-        Ignore:
-            >>> dataset = ub.expandpath('$HOME/remote/namek/tmp/cached_clf_out_cli/reclassified.mscoco.json')
-            >>> gid_to_pred, extras = CocoEvaluator._coerce_dets(dataset)
         """
         # coerce the input into dictionary of detection objects.
         import kwcoco
@@ -605,6 +603,7 @@ class CocoEvaluator(object):
 def _load_dets(pred_fpaths, workers=6):
     """
     Example:
+        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
         >>> import ubelt as ub
         >>> import kwcoco
@@ -638,8 +637,8 @@ def _load_dets(pred_fpaths, workers=6):
 
 def _load_dets_worker(single_pred_fpath, with_coco=True):
     """
-    single_pred_fpath = ub.expandpath('$HOME/remote/namek/work/bioharn/fit/runs/bioharn-det-mc-cascade-rgbd-v36/brekugqz/eval/habcam_cfarm_v6_test.mscoc/bioharn-det-mc-cascade-rgbd-v36__epoch_00000018/c=0.2,i=window,n=0.5,window_d=512,512,window_o=0.0/pred/dets_gid_00004070_v2.mscoco.json')
-
+    Ignore:
+        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
         >>> import ubelt as ub
         >>> import kwcoco

@@ -63,6 +63,7 @@ class VOC_Metrics(ub.NiceRepr):
         Compute VOC scores for every category
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> from kwcoco.metrics.voc_metrics import *  # NOQA
             >>> dmet = DetectionMetrics.demo(

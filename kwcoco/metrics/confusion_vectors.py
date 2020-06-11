@@ -482,6 +482,7 @@ class ConfusionVectors(ub.NiceRepr):
         Build a classification report with various metrics.
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> report = cfsn_vecs.classification_report(verbose=1)
