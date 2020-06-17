@@ -960,7 +960,7 @@ class MixinCocoExtras(object):
         if key.startswith('special:'):
             demokey = key.split(':')[1]
             self = cls.demo(key=demokey, **kw)
-        elif exists(key):
+        elif exists(key) or key.endswith('.json'):
             self = cls(key, **kw)
         else:
             self = cls.demo(key=key, **kw)
@@ -3979,6 +3979,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 dict_lines.append(item_repr)
             text = '{\n' + ',\n'.join(dict_lines) + '\n}'
         else:
+            # TODO: do main key sorting here as well
             text = _json_dumps(self.dataset, indent=indent)
 
         return text
