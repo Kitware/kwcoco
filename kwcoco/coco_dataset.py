@@ -956,11 +956,10 @@ class MixinCocoExtras(object):
 
     @classmethod
     def coerce(cls, key, **kw):
-        from os.path import exists
         if key.startswith('special:'):
             demokey = key.split(':')[1]
             self = cls.demo(key=demokey, **kw)
-        elif exists(key) or key.endswith('.json'):
+        elif key.endswith('.json'):
             self = cls(key, **kw)
         else:
             self = cls.demo(key=key, **kw)
