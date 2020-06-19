@@ -559,6 +559,8 @@ class CocoEvaluator(object):
                     classes=classes,
                     weights=np.array(weights),
                     scores=np.array(scores),
+                    aids=np.array(aids),
+                    datakeys=['aids'],
                     **kw,
                 ).numpy()
                 gid_to_det[gid] = dets
