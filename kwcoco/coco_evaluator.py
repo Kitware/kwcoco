@@ -656,7 +656,7 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
     single_img_coco = kwcoco.CocoDataset(single_pred_fpath, autobuild=False)
     dets = kwimage.Detections.from_coco_annots(single_img_coco.dataset['annotations'],
                                                dset=single_img_coco)
-    if len(single_img_coco.dataset['images']) != 1:
+    if len(single_img_coco.dataset['images']) == 1:
         # raise Exception('Expected predictions for a single image only')
         gid = single_img_coco.dataset['images'][0]['id']
         dets.meta['gid'] = gid
