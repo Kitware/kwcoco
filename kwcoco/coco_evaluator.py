@@ -535,7 +535,7 @@ class CocoEvaluator(object):
             gids = sorted(coco_dset.imgs.keys())
             classes = coco_dset.object_categories()
             for gid in ub.ProgIter(gids, desc='convert coco to dets'):
-                aids = coco_dset.index.gid_to_aids[gid]
+                aids = list(coco_dset.index.gid_to_aids[gid])
                 anns = [coco_dset.anns[aid] for aid in aids]
                 cids = [a['category_id'] for a in anns]
                 # remap truth cids to be consistent with "classes"
