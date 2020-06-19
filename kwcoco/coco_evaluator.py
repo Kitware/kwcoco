@@ -579,6 +579,7 @@ class CocoEvaluator(object):
                     pat = join(coco_dpath, '**/*.json')
                     coco_fpaths = sorted(glob.glob(pat, recursive=True))
                     dets, coco_dset = _load_dets(coco_fpaths)
+                    extra['coco_dset'] = coco_dset
                     # coco_dset = kwcoco.CocoDataset.from_coco_paths(
                     #     coco_fpaths, max_workers=6, verbose=1, mode='process')
                     gid_to_det = {d.meta['gid']: d for d in dets}
