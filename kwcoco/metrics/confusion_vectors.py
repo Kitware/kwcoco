@@ -77,6 +77,37 @@ class ConfusionVectors(ub.NiceRepr):
     def __nice__(cfsn_vecs):
         return cfsn_vecs.data.__nice__()
 
+    def __json__(self):
+        """
+        Serialize to json
+
+        Example:
+            >>> from kwcoco.metrics import ConfusionVectors
+            >>> self = ConfusionVectors.demo(n_imgs=1, nclasses=2, n_fp=0, nboxes=1)
+            >>> state = self.__json__()
+            >>> print('state = {}'.format(ub.repr2(state, nl=2, precision=2, align=1)))
+            >>> recon = ConfusionVectors.from_json(state)
+        """
+        state = {
+            'probs': None if self.probs is None else self.probs.tolist(),
+            'classes': self.classes.__json__(),
+            'data': self.data.pandas().to_dict(orient='list'),
+        }
+        return state
+
+    @classmethod
+    def from_json(cls, state):
+        import ndsampler
+        import kwarray
+        probs = state['probs']
+        if probs is not None:
+            probs = np.array(probs)
+        classes = ndsampler.CategoryTree.from_json(state['classes'])
+        data = ub.map_vals(np.array, state['data'])
+        data = kwarray.DataFrameArray(data)
+        self = cls(data=data, probs=probs, classes=classes)
+        return self
+
     @classmethod
     def demo(cfsn_vecs, **kw):
         """
@@ -93,7 +124,6 @@ class ConfusionVectors(ub.NiceRepr):
             'nboxes': (0, 10),
             'n_fp': (0, 1),
             'n_fn': 0,
-            'nclasses': 3,
         }
         demokw = default.copy()
         demokw.update(kw)
@@ -1130,7 +1160,10 @@ class Measures(ub.NiceRepr, DictProxy):
         return self.get('node', None)
 
     def __nice__(self):
-        return ub.repr2({
+        return ub.repr2(self.summary(), nl=0, precision=4, strvals=True)
+
+    def summary(self):
+        return {
             'ap': self['ap'],
             'auc': self['auc'],
             'max_mcc': self['max_mcc'],
@@ -1140,7 +1173,7 @@ class Measures(ub.NiceRepr, DictProxy):
             'realpos_total': self['realpos_total'],
             'realneg_total': self['realneg_total'],
             'catname': self.get('node', None),
-        }, nl=0, precision=4, strvals=True)
+        }
 
     def draw(self, key=None, prefix='', **kw):
         """
@@ -1193,6 +1226,9 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
 
     def __nice__(self):
         return ub.repr2(self.proxy, nl=2, strvals=True)
+
+    def summary(self):
+        return {k: v.summary() for k, v in self.items()}
 
     def draw(self, key='mcc', prefix='', **kw):
         """
