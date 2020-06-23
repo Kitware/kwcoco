@@ -1162,6 +1162,15 @@ class Measures(ub.NiceRepr, DictProxy):
     def __nice__(self):
         return ub.repr2(self.summary(), nl=0, precision=4, strvals=True)
 
+    def __json__(self):
+        state = {}
+        for k, v in self.proxy.items():
+            if isinstance(v, np.ndarray):
+                state[k] = v.tolist()
+            else:
+                state[k] = v
+        return state
+
     def summary(self):
         return {
             'ap': self['ap'],
@@ -1229,6 +1238,9 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
 
     def summary(self):
         return {k: v.summary() for k, v in self.items()}
+
+    def __json__(self):
+        return {k: v.__json__() for k, v in self.items()}
 
     def draw(self, key='mcc', prefix='', **kw):
         """
