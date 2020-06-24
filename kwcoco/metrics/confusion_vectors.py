@@ -888,8 +888,8 @@ class BinaryConfusionVectors(ub.NiceRepr):
         for key in keys:
             measure = info[key]
             max_idx = measure.argmax()
-            best_thresh = info['thresholds'][max_idx]
-            best_measure = measure[max_idx]
+            best_thresh = float(info['thresholds'][max_idx])
+            best_measure = float(measure[max_idx])
             best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
             info['max_{}'.format(key)] = best_label
             info['_max_{}'.format(key)] = (best_measure, best_thresh)
@@ -954,7 +954,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             prec_items = prec[1:]
 
             # basline way
-            ap = info['sklish_ap'] = np.sum(diff_items * prec_items)
+            ap = info['sklish_ap'] = float(np.sum(diff_items * prec_items))
 
             if EXPERIMENTAL_AP:
                 # Remove extreme outliers from ap calculation
@@ -984,14 +984,14 @@ class BinaryConfusionVectors(ub.NiceRepr):
                     # weight = weight / weight.sum()
                     # expt2_ap = (weight * score).sum()
 
-                    info['expt_ap'] = expt1_ap
+                    info['expt_ap'] = float(expt1_ap)
                 except Exception:
                     pass
 
             # print('ap = {!r}'.format(ap))
             # print('ap = {!r}'.format(ap))
             # ap = np.sum(np.diff(rec) * prec[1:])
-            info['ap'] = ap
+            info['ap'] = float(ap)
 
         return Measures(info)
 
@@ -1163,12 +1163,22 @@ class Measures(ub.NiceRepr, DictProxy):
         return ub.repr2(self.summary(), nl=0, precision=4, strvals=True)
 
     def __json__(self):
+        import numbers
         state = {}
         for k, v in self.proxy.items():
             if isinstance(v, np.ndarray):
                 state[k] = v.tolist()
-            else:
+            elif isinstance(v, numbers.Integral):
+                v = int(v)
+            elif isinstance(v, numbers.Real):
+                v = float(v)
                 state[k] = v
+            else:
+                debug = 1
+                if debug:
+                    import json
+                    json.dumps(v)
+                    json.dumps(k)
         return state
 
     def summary(self):

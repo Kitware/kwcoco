@@ -28,10 +28,9 @@ class CocoEvalConfig(scfg.Config):
         'classes_of_interest': scfg.Value(None, type=list, help='if specified only these classes are given weight'),
         'ignore_classes': scfg.Value(None, type=list, help='classes to ignore (give them zero weight)'),
 
-        # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
+        # 'TODO: OPTION FOR CLASSLESS-LOCALIZATION SCOREING ONLY'
 
-        'draw': scfg.Value(True, help='draw metric plots'),
-        'out_dpath': scfg.Value('./coco_metrics', type=str),
+        # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
 
         'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
 
@@ -39,9 +38,11 @@ class CocoEvalConfig(scfg.Config):
 
         'implicit_ignore_classes': scfg.Value(['ignore']),
 
-        'expt_title': scfg.Value('', help='title for plots'),
+        'expt_title': scfg.Value('', type=str, help='title for plots'),
 
-        # 'TODO: OPTION FOR CLASSLESS-LOCALIZATION SCOREING ONLY'
+        # These should go into the CLI args, not the class config args
+        'draw': scfg.Value(True, help='draw metric plots'),
+        'out_dpath': scfg.Value('./coco_metrics', type=str),
     }
 
 
@@ -189,9 +190,6 @@ class CocoEvaluator(object):
     def _ensure_init(coco_eval):
         if not coco_eval._is_init:
             coco_eval._init()
-
-    def _init_paths():
-        pass
 
     @classmethod
     def _rectify_classes(coco_eval, true_classes, pred_classes):
@@ -366,6 +364,7 @@ class CocoEvaluator(object):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> from kwcoco.coco_evaluator import *  # NOQA
             >>> from kwcoco.coco_evaluator import CocoEvaluator
             >>> import kwcoco
             >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
@@ -453,17 +452,19 @@ class CocoEvaluator(object):
         ovr_measures = ovr_binvecs.measures(fp_cutoff=fp_cutoff)['perclass']
         print('ovr_measures = {!r}'.format(ovr_measures))
 
+        # Remove large datasets values in configs that are not file references
+        meta = dict(coco_eval.config)
+        if not isinstance(meta['true_dataset'], str):
+            meta['true_dataset'] = '<not-a-file-ref>'
+        if not isinstance(meta['pred_dataset'], str):
+            meta['pred_dataset'] = '<not-a-file-ref>'
+
         results = CocoResults(
-            cfsn_vecs,
             measures,
             ovr_measures,
+            cfsn_vecs,
+            meta,
         )
-
-        results = {
-            'cfsn_vecs': cfsn_vecs,
-            'measures': measures,
-            'ovr_measures': ovr_measures,
-        }
 
         # TODO: when making the ovr localization curves, it might be a good
         # idea to include a second version where any COI prediction assigned
@@ -491,15 +492,15 @@ class CocoEvaluator(object):
 
             ovr_measures2 = ovr_binvecs2.measures(fp_cutoff=fp_cutoff)['perclass']
             print('ovr_measures2 = {!r}'.format(ovr_measures2))
-            results.update({
-                'ovr_measures2': ovr_measures2,
-            })
+            results.ovr_measures2 = ovr_measures2
 
-        # FIXME: there is a lot of redundant information here,
-        # this needs to be consolidated both here and in netharn metrics
-        # metrics_dpath = coco_eval.config['out_dpath']
+        # TODO: The evaluate method itself probably shouldn't do the drawing it
+        # should be the responsibility of the caller.
         if coco_eval.config['draw']:
-            coco_eval.dump_figures(results, expt_title=coco_eval.config['expt_title'])
+            results.dump_figures(
+                coco_eval.config['out_dpath'],
+                expt_title=coco_eval.config['expt_title']
+            )
         return results
 
 
@@ -515,7 +516,37 @@ class CocoResults(ub.NiceRepr):
         results.cfsn_vecs = cfsn_vecs
         results.meta = meta
 
-    def dump_figures(results, out_dpath, expt_title=''):
+    def __nice__(results):
+        text = ub.repr2({
+            'measures': results.measures,
+            'ovr_measures': results.ovr_measures,
+        }, sv=1)
+        return text
+
+    def __json__(results):
+        state = {
+            'measures': results.measures.__json__(),
+            'ovr_measures': results.ovr_measures.__json__(),
+            'cfsn_vecs': results.cfsn_vecs.__json__(),
+            'meta': results.meta,
+        }
+        from kwcoco.util.util_json import ensure_json_serializable
+        ensure_json_serializable(state, normalize_containers=True, verbose=0)
+        return state
+
+    def dump(results, file, indent='    '):
+        """
+        Serialize to json file
+        """
+        if isinstance(file, str):
+            with open(file, 'w') as fp:
+                return results.dump(fp, indent=indent)
+        else:
+            import json
+            state = results.__json__()
+            json.dump(state, file, indent=indent)
+
+    def dump_figures(results, out_dpath, expt_title=None):
         # classes_of_interest=[], ignore_classes=None,
         # if 0:
         #     cname = 'flatfish'
@@ -524,6 +555,8 @@ class CocoResults(ub.NiceRepr):
         #     num_localized = (cfsn_vecs.data['pred'][is_true] != -1).sum()
         #     num_missed = is_true.sum() - num_localized
         # metrics_dpath = ub.ensuredir(coco_eval.config['out_dpath'])
+        if expt_title is None:
+            expt_title = results.meta.get('expt_title', '')
         metrics_dpath = ub.ensuredir(out_dpath)
         # coco_eval.config['out_dpath'])
 
