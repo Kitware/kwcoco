@@ -407,6 +407,7 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
         warnings.filterwarnings('ignore', message='invalid value encountered in true_divide')
         warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
         warnings.filterwarnings('ignore', message='divide by zero')
+        warnings.filterwarnings('ignore', message='due to no true nor predicted samples')
 
         for k in range(n_classes):
             k_metrics = ub.odict()
