@@ -947,7 +947,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             rec = np.r_[0, tpr[:last_ind + 1]]
             prec = np.r_[1, ppv[:last_ind + 1]]
 
-            EXPERIMENTAL_AP = 1
+            OUTLIER_AP = 1
 
             # Precisions are weighted by the change in recall
             diff_items = np.diff(rec)
@@ -956,7 +956,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             # basline way
             ap = info['sklish_ap'] = float(np.sum(diff_items * prec_items))
 
-            if EXPERIMENTAL_AP:
+            if OUTLIER_AP:
                 # Remove extreme outliers from ap calculation
                 # only do this on the first or last 2 items.
                 # Hueristically chosen.
@@ -975,16 +975,9 @@ class BinaryConfusionVectors(ub.NiceRepr):
                     score[outlier_flags] = score[inlier_flags].min()
                     score[outlier_flags] = 0
 
-                    ap = expt1_ap = np.sum(score * diff_items)
+                    ap = outlier_ap = np.sum(score * diff_items)
 
-                    # prec_items[inlier_flags]
-                    # Renormalize AP calculation within inlier area
-                    # weight = diff_items[inlier_flags]
-                    # score = prec_items[inlier_flags]
-                    # weight = weight / weight.sum()
-                    # expt2_ap = (weight * score).sum()
-
-                    info['expt_ap'] = float(expt1_ap)
+                    info['outlier_ap'] = float(outlier_ap)
                 except Exception:
                     pass
 
