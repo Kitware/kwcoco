@@ -82,6 +82,7 @@ class ConfusionVectors(ub.NiceRepr):
         Serialize to json
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics import ConfusionVectors
             >>> self = ConfusionVectors.demo(n_imgs=1, nclasses=2, n_fp=0, nboxes=1)
             >>> state = self.__json__()
