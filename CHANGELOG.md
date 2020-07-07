@@ -10,6 +10,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Basic KW18 read/write/from-COCO support
 
+### Fixed
+* Fixed json serialization error when using perterb_coco.
+
 ## Version 0.1.2 - Released 2020-06-11
 
 ### Added 

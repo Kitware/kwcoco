@@ -1,7 +1,9 @@
 import copy
 import numpy as np
 import ubelt as ub
+import json
 from collections import OrderedDict
+from collections import deque
 
 
 def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
@@ -130,3 +132,90 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
         # normalize the outer layer
         dict_ = _norm_container(dict_)
     return dict_
+
+
+def find_json_unserializable(data):
+    """
+    Recurse through json datastructure and find any component that
+    causes a serialization error. Record the location of these errors
+    in the datastructure as we recurse through the call tree.
+
+    Args:
+        data (object): data that should be json serializable
+
+    Returns:
+        List[Dict]: list of "bad part" dictionaries containing items
+            'value' - the value that caused the serialization error
+            'loc' - which contains a list of key/indexes that can be used
+                    to lookup the location of the unserializable value.
+                    If the "loc" is a list, then it indicates a rare case where
+                    a key in a dictionary is causing the serialization error.
+
+    Example:
+        >>> from kwcoco.util.util_json import *  # NOQA
+        >>> part = ub.ddict(lambda: int)
+        >>> part['foo'] = ub.ddict(lambda: int)
+        >>> part['bar'] = np.array([1, 2, 3])
+        >>> part['foo']['a'] = 1
+        >>> # Create a dictionary with two unserializable parts
+        >>> data = [1, 2, {'nest1': [2, part]}, {frozenset({'badkey'}): 3, 2: 4}]
+        >>> parts = find_json_unserializable(data)
+        >>> print('parts = {}'.format(ub.repr2(parts, nl=1)))
+        >>> # Check expected structure of bad parts
+        >>> assert len(parts) == 2
+        >>> part = parts[0]
+        >>> assert list(part['loc']) == [2, 'nest1', 1, 'bar']
+        >>> # We can use the "loc" to find the bad value
+        >>> for part in parts:
+        >>>     # "loc" is a list of directions containing which keys/indexes
+        >>>     # to traverse at each descent into the data structure.
+        >>>     directions = part['loc']
+        >>>     curr = data
+        >>>     special_flag = False
+        >>>     for key in directions:
+        >>>         if isinstance(key, list):
+        >>>             # special case for bad keys
+        >>>             special_flag = True
+        >>>             break
+        >>>         else:
+        >>>             # normal case for bad values
+        >>>             curr = curr[key]
+        >>>     if special_flag:
+        >>>         assert part['data'] in curr.keys()
+        >>>         assert part['data'] is key[1]
+        >>>     else:
+        >>>         assert part['data'] is curr
+    """
+    try:
+        # Might be a more efficient way to do this check. We duplicate a lot of
+        # work by doing the check for unserializable data this way.
+        json.dumps(data)
+    except Exception:
+        # If there is unserializable data, find out where it is.
+        parts = []
+        if isinstance(data, list):
+            for idx, item in enumerate(data):
+                subparts_item = find_json_unserializable(item)
+                for sub in subparts_item:
+                    sub['loc'].appendleft(idx)
+                    parts.append(sub)
+        elif isinstance(data, dict):
+            for key, value in data.items():
+                subparts_key = find_json_unserializable(key)
+                for sub in subparts_key:
+                    # Special case where a dict key is the error value
+                    # Purposely make loc non-hashable so its not confused with
+                    # an address. All we can know in this case is that they key
+                    # is at this level, there is no concept of where.
+                    sub['loc'].appendleft(['.keys', key])
+                    parts.append(sub)
+
+                subparts_val = find_json_unserializable(value)
+                for sub in subparts_val:
+                    sub['loc'].appendleft(key)
+                    parts.append(sub)
+        else:
+            parts = [{'loc': deque(), 'data': data}]
+        return parts
+    else:
+        return []

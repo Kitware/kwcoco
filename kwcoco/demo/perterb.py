@@ -8,8 +8,8 @@ def perterb_coco(coco_dset, **kwargs):
 
     Example:
         >>> # xdoctest: +REQUIRES(module:ndsampler)
-        >>> from perterb import *  # NOQA
-        >>> from perterb import _demo_construct_probs
+        >>> from kwcoco.demo.perterb import *  # NOQA
+        >>> from kwcoco.demo.perterb import _demo_construct_probs
         >>> import kwcoco
         >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
         >>> kwargs = {
@@ -18,6 +18,7 @@ def perterb_coco(coco_dset, **kwargs):
         >>>     'with_probs': 1,
         >>> }
         >>> pred_dset = perterb_coco(true_dset, **kwargs)
+        >>> pred_dset._check_json_serializable()
 
     """
     import kwimage
@@ -88,7 +89,7 @@ def perterb_coco(coco_dset, **kwargs):
             ann = new_dset.anns[aid]
             ann['bbox'] = (np.array(ann['bbox']) + box_noise_RV(4)).tolist()
 
-            ann['score'] = true_score_RV()
+            ann['score'] = float(true_score_RV(1)[0])
 
             if cls_noise_RV():
                 # Perterb class predictions
