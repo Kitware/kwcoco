@@ -77,6 +77,38 @@ class ConfusionVectors(ub.NiceRepr):
     def __nice__(cfsn_vecs):
         return cfsn_vecs.data.__nice__()
 
+    def __json__(self):
+        """
+        Serialize to json
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> from kwcoco.metrics import ConfusionVectors
+            >>> self = ConfusionVectors.demo(n_imgs=1, nclasses=2, n_fp=0, nboxes=1)
+            >>> state = self.__json__()
+            >>> print('state = {}'.format(ub.repr2(state, nl=2, precision=2, align=1)))
+            >>> recon = ConfusionVectors.from_json(state)
+        """
+        state = {
+            'probs': None if self.probs is None else self.probs.tolist(),
+            'classes': self.classes.__json__(),
+            'data': self.data.pandas().to_dict(orient='list'),
+        }
+        return state
+
+    @classmethod
+    def from_json(cls, state):
+        import ndsampler
+        import kwarray
+        probs = state['probs']
+        if probs is not None:
+            probs = np.array(probs)
+        classes = ndsampler.CategoryTree.from_json(state['classes'])
+        data = ub.map_vals(np.array, state['data'])
+        data = kwarray.DataFrameArray(data)
+        self = cls(data=data, probs=probs, classes=classes)
+        return self
+
     @classmethod
     def demo(cfsn_vecs, **kw):
         """
@@ -93,7 +125,6 @@ class ConfusionVectors(ub.NiceRepr):
             'nboxes': (0, 10),
             'n_fp': (0, 1),
             'n_fn': 0,
-            'nclasses': 3,
         }
         demokw = default.copy()
         demokw.update(kw)
@@ -858,8 +889,8 @@ class BinaryConfusionVectors(ub.NiceRepr):
         for key in keys:
             measure = info[key]
             max_idx = measure.argmax()
-            best_thresh = info['thresholds'][max_idx]
-            best_measure = measure[max_idx]
+            best_thresh = float(info['thresholds'][max_idx])
+            best_measure = float(measure[max_idx])
             best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
             info['max_{}'.format(key)] = best_label
             info['_max_{}'.format(key)] = (best_measure, best_thresh)
@@ -917,16 +948,16 @@ class BinaryConfusionVectors(ub.NiceRepr):
             rec = np.r_[0, tpr[:last_ind + 1]]
             prec = np.r_[1, ppv[:last_ind + 1]]
 
-            EXPERIMENTAL_AP = 1
+            OUTLIER_AP = 1
 
             # Precisions are weighted by the change in recall
             diff_items = np.diff(rec)
             prec_items = prec[1:]
 
             # basline way
-            ap = info['sklish_ap'] = np.sum(diff_items * prec_items)
+            ap = info['sklish_ap'] = float(np.sum(diff_items * prec_items))
 
-            if EXPERIMENTAL_AP:
+            if OUTLIER_AP:
                 # Remove extreme outliers from ap calculation
                 # only do this on the first or last 2 items.
                 # Hueristically chosen.
@@ -945,23 +976,16 @@ class BinaryConfusionVectors(ub.NiceRepr):
                     score[outlier_flags] = score[inlier_flags].min()
                     score[outlier_flags] = 0
 
-                    ap = expt1_ap = np.sum(score * diff_items)
+                    ap = outlier_ap = np.sum(score * diff_items)
 
-                    # prec_items[inlier_flags]
-                    # Renormalize AP calculation within inlier area
-                    # weight = diff_items[inlier_flags]
-                    # score = prec_items[inlier_flags]
-                    # weight = weight / weight.sum()
-                    # expt2_ap = (weight * score).sum()
-
-                    info['expt_ap'] = expt1_ap
+                    info['outlier_ap'] = float(outlier_ap)
                 except Exception:
                     pass
 
             # print('ap = {!r}'.format(ap))
             # print('ap = {!r}'.format(ap))
             # ap = np.sum(np.diff(rec) * prec[1:])
-            info['ap'] = ap
+            info['ap'] = float(ap)
 
         return Measures(info)
 
@@ -1130,7 +1154,29 @@ class Measures(ub.NiceRepr, DictProxy):
         return self.get('node', None)
 
     def __nice__(self):
-        return ub.repr2({
+        return ub.repr2(self.summary(), nl=0, precision=4, strvals=True)
+
+    def __json__(self):
+        import numbers
+        state = {}
+        for k, v in self.proxy.items():
+            if isinstance(v, np.ndarray):
+                state[k] = v.tolist()
+            elif isinstance(v, numbers.Integral):
+                v = int(v)
+            elif isinstance(v, numbers.Real):
+                v = float(v)
+                state[k] = v
+            else:
+                debug = 1
+                if debug:
+                    import json
+                    json.dumps(v)
+                    json.dumps(k)
+        return state
+
+    def summary(self):
+        return {
             'ap': self['ap'],
             'auc': self['auc'],
             'max_mcc': self['max_mcc'],
@@ -1140,7 +1186,7 @@ class Measures(ub.NiceRepr, DictProxy):
             'realpos_total': self['realpos_total'],
             'realneg_total': self['realneg_total'],
             'catname': self.get('node', None),
-        }, nl=0, precision=4, strvals=True)
+        }
 
     def draw(self, key=None, prefix='', **kw):
         """
@@ -1193,6 +1239,12 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
 
     def __nice__(self):
         return ub.repr2(self.proxy, nl=2, strvals=True)
+
+    def summary(self):
+        return {k: v.summary() for k, v in self.items()}
+
+    def __json__(self):
+        return {k: v.__json__() for k, v in self.items()}
 
     def draw(self, key='mcc', prefix='', **kw):
         """

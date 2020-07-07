@@ -956,11 +956,10 @@ class MixinCocoExtras(object):
 
     @classmethod
     def coerce(cls, key, **kw):
-        from os.path import exists
         if key.startswith('special:'):
             demokey = key.split(':')[1]
             self = cls.demo(key=demokey, **kw)
-        elif exists(key):
+        elif key.endswith('.json'):
             self = cls(key, **kw)
         else:
             self = cls.demo(key=key, **kw)
@@ -3979,6 +3978,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 dict_lines.append(item_repr)
             text = '{\n' + ',\n'.join(dict_lines) + '\n}'
         else:
+            # TODO: do main key sorting here as well
             text = _json_dumps(self.dataset, indent=indent)
 
         return text
@@ -4029,6 +4029,20 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 file.write(self.dumps(indent=indent, newlines=newlines))
             else:
                 json.dump(self.dataset, file, indent=indent, ensure_ascii=False)
+
+    def _check_json_serializable(self, verbose=1):
+        """
+        Debug which part of a coco dataset might not be json serializable
+        """
+        from kwcoco.util.util_json import find_json_unserializable
+        bad_parts = find_json_unserializable(self.dataset)
+
+        if verbose:
+            if bad_parts:
+                print(ub.repr2(bad_parts))
+            summary = 'There are {} total errors'.format(len(bad_parts))
+            print('summary = {}'.format(summary))
+        return bad_parts
 
     def _check_integrity(self):
         """ perform all checks """

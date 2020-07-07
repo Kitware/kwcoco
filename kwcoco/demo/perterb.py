@@ -8,13 +8,17 @@ def perterb_coco(coco_dset, **kwargs):
 
     Example:
         >>> # xdoctest: +REQUIRES(module:ndsampler)
+        >>> from kwcoco.demo.perterb import *  # NOQA
+        >>> from kwcoco.demo.perterb import _demo_construct_probs
         >>> import kwcoco
         >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
         >>> kwargs = {
         >>>     'box_noise': 0.5,
         >>>     'n_fp': 3,
+        >>>     'with_probs': 1,
         >>> }
         >>> pred_dset = perterb_coco(true_dset, **kwargs)
+        >>> pred_dset._check_json_serializable()
 
     """
     import kwimage
@@ -85,7 +89,7 @@ def perterb_coco(coco_dset, **kwargs):
             ann = new_dset.anns[aid]
             ann['bbox'] = (np.array(ann['bbox']) + box_noise_RV(4)).tolist()
 
-            ann['score'] = true_score_RV()
+            ann['score'] = float(true_score_RV(1)[0])
 
             if cls_noise_RV():
                 # Perterb class predictions
@@ -119,22 +123,27 @@ def perterb_coco(coco_dset, **kwargs):
                 ann['image_id'] = gid
                 false_anns.append(ann)
 
-        # Transform the scores for the assigned class into a predicted
-        # probability for each class. (Currently a bit hacky).
-        # class_probs = _demo_construct_probs(
-        #     pred_cxs, pred_scores, classes, rng,
-        #     hacked=kwargs.get('hacked', 0))
-
-        # Hack in the probs
-        if with_probs:
-            raise NotImplementedError
-
         if null_pred:
             raise NotImplementedError
 
     new_dset.remove_annotations(remove_aids)
     for ann in false_anns:
         new_dset.add_annotation(**ann)
+
+    # Hack in the probs
+    if with_probs:
+        annots = new_dset.annots()
+        pred_cids = annots.lookup('category_id')
+        pred_cxs = np.array([classes.id_to_idx[cid] for cid in pred_cids])
+        pred_scores = np.array(annots.lookup('score'))
+        # Transform the scores for the assigned class into a predicted
+        # probability for each class. (Currently a bit hacky).
+        pred_probs = _demo_construct_probs(
+            pred_cxs, pred_scores, classes, rng,
+            hacked=kwargs.get('hacked', 1))
+
+        for aid, prob in zip(annots.aids, pred_probs):
+            new_dset.anns[aid]['prob'] = prob.tolist()
     return new_dset
 
 

@@ -358,6 +358,7 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     Example:
         >>> # xdoctest: +IGNORE_WANT
         >>> # xdoctest: +REQUIRES(module:sklearn)
+        >>> from kwcoco.metrics.clf_report import *  # NOQA
         >>> y_true = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0]
         >>> y_probs = np.random.rand(len(y_true), max(y_true) + 1)
         >>> target_names = None
@@ -391,7 +392,7 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     import sklearn.metrics
 
     if metrics is None:
-        metrics = ['auc', 'ap', 'mcc', 'brier', 'kappa']
+        metrics = ['auc', 'ap', 'mcc', 'f1', 'brier', 'kappa']
 
     n_classes = mc_probs.shape[1]
     ohvec_true = np.eye(n_classes, dtype=np.uint8)[mc_y_true]
@@ -406,6 +407,7 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
         warnings.filterwarnings('ignore', message='invalid value encountered in true_divide')
         warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
         warnings.filterwarnings('ignore', message='divide by zero')
+        warnings.filterwarnings('ignore', message='due to no true nor predicted samples')
 
         for k in range(n_classes):
             k_metrics = ub.odict()
@@ -441,6 +443,10 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
             if 'mcc' in metrics:
                 k_metrics['mcc'] = sklearn.metrics.matthews_corrcoef(
                     k_true, k_pred, sample_weight=sample_weight)
+
+            if 'f1' in metrics:
+                k_metrics['f1'] = sklearn.metrics.fbeta_score(
+                    k_true, k_pred, beta=1.0, sample_weight=sample_weight)
 
             if 'brier' in metrics:
                 # Get the probablity of the real class for each example

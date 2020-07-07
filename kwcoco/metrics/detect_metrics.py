@@ -633,7 +633,16 @@ class DetectionMetrics(ub.NiceRepr):
         import ndsampler
         # Parse kwargs
         rng = kwarray.ensure_rng(kwargs.get('rng', 0))
-        nclasses = kwargs.get('nclasses', 1)
+
+        # todo: accept and coerce classes instead of nclasses
+        classes = kwargs.get('classes', None)
+        nclasses = kwargs.get('nclasses', None)
+
+        if classes is not None and nclasses is not None:
+            raise ValueError('cant specify both classes and nclasses')
+        elif classes is None and nclasses is None:
+            nclasses = 1
+
         nimgs = kwargs.get('nimgs', 1)
         box_noise = kwargs.get('box_noise', 0)
         cls_noise = kwargs.get('cls_noise', 0)
@@ -681,22 +690,25 @@ class DetectionMetrics(ub.NiceRepr):
         false_score_RV = distributions.TruncNormal(
             mean=false_mean, std=.5, low=0, high=false_high, rng=rng)
 
-        frgnd_cx_RV = distributions.DiscreteUniform(
-            1, nclasses + 1, rng=rng)
-
         # Create the category hierarcy
-        graph = nx.DiGraph()
-        graph.add_node('background', id=0)
-        for cid in range(1, nclasses + 1):
-            # binary heap encoding of a tree
-            cx = cid - 1
-            parent_cx = (cx - 1) // 2
-            node = 'cat_{}'.format(cid)
-            graph.add_node(node, id=cid)
-            if parent_cx > 0:
-                supercategory = 'cat_{}'.format(parent_cx + 1)
-                graph.add_edge(supercategory, node)
-        classes = ndsampler.CategoryTree(graph)
+        if nclasses is not None:
+            graph = nx.DiGraph()
+            graph.add_node('background', id=0)
+            for cid in range(1, nclasses + 1):
+                # binary heap encoding of a tree
+                cx = cid - 1
+                parent_cx = (cx - 1) // 2
+                node = 'cat_{}'.format(cid)
+                graph.add_node(node, id=cid)
+                if parent_cx > 0:
+                    supercategory = 'cat_{}'.format(parent_cx + 1)
+                    graph.add_edge(supercategory, node)
+            classes = ndsampler.CategoryTree(graph)
+            frgnd_cx_RV = distributions.DiscreteUniform(1, len(classes), rng=rng)
+        else:
+            classes = ndsampler.CategoryTree.coerce(classes)
+            # TODO: remove background classes via rejection sampling
+            frgnd_cx_RV = distributions.DiscreteUniform(0, len(classes), rng=rng)
 
         dmet = cls()
         dmet.classes = classes
