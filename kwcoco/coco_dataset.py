@@ -2140,6 +2140,9 @@ class MixinCocoExtras(object):
             gids (None | List): Subset of image ids to consider when finding
                 representative images. Uses all images if unspecified.
 
+        Returns:
+            List: list of image ids determined to be representative
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
