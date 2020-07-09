@@ -2132,7 +2132,13 @@ class MixinCocoExtras(object):
 
     def find_representative_images(self, gids=None):
         r"""
-        Find images that have a wide array of categories
+        Find images that have a wide array of categories. Attempt to find the
+        fewest images that cover all categories using images that contain both
+        a large and small number of annotations.
+
+        Args:
+            gids (None | List): Subset of image ids to consider when finding
+                representative images. Uses all images if unspecified.
 
         Example:
             >>> import kwcoco

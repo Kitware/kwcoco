@@ -5,7 +5,13 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.3 - Unreleased
+## Version 0.1.4 - Unreleased
+
+### Fixed
+* Fix bug in find_representative_images.
+
+
+## Version 0.1.3 - Released
 
 ### Added
 * Basic KW18 read/write/from-COCO support
