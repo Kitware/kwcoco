@@ -163,6 +163,9 @@ TODO:
       on demand. This will give us faster access to categories / images,
       whereas we will always have to wait for annotations etc...
 
+    - [ ] Should img_root be changed to data root?
+
+
 References:
     .. [1] http://cocodataset.org/#format-data
     .. [2] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
@@ -2136,26 +2139,49 @@ class MixinCocoExtras(object):
             >>> self = kwcoco.CocoDataset.demo()
             >>> gids = self.find_representative_images()
             >>> print('gids = {!r}'.format(gids))
+            >>> gids = self.find_representative_images([3])
+            >>> print('gids = {!r}'.format(gids))
+
+            >>> self = kwcoco.CocoDataset.demo('shapes8')
+            >>> gids = self.find_representative_images()
+            >>> print('gids = {!r}'.format(gids))
+            >>> valid = {7, 1}
+            >>> gids = self.find_representative_images(valid)
+            >>> assert valid.issuperset(gids)
+            >>> print('gids = {!r}'.format(gids))
         """
         if gids is None:
             gids = sorted(self.imgs.keys())
+            gid_to_aids = self.gid_to_aids
+        else:
+            gid_to_aids = ub.dict_subset(self.gid_to_aids, gids)
+
+        all_cids = set(self.cid_to_aids.keys())
 
         # Select representative images to draw such that each category
         # appears at least once.
         gid_to_cidfreq = ub.map_vals(
             lambda aids: ub.dict_hist([self.anns[aid]['category_id']
                                        for aid in aids]),
-            self.gid_to_aids)
+            gid_to_aids)
 
-        gid_to_nannots = ub.map_vals(len, self.gid_to_aids)
+        gid_to_nannots = ub.map_vals(len, gid_to_aids)
 
         gid_to_cids = {
             gid: list(cidfreq.keys())
             for gid, cidfreq in gid_to_cidfreq.items()
         }
+
+        for gid, nannots in gid_to_nannots.items():
+            if nannots == 0:
+                # Add a dummy category to note images without any annotations
+                gid_to_cids[gid].append(-1)
+                all_cids.add(-1)
+
+        all_cids = list(all_cids)
+
         # Solve setcover with different weight schemes to get a better
         # representative sample.
-        all_cids = list(self.cid_to_aids.keys())
 
         candidate_sets = gid_to_cids.copy()
 
@@ -2443,27 +2469,22 @@ class _NextId(object):
     def __init__(self, parent):
         self.parent = parent
         self.unused = {
-            'cid': None,
-            'gid': None,
-            'aid': None,
+            'categories': None,
+            'images': None,
+            'annotations': None,
         }
 
-    def set(self, key):
-        # Determines what the next safe id can be
-        key2 = {'aid': 'annotations', 'gid': 'images',
-                'cid': 'categories'}[key]
-        item_list = self.parent.dataset[key2]
+    def update_unused(self, key):
+        """ Scans for what the next safe id can be for ``key`` """
+        item_list = self.parent.dataset[key]
         max_id = max(item['id'] for item in item_list) if item_list else 0
         next_id = max(max_id + 1, len(item_list))
         self.unused[key] = next_id
-        # for i in it.count(len(self.cats) + 1):
-        #     if i not in self.cats:
-        #         return i
 
     def get(self, key):
-        """ Get the next safe item id """
+        """ Get the next safe item id for ``key`` """
         if self.unused[key] is None:
-            self.set(key)
+            self.update_unused(key)
         new_id = self.unused[key]
         self.unused[key] += 1
         return new_id
@@ -2784,8 +2805,9 @@ class MixinCocoAddRemove(object):
         Add an image to the dataset (dynamically updates the index)
 
         Args:
-            file_name (str): image name
+            file_name (str): relative or absolute path to image
             id (None or int): ADVANCED. Force using this image id.
+            **kw : stores arbitrary key/value pairs in this new image
 
         Example:
             >>> self = CocoDataset.demo()
@@ -2795,7 +2817,7 @@ class MixinCocoAddRemove(object):
             >>> assert self.imgs[gid]['file_name'] == gname
         """
         if id is None:
-            id = self._next_ids.get('gid')
+            id = self._next_ids.get('images')
         elif self.imgs and id in self.imgs:
             raise IndexError('Image id={} already exists'.format(id))
 
@@ -2817,6 +2839,7 @@ class MixinCocoAddRemove(object):
             category_id (int): category_id to add to
             bbox (list or kwimage.Boxes): bounding box in xywh format
             id (None or int): ADVANCED. Force using this annotation id.
+            **kw : stores arbitrary key/value pairs in this new image
 
         Example:
             >>> self = CocoDataset.demo()
@@ -2827,7 +2850,7 @@ class MixinCocoAddRemove(object):
             >>> assert self.anns[aid]['bbox'] == bbox
         """
         if id is None:
-            id = self._next_ids.get('aid')
+            id = self._next_ids.get('annotations')
         elif self.anns and id in self.anns:
             raise IndexError('Annot id={} already exists'.format(id))
 
@@ -2858,6 +2881,7 @@ class MixinCocoAddRemove(object):
             name (str): name of the new category
             supercategory (str, optional): parent of this category
             id (int, optional): use this category id, if it was not taken
+            **kw : stores arbitrary key/value pairs in this new image
 
         Example:
             >>> self = CocoDataset.demo()
@@ -2874,7 +2898,7 @@ class MixinCocoAddRemove(object):
             raise ValueError('Category name={!r} already exists'.format(name))
 
         if id is None:
-            id = self._next_ids.get('cid')
+            id = self._next_ids.get('categories')
         elif index.cats and id in index.cats:
             raise IndexError('Category id={} already exists'.format(id))
 
@@ -2897,6 +2921,11 @@ class MixinCocoAddRemove(object):
         """
         Like add_image, but returns the existing image id if it already
         exists instead of failing. In this case all metadata is ignored.
+
+        Args:
+            file_name (str): relative or absolute path to image
+            id (None or int): ADVANCED. Force using this image id.
+            **kw : stores arbitrary key/value pairs in this new image
 
         Returns:
             int: the existing or new image id
@@ -3710,15 +3739,27 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         """
         Args:
 
-            data : semi-coercable data (note use :func:`CocoDataset.coerce` for
-                   a generally coercable constructor)
+            data (str | dict):
+                Either a filepath to a coco json file, or a dictionary
+                containing the actual coco json structure. For a more generally
+                coercable constructor see func:`CocoDataset.coerce`.
 
-            tag : semi-coercable dataset tag. This is mostly for display
-                purposes, and does not influence behavior of the underlying
-                data structure, although it may be used via convinience
-                methods.
+            tag (str) :
+                Name of the dataset for display purposes, and does not
+                influence behavior of the underlying data structure, although
+                it may be used via convinience methods. We attempt to
+                autopopulate this via information in ``data`` if available.
+                If unspecfied and ``data`` is a filepath this becomes the
+                basename.
 
             img_root (str | None):
+                the root of the dataset that images / external data will be
+                assumed to be relative to. (in the future this name might
+                change to data_root). If unspecfied, we attempt to determine it
+                using information in ``data``. If ``data`` is a filepath, we
+                use the dirname of that path. If ``data`` is a dictionary, we
+                look for the "img_root" key. If unspecfied and we fail to
+                introspect then, we fallback to the current working directory.
         """
         if data is None:
             data = {
