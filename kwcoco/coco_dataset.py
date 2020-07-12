@@ -194,6 +194,18 @@ __all__ = [
 _dict = OrderedDict
 
 
+# These are the keys that are / should be supported by the API
+SPEC_KEYS = [
+    'info',
+    'licenses',
+    'categories',
+    'keypoint_categories',  # support only partially implemented
+    'videos',  # support only partially implemented
+    'images',
+    'annotations',
+]
+
+
 # TODO
 # Programatically layout the extended Kitware MS-COCO specification.
 """
@@ -1057,6 +1069,7 @@ class MixinCocoExtras(object):
             hashid_parts = OrderedDict()
 
         # Ensure hashid_parts has the proper root structure
+        # TODO: rely on subet of SPEC_KEYS
         parts = ['annotations', 'images', 'categories']
         for part in parts:
             if not hashid_parts.get(part, None):
@@ -1564,7 +1577,13 @@ class MixinCocoExtras(object):
                 raise KeyError('could not find keypoint names for cid={}, cat={}, orig_cat={}'.format(cid, cat, orig_cat))
         return kpnames
 
-    def _ensure_image_data(self, verbose=1):
+    def _ensure_image_data(self, gids=None, verbose=1):
+        """
+        Download data from "url" fields if specified.
+
+        Args:
+            gids (List): subset of images to download
+        """
         def _gen_missing_imgs():
             for img in self.dataset['images']:
                 gpath = join(self.img_root, img['file_name'])
@@ -1578,7 +1597,10 @@ class MixinCocoExtras(object):
                     _HAS_PREMISSION[0] = True
             return _HAS_PREMISSION[0]
 
-        for img in ub.ProgIter(_gen_missing_imgs(), desc='ensure image data'):
+        if gids is None:
+            gids = _gen_missing_imgs()
+
+        for img in ub.ProgIter(gids, desc='ensure image data'):
             if 'url' in img:
                 if _has_download_permission():
                     gpath = join(self.img_root, img['file_name'])
@@ -2129,6 +2151,11 @@ class MixinCocoExtras(object):
 
         self.img_root = new_img_root
         return self
+
+    @property
+    def data_root(self):
+        """ In the future we may deprecate img_root for data_root """
+        return self.img_root
 
     def find_representative_images(self, gids=None):
         r"""
@@ -3771,6 +3798,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 introspect then, we fallback to the current working directory.
         """
         if data is None:
+            # TODO: rely on subset of SPEC keys
             data = {
                 'categories': [],
                 'images': [],
@@ -3999,11 +4027,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             if isinstance(indent, int):
                 indent = ' ' * indent
             dict_lines = []
-            main_keys = [
-                'info', 'licenses',
-                'categories', 'videos', 'images', 'annotations',
-                'keypoint_categories',
-            ]
+            main_keys = SPEC_KEYS
             other_keys = sorted(set(self.dataset.keys()) - set(main_keys))
             for key in main_keys:
                 if key not in self.dataset:
@@ -4236,6 +4260,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         def _coco_union(relative_dsets, common_root):
             """ union of dictionary based data structure """
+            # TODO: rely on subset of SPEC keys
             merged = _dict([
                 ('categories', []),
                 ('licenses', []),
