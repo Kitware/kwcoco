@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Added `compat_dataset.COCO` which supports 99% of the original `pycocotools` API.
+* Added `kwcoco modify_categories` CLI which supports renaming and removal of categories.
 
 ### Fixed
 * Fix bug in find_representative_images.
