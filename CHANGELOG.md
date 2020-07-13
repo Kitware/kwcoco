@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.4 - Unreleased
 
+### Added
+* Added `compat_dataset.COCO` which supports 99% of the original `pycocotools` API.
+
 ### Fixed
 * Fix bug in find_representative_images.
 
