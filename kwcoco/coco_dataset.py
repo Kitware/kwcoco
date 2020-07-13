@@ -178,7 +178,7 @@ from os.path import splitext
 from os.path import basename
 from os.path import join
 from os.path import exists
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import json
 import numpy as np
 import ubelt as ub
@@ -2442,7 +2442,7 @@ class MixinCocoStats(object):
             >>> print(ub.repr2(infos, nl=-1, precision=2))
         """
         import kwarray
-        cname_to_box_sizes = ub.ddict(list)
+        cname_to_box_sizes = defaultdict(list)
 
         if bool(gids) and bool(aids):
             raise ValueError('specifying gids and aids is mutually exclusive')
@@ -2587,7 +2587,7 @@ class MixinCocoDraw(object):
         aids = self.gid_to_aids.get(img['id'], [])
 
         # Collect annotation overlays
-        colored_segments = ub.ddict(list)
+        colored_segments = defaultdict(list)
         keypoints = []
         rects = []
         texts = []
@@ -3405,10 +3405,31 @@ class CocoIndex(object):
         self.file_name_to_img = None
         self._CHECKS = True
 
+        # self.vidid_to_gids = None  # TODO
+        # self.file_name_to_video = None  # TODO
+        # self.kpcid_to_aids = None  # TODO
+        # self.kpcid_to_gids = None  # TODO
+
     def __bool__(self):
         return self.anns is not None
 
     __nonzero__ = __bool__  # python 2 support
+
+    # On-demand lookup tables
+    @property
+    def cid_to_gids(self):
+        from scriptconfig.dict_like import DictLike
+        class ProxyCidToGids(DictLike):
+            def __init__(self, parent):
+                self.parent = parent
+            def getitem(self, cid):
+                aids = self.parent.cid_to_aids[cid]
+                gids = {self.parent.anns[aid]['image_id'] for aid in aids}
+                return gids
+            def keys(self):
+                return self.parent.cid_to_aids.keys()
+        cid_to_gids = ProxyCidToGids(parent=self)
+        return cid_to_gids
 
     def _add_image(self, gid, img):
         if self.imgs is not None:
@@ -3562,8 +3583,8 @@ class CocoIndex(object):
         """
         # create index
         anns, cats, imgs = {}, {}, {}
-        gid_to_aids = ub.ddict(self._set)
-        cid_to_aids = ub.ddict(self._set)
+        gid_to_aids = defaultdict(self._set)
+        cid_to_aids = defaultdict(self._set)
 
         # Build one-to-one self-lookup maps
         for cat in parent.dataset.get('categories', []):
@@ -3654,6 +3675,10 @@ class CocoIndex(object):
         self.anns = anns
         self.imgs = imgs
         self.cats = cats
+
+        # Remove defaultdict like behavior
+        gid_to_aids.default_factory = None
+        cid_to_aids.default_factory = None
 
         self.gid_to_aids = gid_to_aids
         self.cid_to_aids = cid_to_aids
