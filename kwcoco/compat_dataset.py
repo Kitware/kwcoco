@@ -33,8 +33,13 @@ class COCO(CocoDataset):
         >>> print('self.catToImgs = {!r}'.format(self.catToImgs))
     """
 
-    def __init__(self, annotation_file=None):
-        super().__init__(annotation_file)
+    def __init__(self, annotation_file=None, **kw):
+        if annotation_file is not None:
+            if 'data' in kw:
+                raise ValueError('cannot specify data and annotation file')
+        if 'data' in kw and annotation_file is None:
+            annotation_file = kw.pop('data')
+        super().__init__(annotation_file, **kw)
 
     def createIndex(self):
         self._build_index()

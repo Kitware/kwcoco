@@ -4169,14 +4169,16 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         bad_parts_gen = find_json_unserializable(self.dataset)
         bad_parts = []
         for part in bad_parts_gen:
-            if verbose and len(bad_parts) == 0:
+            if verbose == 3:
+                print('part = {!r}'.format(part))
+            elif verbose and len(bad_parts) == 0:
                 # print out the first one we find
                 print('Found at least one bad part = {!r}'.format(part))
             bad_parts.append(part)
 
         if verbose:
-            if bad_parts:
-                print(ub.repr2(bad_parts))
+            # if bad_parts:
+            #     print(ub.repr2(bad_parts))
             summary = 'There are {} total errors'.format(len(bad_parts))
             print('summary = {}'.format(summary))
         return bad_parts
