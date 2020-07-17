@@ -2537,6 +2537,38 @@ class MixinCocoDraw(object):
         """
         pass
 
+    def draw_image(self, gid):
+        """
+        Use kwimage to draw all annotations on an image and return the pixels
+        as a numpy array.
+
+        Returns:
+            ndarray: canvas
+
+        Example:
+            >>> self = kwcoco.CocoDataset.demo('shapes8')
+            >>> self.draw_image(gid)
+            >>> # Now you can dump the annotated image to disk /
+            >>> # display on a webbrowser / show with matplotlib / whatever
+            >>> # kwimage.imwrite('my_canvas.jpg', canvas)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> # I'll use kwplot to draw with matplotlib
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> kwplot.imshow(canvas)
+        """
+        import kwimage
+        # Load the raw image pixels
+        canvas = self.load_image(gid)
+        # Get annotation IDs from this image
+        aids = self.index.gid_to_aids[gid]
+        # Grab relevant annotation dictionaries
+        anns = [self.anns[aid] for aid in aids]
+        # Transform them into a kwimage.Detections datastructure
+        dets = kwimage.Detections.from_coco_annots(anns, dset=self)
+        canvas = dets.draw_on(canvas)
+        return canvas
+
     def show_image(self, gid=None, aids=None, aid=None, **kwargs):
         """
         Use matplotlib to show an image with annotations overlaid
@@ -4668,6 +4700,8 @@ def demo_coco_data():
         'info': [],
     }
     return dataset
+
+
 
 
 if __name__ == '__main__':
