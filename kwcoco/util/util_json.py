@@ -134,7 +134,7 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
     return dict_
 
 
-def find_json_unserializable(data):
+def find_json_unserializable(data, quickcheck=False):
     """
     Recurse through json datastructure and find any component that
     causes a serialization error. Record the location of these errors
@@ -142,6 +142,8 @@ def find_json_unserializable(data):
 
     Args:
         data (object): data that should be json serializable
+        quickcheck (bool): if True, check the entire datastructure assuming
+            its ok before doing the python-based recursive logic.
 
     Returns:
         List[Dict]: list of "bad part" dictionaries containing items
@@ -159,7 +161,7 @@ def find_json_unserializable(data):
         >>> part['foo']['a'] = 1
         >>> # Create a dictionary with two unserializable parts
         >>> data = [1, 2, {'nest1': [2, part]}, {frozenset({'badkey'}): 3, 2: 4}]
-        >>> parts = find_json_unserializable(data)
+        >>> parts = list(find_json_unserializable(data))
         >>> print('parts = {}'.format(ub.repr2(parts, nl=1)))
         >>> # Check expected structure of bad parts
         >>> assert len(parts) == 2
@@ -186,36 +188,52 @@ def find_json_unserializable(data):
         >>>     else:
         >>>         assert part['data'] is curr
     """
-    try:
-        # Might be a more efficient way to do this check. We duplicate a lot of
-        # work by doing the check for unserializable data this way.
-        json.dumps(data)
-    except Exception:
-        # If there is unserializable data, find out where it is.
-        parts = []
+    needs_check = True
+    is_serializable = None
+    if quickcheck:
+        try:
+            # Might be a more efficient way to do this check. We duplicate a lot of
+            # work by doing the check for unserializable data this way.
+            json.dumps(data)
+        except Exception:
+            # If there is unserializable data, find out where it is.
+            is_serializable = False
+        else:
+            is_serializable = True
+            needs_check = False
+
+    if needs_check:
         if isinstance(data, list):
             for idx, item in enumerate(data):
-                subparts_item = find_json_unserializable(item)
+                subparts_item = find_json_unserializable(item, quickcheck=False)
                 for sub in subparts_item:
                     sub['loc'].appendleft(idx)
-                    parts.append(sub)
+                    yield sub
         elif isinstance(data, dict):
             for key, value in data.items():
-                subparts_key = find_json_unserializable(key)
+                subparts_key = find_json_unserializable(key, quickcheck=False)
                 for sub in subparts_key:
                     # Special case where a dict key is the error value
                     # Purposely make loc non-hashable so its not confused with
                     # an address. All we can know in this case is that they key
                     # is at this level, there is no concept of where.
                     sub['loc'].appendleft(['.keys', key])
-                    parts.append(sub)
+                    yield sub
 
-                subparts_val = find_json_unserializable(value)
+                subparts_val = find_json_unserializable(value, quickcheck=False)
                 for sub in subparts_val:
                     sub['loc'].appendleft(key)
-                    parts.append(sub)
+                    yield sub
         else:
-            parts = [{'loc': deque(), 'data': data}]
-        return parts
-    else:
-        return []
+            if is_serializable is None:
+                try:
+                    # Might be a more efficient way to do this check. We duplicate a lot of
+                    # work by doing the check for unserializable data this way.
+                    json.dumps(data)
+                except Exception:
+                    is_serializable = False
+                else:
+                    is_serializable = True
+
+            if is_serializable is False:
+                yield {'loc': deque(), 'data': data}

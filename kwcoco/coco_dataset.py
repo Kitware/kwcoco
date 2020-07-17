@@ -4166,7 +4166,13 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         Debug which part of a coco dataset might not be json serializable
         """
         from kwcoco.util.util_json import find_json_unserializable
-        bad_parts = find_json_unserializable(self.dataset)
+        bad_parts_gen = find_json_unserializable(self.dataset)
+        bad_parts = []
+        for part in bad_parts_gen:
+            if verbose and len(bad_parts) == 0:
+                # print out the first one we find
+                print('Found at least one bad part = {!r}'.format(part))
+            bad_parts.append(part)
 
         if verbose:
             if bad_parts:
