@@ -445,3 +445,391 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         cacher.save(dataset)
 
     return dataset
+
+
+def random_video_dset(gsize=(600, 600), num_frames=5, verbose=3, num_tracks=3,
+                      tid_start=1, gid_start=1, video_id=1, render=False,
+                      rng=None):
+    """
+    Example:
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> dset = random_video_dset(render=True, num_frames=2, num_tracks=10)
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> dset.show_image(1, doclf=True)
+        >>> dset.show_image(2, doclf=True)
+    """
+    import pandas as pd
+    rng = kwarray.ensure_rng(rng)
+
+    image_ids = list(range(gid_start, num_frames + gid_start))
+    track_ids = list(range(tid_start, num_tracks + tid_start))
+
+    import kwcoco
+    dset = kwcoco.CocoDataset(autobuild=False)
+    dset.add_video(name='toy_video_{}'.format(video_id), id=video_id)
+
+    for frame_idx, gid in enumerate(image_ids):
+        dset.add_image(**{
+            'id': gid,
+            'file_name': '<todo-generate>',
+            'width': gsize[0],
+            'height': gsize[1],
+            'frame_index': frame_idx,
+            'video_id': video_id,
+        })
+
+    classes = ['star', 'superstar', 'eff']
+    for catname in classes:
+        dset.ensure_category(name=catname)
+
+    tid_to_anns = {}
+    for tid in track_ids:
+        degree = rng.randint(1, 5)
+        num = num_frames
+        path = random_path(num, degree=degree, rng=rng)
+        boxes = kwimage.Boxes.random(
+            num=num, scale=1.0, format='cxywh', rng=rng)
+
+        # Smooth out varying box sizes
+        alpha = rng.rand() * 0.1
+        wh = pd.DataFrame(boxes.data[:, 2:4], columns=['w', 'h'])
+
+        ar = wh['w'] / wh['h']
+        min_ar = 0.25
+        max_ar = 1 / min_ar
+
+        wh['w'][ar < min_ar] = wh['h'] * 0.25
+        wh['h'][ar > max_ar] = wh['w'] * 0.25
+
+        box_dims = wh.ewm(alpha=alpha, adjust=False).mean()
+        boxes.data[:, 0:2] = path
+        boxes.data[:, 2:4] = box_dims.values
+        boxes = boxes.scale(gsize).scale(0.9, about='center')
+
+        def warp_within_bounds(self, x_min, y_min, x_max, y_max):
+            """
+            Translate / scale the boxes to fit in the bounds
+
+            Example:
+                >>> from kwimage.structs.boxes import *  # NOQA
+                >>> self = Boxes.random(10).scale(1).translate(-10)
+                >>> x_min, y_min, x_max, y_max = 10, 10, 20, 20
+                >>> x_min, y_min, x_max, y_max = 0, 0, 20, 20
+                >>> print('self = {!r}'.format(self))
+                >>> scaled = warp_within_bounds(self, x_min, y_min, x_max, y_max)
+                >>> print('scaled = {!r}'.format(scaled))
+
+            """
+            tlbr = self.to_tlbr()
+            tl_x, tl_y, br_x, br_y = tlbr.components
+            tl_xy_min = np.c_[tl_x, tl_y].min(axis=0)
+            br_xy_max = np.c_[br_x, br_y].max(axis=0)
+            tl_xy_lb = np.array([x_min, y_min])
+            br_xy_ub = np.array([x_max, y_max])
+
+            size_ub = br_xy_ub - tl_xy_lb
+            size_max = br_xy_max - tl_xy_min
+
+            tl_xy_over = np.maximum(tl_xy_lb - tl_xy_min, 0)
+            # Now at the minimum coord
+            tmp = tlbr.translate(tl_xy_over)
+            _tl_x, _tl_y, _br_x, _br_y = tmp.components
+            tmp_tl_xy_min = np.c_[_tl_x, _tl_y].min(axis=0)
+            # tmp_br_xy_max = np.c_[_br_x, _br_y].max(axis=0)
+
+            tmp.translate(-tmp_tl_xy_min)
+            sf = np.minimum(size_ub / size_max, 1)
+            out = tmp.scale(sf).translate(tmp_tl_xy_min)
+            return out
+
+        oob_pad = -20  # allow some out of bounds
+        boxes = boxes.to_tlbr()
+        boxes = boxes.clip(0, 0, gsize[0], gsize[1])
+        boxes = warp_within_bounds(boxes, 0 - oob_pad, 0 - oob_pad, gsize[0] + oob_pad, gsize[1] + oob_pad)
+        boxes = boxes.to_xywh()
+
+        boxes.data = boxes.data.round(1)
+        cidx = rng.randint(0, len(classes))
+        dets = kwimage.Detections(
+            boxes=boxes,
+            class_idxs=np.array([cidx] * len(boxes)),
+            classes=classes,
+        )
+
+        anns = list(dets.to_coco(dset=dset))
+        start_frame = 0
+        for frame_index, ann in enumerate(anns, start=start_frame):
+            ann['track_id'] = tid
+            ann['image_id'] = dset.dataset['images'][frame_index]['id']
+            dset.add_annotation(**ann)
+        tid_to_anns[tid] = anns
+
+    # The dataset has been prepared, now we just render it and we have
+    # a nice video dataset.
+    renderkw = {
+        'dpath': None,
+    }
+    if isinstance(render, dict):
+        renderkw.update(render)
+    else:
+        if not render:
+            renderkw = None
+    if renderkw is not None:
+        render_toy_dataset(dset, rng=rng, **renderkw)
+    dset._build_index()
+    return dset
+
+
+def render_toy_dataset(dset, rng, dpath=None):
+    """
+    Create toydata renderings for a preconstructed coco dataset.
+
+    Example:
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> import kwarray
+        >>> rng = None
+        >>> rng = kwarray.ensure_rng(rng)
+        >>> dset = random_video_dset(rng=rng, num_frames=10, num_tracks=3)
+        >>> dset = render_toy_dataset(dset, rng)
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> plt = kwplot.autoplt()
+        >>> gids = list(dset.imgs.keys())
+        >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
+        >>> for gid in gids:
+        >>>     dset.show_image(gid, pnum=pnums(), fnum=1)
+        >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
+        >>> for gid in gids:
+        >>>     canvas = dset.draw_image(gid)
+        >>>     kwplot.imshow(canvas, pnum=pnums(), fnum=2)
+    """
+    rng = kwarray.ensure_rng(rng)
+    dset._build_index()
+
+    dset._ensure_json_serializable()
+    hashid = dset._build_hashid()[0:24]
+
+    dpath = None
+    if dpath is None:
+        dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
+    else:
+        ub.ensuredir(dpath)
+    root_dpath = ub.ensuredir((dpath, 'render_{}'.format(hashid)))
+    img_dpath = ub.ensuredir((root_dpath, 'images'))
+
+    for gid in dset.imgs.keys():
+        render_toy_image(dset, gid)
+        img = dset.imgs[gid]
+        imdata = img.pop('imdata')
+        fname = 'img_{:05d}.png'.format(gid)
+        fpath = join(img_dpath, fname)
+        img.update({
+            'file_name': fpath,
+            'channels': 'rgb',
+        })
+        auxillaries = img.pop('auxillary', None)
+        if auxillaries is not None:
+            for auxdict in auxillaries:
+                aux_dpath = ub.ensuredir(
+                    (root_dpath, 'aux_' + auxdict['channels']))
+                aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
+                ub.ensuredir(aux_dpath)
+                auxdata = (auxdict.pop('imdata') * 255).astype(np.uint8)
+                auxdict['file_name'] = aux_fpath
+                try:
+                    import gdal  # NOQA
+                    kwimage.imwrite(aux_fpath, auxdata, backend='gdal')
+                except Exception:
+                    kwimage.imwrite(aux_fpath, auxdata)
+            img['auxillary'] = auxillaries
+
+        kwimage.imwrite(fpath, imdata)
+    dset._build_index()
+    return dset
+
+
+def render_toy_image(dset, gid, rng=None):
+    """
+    Example:
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> gsize=(600, 600)
+        >>> num_frames=5
+        >>> verbose=3
+        >>> rng = None
+        >>> import kwarray
+        >>> rng = kwarray.ensure_rng(rng)
+        >>> dset = random_video_dset(
+        >>>     gsize=gsize, num_frames=num_frames, verbose=verbose, rng=rng)
+        >>> gid = 1
+        >>> render_toy_image(dset, gid, rng)
+        >>> gid = 1
+        >>> canvas = dset.imgs[gid]['imdata']
+        >>> import kwplot
+        >>> kwplot.imshow(canvas, doclf=True)
+        >>> dets = dset.annots(gid=gid).detections
+        >>> dets.draw()
+    """
+    rng = kwarray.ensure_rng(rng)
+
+    # bg_intensity = 0
+    # bg_scale = 1
+    # fg_scale = 1
+    # fg_intensity = 1
+
+    gray = 1
+
+    fg_scale = 0.5
+    bg_scale = 0.8
+    bg_intensity = 0.1
+    fg_intensity = 0.9
+
+    newstyle = False
+
+    categories = list(dset.name_to_cat.keys())
+    catpats = CategoryPatterns.coerce(categories, fg_scale=fg_scale,
+                                      fg_intensity=fg_intensity, rng=rng)
+
+    if newstyle:
+        # Add newstyle keypoint categories
+        kpname_to_id = {}
+        dset.dataset['keypoint_categories'] = []
+        for kpcat in catpats.keypoint_categories:
+            dset.dataset['keypoint_categories'].append(kpcat)
+            kpname_to_id[kpcat['name']] = kpcat['id']
+
+    img = dset.imgs[gid]
+    gw, gh = img['width'], img['height']
+    dims = (gh, gw)
+    annots = dset.annots(gid=gid)
+
+    def render_background():
+        # This is 2x as fast for gsize=(300,300)
+        if gray:
+            gshape = (gh, gw, 1)
+            imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
+                                               rng=rng, dtype=np.float32)
+        else:
+            gshape = (gh, gw, 3)
+            # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
+            #                                    rng=rng, dtype=np.float32)
+            # hack because 3 channels is slower
+            imdata = kwarray.uniform(0, 1, gshape, rng=rng, dtype=np.float32)
+        np.clip(imdata, 0, 1, out=imdata)
+
+        aux = 0
+        if aux:
+            auxdata = np.zeros(gshape, dtype=np.float32)
+        else:
+            auxdata = None
+        return imdata, auxdata
+
+    def render_foreground(imdata, auxdata):
+        boxes = annots.boxes
+        tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(np.int)
+
+        # Render coco-style annotation dictionaries
+        for (aid, ann), tlbr in zip(annots._id_to_obj.items(), tlbr_boxes):
+            catname = dset._resolve_to_cat(ann['category_id'])['name']
+            tl_x, tl_y, br_x, br_y = tlbr
+            chip_index = tuple([slice(tl_y, br_y), slice(tl_x, br_x)])
+            chip = imdata[chip_index]
+            xy_offset = (tl_x, tl_y)
+
+            if chip.size:
+                info = catpats.render_category(catname, chip, xy_offset, dims,
+                                               newstyle=newstyle)
+
+                fgdata = info['data']
+                if gray:
+                    fgdata = fgdata.mean(axis=2, keepdims=True)
+
+                imdata[tl_y:br_y, tl_x:br_x, :] = fgdata
+                ann.update({
+                    # 'segmentation': info['segmentation'],
+                    # 'keypoints': info['keypoints'],
+                })
+
+                if auxdata is not None:
+                    seg = kwimage.Segmentation.coerce(info['segmentation'])
+                    seg = seg.to_multi_polygon()
+                    val = rng.uniform(0.2, 1.0)
+                    # val = 1.0
+                    auxdata = seg.fill(auxdata, value=val)
+            else:
+                ann.update({
+                    # 'segmentation': None,
+                    # 'keypoints': None,
+                })
+
+            # if newstyle:
+            #     # rectify newstyle keypoint ids
+            #     for kpdict in ann.get('keypoints', []):
+            #         kpname = kpdict.pop('keypoint_category')
+            #         kpdict['keypoint_category_id'] = kpname_to_id[kpname]
+        return imdata, auxdata
+
+    imdata, auxdata = render_background()
+    imdata, auxdata = render_foreground(imdata, auxdata)
+
+    imdata = (imdata * 255).astype(np.uint8)
+    imdata = kwimage.atleast_3channels(imdata)
+
+    main_channels = 'rgb'
+    # main_channels = 'gray' if gray else 'rgb'
+
+    img.update({
+        # 'width': gw,
+        # 'height': gh,
+        'imdata': imdata,
+        'channels': main_channels,
+    })
+
+    if auxdata is not None:
+        mask = rng.rand(*auxdata.shape[0:2]) > 0.5
+        auxdata = kwimage.fourier_mask(auxdata, mask)
+        auxdata = (auxdata - auxdata.min())
+        auxdata = (auxdata / max(1e-8, auxdata.max()))
+        auxdata = auxdata.clip(0, 1)
+        # Hack aux data is always disparity for now
+        img['auxillary'] = [{
+            'imdata': auxdata,
+            'channels': 'disparity',
+        }]
+
+
+def random_path(num, degree=1, dimension=2, rng=None):
+    """
+    Create a random path using a bezier curve.
+
+    Args:
+        num (int): number of points in the path
+        degree (int, default=1): degree of curvieness of the path
+        dimension (int, default=2): number of spatial dimensions
+        rng (RandomState, default=None): seed
+
+    References:
+        https://github.com/dhermes/bezier
+
+    Example:
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> num = 50
+        >>> dimension = 2
+        >>> degree = 10
+        >>> rng = 0
+        >>> path = random_path(num, degree, dimension, rng)
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> plt = kwplot.autoplt()
+        >>> kwplot.multi_plot(xdata=path[:, 0], ydata=path[:, 1])
+        >>> kwplot.show_if_requested()
+    """
+    import bezier
+    rng = kwarray.ensure_rng(rng)
+    # Create random bezier control points
+    nodes_f = rng.rand(degree + 1, dimension).T  # F-contiguous
+    curve = bezier.Curve(nodes_f, degree=degree)
+    # Evaluate path points
+    s_vals = np.linspace(0, 1, num)
+    path_f = curve.evaluate_multi(s_vals)
+    path = path_f.T  # C-contiguous
+    return path

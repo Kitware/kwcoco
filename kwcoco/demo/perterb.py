@@ -11,7 +11,7 @@ def perterb_coco(coco_dset, **kwargs):
         >>> from kwcoco.demo.perterb import *  # NOQA
         >>> from kwcoco.demo.perterb import _demo_construct_probs
         >>> import kwcoco
-        >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
+        >>> coco_dset = true_dset = kwcoco.CocoDataset.demo('shapes8')
         >>> kwargs = {
         >>>     'box_noise': 0.5,
         >>>     'n_fp': 3,
@@ -71,7 +71,10 @@ def perterb_coco(coco_dset, **kwargs):
     # Create the category hierarcy
     classes = coco_dset.object_categories()
 
-    frgnd_cx_RV = distributions.DiscreteUniform(0, len(classes), rng=rng)
+    cids = coco_dset.cats.keys()
+    cidxs = [classes.id_to_idx[c] for c in cids]
+
+    frgnd_cx_RV = distributions.CategoryUniform(cidxs, rng=rng)
 
     new_dset = coco_dset.copy()
     remove_aids = []

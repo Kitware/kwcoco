@@ -10,6 +10,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Added `compat_dataset.COCO` which supports 99% of the original `pycocotools` API.
 * Added `kwcoco modify_categories` CLI which supports renaming and removal of categories.
+* New `random_video_dset` demo function to generate toydata in video sequences. Added new tooling for this. STATUS: INCOMPLETE
+* Add new video-based APIs to the CocoDataset based on the spec. STATUS: incomplete
 
 ### Fixed
 * Fix bug in find_representative_images.
