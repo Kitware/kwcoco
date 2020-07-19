@@ -1507,10 +1507,15 @@ class MixinCocoExtras(object):
             >>> classes = self.object_categories()
             >>> print('classes = {}'.format(classes))
         """
-        import ndsampler
-        graph = self.category_graph()
-        classes = ndsampler.CategoryTree(graph)
-        return classes
+        try:
+            import ndsampler
+        except Exception:
+            raise
+            classes = [cat['name'] for cat in self.dataset['cats']]
+        else:
+            graph = self.category_graph()
+            classes = ndsampler.CategoryTree(graph)
+            return classes
 
     def keypoint_categories(self):
         """
@@ -1525,18 +1530,23 @@ class MixinCocoExtras(object):
             >>> classes = self.keypoint_categories()
             >>> print('classes = {}'.format(classes))
         """
-        import ndsampler
-        if 'keypoint_categories' in self.dataset:
-            import networkx as nx
-            graph = nx.DiGraph()
-            for cat in self.dataset['keypoint_categories']:
-                graph.add_node(cat['name'], **cat)
-                if 'supercategory' in cat:
-                    graph.add_edge(cat['supercategory'], cat['name'])
-            classes = ndsampler.CategoryTree(graph)
+        try:
+            import ndsampler
+        except Exception:
+            raise
+            classes = [cat['name'] for cat in self.dataset['keypoint_categories']]
         else:
-            catnames = self._keypoint_category_names()
-            classes = ndsampler.CategoryTree.coerce(catnames)
+            if 'keypoint_categories' in self.dataset:
+                import networkx as nx
+                graph = nx.DiGraph()
+                for cat in self.dataset['keypoint_categories']:
+                    graph.add_node(cat['name'], **cat)
+                    if 'supercategory' in cat:
+                        graph.add_edge(cat['supercategory'], cat['name'])
+                classes = ndsampler.CategoryTree(graph)
+            else:
+                catnames = self._keypoint_category_names()
+                classes = ndsampler.CategoryTree.coerce(catnames)
         return classes
 
     def _keypoint_category_names(self):
@@ -2583,7 +2593,26 @@ class MixinCocoDraw(object):
         # Grab relevant annotation dictionaries
         anns = [self.anns[aid] for aid in aids]
         # Transform them into a kwimage.Detections datastructure
-        dets = kwimage.Detections.from_coco_annots(anns, dset=self)
+
+        # if 1:
+        dset = self
+        try:
+            classes = dset.object_categories()
+        except Exception:
+            classes = list(dset.name_to_cat.keys())
+        try:
+            kp_classes = dset.keypoint_categories()
+        except Exception:
+            # hack
+            anns = [ann.copy() for ann in anns]
+            for ann in anns:
+                ann.pop('keypoints', None)
+            kp_classes = None
+        cats = dset.dataset['categories']
+        # dets = kwimage.Detections.from_coco_annots(anns, dset=self)
+        dets = kwimage.Detections.from_coco_annots(
+            anns, classes=classes, cats=cats, kp_classes=kp_classes)
+
         canvas = dets.draw_on(canvas)
         return canvas
 

@@ -664,6 +664,7 @@ def render_toy_image(dset, gid, rng=None):
         >>> render_toy_image(dset, gid, rng)
         >>> gid = 1
         >>> canvas = dset.imgs[gid]['imdata']
+        >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> kwplot.imshow(canvas, doclf=True)
         >>> dets = dset.annots(gid=gid).detections
