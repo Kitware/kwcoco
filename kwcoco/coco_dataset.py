@@ -3699,13 +3699,19 @@ class CocoIndex(object):
 
     def build(index, parent):
         """
-        build reverse indexes
+        Build all id-to-obj reverse indexes from scratch.
 
         Notation:
             aid - Annotation ID
             gid - imaGe ID
             cid - Category ID
             vidid - Video ID
+
+        Example:
+            >>> from kwcoco.demo.toydata import *  # NOQA
+            >>> parent = random_video_dset(num_frames=4, rng=1)
+            >>> index = parent.index
+            >>> index.build(parent)
         """
         # create index
         anns, cats, imgs = {}, {}, {}
@@ -3748,53 +3754,56 @@ class CocoIndex(object):
             anns[aid] = ann
 
         # Build one-to-many lookup maps
-        gid_to_aids = defaultdict(index._set)
-        cid_to_aids = defaultdict(index._set)
-        vidid_to_gids = defaultdict(index._set)
-
         vidid_to_gids = ub.group_items(
             [g['id'] for g in imgs.values()],
             [g.get('video_id', None) for g in imgs.values()]
         )
         vidid_to_gids.pop(None, None)
 
-        for ann in anns.values():
-            try:
-                aid = ann['id']
-                gid = ann['image_id']
-            except KeyError:
-                raise KeyError('Annotation does not have ids {}'.format(ann))
+        if 0:
+            # The following is slightly slower, but it is also many fewer lines
+            # Not sure if its correct to replace the else block or not
+            aids = [d['id'] for d in anns.values()]
+            gid_to_aids = ub.group_items(aids, (d['image_id'] for d in anns.values()))
+            cid_to_aids = ub.group_items(aids, (d.get('category_id', None) for d in anns.values()))
+            cid_to_aids.pop(None, None)
+            gid_to_aids = ub.map_vals(index._set, gid_to_aids)
+            cid_to_aids = ub.map_vals(index._set, cid_to_aids)
+            vidid_to_gids = ub.map_vals(index._set, vidid_to_gids)
+        else:
+            gid_to_aids = defaultdict(index._set)
+            cid_to_aids = defaultdict(index._set)
+            for ann in anns.values():
+                try:
+                    aid = ann['id']
+                    gid = ann['image_id']
+                except KeyError:
+                    raise KeyError('Annotation does not have ids {}'.format(ann))
 
-            if not isinstance(aid, INT_TYPES):
-                raise TypeError('bad aid={} type={}'.format(aid, type(aid)))
-            if not isinstance(gid, INT_TYPES):
-                raise TypeError('bad gid={} type={}'.format(gid, type(gid)))
+                if not isinstance(aid, INT_TYPES):
+                    raise TypeError('bad aid={} type={}'.format(aid, type(aid)))
+                if not isinstance(gid, INT_TYPES):
+                    raise TypeError('bad gid={} type={}'.format(gid, type(gid)))
 
-            gid_to_aids[gid].add(aid)
-            if gid not in imgs:
-                warnings.warn('Annotation {} in {} references '
-                              'unknown image_id'.format(ann, parent))
+                gid_to_aids[gid].add(aid)
+                if gid not in imgs:
+                    warnings.warn('Annotation {} in {} references '
+                                  'unknown image_id'.format(ann, parent))
 
-            ALLOW_EMPTY_CATEGORIES = True
-
-            try:
-                cid = ann['category_id']
-            except KeyError:
-                if ALLOW_EMPTY_CATEGORIES:
+                try:
+                    cid = ann['category_id']
+                except KeyError:
                     warnings.warn('Annotation {} in {} is missing '
                                   'a category_id'.format(ann, parent))
                 else:
-                    raise KeyError(
-                        'Annotation does not have category id {}'.format(ann))
-            else:
-                cid_to_aids[cid].add(aid)
+                    cid_to_aids[cid].add(aid)
 
-                if not isinstance(cid, INT_TYPES) and cid is not None:
-                    raise TypeError('bad cid={} type={}'.format(cid, type(cid)))
+                    if not isinstance(cid, INT_TYPES) and cid is not None:
+                        raise TypeError('bad cid={} type={}'.format(cid, type(cid)))
 
-                if cid not in cats and cid is not None:
-                    warnings.warn('Annotation {} in {} references '
-                                  'unknown category_id'.format(ann, parent))
+                    if cid not in cats and cid is not None:
+                        warnings.warn('Annotation {} in {} references '
+                                      'unknown category_id'.format(ann, parent))
 
         # Fix one-to-zero cases
         for cid in cats.keys():
