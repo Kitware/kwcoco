@@ -7,3 +7,4 @@ kwplot >= 0.4.0
 six >= 1.11.0
 numpy >= 1.9.0
 scikit-learn >= 0.19.1
+bezier >= 2020.5.19
