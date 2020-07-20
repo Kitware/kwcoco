@@ -37,18 +37,20 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 
 .. code:: 
 
-    usage: kwcoco [-h] {stats,union,split,show,toydata} ...
+    usage: kwcoco [-h] {stats,union,split,show,toydata,eval,modify_categories} ...
 
     The Kitware COCO CLI
 
     positional arguments:
-      {stats,union,split,show,toydata}
+      {stats,union,split,show,toydata,eval,modify_categories}
                             specify a command to run
         stats               Compute summary statistics about a COCO dataset
         union               Combine multiple COCO datasets into a single merged dataset.
         split               Split a single COCO dataset into two sub-datasets.
-        show                Visualize a COCO image
+        show                Visualize a COCO image using matplotlib, optionally writing it to disk
         toydata             Create COCO toydata
+        eval                Evaluate and score predicted versus truth detections / classifications in a COCO dataset
+        modify_categories   ModifyCats image paths onto a new image root.
 
     optional arguments:
       -h, --help            show this help message and exit
@@ -196,35 +198,37 @@ Dataset Spec:
 
 .. code:: 
 
+    category = {
+        'id': int,
+        'name': str,
+        'supercategory': Optional[str],
+        'keypoints': Optional(List[str]),
+        'skeleton': Optional(List[Tuple[Int, Int]]),
+    }
+
+    image = {
+        'id': int,
+        'file_name': str
+    }
+
     dataset = {
         # these are object level categories
-        'categories': [
-            {
-                'id': <int:category_id>,
-                'name': <str:>,
-                'supercategory': str  # optional
-
-                # Note: this is the original way to specify keypoint
-                # categories, but our implementation supports a more general
-                # alternative schema
-                "keypoints": [kpname_1, ..., kpname_K], # length <k> array of keypoint names
-                "skeleton": [(kx_a1, kx_b1), ..., (kx_aE, kx_bE)], # list of edge pairs (of keypoint indices), defining connectivity of keypoints.
-            },
-            ...
-        ],
-        'images': [
-            {
-                'id': int, 'file_name': str
-            },
+        'categories': [category],
+        'images': [image]
             ...
         ],
         'annotations': [
             {
-                'id': int,
-                'image_id': int,
-                'category_id': int,
+                'id': Int,
+                'image_id': Int,
+                'category_id': Int,
+                'track_id': Optional[Int],
+
                 'bbox': [tl_x, tl_y, w, h],  # optional (xywh format)
                 "score" : float,
+                "prob" : List[float],
+                "weight" : float,
+
                 "caption": str,  # an optional text caption for this annotation
                 "iscrowd" : <0 or 1>,  # denotes if the annotation covers a single object (0) or multiple objects (1)
                 "keypoints" : [x1,y1,v1,...,xk,yk,vk], # or new dict-based format
@@ -243,16 +247,16 @@ Dataset Spec:
         or a list of flattned list of xy coordinates if the CCs are disjoint
         [[x1, y1, x2, y2, ..., xn, yn], [x1, y1, ..., xm, ym],]
 
-        Note: the original COCO spec does not allow for holes in polygons.
+        Note: the original coco spec does not allow for holes in polygons.
 
-        (PENDING) We also allow a non-standard dictionary encoding of polygons
+        We also allow a non-standard dictionary encoding of polygons
             {'exterior': [(x1, y1)...],
              'interiors': [[(x1, y1), ...], ...]}
 
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
         encoding. We reuse the original C functions are in [2]_ in
-        `kwimage.structs.Mask` to provide a convinient way to abstract this
+        ``kwimage.structs.Mask`` to provide a convinient way to abstract this
         rather esoteric bytes encoding.
 
         For pure python implementations see kwimage:
@@ -264,7 +268,6 @@ Dataset Spec:
             for these functions are set to true.
 
     Keypoints:
-        (PENDING)
         Annotation keypoints may also be specified in this non-standard (but
         ultimately more general) way:
 
@@ -311,6 +314,32 @@ Dataset Spec:
                     'channels': <spec>
                 }, ... # can have many auxillary channels with unique specs
             ]
+        }
+
+    Video Sequences:
+        For video sequences, we add the following video level index:
+
+        "videos": [
+            { "id": <int>, "name": <video_name:str> },
+        ]
+
+        Note that the videos might be given as encoded mp4/avi/etc.. files (in
+        which case the name should correspond to a path) or as a series of
+        frames in which case the images should be used to index the extracted
+        frames and information in them.
+
+        Then image dictionaries are augmented as follows:
+
+        {
+            'video_id': str  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
+            'timestamp': int  # optional, timestamp (ideally in flicks), used to identify the timestamp of the frame. Only applicable video inputs.
+            'frame_index': int  # optional, ordinal frame index which can be used if timestamp is unknown.
+        }
+
+        And annotations are augmented as follows:
+
+        {
+            "track_id": <int | str | uuid>  # optional, indicates association between annotations across frames
         }
 
 
