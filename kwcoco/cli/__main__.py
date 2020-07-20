@@ -13,6 +13,7 @@ def main(cmdline=True, **kw):
     from kwcoco.cli import coco_show
     from kwcoco.cli import coco_toydata
     from kwcoco.cli import coco_eval
+    from kwcoco.cli import coco_modify_categories
     # from kwcoco.cli import coco_rebase
 
     # Create a list of all submodules with CLI interfaces
@@ -24,6 +25,7 @@ def main(cmdline=True, **kw):
         # coco_rebase,
         coco_toydata,
         coco_eval,
+        coco_modify_categories,
     ]
 
     # Create a subparser that uses the first positional argument to run one of

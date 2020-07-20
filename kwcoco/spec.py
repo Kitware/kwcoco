@@ -6,7 +6,7 @@ are, and what we have gained by carefully designing a type spec.
 import pathlib
 import uuid
 import numbers
-from typing import Optional, Any, Tuple, List, Set, Dict, AnyStr, Text, Union, NewType
+from typing import Optional, Any, Tuple, List, Set, Dict, AnyStr, Text, Union, NewType  # NOQA
 from collections import OrderedDict
 
 Int = NewType('Int', numbers.Integral)

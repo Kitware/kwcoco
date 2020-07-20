@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import ubelt as ub
+import scriptconfig as scfg
+
+
+class CocoModifyCatsCLI:
+    """
+    Remove, rename, or coarsen categories.
+    """
+    name = 'modify_categories'
+
+    class CLIConfig(scfg.Config):
+        """
+        ModifyCats image paths onto a new image root.
+        """
+        epilog = """
+        Example Usage:
+            kwcoco modify_categories --help
+            kwcoco modify_categories --src=special:shapes8 --dst modcats.json
+            kwcoco modify_categories --src=special:shapes8 --dst modcats.json --rename eff:F,star:sun
+            kwcoco modify_categories --src=special:shapes8 --dst modcats.json --remove eff,star
+            kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep eff,
+
+            kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep=[] --keep_annots=True
+        """
+        default = {
+            'src': scfg.Value(None, help=(
+                'Path to the coco dataset')),
+
+            'dst': scfg.Value(None, help=(
+                'Save the rebased dataset to a new file')),
+
+            'keep_annots': scfg.Value(False, help=(
+                'if False, removes annotations when categories are removed, '
+                'otherwise the annotations category is simply unset')),
+
+            'remove': scfg.Value(None, help='Category names to remove.'),
+
+            'keep': scfg.Value(None, help='If specified, remove all other categories.'),
+
+            'rename': scfg.Value(None, type=str, help='category mapping in the format. "old1:new1,old2:new2"'),
+        }
+
+    @classmethod
+    def main(cls, cmdline=True, **kw):
+        """
+        Example:
+            >>> # xdoctest: +SKIP
+            >>> kw = {'src': 'special:shapes8'}
+            >>> cmdline = False
+            >>> cls = CocoModifyCatsCLI
+            >>> cls.main(cmdline, **kw)
+        """
+        import kwcoco
+        config = cls.CLIConfig(kw, cmdline=cmdline)
+        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+
+        if config['src'] is None:
+            raise Exception('must specify source: {}'.format(config['src']))
+
+        dset = kwcoco.CocoDataset.coerce(config['src'])
+        print('dset = {!r}'.format(dset))
+
+        try:
+            from ndsampler.category_tree import _print_forest
+            print('Input Categories:')
+            _print_forest(dset.object_categories().graph)
+        except Exception:
+            pass
+
+        if config['keep'] is not None:
+            classes = set(dset.name_to_cat.keys())
+            remove = list(classes - set(config['keep']))
+        else:
+            remove = config['remove']
+
+        if remove is not None:
+            remove_cids = []
+            for catname in remove:
+                try:
+                    cid = dset._resolve_to_cid(catname)
+                except KeyError:
+                    import warnings
+                    warnings.warn('unable to lookup catname={!r}'.format(catname))
+                else:
+                    remove_cids.append(cid)
+            dset.remove_categories(
+                remove_cids, keep_annots=config['keep_annots'], verbose=1)
+
+        if config['rename'] is not None:
+            # parse rename string
+            mapper = dict([p.split(':') for p in config['rename'].split(',')])
+            dset.rename_categories(mapper)
+
+        print('Output Categories: ')
+        _print_forest(dset.object_categories().graph)
+
+        if config['dst'] is None:
+            print('dry run')
+        else:
+            dset.fpath = config['dst']
+            print('dset.fpath = {!r}'.format(dset.fpath))
+            dset.dump(dset.fpath, newlines=True)
+
+
+_CLI = CocoModifyCatsCLI
+
+if __name__ == '__main__':
+    _CLI.main()

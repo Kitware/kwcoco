@@ -38,7 +38,7 @@ class CocoStatsCLI:
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
         if config['src'] is None:
-            raise Exception('must specify source: '.format(config['src']))
+            raise Exception('must specify source: {}'.format(config['src']))
 
         if isinstance(config['src'], str):
             fpaths = [config['src']]
@@ -50,6 +50,15 @@ class CocoStatsCLI:
             print('reading fpath = {!r}'.format(fpath))
             dset = kwcoco.CocoDataset.coerce(fpath)
             datasets.append(dset)
+
+        try:
+            from ndsampler.category_tree import _print_forest
+            for dset in datasets:
+                print('dset = {!r}'.format(dset))
+                print('Category Heirarchy: ')
+                _print_forest(dset.object_categories().graph)
+        except Exception:
+            pass
 
         import pandas as pd
         pd.set_option('max_colwidth', 256)
