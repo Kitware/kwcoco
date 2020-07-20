@@ -188,11 +188,10 @@ the image data. Images can also have auxillary files (e.g. for depth masks,
 infared, or motion). A category has an id, a name, and an optional
 supercategory.  Annotations always have an id, an image-id, and a bounding box.
 Usually they also contain a category-id. Sometimes they contain keypoints,
-segmentations. 
+segmentations. The dataset can also store videos, in which case images should
+have video_id field, and annotations should have a track_id field.
 
 An implementation and extension of the original MS-COCO API [1]_.
-
-Extends the format to also include line annotations.
 
 Dataset Spec:
 
@@ -225,9 +224,9 @@ Dataset Spec:
                 'track_id': Optional[Int],
 
                 'bbox': [tl_x, tl_y, w, h],  # optional (xywh format)
-                "score" : float,
-                "prob" : List[float],
-                "weight" : float,
+                "score" : float,  # optional
+                "prob" : List[float],  # optional
+                "weight" : float,  # optional
 
                 "caption": str,  # an optional text caption for this annotation
                 "iscrowd" : <0 or 1>,  # denotes if the annotation covers a single object (0) or multiple objects (1)

@@ -33,9 +33,9 @@ Dataset Spec:
                 'track_id': Optional[Int],
 
                 'bbox': [tl_x, tl_y, w, h],  # optional (xywh format)
-                "score" : float,
-                "prob" : List[float],
-                "weight" : float,
+                "score" : float,  # optional
+                "prob" : List[float],  # optional
+                "weight" : float,  # optional
 
                 "caption": str,  # an optional text caption for this annotation
                 "iscrowd" : <0 or 1>,  # denotes if the annotation covers a single object (0) or multiple objects (1)
