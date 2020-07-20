@@ -50,7 +50,7 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
         show                Visualize a COCO image using matplotlib, optionally writing it to disk
         toydata             Create COCO toydata
         eval                Evaluate and score predicted versus truth detections / classifications in a COCO dataset
-        modify_categories   ModifyCats image paths onto a new image root.
+        modify_categories   Rename or remove categories
 
     optional arguments:
       -h, --help            show this help message and exit

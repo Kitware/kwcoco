@@ -12,7 +12,7 @@ class CocoModifyCatsCLI:
 
     class CLIConfig(scfg.Config):
         """
-        ModifyCats image paths onto a new image root.
+        Rename or remove categories
         """
         epilog = """
         Example Usage:
