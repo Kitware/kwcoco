@@ -63,7 +63,7 @@ class CocoModifyCatsCLI:
         print('dset = {!r}'.format(dset))
 
         try:
-            from ndsampler.category_tree import _print_forest
+            from kwcoco.category_tree import _print_forest
             print('Input Categories:')
             _print_forest(dset.object_categories().graph)
         except Exception:

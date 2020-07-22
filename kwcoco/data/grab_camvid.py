@@ -153,10 +153,10 @@ def grab_camvid_train_test_val_splits(coco_dset, mode='segnet'):
 
 def grab_camvid_sampler():
     """
-    Grab a ndsampler.CocoSampler object for the CamVid dataset.
+    Grab a kwcoco.CocoSampler object for the CamVid dataset.
 
     Returns:
-        ndsampler.CocoSampler: sampler
+        kwcoco.CocoSampler: sampler
 
     Example:
         >>> # xdoctest: +REQUIRES(--download)
@@ -166,10 +166,10 @@ def grab_camvid_sampler():
         >>> for gid in ub.ProgIter(sampler.image_ids, desc='load image'):
         >>>     img = sampler.load_image(gid)
     """
-    import ndsampler
+    import kwcoco
     dset = grab_coco_camvid()
     workdir = ub.ensure_app_cache_dir('camvid')
-    sampler = ndsampler.CocoSampler(dset, workdir=workdir)
+    sampler = kwcoco.CocoSampler(dset, workdir=workdir)
     return sampler
 
 
@@ -192,7 +192,7 @@ def grab_coco_camvid():
             dset.show_image(gid)
             xdev.InteractiveIter.draw()
     """
-    import ndsampler
+    import kwcoco
     cache_dpath = ub.ensure_app_cache_dir('kwcoco', 'camvid')
     coco_fpath = join(cache_dpath, 'camvid.mscoco.json')
 
@@ -221,7 +221,7 @@ def grab_coco_camvid():
     dset = cacher.tryload()
     if dset is None:
         print('Reading coco_fpath = {!r}'.format(coco_fpath))
-        dset = ndsampler.CocoDataset(coco_fpath, tag='camvid')
+        dset = kwcoco.CocoDataset(coco_fpath, tag='camvid')
         # Directly save the file to disk.
         dset._build_index()
         dset._build_hashid()
@@ -289,7 +289,7 @@ def cid_to_rgb(cid):
 def convert_camvid_raw_to_coco(camvid_raw_info):
     """
     Converts the raw camvid format to an MSCOCO based format, ( which lets use
-    use ndsampler's COCO backend).
+    use kwcoco's COCO backend).
 
     Example:
         >>> # xdoctest: +REQUIRES(--download)
@@ -308,7 +308,7 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
     """
     import re
     import kwimage
-    import ndsampler
+    import kwcoco
     print('Converting CamVid to MS-COCO format')
 
     dset_root, img_paths, label_path, mask_paths = ub.take(
@@ -354,7 +354,7 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
         }
         dataset['images'].append(img)
 
-    dset = ndsampler.CocoDataset(dataset)
+    dset = kwcoco.CocoDataset(dataset)
     dset.rename_categories({'Void': 'background'})
 
     assert dset.name_to_cat['background']['id'] == 0

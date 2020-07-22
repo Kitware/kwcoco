@@ -637,7 +637,7 @@ class Annots(ObjectList1D):
             kwimage.Detections
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> # xdoctest: +REQUIRES(module:kwimage)
             >>> from kwcoco.coco_dataset import *  # NOQA
             >>> self = CocoDataset.demo('shapes32').annots([1, 2, 11])
             >>> dets = self.detections
@@ -941,7 +941,6 @@ class MixinCocoExtras(object):
                 (note: this process is inefficient unless image is specified)
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> sample = self.load_annot_sample(2, pad=100)
@@ -951,7 +950,7 @@ class MixinCocoExtras(object):
             >>> kwplot.imshow(sample['im'])
             >>> kwplot.show_if_requested()
         """
-        from ndsampler.coco_sampler import padded_slice
+        from kwcoco.util.util_slice import padded_slice
         ann = self._resolve_to_ann(aid_or_ann)
         if image is None:
             image = self.load_image(ann['image_id'])
@@ -1496,57 +1495,45 @@ class MixinCocoExtras(object):
 
     def object_categories(self):
         """
-        Construct a consistent ndsampler representation of object classes
+        Construct a consistent CategoryTree representation of object classes
 
         Returns:
-            nsampler.CategoryTree:
+            kwcoco.CategoryTree: category data structure
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> self = CocoDataset.demo()
             >>> classes = self.object_categories()
             >>> print('classes = {}'.format(classes))
         """
-        try:
-            import ndsampler
-        except Exception:
-            raise
-            classes = [cat['name'] for cat in self.dataset['cats']]
-        else:
-            graph = self.category_graph()
-            classes = ndsampler.CategoryTree(graph)
-            return classes
+        from kwcoco.category_tree import CategoryTree
+        graph = self.category_graph()
+        classes = CategoryTree(graph)
+        return classes
 
     def keypoint_categories(self):
         """
-        Construct a consistent ndsampler representation of keypoint classes
+        Construct a consistent CategoryTree representation of keypoint classes
 
         Returns:
-            nsampler.CategoryTree:
+            kwcoco.CategoryTree: category data structure
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> self = CocoDataset.demo()
             >>> classes = self.keypoint_categories()
             >>> print('classes = {}'.format(classes))
         """
-        try:
-            import ndsampler
-        except Exception:
-            raise
-            classes = [cat['name'] for cat in self.dataset['keypoint_categories']]
+        from kwcoco.category_tree import CategoryTree
+        if 'keypoint_categories' in self.dataset:
+            import networkx as nx
+            graph = nx.DiGraph()
+            for cat in self.dataset['keypoint_categories']:
+                graph.add_node(cat['name'], **cat)
+                if 'supercategory' in cat:
+                    graph.add_edge(cat['supercategory'], cat['name'])
+            classes = CategoryTree(graph)
         else:
-            if 'keypoint_categories' in self.dataset:
-                import networkx as nx
-                graph = nx.DiGraph()
-                for cat in self.dataset['keypoint_categories']:
-                    graph.add_node(cat['name'], **cat)
-                    if 'supercategory' in cat:
-                        graph.add_edge(cat['supercategory'], cat['name'])
-                classes = ndsampler.CategoryTree(graph)
-            else:
-                catnames = self._keypoint_category_names()
-                classes = ndsampler.CategoryTree.coerce(catnames)
+            catnames = self._keypoint_category_names()
+            classes = CategoryTree.coerce(catnames)
         return classes
 
     def _keypoint_category_names(self):

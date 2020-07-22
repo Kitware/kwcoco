@@ -7,6 +7,7 @@ __submodules__ = ['coco_dataset']
 
 from kwcoco import coco_dataset
 
+from kwcoco.category_tree import (CategoryTree,)
 from kwcoco.coco_dataset import (CocoDataset,)
 
-__all__ = ['CocoDataset', 'coco_dataset']
+__all__ = ['CocoDataset', 'CategoryTree', 'coco_dataset']

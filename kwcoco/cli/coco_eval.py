@@ -10,7 +10,6 @@ class CocoEvalCLI:
     def main(cls, cmdline=True, **kw):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import ubelt as ub
             >>> from kwcoco.cli.coco_eval import *  # NOQA
             >>> from kwcoco.coco_evaluator import CocoEvaluator

@@ -14,7 +14,6 @@ class DetectionMetrics(ub.NiceRepr):
         classes (CategoryTree): category coder
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> dmet = DetectionMetrics.demo(
         >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8, score_noise=0.9, hacked=False)
         >>> print(dmet.score_kwcoco(bias=0, compat='mutex', prioritize='iou')['mAP'])
@@ -52,13 +51,12 @@ class DetectionMetrics(ub.NiceRepr):
         predictions.
 
         Args:
-            true_coco (ndsampler.CocoDataset):
-            pred_coco (ndsampler.CocoDataset):
+            true_coco (kwcoco.CocoDataset):
+            pred_coco (kwcoco.CocoDataset):
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
-            >>> import ndsampler
-            >>> true_coco = ndsampler.CocoDataset.demo('shapes')
+            >>> import kwcoco
+            >>> true_coco = kwcoco.CocoDataset.demo('shapes')
             >>> pred_coco = true_coco
             >>> self = DetectionMetrics.from_coco(true_coco, pred_coco)
             >>> self.score_voc()
@@ -218,7 +216,7 @@ class DetectionMetrics(ub.NiceRepr):
                 except ValueError:
                     pass
 
-        from ndsampler.utils import util_futures
+        from kwcoco.utils import util_futures
         workers = 0
         jobs = util_futures.JobPool(mode='process', max_workers=workers)
 
@@ -435,7 +433,6 @@ class DetectionMetrics(ub.NiceRepr):
         score using voc method
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> dmet = DetectionMetrics.demo(
             >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8,
             >>>     score_noise=.5)
@@ -469,9 +466,9 @@ class DetectionMetrics(ub.NiceRepr):
         """
         Convert to a coco representation of truth and predictions
         """
-        import ndsampler
-        true = ndsampler.CocoDataset()
-        pred = ndsampler.CocoDataset()
+        import kwcoco
+        true = kwcoco.CocoDataset()
+        pred = kwcoco.CocoDataset()
 
         for node in dmet.classes:
             # cid = dmet.classes.graph.node[node]['id']
@@ -586,7 +583,6 @@ class DetectionMetrics(ub.NiceRepr):
                 if True, includes per-class probabilities with predictions
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> kwargs = {}
             >>> # Seed the RNG
             >>> kwargs['rng'] = 0
@@ -608,7 +604,6 @@ class DetectionMetrics(ub.NiceRepr):
             <Detections(7)>
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> # Test case with null predicted categories
             >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, nclasses=3,
             >>>                              nboxes=10, n_fp=10, box_noise=0.3,
@@ -630,7 +625,7 @@ class DetectionMetrics(ub.NiceRepr):
         """
         import kwimage
         import kwarray
-        import ndsampler
+        import kwcoco
         # Parse kwargs
         rng = kwarray.ensure_rng(kwargs.get('rng', 0))
 
@@ -703,10 +698,10 @@ class DetectionMetrics(ub.NiceRepr):
                 if parent_cx > 0:
                     supercategory = 'cat_{}'.format(parent_cx + 1)
                     graph.add_edge(supercategory, node)
-            classes = ndsampler.CategoryTree(graph)
+            classes = kwcoco.CategoryTree(graph)
             frgnd_cx_RV = distributions.DiscreteUniform(1, len(classes), rng=rng)
         else:
-            classes = ndsampler.CategoryTree.coerce(classes)
+            classes = kwcoco.CategoryTree.coerce(classes)
             # TODO: remove background classes via rejection sampling
             frgnd_cx_RV = distributions.DiscreteUniform(0, len(classes), rng=rng)
 
@@ -795,7 +790,6 @@ class DetectionMetrics(ub.NiceRepr):
     def summarize(dmet, out_dpath=None, plot=False, title=''):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
@@ -921,7 +915,7 @@ def eval_detections_cli(**kw):
         xdoctest -m ~/code/kwcoco/kwcoco/metrics/detect_metrics.py eval_detections_cli
     """
     import scriptconfig as scfg
-    import ndsampler
+    import kwcoco
 
     class EvalDetectionCLI(scfg.Config):
         default = {
@@ -935,8 +929,8 @@ def eval_detections_cli(**kw):
     cmdline = kw.pop('cmdline', True)
     config.load(kw, cmdline=cmdline)
 
-    true_coco = ndsampler.CocoDataset(config['true'])
-    pred_coco = ndsampler.CocoDataset(config['pred'])
+    true_coco = kwcoco.CocoDataset(config['true'])
+    pred_coco = kwcoco.CocoDataset(config['pred'])
 
     from kwcoco.metrics.detect_metrics import DetectionMetrics
     dmet = DetectionMetrics.from_coco(true_coco, pred_coco)

@@ -5,6 +5,15 @@ from kwcoco.metrics.functional import fast_confusion_matrix
 from kwcoco.metrics.util import DictProxy
 
 
+from kwcoco.category_tree import CategoryTree
+
+try:
+    import ndsampler
+    CATEGORY_TREE_CLS = (CategoryTree, ndsampler.CategoryTree)
+except Exception:
+    CATEGORY_TREE_CLS = (CategoryTree,)
+
+
 class ConfusionVectors(ub.NiceRepr):
     """
     Stores information used to construct a confusion matrix. This includes
@@ -17,7 +26,6 @@ class ConfusionVectors(ub.NiceRepr):
         probs (ndarray, optional): probabilities for each class
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> # xdoctest: IGNORE_WANT
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
@@ -82,7 +90,6 @@ class ConfusionVectors(ub.NiceRepr):
         Serialize to json
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics import ConfusionVectors
             >>> self = ConfusionVectors.demo(n_imgs=1, nclasses=2, n_fp=0, nboxes=1)
             >>> state = self.__json__()
@@ -98,12 +105,12 @@ class ConfusionVectors(ub.NiceRepr):
 
     @classmethod
     def from_json(cls, state):
-        import ndsampler
         import kwarray
+        import kwcoco
         probs = state['probs']
         if probs is not None:
             probs = np.array(probs)
-        classes = ndsampler.CategoryTree.from_json(state['classes'])
+        classes = kwcoco.CategoryTree.from_json(state['classes'])
         data = ub.map_vals(np.array, state['data'])
         data = kwarray.DataFrameArray(data)
         self = cls(data=data, probs=probs, classes=classes)
@@ -113,7 +120,6 @@ class ConfusionVectors(ub.NiceRepr):
     def demo(cfsn_vecs, **kw):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> print('cfsn_vecs = {!r}'.format(cfsn_vecs))
             >>> cx_to_binvecs = cfsn_vecs.binarize_ovr()
@@ -143,7 +149,6 @@ class ConfusionVectors(ub.NiceRepr):
         Construct confusion vector data structure from component arrays
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwarray
             >>> classes = ['person', 'vehicle', 'object']
             >>> rng = kwarray.ensure_rng(0)
@@ -160,8 +165,7 @@ class ConfusionVectors(ub.NiceRepr):
         import kwarray
         if pred is None:
             if probs is not None:
-                import ndsampler
-                if isinstance(classes, ndsampler.CategoryTree):
+                if isinstance(classes, CATEGORY_TREE_CLS):
                     if not classes.is_mutex():
                         raise Exception('Graph categories require explicit pred')
                 # We can assume all classes are mutually exclusive here
@@ -197,7 +201,6 @@ class ConfusionVectors(ub.NiceRepr):
             xdoctest -m ~/code/kwcoco/kwcoco/metrics/confusion_vectors.py ConfusionVectors.confusion_matrix
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
             >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), n_fn=(0, 1), nclasses=3, cls_noise=.2)
@@ -251,11 +254,10 @@ class ConfusionVectors(ub.NiceRepr):
         """
         Creates a coarsened set of vectors
         """
-        import ndsampler
         import kwarray
         assert cfsn_vecs.probs is not None, 'need probs'
-        if not isinstance(cfsn_vecs.classes, ndsampler.CategoryTree):
-            raise TypeError('classes must be a ndsampler.CategoryTree')
+        if not isinstance(cfsn_vecs.classes, CATEGORY_TREE_CLS):
+            raise TypeError('classes must be a kwcoco.CategoryTree')
 
         descendent_map = cfsn_vecs.classes.idx_to_descendants_idxs(include_cfsn_vecs=True)
         valid_descendant_mapping = ub.dict_isect(descendent_map, cxs)
@@ -297,7 +299,6 @@ class ConfusionVectors(ub.NiceRepr):
             BinaryConfusionVectors
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
             >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
@@ -357,7 +358,6 @@ class ConfusionVectors(ub.NiceRepr):
                 Dict[int, BinaryConfusionVectors]: cx_to_binvecs
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> print('cfsn_vecs = {!r}'.format(cfsn_vecs))
             >>> catname_to_binvecs = cfsn_vecs.binarize_ovr(keyby='name')
@@ -513,7 +513,6 @@ class ConfusionVectors(ub.NiceRepr):
         Build a classification report with various metrics.
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> report = cfsn_vecs.classification_report(verbose=1)
@@ -542,7 +541,6 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         classes
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
         >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
@@ -573,7 +571,6 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
     def measures(self, **kwargs):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> self = OneVsRestConfusionVectors.demo()
             >>> thresh_result = self.measures()['perclass']
         """
@@ -725,7 +722,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
     def _3dplot(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
@@ -1191,7 +1187,6 @@ class Measures(ub.NiceRepr, DictProxy):
     def draw(self, key=None, prefix='', **kw):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
             >>> self = ovr_cfsn.measures()['perclass']
@@ -1210,7 +1205,6 @@ class Measures(ub.NiceRepr, DictProxy):
     def summary_plot(self, fnum=1, title=''):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> cfsn_vecs = ConfusionVectors.demo(n=100, p_error=0.5)
             >>> binvecs = cfsn_vecs.binarize_peritem()
@@ -1249,7 +1243,6 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
     def draw(self, key='mcc', prefix='', **kw):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
             >>> self = ovr_cfsn.measures()['perclass']
@@ -1278,7 +1271,6 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
         """
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(

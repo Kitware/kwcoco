@@ -71,7 +71,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             column when a predicted bounding box does not match any true
             bounding box.
 
-        classes (List[str] | ndsampler.CategoryTree):
+        classes (List[str] | kwcoco.CategoryTree):
             mapping from class indices to class names. Can also contain class
             heirarchy information.
 
@@ -94,7 +94,6 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             any predicted annotation.
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> import pandas as pd
         >>> import kwcoco as nh
         >>> import kwimage
@@ -116,8 +115,8 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>> compat = 'all'
         >>> ovthresh = 0.5
         >>> bias = 0.0
-        >>> import ndsampler
-        >>> classes = ndsampler.CategoryTree.from_mutex(list(range(3)))
+        >>> import kwcoco
+        >>> classes = kwcoco.CategoryTree.from_mutex(list(range(3)))
         >>> bg_cidx = -1
         >>> y = _assign_confusion_vectors(true_dets, pred_dets, bias=bias,
         >>>                               bg_weight=bg_weight, ovthresh=ovthresh,
@@ -139,7 +138,6 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         globals().update(get_func_kwargs(_assign_confusion_vectors))
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> import pandas as pd
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(nimgs=1, nclasses=8,
@@ -180,11 +178,11 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
     unique_pcxs = np.array(sorted(set(pred_dets.class_idxs)))
 
     if classes is None:
-        import ndsampler
+        import kwcoco
         # Build mutually exclusive category tree
         all_cxs = sorted(set(map(int, unique_pcxs)) | set(map(int, unique_tcxs)))
         all_cxs = list(range(max(all_cxs) + 1))
-        classes = ndsampler.CategoryTree.from_mutex(all_cxs)
+        classes = kwcoco.CategoryTree.from_mutex(all_cxs)
 
     cx_to_ancestors = classes.idx_to_ancestor_idxs()
 
@@ -481,7 +479,7 @@ def _fast_pdist_priority(classes, prioritize, _cache={}):
     key = ub.hash_data('\n'.join(list(map(str, classes))), hasher='sha1')
     # key = ub.repr2(classes.__json__())
     if key not in _cache:
-        # classes = ndsampler.CategoryTree.from_json(classes)
+        # classes = kwcoco.CategoryTree.from_json(classes)
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='invalid .* less')
             warnings.filterwarnings('ignore', message='invalid .* greater_equal')

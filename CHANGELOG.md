@@ -5,6 +5,18 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## Version 0.1.5 - Unreleased
+
+### Added
+
+* Ported the non-torch components of CategoryTree from ndsampler to kwcoco. 
+* This helps kwcoco work better as a standalone package.
+
+
+### Changed
+* Removed optional dependency on ndsampler, functionality should now be available without ndsampler.
+
+
 ## Version 0.1.4 - Released 2020-07-20
 
 ### Added
@@ -57,11 +69,3 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Initial version
-
-## Version 0.1.3 - Unreleased
-
-## Version 0.1.4 - Unreleased
-
-## Version 0.1.4 - Unreleased
-
-## Version 0.1.5 - Unreleased

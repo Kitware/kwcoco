@@ -17,6 +17,14 @@ import scriptconfig as scfg
 # from kwcoco.metrics.util import DictProxy
 
 
+from kwcoco.category_tree import CategoryTree
+try:
+    import ndsampler
+    CATEGORY_TREE_CLS = (CategoryTree, ndsampler.CategoryTree)
+except Exception:
+    CATEGORY_TREE_CLS = (CategoryTree,)
+
+
 class CocoEvalConfig(scfg.Config):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
@@ -71,7 +79,6 @@ class CocoEvaluator(object):
         >>> coco_eval.evaluate()
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> import kwcoco
         >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
@@ -193,7 +200,7 @@ class CocoEvaluator(object):
 
     @classmethod
     def _rectify_classes(coco_eval, true_classes, pred_classes):
-        import ndsampler
+        import kwcoco
         # Determine if truth and model classes are compatible, attempt to remap
         # if possible.
         errors = []
@@ -225,7 +232,7 @@ class CocoEvaluator(object):
         true_norm = {_normalize_name(name): name for name in true_classes}
         # TODO: remove background hack, use "implicit_negative_classes" or "negative_classes"
         unified_names = list(ub.unique(['background'] + list(pred_norm) + list(true_norm)))
-        classes = ndsampler.CategoryTree.coerce(unified_names)
+        classes = kwcoco.CategoryTree.coerce(unified_names)
 
         # raise Exception('\n'.join(errors))
         for true_name, true_cid in true_classes.node_to_id.items():
@@ -260,14 +267,12 @@ class CocoEvaluator(object):
                 extra: any extra information we gathered via coercion
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwcoco
             >>> coco_dset = kwcoco.CocoDataset.demo('shapes8')
             >>> gid_to_det, extras = CocoEvaluator._coerce_dets(coco_dset)
         """
         # coerce the input into dictionary of detection objects.
         import kwcoco
-        import ndsampler
         # if 0:
         #     # hack
         #     isinstance = kwimage.structs._generic._isinstance2
@@ -321,8 +326,8 @@ class CocoEvaluator(object):
                     **kw,
                 ).numpy()
                 gid_to_det[gid] = dets
-        elif isinstance(dataset, ndsampler.CocoSampler):
-            # Input is an ndsampler object
+        elif isinstance(dataset, CATEGORY_TREE_CLS):
+            # Input is an kwcoco.CategoryTree object
             extra['sampler'] = sampler = dataset
             coco_dset = sampler.dset
             gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
@@ -363,7 +368,6 @@ class CocoEvaluator(object):
         """
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.coco_evaluator import *  # NOQA
             >>> from kwcoco.coco_evaluator import CocoEvaluator
             >>> import kwcoco
@@ -685,7 +689,6 @@ class CocoResults(ub.NiceRepr):
 def _load_dets(pred_fpaths, workers=6):
     """
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
         >>> import ubelt as ub
         >>> import kwcoco
@@ -720,7 +723,6 @@ def _load_dets(pred_fpaths, workers=6):
 def _load_dets_worker(single_pred_fpath, with_coco=True):
     """
     Ignore:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
         >>> import ubelt as ub
         >>> import kwcoco

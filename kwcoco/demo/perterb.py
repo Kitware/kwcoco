@@ -7,7 +7,6 @@ def perterb_coco(coco_dset, **kwargs):
     Perterbs a coco dataset
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.demo.perterb import *  # NOQA
         >>> from kwcoco.demo.perterb import _demo_construct_probs
         >>> import kwcoco
