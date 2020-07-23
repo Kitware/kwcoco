@@ -137,7 +137,8 @@ class DetectionMetrics(ub.NiceRepr):
 
     def confusion_vectors(dmet, ovthresh=0.5, bias=0, gids=None, compat='all',
                           prioritize='iou', ignore_classes='ignore',
-                          background_class=ub.NoParam, verbose='auto', workers=0):
+                          background_class=ub.NoParam, verbose='auto',
+                          workers=0, track_probs='try'):
         """
         Assigns predicted boxes to the true boxes so we can transform the
         detection problem into a classification problem for scoring.
@@ -186,14 +187,18 @@ class DetectionMetrics(ub.NiceRepr):
             workers (int, default=0):
                 number of parallel assignment processes
 
+            track_probs (str, default='try'): can be 'try', 'force', or False.
+                if truthy, we assume probabilities for multiple classes are
+                available.
+
         Ignore:
             globals().update(xdev.get_func_kwargs(dmet.confusion_vectors))
         """
         import kwarray
         y_accum = ub.ddict(list)
 
-        TRACK_PROBS = True
-        if TRACK_PROBS:
+        _tracking_probs = bool(track_probs)
+        if _tracking_probs:
             prob_accum = []
 
         if gids is None:
@@ -216,7 +221,7 @@ class DetectionMetrics(ub.NiceRepr):
                 except ValueError:
                     pass
 
-        from kwcoco.utils import util_futures
+        from kwcoco.util import util_futures
         workers = 0
         jobs = util_futures.JobPool(mode='process', max_workers=workers)
 
@@ -236,13 +241,21 @@ class DetectionMetrics(ub.NiceRepr):
             y = job.result()
             gid = job.gid
 
-            if TRACK_PROBS:
+            if _tracking_probs:
                 # Keep track of per-class probs
                 pred_dets = dmet.pred_detections(gid)
                 try:
                     pred_probs = pred_dets.probs
+                    if pred_probs is None:
+                        raise KeyError
                 except KeyError:
-                    TRACK_PROBS = False
+                    _tracking_probs = False
+                    if track_probs == 'force':
+                        raise Exception('unable to track probs')
+                    elif track_probs == 'try':
+                        pass
+                    else:
+                        raise KeyError(track_probs)
                 else:
                     pxs = np.array(y['pxs'], dtype=np.int)
 
@@ -272,12 +285,12 @@ class DetectionMetrics(ub.NiceRepr):
         #                                       compat=compat, prioritize=prioritize,
         #                                       ignore_classes=ignore_classes)
 
-        #         if TRACK_PROBS:
+        #         if _tracking_probs:
         #             # Keep track of per-class probs
         #             try:
         #                 pred_probs = pred_dets.probs
         #             except KeyError:
-        #                 TRACK_PROBS = False
+        #                 _tracking_probs = False
         #             else:
         #                 pxs = np.array(y['pxs'], dtype=np.int)
         #                 flags = pxs > -1
@@ -315,7 +328,7 @@ class DetectionMetrics(ub.NiceRepr):
                 nbytes += v.size * v.dtype.itemsize
             print(xdev.byte_str(nbytes))
 
-        if TRACK_PROBS:
+        if _tracking_probs:
             y_prob = np.vstack(prob_accum)
         else:
             y_prob = None
@@ -764,7 +777,7 @@ class DetectionMetrics(ub.NiceRepr):
             # probability for each class. (Currently a bit hacky).
             class_probs = _demo_construct_probs(
                 pred_cxs, pred_scores, classes, rng,
-                hacked=kwargs.get('hacked', 0))
+                hacked=kwargs.get('hacked', 1))
 
             true_dets = kwimage.Detections(boxes=true_boxes,
                                            class_idxs=true_cxs,
@@ -843,7 +856,7 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
     # conditional. The right thing to do would be to do this, and then
     # perterb ancestor categories such that the probability evenetually
     # converges on the right value at that specific classes depth.
-    import torch
+    # import torch
 
     # Ensure probs
     pred_scores2 = pred_scores.clip(0, 1.0)
@@ -856,57 +869,57 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
         # HACK! All that nice work we did is too slow for doctests
         return class_energy
 
-    class_energy = torch.Tensor(class_energy)
-    cond_logprobs = classes.conditional_log_softmax(class_energy, dim=1)
-    cond_probs = torch.exp(cond_logprobs).numpy()
+    # class_energy = torch.Tensor(class_energy)
+    # cond_logprobs = classes.conditional_log_softmax(class_energy, dim=1)
+    # cond_probs = torch.exp(cond_logprobs).numpy()
 
-    # I was having a difficult time getting this right, so an
-    # inefficient per-item non-vectorized implementation it is.
-    # Note: that this implementation takes 70% of the time in this function
-    # and is a bottleneck for the doctests. A vectorized implementation would
-    # be nice.
-    idx_to_ancestor_idxs = classes.idx_to_ancestor_idxs()
-    idx_to_groups = {idx: group for group in classes.idx_groups for idx in group}
+    # # I was having a difficult time getting this right, so an
+    # # inefficient per-item non-vectorized implementation it is.
+    # # Note: that this implementation takes 70% of the time in this function
+    # # and is a bottleneck for the doctests. A vectorized implementation would
+    # # be nice.
+    # idx_to_ancestor_idxs = classes.idx_to_ancestor_idxs()
+    # idx_to_groups = {idx: group for group in classes.idx_groups for idx in group}
 
-    def set_conditional_score(row, cx, score, idx_to_groups):
-        group_cxs = np.array(idx_to_groups[cx])
-        flags = group_cxs == cx
-        group_row = row[group_cxs]
-        # Ensure that that heriarchical probs sum to 1
-        current = group_row[~flags]
-        other = current * (1 - score) / current.sum()
-        other = np.nan_to_num(other)
-        group_row[~flags] = other
-        group_row[flags] = score
-        row[group_cxs] = group_row
+    # def set_conditional_score(row, cx, score, idx_to_groups):
+    #     group_cxs = np.array(idx_to_groups[cx])
+    #     flags = group_cxs == cx
+    #     group_row = row[group_cxs]
+    #     # Ensure that that heriarchical probs sum to 1
+    #     current = group_row[~flags]
+    #     other = current * (1 - score) / current.sum()
+    #     other = np.nan_to_num(other)
+    #     group_row[~flags] = other
+    #     group_row[flags] = score
+    #     row[group_cxs] = group_row
 
-    for row, cx, score in zip(cond_probs, pred_cxs, pred_scores2):
-        set_conditional_score(row, cx, score, idx_to_groups)
-        for ancestor_cx in idx_to_ancestor_idxs[cx]:
-            if ancestor_cx != cx:
-                # Hack all parent probs to 1.0 so conditional probs
-                # turn into real probs.
-                set_conditional_score(row, ancestor_cx, 1.0, idx_to_groups)
-                # TODO: could add a fudge factor here so the
-                # conditional prob is higher than score, but parent
-                # probs are less than 1.0
+    # for row, cx, score in zip(cond_probs, pred_cxs, pred_scores2):
+    #     set_conditional_score(row, cx, score, idx_to_groups)
+    #     for ancestor_cx in idx_to_ancestor_idxs[cx]:
+    #         if ancestor_cx != cx:
+    #             # Hack all parent probs to 1.0 so conditional probs
+    #             # turn into real probs.
+    #             set_conditional_score(row, ancestor_cx, 1.0, idx_to_groups)
+    #             # TODO: could add a fudge factor here so the
+    #             # conditional prob is higher than score, but parent
+    #             # probs are less than 1.0
 
-                # TODO: could also maximize entropy of descendant nodes
-                # so classes.decision2 would stop at this node
+    #             # TODO: could also maximize entropy of descendant nodes
+    #             # so classes.decision2 would stop at this node
 
-    # For each level the conditional probs must sum to 1
-    if cond_probs.size > 0:
-        for idxs in classes.idx_groups:
-            level = cond_probs[:, idxs]
-            totals = level.sum(axis=1)
-            assert level.shape[1] == 1 or np.allclose(totals, 1.0), str(level) + ' : ' + str(totals)
+    # # For each level the conditional probs must sum to 1
+    # if cond_probs.size > 0:
+    #     for idxs in classes.idx_groups:
+    #         level = cond_probs[:, idxs]
+    #         totals = level.sum(axis=1)
+    #         assert level.shape[1] == 1 or np.allclose(totals, 1.0), str(level) + ' : ' + str(totals)
 
-    cond_logprobs = torch.Tensor(cond_probs).log()
-    class_probs = classes._apply_logprob_chain_rule(cond_logprobs, dim=1).exp().numpy()
-    class_probs = class_probs.reshape(-1, len(classes))
-    # print([p[x] for p, x in zip(class_probs, pred_cxs)])
-    # print(pred_scores2)
-    return class_probs
+    # cond_logprobs = torch.Tensor(cond_probs).log()
+    # class_probs = classes._apply_logprob_chain_rule(cond_logprobs, dim=1).exp().numpy()
+    # class_probs = class_probs.reshape(-1, len(classes))
+    # # print([p[x] for p, x in zip(class_probs, pred_cxs)])
+    # # print(pred_scores2)
+    # return class_probs
 
 
 def eval_detections_cli(**kw):
@@ -1009,3 +1022,12 @@ def eval_detections_cli(**kw):
         )
         plt.plot(thresh[mcc_idx], f1[mcc_idx], 'r*', markersize=20)
         plt.plot(thresh[f1_idx], f1[f1_idx], 'k*', markersize=20)
+
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/kwcoco/metrics/detect_metrics.py all
+    """
+    import xdoctest
+    xdoctest.doctest_module(__file__)

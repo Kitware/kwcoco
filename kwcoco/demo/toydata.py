@@ -53,11 +53,11 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         aux: if specified builds auxillary channels
 
     CommandLine:
-        xdoctest -m kwcoco.toydata demodata_toy_img:0 --profile
-        xdoctest -m kwcoco.toydata demodata_toy_img:1 --show
+        xdoctest -m kwcoco.demo.toydata demodata_toy_img:0 --profile
+        xdoctest -m kwcoco.demo.toydata demodata_toy_img:1 --show
 
     Example:
-        >>> from kwcoco.toydata import *  # NOQA
+        >>> from kwcoco.demo.toydata import *  # NOQA
         >>> img, anns = demodata_toy_img(gsize=(32, 32), anchors=[[.3, .3]], rng=0)
         >>> img['imdata'] = '<ndarray shape={}>'.format(img['imdata'].shape)
         >>> print('img = {}'.format(ub.repr2(img)))
@@ -97,7 +97,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         >>> kwplot.show_if_requested()
 
     Ignore:
-        from kwcoco.toydata import *
+        from kwcoco.demo.toydata import *
         import xinspect
         globals().update(xinspect.get_kwargs(demodata_toy_img))
 
@@ -279,14 +279,14 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         dict: dataset in mscoco format
 
     CommandLine:
-        xdoctest -m kwcoco.toydata demodata_toy_dset --show
+        xdoctest -m kwcoco.demo.toydata demodata_toy_dset --show
 
     Ignore:
         import xdev
         globals().update(xdev.get_func_kwargs(demodata_toy_dset))
 
     Example:
-        >>> from kwcoco.toydata import *
+        >>> from kwcoco.demo.toydata import *
         >>> import kwcoco
         >>> dataset = demodata_toy_dset(gsize=(300, 300), aux=True, cache=False)
         >>> dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
