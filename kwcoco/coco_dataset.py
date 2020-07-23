@@ -277,6 +277,10 @@ class ObjectList1D(ub.NiceRepr):
     def _id_to_obj(self):
         return self._dset.index._id_lookup[self._key]
 
+    @property
+    def objs(self):
+        return list(ub.take(self._id_to_obj, self._ids))
+
     def take(self, idxs):
         """
         Take a subset by index
@@ -993,7 +997,22 @@ class MixinCocoExtras(object):
             >>> print(CocoDataset.demo('photos'))
             >>> print(CocoDataset.demo('shapes', verbose=0))
             >>> print(CocoDataset.demo('shapes256', verbose=0))
-            >>> print(CocoDataset.demo('shapes-8', verbose=0))
+            >>> print(CocoDataset.demo('shapes8', verbose=0))
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5, verbose=0, rng=None)
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5, num_tracks=4, verbose=0, rng=44)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> pnums = kwplot.PlotNums(nSubplots=len(dset.imgs))
+            >>> fnum = 1
+            >>> for gx, gid in enumerate(dset.imgs.keys()):
+            >>>     canvas = dset.draw_image(gid=gid)
+            >>>     kwplot.imshow(canvas, pnum=pnums[gx], fnum=fnum)
+            >>>     #dset.show_image(gid=gid, pnum=pnums[gx])
+            >>> kwplot.show_if_requested()
         """
         if key.startswith('shapes'):
             from kwcoco.demo import toydata
@@ -1005,6 +1024,22 @@ class MixinCocoExtras(object):
                 kw['rng'] = kw['n_imgs']
             dataset = toydata.demodata_toy_dset(**kw)
             self = cls(dataset, tag=key)
+        elif key.startswith('vidshapes'):
+            from kwcoco.demo import toydata
+            import parse
+            res = parse.parse('{prefix}{num_videos:d}', key)
+
+            vidkw = {
+                'render': True,
+                'num_videos': 2,
+            }
+            if res:
+                kw['num_videos'] = int(res.named['num_videos'])
+            # if 'rng' not in kw and 'n_imgs' in kw:
+            #     kw['rng'] = kw['n_imgs']
+            vidkw.update(kw)
+            self = toydata.random_video_dset(**vidkw)
+            # self = cls(dataset, tag=key)
         elif key == 'photos':
             dataset = demo_coco_data()
             self = cls(dataset, tag=key)
@@ -3725,7 +3760,7 @@ class CocoIndex(object):
 
         Example:
             >>> from kwcoco.demo.toydata import *  # NOQA
-            >>> parent = random_video_dset(num_frames=4, rng=1)
+            >>> parent = CocoDataset.demo('vidshapes1', num_frames=4, rng=1)
             >>> index = parent.index
             >>> index.build(parent)
         """
@@ -4473,9 +4508,10 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             """ union of dictionary based data structure """
             # TODO: rely on subset of SPEC keys
             merged = _dict([
-                ('categories', []),
                 ('licenses', []),
                 ('info', []),
+                ('categories', []),
+                ('videos', []),
                 ('images', []),
                 ('annotations', []),
             ])
@@ -4504,10 +4540,15 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             _all_gids = (img['id'] for img in _all_imgs)
             preserve_gids = not _has_duplicates(_all_gids)
 
+            _all_videos = (video for _, d in relative_dsets for video in (d.get('videos', None) or []))
+            _all_vidids = (video['id'] for video in _all_videos)
+            preserve_vidids = not _has_duplicates(_all_vidids)
+
             for subdir, old_dset in relative_dsets:
                 # Create temporary indexes to map from old to new
                 cat_id_map = {None: None}
                 img_id_map = {}
+                video_id_map = {}
                 kpcat_id_map = {}
 
                 # Add the licenses / info into the merged dataset
@@ -4569,6 +4610,21 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                         new_reflect_id = merged_kp_name_to_id.get(reflect_name, None)
                         kpcat['reflection_id'] = new_reflect_id
 
+                # Add the videos into the merged dataset
+                for old_video in old_dset.get('videos', []):
+                    if preserve_vidids:
+                        new_id = old_video['id']
+                    else:
+                        new_id = len(merged['videos']) + 1
+                    new_video = _dict([
+                        ('id', new_id),
+                        ('name', join(subdir, old_video['name'])),
+                    ])
+                    # copy over other metadata
+                    update_ifnotin(new_video, old_video)
+                    video_id_map[old_video['id']] = new_video['id']
+                    merged['videos'].append(new_video)
+
                 # Add the images into the merged dataset
                 for old_img in old_dset['images']:
                     if preserve_gids:
@@ -4579,6 +4635,9 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                         ('id', new_id),
                         ('file_name', join(subdir, old_img['file_name'])),
                     ])
+                    video_img_id = video_id_map.get(old_img.get('video_id'), None)
+                    if video_img_id is not None:
+                        new_img['video_id'] = video_img_id
                     # copy over other metadata
                     update_ifnotin(new_img, old_img)
                     img_id_map[old_img['id']] = new_img['id']

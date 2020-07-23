@@ -642,6 +642,8 @@ class DetectionMetrics(ub.NiceRepr):
         # Parse kwargs
         rng = kwarray.ensure_rng(kwargs.get('rng', 0))
 
+        # TODO: use kwcoco.demo.perterb instead of rolling the logic here
+
         # todo: accept and coerce classes instead of nclasses
         classes = kwargs.get('classes', None)
         nclasses = kwargs.get('nclasses', None)

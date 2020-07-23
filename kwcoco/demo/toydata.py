@@ -447,13 +447,72 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     return dataset
 
 
-def random_video_dset(gsize=(600, 600), num_frames=5, verbose=3, num_tracks=3,
-                      tid_start=1, gid_start=1, video_id=1, render=False,
+def random_video_dset(gsize=(600, 600), num_frames=2, verbose=3, num_tracks=2,
+                      tid_start=1, gid_start=1, num_videos=1, render=False,
                       rng=None):
     """
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
-        >>> dset = random_video_dset(render=True, num_frames=2, num_tracks=10)
+        >>> dset = random_video_dset(render=True, num_videos=3, num_frames=2, num_tracks=10)
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> dset.show_image(1, doclf=True)
+        >>> dset.show_image(2, doclf=True)
+
+        import xdev
+        globals().update(xdev.get_func_kwargs(random_video_dset))
+        num_videos = 2
+    """
+    rng = kwarray.ensure_rng(rng)
+    subsets = []
+    tid_start = 1
+    for vidid in range(1, num_videos + 1):
+        dset = random_single_video_dset(
+            gsize=gsize,
+            num_frames=num_frames,
+            num_tracks=num_tracks, tid_start=tid_start,
+            gid_start=gid_start, video_id=vidid, render=False,
+            autobuild=False, rng=rng)
+
+        try:
+            gid_start = dset.dataset['images'][-1]['id'] + 1
+            tid_start = dset.dataset['annotations'][-1]['track_id'] + 1
+        except IndexError:
+            pass
+        subsets.append(dset)
+
+    if num_videos == 0:
+        raise AssertionError
+    if num_videos == 1:
+        dset = subsets[0]
+    else:
+        import kwcoco
+        assert len(subsets) > 1, '{}'.format(len(subsets))
+        dset = kwcoco.CocoDataset.union(*subsets)
+
+    # The dataset has been prepared, now we just render it and we have
+    # a nice video dataset.
+    renderkw = {
+        'dpath': None,
+    }
+    if isinstance(render, dict):
+        renderkw.update(render)
+    else:
+        if not render:
+            renderkw = None
+    if renderkw:
+        render_toy_dataset(dset, rng=rng, **renderkw)
+
+    dset._build_index()
+    return dset
+
+
+def random_single_video_dset(gsize=(600, 600), num_frames=5, verbose=3,
+                             num_tracks=3, tid_start=1, gid_start=1,
+                             video_id=1, render=False, rng=None, autobuild=True):
+    """
+    Example:
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> dset = random_single_video_dset(render=True, num_frames=2, num_tracks=10)
         >>> # xdoctest: +REQUIRES(--show)
         >>> dset.show_image(1, doclf=True)
         >>> dset.show_image(2, doclf=True)
@@ -576,7 +635,8 @@ def random_video_dset(gsize=(600, 600), num_frames=5, verbose=3, num_tracks=3,
             renderkw = None
     if renderkw is not None:
         render_toy_dataset(dset, rng=rng, **renderkw)
-    dset._build_index()
+    if autobuild:
+        dset._build_index()
     return dset
 
 
@@ -618,7 +678,9 @@ def render_toy_dataset(dset, rng, dpath=None):
     img_dpath = ub.ensuredir((root_dpath, 'images'))
 
     for gid in dset.imgs.keys():
-        render_toy_image(dset, gid)
+
+        render_toy_image(dset, gid, rng=rng)
+
         img = dset.imgs[gid]
         imdata = img.pop('imdata')
         fname = 'img_{:05d}.png'.format(gid)
@@ -684,7 +746,7 @@ def render_toy_image(dset, gid, rng=None):
     bg_intensity = 0.1
     fg_intensity = 0.9
 
-    newstyle = False
+    newstyle = True
 
     categories = list(dset.name_to_cat.keys())
     catpats = CategoryPatterns.coerce(categories, fg_scale=fg_scale,
@@ -729,7 +791,8 @@ def render_toy_image(dset, gid, rng=None):
         tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(np.int)
 
         # Render coco-style annotation dictionaries
-        for (aid, ann), tlbr in zip(annots._id_to_obj.items(), tlbr_boxes):
+        for ann, tlbr in zip(annots.objs, tlbr_boxes):
+            print('ann = {}'.format(ub.repr2(ann, nl=1)))
             catname = dset._resolve_to_cat(ann['category_id'])['name']
             tl_x, tl_y, br_x, br_y = tlbr
             chip_index = tuple([slice(tl_y, br_y), slice(tl_x, br_x)])
