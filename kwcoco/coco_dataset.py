@@ -165,7 +165,9 @@ TODO:
 
     - [ ] Should img_root be changed to data root?
 
-    - [ ] Read image data, return numpy arrays (requires API for images)
+    - [ ] Read video data, return numpy arrays (requires API for images)
+
+    - [ ] Spec for video URI, and convert to frames @ framerate function.
 
     - [ ] remove videos
 
@@ -241,10 +243,15 @@ def _annot_type(ann):
 
 class ObjectList1D(ub.NiceRepr):
     """
-    Lightweight reference to a set of annotations that allows for convenient
-    property access.
+    Vectorized access to lists of dictionary objects
 
-    Similar to ibeis._ibeis_object.ObjectList1D
+    Lightweight reference to a set of object (e.g. annotations, images) that
+    allows for convenient property access.
+
+    Args:
+        ids (List[int]): list of ids
+        dset (CocoDataset): parent dataset
+        key (str): main object name (e.g. 'images', 'annotations')
 
     Types:
         ObjT = Ann | Img | Cat  # can be one of these types
@@ -283,6 +290,10 @@ class ObjectList1D(ub.NiceRepr):
 
     @property
     def objs(self):
+        """
+        Returns:
+            List: all object dictionaries
+        """
         return list(ub.take(self._id_to_obj, self._ids))
 
     def take(self, idxs):
@@ -310,6 +321,9 @@ class ObjectList1D(ub.NiceRepr):
         return newself
 
     def peek(self):
+        """
+        Return the first object dictionary
+        """
         return ub.peek(self._id_to_obj.values())
 
     def lookup(self, key, default=ub.NoParam, keepid=False):
@@ -471,12 +485,58 @@ class ObjectGroups(ub.NiceRepr):
         return nice
 
 
+class Categories(ObjectList1D):
+    """
+    Vectorized access to category attributes
+
+    Example:
+        >>> from kwcoco.coco_dataset import Categories  # NOQA
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo()
+        >>> ids = list(dset.cats.keys())
+        >>> self = Categories(ids, dset)
+        >>> print('self.name = {!r}'.format(self.name))
+        >>> print('self.supercategory = {!r}'.format(self.supercategory))
+    """
+    def __init__(self, ids, dset):
+        super().__init__(ids, dset, 'categories')
+
+    @property
+    def cids(self):
+        return self.lookup('id')
+
+    @property
+    def name(self):
+        return self.lookup('name')
+
+    @property
+    def supercategory(self):
+        return self.lookup('supercategory', None)
+
+
+class Videos(ObjectList1D):
+    """
+    Vectorized access to video attributes
+
+    Example:
+        >>> from kwcoco.coco_dataset import Videos  # NOQA
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes5')
+        >>> ids = list(dset.index.videos.keys())
+        >>> self = Videos(ids, dset)
+        >>> print('self = {!r}'.format(self))
+    """
+    def __init__(self, ids, dset):
+        super().__init__(ids, dset, 'videos')
+
+
 class Images(ObjectList1D):
     """
+    Vectorized access to image attributes
     """
 
     def __init__(self, ids, dset):
-        super(Images, self).__init__(ids, dset, 'images')
+        super().__init__(ids, dset, 'images')
 
     @property
     def gids(self):
@@ -557,10 +617,11 @@ class Images(ObjectList1D):
 
 class Annots(ObjectList1D):
     """
+    Vectorized access to annotation attributes
     """
 
     def __init__(self, ids, dset):
-        super(Annots, self).__init__(ids, dset, 'annotations')
+        super().__init__(ids, dset, 'annotations')
 
     @property
     def aids(self):
@@ -2303,9 +2364,9 @@ class MixinCocoAttrs(object):
             <Annots(num=11)>
         """
         if aids is None and gid is not None:
-            aids = sorted(self.gid_to_aids[gid])
+            aids = sorted(self.index.gid_to_aids[gid])
         if aids is None:
-            aids = sorted(self.anns.keys())
+            aids = sorted(self.index.anns.keys())
         return Annots(aids, self)
 
     def images(self, gids=None):
@@ -2319,8 +2380,38 @@ class MixinCocoAttrs(object):
             <Images(num=3)>
         """
         if gids is None:
-            gids = sorted(self.imgs.keys())
+            gids = sorted(self.index.imgs.keys())
         return Images(gids, self)
+
+    def categories(self, cids=None):
+        """
+        Return boxes for annotations
+
+        Example:
+            >>> self = CocoDataset.demo()
+            >>> categories = self.categories()
+            >>> print(categories)
+            <Categories(num=8)>
+        """
+        if cids is None:
+            cids = sorted(self.index.cats.keys())
+        return Categories(cids, self)
+
+    def videos(self, vidids=None):
+        """
+        Return boxes for annotations
+
+        Example:
+            >>> self = CocoDataset.demo('vidshapes2')
+            >>> videos = self.videos()
+            >>> print(videos)
+            >>> videos.lookup('name')
+            >>> videos.lookup('id')
+            >>> print('videos.objs = {}'.format(ub.repr2(videos.objs[0:2], nl=1)))
+        """
+        if vidids is None:
+            vidids = sorted(self.index.videos.keys())
+        return Videos(vidids, self)
 
 
 class MixinCocoStats(object):
@@ -2591,7 +2682,7 @@ class MixinCocoDraw(object):
         """
         Loads a particular image
         """
-        pass
+        return self.load_image(gid)
 
     def draw_image(self, gid):
         """
@@ -2943,6 +3034,13 @@ class MixinCocoAddRemove(object):
 
     def add_video(self, name, id=None, **kw):
         """
+        Add a video to the dataset (dynamically updates the index)
+
+        Args:
+            name (str): Unique name for this video.
+            id (None or int): ADVANCED. Force using this image id.
+            **kw : stores arbitrary key/value pairs in this new video
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset()
@@ -3553,7 +3651,7 @@ class CocoIndex(object):
         index.file_name_to_img = None
         index._CHECKS = True
 
-        # index.name_to_vidid = None # TODO
+        # index.name_to_video = None # TODO
         # index.kpcid_to_aids = None  # TODO
 
     def __bool__(index):
@@ -3749,7 +3847,7 @@ class CocoIndex(object):
         index.name_to_cat = None
         index.file_name_to_img = None
 
-        # index.name_to_vidid = None
+        # index.name_to_video = None
         # index.kpcid_to_aids = None  # TODO
 
     def build(index, parent):
