@@ -18,6 +18,8 @@ Str = NewType('Str', Text)
 Path = NewType('Path', pathlib.Path)
 UUID = NewType('UUID', uuid.UUID)
 
+Deprecated = NewType('Deprecated', DeprecationWarning)
+
 Int = numbers.Integral
 Float = numbers.Rational
 Str = Text
@@ -25,14 +27,25 @@ Path = pathlib.Path
 UUID = uuid.UUID
 
 
+class Deprecated:
+    def __init__(self, *args):
+        self.args = args
+
+
 category = {
     'id': Int,
     'name': Str,
+
+    # list of alter egos
+    'alias': Optional[List[Str]],
+
+    # coarser category
     'supercategory': Optional[Str],
+    'parents': Optional[List[Str]],
 
     # Legacy
-    'keypoints': Optional[List[Str]],
-    'skeleton': Optional[List[Tuple[Int, Int]]],
+    'keypoints': Deprecated(Optional[List[Str]]),
+    'skeleton': Deprecated(Optional[List[Tuple[Int, Int]]]),
 }
 
 keypoint_category = {
@@ -115,7 +128,7 @@ annotation = OrderedDict([
     ('keypoints', Optional[List[Keypoint]]),
 
     # this needs to be in the same order as categories
-    ('prob', Optional[List[Float]]),
+    ('prob', Optional[List[Float]]),  # probability order currently needs to be known a-priori, typically in "order" of the classes, but its hard to always keep that consistent.
 
     ('score', Optional[Float]),
     ('weight', Optional[Float]),
@@ -144,7 +157,7 @@ dataset = OrderedDict([
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/spec.py
+        python -m kwcoco.spec
     """
     import ubelt as ub
-    print('dataset = {}'.format(ub.repr2(dataset, nl=True)))
+    print('dataset = {}'.format(ub.repr2(dataset, nl=True, sort=False)))

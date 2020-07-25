@@ -696,19 +696,22 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
         >>> import kwarray
         >>> rng = None
         >>> rng = kwarray.ensure_rng(rng)
-        >>> dset = random_video_dset(rng=rng, num_videos=4, num_frames=5, num_tracks=3)
+        >>> num_tracks = 3
+        >>> dset = random_video_dset(rng=rng, num_videos=3, num_frames=10, num_tracks=3)
         >>> dset = render_toy_dataset(dset, rng)
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> plt = kwplot.autoplt()
+        >>> plt.clf()
         >>> gids = list(dset.imgs.keys())
-        >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
+        >>> pnums = kwplot.PlotNums(nSubplots=len(gids), nRows=num_tracks)
         >>> for gid in gids:
-        >>>     dset.show_image(gid, pnum=pnums(), fnum=1)
+        >>>     dset.show_image(gid, pnum=pnums(), fnum=1, title=False)
         >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
-        >>> for gid in gids:
-        >>>     canvas = dset.draw_image(gid)
-        >>>     kwplot.imshow(canvas, pnum=pnums(), fnum=2)
+        >>> #
+        >>> # for gid in gids:
+        >>> #    canvas = dset.draw_image(gid)
+        >>> #    kwplot.imshow(canvas, pnum=pnums(), fnum=2)
     """
     rng = kwarray.ensure_rng(rng)
     dset._build_index()
@@ -776,10 +779,13 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         >>> import kwarray
         >>> rng = kwarray.ensure_rng(rng)
         >>> dset = random_video_dset(
-        >>>     gsize=gsize, num_frames=num_frames, verbose=verbose, rng=rng, num_videos=2)
+        >>>     gsize=gsize, num_frames=num_frames, verbose=verbose, rng=rng, num_videos=2
         >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
         >>> gid = 1
-        >>> render_toy_image(dset, gid, rng)
+        >>> renderkw = dict(
+        ...    gray=0,
+        ... )
+        >>> render_toy_image(dset, gid, rng, renderkw=renderkw)
         >>> gid = 1
         >>> canvas = dset.imgs[gid]['imdata']
         >>> # xdoctest: +REQUIRES(--show)
@@ -905,7 +911,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         }]
 
 
-def random_path(num, degree=1, dimension=2, rng=None):
+def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
     """
     Create a random path using a bezier curve.
 
@@ -924,7 +930,7 @@ def random_path(num, degree=1, dimension=2, rng=None):
         >>> dimension = 2
         >>> degree = 3
         >>> rng = None
-        >>> path = random_path(num, degree, dimension, rng)
+        >>> path = random_path(num, degree, dimension, rng, mode='walk')
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> plt = kwplot.autoplt()
@@ -933,27 +939,61 @@ def random_path(num, degree=1, dimension=2, rng=None):
     """
     import bezier
     rng = kwarray.ensure_rng(rng)
-    # Create random bezier control points
-    nodes_f = rng.rand(degree + 1, dimension).T  # F-contiguous
-    curve = bezier.Curve(nodes_f, degree=degree)
-    if 0:
-        # TODO: https://stackoverflow.com/questions/18244305/how-to-redistribute-points-evenly-over-a-curve
-        t = int(np.log2(num) + 1)
 
-        def recsub(c, d):
-            if d <= 0:
-                yield c
-            else:
-                a, b = c.subdivide()
-                yield from recsub(a, d - 1)
-                yield from recsub(b, d - 1)
-        c = curve
-        subcurves = list(recsub(c, d=t))
-        path_f = np.array([c.evaluate(0.0)[:, 0] for c in subcurves][0:num]).T
+    if mode == 'walk':
+
+        import torch
+        torch.optim.SGD
+
+        class Position(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.pos = torch.nn.Parameter(torch.from_numpy(rng.rand(2)))
+
+            def forward(self, noise):
+                return (self.pos * noise).sum()
+
+        pos = Position()
+        params = list(pos.parameters())
+        optim = torch.optim.SGD(params, lr=0.01, momentum=0.9)
+
+        positions = []
+        for i in range(num):
+            optim.zero_grad()
+            noise = torch.from_numpy(rng.rand(2))
+            loss = pos.forward(noise)
+            loss.backward()
+            optim.step()
+            # print('loss = {!r}'.format(loss))
+            print('pos.pos.data = {!r}'.format(pos.pos.data))
+            positions.append(pos.pos.data.numpy().copy())
+
+        path = np.array(positions) % 1
+
+    elif mode == 'bezier':
+        # Create random bezier control points
+        nodes_f = rng.rand(degree + 1, dimension).T  # F-contiguous
+        curve = bezier.Curve(nodes_f, degree=degree)
+        if 0:
+            # TODO: https://stackoverflow.com/questions/18244305/how-to-redistribute-points-evenly-over-a-curve
+            t = int(np.log2(num) + 1)
+
+            def recsub(c, d):
+                if d <= 0:
+                    yield c
+                else:
+                    a, b = c.subdivide()
+                    yield from recsub(a, d - 1)
+                    yield from recsub(b, d - 1)
+            c = curve
+            subcurves = list(recsub(c, d=t))
+            path_f = np.array([c.evaluate(0.0)[:, 0] for c in subcurves][0:num]).T
+        else:
+            # Evaluate path points
+            s_vals = np.linspace(0, 1, num)
+            # s_vals = np.linspace(*sorted(rng.rand(2)), num)
+            path_f = curve.evaluate_multi(s_vals)
+        path = path_f.T  # C-contiguous
     else:
-        # Evaluate path points
-        s_vals = np.linspace(0, 1, num)
-        # s_vals = np.linspace(*sorted(rng.rand(2)), num)
-        path_f = curve.evaluate_multi(s_vals)
-    path = path_f.T  # C-contiguous
+        raise KeyError(mode)
     return path

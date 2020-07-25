@@ -165,6 +165,10 @@ TODO:
 
     - [ ] Should img_root be changed to data root?
 
+    - [ ] Read image data, return numpy arrays (requires API for images)
+
+    - [ ] remove videos
+
 
 References:
     .. [1] http://cocodataset.org/#format-data
@@ -4425,8 +4429,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
     def union(self, *others, **kwargs):
         """
-        Merges multiple :class:`CocoDataset` items into one. Names and associations
-        are retained, but ids may be different.
+        Merges multiple :class:`CocoDataset` items into one. Names and
+        associations are retained, but ids may be different.
 
         Args:
             self : note that :func:`union` can be called as an instance method
