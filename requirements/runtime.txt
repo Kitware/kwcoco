@@ -9,3 +9,4 @@ numpy >= 1.9.0
 scikit-learn >= 0.19.1
 bezier >= 0.8.0;python_version>='3.6' 
 bezier <= 0.8.0;python_version<='3.5' 
+seaborn >= 0.10.1

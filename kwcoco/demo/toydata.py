@@ -779,7 +779,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         >>> import kwarray
         >>> rng = kwarray.ensure_rng(rng)
         >>> dset = random_video_dset(
-        >>>     gsize=gsize, num_frames=num_frames, verbose=verbose, rng=rng, num_videos=2
+        >>>     gsize=gsize, num_frames=num_frames, verbose=verbose, rng=rng, num_videos=2)
         >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
         >>> gid = 1
         >>> renderkw = dict(
@@ -941,10 +941,8 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
     rng = kwarray.ensure_rng(rng)
 
     if mode == 'walk':
-
         import torch
         torch.optim.SGD
-
         class Position(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -964,10 +962,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
             loss = pos.forward(noise)
             loss.backward()
             optim.step()
-            # print('loss = {!r}'.format(loss))
-            print('pos.pos.data = {!r}'.format(pos.pos.data))
             positions.append(pos.pos.data.numpy().copy())
-
         path = np.array(positions) % 1
 
     elif mode == 'bezier':
