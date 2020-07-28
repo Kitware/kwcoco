@@ -72,10 +72,16 @@ class CocoModifyCatsCLI:
         if config['rename'] is not None:
             # parse rename string
             mapper = dict([p.split(':') for p in config['rename'].split(',')])
+            print('mapper = {}'.format(ub.repr2(mapper, nl=1)))
             dset.rename_categories(mapper)
 
         if config['keep'] is not None:
             classes = set(dset.name_to_cat.keys())
+            if isinstance(config['keep'], str):
+                import warnings
+                warnings.warn(
+                    'Keep is specified as a string. '
+                    'Did you mean to input a list?')
             remove = list(classes - set(config['keep']))
         else:
             remove = config['remove']
