@@ -35,9 +35,9 @@ class CocoModifyCatsCLI:
                 'if False, removes annotations when categories are removed, '
                 'otherwise the annotations category is simply unset')),
 
-            'remove': scfg.Value(None, help='Category names to remove.'),
+            'remove': scfg.Value(None, help='Category names to remove. Mutex with keep.'),
 
-            'keep': scfg.Value(None, help='If specified, remove all other categories.'),
+            'keep': scfg.Value(None, help='If specified, remove all other categories. Mutex with remove.'),
 
             'rename': scfg.Value(None, type=str, help='category mapping in the format. "old1:new1,old2:new2"'),
         }
@@ -69,6 +69,11 @@ class CocoModifyCatsCLI:
         except Exception:
             pass
 
+        if config['rename'] is not None:
+            # parse rename string
+            mapper = dict([p.split(':') for p in config['rename'].split(',')])
+            dset.rename_categories(mapper)
+
         if config['keep'] is not None:
             classes = set(dset.name_to_cat.keys())
             remove = list(classes - set(config['keep']))
@@ -87,11 +92,6 @@ class CocoModifyCatsCLI:
                     remove_cids.append(cid)
             dset.remove_categories(
                 remove_cids, keep_annots=config['keep_annots'], verbose=1)
-
-        if config['rename'] is not None:
-            # parse rename string
-            mapper = dict([p.split(':') for p in config['rename'].split(',')])
-            dset.rename_categories(mapper)
 
         print('Output Categories: ')
         _print_forest(dset.object_categories().graph)
