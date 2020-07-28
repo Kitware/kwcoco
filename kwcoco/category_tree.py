@@ -183,12 +183,27 @@ class CategoryTree(ub.NiceRepr):
 
         Args:
             data (object): a known representation of a category tree.
+            **kwargs: input type specific arguments
 
         Returns:
             CategoryTree: self
 
         Raises:
             TypeError - if the input format is unknown
+            ValueError - if kwargs are not compatible with the input format
+
+        Example:
+            >>> import kwcoco
+            >>> classes1 = kwcoco.CategoryTree.coerce(3)  # integer
+            >>> classes2 = kwcoco.CategoryTree.coerce(classes1.__json__())  # graph dict
+            >>> classes3 = kwcoco.CategoryTree.coerce(['class_1', 'class_2', 'class_3'])  # mutex list
+            >>> classes4 = kwcoco.CategoryTree.coerce(classes1.graph)  # nx Graph
+            >>> classes5 = kwcoco.CategoryTree.coerce(classes1)  # cls
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> import ndsampler
+            >>> classes6 = ndsampler.CategoryTree.coerce(3)
+            >>> classes7 = ndsampler.CategoryTree.coerce(classes1)
+            >>> classes8 = kwcoco.CategoryTree.coerce(classes6)
         """
         if isinstance(data, int):
             # An integer specifies the number of classes.
@@ -206,9 +221,20 @@ class CategoryTree(ub.NiceRepr):
         elif isinstance(data, cls):
             # If data is already a CategoryTree, do nothing and just return it
             self = data
-            assert not kw
+            if len(kw):
+                raise ValueError(
+                    'kwargs cannot with this cls={}, type(data)={}'.format(
+                        cls, type(data)))
+        elif issubclass(cls, type(data)):
+            # If we are an object that inherits from kwcoco.CategoryTree (e.g.
+            # ndsampler.CategoryTree), but we are given a raw
+            # kwcoco.CategoryTree, we need to try and upgrade the data
+            # structure.
+            self = cls(data.graph)
         else:
-            raise TypeError('Unknown type {}: {!r}'.format(type(data), data))
+            raise TypeError(
+                'Unknown type cls={}, type(data)={}: data={!r}'.format(
+                    cls, type(data), data))
         return self
 
     @classmethod

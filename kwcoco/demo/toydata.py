@@ -278,6 +278,9 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     Returns:
         dict: dataset in mscoco format
 
+    SeeAlso:
+        random_video_dset
+
     CommandLine:
         xdoctest -m kwcoco.demo.toydata demodata_toy_dset --show
 
@@ -448,7 +451,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
 
 
 def random_video_dset(
-        num_videos=1, num_frames=2, num_tracks=2,
+        num_videos=1, num_frames=2, num_tracks=2, anchors=None,
         gsize=(600, 600), verbose=3, render=False, rng=None):
     """
     Create a toy Coco Video Dataset
@@ -461,6 +464,9 @@ def random_video_dset(
         render (bool | dict): if truthy the toy annotations are synthetically
             rendered. See ``render_toy_image`` for details.
         rng (int | None | RandomState): random seed / state
+
+    SeeAlso:
+        random_single_video_dset
 
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
@@ -479,11 +485,9 @@ def random_video_dset(
     gid_start = 1
     for vidid in range(1, num_videos + 1):
         dset = random_single_video_dset(
-            gsize=gsize,
-            num_frames=num_frames,
-            num_tracks=num_tracks, tid_start=tid_start,
-            gid_start=gid_start, video_id=vidid, render=False,
-            autobuild=False, rng=rng)
+            gsize=gsize, num_frames=num_frames, num_tracks=num_tracks,
+            tid_start=tid_start, anchors=anchors, gid_start=gid_start,
+            video_id=vidid, render=False, autobuild=False, rng=rng)
 
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
@@ -518,40 +522,88 @@ def random_video_dset(
     return dset
 
 
-def random_single_video_dset(gsize=(600, 600), num_frames=5, verbose=3,
+def random_single_video_dset(gsize=(600, 600), num_frames=5,
                              num_tracks=3, tid_start=1, gid_start=1,
-                             video_id=1, render=False, rng=None, autobuild=True):
+                             video_id=1, anchors=None, rng=None, render=False,
+                             autobuild=True, verbose=3):
     """
+    Create the video scene layout of object positions.
+
+    Args:
+        gsize (Tuple[int, int]): size of the images
+
+        num_frames (int): number of frames in this video
+
+        num_tracks (int): number of tracks in this video
+
+        tid_start (int, default=1): track-id start index
+
+        gid_start (int, default=1): image-id start index
+
+        video_id (int, default=1): video-id of this video
+
+        anchors (ndarray | None): base anchor sizes of the object boxes we will
+            generate.
+
+        rng (RandomState): random state / seed
+
+        render (bool | dict): if truthy, does the rendering according to
+            provided params in the case of dict input.
+
+        autobuild (bool, default=True): prebuild coco lookup indexes
+
+        verbose (int): verbosity level
+
+    TODO:
+        - [ ] Need maximum allowed object overlap measure
+        - [ ] Need better parameterized path generation
+
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
-        >>> dset = random_single_video_dset(render=True, num_frames=10, num_tracks=10)
+        >>> anchors = np.array([ [0.3, 0.3],  [0.1, 0.1]])
+        >>> dset = random_single_video_dset(render=True, num_frames=10, num_tracks=10, anchors=anchors)
         >>> # xdoctest: +REQUIRES(--show)
-        >>> dset.show_image(1, doclf=True)
-        >>> dset.show_image(2, doclf=True)
+        >>> # Show the tracks in a single image
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> annots = dset.annots()
+        >>> tids = annots.lookup('track_id')
+        >>> tid_to_aids = ub.group_items(annots.aids, tids)
+        >>> paths = []
+        >>> track_boxes = []
+        >>> for tid, aids in tid_to_aids.items():
+        >>>     boxes = dset.annots(aids).boxes.to_cxywh()
+        >>>     path = boxes.data[:, 0:2]
+        >>>     paths.append(path)
+        >>>     track_boxes.append(boxes)
+        >>> import kwplot
+        >>> plt = kwplot.autoplt()
+        >>> ax = plt.gca()
+        >>> ax.cla()
+        >>> #
+        >>> import kwimage
+        >>> colors = kwimage.Color.distinct(len(track_boxes))
+        >>> for i, boxes in enumerate(track_boxes):
+        >>>     color = colors[i]
+        >>>     path = boxes.data[:, 0:2]
+        >>>     boxes.draw(color=color, centers={'radius': 0.01}, alpha=0.5)
+        >>>     ax.plot(path.T[0], path.T[1], 'x-', color=color)
 
-        annots = dset.annots()
-        tids = annots.lookup('track_id')
-        tid_to_aids = ub.group_items(annots.aids, tids)
-        paths = []
-        track_boxes = []
-        for tid, aids in tid_to_aids.items():
-            boxes = dset.annots(aids).boxes.to_cxywh()
-            path = boxes.data[:, 0:2]
-            paths.append(path)
-            track_boxes.append(boxes)
-
-        import kwplot
-        plt = kwplot.autoplt()
-        ax = plt.gca()
-        ax.cla()
-
-        import kwimage
-        colors = kwimage.Color.distinct(len(track_boxes))
-        for i, boxes in enumerate(track_boxes):
-            color = colors[i]
-            path = boxes.data[:, 0:2]
-            boxes.draw(color=color, centers={'radius': 0.01}, alpha=0.5)
-            ax.plot(path.T[0], path.T[1], 'x-', color=color)
+    Example:
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> anchors = np.array([ [0.3, 0.3],  [0.1, 0.1]])
+        >>> gsize = np.array([(600, 600)])
+        >>> print(anchors * gsize)
+        >>> dset = random_single_video_dset(render=True, num_frames=10, anchors=anchors, num_tracks=10)
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> plt = kwplot.autoplt()
+        >>> plt.clf()
+        >>> gids = list(dset.imgs.keys())
+        >>> pnums = kwplot.PlotNums(nSubplots=len(gids), nRows=1)
+        >>> for gid in gids:
+        >>>     dset.show_image(gid, pnum=pnums(), fnum=1, title=False)
+        >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
     """
     import pandas as pd
     import kwcoco
@@ -583,10 +635,14 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5, verbose=3,
         num = num_frames
         path = random_path(num, degree=degree, rng=rng)
 
-        # Box scale
+        if anchors is None:
+            anchors_ = anchors
+        else:
+            anchors_ = np.array([anchors[rng.randint(0, len(anchors))]])
 
+        # Box scale
         boxes = kwimage.Boxes.random(
-            num=num, scale=1.0, format='cxywh', rng=rng)
+            num=num, scale=1.0, format='cxywh', rng=rng, anchors=anchors_)
 
         # Smooth out varying box sizes
         alpha = rng.rand() * 0.1
@@ -604,11 +660,15 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5, verbose=3,
         boxes.data[:, 0:2] = path
         boxes.data[:, 2:4] = box_dims.values
         # boxes = boxes.scale(0.1, about='center')
-        boxes = boxes.scale(gsize).scale(0.5, about='center')
+        # boxes = boxes.scale(gsize).scale(0.5, about='center')
+        boxes = boxes.scale(gsize, about='origin')
+        boxes = boxes.scale(0.9, about='center')
 
         def warp_within_bounds(self, x_min, y_min, x_max, y_max):
             """
             Translate / scale the boxes to fit in the bounds
+
+            FIXME: do something reasonable
 
             Example:
                 >>> from kwimage.structs.boxes import *  # NOQA
@@ -618,7 +678,6 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5, verbose=3,
                 >>> print('self = {!r}'.format(self))
                 >>> scaled = warp_within_bounds(self, x_min, y_min, x_max, y_max)
                 >>> print('scaled = {!r}'.format(scaled))
-
             """
             tlbr = self.to_tlbr()
             tl_x, tl_y, br_x, br_y = tlbr.components
@@ -643,15 +702,11 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5, verbose=3,
             out = tmp.scale(sf).translate(tmp_tl_xy_min)
             return out
 
-        oob_pad = -20  # allow some out of bounds
+        # oob_pad = -20  # allow some out of bounds
         # oob_pad = 20  # allow some out of bounds
-        boxes = boxes.to_tlbr()
-
-        # if 0:
-        #     # boxes = boxes.clip(0, 0, gsize[0], gsize[1])
-
+        # boxes = boxes.to_tlbr()
         # TODO: need better path distributions
-        boxes = warp_within_bounds(boxes, 0 - oob_pad, 0 - oob_pad, gsize[0] + oob_pad, gsize[1] + oob_pad)
+        # boxes = warp_within_bounds(boxes, 0 - oob_pad, 0 - oob_pad, gsize[0] + oob_pad, gsize[1] + oob_pad)
         boxes = boxes.to_xywh()
 
         boxes.data = boxes.data.round(1)
@@ -769,6 +824,14 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         gid (int): image to render
         rng (int | None | RandomState): random state
         renderkw (dict): rendering config
+             gray (boo): gray or color images
+             fg_scale (float): foreground noisyness (gauss std)
+             bg_scale (float): background noisyness (gauss std)
+             fg_intensity (float): foreground brightness (gauss mean)
+             bg_intensity (float): background brightness (gauss mean)
+             newstyle (bool): use new kwcoco datastructure formats
+             with_kpts (bool): include keypoint info
+             with_sseg (bool): include segmentation info
 
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
@@ -941,6 +1004,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
     rng = kwarray.ensure_rng(rng)
 
     if mode == 'walk':
+        # TODO: can we do better?
         import torch
         torch.optim.SGD
         class Position(torch.nn.Module):

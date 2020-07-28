@@ -2355,13 +2355,33 @@ class MixinCocoAttrs(object):
 
     def annots(self, aids=None, gid=None):
         """
-        Return boxes for annotations
+        Return vectorized annotation objects
+
+        Args:
+            aids (List[int]): annotation ids to reference, if unspecified
+                 all annotations are returned.
+
+            gid (int): return all annotations that belong to this image id.
+                 mutually exclusive with `aids` arg.
+
+        Returns:
+            Annots: vectorized annotation object
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> annots = self.annots()
             >>> print(annots)
             <Annots(num=11)>
+            >>> sub_annots = annots.take([1, 2, 3])
+            >>> print(sub_annots)
+            <Annots(num=3)>
+            >>> print(ub.repr2(sub_annots.get('bbox')))
+            [
+                [268.3, 182.1, 132.0, 176.6],
+                [255.3, 174.4, 134.6, 174.7],
+                [240.4, 164.0, 136.3, 173.5],
+            ]
         """
         if aids is None and gid is not None:
             aids = sorted(self.index.gid_to_aids[gid])
@@ -2371,7 +2391,14 @@ class MixinCocoAttrs(object):
 
     def images(self, gids=None):
         """
-        Return boxes for annotations
+        Return vectorized image objects
+
+        Args:
+            gids (List[int]): image ids to reference, if unspecified
+                 all images are returned.
+
+        Returns:
+            Images: vectorized images object
 
         Example:
             >>> self = CocoDataset.demo()
@@ -2385,7 +2412,7 @@ class MixinCocoAttrs(object):
 
     def categories(self, cids=None):
         """
-        Return boxes for annotations
+        Return vectorized category objects
 
         Example:
             >>> self = CocoDataset.demo()
@@ -2399,7 +2426,7 @@ class MixinCocoAttrs(object):
 
     def videos(self, vidids=None):
         """
-        Return boxes for annotations
+        Return vectorized video objects
 
         Example:
             >>> self = CocoDataset.demo('vidshapes2')
