@@ -361,23 +361,43 @@ class ObjectList1D(ub.NiceRepr):
         if ub.iterable(key):
             return {k: self.lookup(k, default, keepid) for k in key}
         else:
-            _lut = self._id_to_obj
-            if keepid:
-                if default is ub.NoParam:
-                    attr_list = {_id: _lut[_id][key] for _id in self._ids}
-                else:
-                    attr_list = {_id: _lut[_id].get(key, default) for _id in self._ids}
-            else:
-                if default is ub.NoParam:
-                    attr_list = [_lut[_id][key] for _id in self._ids]
-                else:
-                    attr_list = [_lut[_id].get(key, default) for _id in self._ids]
-            return attr_list
+            return self.get(key, default=default, keepid=keepid)
 
-    def get(self, key, default=ub.NoParam):
-        """ alias for lookup """
-        assert not ub.iterable(key)
-        return self.lookup(key, default=default)
+    def get(self, key, default=ub.NoParam, keepid=False):
+        """
+        Lookup a list of object attributes
+
+        Args:
+            key (str): name of the property you want to lookup
+
+            default : if specified, uses this value if it doesn't exist
+                in an ObjT.
+
+            keepid: if True, return a mapping from ids to the property
+
+        Returns:
+            List[ObjT]: a list of whatever type the object is
+            Dict[str, ObjT]
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo()
+            >>> self = dset.annots()
+            >>> self.get('id')
+            >>> self.get(key='foo', default=None, keepid=True)
+        """
+        _lut = self._id_to_obj
+        if keepid:
+            if default is ub.NoParam:
+                attr_list = {_id: _lut[_id][key] for _id in self._ids}
+            else:
+                attr_list = {_id: _lut[_id].get(key, default) for _id in self._ids}
+        else:
+            if default is ub.NoParam:
+                attr_list = [_lut[_id][key] for _id in self._ids]
+            else:
+                attr_list = [_lut[_id].get(key, default) for _id in self._ids]
+        return attr_list
 
     def set(self, key, values):
         """
@@ -2376,11 +2396,11 @@ class MixinCocoAttrs(object):
             >>> sub_annots = annots.take([1, 2, 3])
             >>> print(sub_annots)
             <Annots(num=3)>
-            >>> print(ub.repr2(sub_annots.get('bbox')))
+            >>> print(ub.repr2(sub_annots.get('bbox', None)))
             [
-                [268.3, 182.1, 132.0, 176.6],
-                [255.3, 174.4, 134.6, 174.7],
-                [240.4, 164.0, 136.3, 173.5],
+                [350, 5, 130, 290],
+                None,
+                None,
             ]
         """
         if aids is None and gid is not None:
