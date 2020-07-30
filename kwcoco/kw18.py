@@ -122,9 +122,14 @@ class KW18(kwarray.DataFrameArray):
     def load(KW18, file):
         import pandas as pd
         try:
+            EmptyDataError = pd.errors.EmptyDataError
+        except Exception:
+            EmptyDataError = pd.io.common.EmptyDataError
+
+        try:
             df = pd.read_csv(
                 file, sep=' +', comment='#', header=None, engine='python')
-        except pd.io.common.EmptyDataError:
+        except EmptyDataError:
             df = pd.DataFrame()
         renamer = dict(zip(df.columns, KW18.DEFAULT_COLUMNS))
         raw = df.rename(columns=renamer)

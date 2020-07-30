@@ -21,7 +21,9 @@ from kwcoco.category_tree import CategoryTree
 try:
     import ndsampler
     CATEGORY_TREE_CLS = (CategoryTree, ndsampler.CategoryTree)
+    COCO_SAMPLER_CLS = ndsampler.CocoSampler
 except Exception:
+    COCO_SAMPLER_CLS = None
     CATEGORY_TREE_CLS = (CategoryTree,)
 
 
@@ -326,8 +328,8 @@ class CocoEvaluator(object):
                     **kw,
                 ).numpy()
                 gid_to_det[gid] = dets
-        elif isinstance(dataset, CATEGORY_TREE_CLS):
-            # Input is an kwcoco.CategoryTree object
+        elif COCO_SAMPLER_CLS and isinstance(dataset, COCO_SAMPLER_CLS):
+            # Input is an ndsampler.CocoSampler object
             extra['sampler'] = sampler = dataset
             coco_dset = sampler.dset
             gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
