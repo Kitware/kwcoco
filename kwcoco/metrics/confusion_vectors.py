@@ -1270,11 +1270,15 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
     def summary_plot(self, fnum=1, title=''):
         """
 
+        CommandLine:
+            python ~/code/kwcoco/kwcoco/metrics/confusion_vectors.py PerClass_Measures.summary_plot --show
+
+
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
-            >>>     n_fp=(0, 20), n_fn=(0, 20), nimgs=128, nboxes=(0, 10),
+            >>>     n_fp=(0, 5), n_fn=(0, 5), nimgs=128, nboxes=(0, 10),
             >>>     nclasses=3)
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
