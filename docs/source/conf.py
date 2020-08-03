@@ -82,3 +82,5 @@ html_theme_options = {
     'display_version': True,
     # 'logo_only': True,
 }
+
+master_doc = 'index'
