@@ -3767,8 +3767,10 @@ class CocoIndex(object):
                 try:
                     index.vidid_to_gids[vidid].add(gid)
                 except KeyError:
-                    msg = ('Add image-id={} to '
-                           'non-existing video-id={}').format(gid, vidid)
+                    # Should warning messages contain data-specific info?
+                    # msg = ('Adding image-id={} to '
+                    #        'non-existing video-id={}').format(gid, vidid)
+                    msg = 'Adding image to non-existing video'
                     warnings.warn(msg)
                     index.vidid_to_gids[vidid] = index._set()
                     index.vidid_to_gids[vidid].add(gid)
