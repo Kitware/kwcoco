@@ -18,6 +18,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Removed optional dependency on ndsampler, functionality should now be available without ndsampler.
 
 
+### Fixed
+
+* the `_check_index` method now works correctly.
+* `add_image` with `video_id` now works even if the video doesn't exist yet.
+
+
 ## Version 0.1.4 - Released 2020-07-20
 
 ### Added

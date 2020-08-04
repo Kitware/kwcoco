@@ -3730,10 +3730,27 @@ class CocoIndex(object):
             #         raise ValueError(
             #             'video with name={} already exists'.format(name))
             index.videos[vidid] = video
-            index.vidid_to_gids[vidid] = index._set()
+            if vidid not in index.vidid_to_gids:
+                index.vidid_to_gids[vidid] = index._set()
             # index.name_to_video[name] = video
 
     def _add_image(index, gid, img):
+        """
+        Example:
+            >>> # Test adding image to video that doesnt exist
+            >>> import kwcoco
+            >>> self = dset = kwcoco.CocoDataset()
+            >>> dset.add_image(file_name='frame1', video_id=1)
+            >>> dset.add_image(file_name='frame2', video_id=1)
+            >>> dset._check_pointers()
+            >>> dset._check_index()
+            >>> print('dset.index.vidid_to_gids = {!r}'.format(dset.index.vidid_to_gids))
+            >>> assert len(dset.index.vidid_to_gids) == 1
+            >>> dset.add_video(name='foo-vid', id=1)
+            >>> assert len(dset.index.vidid_to_gids) == 1
+            >>> dset._check_pointers()
+            >>> dset._check_index()
+        """
         if index.imgs is not None:
             file_name = img['file_name']
             if index._CHECKS:
@@ -3747,7 +3764,14 @@ class CocoIndex(object):
 
             if 'video_id' in img:
                 vidid = img['video_id']
-                index.vidid_to_gids[vidid].add(gid)
+                try:
+                    index.vidid_to_gids[vidid].add(gid)
+                except KeyError:
+                    msg = ('Add image-id={} to '
+                           'non-existing video-id={}').format(gid, vidid)
+                    warnings.warn(msg)
+                    index.vidid_to_gids[vidid] = index._set()
+                    index.vidid_to_gids[vidid].add(gid)
 
     def _add_images(index, imgs):
         """
@@ -3959,6 +3983,8 @@ class CocoIndex(object):
             [g.get('video_id', None) for g in imgs.values()]
         )
         vidid_to_gids.pop(None, None)
+        # Ensure that the values are cast to the appropriate set type
+        vidid_to_gids = ub.map_vals(index._set, vidid_to_gids)
 
         if 0:
             # The following is slightly slower, but it is also many fewer lines
@@ -4033,7 +4059,7 @@ class CocoIndex(object):
         # Remove defaultdict like behavior
         gid_to_aids.default_factory = None
         cid_to_aids.default_factory = None
-        vidid_to_gids.default_factory = None
+        # vidid_to_gids.default_factory = None
 
         index.gid_to_aids = gid_to_aids
         index.cid_to_aids = cid_to_aids
@@ -4520,23 +4546,45 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         assert len(self.missing_images()) == 0
 
     def _check_index(self):
+        """
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> self._check_index()
+            >>> # Force a failure
+            >>> self.index.anns.pop(1)
+            >>> self.index.anns.pop(2)
+            >>> import pytest
+            >>> with pytest.raises(AssertionError):
+            >>>     self._check_index()
+        """
         # We can verify our index invariants by copying the raw dataset and
         # checking if the newly constructed index is the same as this index.
-        new = copy.copy(self)
-        new.dataset = copy.deepcopy(self.dataset)
+        new_dataset = copy.deepcopy(self.dataset)
+        new = self.__class__(new_dataset, autobuild=False)
         new._build_index()
-        assert self.index.anns == new.index.anns
-        assert self.index.imgs == new.index.imgs
-        assert self.index.cats == new.index.cats
-        assert self.index.gid_to_aids == new.index.gid_to_aids
-        assert self.index.cid_to_aids == new.index.cid_to_aids
-        assert self.index.name_to_cat == new.index.name_to_cat
-        assert self.index.file_name_to_img == new.index.file_name_to_img
+        checks = {}
+        checks['anns'] = self.index.anns == new.index.anns
+        checks['imgs'] = self.index.imgs == new.index.imgs
+        checks['cats'] = self.index.cats == new.index.cats
+        checks['gid_to_aids'] = self.index.gid_to_aids == new.index.gid_to_aids
+        checks['cid_to_aids'] = self.index.cid_to_aids == new.index.cid_to_aids
+        checks['name_to_cat'] = self.index.name_to_cat == new.index.name_to_cat
+        checks['file_name_to_img'] = self.index.file_name_to_img == new.index.file_name_to_img
+        checks['vidid_to_gids'] = self.index.vidid_to_gids == new.index.vidid_to_gids
+
+        failed_checks = {k: v for k, v in checks.items() if not v}
+        if any(failed_checks):
+            raise AssertionError(
+                'Failed index checks: {}'.format(list(failed_checks)))
         return True
 
     def _check_pointers(self, verbose=1):
         """
         Check that all category and image ids referenced by annotations exist
+
+        TODO:
+           - [ ] Check video_id attr in images
         """
         if not self.index:
             raise Exception('Build index before running pointer check')
