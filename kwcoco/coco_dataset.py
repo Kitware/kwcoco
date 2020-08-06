@@ -6,6 +6,8 @@ Extends the format to also include line annotations.
 
 Dataset Spec:
 
+.. code::
+
     category = {
         'id': int,
         'name': str,
@@ -215,7 +217,7 @@ SPEC_KEYS = [
 
 # TODO
 # Programatically layout the extended Kitware MS-COCO specification.
-"""
+_ = """
 
 In the meantime, here is a draft of what it may look like
 
