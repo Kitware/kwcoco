@@ -193,9 +193,10 @@ import itertools as it
 from six.moves import cStringIO as StringIO
 import copy
 
-__all__ = [
-    'CocoDataset',
-]
+# Does having __all__ prevent readthedocs from building mixins?
+# __all__ = [
+#     'CocoDataset',
+# ]
 
 _dict = OrderedDict
 
