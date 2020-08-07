@@ -3420,7 +3420,7 @@ class MixinCocoAddRemove(object):
                 print('Removing {} annotations'.format(len(remove_aids)))
 
             remove_idxs = list(ub.take(aid_to_index, remove_aids))
-            delitems(self.dataset['annotations'], remove_idxs)
+            _delitems(self.dataset['annotations'], remove_idxs)
 
             self.index._remove_annotations(remove_aids, verbose=verbose)
             self._invalidate_hashid(['annotations'])
@@ -3494,7 +3494,7 @@ class MixinCocoAddRemove(object):
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(cid_to_index, remove_cids))
-            delitems(self.dataset['categories'], remove_idxs)
+            _delitems(self.dataset['categories'], remove_idxs)
 
             self.index._remove_categories(remove_cids, verbose=verbose)
             self._invalidate_hashid(['categories', 'annotations'])
@@ -3555,7 +3555,7 @@ class MixinCocoAddRemove(object):
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(gid_to_index, remove_gids))
-            delitems(self.dataset['images'], remove_idxs)
+            _delitems(self.dataset['images'], remove_idxs)
 
             self.index._remove_images(remove_gids, verbose=verbose)
             self._invalidate_hashid(['images', 'annotations'])
@@ -3583,7 +3583,7 @@ class MixinCocoAddRemove(object):
                 if kp['keypoint_category_id'] in kpcids
             ]
             num_kps_removed += len(remove_idxs)
-            delitems(ann['keypoints'], remove_idxs)
+            _delitems(ann['keypoints'], remove_idxs)
         remove_info = {'annotation_keypoints': num_kps_removed}
         return remove_info
 
@@ -4613,6 +4613,14 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             else:
                 if self.imgs[gid]['id'] != gid:
                     errors.append('gid={} has a bad index'.format(gid))
+
+        if 0:
+            # WIP
+            iter_ = ub.ProgIter(self.dataset['images'], desc='check images', enabled=verbose)
+            for img in iter_:
+                img['video_id']
+                pass
+
         if errors:
             raise Exception('\n'.join(errors))
         elif verbose:
@@ -4951,8 +4959,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             new_dataset['keypoint_categories'] = self.dataset['keypoint_categories']
 
         if 'videos' in self.dataset:
-            # TODO: Handle this case
-            pass
+            # TODO: Take only videos with image support?
+            new_dataset['videos'] = self.dataset['videos']
 
         gids = sorted(set(gids))
         sub_aids = sorted([aid for gid in gids
@@ -4969,7 +4977,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         return sub_dset
 
 
-def delitems(items, remove_idxs, thresh=750):
+def _delitems(items, remove_idxs, thresh=750):
     """
     Args:
         items (List): list which will be modified
