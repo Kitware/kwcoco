@@ -4,6 +4,9 @@ are, and what we have gained by carefully designing a type spec.
 
 TODO: We need to make this programatic so it can validate if a file is accepted
 or rejected. by the schema
+
+TODO:
+    - [ ] jsonschema
 """
 
 import pathlib

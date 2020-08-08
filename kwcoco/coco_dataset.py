@@ -177,6 +177,7 @@ TODO:
 References:
     .. [1] http://cocodataset.org/#format-data
     .. [2] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
+    .. [3] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
