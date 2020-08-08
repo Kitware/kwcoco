@@ -222,6 +222,15 @@ class SchemaElements(
         >>> })
         >>> print('schema = {}'.format(ub.repr2(schema, nl=-1)))
         >>> print('schema = {}'.format(ub.repr2(schema, nl=2)))
+
+        >>> TYPE = elem.OBJECT({
+        >>>     'p1': ANY,
+        >>>     'p2': ANY,
+        >>> }, required=['p1'])
+        >>> import jsonschema
+        >>> inst = {'p1': None}
+        >>> jsonschema.validate(inst, schema=TYPE)
+        >>> #jsonschema.validate({'p2': None}, schema=TYPE)
     """
 
 

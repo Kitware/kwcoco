@@ -1,20 +1,37 @@
+"""
+CommandLine:
+    xdoctest -m kwcoco.coco_schema __doc__
+
+Example:
+    >>> import kwcoco
+    >>> from kwcoco.coco_schema import COCO_SCHEMA
+    >>> COCO_SCHEMA
+    >>> dset = kwcoco.CocoDataset.demo('shapes1')
+    >>> import jsonschema
+    >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
+    >>> jsonschema.validate(dset.dataset, schema=COCO_SCHEMA)
+"""
+
 from kwcoco.jsonschema_elements import SchemaElements
 from collections import OrderedDict
 import ubelt as ub
 
 
-class deprecated:
-    def __init__(self, item):
-        self.item = item
+def deprecated(*args):
+    return ANY
 
-    def __str__(self):
-        return 'DEPRECATED'
+# class deprecated:
+#     def __init__(self, item):
+#         self.item = item
 
-    def __repr__(self):
-        return 'DEPRECATED'
+#     def __str__(self):
+#         return 'DEPRECATED'
 
-    def __call__(self, **kw):
-        return deprecated(self.item(**kw))
+#     def __repr__(self):
+#         return 'DEPRECATED'
+
+#     def __call__(self, **kw):
+#         return deprecated(self.item(**kw))
 
 
 # class optional:
@@ -53,6 +70,11 @@ NUMBER = elem.NUMBER
 OBJECT = elem.OBJECT
 ONEOF = elem.ONEOF
 STRING = elem.STRING
+
+
+# def optional(x):
+#     return ANYOF(x, ANY)
+
 
 UUID = STRING
 PATH = STRING
@@ -109,13 +131,6 @@ BBOX = ARRAY(
 SEGMENTATION = ANYOF(POLYGON, RUN_LENGTH_ENCODING)
 
 
-IMAGE = OBJECT(
-    PROPERTIES={
-        'id': INTEGER,
-        'file_name': STRING,
-    }
-)
-
 CATEGORY = OBJECT({
     'id': INTEGER,
     'name': STRING,
@@ -128,25 +143,27 @@ CATEGORY = OBJECT({
     # Legacy
     'keypoints': deprecated(optional(ARRAY(STRING))),
     'skeleton': deprecated(optional(ARRAY(TUPLE(INTEGER, INTEGER)))),
-})
+},
+    required=['id', 'name'],
+    title='CATEGORY')
 
 KEYPOINT_CATEGORY = OBJECT({
     'name': STRING,
     'id': INTEGER,
     'supercategory': STRING,
     'reflection_id': INTEGER,
-})
+}, required=['id', 'name'], title='KEYPOINT_CATEGORY')
 
 # Extension
-VIDEO = {
+VIDEO = OBJECT({
     'id': INTEGER,
-    'name': ANYOF(PATH, STRING),
+    'name': STRING,
     'caption': STRING,
-}
+}, required=['id', 'name'], title='VIDEO')
 
 CHANNELS = STRING(title='CHANNEL_SPEC', description='experimental')
 
-IMAGE = OrderedDict((
+IMAGE = OBJECT(OrderedDict((
     ('id', INTEGER),
     ('file_name', PATH),
 
@@ -163,17 +180,17 @@ IMAGE = OrderedDict((
     # TODO: optional world localization information
     # TODO: camera information?
 
-    ('auxillary', ARRAY(
-        TYPE={
-            'file_name': PATH,
-            'channels': CHANNELS,
-            'width': optional(INTEGER),
-            'height': optional(INTEGER),
-        }
-    )),
-))
+    # ('auxillary', ARRAY(
+    #     TYPE=OBJECT({
+    #         'file_name': PATH,
+    #         'channels': CHANNELS,
+    #         'width': optional(INTEGER),
+    #         'height': optional(INTEGER),
+    #     }, title='aux')
+    # )),
+)), required=['id', 'file_name'])
 
-ANNOTATION = OrderedDict((
+ANNOTATION = OBJECT(OrderedDict((
     ('id', INTEGER),
     ('image_id', INTEGER),
 
@@ -193,15 +210,15 @@ ANNOTATION = OrderedDict((
 
     ('iscrowd', STRING),  # legacy
     ('caption', STRING),
-))
+)),
+    required=['id', 'image_id']
+)
 
 
 COCO_SCHEMA = OBJECT(
-    required=[
-        'categories',
-        'images',
-        'annotations'
-    ],
+    title='KWCOCO_SCHEMA',
+    required=['images'],
+    # propertyNames='.*',
     PROPERTIES=ub.odict([
         ('info', ANY),
         ('licenses', ANY),
@@ -225,4 +242,5 @@ if __name__ == '__main__':
         python ~/code/kwcoco/kwcoco/coco_schema.py > out.py
     """
     print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=-1)))
+    # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=2)))
     # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=2)))
