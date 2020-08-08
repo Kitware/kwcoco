@@ -4,20 +4,41 @@ import ubelt as ub
 
 
 class deprecated:
-    def __init__(self, *args):
-        self.args = args
+    def __init__(self, item):
+        self.item = item
+
+    def __str__(self):
+        return 'DEPRECATED'
+
+    def __repr__(self):
+        return 'DEPRECATED'
+
+    def __call__(self, **kw):
+        return deprecated(self.item(**kw))
 
 
-class optional:
-    def __init__(self, *args):
-        self.args = args
+# class optional:
+#     def __init__(self, item):
+#         self.item = item
+
+#     def __str__(self):
+#         return 'OPTIONAL'
+
+#     def __repr__(self):
+#         return 'OPTIONAL'
+
+#     def __call__(self, **kw):
+#         return optional(self.item(**kw))
 
 
-def TUPLE(*args):
+optional = ub.identity
+
+
+def TUPLE(*args, **kw):
     if args and ub.allsame(args):
-        return ARRAY(TYPE=ub.peek(args), numItems=len(args))
+        return ARRAY(TYPE=ub.peek(args), numItems=len(args), **kw)
     else:
-        return ARRAY(TYPE=ANY, numItems=len(args))
+        return ARRAY(TYPE=ANY, numItems=len(args), **kw)
 
 elem = SchemaElements()
 ALLOF = elem.ALLOF
@@ -36,33 +57,30 @@ STRING = elem.STRING
 UUID = STRING
 PATH = STRING
 
-KEYPOINT = OBJECT(
-    title='KEYPOINT',
+KWCOCO_KEYPOINT = OBJECT(
+    title='KWCOCO_KEYPOINT',
     PROPERTIES={
-        'xy': TUPLE(INTEGER, INTEGER)(description='<x1, y1>'),
+        'xy': TUPLE(NUMBER, NUMBER, description='<x1, y1>'),
         'visible': INTEGER(description='choice(0, 1, 2)'),
         'keypoint_category_id': INTEGER,
-        'KEYPOINT_CATEGORY': optional(STRING)(description='only to be used as a hint')}
+        'keypoint_category': optional(STRING)(description='only to be used as a hint')}
 )
-
-
-OLD_POLYGON = ANYOF(ARRAY(NUMBER), ARRAY(ARRAY(NUMBER)))
-
-KEYPOINTS_V1 = ARRAY(INTEGER, description='old format (x1,y1,v1,...,xk,yk,vk')
-KEYPOINTS_V2 = ARRAY(KEYPOINT)
-KEYPOINTS = ANYOF(KEYPOINTS_V1, KEYPOINTS_V2)
 
 KWCOCO_POLYGON = OBJECT(
     PROPERTIES={
         'exterior': ARRAY(ARRAY(NUMBER, numItems=2), description='ccw xy exterior points'),
         'interiors': ARRAY(
             ARRAY(ARRAY(NUMBER, numItems=2), description='cw xy hole'),
-            description='multiple cw xy holes'
         )
     },
     title='KWCOCO_POLYGON',
     description='a simply polygon format that supports holes',
 )
+
+
+KEYPOINTS_V1 = ARRAY(INTEGER, description='old format (x1,y1,v1,...,xk,yk,vk)')
+KEYPOINTS_V2 = ARRAY(KWCOCO_KEYPOINT)
+KEYPOINTS = ANYOF(KEYPOINTS_V1, KEYPOINTS_V2)
 
 
 ORIG_COCO_POLYGON = ARRAY(
@@ -76,7 +94,6 @@ POLYGON = ANYOF(
     ORIG_COCO_POLYGON
 )
 
-
 RUN_LENGTH_ENCODING = STRING(description='format read by pycocotools')
 
 BBOX = ARRAY(
@@ -89,41 +106,8 @@ BBOX = ARRAY(
 ### ------------------------
 
 
-SEGMENTATION = ANYOF(OLD_POLYGON, POLYGON, RUN_LENGTH_ENCODING)
+SEGMENTATION = ANYOF(POLYGON, RUN_LENGTH_ENCODING)
 
-
-CATEGORY = OBJECT(
-    PROPERTIES={
-        'id': INTEGER,
-        'name': STRING,
-        'supercategory': STRING,
-    }
-)
-
-ANNOTATION = OBJECT()
-#     PROPERTIES=OrderedDict([
-#         ('id', INTEGER),
-#         ('image_id', INTEGER),
-
-#         ('bbox', BBOX),
-
-#         ('category_id', INTEGER,
-#         ('track_id', ANYOF(INTEGER, STRING)),
-
-#         ('segmentation', optional(SEGMENTATION)),
-#         ('keypoints', optional(ARRAY(KEYPOINT)),
-
-#         # this needs to be in the same order as categories
-#         ('prob', optional[ARRAY[NUMBER]]),  # probability order currently needs to be known a-priori, typically in "order" of the classes, but its hard to always keep that consistent.
-
-#         ('score', optional[NUMBER]),
-#         ('weight', optional[NUMBER]),
-
-#         ('iscrowd', STRING),  # legacy
-#         ('caption', STRING),
-
-#     ])
-# )
 
 IMAGE = OBJECT(
     PROPERTIES={
@@ -136,11 +120,9 @@ CATEGORY = OBJECT({
     'id': INTEGER,
     'name': STRING,
 
-    # list of alter egos
-    'alias': optional(ARRAY(STRING)),
+    'alias': optional(ARRAY(STRING, description='list of alter egos')),
 
-    # coarser category
-    'supercategory': optional(STRING),
+    'supercategory': optional(STRING(description='coarser category')),
     'parents': optional(ARRAY(STRING)),
 
     # Legacy
@@ -173,21 +155,21 @@ IMAGE = OrderedDict((
 
     # Extension
     ('video_id', optional(INTEGER)),
-    ('timestamp', optional(INTEGER)),  # optional in flicks
-    ('frame_index', optional(INTEGER)),  # optional
+    ('timestamp', optional(NUMBER)(description='todo describe format. flicks?')),
+    ('frame_index', optional(INTEGER)),
 
     ('channels', optional(CHANNELS)),
 
     # TODO: optional world localization information
     # TODO: camera information?
 
-    ('auxillary', (
-        {
+    ('auxillary', ARRAY(
+        TYPE={
             'file_name': PATH,
             'channels': CHANNELS,
             'width': optional(INTEGER),
             'height': optional(INTEGER),
-        }, ...,
+        }
     )),
 ))
 
@@ -195,7 +177,7 @@ ANNOTATION = OrderedDict((
     ('id', INTEGER),
     ('image_id', INTEGER),
 
-    ('bbox', TUPLE(NUMBER, NUMBER, NUMBER, NUMBER)),  # tl-x, tl-y, w, h
+    ('bbox', BBOX),
 
     ('category_id', optional(INTEGER)),
     ('track_id', optional(ANYOF(INTEGER, STRING, UUID))),
@@ -220,28 +202,27 @@ COCO_SCHEMA = OBJECT(
         'images',
         'annotations'
     ],
-    PROPERTIES={
-        'info': ANY,
-        'licenses': ANY,
+    PROPERTIES=ub.odict([
+        ('info', ANY),
+        ('licenses', ANY),
 
-        'categories': ARRAY(CATEGORY),
+        ('categories', ARRAY(CATEGORY)),
 
-        'keypoint_categories': ARRAY(ANY),
+        ('keypoint_categories', ARRAY(KEYPOINT_CATEGORY)),
 
-        'videos': ARRAY(ANY),
+        ('videos', ARRAY(VIDEO)),
 
-        'images': ARRAY(ANY),
+        ('images', ARRAY(IMAGE)),
 
-        'annotations': ARRAY(ANNOTATION),
-    }
+        ('annotations', ARRAY(ANNOTATION)),
+    ])
 )
 
 
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/coco_schema.py
+        python ~/code/kwcoco/kwcoco/coco_schema.py > out.py
     """
-    # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=-1)))
-
-    print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=2)))
+    print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=-1)))
+    # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=2)))

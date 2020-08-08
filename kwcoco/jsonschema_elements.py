@@ -17,7 +17,7 @@ Example:
 import ubelt as ub
 
 
-class Element(dict):
+class Element(ub.odict):
     """
     Example:
         >>> from kwcoco.coco_schema import *  # NOQA
