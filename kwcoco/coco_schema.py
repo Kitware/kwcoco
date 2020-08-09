@@ -1,6 +1,6 @@
 """
 CommandLine:
-    python ~/code/kwcoco/kwcoco/coco_schema.py
+    python -m kwcoco.coco_schema
     xdoctest -m kwcoco.coco_schema __doc__
 
 Example:
@@ -228,9 +228,6 @@ if __debug__:
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/coco_schema.py
-        > out.py
+        python ~/code/kwcoco/kwcoco/coco_schema.py > kwcoco_full_schema.py
     """
     print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=-1)))
-    # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=2)))
-    # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=2)))
