@@ -17,7 +17,7 @@ Example:
 import ubelt as ub
 
 
-class Element(ub.odict):
+class Element(dict):
     """
     Example:
         >>> from kwcoco.coco_schema import *  # NOQA
@@ -31,10 +31,10 @@ class Element(ub.odict):
         >>> print('new5 = {}'.format(ub.repr2(new(badattr=True), nl=1)))
     """
     __generics__ = {
-            'title': NotImplemented,
-            'description': NotImplemented,
-            'default': NotImplemented,
-            'examples': NotImplemented
+        'title': NotImplemented,
+        'description': NotImplemented,
+        'default': NotImplemented,
+        'examples': NotImplemented
     }
 
     def __init__(self, base, options={}, _magic=None):
@@ -54,6 +54,16 @@ class Element(ub.odict):
         newbase = ub.dict_union(self._base, ub.dict_isect(kw, self._options))
         new = Element(newbase, self._options, self._magic)
         return new
+
+    def validate(self, instance=ub.NoParam):
+        import jsonschema
+        from jsonschema.validators import validator_for
+        if instance is ub.NoParam:
+            cls = validator_for(self)
+            cls.check_schema(self)
+            return self
+        else:
+            return jsonschema.validate(instance, schema=self)
 
 
 class ScalarElements(object):
@@ -113,19 +123,27 @@ class QuantifierElements(object):
     Quantifier types
 
     https://json-schema.org/understanding-json-schema/reference/combining.html#allof
+
+    Example:
+        >>> from kwcoco.jsonschema_elements import *  # NOQA
+        >>> elem.ANYOF(elem.STRING, elem.NUMBER).validate()
+        >>> elem.ONEOF(elem.STRING, elem.NUMBER).validate()
+        >>> elem.NOT(elem.NULL).validate()
+        >>> elem.NOT(elem.ANY).validate()
+        >>> elem.ANY.validate()
     """
     @property
     def ANY(self):
         return Element({})
 
     def ALLOF(self, *TYPES):
-        return Element({'allOf': TYPES})
+        return Element({'allOf': list(TYPES)})
 
     def ANYOF(self, *TYPES):
-        return Element({'anyOf': TYPES})
+        return Element({'anyOf': list(TYPES)})
 
     def ONEOF(self, *TYPES):
-        return Element({'oneOf': TYPES})
+        return Element({'oneOf': list(TYPES)})
 
     def NOT(self, TYPE):
         return Element({'not': TYPE})
@@ -137,9 +155,9 @@ class ContainerElements:
 
     Example:
         >>> from kwcoco.jsonschema_elements import *  # NOQA
-        >>> print(elem.ARRAY())
-        >>> print(elem.OBJECT())
-        >>> print(elem.OBJECT())
+        >>> print(elem.ARRAY().validate())
+        >>> print(elem.OBJECT().validate())
+        >>> print(elem.OBJECT().validate())
     """
 
     def ARRAY(self, TYPE={}, **kw):
@@ -149,7 +167,8 @@ class ContainerElements:
         Example:
             >>> from kwcoco.jsonschema_elements import *  # NOQA
             >>> ARRAY(numItems=3)
-            >>> ARRAY(minItems=3)
+            >>> schema = ARRAY(minItems=3)
+            >>> schema.validate()
         """
         def _magic(kw):
             numItems = kw.pop('numItems', None)
@@ -160,7 +179,7 @@ class ContainerElements:
                 })
             return kw
         self = Element(
-                base={'type': 'array', 'items': {'type': TYPE}},
+                base={'type': 'array', 'items': TYPE},
                 options={
                     'contains': {'type': 'number'},
                     'minItems': 2,
@@ -171,9 +190,31 @@ class ContainerElements:
                 _magic=_magic)
         return self(**_magic(kw))
 
-    def OBJECT(self, PROPERTIES=[], **kw):
+    def OBJECT(self, PROPERTIES={}, **kw):
         """
         https://json-schema.org/understanding-json-schema/reference/object.html
+
+
+        Example:
+            >>> import jsonschema
+            >>> schema = elem.OBJECT()
+            >>> jsonschema.validate({}, schema)
+            >>> #
+            >>> import jsonschema
+            >>> schema = elem.OBJECT({
+            >>>     'key1': elem.ANY(),
+            >>>     'key2': elem.ANY(),
+            >>> }, required=['key1'])
+            >>> jsonschema.validate({'key1': None}, schema)
+            >>> #
+            >>> import jsonschema
+            >>> schema = elem.OBJECT({
+            >>>     'key1': elem.OBJECT({'arr': elem.ARRAY()}),
+            >>>     'key2': elem.ANY(),
+            >>> }, required=['key1'], title='a title')
+            >>> schema.validate()
+            >>> print('schema = {}'.format(ub.repr2(schema, nl=-1)))
+            >>> jsonschema.validate({'key1': {'arr': []}}, schema)
         """
         self = Element(
                 base={'type': 'object', 'properties': PROPERTIES},

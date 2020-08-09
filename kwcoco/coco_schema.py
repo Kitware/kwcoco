@@ -1,5 +1,6 @@
 """
 CommandLine:
+    python ~/code/kwcoco/kwcoco/coco_schema.py
     xdoctest -m kwcoco.coco_schema __doc__
 
 Example:
@@ -9,7 +10,19 @@ Example:
     >>> dset = kwcoco.CocoDataset.demo('shapes1')
     >>> import jsonschema
     >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
-    >>> jsonschema.validate(dset.dataset, schema=COCO_SCHEMA)
+    >>> COCO_SCHEMA.validate(dset.dataset)
+
+    >>> try:
+    >>>     jsonschema.validate(dset.dataset, schema=COCO_SCHEMA)
+    >>> except jsonschema.exceptions.ValidationError as ex:
+    >>>     vali_ex = ex
+    >>>     print('ex = {!r}'.format(ex))
+    >>>     raise
+    >>> except jsonschema.exceptions.SchemaError as ex:
+    >>>     print('ex = {!r}'.format(ex))
+    >>>     schema_ex = ex
+    >>>     print('schema_ex.instance = {}'.format(ub.repr2(schema_ex.instance, nl=-1)))
+    >>>     raise
 """
 
 from kwcoco.jsonschema_elements import SchemaElements
@@ -19,36 +32,6 @@ import ubelt as ub
 
 def deprecated(*args):
     return ANY
-
-# class deprecated:
-#     def __init__(self, item):
-#         self.item = item
-
-#     def __str__(self):
-#         return 'DEPRECATED'
-
-#     def __repr__(self):
-#         return 'DEPRECATED'
-
-#     def __call__(self, **kw):
-#         return deprecated(self.item(**kw))
-
-
-# class optional:
-#     def __init__(self, item):
-#         self.item = item
-
-#     def __str__(self):
-#         return 'OPTIONAL'
-
-#     def __repr__(self):
-#         return 'OPTIONAL'
-
-#     def __call__(self, **kw):
-#         return optional(self.item(**kw))
-
-
-optional = ub.identity
 
 
 def TUPLE(*args, **kw):
@@ -72,10 +55,6 @@ ONEOF = elem.ONEOF
 STRING = elem.STRING
 
 
-# def optional(x):
-#     return ANYOF(x, ANY)
-
-
 UUID = STRING
 PATH = STRING
 
@@ -85,7 +64,7 @@ KWCOCO_KEYPOINT = OBJECT(
         'xy': TUPLE(NUMBER, NUMBER, description='<x1, y1>'),
         'visible': INTEGER(description='choice(0, 1, 2)'),
         'keypoint_category_id': INTEGER,
-        'keypoint_category': optional(STRING)(description='only to be used as a hint')}
+        'keypoint_category': STRING(description='only to be used as a hint')}
 )
 
 KWCOCO_POLYGON = OBJECT(
@@ -135,14 +114,14 @@ CATEGORY = OBJECT({
     'id': INTEGER,
     'name': STRING,
 
-    'alias': optional(ARRAY(STRING, description='list of alter egos')),
+    'alias': ARRAY(STRING, description='list of alter egos'),
 
-    'supercategory': optional(STRING(description='coarser category')),
-    'parents': optional(ARRAY(STRING)),
+    'supercategory': ANYOF(STRING(description='coarser category'), NULL),
+    'parents': ARRAY(STRING),
 
     # Legacy
-    'keypoints': deprecated(optional(ARRAY(STRING))),
-    'skeleton': deprecated(optional(ARRAY(TUPLE(INTEGER, INTEGER)))),
+    'keypoints': deprecated(ARRAY(STRING)),
+    'skeleton': deprecated(ARRAY(TUPLE(INTEGER, INTEGER))),
 },
     required=['id', 'name'],
     title='CATEGORY')
@@ -150,44 +129,48 @@ CATEGORY = OBJECT({
 KEYPOINT_CATEGORY = OBJECT({
     'name': STRING,
     'id': INTEGER,
-    'supercategory': STRING,
-    'reflection_id': INTEGER,
+    'supercategory': ANYOF(STRING, NULL),
+    'reflection_id': ANYOF(INTEGER, NULL),
 }, required=['id', 'name'], title='KEYPOINT_CATEGORY')
 
 # Extension
-VIDEO = OBJECT({
-    'id': INTEGER,
-    'name': STRING,
-    'caption': STRING,
-}, required=['id', 'name'], title='VIDEO')
+VIDEO = OBJECT(
+    PROPERTIES={
+        'id': INTEGER,
+        'name': STRING,
+        'caption': STRING,
+        },
+    required=['id', 'name'],
+    title='VIDEO'
+)
 
-CHANNELS = STRING(title='CHANNEL_SPEC', description='experimental')
+CHANNELS = STRING(title='CHANNEL_SPEC', description='experimental. todo: refine')
 
 IMAGE = OBJECT(OrderedDict((
     ('id', INTEGER),
     ('file_name', PATH),
 
-    ('width', optional(INTEGER)),
-    ('height', optional(INTEGER)),
+    ('width', INTEGER),
+    ('height', INTEGER),
 
     # Extension
-    ('video_id', optional(INTEGER)),
-    ('timestamp', optional(NUMBER)(description='todo describe format. flicks?')),
-    ('frame_index', optional(INTEGER)),
+    ('video_id', INTEGER),
+    ('timestamp', NUMBER(description='todo describe format. flicks?')),
+    ('frame_index', INTEGER),
 
-    ('channels', optional(CHANNELS)),
+    ('channels', CHANNELS),
 
     # TODO: optional world localization information
     # TODO: camera information?
 
-    # ('auxillary', ARRAY(
-    #     TYPE=OBJECT({
-    #         'file_name': PATH,
-    #         'channels': CHANNELS,
-    #         'width': optional(INTEGER),
-    #         'height': optional(INTEGER),
-    #     }, title='aux')
-    # )),
+    ('auxillary', ARRAY(
+        TYPE=OBJECT({
+            'file_name': PATH,
+            'channels': CHANNELS,
+            'width': INTEGER,
+            'height': INTEGER,
+        }, title='aux')
+    )),
 )), required=['id', 'file_name'])
 
 ANNOTATION = OBJECT(OrderedDict((
@@ -196,17 +179,20 @@ ANNOTATION = OBJECT(OrderedDict((
 
     ('bbox', BBOX),
 
-    ('category_id', optional(INTEGER)),
-    ('track_id', optional(ANYOF(INTEGER, STRING, UUID))),
+    ('category_id', INTEGER),
+    ('track_id', ANYOF(INTEGER, STRING, UUID)),
 
-    ('segmentation', optional(SEGMENTATION)),
-    ('keypoints', optional(KEYPOINTS)),
+    ('segmentation', SEGMENTATION),
+    ('keypoints', KEYPOINTS),
 
-    # this needs to be in the same order as categories
-    ('prob', optional(ARRAY(NUMBER))),  # probability order currently needs to be known a-priori, typically in "order" of the classes, but its hard to always keep that consistent.
+    ('prob', ARRAY(NUMBER, description=(
+        'This needs to be in the same order as categories. '
+        'probability order currently needs to be known a-priori, '
+        'typically in "order" of the classes, but its hard to always '
+        'keep that consistent.'))),
 
-    ('score', optional(NUMBER)),
-    ('weight', optional(NUMBER)),
+    ('score', NUMBER),
+    ('weight', NUMBER),
 
     ('iscrowd', STRING),  # legacy
     ('caption', STRING),
@@ -217,8 +203,7 @@ ANNOTATION = OBJECT(OrderedDict((
 
 COCO_SCHEMA = OBJECT(
     title='KWCOCO_SCHEMA',
-    required=['images'],
-    # propertyNames='.*',
+    required=[],
     PROPERTIES=ub.odict([
         ('info', ANY),
         ('licenses', ANY),
@@ -236,10 +221,15 @@ COCO_SCHEMA = OBJECT(
 )
 
 
+if __debug__:
+    COCO_SCHEMA.validate()
+
+
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/coco_schema.py > out.py
+        python ~/code/kwcoco/kwcoco/coco_schema.py
+        > out.py
     """
     print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=-1)))
     # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=2)))
