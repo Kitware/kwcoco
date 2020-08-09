@@ -629,11 +629,15 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     for catname in classes:
         dset.ensure_category(name=catname)
 
+    paths = random_multi_object_path(
+        num_frames=num_frames,
+        num_objects=num_tracks, rng=rng)
+
     tid_to_anns = {}
-    for tid in track_ids:
-        degree = rng.randint(1, 5)
-        num = num_frames
-        path = random_path(num, degree=degree, rng=rng)
+    for tid, path in zip(track_ids, paths):
+        # degree = rng.randint(1, 5)
+        # num = num_frames
+        # path = random_path(num, degree=degree, rng=rng)
 
         if anchors is None:
             anchors_ = anchors
@@ -642,7 +646,8 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
 
         # Box scale
         boxes = kwimage.Boxes.random(
-            num=num, scale=1.0, format='cxywh', rng=rng, anchors=anchors_)
+            num=num_frames, scale=1.0, format='cxywh', rng=rng,
+            anchors=anchors_)
 
         # Smooth out varying box sizes
         alpha = rng.rand() * 0.1
@@ -972,6 +977,91 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
             'imdata': auxdata,
             'channels': 'disparity',
         }]
+
+
+def random_multi_object_path(num_objects, num_frames, rng=None):
+    """
+    num_objects = 30
+    num_frames = 30
+
+    from kwcoco.demo.toydata import *  # NOQA
+    paths = random_multi_object_path(num_objects, num_frames, rng)
+
+    import kwplot
+    plt = kwplot.autoplt()
+    ax = plt.gca()
+    ax.cla()
+    ax.set_xlim(-.01, 1.01)
+    ax.set_ylim(-.01, 1.01)
+
+    rng = None
+
+    for path in paths:
+        ax.plot(path.T[0], path.T[1], 'x-')
+    """
+    import kwarray
+    import torch
+    from torch.nn import functional as F
+    rng = kwarray.ensure_rng(rng)
+
+    max_speed = rng.rand(num_objects, 1) * 0.01
+    max_speed = np.concatenate([max_speed, max_speed], axis=1)
+
+    max_speed = torch.from_numpy(max_speed)
+
+    # TODO: can we do better?
+    torch.optim.SGD
+    class Positions(torch.nn.Module):
+        def __init__(model):
+            super().__init__()
+            _pos = torch.from_numpy(rng.rand(num_objects, 2))
+            model.pos = torch.nn.Parameter(_pos)
+
+        def forward(model, noise):
+            loss_parts = {}
+
+            # Push objects away from each other
+            utriu_dists = torch.nn.functional.pdist(model.pos)
+            respulsive = (1 / (utriu_dists ** 2)).sum() / num_objects
+            loss_parts['repulsive'] = 0.01 * respulsive.sum()
+
+            # Push objects in random directions
+            loss_parts['random'] = (model.pos * noise).sum()
+
+            # Push objects away from the boundary
+            margin = 0
+            x = model.pos
+            y = F.softplus((x - 0.5) + margin)
+            y = torch.max(F.softplus(-(x - 0.5) + margin), y)
+            loss_parts['boundary'] = y.sum() * 2
+
+            return sum(loss_parts.values())
+
+    model = Positions()
+    params = list(model.parameters())
+    optim = torch.optim.SGD(params, lr=1.00, momentum=0.9)
+
+    positions = []
+    for i in range(num_frames):
+        optim.zero_grad()
+        noise = torch.from_numpy(rng.rand(2))
+        loss = model.forward(noise)
+        loss.backward()
+
+        if max_speed is not None:
+            # Enforce a per-object speed limit
+            model.pos.grad.data[:] = torch.min(model.pos.grad, max_speed)
+            model.pos.grad.data[:] = torch.max(model.pos.grad, -max_speed)
+
+        optim.step()
+
+        # Enforce boundry conditions
+        model.pos.data.clamp_(0, 1)
+        positions.append(model.pos.data.numpy().copy())
+
+    paths = np.concatenate([p[:, None] for p in positions], axis=1)
+    return paths
+    # path = np.array(positions) % 1
 
 
 def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
