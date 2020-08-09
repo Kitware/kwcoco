@@ -12,6 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Ported the non-torch components of CategoryTree from ndsampler to kwcoco. 
 * This helps kwcoco work better as a standalone package.
 * Union now works with videos
+* New formal schema with jsonschema validation support
 
 
 ### Changed
