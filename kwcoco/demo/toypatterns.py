@@ -169,6 +169,7 @@ class CategoryPatterns(object):
             globals().update(xdev.get_func_kwargs(self.random_category))
 
         Example:
+            >>> from kwcoco.demo.toypatterns import *  # NOQA
             >>> self = CategoryPatterns.coerce(['superstar'])
             >>> chip = np.random.rand(64, 64)
             >>> info = self.random_category(chip)
@@ -188,36 +189,47 @@ class CategoryPatterns(object):
         Example:
             >>> self = CategoryPatterns.coerce(['superstar'])
             >>> chip = np.random.rand(64, 64)
-            >>> info = self.random_category(chip)
+            >>> info = self.render_category('superstar', chip, newstyle=True)
+            >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
+            >>> info = self.render_category('superstar', chip, newstyle=False)
+            >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
         """
         data, mask, kpts = self._from_elem(cname, chip)
         info = self._package_info(cname, data, mask, kpts, xy_offset, dims,
-                                  newstyle)
+                                  newstyle=newstyle)
         return info
 
     def _package_info(self, cname, data, mask, kpts, xy_offset, dims,
                       newstyle):
         """ packages data from _from_elem into coco-like annotation """
         import kwimage
-        segmentation = kwimage.Mask(mask, 'c_mask').to_array_rle()
+
+        if newstyle:
+            segmentation = kwimage.Mask(mask, 'c_mask').to_multi_polygon()
+        else:
+            segmentation = kwimage.Mask(mask, 'c_mask').to_array_rle()
+
         if xy_offset is not None:
             segmentation = segmentation.translate(xy_offset, output_dims=dims)
             kpts = kpts.translate(xy_offset, output_dims=dims)
 
-        segmentation = segmentation.to_bytes_rle()
-        segmentation.data['counts'] = segmentation.data['counts'].decode('utf8')
+        if not newstyle:
+            segmentation = segmentation.to_mask().to_bytes_rle()
+            segmentation.data['counts'] = segmentation.data['counts'].decode('utf8')
 
         if newstyle:
+            segmentation = segmentation.to_coco('new')
             keypoints = kpts.to_coco('new')
         else:
             # old style keypoints
             import kwarray
             keypoints = kwarray.ArrayAPI.tolist(kpts.to_coco('orig'))
+            segmentation = segmentation.data
 
         info = {
             'name': cname,
             'data': data,
-            'segmentation': segmentation.data,
+            'segmentation': segmentation,
             'keypoints': keypoints,
         }
         return info
@@ -385,3 +397,11 @@ class Rasters:
             'bot_tip': (23.0, 4.5),
         }
         return patch, keypoints_yx
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/kwcoco/demo/toypatterns.py
+    """
+    import xdoctest
+    xdoctest.doctest_module(__file__)

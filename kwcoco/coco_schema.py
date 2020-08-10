@@ -69,9 +69,13 @@ KWCOCO_KEYPOINT = OBJECT(
 
 KWCOCO_POLYGON = OBJECT(
     PROPERTIES={
-        'exterior': ARRAY(ARRAY(NUMBER, numItems=2), description='ccw xy exterior points'),
+        'exterior': ARRAY(
+            ARRAY(NUMBER, numItems=2),
+            description='counter-clockwise xy exterior points'),
         'interiors': ARRAY(
-            ARRAY(ARRAY(NUMBER, numItems=2), description='cw xy hole'),
+            ARRAY(
+                ARRAY(NUMBER, numItems=2),
+                description='clockwise xy hole'),
         )
     },
     title='KWCOCO_POLYGON',
@@ -79,9 +83,10 @@ KWCOCO_POLYGON = OBJECT(
 )
 
 
-KEYPOINTS_V1 = ARRAY(INTEGER, description='old format (x1,y1,v1,...,xk,yk,vk)')
-KEYPOINTS_V2 = ARRAY(KWCOCO_KEYPOINT)
-KEYPOINTS = ANYOF(KEYPOINTS_V1, KEYPOINTS_V2)
+ORIG_COCO_KEYPOINTS = ARRAY(
+    INTEGER, description='old format (x1,y1,v1,...,xk,yk,vk)')
+KWCOCO_KEYPOINTS = ARRAY(KWCOCO_KEYPOINT)
+KEYPOINTS = ANYOF(ORIG_COCO_KEYPOINTS, KWCOCO_KEYPOINTS)
 
 
 ORIG_COCO_POLYGON = ARRAY(
@@ -92,6 +97,7 @@ ORIG_COCO_POLYGON = ARRAY(
 
 POLYGON = ANYOF(
     KWCOCO_POLYGON,
+    ARRAY(KWCOCO_POLYGON),
     ORIG_COCO_POLYGON
 )
 
