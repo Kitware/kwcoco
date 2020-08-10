@@ -591,7 +591,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
 
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
-        >>> anchors = np.array([ [0.3, 0.3],  [0.1, 0.1]])
+        >>> anchors = np.array([ [0.2, 0.2],  [0.1, 0.1]])
         >>> gsize = np.array([(600, 600)])
         >>> print(anchors * gsize)
         >>> dset = random_single_video_dset(render=True, num_frames=10, anchors=anchors, num_tracks=10)
@@ -629,6 +629,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     for catname in classes:
         dset.ensure_category(name=catname)
 
+    # Generate paths in a way that they are dependant on each other
     paths = random_multi_object_path(
         num_frames=num_frames,
         num_objects=num_tracks, rng=rng)
