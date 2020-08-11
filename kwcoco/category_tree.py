@@ -613,7 +613,8 @@ def _print_forest(graph):
             else:
                 this_prefix = indent + '├── '
                 next_prefix = indent + '│   '
-            print(this_prefix + str(node))
+            label = graph.nodes[node].get('label', node)
+            print(this_prefix + str(label))
             _recurse(children, indent=next_prefix)
     _recurse(encoding)
 
