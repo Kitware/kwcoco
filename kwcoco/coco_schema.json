@@ -1,0 +1,253 @@
+{
+    "type": "object",
+    "properties": {
+        "info": {},
+        "licenses": {},
+        "categories": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "unique internal id"},
+                    "name": {"type": "string", "description": "unique external name or identifier"},
+                    "alias": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "list of alter egos"
+                    },
+                    "supercategory": {
+                        "anyOf": [
+                            {"type": "string", "description": "coarser category name"},
+                            {"type": "null"}
+                        ]
+                    },
+                    "parents": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "used for multiple inheritence"
+                    },
+                    "keypoints": {"description": "deprecated"},
+                    "skeleton": {"description": "deprecated"}
+                },
+                "title": "CATEGORY",
+                "required": ["id", "name"]
+            }
+        },
+        "keypoint_categories": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "id": {"type": "integer"},
+                    "supercategory": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "null"}
+                        ]
+                    },
+                    "reflection_id": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "null"}
+                        ]
+                    }
+                },
+                "title": "KEYPOINT_CATEGORY",
+                "required": ["id", "name"]
+            }
+        },
+        "videos": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "caption": {"type": "string"}
+                },
+                "title": "VIDEO",
+                "required": ["id", "name"]
+            }
+        },
+        "images": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "file_name": {"type": "string"},
+                    "width": {"type": "integer"},
+                    "height": {"type": "integer"},
+                    "video_id": {"type": "integer"},
+                    "timestamp": {"type": "number", "description": "todo describe format. flicks?"},
+                    "frame_index": {"type": "integer"},
+                    "channels": {"type": "string", "title": "CHANNEL_SPEC", "description": "experimental. todo: refine"},
+                    "auxillary": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "file_name": {"type": "string"},
+                                "channels": {"type": "string", "title": "CHANNEL_SPEC", "description": "experimental. todo: refine"},
+                                "width": {"type": "integer"},
+                                "height": {"type": "integer"}
+                            },
+                            "title": "aux"
+                        }
+                    }
+                },
+                "required": ["id", "file_name"]
+            }
+        },
+        "annotations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "image_id": {"type": "integer"},
+                    "bbox": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "maxItems": 4,
+                        "minItems": 4,
+                        "title": "bbox",
+                        "description": "[top-left x, top-left-y, width, height] in pixels"
+                    },
+                    "category_id": {"type": "integer"},
+                    "track_id": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "string"},
+                            {"type": "string"}
+                        ]
+                    },
+                    "segmentation": {
+                        "anyOf": [
+                            {
+                                "anyOf": [
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "exterior": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {"type": "number"},
+                                                    "maxItems": 2,
+                                                    "minItems": 2
+                                                },
+                                                "description": "counter-clockwise xy exterior points"
+                                            },
+                                            "interiors": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {"type": "number"},
+                                                        "maxItems": 2,
+                                                        "minItems": 2
+                                                    },
+                                                    "description": "clockwise xy hole"
+                                                }
+                                            }
+                                        },
+                                        "title": "KWCOCO_POLYGON",
+                                        "description": "a simply polygon format that supports holes"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "exterior": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {"type": "number"},
+                                                        "maxItems": 2,
+                                                        "minItems": 2
+                                                    },
+                                                    "description": "counter-clockwise xy exterior points"
+                                                },
+                                                "interiors": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "array",
+                                                            "items": {"type": "number"},
+                                                            "maxItems": 2,
+                                                            "minItems": 2
+                                                        },
+                                                        "description": "clockwise xy hole"
+                                                    }
+                                                }
+                                            },
+                                            "title": "KWCOCO_POLYGON",
+                                            "description": "a simply polygon format that supports holes"
+                                        }
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "maxItems": 2,
+                                            "minItems": 2
+                                        },
+                                        "title": "ORIG_COCO_POLYGON",
+                                        "description": "[x1,y1,v1,...,xk,yk,vk]"
+                                    }
+                                ]
+                            },
+                            {"type": "string", "description": "format read by pycocotools"}
+                        ]
+                    },
+                    "keypoints": {
+                        "anyOf": [
+                            {
+                                "type": "array",
+                                "items": {"type": "integer"},
+                                "description": "old format (x1,y1,v1,...,xk,yk,vk)"
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "xy": {
+                                            "type": "array",
+                                            "items": {"type": "number"},
+                                            "maxItems": 2,
+                                            "minItems": 2,
+                                            "description": "<x1, y1> in pixels"
+                                        },
+                                        "visible": {"type": "integer", "description": "choice(0, 1, 2)"},
+                                        "keypoint_category_id": {"type": "integer"},
+                                        "keypoint_category": {"type": "string", "description": "only to be used as a hint"}
+                                    },
+                                    "title": "KWCOCO_KEYPOINT"
+                                }
+                            }
+                        ]
+                    },
+                    "prob": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "description": "This needs to be in the same order as categories. probability order currently needs to be known a-priori, typically in "order" of the classes, but its hard to always keep that consistent."
+                    },
+                    "score": {"type": "number"},
+                    "weight": {"type": "number"},
+                    "iscrowd": {"type": "string"},
+                    "caption": {"type": "string"}
+                },
+                "required": ["id", "image_id"]
+            }
+        }
+    },
+    "title": "KWCOCO_SCHEMA",
+    "required": []
+}

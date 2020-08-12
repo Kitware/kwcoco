@@ -31,7 +31,7 @@ import ubelt as ub
 
 
 def deprecated(*args):
-    return ANY
+    return ANY(description='deprecated')
 
 
 def TUPLE(*args, **kw):
@@ -61,7 +61,7 @@ PATH = STRING
 KWCOCO_KEYPOINT = OBJECT(
     title='KWCOCO_KEYPOINT',
     PROPERTIES={
-        'xy': TUPLE(NUMBER, NUMBER, description='<x1, y1>'),
+        'xy': TUPLE(NUMBER, NUMBER, description='<x1, y1> in pixels'),
         'visible': INTEGER(description='choice(0, 1, 2)'),
         'keypoint_category_id': INTEGER,
         'keypoint_category': STRING(description='only to be used as a hint')}
@@ -107,7 +107,7 @@ BBOX = ARRAY(
     TYPE=NUMBER,
     title='bbox',
     numItems=4,
-    description='top-left x, top-left-y, width, height'
+    description='[top-left x, top-left-y, width, height] in pixels'
 )
 
 ### ------------------------
@@ -117,13 +117,13 @@ SEGMENTATION = ANYOF(POLYGON, RUN_LENGTH_ENCODING)
 
 
 CATEGORY = OBJECT({
-    'id': INTEGER,
-    'name': STRING,
+    'id': INTEGER(description='unique internal id'),
+    'name': STRING(description='unique external name or identifier'),
 
     'alias': ARRAY(STRING, description='list of alter egos'),
 
-    'supercategory': ANYOF(STRING(description='coarser category'), NULL),
-    'parents': ARRAY(STRING),
+    'supercategory': ANYOF(STRING(description='coarser category name'), NULL),
+    'parents': ARRAY(STRING, description='used for multiple inheritence'),
 
     # Legacy
     'keypoints': deprecated(ARRAY(STRING)),
@@ -234,6 +234,9 @@ if __debug__:
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/coco_schema.py > kwcoco_full_schema.py
+        python ~/code/kwcoco/kwcoco/coco_schema.py > ~/code/kwcoco/kwcoco/coco_schema.json
     """
-    print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=-1)))
+    # import json
+    print(ub.repr2(COCO_SCHEMA, nl=-1, trailsep=False, sort=False).replace("'", '"'))
+    # print(json.dumps(COCO_SCHEMA, indent='    '))
+    # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=-1)))

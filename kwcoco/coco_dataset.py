@@ -6,6 +6,8 @@ Extends the format to also include line annotations.
 
 Dataset Spec:
 
+    * Note: a formal spec has been defined in
+
 .. code::
 
     category = {
@@ -215,25 +217,6 @@ SPEC_KEYS = [
     'annotations',
 ]
 
-
-# TODO
-# Programatically layout the extended Kitware MS-COCO specification.
-_ = """
-
-In the meantime, here is a draft of what it may look like
-
-mkdir -p $HOME/tmp/dummy_typing
-touch $HOME/tmp/dummy_typing/__init__.py
-cp /home/joncrall/.local/conda/envs/py38/lib/python3.8/typing.py $HOME/tmp/dummy_typing/dummy.py
-
-python -c "import typing; print(typing.__all__)"
-
-mkinit $HOME/tmp/dummy_typing
-
-see ~/code/kwcoco/kwcoco/spec.py
-
-
-"""
 
 INT_TYPES = (int, np.integer)
 
