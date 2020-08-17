@@ -3819,6 +3819,7 @@ class CocoIndex(object):
     def _add_annotation(index, aid, gid, cid, ann):
         if index.anns is not None:
             index.anns[aid] = ann
+            # FIXME: should we allow None here?
             index.gid_to_aids[gid].add(aid)
             index.cid_to_aids[cid].add(aid)
 
