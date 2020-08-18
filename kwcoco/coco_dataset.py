@@ -4615,9 +4615,6 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
     def _build_index(self):
         self.index.build(self)
 
-    def _clear_index(self):
-        self.index.clear()
-
     def union(self, *others, **kwargs):
         """
         Merges multiple :class:`CocoDataset` items into one. Names and
@@ -4906,7 +4903,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             new_dset.img_root = soft_img_root
         return new_dset
 
-    def subset(self, gids, copy=False):
+    def subset(self, gids, copy=False, autobuild=True):
         """
         Return a subset of the larger coco dataset by specifying which images
         to port. All annotations in those images will be taken.
@@ -4915,6 +4912,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             gids (List[int]): image-ids to copy into a new dataset
             copy (bool, default=False): if True, makes a deep copy of
                 all nested attributes, otherwise makes a shallow copy.
+            autobuild (bool, default=True): if True will automatically
+                build the fast lookup index.
 
         Example:
             >>> self = CocoDataset.demo()
@@ -4958,7 +4957,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             from copy import deepcopy
             new_dataset = deepcopy(new_dataset)
 
-        sub_dset = CocoDataset(new_dataset, img_root=self.img_root)
+        sub_dset = CocoDataset(new_dataset, img_root=self.img_root,
+                               autobuild=autobuild)
         return sub_dset
 
 
