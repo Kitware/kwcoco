@@ -3159,6 +3159,14 @@ class MixinCocoAddRemove(object):
             >>> bbox = [10, 10, 20, 20]
             >>> aid = self.add_annotation(image_id, cid, bbox)
             >>> assert self.anns[aid]['bbox'] == bbox
+
+        Example:
+            >>> # Attempt to annot without a category or bbox
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> image_id = 1
+            >>> aid = self.add_annotation(image_id)
+            >>> assert None in self.index.cid_to_aids
         """
         if id is None:
             id = self._next_ids.get('annotations')
@@ -3696,17 +3704,23 @@ class CocoIndex(object):
     # On-demand lookup tables
     @property
     def cid_to_gids(index):
+        """
+        Example:
+            >>> import kwcoco
+            >>> self = dset = kwcoco.CocoDataset()
+            >>> self.index.cid_to_gids
+        """
         from scriptconfig.dict_like import DictLike
         class ProxyCidToGids(DictLike):
-            def __init__(index, parent):
-                index.parent = parent
-            def getitem(index, cid):
-                aids = index.parent.cid_to_aids[cid]
-                gids = {index.parent.anns[aid]['image_id'] for aid in aids}
+            def __init__(self, index):
+                self.index = index
+            def getitem(self, cid):
+                aids = self.index.cid_to_aids[cid]
+                gids = {self.index.anns[aid]['image_id'] for aid in aids}
                 return gids
-            def keys(index):
-                return index.parent.cid_to_aids.keys()
-        cid_to_gids = ProxyCidToGids(parent=index)
+            def keys(self):
+                return self.index.cid_to_aids.keys()
+        cid_to_gids = ProxyCidToGids(index=index)
         return cid_to_gids
 
     def _add_video(index, vidid, video):
@@ -3819,7 +3833,7 @@ class CocoIndex(object):
     def _add_annotation(index, aid, gid, cid, ann):
         if index.anns is not None:
             index.anns[aid] = ann
-            # FIXME: should we allow None here?
+            # Note: it should be ok to have None's here
             index.gid_to_aids[gid].add(aid)
             index.cid_to_aids[cid].add(aid)
 
@@ -3914,6 +3928,9 @@ class CocoIndex(object):
     def build(index, parent):
         """
         Build all id-to-obj reverse indexes from scratch.
+
+        Args:
+            parent (CocoDataset): the dataset to index
 
         Notation:
             aid - Annotation ID
@@ -4048,7 +4065,10 @@ class CocoIndex(object):
 
         # Remove defaultdict like behavior
         gid_to_aids.default_factory = None
-        cid_to_aids.default_factory = None
+
+        # Actually, its important to have defaultdict like behavior for
+        # categories so we can allow for the category_id=None case
+        # cid_to_aids.default_factory = None
         # vidid_to_gids.default_factory = None
 
         index.gid_to_aids = gid_to_aids
@@ -4657,7 +4677,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>>     for aid in dset1.gid_to_aids[img['id']]:
             >>>         dset1.anns[aid]['image_id'] = new_gid
             >>>     img['id'] = new_gid
-            >>> dset1._clear_index()
+            >>> dset1.index.clear()
             >>> dset1._build_index()
             >>> # ------
             >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
@@ -4665,7 +4685,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>>     for aid in dset2.gid_to_aids[img['id']]:
             >>>         dset2.anns[aid]['image_id'] = new_gid
             >>>     img['id'] = new_gid
-            >>> dset2._clear_index()
+            >>> dset1.index.clear()
             >>> dset2._build_index()
             >>> others = [dset1, dset2]
             >>> merged = kwcoco.CocoDataset.union(*others)

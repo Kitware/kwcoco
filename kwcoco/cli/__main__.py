@@ -30,10 +30,15 @@ def main(cmdline=True, **kw):
 
     # Create a subparser that uses the first positional argument to run one of
     # the previous CLI interfaces.
+
+    class RawDescriptionDefaultsHelpFormatter(
+            argparse.RawDescriptionHelpFormatter,
+            argparse.ArgumentDefaultsHelpFormatter):
+        pass
+
     parser = argparse.ArgumentParser(
         description='The Kitware COCO CLI',
-        # formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=RawDescriptionDefaultsHelpFormatter,
     )
     subparsers = parser.add_subparsers(help='specify a command to run')
 

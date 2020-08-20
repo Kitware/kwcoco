@@ -4,7 +4,7 @@ from kwcoco import coco_evaluator
 class CocoEvalCLI:
     name = 'eval'
 
-    CLIConfig = coco_evaluator.CocoEvalConfig
+    CLIConfig = coco_evaluator.CocoEvalCLIConfig
 
     @classmethod
     def main(cls, cmdline=True, **kw):

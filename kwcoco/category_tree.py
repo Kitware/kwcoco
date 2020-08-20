@@ -7,7 +7,6 @@ torch operations. See the ndsampler version for the extension with torch
 operations.
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
-import kwarray
 import itertools as it
 import networkx as nx
 import ubelt as ub
@@ -242,6 +241,9 @@ class CategoryTree(ub.NiceRepr):
         """
         Args:
             key (str): specify which demo dataset to use.
+                Can be 'coco' (which uses the default coco demo data).
+                Can be 'btree' which creates a binary tree and accepts kwargs
+                    'r' and 'h' for branching-factor and height.
 
         CommandLine:
             xdoctest -m ~/code/kwcoco/kwcoco/category_tree.py CategoryTree.demo
@@ -264,6 +266,14 @@ class CategoryTree(ub.NiceRepr):
             graph = nx.relabel_nodes(graph, {n: n + 1 for n in graph})
             if kwargs.pop('add_zero', True):
                 graph.add_node(0)
+            assert not kwargs
+        elif key == 'btree2':
+            r = kwargs.pop('r', 3)
+            h = kwargs.pop('h', 3)
+            graph = nx.generators.balanced_tree(r=r, h=h, create_using=nx.DiGraph())
+            graph = nx.relabel_nodes(graph, {n: str(n + 1) for n in graph})
+            if kwargs.pop('add_zero', True):
+                graph.add_node(str(0))
             assert not kwargs
         else:
             raise KeyError(key)
@@ -378,6 +388,9 @@ class CategoryTree(ub.NiceRepr):
 
     def __getitem__(self, index):
         return self.idx_to_node[index]
+
+    def __contains__(self, node):
+        return node in self.idx_to_node
 
     def __json__(self):
         """
