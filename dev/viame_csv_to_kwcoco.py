@@ -42,6 +42,8 @@ def coco_from_viame_csv(csv_fpaths, images=None):
 
         return all_gpaths
 
+    empty_image_case = False
+
     import kwcoco
     dset = kwcoco.CocoDataset()
     for csv_fpath in csv_fpaths:
@@ -56,8 +58,9 @@ def coco_from_viame_csv(csv_fpaths, images=None):
             frame_index = int(parts[2])
 
             if gname == '':
-                if len(dset.imgs) == 0:
+                if len(dset.imgs) == 0 or empty_image_case:
                     # I GUESS WE ARE SUPPOSED TO GUESS WHAT IMAGE IS WHICH
+                    empty_image_case = True
                     gname = lazy_image_list()[frame_index]
                 else:
                     # Skip this annotation
