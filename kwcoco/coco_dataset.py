@@ -2052,18 +2052,23 @@ class MixinCocoExtras(object):
             DeprecationWarning)
         return self.reroot(*args, **kw)
 
-    def reroot(self, img_root=None, absolute=False, check=True, safe=True,
-               smart=False):
+    def reroot(self, new_root=None, old_root=None, absolute=False, check=True,
+               safe=True, smart=False):
         """
-        Rebase image paths onto a new image root.
+        Rebase image/data paths onto a new image/data root.
 
         Args:
-            img_root (str, default=None):
-                New image root. If unspecified the current root is used.
+            new_root (str, default=None):
+                New image root. If unspecified the current ``self.img_root`` is
+                used.
+
+            old_root (str, default=None):
+                If specified, removes the root from file names. If unspecified,
+                then the existing paths MUST be relative to ``new_root``.
 
             absolute (bool, default=False):
                 if True, file names are stored as absolute paths, otherwise
-                they are relative to the image root.
+                they are relative to the new image root.
 
             check (bool, default=True):
                 if True, checks that the images all exist.
@@ -2079,26 +2084,14 @@ class MixinCocoExtras(object):
         CommandLine:
             xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.reroot
 
-        Notes:
-
-            Cases:
-
-                - [ ]
-                    * The COCO dataset contains relative image paths
-                    * The current ``old_img_root`` is incorrect
-                    * The new ``new_img_root`` is correct
-
-                - [ ]
-                    * The COCO dataset contains relative image paths
-                    * The current ``old_img_root`` is correct
-                    * The new ``new_img_root`` is a new desired location
-
-                - [ ] todo, enumerate the rest of the cases.
+        TODO:
+            - [ ] Incorporate maximum ordered subtree embedding once completed?
 
         Ignore:
             >>> # There might not be a way to easily handle the cases that I
             >>> # want to here. Might need to discuss this.
             >>> import kwcoco
+            >>> import os
             >>> gname = 'images/foo.png'
             >>> remote = '/remote/path'
             >>> host = ub.ensure_app_cache_dir('kwcoco/tests/reroot')
@@ -2121,38 +2114,39 @@ class MixinCocoExtras(object):
             >>> cases['abs_remote'] = kwcoco.CocoDataset.from_image_paths([join(remote, gname)])
             >>> def report(dset, name):
             >>>     gid = 1
-            >>>     abs_fpath = dset.get_image_fpath(gid)
             >>>     rel_fpath = dset.imgs[gid]['file_name']
+            >>>     abs_fpath = dset.get_image_fpath(gid)
             >>>     color = 'green' if exists(abs_fpath) else 'red'
-            >>>     print('strategy_name = {!r}'.format(name))
-            >>>     print(ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
-            >>>     print('rel_fpath = {!r}'.format(rel_fpath))
+            >>>     print('   * strategy_name = {!r}'.format(name))
+            >>>     print('       * rel_fpath = {!r}'.format(rel_fpath))
+            >>>     print('       * ' + ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
             >>> for key, dset in cases.items():
             >>>     print('----')
-            >>>     self = dset
             >>>     print('case key = {!r}'.format(key))
-            >>>     missing_gids = dset.missing_images()
-            >>>     print('missing_gids = {!r}'.format(missing_gids))
             >>>     print('ORIG = {!r}'.format(dset.imgs[1]['file_name']))
             >>>     print('dset.img_root = {!r}'.format(dset.img_root))
+            >>>     print('missing_gids = {!r}'.format(dset.missing_images()))
+            >>>     print('cwd = {!r}'.format(os.getcwd()))
+            >>>     print('host = {!r}'.format(host))
+            >>>     print('remote = {!r}'.format(remote))
             >>>     #
             >>>     dset_None_rel = dset.copy().reroot(absolute=False, check=0)
             >>>     report(dset_None_rel, 'dset_None_rel')
             >>>     #
-            >>>     #dset_remote_rel = dset.copy().reroot(remote, absolute=False, check=0)
-            >>>     #report(dset_remote_rel, 'dset_remote_rel')
+            >>>     dset_None_abs = dset.copy().reroot(absolute=True, check=0)
+            >>>     report(dset_None_abs, 'dset_None_abs')
             >>>     #
             >>>     dset_host_rel = dset.copy().reroot(host, absolute=False, check=0)
             >>>     report(dset_host_rel, 'dset_host_rel')
             >>>     #
-            >>>     dset_None_abs = dset.copy().reroot(absolute=True, check=0)
-            >>>     report(dset_None_abs, 'dset_None_abs')
-            >>>     #
-            >>>     #dset_remote_abs = dset.copy().reroot(remote, absolute=True, check=0)
-            >>>     #report(dset_remote_abs, 'dset_remote_abs')
-            >>>     #
             >>>     dset_host_abs = dset.copy().reroot(host, absolute=True, check=0)
             >>>     report(dset_host_abs, 'dset_host_abs')
+            >>>     #
+            >>>     dset_remote_rel = dset.copy().reroot(host, old_root=remote, absolute=False, check=0)
+            >>>     report(dset_remote_rel, 'dset_remote_rel')
+            >>>     #
+            >>>     dset_remote_abs = dset.copy().reroot(host, old_root=remote, absolute=True, check=0)
+            >>>     report(dset_remote_abs, 'dset_remote_abs')
 
         Example:
             >>> import kwcoco
@@ -2198,21 +2192,31 @@ class MixinCocoExtras(object):
         """
         from os.path import exists, relpath
 
-        new_img_root = img_root
-        old_img_root = self.img_root
+        new_img_root = new_root
+        old_img_root = old_root
+        cur_img_root = self.img_root
         if new_img_root is None:
-            new_img_root = old_img_root
+            new_img_root = self.img_root
 
         if smart:
             raise NotImplementedError('we are not smart yet (probably a good thing)')
 
         def _reroot_path(file_name):
-            old_gpath = join(old_img_root, file_name)
+            """ Reroot a single file """
+
+            cur_gpath = join(cur_img_root, file_name)
+
+            if old_img_root is not None:
+                if file_name.startswith(old_img_root):
+                    file_name = relpath(file_name, old_img_root)
+                elif cur_gpath.startswith(old_img_root):
+                    file_name = relpath(cur_gpath, old_img_root)
 
             if absolute:
                 new_file_name = join(new_img_root, file_name)
             else:
-                new_file_name = relpath(old_gpath, new_img_root)
+                new_file_name = file_name
+                # relpath(cur_gpath, new_img_root)
 
             if check:
                 new_gpath = join(new_img_root, new_file_name)
@@ -2262,6 +2266,10 @@ class MixinCocoExtras(object):
     def data_root(self):
         """ In the future we may deprecate img_root for data_root """
         return self.img_root
+
+    @data_root.setter
+    def data_root(self, value):
+        self.img_root = value
 
     def find_representative_images(self, gids=None):
         r"""
