@@ -42,7 +42,7 @@ def coco_from_viame_csv(csv_fpaths, images=None):
 
         return all_gpaths
 
-    empty_image_case = False
+    indexed_images = None
 
     import kwcoco
     dset = kwcoco.CocoDataset()
@@ -58,11 +58,17 @@ def coco_from_viame_csv(csv_fpaths, images=None):
             frame_index = int(parts[2])
 
             if gname == '':
-                if len(dset.imgs) == 0 or empty_image_case:
+                if len(dset.imgs) == 0 or indexed_images:
                     # I GUESS WE ARE SUPPOSED TO GUESS WHAT IMAGE IS WHICH
-                    empty_image_case = True
-                    gname = lazy_image_list()[frame_index]
+                    if not indexed_images:
+                        indexed_images = lazy_image_list()
+                    try:
+                        gname = indexed_images[frame_index]
+                    except IndexError:
+                        continue
                 else:
+                    # Also, VIAME-CSV lets the annotations run longer than the
+                    # image sequence, so account for that.
                     # Skip this annotation
                     continue
 
