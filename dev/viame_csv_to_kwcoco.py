@@ -51,7 +51,7 @@ def coco_from_viame_csv(csv_fpaths, images=None):
         lines = [line for line in lines if line and not line.startswith('#')]
         for line in lines:
             parts = line.split(',')
-            tid = parts[0]
+            tid = int(parts[0])
             gname = parts[1]
             frame_index = int(parts[2])
 
@@ -81,17 +81,21 @@ def coco_from_viame_csv(csv_fpaths, images=None):
             catscores = list(map(float, rest[1::2]))
 
             cat_to_score = ub.dzip(catnames, catscores)
-            catname = ub.argmax(cat_to_score)
+            if cat_to_score:
+                catname = ub.argmax(cat_to_score)
+                cid = dset.ensure_category(name=catname)
+            else:
+                cid = None
 
             gid = dset.ensure_image(file_name=gname, frame_index=frame_index)
-            cid = dset.ensure_category(name=catname)
+            kw = {}
+            if target_len >= 0:
+                kw['target_len'] = target_len
+            if score >= 0:
+                kw['score'] = score
 
             dset.add_annotation(
-                image_id=gid,
-                category_id=cid,
-                track_id=int(tid),
-                bbox=bbox, score=score,
-                target_length=target_len,
+                image_id=gid, category_id=cid, track_id=tid, bbox=bbox, **kw
             )
     return dset
 
