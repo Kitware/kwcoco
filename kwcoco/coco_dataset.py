@@ -2215,8 +2215,8 @@ class MixinCocoExtras(object):
             if absolute:
                 new_file_name = join(new_img_root, file_name)
             else:
-                if file_name.startswith(new_img_root):
-                    new_file_name = relpath(file_name, new_img_root)
+                if cur_gpath.startswith(new_img_root):
+                    new_file_name = relpath(cur_gpath, new_img_root)
                 else:
                     new_file_name = file_name
 
@@ -4717,6 +4717,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             - [ ] are supercategories broken?
             - [ ] reuse image ids where possible
             - [ ] reuse annotation / category ids where possible
+            - [ ] disambiguate track-ids
+            - [x] disambiguate video-ids
         """
         if self.__class__ is type:
             # Method called as classmethod
