@@ -56,8 +56,12 @@ def coco_from_viame_csv(csv_fpaths, images=None):
             frame_index = int(parts[2])
 
             if gname == '':
-                # I GUESS WE ARE SUPPOSED TO GUESS WHAT IMAGE IS WHICH
-                gname = lazy_image_list()[frame_index]
+                if len(dset.imgs) == 0:
+                    # I GUESS WE ARE SUPPOSED TO GUESS WHAT IMAGE IS WHICH
+                    gname = lazy_image_list()[frame_index]
+                else:
+                    # Skip this annotation
+                    continue
 
             tl_x, tl_y, br_x, br_y = map(float, parts[3:7])
             w = br_x - tl_x
