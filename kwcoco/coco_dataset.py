@@ -2215,8 +2215,10 @@ class MixinCocoExtras(object):
             if absolute:
                 new_file_name = join(new_img_root, file_name)
             else:
-                new_file_name = file_name
-                # relpath(cur_gpath, new_img_root)
+                if file_name.startswith(new_img_root):
+                    new_file_name = relpath(file_name, new_img_root)
+                else:
+                    new_file_name = file_name
 
             if check:
                 new_gpath = join(new_img_root, new_file_name)
