@@ -4,7 +4,8 @@ Basic script to convert VIAME-CSV to kwcoco
 References:
     https://viame.readthedocs.io/en/latest/section_links/detection_file_conversions.html
 """
-
+import ubelt as ub
+from os.path import dirname
 import scriptconfig as scfg
 
 
@@ -12,19 +13,14 @@ class ConvertConfig(scfg.Config):
     default = {
         'src': scfg.PathList('in.viame.csv'),
         'dst': scfg.Value('out.kwcoco.json'),
+        'new_root': None,
+        'old_root': None,
     }
 
 
-def main(cmdline=True, **kw):
-    import ubelt as ub
-    config = ConvertConfig(default=kw, cmdline=cmdline)
-
+def coco_from_viame_csv(csv_fpaths):
     import kwcoco
     dset = kwcoco.CocoDataset()
-
-    # TODO: ability to map image ids to agree with another coco file
-
-    csv_fpaths = config['src']
     for csv_fpath in csv_fpaths:
         with open(csv_fpath, 'r') as file:
             text = file.read()
@@ -70,8 +66,21 @@ def main(cmdline=True, **kw):
                 bbox=bbox, score=score,
                 target_length=target_len,
             )
+    return dset
 
+
+def main(cmdline=True, **kw):
+    config = ConvertConfig(default=kw, cmdline=cmdline)
+    # TODO: ability to map image ids to agree with another coco file
+    csv_fpaths = config['src']
+    dset = coco_from_viame_csv(csv_fpaths)
     dset.fpath = config['dst']
+    dset.img_root = dirname(dset.fpath)
+
+    dset.reroot(
+        new_root=config['new_root'], old_root=config['old_root'],
+        check=0)
+
     print('dset.fpath = {!r}'.format(dset.fpath))
     dset.dump(dset.fpath, newlines=True)
 
