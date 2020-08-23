@@ -2261,6 +2261,10 @@ class MixinCocoExtras(object):
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
 
+        # Need to invalidate the self.index.file_name_to_img
+        # TODO we dont have to invalidate everything
+        self.index.clear()
+
         self.img_root = new_img_root
         return self
 
