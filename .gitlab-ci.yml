@@ -218,6 +218,7 @@ stages:
         # Tags define which runners will accept which jobs
         - docker
         - linux
+        - build
 
     variables:
         # Change pip's cache directory to be inside the project directory since we can
