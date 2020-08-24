@@ -271,6 +271,8 @@ stages:
         - python -V  # Print out python version for debugging
         - pip install -r requirements.txt
         - pip install .  
+        # FIXME: we should start from a docker iamge that already has LibGL setup
+        - apt update && apt install libgl1-mesa-glx -y && rm -rf /var/lib/apt/lists/*  
 
     script: 
         - ./run_tests.py
