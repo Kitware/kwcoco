@@ -21,11 +21,13 @@ turned off, functions are silent by default (with the exception of long running
 processes, which optionally show progress by default). We support helper
 functions that add and remove images, categories, and annotations. 
 
-We do not reimplement the scoring code fro pycocotools in this module. Instead
-that functionality currently lives in netharn:
-https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/metrics/detect_metrics.py
-We may move that file either this repo or kwannot in the future. This module is
-more focused on efficient access and modification of a COCO dataset.
+We have reimplemented the object detection scoring code in the `kwcoco.metrics`
+submodule.  
+
+The original `pycocoutils` API is exposed via the `kwcoco.compat_dataset.COCO`
+class for drop-in replacement with existing tools that use `pycocoutils`. 
+
+There is some support for `kw18` files in the `kwcoco.kw18` module.
 
 
 The kwcoco CLI

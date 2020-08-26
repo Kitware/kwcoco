@@ -118,13 +118,88 @@ class KW18(kwarray.DataFrameArray):
         self = KW18(raw)
         return self
 
+    def to_coco(self):
+        """
+        Translates a kw18 files to a CocoDataset.
+
+        Note:
+            kw18 does not contain complete information, and as such
+            the returned coco dataset may need to be augmented.
+
+        TODO:
+            - [ ] allow kwargs to specify path to frames / videos
+
+        Example:
+            >>> from kwcoco.kw18 import KW18
+            >>> self = KW18.demo()
+            >>> self.to_coco()
+        """
+        import kwcoco
+        import ubelt as ub
+        dset = kwcoco.CocoDataset()
+
+        # kw18s don't have category names, so use ids as proxies
+        unique_category_ids = sorted(set(self['object_type_id']))
+        for cid in unique_category_ids:
+            dset.ensure_category('class_{}'.format(cid), id=cid)
+
+        unique_frame_idxs = ub.argunique(self['frame_number'])
+
+        # kw18 files correspond to one video
+        vidid = 1
+        dset.add_video(id=vidid, name='unknown_kw18_video')
+
+        # Index frames of the video
+        for idx in unique_frame_idxs:
+            frame_index = self['frame_number'][idx]
+            timestamp = self['timestamp'][idx]
+            dset.add_image(
+                id=frame_index,
+                file_name='<unknown_image_{}>'.format(frame_index),
+                video_id=vidid,
+                frame_index=frame_index,
+                timestamp=timestamp
+            )
+
+        for rx, row in self.iterrows():
+            tl_x = row['img_bbox_tl_x']
+            tl_y = row['img_bbox_tl_y']
+            br_x = row['img_bbox_br_x']
+            br_y = row['img_bbox_br_y']
+            w = br_x - tl_x
+            h = br_y - tl_y
+            bbox = [tl_x, tl_y, w, h]
+
+            world_loc = (row['world_loc_x'], row['world_loc_y'], row['world_loc_z'])
+            velocity = (row['velocity_x'], row['velocity_y'])
+
+            kw = {}
+            if 'confidence' in row:
+                kw['score'] = row['confidence']
+
+            dset.add_annotation(
+                id=rx,
+                image_id=row['frame_number'],
+                category_id=row['object_type_id'],
+                track_id=row['track_id'],
+                bbox=bbox,
+                area=row['area'],
+                velocity=velocity,
+                world_loc=world_loc,
+                **kw)
+
     @classmethod
     def load(KW18, file):
         import pandas as pd
         try:
+            EmptyDataError = pd.errors.EmptyDataError
+        except Exception:
+            EmptyDataError = pd.io.common.EmptyDataError
+
+        try:
             df = pd.read_csv(
                 file, sep=' +', comment='#', header=None, engine='python')
-        except pd.io.common.EmptyDataError:
+        except EmptyDataError:
             df = pd.DataFrame()
         renamer = dict(zip(df.columns, KW18.DEFAULT_COLUMNS))
         raw = df.rename(columns=renamer)

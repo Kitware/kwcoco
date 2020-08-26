@@ -349,7 +349,7 @@ class COCO(CocoDataset):
         data = ann['segmentation']
         dims = (h, w)
         sseg = _coerce_coco_segmentation(data, dims)
-        rle = sseg.to_bytes_rle().data['counts']
+        rle = sseg.to_mask(dims=dims).to_bytes_rle().data['counts']
         return rle
 
     def annToMask(self, ann):

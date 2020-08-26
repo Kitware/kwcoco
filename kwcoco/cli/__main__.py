@@ -14,7 +14,7 @@ def main(cmdline=True, **kw):
     from kwcoco.cli import coco_toydata
     from kwcoco.cli import coco_eval
     from kwcoco.cli import coco_modify_categories
-    # from kwcoco.cli import coco_rebase
+    # from kwcoco.cli import coco_reroot
 
     # Create a list of all submodules with CLI interfaces
     cli_modules = [
@@ -22,7 +22,7 @@ def main(cmdline=True, **kw):
         coco_union,
         coco_split,
         coco_show,
-        # coco_rebase,
+        # coco_reroot,
         coco_toydata,
         coco_eval,
         coco_modify_categories,
@@ -30,10 +30,15 @@ def main(cmdline=True, **kw):
 
     # Create a subparser that uses the first positional argument to run one of
     # the previous CLI interfaces.
+
+    class RawDescriptionDefaultsHelpFormatter(
+            argparse.RawDescriptionHelpFormatter,
+            argparse.ArgumentDefaultsHelpFormatter):
+        pass
+
     parser = argparse.ArgumentParser(
         description='The Kitware COCO CLI',
-        # formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=RawDescriptionDefaultsHelpFormatter,
     )
     subparsers = parser.add_subparsers(help='specify a command to run')
 
@@ -82,7 +87,5 @@ if __name__ == '__main__':
     CommandLine:
         python -m kwcoco --help
         python -m kwcoco.coco_stats
-
-        python ~/code/ndsampler/coco_cli/__main__.py
     """
     sys.exit(main())

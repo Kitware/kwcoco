@@ -14,7 +14,6 @@ class DetectionMetrics(ub.NiceRepr):
         classes (CategoryTree): category coder
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> dmet = DetectionMetrics.demo(
         >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8, score_noise=0.9, hacked=False)
         >>> print(dmet.score_kwcoco(bias=0, compat='mutex', prioritize='iou')['mAP'])
@@ -52,13 +51,12 @@ class DetectionMetrics(ub.NiceRepr):
         predictions.
 
         Args:
-            true_coco (ndsampler.CocoDataset):
-            pred_coco (ndsampler.CocoDataset):
+            true_coco (kwcoco.CocoDataset):
+            pred_coco (kwcoco.CocoDataset):
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
-            >>> import ndsampler
-            >>> true_coco = ndsampler.CocoDataset.demo('shapes')
+            >>> import kwcoco
+            >>> true_coco = kwcoco.CocoDataset.demo('shapes')
             >>> pred_coco = true_coco
             >>> self = DetectionMetrics.from_coco(true_coco, pred_coco)
             >>> self.score_voc()
@@ -139,7 +137,8 @@ class DetectionMetrics(ub.NiceRepr):
 
     def confusion_vectors(dmet, ovthresh=0.5, bias=0, gids=None, compat='all',
                           prioritize='iou', ignore_classes='ignore',
-                          background_class=ub.NoParam, verbose='auto', workers=0):
+                          background_class=ub.NoParam, verbose='auto',
+                          workers=0, track_probs='try'):
         """
         Assigns predicted boxes to the true boxes so we can transform the
         detection problem into a classification problem for scoring.
@@ -188,14 +187,18 @@ class DetectionMetrics(ub.NiceRepr):
             workers (int, default=0):
                 number of parallel assignment processes
 
+            track_probs (str, default='try'): can be 'try', 'force', or False.
+                if truthy, we assume probabilities for multiple classes are
+                available.
+
         Ignore:
             globals().update(xdev.get_func_kwargs(dmet.confusion_vectors))
         """
         import kwarray
         y_accum = ub.ddict(list)
 
-        TRACK_PROBS = True
-        if TRACK_PROBS:
+        _tracking_probs = bool(track_probs)
+        if _tracking_probs:
             prob_accum = []
 
         if gids is None:
@@ -218,7 +221,7 @@ class DetectionMetrics(ub.NiceRepr):
                 except ValueError:
                     pass
 
-        from ndsampler.utils import util_futures
+        from kwcoco.util import util_futures
         workers = 0
         jobs = util_futures.JobPool(mode='process', max_workers=workers)
 
@@ -238,13 +241,21 @@ class DetectionMetrics(ub.NiceRepr):
             y = job.result()
             gid = job.gid
 
-            if TRACK_PROBS:
+            if _tracking_probs:
                 # Keep track of per-class probs
                 pred_dets = dmet.pred_detections(gid)
                 try:
                     pred_probs = pred_dets.probs
+                    if pred_probs is None:
+                        raise KeyError
                 except KeyError:
-                    TRACK_PROBS = False
+                    _tracking_probs = False
+                    if track_probs == 'force':
+                        raise Exception('unable to track probs')
+                    elif track_probs == 'try':
+                        pass
+                    else:
+                        raise KeyError(track_probs)
                 else:
                     pxs = np.array(y['pxs'], dtype=np.int)
 
@@ -274,12 +285,12 @@ class DetectionMetrics(ub.NiceRepr):
         #                                       compat=compat, prioritize=prioritize,
         #                                       ignore_classes=ignore_classes)
 
-        #         if TRACK_PROBS:
+        #         if _tracking_probs:
         #             # Keep track of per-class probs
         #             try:
         #                 pred_probs = pred_dets.probs
         #             except KeyError:
-        #                 TRACK_PROBS = False
+        #                 _tracking_probs = False
         #             else:
         #                 pxs = np.array(y['pxs'], dtype=np.int)
         #                 flags = pxs > -1
@@ -317,7 +328,7 @@ class DetectionMetrics(ub.NiceRepr):
                 nbytes += v.size * v.dtype.itemsize
             print(xdev.byte_str(nbytes))
 
-        if TRACK_PROBS:
+        if _tracking_probs:
             y_prob = np.vstack(prob_accum)
         else:
             y_prob = None
@@ -435,7 +446,6 @@ class DetectionMetrics(ub.NiceRepr):
         score using voc method
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> dmet = DetectionMetrics.demo(
             >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8,
             >>>     score_noise=.5)
@@ -469,9 +479,9 @@ class DetectionMetrics(ub.NiceRepr):
         """
         Convert to a coco representation of truth and predictions
         """
-        import ndsampler
-        true = ndsampler.CocoDataset()
-        pred = ndsampler.CocoDataset()
+        import kwcoco
+        true = kwcoco.CocoDataset()
+        pred = kwcoco.CocoDataset()
 
         for node in dmet.classes:
             # cid = dmet.classes.graph.node[node]['id']
@@ -586,7 +596,6 @@ class DetectionMetrics(ub.NiceRepr):
                 if True, includes per-class probabilities with predictions
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> kwargs = {}
             >>> # Seed the RNG
             >>> kwargs['rng'] = 0
@@ -608,7 +617,6 @@ class DetectionMetrics(ub.NiceRepr):
             <Detections(7)>
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> # Test case with null predicted categories
             >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, nclasses=3,
             >>>                              nboxes=10, n_fp=10, box_noise=0.3,
@@ -630,9 +638,11 @@ class DetectionMetrics(ub.NiceRepr):
         """
         import kwimage
         import kwarray
-        import ndsampler
+        import kwcoco
         # Parse kwargs
         rng = kwarray.ensure_rng(kwargs.get('rng', 0))
+
+        # TODO: use kwcoco.demo.perterb instead of rolling the logic here
 
         # todo: accept and coerce classes instead of nclasses
         classes = kwargs.get('classes', None)
@@ -703,10 +713,10 @@ class DetectionMetrics(ub.NiceRepr):
                 if parent_cx > 0:
                     supercategory = 'cat_{}'.format(parent_cx + 1)
                     graph.add_edge(supercategory, node)
-            classes = ndsampler.CategoryTree(graph)
+            classes = kwcoco.CategoryTree(graph)
             frgnd_cx_RV = distributions.DiscreteUniform(1, len(classes), rng=rng)
         else:
-            classes = ndsampler.CategoryTree.coerce(classes)
+            classes = kwcoco.CategoryTree.coerce(classes)
             # TODO: remove background classes via rejection sampling
             frgnd_cx_RV = distributions.DiscreteUniform(0, len(classes), rng=rng)
 
@@ -769,7 +779,7 @@ class DetectionMetrics(ub.NiceRepr):
             # probability for each class. (Currently a bit hacky).
             class_probs = _demo_construct_probs(
                 pred_cxs, pred_scores, classes, rng,
-                hacked=kwargs.get('hacked', 0))
+                hacked=kwargs.get('hacked', 1))
 
             true_dets = kwimage.Detections(boxes=true_boxes,
                                            class_idxs=true_cxs,
@@ -795,7 +805,6 @@ class DetectionMetrics(ub.NiceRepr):
     def summarize(dmet, out_dpath=None, plot=False, title=''):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
@@ -849,7 +858,7 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
     # conditional. The right thing to do would be to do this, and then
     # perterb ancestor categories such that the probability evenetually
     # converges on the right value at that specific classes depth.
-    import torch
+    # import torch
 
     # Ensure probs
     pred_scores2 = pred_scores.clip(0, 1.0)
@@ -862,57 +871,57 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
         # HACK! All that nice work we did is too slow for doctests
         return class_energy
 
-    class_energy = torch.Tensor(class_energy)
-    cond_logprobs = classes.conditional_log_softmax(class_energy, dim=1)
-    cond_probs = torch.exp(cond_logprobs).numpy()
+    # class_energy = torch.Tensor(class_energy)
+    # cond_logprobs = classes.conditional_log_softmax(class_energy, dim=1)
+    # cond_probs = torch.exp(cond_logprobs).numpy()
 
-    # I was having a difficult time getting this right, so an
-    # inefficient per-item non-vectorized implementation it is.
-    # Note: that this implementation takes 70% of the time in this function
-    # and is a bottleneck for the doctests. A vectorized implementation would
-    # be nice.
-    idx_to_ancestor_idxs = classes.idx_to_ancestor_idxs()
-    idx_to_groups = {idx: group for group in classes.idx_groups for idx in group}
+    # # I was having a difficult time getting this right, so an
+    # # inefficient per-item non-vectorized implementation it is.
+    # # Note: that this implementation takes 70% of the time in this function
+    # # and is a bottleneck for the doctests. A vectorized implementation would
+    # # be nice.
+    # idx_to_ancestor_idxs = classes.idx_to_ancestor_idxs()
+    # idx_to_groups = {idx: group for group in classes.idx_groups for idx in group}
 
-    def set_conditional_score(row, cx, score, idx_to_groups):
-        group_cxs = np.array(idx_to_groups[cx])
-        flags = group_cxs == cx
-        group_row = row[group_cxs]
-        # Ensure that that heriarchical probs sum to 1
-        current = group_row[~flags]
-        other = current * (1 - score) / current.sum()
-        other = np.nan_to_num(other)
-        group_row[~flags] = other
-        group_row[flags] = score
-        row[group_cxs] = group_row
+    # def set_conditional_score(row, cx, score, idx_to_groups):
+    #     group_cxs = np.array(idx_to_groups[cx])
+    #     flags = group_cxs == cx
+    #     group_row = row[group_cxs]
+    #     # Ensure that that heriarchical probs sum to 1
+    #     current = group_row[~flags]
+    #     other = current * (1 - score) / current.sum()
+    #     other = np.nan_to_num(other)
+    #     group_row[~flags] = other
+    #     group_row[flags] = score
+    #     row[group_cxs] = group_row
 
-    for row, cx, score in zip(cond_probs, pred_cxs, pred_scores2):
-        set_conditional_score(row, cx, score, idx_to_groups)
-        for ancestor_cx in idx_to_ancestor_idxs[cx]:
-            if ancestor_cx != cx:
-                # Hack all parent probs to 1.0 so conditional probs
-                # turn into real probs.
-                set_conditional_score(row, ancestor_cx, 1.0, idx_to_groups)
-                # TODO: could add a fudge factor here so the
-                # conditional prob is higher than score, but parent
-                # probs are less than 1.0
+    # for row, cx, score in zip(cond_probs, pred_cxs, pred_scores2):
+    #     set_conditional_score(row, cx, score, idx_to_groups)
+    #     for ancestor_cx in idx_to_ancestor_idxs[cx]:
+    #         if ancestor_cx != cx:
+    #             # Hack all parent probs to 1.0 so conditional probs
+    #             # turn into real probs.
+    #             set_conditional_score(row, ancestor_cx, 1.0, idx_to_groups)
+    #             # TODO: could add a fudge factor here so the
+    #             # conditional prob is higher than score, but parent
+    #             # probs are less than 1.0
 
-                # TODO: could also maximize entropy of descendant nodes
-                # so classes.decision2 would stop at this node
+    #             # TODO: could also maximize entropy of descendant nodes
+    #             # so classes.decision2 would stop at this node
 
-    # For each level the conditional probs must sum to 1
-    if cond_probs.size > 0:
-        for idxs in classes.idx_groups:
-            level = cond_probs[:, idxs]
-            totals = level.sum(axis=1)
-            assert level.shape[1] == 1 or np.allclose(totals, 1.0), str(level) + ' : ' + str(totals)
+    # # For each level the conditional probs must sum to 1
+    # if cond_probs.size > 0:
+    #     for idxs in classes.idx_groups:
+    #         level = cond_probs[:, idxs]
+    #         totals = level.sum(axis=1)
+    #         assert level.shape[1] == 1 or np.allclose(totals, 1.0), str(level) + ' : ' + str(totals)
 
-    cond_logprobs = torch.Tensor(cond_probs).log()
-    class_probs = classes._apply_logprob_chain_rule(cond_logprobs, dim=1).exp().numpy()
-    class_probs = class_probs.reshape(-1, len(classes))
-    # print([p[x] for p, x in zip(class_probs, pred_cxs)])
-    # print(pred_scores2)
-    return class_probs
+    # cond_logprobs = torch.Tensor(cond_probs).log()
+    # class_probs = classes._apply_logprob_chain_rule(cond_logprobs, dim=1).exp().numpy()
+    # class_probs = class_probs.reshape(-1, len(classes))
+    # # print([p[x] for p, x in zip(class_probs, pred_cxs)])
+    # # print(pred_scores2)
+    # return class_probs
 
 
 def eval_detections_cli(**kw):
@@ -921,7 +930,7 @@ def eval_detections_cli(**kw):
         xdoctest -m ~/code/kwcoco/kwcoco/metrics/detect_metrics.py eval_detections_cli
     """
     import scriptconfig as scfg
-    import ndsampler
+    import kwcoco
 
     class EvalDetectionCLI(scfg.Config):
         default = {
@@ -935,8 +944,8 @@ def eval_detections_cli(**kw):
     cmdline = kw.pop('cmdline', True)
     config.load(kw, cmdline=cmdline)
 
-    true_coco = ndsampler.CocoDataset(config['true'])
-    pred_coco = ndsampler.CocoDataset(config['pred'])
+    true_coco = kwcoco.CocoDataset(config['true'])
+    pred_coco = kwcoco.CocoDataset(config['pred'])
 
     from kwcoco.metrics.detect_metrics import DetectionMetrics
     dmet = DetectionMetrics.from_coco(true_coco, pred_coco)
@@ -1015,3 +1024,12 @@ def eval_detections_cli(**kw):
         )
         plt.plot(thresh[mcc_idx], f1[mcc_idx], 'r*', markersize=20)
         plt.plot(thresh[f1_idx], f1[f1_idx], 'k*', markersize=20)
+
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/kwcoco/metrics/detect_metrics.py all
+    """
+    import xdoctest
+    xdoctest.doctest_module(__file__)

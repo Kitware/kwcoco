@@ -52,7 +52,7 @@ class CocoStatsCLI:
             datasets.append(dset)
 
         try:
-            from ndsampler.category_tree import _print_forest
+            from kwcoco.category_tree import _print_forest
             for dset in datasets:
                 print('dset = {!r}'.format(dset))
                 print('Category Heirarchy: ')

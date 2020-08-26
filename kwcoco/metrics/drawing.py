@@ -10,7 +10,6 @@ def draw_roc(roc_info, prefix='', fnum=1, **kw):
 
     Example:
         >>> # xdoctest: +REQUIRES(module:kwplot)
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
         >>>     nimgs=100, nboxes=(0, 30), n_fp=(0, 1), nclasses=3,
@@ -128,7 +127,6 @@ def draw_perclass_roc(cx_to_rocinfo, classes=None, prefix='', fnum=1,
 def draw_perclass_prcurve(cx_to_peritem, classes=None, prefix='', fnum=1, **kw):
     """
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
@@ -207,7 +205,6 @@ def draw_perclass_thresholds(cx_to_peritem, key='mcc', classes=None, prefix='', 
         notion of confusion.
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import ConfusionVectors
@@ -278,7 +275,6 @@ def draw_prcurve(peritem, prefix='', fnum=1, **kw):
     TODO: rename to draw prcurve. Just draws a single pr curve.
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
@@ -337,7 +333,6 @@ def draw_prcurve(peritem, prefix='', fnum=1, **kw):
 def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     """
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> import sys, ubelt
         >>> sys.path.append(ubelt.expandpath('~/code/kwcoco'))

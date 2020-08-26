@@ -17,6 +17,16 @@ import scriptconfig as scfg
 # from kwcoco.metrics.util import DictProxy
 
 
+from kwcoco.category_tree import CategoryTree
+try:
+    import ndsampler
+    CATEGORY_TREE_CLS = (CategoryTree, ndsampler.CategoryTree)
+    COCO_SAMPLER_CLS = ndsampler.CocoSampler
+except Exception:
+    COCO_SAMPLER_CLS = None
+    CATEGORY_TREE_CLS = (CategoryTree,)
+
+
 class CocoEvalConfig(scfg.Config):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
@@ -38,9 +48,10 @@ class CocoEvalConfig(scfg.Config):
 
         'implicit_ignore_classes': scfg.Value(['ignore']),
 
-        'expt_title': scfg.Value('', type=str, help='title for plots'),
+        'use_image_names': scfg.Value(False, help='if True use image file_name to associate images instead of ids'),
 
         # These should go into the CLI args, not the class config args
+        'expt_title': scfg.Value('', type=str, help='title for plots'),
         'draw': scfg.Value(True, help='draw metric plots'),
         'out_dpath': scfg.Value('./coco_metrics', type=str),
     }
@@ -71,7 +82,6 @@ class CocoEvaluator(object):
         >>> coco_eval.evaluate()
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> import kwcoco
         >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
@@ -108,12 +118,47 @@ class CocoEvaluator(object):
     def _init(coco_eval):
         # TODO: coerce into a cocodataset form if possible
         coco_eval.log('init truth dset')
+
+        # FIXME: What is the image names line up correctly, but the image ids
+        # do not? This will be common if an external detector is used.
         gid_to_true, true_extra = CocoEvaluator._coerce_dets(
             coco_eval.config['true_dataset'])
 
         coco_eval.log('init pred dset')
         gid_to_pred, pred_extra = CocoEvaluator._coerce_dets(
             coco_eval.config['pred_dataset'])
+
+        if coco_eval.config['use_image_names']:
+            # TODO: currently this is a hacky implementation that modifies the
+            # pred dset, we should not do that, just store a gid mapping.
+            pred_to_true_gid = {}
+            true_coco = true_extra['coco_dset']
+            pred_coco = pred_extra['coco_dset']
+            for gid, true_img in true_coco.imgs.items():
+                fname = true_img['file_name']
+                if fname not in pred_coco.index.file_name_to_img:
+                    continue
+                pred_img = pred_coco.index.file_name_to_img[fname]
+                pred_to_true_gid[pred_img['id']] = true_img['id']
+
+            if not pred_to_true_gid:
+                raise Exception('FAILED TO MAP IMAGE NAMES')
+
+            unused_pred_gids = set(pred_coco.imgs.keys()) - set(pred_to_true_gid.keys())
+            pred_coco.remove_images(unused_pred_gids)
+
+            new_gid_to_pred = {}
+            for pred_img in pred_coco.imgs.values():
+                old_gid = pred_img['id']
+                new_gid = pred_to_true_gid[old_gid]
+                pred = gid_to_pred[old_gid]
+                pred_img['id'] = new_gid
+                for ann in pred_coco.annots(gid=old_gid).objs:
+                    ann['image_id'] = new_gid
+                new_gid_to_pred[new_gid] = pred
+
+            gid_to_pred = new_gid_to_pred
+            pred_coco._build_index()
 
         pred_gids = sorted(gid_to_pred.keys())
         true_gids = sorted(gid_to_true.keys())
@@ -193,7 +238,7 @@ class CocoEvaluator(object):
 
     @classmethod
     def _rectify_classes(coco_eval, true_classes, pred_classes):
-        import ndsampler
+        import kwcoco
         # Determine if truth and model classes are compatible, attempt to remap
         # if possible.
         errors = []
@@ -225,7 +270,7 @@ class CocoEvaluator(object):
         true_norm = {_normalize_name(name): name for name in true_classes}
         # TODO: remove background hack, use "implicit_negative_classes" or "negative_classes"
         unified_names = list(ub.unique(['background'] + list(pred_norm) + list(true_norm)))
-        classes = ndsampler.CategoryTree.coerce(unified_names)
+        classes = kwcoco.CategoryTree.coerce(unified_names)
 
         # raise Exception('\n'.join(errors))
         for true_name, true_cid in true_classes.node_to_id.items():
@@ -260,14 +305,12 @@ class CocoEvaluator(object):
                 extra: any extra information we gathered via coercion
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwcoco
             >>> coco_dset = kwcoco.CocoDataset.demo('shapes8')
             >>> gid_to_det, extras = CocoEvaluator._coerce_dets(coco_dset)
         """
         # coerce the input into dictionary of detection objects.
         import kwcoco
-        import ndsampler
         # if 0:
         #     # hack
         #     isinstance = kwimage.structs._generic._isinstance2
@@ -321,8 +364,8 @@ class CocoEvaluator(object):
                     **kw,
                 ).numpy()
                 gid_to_det[gid] = dets
-        elif isinstance(dataset, ndsampler.CocoSampler):
-            # Input is an ndsampler object
+        elif COCO_SAMPLER_CLS and isinstance(dataset, COCO_SAMPLER_CLS):
+            # Input is an ndsampler.CocoSampler object
             extra['sampler'] = sampler = dataset
             coco_dset = sampler.dset
             gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
@@ -363,7 +406,6 @@ class CocoEvaluator(object):
         """
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> from kwcoco.coco_evaluator import *  # NOQA
             >>> from kwcoco.coco_evaluator import CocoEvaluator
             >>> import kwcoco
@@ -494,13 +536,14 @@ class CocoEvaluator(object):
             print('ovr_measures2 = {!r}'.format(ovr_measures2))
             results.ovr_measures2 = ovr_measures2
 
-        # TODO: The evaluate method itself probably shouldn't do the drawing it
-        # should be the responsibility of the caller.
-        if coco_eval.config['draw']:
-            results.dump_figures(
-                coco_eval.config['out_dpath'],
-                expt_title=coco_eval.config['expt_title']
-            )
+        if 0:
+            # TODO: The evaluate method itself probably shouldn't do the drawing it
+            # should be the responsibility of the caller.
+            if coco_eval.config['draw']:
+                results.dump_figures(
+                    coco_eval.config['out_dpath'],
+                    expt_title=coco_eval.config['expt_title']
+                )
         return results
 
 
@@ -685,7 +728,6 @@ class CocoResults(ub.NiceRepr):
 def _load_dets(pred_fpaths, workers=6):
     """
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
         >>> import ubelt as ub
         >>> import kwcoco
@@ -720,7 +762,6 @@ def _load_dets(pred_fpaths, workers=6):
 def _load_dets_worker(single_pred_fpath, with_coco=True):
     """
     Ignore:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
         >>> import ubelt as ub
         >>> import kwcoco
@@ -752,12 +793,103 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
         return dets
 
 
+class CocoEvalCLIConfig(scfg.Config):
+    default = ub.dict_union(CocoEvalConfig.default, {
+        # These should go into the CLI args, not the class config args
+        'expt_title': scfg.Value('', type=str, help='title for plots'),
+        'draw': scfg.Value(True, help='draw metric plots'),
+        'out_dpath': scfg.Value('./coco_metrics', type=str),
+    })
+
+
 def main(cmdline=True, **kw):
-    config = CocoEvalConfig(cmdline=cmdline, default=kw)
+    config = CocoEvalCLIConfig(cmdline=cmdline, default=kw)
+    print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+
     coco_eval = CocoEvaluator(config)
     coco_eval._init()
-    coco_eval.evaluate()
 
+    results = coco_eval.evaluate()
+
+    ub.ensuredir(config['out_dpath'])
+
+    if 1:
+        metrics_fpath = join(config['out_dpath'], 'metrics.json')
+        print('dumping metrics_fpath = {!r}'.format(metrics_fpath))
+        results.dump(metrics_fpath, indent='    ')
+    else:
+        import json
+        with open(join(config['out_dpath'], 'meta.json'), 'w') as file:
+            state = results.meta
+            json.dump(state, file, indent='    ')
+
+        with open(join(config['out_dpath'], 'measures.json'), 'w') as file:
+            state = results.measures.__json__()
+            json.dump(state, file, indent='    ')
+
+        with open(join(config['out_dpath'], 'ovr_measures.json'), 'w') as file:
+            state = results.ovr_measures.__json__()
+            json.dump(state, file, indent='    ')
+
+        with open(join(config['out_dpath'], 'cfsn_vecs.json'), 'w') as file:
+            state = results.cfsn_vecs.__json__()
+            json.dump(state, file, indent='    ')
+
+    if config['draw']:
+        results.dump_figures(
+            config['out_dpath'],
+            expt_title=config['expt_title']
+        )
+
+    if 'coco_dset' in coco_eval.true_extra:
+        truth_dset = coco_eval.true_extra['coco_dset']
+    elif 'sampler' in coco_eval.true_extra:
+        truth_dset = coco_eval.true_extra['sampler'].dset
+    else:
+        truth_dset = None
+
+    if truth_dset is not None:
+        print('Attempting to draw examples')
+        gid_to_stats = {}
+        import kwarray
+        gids, groupxs = kwarray.group_indices(results.cfsn_vecs.data['gid'])
+        for gid, groupx in zip(gids, groupxs):
+            true_vec = results.cfsn_vecs.data['true'][groupx]
+            pred_vec = results.cfsn_vecs.data['pred'][groupx]
+            is_true = (true_vec > 0)
+            is_pred = (pred_vec > 0)
+            has_pred = is_true & is_pred
+
+            stats = {
+                'num_assigned_pred': has_pred.sum(),
+                'num_true': is_true.sum(),
+                'num_pred': is_pred.sum(),
+            }
+            stats['frac_assigned'] = stats['num_assigned_pred'] / stats['num_true']
+            gid_to_stats[gid] = stats
+
+        set([stats['frac_assigned'] for stast in gid_to_stats.values()])
+        gid = ub.argmax(gid_to_stats, key=lambda x: x['num_pred'] * x['num_true'])
+        stat_gids = [gid]
+
+        rng = kwarray.ensure_rng(None)
+        random_gids = rng.choice(gids, size=5).tolist()
+        # import random
+        # random_gids = random.choices(gids, k=5)
+        found_gids = truth_dset.find_representative_images(gids)
+        draw_gids = list(ub.unique(found_gids + stat_gids + random_gids))
+
+        for gid in ub.ProgIter(draw_gids):
+            truth_dets = coco_eval.gid_to_true[gid]
+            pred_dets = coco_eval.gid_to_pred[gid]
+
+            canvas = truth_dset.load_image(gid)
+            canvas = truth_dets.draw_on(canvas, color='green', sseg=False)
+            canvas = pred_dets.draw_on(canvas, color='blue', sseg=False)
+
+            viz_dpath = ub.ensuredir((config['out_dpath'], 'viz'))
+            fig_fpath = join(viz_dpath, 'eval-gid={}.jpg'.format(gid))
+            kwimage.imwrite(fig_fpath, canvas)
 
 if __name__ == '__main__':
     """

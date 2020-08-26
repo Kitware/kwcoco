@@ -5,6 +5,28 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## Version 0.1.5 - Unreleased
+
+### Added
+
+* Ported the non-torch components of CategoryTree from ndsampler to kwcoco. 
+* This helps kwcoco work better as a standalone package.
+* Union now works with videos
+* New formal schema with jsonschema validation support
+* Add `autobuild` kwarg to `CocoDset.subset`
+
+
+### Changed
+* Removed optional dependency on ndsampler, functionality should now be available without ndsampler.
+
+
+### Fixed
+
+* the `_check_index` method now works correctly.
+* `add_image` with `video_id` now works even if the video doesn't exist yet.
+* `add_annotation` no longer fails if `category_id` is None.
+
+
 ## Version 0.1.4 - Released 2020-07-20
 
 ### Added
@@ -57,9 +79,3 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Initial version
-
-## Version 0.1.3 - Unreleased
-
-## Version 0.1.4 - Unreleased
-
-## Version 0.1.4 - Unreleased

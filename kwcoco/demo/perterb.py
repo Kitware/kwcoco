@@ -7,7 +7,6 @@ def perterb_coco(coco_dset, **kwargs):
     Perterbs a coco dataset
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:ndsampler)
         >>> from kwcoco.demo.perterb import *  # NOQA
         >>> from kwcoco.demo.perterb import _demo_construct_probs
         >>> import kwcoco
@@ -174,54 +173,56 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
         # HACK! All that nice work we did is too slow for doctests
         return class_energy
 
-    class_energy = torch.Tensor(class_energy)
-    cond_logprobs = classes.conditional_log_softmax(class_energy, dim=1)
-    cond_probs = torch.exp(cond_logprobs).numpy()
+    raise AssertionError('must be hacked')
 
-    # I was having a difficult time getting this right, so an
-    # inefficient per-item non-vectorized implementation it is.
-    # Note: that this implementation takes 70% of the time in this function
-    # and is a bottleneck for the doctests. A vectorized implementation would
-    # be nice.
-    idx_to_ancestor_idxs = classes.idx_to_ancestor_idxs()
-    idx_to_groups = {idx: group for group in classes.idx_groups for idx in group}
+    # class_energy = torch.Tensor(class_energy)
+    # cond_logprobs = classes.conditional_log_softmax(class_energy, dim=1)
+    # cond_probs = torch.exp(cond_logprobs).numpy()
 
-    def set_conditional_score(row, cx, score, idx_to_groups):
-        group_cxs = np.array(idx_to_groups[cx])
-        flags = group_cxs == cx
-        group_row = row[group_cxs]
-        # Ensure that that heriarchical probs sum to 1
-        current = group_row[~flags]
-        other = current * (1 - score) / current.sum()
-        other = np.nan_to_num(other)
-        group_row[~flags] = other
-        group_row[flags] = score
-        row[group_cxs] = group_row
+    # # I was having a difficult time getting this right, so an
+    # # inefficient per-item non-vectorized implementation it is.
+    # # Note: that this implementation takes 70% of the time in this function
+    # # and is a bottleneck for the doctests. A vectorized implementation would
+    # # be nice.
+    # idx_to_ancestor_idxs = classes.idx_to_ancestor_idxs()
+    # idx_to_groups = {idx: group for group in classes.idx_groups for idx in group}
 
-    for row, cx, score in zip(cond_probs, pred_cxs, pred_scores2):
-        set_conditional_score(row, cx, score, idx_to_groups)
-        for ancestor_cx in idx_to_ancestor_idxs[cx]:
-            if ancestor_cx != cx:
-                # Hack all parent probs to 1.0 so conditional probs
-                # turn into real probs.
-                set_conditional_score(row, ancestor_cx, 1.0, idx_to_groups)
-                # TODO: could add a fudge factor here so the
-                # conditional prob is higher than score, but parent
-                # probs are less than 1.0
+    # def set_conditional_score(row, cx, score, idx_to_groups):
+    #     group_cxs = np.array(idx_to_groups[cx])
+    #     flags = group_cxs == cx
+    #     group_row = row[group_cxs]
+    #     # Ensure that that heriarchical probs sum to 1
+    #     current = group_row[~flags]
+    #     other = current * (1 - score) / current.sum()
+    #     other = np.nan_to_num(other)
+    #     group_row[~flags] = other
+    #     group_row[flags] = score
+    #     row[group_cxs] = group_row
 
-                # TODO: could also maximize entropy of descendant nodes
-                # so classes.decision2 would stop at this node
+    # for row, cx, score in zip(cond_probs, pred_cxs, pred_scores2):
+    #     set_conditional_score(row, cx, score, idx_to_groups)
+    #     for ancestor_cx in idx_to_ancestor_idxs[cx]:
+    #         if ancestor_cx != cx:
+    #             # Hack all parent probs to 1.0 so conditional probs
+    #             # turn into real probs.
+    #             set_conditional_score(row, ancestor_cx, 1.0, idx_to_groups)
+    #             # TODO: could add a fudge factor here so the
+    #             # conditional prob is higher than score, but parent
+    #             # probs are less than 1.0
 
-    # For each level the conditional probs must sum to 1
-    if cond_probs.size > 0:
-        for idxs in classes.idx_groups:
-            level = cond_probs[:, idxs]
-            totals = level.sum(axis=1)
-            assert level.shape[1] == 1 or np.allclose(totals, 1.0), str(level) + ' : ' + str(totals)
+    #             # TODO: could also maximize entropy of descendant nodes
+    #             # so classes.decision2 would stop at this node
 
-    cond_logprobs = torch.Tensor(cond_probs).log()
-    class_probs = classes._apply_logprob_chain_rule(cond_logprobs, dim=1).exp().numpy()
-    class_probs = class_probs.reshape(-1, len(classes))
-    # print([p[x] for p, x in zip(class_probs, pred_cxs)])
-    # print(pred_scores2)
-    return class_probs
+    # # For each level the conditional probs must sum to 1
+    # if cond_probs.size > 0:
+    #     for idxs in classes.idx_groups:
+    #         level = cond_probs[:, idxs]
+    #         totals = level.sum(axis=1)
+    #         assert level.shape[1] == 1 or np.allclose(totals, 1.0), str(level) + ' : ' + str(totals)
+
+    # cond_logprobs = torch.Tensor(cond_probs).log()
+    # class_probs = classes._apply_logprob_chain_rule(cond_logprobs, dim=1).exp().numpy()
+    # class_probs = class_probs.reshape(-1, len(classes))
+    # # print([p[x] for p, x in zip(class_probs, pred_cxs)])
+    # # print(pred_scores2)
+    # return class_probs
