@@ -30,13 +30,13 @@ class CocoRerootCLI:
         Example Usage:
             kwcoco reroot --help
             kwcoco reroot --src=special:shapes8 --dst rebased.json
-            kwcoco reroot --src=special:shapes8 --img_root=foo --check=True --dst rebased.json
+            kwcoco reroot --src=special:shapes8 --new_root=foo --check=True --dst rebased.json
         """
         default = {
             'src': scfg.Value(None, help=(
                 'Path to the coco dataset')),
 
-            'img_root': scfg.Value(None, help=(
+            'new_root': scfg.Value(None, help=(
                 'Path to the new image root.')),
 
             'old_root': scfg.Value(None, help=(
@@ -66,19 +66,19 @@ class CocoRerootCLI:
             python ~/code/kwcoco/kwcoco/cli/coco_reroot.py  \
                 --src=$HOME/code/bioharn/fast_test/deep_training/training_truth.json \
                 --dst=$HOME/code/bioharn/fast_test/deep_training/training_truth2.json \
-                --img_root=/home/joncrall/code/bioharn/fast_test/training_data \
+                --new_root=/home/joncrall/code/bioharn/fast_test/training_data \
                 --old_root=/run/media/matt/Storage/TEST/training_data
 
             python ~/code/kwcoco/kwcoco/cli/coco_reroot.py  \
                 --src=$HOME/code/bioharn/fast_test/deep_training/validation_truth.json \
                 --dst=$HOME/code/bioharn/fast_test/deep_training/validation_truth2.json \
-                --img_root=/home/joncrall/code/bioharn/fast_test/training_data \
+                --new_root=/home/joncrall/code/bioharn/fast_test/training_data \
                 --old_root=/run/media/matt/Storage/TEST/training_data
 
             cmdline = '''
                 --src=$HOME/code/bioharn/fast_test/deep_training/training_truth.json
                 --dst=$HOME/code/bioharn/fast_test/deep_training/training_truth2.json
-                --img_root=/home/joncrall/code/bioharn/fast_test/training_data
+                --new_root=/home/joncrall/code/bioharn/fast_test/training_data
                 --old_root=/run/media/matt/Storage/TEST/training_data
             '''
                 /run/media/matt/Storage/TEST/training_data
@@ -96,7 +96,7 @@ class CocoRerootCLI:
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
         dset.reroot(
-            img_root=config['img_root'],
+            new_root=config['new_root'],
             old_root=config['old_root'],
             absolute=config['absolute'],
             check=config['check']

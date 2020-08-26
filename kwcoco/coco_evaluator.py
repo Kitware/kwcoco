@@ -872,9 +872,10 @@ def main(cmdline=True, **kw):
         gid = ub.argmax(gid_to_stats, key=lambda x: x['num_pred'] * x['num_true'])
         stat_gids = [gid]
 
-        import random
-
-        random_gids = random.choices(gids, k=5)
+        rng = kwarray.ensure_rng(None)
+        random_gids = rng.choice(gids, size=5).tolist()
+        # import random
+        # random_gids = random.choices(gids, k=5)
         found_gids = truth_dset.find_representative_images(gids)
         draw_gids = list(ub.unique(found_gids + stat_gids + random_gids))
 

@@ -41,7 +41,7 @@ class CocoSplitCLI(object):
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
         if config['src'] is None:
-            raise Exception('must specify source: '.format(config['src']))
+            raise Exception('must specify source: {}'.format(config['src']))
 
         print('reading fpath = {!r}'.format(config['src']))
         dset = kwcoco.CocoDataset.coerce(config['src'])
