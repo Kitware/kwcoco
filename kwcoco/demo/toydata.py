@@ -288,6 +288,9 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         import xdev
         globals().update(xdev.get_func_kwargs(demodata_toy_dset))
 
+    TODO:
+        - [ ] Non-homogeneous images sizes
+
     Example:
         >>> from kwcoco.demo.toydata import *
         >>> import kwcoco

@@ -1413,7 +1413,7 @@ class MixinCocoExtras(object):
             if self.imgs is not None:
                 resolved_img = self.imgs[gid_or_img]
             else:
-                for img in self.dataset['imgotations']:
+                for img in self.dataset['images']:
                     if img['id'] == gid_or_img:
                         resolved_img = img
                         break
@@ -2261,9 +2261,13 @@ class MixinCocoExtras(object):
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
 
-        # Need to invalidate the self.index.file_name_to_img
-        # TODO we dont have to invalidate everything
-        self.index.clear()
+        if self.index:
+            # Only need to recompute the self.index.file_name_to_img
+            # We dont have to invalidate everything
+            # FIXME: the index should have some method for doing this
+            # (ideally lazilly)
+            self.index.file_name_to_img = {
+                img['file_name']: img for img in self.index.imgs.values()}
 
         self.img_root = new_img_root
         return self
