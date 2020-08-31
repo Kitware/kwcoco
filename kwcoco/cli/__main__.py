@@ -14,7 +14,7 @@ def main(cmdline=True, **kw):
     from kwcoco.cli import coco_toydata
     from kwcoco.cli import coco_eval
     from kwcoco.cli import coco_modify_categories
-    # from kwcoco.cli import coco_reroot
+    from kwcoco.cli import coco_reroot
 
     # Create a list of all submodules with CLI interfaces
     cli_modules = [
@@ -22,7 +22,7 @@ def main(cmdline=True, **kw):
         coco_union,
         coco_split,
         coco_show,
-        # coco_reroot,
+        coco_reroot,
         coco_toydata,
         coco_eval,
         coco_modify_categories,
@@ -40,6 +40,8 @@ def main(cmdline=True, **kw):
         description='The Kitware COCO CLI',
         formatter_class=RawDescriptionDefaultsHelpFormatter,
     )
+    parser.add_argument('--version', action='store_true',
+                        help='show version number and exit')
     subparsers = parser.add_subparsers(help='specify a command to run')
 
     for cli_module in cli_modules:
@@ -64,6 +66,12 @@ def main(cmdline=True, **kw):
 
     # Execute the subcommand without additional CLI parsing
     kw = ns.__dict__
+
+    if kw.pop('version'):
+        import kwcoco
+        print(kwcoco.__version__)
+        return 0
+
     main = kw.pop('main', None)
     if main is None:
         parser.print_help()
