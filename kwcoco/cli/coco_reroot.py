@@ -30,16 +30,16 @@ class CocoRerootCLI:
         Example Usage:
             kwcoco reroot --help
             kwcoco reroot --src=special:shapes8 --dst rebased.json
-            kwcoco reroot --src=special:shapes8 --new_root=foo --check=True --dst rebased.json
+            kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rebased.json
         """
         default = {
             'src': scfg.Value(None, help=(
                 'Path to the coco dataset')),
 
-            'new_root': scfg.Value(None, help=(
+            'new_prefix': scfg.Value(None, help=(
                 'Path to the new image root.')),
 
-            'old_root': scfg.Value(None, help=(
+            'old_prefix': scfg.Value(None, help=(
                 'Previous root to remove.')),
 
             'absolute': scfg.Value(True, help=(
@@ -66,25 +66,26 @@ class CocoRerootCLI:
             python ~/code/kwcoco/kwcoco/cli/coco_reroot.py  \
                 --src=$HOME/code/bioharn/fast_test/deep_training/training_truth.json \
                 --dst=$HOME/code/bioharn/fast_test/deep_training/training_truth2.json \
-                --new_root=/home/joncrall/code/bioharn/fast_test/training_data \
-                --old_root=/run/media/matt/Storage/TEST/training_data
+                --new_prefix=/home/joncrall/code/bioharn/fast_test/training_data \
+                --old_prefix=/run/media/matt/Storage/TEST/training_data
 
             python ~/code/kwcoco/kwcoco/cli/coco_reroot.py  \
                 --src=$HOME/code/bioharn/fast_test/deep_training/validation_truth.json \
                 --dst=$HOME/code/bioharn/fast_test/deep_training/validation_truth2.json \
-                --new_root=/home/joncrall/code/bioharn/fast_test/training_data \
-                --old_root=/run/media/matt/Storage/TEST/training_data
+                --new_prefix=/home/joncrall/code/bioharn/fast_test/training_data \
+                --old_prefix=/run/media/matt/Storage/TEST/training_data
 
             cmdline = '''
                 --src=$HOME/code/bioharn/fast_test/deep_training/training_truth.json
                 --dst=$HOME/code/bioharn/fast_test/deep_training/training_truth2.json
-                --new_root=/home/joncrall/code/bioharn/fast_test/training_data
-                --old_root=/run/media/matt/Storage/TEST/training_data
+                --new_prefix=/home/joncrall/code/bioharn/fast_test/training_data
+                --old_prefix=/run/media/matt/Storage/TEST/training_data
             '''
                 /run/media/matt/Storage/TEST/training_data
                 --check=True --dst rebased.json
         """
         import kwcoco
+        from os.path import dirname
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
@@ -95,9 +96,12 @@ class CocoRerootCLI:
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
+        new_root = dirname(config['dst'])
+
         dset.reroot(
-            new_root=config['new_root'],
-            old_root=config['old_root'],
+            new_root=new_root,
+            new_prefix=config['new_prefix'],
+            old_prefix=config['old_prefix'],
             absolute=config['absolute'],
             check=config['check']
         )

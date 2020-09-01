@@ -2052,8 +2052,14 @@ class MixinCocoExtras(object):
             DeprecationWarning)
         return self.reroot(*args, **kw)
 
-    def reroot(self, new_root=None, old_root=None, absolute=False, check=True,
-               safe=True, smart=False):
+    def reroot(self, new_root=None,
+               old_prefix=None,
+               new_prefix=None,
+               old_root=None,
+               absolute=False,
+               check=True,
+               safe=True,
+               smart=False):
         """
         Rebase image/data paths onto a new image/data root.
 
@@ -2062,7 +2068,14 @@ class MixinCocoExtras(object):
                 New image root. If unspecified the current ``self.img_root`` is
                 used.
 
+            old_prefix (str, default=None):
+                If specified, removes this prefix from file names.
+
+            new_prefix (str, default=None):
+                If specified, adds this prefix to the file names.
+
             old_root (str, default=None):
+                DEPRECATED DO NOT USE
                 If specified, removes the root from file names. If unspecified,
                 then the existing paths MUST be relative to ``new_root``.
 
@@ -2142,10 +2155,10 @@ class MixinCocoExtras(object):
             >>>     dset_host_abs = dset.copy().reroot(host, absolute=True, check=0)
             >>>     report(dset_host_abs, 'dset_host_abs')
             >>>     #
-            >>>     dset_remote_rel = dset.copy().reroot(host, old_root=remote, absolute=False, check=0)
+            >>>     dset_remote_rel = dset.copy().reroot(host, old_prefix=remote, absolute=False, check=0)
             >>>     report(dset_remote_rel, 'dset_remote_rel')
             >>>     #
-            >>>     dset_remote_abs = dset.copy().reroot(host, old_root=remote, absolute=True, check=0)
+            >>>     dset_remote_abs = dset.copy().reroot(host, old_prefix=remote, absolute=True, check=0)
             >>>     report(dset_remote_abs, 'dset_remote_abs')
 
         Example:
@@ -2193,7 +2206,6 @@ class MixinCocoExtras(object):
         from os.path import exists, relpath
 
         new_img_root = new_root
-        old_img_root = old_root
         cur_img_root = self.img_root
         if new_img_root is None:
             new_img_root = self.img_root
@@ -2206,16 +2218,19 @@ class MixinCocoExtras(object):
 
             cur_gpath = join(cur_img_root, file_name)
 
-            if old_img_root is not None:
-                if file_name.startswith(old_img_root):
-                    file_name = relpath(file_name, old_img_root)
-                elif cur_gpath.startswith(old_img_root):
-                    file_name = relpath(cur_gpath, old_img_root)
+            if old_prefix is not None:
+                if file_name.startswith(old_prefix):
+                    file_name = relpath(file_name, old_prefix)
+                elif cur_gpath.startswith(old_prefix):
+                    file_name = relpath(cur_gpath, old_prefix)
+
+            if new_prefix is not None:
+                file_name = join(new_prefix, file_name)
 
             if absolute:
                 new_file_name = join(new_img_root, file_name)
             else:
-                if cur_gpath.startswith(new_img_root):
+                if new_img_root is not None and cur_gpath.startswith(new_img_root):
                     new_file_name = relpath(cur_gpath, new_img_root)
                 else:
                     new_file_name = file_name
