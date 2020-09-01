@@ -106,7 +106,9 @@ class CocoRerootCLI:
             check=config['check']
         )
 
-        dset.dump(config['dst'], newlines=True)
+        dset.fpath = config['dst']
+        print('dump dset.fpath = {!r}'.format(dset.fpath))
+        dset.dump(dset.fpath, newlines=True)
 
 
 _CLI = CocoRerootCLI
