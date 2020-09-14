@@ -1,10 +1,9 @@
 import numpy as np
 import ubelt as ub
 import warnings
+import six
 from kwcoco.metrics.functional import fast_confusion_matrix
 from kwcoco.metrics.util import DictProxy
-
-
 from kwcoco.category_tree import CategoryTree
 
 try:
@@ -253,6 +252,9 @@ class ConfusionVectors(ub.NiceRepr):
     def coarsen(cfsn_vecs, cxs):
         """
         Creates a coarsened set of vectors
+
+        Returns:
+            ConfusionVectors
         """
         import kwarray
         assert cfsn_vecs.probs is not None, 'need probs'
@@ -290,6 +292,9 @@ class ConfusionVectors(ub.NiceRepr):
         detectors. It is assumed that scores of "positive" classes should be
         high and "negative" clases should be low.
 
+        TODO:
+            - [ ] rename to binarize classless
+
         Args:
             negative_classes (List[str | int]): list of negative class names or
                 idxs, by default chooses any class with a true class index of
@@ -319,7 +324,6 @@ class ConfusionVectors(ub.NiceRepr):
                         'classes must be known if negative_classes are strings')
                 return [c.lower() for c in cfsn_vecs.classes]
             for c in negative_classes:
-                import six
                 if isinstance(c, six.string_types):
                     classes = _lower_classes()
                     try:
@@ -1109,7 +1113,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
                 if sample_weight is None:
                     sample_weight = np.ones(len(self))
                 npad = stabalize_pad
-                y_true, y_score, sample_weight = _stabalilze_data(
+                y_true, y_score, sample_weight = _stabalize_data(
                     y_true, y_score, sample_weight, npad=npad)
 
             # Get the total weight (typically number of) positive and negative
@@ -1382,7 +1386,7 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
         self.draw('acc', fnum=fnum, pnum=pnum_())
 
 
-def _stabalilze_data(y_true, y_score, sample_weight, npad=7):
+def _stabalize_data(y_true, y_score, sample_weight, npad=7):
     """
     Adds ideally calibrated dummy values to curves with few positive examples.
     This acts somewhat like a Baysian prior and smooths out the curve.

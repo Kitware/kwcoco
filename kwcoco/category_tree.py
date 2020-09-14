@@ -244,6 +244,7 @@ class CategoryTree(ub.NiceRepr):
                 Can be 'coco' (which uses the default coco demo data).
                 Can be 'btree' which creates a binary tree and accepts kwargs
                     'r' and 'h' for branching-factor and height.
+                Can be 'btree2', which is the same as btree but returns strings
 
         CommandLine:
             xdoctest -m ~/code/kwcoco/kwcoco/category_tree.py CategoryTree.demo

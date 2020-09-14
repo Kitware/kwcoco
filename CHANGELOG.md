@@ -8,6 +8,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.1.6 - Unreleased
 
 
+### Changed
+* Yet more change to `reroot`, this needs to get reviewed and fixed.
+
+
+### Fixed
+* Added version flag to the CLI
+
 ## Version 0.1.5 - Released 2020-08-26
 
 ### Added
@@ -24,7 +31,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Fixed
-
 * the `_check_index` method now works correctly.
 * `add_image` with `video_id` now works even if the video doesn't exist yet.
 * `add_annotation` no longer fails if `category_id` is None.

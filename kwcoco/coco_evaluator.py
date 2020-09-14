@@ -14,6 +14,8 @@ from os.path import isdir
 from os.path import isfile
 from os.path import join
 import scriptconfig as scfg
+import warnings
+import json
 # from kwcoco.metrics.util import DictProxy
 
 
@@ -38,8 +40,6 @@ class CocoEvalConfig(scfg.Config):
         'classes_of_interest': scfg.Value(None, type=list, help='if specified only these classes are given weight'),
         'ignore_classes': scfg.Value(None, type=list, help='classes to ignore (give them zero weight)'),
 
-        # 'TODO: OPTION FOR CLASSLESS-LOCALIZATION SCOREING ONLY'
-
         # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
 
         'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
@@ -49,6 +49,8 @@ class CocoEvalConfig(scfg.Config):
         'implicit_ignore_classes': scfg.Value(['ignore']),
 
         'use_image_names': scfg.Value(False, help='if True use image file_name to associate images instead of ids'),
+
+        'ovthresh': scfg.Value(0.5, help='IoU overlap threshold for detection assignment'),
 
         # These should go into the CLI args, not the class config args
         'expt_title': scfg.Value('', type=str, help='title for plots'),
@@ -116,6 +118,11 @@ class CocoEvaluator(object):
         coco_eval._logs.append((level, msg))
 
     def _init(coco_eval):
+        """
+        Performs initial coercion from given inputs into dictionaries of
+        kwimage.Detection objects and attempts to ensure comparable category
+        and image ids.
+        """
         # TODO: coerce into a cocodataset form if possible
         coco_eval.log('init truth dset')
 
@@ -404,6 +411,14 @@ class CocoEvaluator(object):
 
     def evaluate(coco_eval):
         """
+        Executes the main evaluation logic. Performs assignments between
+        detections to make DetectionMetrics object, then creates per-item and
+        ovr confusion vectors, and performs various threshold-vs-confusion
+        analyses.
+
+        Returns:
+            CocoResults: container storing (and capable of drawing /
+            serializing) results
 
         Example:
             >>> from kwcoco.coco_evaluator import *  # NOQA
@@ -479,11 +494,15 @@ class CocoEvaluator(object):
 
         # Detection only scoring
         print('Building confusion vectors')
-        cfsn_vecs = dmet.confusion_vectors(ignore_classes=ignore_classes,
-                                           ovthresh=0.5,  # compute AP@0.5iou
-                                           workers=8)
+        cfsn_vecs = dmet.confusion_vectors(
+            ignore_classes=ignore_classes, compat='all',
+            ovthresh=coco_eval.config['ovthresh'], workers=8)
 
-        # Get pure per-item detection results
+        # NOTE: translating to classless confusion vectors only works when
+        # compat='all', otherwise we would need to redo confusion vector
+        # computation.
+
+        # Get classless per-item detection results
         binvecs = cfsn_vecs.binarize_peritem(negative_classes=negative_classes)
 
         measures = binvecs.measures(fp_cutoff=fp_cutoff)
@@ -585,7 +604,6 @@ class CocoResults(ub.NiceRepr):
             with open(file, 'w') as fp:
                 return results.dump(fp, indent=indent)
         else:
-            import json
             state = results.__json__()
             json.dump(state, file, indent=indent)
 
@@ -613,8 +631,11 @@ class CocoResults(ub.NiceRepr):
         # TODO: kwcoco matplotlib backend context
         kwplot.autompl()
 
-        import seaborn
-        seaborn.set()
+        try:
+            import seaborn
+            seaborn.set()
+        except Exception:
+            pass
 
         figsize = (9, 7)
 
@@ -688,7 +709,6 @@ class CocoResults(ub.NiceRepr):
             cfsn_vecs = results.cfsn_vecs
             fig = kwplot.figure(fnum=3, doclf=True)
             confusion = cfsn_vecs.confusion_matrix()
-            import kwplot
             ax = kwplot.plot_matrix(confusion, fnum=3, showvals=0, logscale=True)
             fig_fpath = join(metrics_dpath, 'confusion.png')
             print('write fig_fpath = {!r}'.format(fig_fpath))
@@ -784,7 +804,6 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
         gid = single_img_coco.dataset['images'][0]['id']
         dets.meta['gid'] = gid
     else:
-        import warnings
         warnings.warn('Loading dets with muliple images, must track gids carefully')
 
     if with_coco:
@@ -818,7 +837,6 @@ def main(cmdline=True, **kw):
         print('dumping metrics_fpath = {!r}'.format(metrics_fpath))
         results.dump(metrics_fpath, indent='    ')
     else:
-        import json
         with open(join(config['out_dpath'], 'meta.json'), 'w') as file:
             state = results.meta
             json.dump(state, file, indent='    ')

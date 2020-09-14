@@ -8,6 +8,9 @@ from kwcoco.metrics.assignment import _assign_confusion_vectors
 
 class DetectionMetrics(ub.NiceRepr):
     """
+    Object that computes associations between detections and can convert them
+    into sklearn-compatible representations for scoring.
+
     Attributes:
         gid_to_true_dets (Dict): maps image ids to truth
         gid_to_pred_dets (Dict): maps image ids to predictions
@@ -273,37 +276,6 @@ class DetectionMetrics(ub.NiceRepr):
             y['gid'] = [gid] * len(y['pred'])
             for k, v in y.items():
                 y_accum[k].extend(v)
-
-        # else:
-        #     for gid in ub.ProgIter(gids, desc='assign detections', verbose=verbose):
-        #         true_dets = dmet.true_detections(gid)
-        #         pred_dets = dmet.pred_detections(gid)
-
-        #         y = _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1,
-        #                                       ovthresh=ovthresh, bg_cidx=-1,
-        #                                       bias=bias, classes=dmet.classes,
-        #                                       compat=compat, prioritize=prioritize,
-        #                                       ignore_classes=ignore_classes)
-
-        #         if _tracking_probs:
-        #             # Keep track of per-class probs
-        #             try:
-        #                 pred_probs = pred_dets.probs
-        #             except KeyError:
-        #                 _tracking_probs = False
-        #             else:
-        #                 pxs = np.array(y['pxs'], dtype=np.int)
-        #                 flags = pxs > -1
-        #                 probs = np.zeros((len(pxs), pred_probs.shape[1]),
-        #                                  dtype=np.float32)
-        #                 bg_idx = dmet.classes.node_to_idx['background']
-        #                 probs[:, bg_idx] = 1
-        #                 probs[flags] = pred_probs[pxs[flags]]
-        #                 prob_accum.append(probs)
-
-        #         y['gid'] = [gid] * len(y['pred'])
-        #         for k, v in y.items():
-        #             y_accum[k].extend(v)
 
         _data = {}
         for k, v in ub.ProgIter(list(y_accum.items()), desc='ndarray convert', verbose=verbose):
