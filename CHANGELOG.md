@@ -7,13 +7,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.6 - Unreleased
 
-
 ### Changed
 * Yet more change to `reroot`, this needs to get reviewed and fixed.
 
-
 ### Fixed
 * Added version flag to the CLI
+* Fixes to `ensure_json_serializable` for edge cases and recursion depth
 
 ## Version 0.1.5 - Released 2020-08-26
 
