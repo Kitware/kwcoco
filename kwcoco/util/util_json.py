@@ -292,6 +292,26 @@ class IndexableWalker(Generator):
             d = d[k]
         d[key] = value
 
+    def __delitem__(self, path):
+        """
+        Remove nested value by path
+
+        Note:
+            It can be dangerous to use this while iterating (because we may try
+            to descend into a deleted location) or on leaf items that are
+            list-like (because the indexes of all subsequent items will be
+            modified).
+
+        Args:
+            path (List): list of indexes into the nested structure.
+                The item at the last index will be removed.
+        """
+        d = self.data
+        *prefix, key = path
+        for k in prefix:
+            d = d[k]
+        del d[key]
+
     def _walk(self, data, prefix=[]):
         """
         Defines the underlying generator used by IndexableWalker

@@ -51,6 +51,7 @@ class CocoEvalConfig(scfg.Config):
         'use_image_names': scfg.Value(False, help='if True use image file_name to associate images instead of ids'),
 
         'ovthresh': scfg.Value(0.5, help='IoU overlap threshold for detection assignment'),
+        'area_range': scfg.Value((None, None), help='minimum and maximum object areas to consider TODO'),
 
         # These should go into the CLI args, not the class config args
         'expt_title': scfg.Value('', type=str, help='title for plots'),
@@ -418,14 +419,13 @@ class CocoEvaluator(object):
 
         Returns:
             CocoResults: container storing (and capable of drawing /
-            serializing) results
+                serializing) results
 
         Example:
             >>> from kwcoco.coco_evaluator import *  # NOQA
             >>> from kwcoco.coco_evaluator import CocoEvaluator
             >>> import kwcoco
-            >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
-            >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
+            >>> true_dset = kwcoco.CocoDataset.demo('shapes128')
             >>> from kwcoco.demo.perterb import perterb_coco
             >>> kwargs = {
             >>>     'box_noise': 0.5,
@@ -437,10 +437,13 @@ class CocoEvaluator(object):
             >>> config = {
             >>>     'true_dataset': true_dset,
             >>>     'pred_dataset': pred_dset,
-            >>>     'out_dpath': dpath,
             >>> }
             >>> coco_eval = CocoEvaluator(config)
             >>> results = coco_eval.evaluate()
+            >>> # Now we can draw / serialize the results as we please
+            >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
+            >>> results.dump_figures(dpath)
+            >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
         """
         coco_eval.log('evaluating')
         coco_eval._ensure_init()
@@ -498,6 +501,66 @@ class CocoEvaluator(object):
             ignore_classes=ignore_classes, compat='all',
             ovthresh=coco_eval.config['ovthresh'], workers=8)
 
+        if False:
+            """
+            TODO:
+                - [ ] parametarize area-range
+
+                - [ ] does evaluate return one result or multiple results
+                      based on different configurations?
+
+                - [ ] How do we parametarize that we want to run over multiple
+                      configurations?
+
+                - [ ] What are configuration options that we might change
+                      ovthresh - iou overlap
+                      area_range - iou overlap
+                      max_dets - TODO: in original pycocoutils but not here
+
+                - [ ] What happens if we can reuse old assignments?
+                      Do we just redo them and be inefficient, or can
+                      we save those values somehow?
+
+                - [ ] How do we note what ovthresh and area-range were in
+                      the result plots?
+
+            Notes:
+                COCO DEFINITIONS
+                    areaRng = [[0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
+                    areaRngLbl = ['small', 'medium', 'large']
+            """
+            #
+            # Basic logic to handle area-range by weight modification.
+            #
+            # Note: pycocoutils does this in the assignment stage, but I think
+            # its probably fine to do it as a post processing step (and may be
+            # lead to smoother scores across fine-grained size levels)
+            area_min = 0
+            area_max = 47 ** 2
+            gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
+            new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
+            for gid, groupx in zip(gids, groupxs):
+                # Ignore any truth outside the area range
+                true_area = dmet.gid_to_true_dets[gid].boxes.area
+                txs = cfsn_vecs.data['txs'][groupx]
+                tx_flags = txs > -1
+                tarea = true_area[txs[tx_flags]].ravel()
+                is_toob = ((tarea < area_min) | (tarea < area_max))
+                toob_idxs = groupx[tx_flags][is_toob]
+
+                # Ignore any *unassigned* prediction outside the area range
+                pred_area = dmet.gid_to_pred_dets[gid].boxes.area
+                pxs = cfsn_vecs.data['pxs'][groupx]
+                px_flags = (pxs > -1) & (txs < 0)
+                parea = pred_area[pxs[px_flags]].ravel()
+                is_poob = ((parea < area_min) | (parea < area_max))
+                poob_idxs = groupx[px_flags][is_poob]
+                new_ignore[poob_idxs] = True
+                new_ignore[toob_idxs] = True
+
+            # Overwrite weights (we should probably store originals?)
+            cfsn_vecs.data['weight'][new_ignore] = 0
+
         # NOTE: translating to classless confusion vectors only works when
         # compat='all', otherwise we would need to redo confusion vector
         # computation.
@@ -554,15 +617,6 @@ class CocoEvaluator(object):
             ovr_measures2 = ovr_binvecs2.measures(fp_cutoff=fp_cutoff)['perclass']
             print('ovr_measures2 = {!r}'.format(ovr_measures2))
             results.ovr_measures2 = ovr_measures2
-
-        if 0:
-            # TODO: The evaluate method itself probably shouldn't do the drawing it
-            # should be the responsibility of the caller.
-            if coco_eval.config['draw']:
-                results.dump_figures(
-                    coco_eval.config['out_dpath'],
-                    expt_title=coco_eval.config['expt_title']
-                )
         return results
 
 

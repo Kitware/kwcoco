@@ -2238,6 +2238,9 @@ class MixinCocoExtras(object):
             if check:
                 new_gpath = join(new_img_root, new_file_name)
                 if not exists(new_gpath):
+                    print('cur_gpath = {!r}'.format(cur_gpath))
+                    print('file_name = {!r}'.format(file_name))
+                    print('cur_img_root = {!r}'.format(cur_img_root))
                     print('new_file_name = {!r}'.format(new_file_name))
                     print('new_img_root = {!r}'.format(new_img_root))
                     raise Exception(
