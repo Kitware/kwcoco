@@ -2103,6 +2103,7 @@ class MixinCocoExtras(object):
         Ignore:
             >>> # There might not be a way to easily handle the cases that I
             >>> # want to here. Might need to discuss this.
+            >>> from kwcoco.coco_dataset import *  # NOQA
             >>> import kwcoco
             >>> import os
             >>> gname = 'images/foo.png'
@@ -2230,10 +2231,10 @@ class MixinCocoExtras(object):
             if absolute:
                 new_file_name = join(new_img_root, file_name)
             else:
-                if new_img_root is not None and cur_gpath.startswith(new_img_root):
-                    new_file_name = relpath(cur_gpath, new_img_root)
-                else:
-                    new_file_name = file_name
+                # if new_img_root is not None and cur_gpath.startswith(new_img_root):
+                #     new_file_name = relpath(cur_gpath, new_img_root)
+                # else:
+                new_file_name = file_name
 
             if check:
                 new_gpath = join(new_img_root, new_file_name)
