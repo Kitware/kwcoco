@@ -1597,7 +1597,10 @@ class MixinCocoExtras(object):
         for cat in self.dataset['categories']:
             graph.add_node(cat['name'], **cat)
             if 'supercategory' in cat:
-                graph.add_edge(cat['supercategory'], cat['name'])
+                u = cat['supercategory']
+                v = cat['name']
+                if u != v:
+                    graph.add_edge(u, v)
         return graph
 
     def object_categories(self):

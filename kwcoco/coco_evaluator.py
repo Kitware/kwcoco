@@ -437,6 +437,7 @@ class CocoEvaluator(object):
             >>> config = {
             >>>     'true_dataset': true_dset,
             >>>     'pred_dataset': pred_dset,
+            >>>     'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)]
             >>> }
             >>> coco_eval = CocoEvaluator(config)
             >>> results = coco_eval.evaluate()
