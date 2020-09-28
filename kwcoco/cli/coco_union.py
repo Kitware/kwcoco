@@ -49,6 +49,7 @@ class CocoUnionCLI(object):
 
             if config['absolute']:
                 dset.reroot(absolute=True)
+
             datasets.append(dset)
 
         combo = kwcoco.CocoDataset.union(*datasets)

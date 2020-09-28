@@ -184,12 +184,13 @@ class ConfusionVectors(ub.NiceRepr):
         cfsn_vecs = ConfusionVectors(cfsn_data, probs=probs, classes=classes)
         return cfsn_vecs
 
-    def confusion_matrix(cfsn_vecs, raw=False, compress=False):
+    def confusion_matrix(cfsn_vecs, compress=False):
         """
         Builds a confusion matrix from the confusion vectors.
 
         Args:
-            raw (bool): if True uses 'pred_raw' otherwise used 'pred'
+            compress (bool, default=False):
+                if True removes rows / columns with no entries
 
         Returns:
             pd.DataFrame : cm : the labeled confusion matrix
@@ -197,7 +198,7 @@ class ConfusionVectors(ub.NiceRepr):
                  this use case. #remove_pandas)
 
         CommandLine:
-            xdoctest -m ~/code/kwcoco/kwcoco/metrics/confusion_vectors.py ConfusionVectors.confusion_matrix
+            xdoctest -m kwcoco.metrics.confusion_vectors ConfusionVectors.confusion_matrix
 
         Example:
             >>> from kwcoco.metrics import DetectionMetrics
@@ -217,10 +218,7 @@ class ConfusionVectors(ub.NiceRepr):
         data = cfsn_vecs.data
 
         y_true = data['true'].copy()
-        if raw:
-            y_pred = data['pred_raw'].copy()
-        else:
-            y_pred = data['pred'].copy()
+        y_pred = data['pred'].copy()
 
         # FIXME: hard-coded background class
         if 'background' in cfsn_vecs.classes:
@@ -465,7 +463,8 @@ class ConfusionVectors(ub.NiceRepr):
                 else:
                     import warnings
                     warnings.warn(
-                        'Binarize ovr is only approximate if not all probabilities are known')
+                        'Binarize ovr is only approximate if not all '
+                        'probabilities are known')
                     # If we don't know the probabilities for non-predicted
                     # categories then we have to guess.
                     is_true = cfsn_vecs.data['true'] == cx
@@ -476,7 +475,8 @@ class ConfusionVectors(ub.NiceRepr):
 
                     # These scores were for a different class, so assume
                     # other classes were predicted with a uniform prior
-                    approx_score = (1 - pred_score[score_is_unknown]) / (len(classes) - 1)
+                    approx_score = ((1 - pred_score[score_is_unknown]) /
+                                    (len(classes) - 1))
 
                     # Except in the case where predicted class is -1. In this
                     # case no prediction was actually made (above a threshold)
@@ -749,13 +749,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
         tpr = info['tpr']
         fpr = info['fpr']
         ppv = info['ppv']
-        # thresholds = info['thresholds']
-
-        # tpr_to_fpr = scipy.interpolate.interp1d(tpr, fpr)
-        # tpr_to_ppv = scipy.interpolate.interp1d(tpr, ppv)
-        # tpr_range = np.linspace(tpr.min(), tpr.max(), 16)
-        # fpr_range = tpr_to_fpr(tpr_range)
-        # ppv_range = tpr_to_ppv(tpr_range)
 
         kwargs = {}
         cmap = kwargs.get('cmap', mpl.cm.coolwarm)
@@ -858,89 +851,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
         mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
         info['mcc'] = mcc_numer / mcc_denom
 
-        """
-        import sympy
-        sqrt = sympy.sqrt
-
-        tp, tn, fp, fn, B = sympy.symbols(['tp', 'tn', 'fp', 'fn', 'B'], integer=True,
-        negative=False)
-        numer = (tp * tn - fp * fn)
-        denom = ((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn)) ** 0.5
-        mcc = numer / denom
-
-        ppv = tp / (tp + fp)
-        tpr = tp / (tp + fn)
-
-        FM = ((tp / (tp + fn)) * (tp / (tp + fp))) ** 0.5
-
-        B2 = (B ** 2)
-        B2_1 = (1 + B2)
-
-        F_beta_v1 = (B2_1 * (ppv * tpr)) / ((B2 * ppv) + tpr)
-        F_beta_v2 = (B2_1 * tp) / (B2_1 * tp + B2 * fn + fp)
-
-        # Demo how Beta interacts with harmonic mean weights for F-Beta
-        w1 = 1
-        w2 = 1
-        x1 = tpr
-        x2 = ppv
-        harmonic_mean = (w1 + w2) / ((w1 / x1) + (w2 / x2))
-        harmonic_mean = sympy.simplify(harmonic_mean)
-        expr = sympy.simplify(harmonic_mean - F_beta_v1)
-        sympy.solve(expr, B2)
-
-        geometric_mean = ((x1 ** w1) * (x2 ** w2)) ** (1 / (w1 + w2))
-        geometric_mean = sympy.simplify(geometric_mean)
-        assert sympy.simplify(sympy.simplify(geometric_mean) - sympy.simplify(FM)) == 0
-
-        print('geometric_mean = {!r}'.format(geometric_mean))
-
-        # How do we apply weights to precision and recall when tn is included
-        # in mcc?
-
-        print(sympy.simplify(F_beta_v1))
-        print(sympy.simplify(F_beta_v2))
-        assert sympy.simplify(sympy.simplify(F_beta_v1) - sympy.simplify(F_beta_v2)) == 0
-
-
-        tnr_denom = (tn + fp)
-        tnr = tn / tnr_denom
-
-        pnv_denom = (tn + fn)
-        npv = tn / pnv_denom
-
-        mk = ppv + npv - 1  # markedness (precision analog)
-        bm = tpr + tnr - 1  # informedness (recall analog)
-
-        # Demo how Beta interacts with harmonic mean weights for F-Beta
-        w1 = 2
-        w2 = 1
-        x1 = mk  # precision analog
-        x2 = bm  # recall analog
-        geometric_mean = ((x1 ** w1) * (x2 ** w2)) ** (1 / (w1 + w2))
-        geometric_mean = sympy.simplify(geometric_mean)
-        print('geometric_mean w1=2 = {!r}'.format(geometric_mean))
-
-        w1 = 0.5
-        w2 = 1
-        geometric_mean = ((x1 ** w1) * (x2 ** w2)) ** (1 / (w1 + w2))
-        geometric_mean = sympy.simplify(geometric_mean)
-        print('geometric_mean w1=.5 = {!r}'.format(geometric_mean))
-
-        # By taking the weighted geometric mean of bm and mk we can effectively
-        # create a mcc-beta measure
-
-        values = {fn: 3, fp: 10, tp: 100, tn: 200}
-
-        # Cant seem to verify that gmean(bm, mk) == mcc, with sympy, but it is true
-        values = {fn: np.random.rand() * 10, fp: np.random.rand() * 10, tp: np.random.rand() * 10, tn: np.random.rand() * 10}
-        print(geometric_mean.subs(values))
-        print(abs(mcc).subs(values))
-
-        delta = sympy.simplify(sympy.simplify(geometric_mean) - sympy.simplify(sympy.functions.Abs(mcc)))
-        # assert sympy.simplify(sympy.simplify(geometric_mean) - sympy.simplify(sympy.functions.Abs(mcc))) == 0
-        """
-
         # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
         info['g1'] = np.sqrt(ppv * tpr)
 
@@ -1005,7 +915,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
                 boxes and gives them a predicted index of -1 and a score of
                 zero. This means that this function sees them as having a
                 y_true of 1 and a y_score of 0, which allows the
-                scikit-learn fps and tps counts to effectively get up to
+                scikit-learn fp and tp counts to effectively get up to
                 100% recall when the threshold is zero. The VOC method
                 simply ignores these and handles them implicitly. The
                 problem is that if you remove these from the scikit-learn
@@ -1030,6 +940,10 @@ class BinaryConfusionVectors(ub.NiceRepr):
             last_ind = tpr.searchsorted(tpr[-1])
             rec = np.r_[0, tpr[:last_ind + 1]]
             prec = np.r_[1, ppv[:last_ind + 1]]
+
+            # TODO: Need better way of marked unassigned truth as
+            # never-recallable. We need to prevent these unassigned truths from
+            # incorrectly bringing up our true positive rate at low thresholds.
 
             OUTLIER_AP = 1
 

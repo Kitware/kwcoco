@@ -14,6 +14,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Added version flag to the CLI
 * Fixes to `ensure_json_serializable` for edge cases and recursion depth
 
+
+### Removed
+* Removed `pred_raw` from ConfusionVectors
+
+
 ## Version 0.1.5 - Released 2020-08-26
 
 ### Added

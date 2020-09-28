@@ -283,7 +283,7 @@ class DetectionMetrics(ub.NiceRepr):
             kw = dict()
             if k in {'iou', 'score', 'weight'}:
                 kw['dtype'] = np.float32
-            if k in {'pxs', 'txs', 'gid', 'pred', 'true', 'pred_raw'}:
+            if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
                 kw['dtype'] = np.int32
             try:
                 _data[k] = np.asarray(v, **kw)
@@ -511,15 +511,15 @@ class DetectionMetrics(ub.NiceRepr):
             >>> print(dmet.score_coco()['mAP'])
             0.711016...
         """
-        from pycocotools import coco
+        from pycocotools import coco  # NOQA
         from pycocotools import cocoeval
-        # The original pycoco-api prints to much, supress it
-        import kwcoco as nh
+        from kwcoco.utils.util_monkey import SupressPrint
 
         pred, true = dmet._to_coco()
 
+        # The original pycoco-api prints to much, supress it
         quiet = verbose == 0
-        with nh.util.SupressPrint(coco, cocoeval, enabled=quiet):
+        with SupressPrint(coco, cocoeval, enabled=quiet):
             cocoGt = true._aspycoco()
             cocoDt = pred._aspycoco()
 
@@ -538,10 +538,10 @@ class DetectionMetrics(ub.NiceRepr):
             evaler.accumulate()
             evaler.summarize()
             coco_ap = evaler.stats[1]
-            coco_scores = {
-                'mAP': coco_ap,
-                'evalar_stats': evaler.stats
-            }
+        coco_scores = {
+            'mAP': coco_ap,
+            'evalar_stats': evaler.stats
+        }
         return coco_scores
 
     @classmethod

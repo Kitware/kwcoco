@@ -421,6 +421,9 @@ class CocoEvaluator(object):
             CocoResults: container storing (and capable of drawing /
                 serializing) results
 
+        CommandLine:
+            xdoctest -m kwcoco.coco_evaluator CocoEvaluator.evaluate --vd
+
         Example:
             >>> from kwcoco.coco_evaluator import *  # NOQA
             >>> from kwcoco.coco_evaluator import CocoEvaluator
@@ -434,10 +437,12 @@ class CocoEvaluator(object):
             >>>     'with_probs': True,
             >>> }
             >>> pred_dset = perterb_coco(true_dset, **kwargs)
+            >>> print('true_dset = {!r}'.format(true_dset))
+            >>> print('pred_dset = {!r}'.format(pred_dset))
             >>> config = {
             >>>     'true_dataset': true_dset,
             >>>     'pred_dataset': pred_dset,
-            >>>     'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)]
+            >>>     #'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)]
             >>> }
             >>> coco_eval = CocoEvaluator(config)
             >>> results = coco_eval.evaluate()
@@ -445,6 +450,9 @@ class CocoEvaluator(object):
             >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
             >>> results.dump_figures(dpath)
             >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
+            >>> if ub.argflag('--vd'):
+            >>>     import xdev
+            >>>     xdev.view_directory(dpath)
         """
         coco_eval.log('evaluating')
         coco_eval._ensure_init()

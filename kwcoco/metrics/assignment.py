@@ -82,6 +82,9 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         - [ ] This is a bottleneck function. An implementation in C / C++ /
         Cython would likely improve the overall system.
 
+        - [ ] Implement crowd truth. Allow multiple predictions to match any
+              truth objet marked as "iscrowd".
+
     Returns:
         dict: with relevant confusion vectors. This keys of this dict can be
             interpreted as columns of a data frame. The `txs` / `pxs` columns
@@ -123,15 +126,15 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>>                               compat=compat)
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
-           pred_raw  pred  true  score  weight     iou  txs  pxs
-        0         1     1     2 0.5000  1.0000  1.0000    3    5
-        1         0     0    -1 0.5000  1.0000 -1.0000   -1    4
-        2         2     2    -1 0.5000  1.0000 -1.0000   -1    3
-        3         1     1    -1 0.5000  1.0000 -1.0000   -1    2
-        4         0     0    -1 0.5000  1.0000 -1.0000   -1    1
-        5         0     0     0 0.5000  0.0000  0.6061    1    0
-        6        -1    -1     0 0.0000  1.0000 -1.0000    0   -1
-        7        -1    -1     1 0.0000  0.9000 -1.0000    2   -1
+           pred  true  score  weight     iou  txs  pxs
+        0     1     2 0.5000  1.0000  1.0000    3    5
+        1     0    -1 0.5000  1.0000 -1.0000   -1    4
+        2     2    -1 0.5000  1.0000 -1.0000   -1    3
+        3     1    -1 0.5000  1.0000 -1.0000   -1    2
+        4     0    -1 0.5000  1.0000 -1.0000   -1    1
+        5     0     0 0.5000  0.0000  0.6061    1    0
+        6    -1     0 0.0000  1.0000 -1.0000    0   -1
+        7    -1     1 0.0000  0.9000 -1.0000    2   -1
 
     Ignore:
         from xinspect.dynamic_kwargs import get_func_kwargs
@@ -152,13 +155,11 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>>                               compat='all', prioritize='class')
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
-        >>> print(y[(y.pred_raw != y.pred)])
         >>> y = _assign_confusion_vectors(true_dets, pred_dets,
         >>>                               classes=dmet.classes,
         >>>                               compat='ancestors', ovthresh=.5)
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
-        >>> print(y[(y.pred_raw != y.pred)])
     """
     import kwarray
     valid_compat_keys = {'ancestors', 'mutex', 'all'}
@@ -264,17 +265,22 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
 
     if ignore_classes is not None:
         # Remove certain ignore regions from scoring
+
+        # FIXME: does this use the iou threshold correctly?
+        # ovthresh is being used as iooa not iou to determine which
+        # pred regions are ignored.
         true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
             true_dets, pred_dets, ovthresh=ovthresh, ignore_classes=ignore_classes)
 
+        # Remove ignored predicted regions from assignment consideration
         _pred_keep_flags = ~pred_ignore_flags[_pred_sortx]
         _pred_sortx = _pred_sortx[_pred_keep_flags]
         _pred_cxs = _pred_cxs[_pred_keep_flags]
         _pred_scores = _pred_scores[_pred_keep_flags]
 
+        # Remove ignored truth regions from assignment consideration
         true_unused[true_ignore_flags] = False
 
-    y_pred_raw = []
     y_pred = []
     y_true = []
     y_score = []
@@ -293,7 +299,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     for px, pred_cx, score in zip(_pred_sortx, _pred_cxs, _pred_scores):
 
         # Find compatible truth indices
-        raw_pred_cx = pred_cx
         true_idxs = cx_to_matchable_txs[pred_cx]
         # Filter out any truth that has already been used
         unused = true_unused[true_idxs]
@@ -384,7 +389,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             if pred_cx is not None and true_cx in cx_to_ancestors[pred_cx]:
                 pred_cx = true_cx
 
-            y_pred_raw.append(raw_pred_cx)
             y_pred.append(pred_cx)
             y_true.append(true_cx)
             y_score.append(score)
@@ -396,7 +400,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             # Assign this prediction to a the background
             # Mark this prediction as a false positive
 
-            y_pred_raw.append(raw_pred_cx)
             y_pred.append(pred_cx)
             y_true.append(bg_cidx)
             y_score.append(score)
@@ -417,7 +420,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     else:
         unused_y_weight = [1.0] * n
 
-    y_pred_raw.extend([-1] * n)
     y_pred.extend([-1] * n)
     y_true.extend(unused_y_true)
     y_score.extend([0.0] * n)
@@ -426,28 +428,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     y_pxs.extend([bg_px] * n)
     y_txs.extend(unused_txs.tolist())
 
-    # TODO:
-    # Can we augment these vectors to balance these false negatives with
-    # implicit false positives?
-
-    BALANCE_FN = False
-    if BALANCE_FN:
-        # balance each false negatives with a false positive
-        # Note: doing this is more correct, but is also more expensive Upweight
-        # these True negative examples to capture the fact that there are
-        # effectively infinite true negatives.
-        w_factor = 10000000
-        y_pred_raw.extend(unused_y_true)
-        y_pred.extend(unused_y_true)
-        y_true.extend([-1] * n)
-        y_score.extend([0.0] * n)
-        y_iou.extend([-1] * n)
-        y_weight.extend((np.array(unused_y_weight) * w_factor).tolist())
-        y_pxs.extend([bg_px] * n)
-        y_txs.extend([bg_px] * n)
-
     y = {
-        'pred_raw': y_pred_raw,
         'pred': y_pred,
         'true': y_true,
         'score': y_score,
