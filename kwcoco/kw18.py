@@ -1,6 +1,39 @@
 # -*- coding: utf-8 -*-
 """
 A helper for converting COCO to / from KW18 format.
+
+KW18 File Format
+https://docs.google.com/spreadsheets/d/1DFCwoTKnDv8qfy3raM7QXtir2Fjfj9j8-z8px5Bu0q8/edit#gid=10
+
+The kw18.trk files are text files, space delimited; each row is one
+frame of one track and all rows have the same number of columns. The fields are:
+
+01) track_ID         : identifies the track
+02) num_frames:     number of frames in the track
+03) frame_id        : frame number for this track sample
+04) loc_x        : X-coordinate of the track (image/ground coords)
+05) loc_y        : Y-coordinate of the track (image/ground coords)
+06) vel_x        : X-velocity of the object (image/ground coords)
+07) vel_y        : Y-velocity of the object (image/ground coords)
+08) obj_loc_x        : X-coordinate of the object (image coords)
+09) obj_loc_y        : Y-coordinate of the object (image coords)
+10) bbox_min_x    : minimum X-coordinate of bounding box (image coords)
+11) bbox_min_y    : minimum Y-coordinate of bounding box (image coords)
+12) bbox_max_x    : maximum X-coordinate of bounding box (image coords)
+13) bbox_max_y    : maximum Y-coordinate of bounding box (image coords)
+14) area        : area of object (pixels)
+15) world_loc_x    : X-coordinate of object in world
+16) world_loc_y    : Y-coordinate of object in world
+17) world_loc_z    : Z-coordiante of object in world
+18) timestamp        : timestamp of frame (frames)
+For the location and velocity of object centroids, use fields 4-7.
+Bounding box is specified using coordinates of the top-left and bottom
+right corners. Fields 15-17 may be ignored.
+
+The kw19.trk and kw20.trk files, when present, add the following field(s):
+19) object class: estimated class of the object, either 1 (person), 2
+(vehicle), or 3 (other).
+20) Activity ID -- refer to activities.txt for index and list of activities.
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 import kwarray
@@ -39,6 +72,10 @@ class KW18(kwarray.DataFrameArray):
     ]
 
     def __init__(self, data):
+        """
+        Args:
+            data : the kw18 data frame.
+        """
         super().__init__(data)
 
     @classmethod
@@ -118,7 +155,7 @@ class KW18(kwarray.DataFrameArray):
         self = KW18(raw)
         return self
 
-    def to_coco(self):
+    def to_coco(self, image_paths=None, video_name=None):
         """
         Translates a kw18 files to a CocoDataset.
 
@@ -126,13 +163,46 @@ class KW18(kwarray.DataFrameArray):
             kw18 does not contain complete information, and as such
             the returned coco dataset may need to be augmented.
 
+        Args:
+            image_paths (Dict[int, str], default=None):
+                if specified, maps frame numbers to image file paths.
+
+            video_name (str, default=None):
+                if specified records the name of the video this kw18 belongs to
+
         TODO:
-            - [ ] allow kwargs to specify path to frames / videos
+            - [X] allow kwargs to specify path to frames / videos
 
         Example:
             >>> from kwcoco.kw18 import KW18
-            >>> self = KW18.demo()
-            >>> self.to_coco()
+            >>> from os.path import join
+            >>> import ubelt as ub
+            >>> import kwimage
+            >>> # Prep test data - autogen a demo kw18 and write it to disk
+            >>> dpath = ub.ensure_app_cache_dir('kwcoco/kw18')
+            >>> kw18_fpath = join(dpath, 'test.kw18')
+            >>> KW18.demo().dump(kw18_fpath)
+            >>> #
+            >>> # Load the kw18 file
+            >>> self = KW18.load(kw18_fpath)
+            >>> # Pretend that these image correspond to kw18 frame numbers
+            >>> frame_names = [kwimage.grab_test_image_fpath(k) for k in kwimage.grab_test_image.keys()]
+            >>> frame_ids = sorted(set(self['frame_number']))
+            >>> image_paths = dict(zip(frame_ids, frame_names))
+            >>> #
+            >>> # Convert the kw18 to kwcoco and specify paths to images
+            >>> coco_dset = self.to_coco(image_paths=image_paths, video_name='dummy.mp4')
+            >>> #
+            >>> # Now we can draw images
+            >>> canvas = coco_dset.draw_image(1)
+            >>> # xdoctest: +REQUIRES(--draw)
+            >>> kwimage.imwrite('foo.jpg', canvas)
+            >>> # Draw all iamges
+            >>> for gid in coco_dset.imgs.keys():
+            >>>     canvas = coco_dset.draw_image(gid)
+            >>>     fpath = join(dpath, 'gid_{}.jpg'.format(gid))
+            >>>     print('write fpath = {!r}'.format(fpath))
+            >>>     kwimage.imwrite(fpath, canvas)
         """
         import kwcoco
         import ubelt as ub
@@ -151,13 +221,17 @@ class KW18(kwarray.DataFrameArray):
 
         # Index frames of the video
         for idx in unique_frame_idxs:
-            frame_index = self['frame_number'][idx]
+            frame_num = self['frame_number'][idx]
             timestamp = self['timestamp'][idx]
+            if image_paths and frame_num in image_paths:
+                file_name = image_paths[frame_num]
+            else:
+                file_name = '<unknown_image_{}>'.format(frame_num)
             dset.add_image(
-                id=frame_index,
-                file_name='<unknown_image_{}>'.format(frame_index),
+                id=frame_num,
+                file_name=file_name,
                 video_id=vidid,
-                frame_index=frame_index,
+                frame_index=frame_num,
                 timestamp=timestamp
             )
 
@@ -187,9 +261,18 @@ class KW18(kwarray.DataFrameArray):
                 velocity=velocity,
                 world_loc=world_loc,
                 **kw)
+        return dset
 
     @classmethod
     def load(KW18, file):
+        """
+        Example:
+            >>> import kwcoco
+            >>> from kwcoco.kw18 import KW18
+            >>> coco_dset = kwcoco.CocoDataset.demo('shapes')
+            >>> kw18_dset = KW18.from_coco(coco_dset)
+            >>> print(kw18_dset.pandas())
+        """
         import pandas as pd
         try:
             EmptyDataError = pd.errors.EmptyDataError

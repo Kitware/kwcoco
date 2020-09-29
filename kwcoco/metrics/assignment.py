@@ -422,7 +422,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
 
     y_pred.extend([-1] * n)
     y_true.extend(unused_y_true)
-    y_score.extend([0.0] * n)
+    y_score.extend([np.nan] * n)
     y_iou.extend([-1] * n)
     y_weight.extend(unused_y_weight)
     y_pxs.extend([bg_px] * n)

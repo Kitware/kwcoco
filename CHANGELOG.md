@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.6 - Unreleased
 
+### Added
+* `kwcoco.kw18.KW18.to_coco` can now accept `image_paths` and `video_name`
+
 ### Changed
 * Yet more change to `reroot`, this needs to get reviewed and fixed.
 

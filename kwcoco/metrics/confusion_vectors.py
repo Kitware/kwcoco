@@ -118,6 +118,12 @@ class ConfusionVectors(ub.NiceRepr):
     @classmethod
     def demo(cfsn_vecs, **kw):
         """
+        Args:
+            **kwargs: See :func:`kwcoco.metrics.DetectionMetrics.demo`
+
+        Returns:
+            ConfusionVectors
+
         Example:
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> print('cfsn_vecs = {!r}'.format(cfsn_vecs))
@@ -562,6 +568,13 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
 
     @classmethod
     def demo(cls):
+        """
+        Args:
+            **kwargs: See :func:`kwcoco.metrics.DetectionMetrics.demo`
+
+        Returns:
+            ConfusionVectors
+        """
         cfsn_vecs = ConfusionVectors.demo()
         self = cfsn_vecs.binarize_ovr(keyby='name')
         return self
@@ -633,13 +646,23 @@ class BinaryConfusionVectors(ub.NiceRepr):
         self.classes = classes
 
     @classmethod
-    def demo(cls, n=10, p_true=0.5, p_error=0.2, rng=None):
+    def demo(cls, n=10, p_true=0.5, p_error=0.2, p_nan=0.0, rng=None):
         """
         Create random data for tests
 
+        Args:
+            n (int): number of rows
+            p_true (int): fraction of real positive cases
+            p_error (int): probability of making a recoverable mistake
+            p_nan (int): probability of making a unrecoverable mistake
+            rng (int | RandomState): random seed / state
+
+        Returns:
+            BinaryConfusionVectors
+
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-            >>> cfsn = BinaryConfusionVectors.demo(n=1000, p_error=0.1)
+            >>> cfsn = BinaryConfusionVectors.demo(n=1000, p_error=0.1, p_nan=0.1)
             >>> measures = cfsn.measures()
             >>> print('measures = {}'.format(ub.repr2(measures, nl=1)))
             >>> # xdoctest: +REQUIRES(--show)
@@ -659,8 +682,11 @@ class BinaryConfusionVectors(ub.NiceRepr):
             'pred_score': score,
         })
 
-        flags = rng.rand(n) < p_error
-        data['is_true'][flags] = 1 - data['is_true'][flags]
+        flip_flags = rng.rand(n) < p_error
+        data['is_true'][flip_flags] = 1 - data['is_true'][flip_flags]
+
+        nan_flags = rng.rand(n) < p_nan
+        data['pred_score'][nan_flags] = np.nan
 
         classes = ['c1', 'c2', 'c3']
         self = cls(data, cx=1, classes=classes)
@@ -796,8 +822,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
             >>> print('measures = {}'.format(ub.repr2(self.measures())))
             >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
-            >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.7, p_error=0.3)
             >>> print('measures = {}'.format(ub.repr2(self.measures())))
 
         Ignore:
@@ -1001,6 +1025,15 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
             >>> self = BinaryConfusionVectors.demo(n=0, p_true=0.5, p_error=0.5)
             >>> self._binary_clf_curves()
+
+            >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.5, p_error=0.5)
+            >>> self._binary_clf_curves()
+
+        Ignore:
+            import xdev
+            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors._binary_clf_curves))
+            >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.7, p_error=0.3, p_nan=0.2)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
         """
         try:
             from sklearn.metrics._ranking import _binary_clf_curve
@@ -1324,6 +1357,113 @@ def _stabalize_data(y_true, y_score, sample_weight, npad=7):
     y_score = np.hstack([y_score, pad_score])
     sample_weight = np.hstack([sample_weight, pad_weight])
     return y_true, y_score, sample_weight
+
+
+def _binary_clf_curve(y_true, y_score, pos_label=None, sample_weight=None):
+    """
+    MODIFIED VERSION OF SCIKIT-LEARN API
+
+    Calculate true and false positives per binary classification threshold.
+
+    Parameters
+    ----------
+    y_true : array, shape = [n_samples]
+        True targets of binary classification
+
+    y_score : array, shape = [n_samples]
+        Estimated probabilities or decision function
+
+    pos_label : int or str, default=None
+        The label of the positive class
+
+    sample_weight : array-like of shape (n_samples,), default=None
+        Sample weights.
+
+    Returns
+    -------
+    fps : array, shape = [n_thresholds]
+        A count of false positives, at index i being the number of negative
+        samples assigned a score >= thresholds[i]. The total number of
+        negative samples is equal to fps[-1] (thus true negatives are given by
+        fps[-1] - fps).
+
+    tps : array, shape = [n_thresholds <= len(np.unique(y_score))]
+        An increasing count of true positives, at index i being the number
+        of positive samples assigned a score >= thresholds[i]. The total
+        number of positive samples is equal to tps[-1] (thus false negatives
+        are given by tps[-1] - tps).
+
+    thresholds : array, shape = [n_thresholds]
+        Decreasing score values.
+    """
+    from sklearn.utils import assert_all_finite
+    from sklearn.utils import column_or_1d
+    from sklearn.utils import check_consistent_length
+    from sklearn.utils.multiclass import type_of_target
+    from sklearn.utils.extmath import stable_cumsum
+    # Check to make sure y_true is valid
+    y_type = type_of_target(y_true)
+    if not (y_type == "binary" or
+            (y_type == "multiclass" and pos_label is not None)):
+        raise ValueError("{0} format is not supported".format(y_type))
+
+    check_consistent_length(y_true, y_score, sample_weight)
+    y_true = column_or_1d(y_true)
+    y_score = column_or_1d(y_score)
+    assert_all_finite(y_true)
+    # assert_all_finite(y_score)
+
+    if sample_weight is not None:
+        sample_weight = column_or_1d(sample_weight)
+
+    # ensure binary classification if pos_label is not specified
+    # classes.dtype.kind in ('O', 'U', 'S') is required to avoid
+    # triggering a FutureWarning by calling np.array_equal(a, b)
+    # when elements in the two arrays are not comparable.
+    classes = np.unique(y_true)
+    if (pos_label is None and (
+            classes.dtype.kind in ('O', 'U', 'S') or
+            not (np.array_equal(classes, [0, 1]) or
+                 np.array_equal(classes, [-1, 1]) or
+                 np.array_equal(classes, [0]) or
+                 np.array_equal(classes, [-1]) or
+                 np.array_equal(classes, [1])))):
+        classes_repr = ", ".join(repr(c) for c in classes)
+        raise ValueError("y_true takes value in {{{classes_repr}}} and "
+                         "pos_label is not specified: either make y_true "
+                         "take value in {{0, 1}} or {{-1, 1}} or "
+                         "pass pos_label explicitly.".format(
+                             classes_repr=classes_repr))
+    elif pos_label is None:
+        pos_label = 1.
+
+    # make y_true a boolean vector
+    y_true = (y_true == pos_label)
+
+    # sort scores and corresponding truth values
+    desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
+    y_score = y_score[desc_score_indices]
+    y_true = y_true[desc_score_indices]
+    if sample_weight is not None:
+        weight = sample_weight[desc_score_indices]
+    else:
+        weight = 1.
+
+    # y_score typically has many tied values. Here we extract
+    # the indices associated with the distinct values. We also
+    # concatenate a value for the end of the curve.
+    distinct_value_indices = np.where(np.diff(y_score))[0]
+    threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
+
+    # accumulate the true positives with decreasing threshold
+    tps = stable_cumsum(y_true * weight)[threshold_idxs]
+    if sample_weight is not None:
+        # express fps as a cumsum to ensure fps is increasing even in
+        # the presence of floating point errors
+        fps = stable_cumsum((1 - y_true) * weight)[threshold_idxs]
+    else:
+        fps = 1 + threshold_idxs - tps
+    return fps, tps, y_score[threshold_idxs]
 
 if __name__ == '__main__':
     """
