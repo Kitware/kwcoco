@@ -1119,6 +1119,16 @@ class MixinCocoExtras(object):
             raise KeyError(key)
         return self
 
+    @classmethod
+    def random(cls, rng=None):
+        """
+        Creates a random CocoDataset according to distribution parameters
+        """
+        from kwcoco.demo.toydata import random_single_video_dset
+        dset = random_single_video_dset(num_frames=5, num_tracks=3,
+                                        tid_start=1, rng=rng)
+        return dset
+
     def _build_hashid(self, hash_pixels=False, verbose=0):
         """
         Construct a hash that uniquely identifies the state of this dataset.

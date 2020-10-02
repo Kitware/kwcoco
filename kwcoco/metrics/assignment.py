@@ -21,6 +21,9 @@ import numpy as np
 import ubelt as ub
 
 
+USE_NEG_INF = True
+
+
 def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                               ovthresh=0.5, bg_cidx=-1, bias=0.0, classes=None,
                               compat='all', prioritize='iou',
@@ -422,7 +425,10 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
 
     y_pred.extend([-1] * n)
     y_true.extend(unused_y_true)
-    y_score.extend([np.nan] * n)
+    if USE_NEG_INF:
+        y_score.extend([-np.inf] * n)
+    else:
+        y_score.extend([0] * n)
     y_iou.extend([-1] * n)
     y_weight.extend(unused_y_weight)
     y_pxs.extend([bg_px] * n)

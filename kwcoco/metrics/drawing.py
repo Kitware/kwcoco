@@ -9,11 +9,12 @@ def draw_roc(roc_info, prefix='', fnum=1, **kw):
     to make any sense!
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:kwplot)
+        >>> # xdoctest: +REQUIRES(module:kwplot, module:seaborn)
+        >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import DetectionMetrics
-        >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=100, nboxes=(0, 30), n_fp=(0, 1), nclasses=3,
-        >>>     box_noise=0.00, cls_noise=.0, score_noise=1.0)
+        >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, nclasses=3,
+        >>>                              nboxes=10, n_fp=10, box_noise=0.3,
+        >>>                              with_probs=False)
         >>> dmet.true_detections(0).data
         >>> cfsn_vecs = dmet.confusion_vectors(compat='mutex', prioritize='iou', bias=0)
         >>> print(cfsn_vecs.data._pandas().sort_values('score'))
@@ -39,18 +40,31 @@ def draw_roc(roc_info, prefix='', fnum=1, **kw):
     realpos_total = roc_info['realpos_total']
 
     title = prefix + 'AUC*: {:.4f}'.format(auc)
-    xscale = 'linear'
     falsepos_total = fp_count[-1]
 
-    ax = kwplot.multi_plot(
-        list(fp_rate), list(tp_rate), marker='',
-        # xlabel='FA count (false positive count)',
-        xlabel='fpr (count={})'.format(falsepos_total),
-        ylabel='tpr (count={})'.format(int(realpos_total)),
-        title=title, xscale=xscale,
-        ylim=(0, 1), ypad=1e-2,
-        xlim=(0, 1), xpad=1e-2,
-        fnum=fnum, **kw)
+    if 0:
+        # TODO: deprecate multi_plot for seaborn
+        fig = kwplot.figure(fnum=fnum)
+        ax = fig.gca()
+        import seaborn as sns
+        xlabel = 'fpr (count={})'.format(falsepos_total)
+        ylabel = 'tpr (count={})'.format(int(realpos_total))
+        data = {
+            xlabel: list(fp_rate),
+            ylabel: list(tp_rate),
+        }
+        sns.lineplot(data=data, x=xlabel, y=ylabel, markers='', ax=ax)
+        ax.set_title(title)
+    else:
+        ax = kwplot.multi_plot(
+            list(fp_rate), list(tp_rate), marker='',
+            # xlabel='FA count (false positive count)',
+            xlabel='fpr (count={})'.format(falsepos_total),
+            ylabel='tpr (count={})'.format(int(realpos_total)),
+            title=title,
+            ylim=(0, 1), ypad=1e-2,
+            xlim=(0, 1), xpad=1e-2,
+            fnum=fnum, **kw)
 
     return ax
 
@@ -128,17 +142,26 @@ def draw_perclass_prcurve(cx_to_peritem, classes=None, prefix='', fnum=1, **kw):
     """
     Example:
         >>> # xdoctest: +REQUIRES(module:kwplot)
+        >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
+        >>>     nimgs=3, nboxes=(0, 10), n_fp=(0, 3), n_fn=(0, 2), nclasses=3, score_noise=0.1, box_noise=0.1, with_probs=False)
         >>> cfsn_vecs = dmet.confusion_vectors()
+        >>> print(cfsn_vecs.data.pandas())
         >>> classes = cfsn_vecs.classes
         >>> cx_to_peritem = cfsn_vecs.binarize_ovr().measures()['perclass']
+        >>> print('cx_to_peritem = {}'.format(ub.repr2(cx_to_peritem, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
         >>> draw_perclass_prcurve(cx_to_peritem, classes)
         >>> # xdoctest: +REQUIRES(--show)
         >>> kwplot.show_if_requested()
+
+    Ignore:
+        from kwcoco.metrics.drawing import *  # NOQA
+        import xdev
+        globals().update(xdev.get_func_kwargs(draw_perclass_prcurve))
+
     """
     import kwplot
     # Sort by descending AP
@@ -187,14 +210,58 @@ def draw_perclass_prcurve(cx_to_peritem, classes=None, prefix='', fnum=1, **kw):
         warnings.filterwarnings('ignore', 'Mean of empty slice', RuntimeWarning)
         mAP = np.nanmean(aps)
 
-    ax = kwplot.multi_plot(
-        xydata=xydata, fnum=fnum,
-        xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
-        xlabel='recall', ylabel='precision',
-        title=prefix + 'perclass mAP={:.4f}'.format(mAP),
-        legend_loc='lower right',
-        color='distinct', linestyle='cycle', marker='cycle', **kw
-    )
+    if 0:
+        # TODO: deprecate multi_plot for seaborn?
+        data_groups = {
+            key: {'recall': r, 'precision': p}
+            for key, (r, p) in xydata.items()
+        }
+        print('data_groups = {}'.format(ub.repr2(data_groups, nl=3)))
+
+        longform = []
+        for key, subdata in data_groups.items():
+            import pandas as pd
+            subdata = pd.DataFrame.from_dict(subdata)
+            subdata['label'] = key
+            longform.append(subdata)
+        data = pd.concat(longform)
+
+        import seaborn as sns
+        import pandas as pd
+        # sns.set()
+        fig = kwplot.figure(fnum=fnum)
+        ax = fig.gca()
+        longform = []
+        for key, (r, p) in xydata.items():
+            subdata = pd.DataFrame.from_dict({'recall': r, 'precision': p, 'label': key})
+            longform.append(subdata)
+        data = pd.concat(longform)
+
+        palette = ub.dzip(xydata.keys(), kwplot.distinct_colors(len(xydata)))
+        # markers = ub.dzip(xydata.keys(), kwplot.distinct_markers(len(xydata)))
+
+        sns.lineplot(
+            data=data, x='recall', y='precision',
+            hue='label', style='label', ax=ax,
+            # markers=markers,
+            estimator=None,
+            ci=0,
+            hue_order=list(xydata.keys()),
+            palette=palette,
+        )
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+
+    else:
+        ax = kwplot.multi_plot(
+            xydata=xydata, fnum=fnum,
+            xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
+            xlabel='recall', ylabel='precision',
+            err_style='bars',
+            title=prefix + 'perclass mAP={:.4f}'.format(mAP),
+            legend_loc='lower right',
+            color='distinct', linestyle='cycle', marker='cycle', **kw
+        )
     return ax
 
 

@@ -19,6 +19,11 @@ def perterb_coco(coco_dset, **kwargs):
         >>> pred_dset = perterb_coco(true_dset, **kwargs)
         >>> pred_dset._check_json_serializable()
 
+    Ignore:
+        import xdev
+        from kwcoco.demo.perterb import perterb_coco  # NOQA
+        xdev.get_func_kwargs(perterb_coco)
+
     """
     import kwimage
     import kwarray
@@ -43,7 +48,7 @@ def perterb_coco(coco_dset, **kwargs):
             low, high = value
             return (low, high + 1)
         except Exception:
-            return (0, value + 1)
+            return (value, value + 1)
     n_fp_RV = DiscreteUniform(*_parse_arg('n_fp', 0))
     n_fn_RV = DiscreteUniform(*_parse_arg('n_fn', 0))
 
@@ -57,6 +62,7 @@ def perterb_coco(coco_dset, **kwargs):
     mid = 0.5
     # true_high = 2.0
     true_high = 1.0
+    false_low = 0.0
     true_low   = _interp(0, mid, score_noise)
     false_high = _interp(true_high, mid - 1e-3, score_noise)
     true_mean  = _interp(0.5, .8, score_noise)
@@ -65,7 +71,7 @@ def perterb_coco(coco_dset, **kwargs):
     true_score_RV = distributions.TruncNormal(
         mean=true_mean, std=.5, low=true_low, high=true_high, rng=rng)
     false_score_RV = distributions.TruncNormal(
-        mean=false_mean, std=.5, low=0, high=false_high, rng=rng)
+        mean=false_mean, std=.5, low=false_low, high=false_high, rng=rng)
 
     # Create the category hierarcy
     classes = coco_dset.object_categories()
@@ -79,6 +85,8 @@ def perterb_coco(coco_dset, **kwargs):
     remove_aids = []
     false_anns = []
 
+    index_invalidated = False
+
     for gid in coco_dset.imgs.keys():
         # Sample random variables
         n_fp_ = n_fp_RV()
@@ -90,12 +98,12 @@ def perterb_coco(coco_dset, **kwargs):
             # Perterb box coordinates
             ann = new_dset.anns[aid]
             ann['bbox'] = (np.array(ann['bbox']) + box_noise_RV(4)).tolist()
-
             ann['score'] = float(true_score_RV(1)[0])
 
             if cls_noise_RV():
                 # Perterb class predictions
                 ann['category_id'] = classes.idx_to_id[frgnd_cx_RV()]
+                index_invalidated = True
 
         # Drop true positive boxes
         if n_fn_:
@@ -128,7 +136,11 @@ def perterb_coco(coco_dset, **kwargs):
         if null_pred:
             raise NotImplementedError
 
+    if index_invalidated:
+        new_dset.index.clear()
+        new_dset._build_index()
     new_dset.remove_annotations(remove_aids)
+
     for ann in false_anns:
         new_dset.add_annotation(**ann)
 
@@ -152,6 +164,17 @@ def perterb_coco(coco_dset, **kwargs):
 def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
     """
     Constructs random probabilities for demo data
+
+    Example:
+        >>> import kwcoco
+        >>> import kwarray
+        >>> rng = kwarray.ensure_rng(0)
+        >>> classes = kwcoco.CategoryTree.coerce(10)
+        >>> hacked = 1
+        >>> pred_cxs = rng.randint(0, 10, 10)
+        >>> pred_scores = rng.rand(10)
+        >>> probs = _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked)
+        >>> probs.sum(axis=1)
     """
     # Setup probs such that the assigned class receives a probability
     # equal-(ish) to the assigned score.
@@ -160,14 +183,31 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
     # conditional. The right thing to do would be to do this, and then
     # perterb ancestor categories such that the probability evenetually
     # converges on the right value at that specific classes depth.
-    import torch
+    # import torch
 
     # Ensure probs
     pred_scores2 = pred_scores.clip(0, 1.0)
 
     class_energy = rng.rand(len(pred_scores2), len(classes)).astype(np.float32)
-    for p, x, s in zip(class_energy, pred_cxs, pred_scores2):
-        p[x] = s
+
+    is_mutex = 0
+    if hasattr(classes, 'is_mutex') and classes.is_mutex():
+        is_mutex = 1
+
+    if isinstance(classes, (list, tuple)):
+        is_mutex = 1
+
+    if is_mutex:
+        class_energy = class_energy / class_energy.sum(axis=1, keepdims=True)
+        for p, x, s in zip(class_energy, pred_cxs, pred_scores2):
+            # ensure sum to 1 when classes are known mutex
+            rest = p[0:x].sum() + p[x + 1:].sum()
+            if s <= 1:
+                p[:] = p * ((1 - s) / rest)
+            p[x] = s
+    else:
+        for p, x, s in zip(class_energy, pred_cxs, pred_scores2):
+            p[x] = s
 
     if hacked:
         # HACK! All that nice work we did is too slow for doctests

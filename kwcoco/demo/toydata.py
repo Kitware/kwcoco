@@ -621,7 +621,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     for frame_idx, gid in enumerate(image_ids):
         dset.add_image(**{
             'id': gid,
-            'file_name': '<todo-generate>',
+            'file_name': '<todo-generate-{}-{}>'.format(video_id, frame_idx),
             'width': gsize[0],
             'height': gsize[1],
             'frame_index': frame_idx,
