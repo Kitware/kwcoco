@@ -750,7 +750,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
     def __len__(self):
         return len(self.data)
 
-    @ub.memoize_method
+    # @ub.memoize_method
     def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False):
         """
         Get statistics (F1, G1, MCC) versus thresholds
@@ -1104,8 +1104,8 @@ class Measures(ub.NiceRepr, DictProxy):
             # 'outlier_ap', 'inf_thresh_ap',
         }
         state = ub.dict_isect(self.proxy, minimal)
-        import kwcoco
-        state = kwcoco.util.util_json.ensure_json_serializable(state)
+        from kwcoco.util.util_json import ensure_json_serializable
+        state = ensure_json_serializable(state)
         return state
 
     def summary(self):
@@ -1300,6 +1300,8 @@ def populate_info(info):
     info['fn_count'] = fn = np.array(info['fn_count'])
     info['thresholds'] = thresh = np.array(info['thresholds'])
 
+    finite_flags = np.isfinite(thresh)
+
     trunc_fp = fp
     # Cutoff the curves at a comparable point
     if fp_cutoff is None:
@@ -1426,17 +1428,27 @@ def populate_info(info):
         info['mk'] = ppv + npv - 1  # markedness
 
         keys = ['mcc', 'g1', 'f1', 'acc']
+        finite_thresh = thresh[finite_flags]
         for key in keys:
-            measure = info[key]
+            measure = info[key][finite_flags]
             try:
                 max_idx = np.nanargmax(measure)
             except ValueError:
                 best_thresh = np.nan
                 best_measure = np.nan
             else:
-                best_thresh = float(thresh[max_idx])
+                best_thresh = float(finite_thresh[max_idx])
                 best_measure = float(measure[max_idx])
+
             best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+
+            # if np.isinf(best_thresh) or np.isnan(best_measure):
+            #     print('key = {!r}'.format(key))
+            #     print('finite_flags = {!r}'.format(finite_flags))
+            #     print('measure = {!r}'.format(measure))
+            #     print('best_label = {!r}'.format(best_label))
+            #     import xdev
+            #     xdev.embed()
             info['max_{}'.format(key)] = best_label
             info['_max_{}'.format(key)] = (best_measure, best_thresh)
 
@@ -1468,7 +1480,8 @@ def populate_info(info):
             normalize the true positive reate. On the other hand,
             confusion vectors maintains a list of these unassigned true
             boxes and gives them a predicted index of -1 and a score of
-            zero. This means that this function sees them as having a
+            zero. This means that this function sees them as having rsync -avr --stats $HOME/data/public_data_registry/.dvc/cache/ hermes:/data/shared/dvc-cache/public_data_registry/
+a
             y_true of 1 and a y_score of 0, which allows the
             scikit-learn fp and tp counts to effectively get up to
             100% recall when the threshold is zero. The VOC method

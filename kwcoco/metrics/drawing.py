@@ -195,7 +195,7 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
             xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
             xlabel='recall', ylabel='precision',
             err_style='bars',
-            title=prefix + 'perclass mAP={:.4f}'.format(mAP),
+            title=prefix + 'OVR mAP={:.4f}'.format(mAP),
             legend_loc='lower right',
             color='distinct', linestyle='cycle', marker='cycle', **kw
         )
@@ -270,7 +270,7 @@ def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnu
         xydata=xydata, fnum=fnum,
         xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
         xlabel='threshold', ylabel=key,
-        title=prefix + 'perclass {}'.format(key),
+        title=prefix + 'OVR {}'.format(key),
         legend_loc='lower right',
         color='distinct', linestyle='cycle', marker='cycle', **kw
     )
@@ -444,10 +444,14 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
 
     xydata = {}
     colors = {}
+    finite_flags = np.isfinite(thresh)
+
     for idx, key in enumerate(keys):
         color = idx_to_colors[idx]
-        measure = info[key]
-        max_idx = measure.argmax()
+        measure = info[key][finite_flags]
+        max_idx = np.nanargmax(measure)
+        offset = (~finite_flags[:max_idx]).sum()
+        max_idx += offset
         best_thresh = thresh[max_idx]
         best_measure = measure[max_idx]
         best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
@@ -482,7 +486,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
 
 if __name__ == '__main__':
     """
-    CommandLine:
+
         python ~/code/kwcoco/kwcoco/metrics/drawing.py
     """
     import xdoctest

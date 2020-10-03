@@ -25,6 +25,7 @@ from os.path import join
 import scriptconfig as scfg
 import warnings
 import json
+from kwcoco.metrics.util import DictProxy
 
 
 try:
@@ -80,7 +81,7 @@ class CocoEvalConfig(scfg.Config):
         # TODO options:
 
         'area_range': scfg.Value(
-            value='0-inf',
+            value=['all', 'small'],
             # value='0-inf,0-32,32-96,96-inf',
             help=(
                 'minimum and maximum object areas to consider. '
@@ -129,18 +130,20 @@ class CocoEvalConfig(scfg.Config):
                 parts = [code]
 
             for p in parts:
+                minmax = p
                 if isinstance(p, str):
-                    if p == 'small':
-                        p = [0 ** 2, 32 ** 2],
-                    if p == 'medium':
-                        p = [32 ** 2, 96 ** 2],
-                    if p == 'large':
-                        p = [96 ** 2, 1e5 ** 2],
-                    if p == 'all':
-                        p = [0, float('inf')],
-                    else:
+                    if '-' in p:
                         p = p.split('-')
-                minmax = tuple(map(float, p))
+                        minmax = tuple(map(float, p))
+                    # else:
+                    #     if p == 'small':
+                    #         p = [0 ** 2, 32 ** 2],
+                    #     if p == 'medium':
+                    #         p = [32 ** 2, 96 ** 2],
+                    #     if p == 'large':
+                    #         p = [96 ** 2, 1e5 ** 2],
+                    #     if p == 'all':
+                    #         p = [0, float('inf')],
                 parsed.append(minmax)
             self['area_range'] = parsed
 
@@ -557,7 +560,7 @@ class CocoEvaluator(object):
             >>> config = {
             >>>     'true_dataset': true_dset,
             >>>     'pred_dataset': pred_dset,
-            >>>     'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)],
+            >>>     'area_range': ['all', 'small'],
             >>>     'iou_thresh': [0.3, 0.5, 0.95],
             >>> }
             >>> coco_eval = CocoEvaluator(config)
@@ -566,7 +569,8 @@ class CocoEvaluator(object):
             >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
             >>> results.dump_figures(dpath)
             >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
-            >>> if ub.argflag('--vd'):
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> if ub.argflag('--vd') or 1:
             >>>     import xdev
             >>>     xdev.view_directory(dpath)
         """
@@ -595,7 +599,7 @@ class CocoEvaluator(object):
             iou_thresholds = [iou_thresholds]
 
         if not area_ranges:
-            area_ranges = [(0, float('inf'))]
+            area_ranges = ['all']
 
         # Remove large datasets values in configs that are not file references
         base_meta = dict(coco_eval.config)
@@ -625,8 +629,8 @@ class CocoEvaluator(object):
                 monotonic_ppv=coco_eval.config['monotonic_ppv'],
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
-
             for minmax, new_weights in zip(area_ranges, dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges)):
+                print('new_weights = {!r}'.format(new_weights.sum()))
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
                 nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
@@ -672,16 +676,30 @@ class CocoEvaluator(object):
                     # print('ovr_measures2 = {!r}'.format(ovr_measures2))
                     result.ovr_measures2 = ovr_measures2
 
-                print('iou_thresh = {!r}'.format(iou_thresh))
-                print('minmax = {!r}'.format(minmax))
+                reskey = ub.repr2(
+                    dict(area_range=minmax, iou_thresh=iou_thresh),
+                    nl=0, explicit=1, itemsep='', nobr=1)
+                resdata[reskey] = result
+                print('reskey = {!r}'.format(reskey))
                 print('result = {!r}'.format(result))
-                resdata[str((iou_thresh, minmax))] = result
-        return resdata
+
+        results = CocoResults(resdata)
+        return results
 
 
 def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
     # Basic logic to handle area-range by weight modification.
     for minmax in area_ranges:
+        print('minmax = {!r}'.format(minmax))
+        if isinstance(minmax, str):
+            if minmax == 'small':
+                minmax = [0 ** 2, 32 ** 2]
+            if minmax == 'medium':
+                minmax = [32 ** 2, 96 ** 2]
+            if minmax == 'large':
+                minmax = [96 ** 2, 1e5 ** 2]
+            if minmax == 'all':
+                minmax = [0, float('inf')]
         area_min, area_max = minmax
         gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
         new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
@@ -691,7 +709,7 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
             txs = cfsn_vecs.data['txs'][groupx]
             tx_flags = txs > -1
             tarea = true_area[txs[tx_flags]].ravel()
-            is_toob = ((tarea < area_min) | (tarea < area_max))
+            is_toob = ((tarea < area_min) | (tarea >= area_max))
             toob_idxs = groupx[tx_flags][is_toob]
 
             # Ignore any *unassigned* prediction outside the area range
@@ -699,7 +717,7 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
             pxs = cfsn_vecs.data['pxs'][groupx]
             px_flags = (pxs > -1) & (txs < 0)
             parea = pred_area[pxs[px_flags]].ravel()
-            is_poob = ((parea < area_min) | (parea < area_max))
+            is_poob = ((parea < area_min) | (parea >= area_max))
             poob_idxs = groupx[px_flags][is_poob]
             new_ignore[poob_idxs] = True
             new_ignore[toob_idxs] = True
@@ -709,12 +727,66 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
         yield new_weights
 
 
-class CocoResults(ub.NiceRepr):
-    def __init__(results, resdata=None):
-        results.resdata = resdata
+class CocoResults(ub.NiceRepr, DictProxy):
+    """
+        >>> from kwcoco.coco_evaluator import *  # NOQA
+        >>> from kwcoco.coco_evaluator import CocoEvaluator
+        >>> import kwcoco
+        >>> true_dset = kwcoco.CocoDataset.demo('shapes2')
+        >>> from kwcoco.demo.perterb import perterb_coco
+        >>> kwargs = {
+        >>>     'box_noise': 0.5,
+        >>>     'n_fp': (0, 10),
+        >>>     'n_fn': (0, 10),
+        >>> }
+        >>> pred_dset = perterb_coco(true_dset, **kwargs)
+        >>> print('true_dset = {!r}'.format(true_dset))
+        >>> print('pred_dset = {!r}'.format(pred_dset))
+        >>> config = {
+        >>>     'true_dataset': true_dset,
+        >>>     'pred_dataset': pred_dset,
+        >>>     'area_range': ['small', 'all'],
+        >>>     'iou_thresh': [0.3, 0.5],
+        >>> }
+        >>> coco_eval = CocoEvaluator(config)
+        >>> results = coco_eval.evaluate()
+        >>> # Now we can draw / serialize the results as we please
+        >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
+        >>> results.dump_figures(dpath)
+        >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
 
-    def dump_figures(result, out_dpath, expt_title=None):
-        pass
+    """
+    def __init__(results, resdata=None):
+        results.proxy = resdata
+
+    def dump_figures(results, out_dpath, expt_title=None):
+        for key, result in results.items():
+            dpath = ub.ensuredir((out_dpath, key))
+            if expt_title is None:
+                title = str(key)
+            else:
+                title = expt_title + ' ' + str(key)
+            result.dump_figures(dpath, expt_title=title)
+
+    def __json__(results):
+        """
+        print(ub.repr2(results.__json__(), nl=-1))
+        """
+        # from kwcoco.util.util_json import ensure_json_serializable
+        state = {k: v.__json__() for k, v in results.items()}
+        # ensure_json_serializable(state, normalize_containers=True, verbose=0)
+        return state
+
+    def dump(result, file, indent='    '):
+        """
+        Serialize to json file
+        """
+        if isinstance(file, str):
+            with open(file, 'w') as fp:
+                return result.dump(fp, indent=indent)
+        else:
+            state = result.__json__()
+            json.dump(state, file, indent=indent)
 
 
 class CocoSingleResult(ub.NiceRepr):
@@ -726,13 +798,13 @@ class CocoSingleResult(ub.NiceRepr):
         >>> from kwcoco.coco_evaluator import *  # NOQA
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> import kwcoco
-        >>> true_dset = kwcoco.CocoDataset.demo('shapes1')
+        >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
         >>> from kwcoco.demo.perterb import perterb_coco
         >>> kwargs = {
-        >>>     'box_noise': 0.5,
-        >>>     'n_fp': (0, 10),
-        >>>     'n_fn': (0, 10),
-        >>>     'with_probs': True,
+        >>>     'box_noise': 0.2,
+        >>>     'n_fp': (0, 3),
+        >>>     'n_fn': (0, 3),
+        >>>     'with_probs': False,
         >>> }
         >>> pred_dset = perterb_coco(true_dset, **kwargs)
         >>> print('true_dset = {!r}'.format(true_dset))
@@ -750,6 +822,7 @@ class CocoSingleResult(ub.NiceRepr):
         >>> print('state = {}'.format(ub.repr2(state, nl=-1)))
         >>> recon = CocoSingleResult.from_json(state)
         >>> state = recon.__json__()
+        >>> print('state = {}'.format(ub.repr2(state, nl=-1)))
     """
 
     def __init__(result, nocls_measures, ovr_measures, cfsn_vecs, meta=None):
@@ -830,7 +903,7 @@ class CocoSingleResult(ub.NiceRepr):
         figsize = (9, 7)
 
         def writefig(fig: mpl.pyplot.Figure, dpath: str, fname: str):
-            fig_fpath = join(metrics_dpath, 'loc_pr_roc.png')
+            fig_fpath = join(metrics_dpath, fname)
             print('write fig_fpath = {!r}'.format(fig_fpath))
             fig.set_size_inches(figsize)
             fig.savefig(fig_fpath, bbox_inches='tight')
@@ -842,30 +915,30 @@ class CocoSingleResult(ub.NiceRepr):
         nocls_measures.draw(key='pr')
         kwplot.figure(fnum=1, pnum=(1, 2, 2))
         nocls_measures.draw(key='roc')
-        writefig(fig, metrics_dpath, 'loc_pr_roc.png')
+        writefig(fig, metrics_dpath, 'nocls_pr_roc.png')
         fig = kwplot.figure(fnum=1, pnum=(1, 1, 1), doclf=True, **figkw)
         nocls_measures.draw(key='thresh')
-        writefig(fig, metrics_dpath, 'loc_thresh.png')
+        writefig(fig, metrics_dpath, 'nocls_thresh.png')
 
         # --- perclass (ovr)
 
         fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
         ovr_measures.draw(key='roc', fnum=2)
-        writefig(fig, metrics_dpath, 'perclass_roc.png')
+        writefig(fig, metrics_dpath, 'ovr_roc.png')
 
         fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
         ovr_measures.draw(key='pr', fnum=2)
-        writefig(fig, metrics_dpath, 'perclass_pr.png')
+        writefig(fig, metrics_dpath, 'ovr_pr.png')
 
         if hasattr(result, 'ovr_measures2'):
             ovr_measures2 = result.ovr_measures2
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures2.draw(key='pr', fnum=2, prefix='coi-vs-bg-only')
-            writefig(fig, metrics_dpath, 'perclass_pr_coi_vs_bg.png')
+            writefig(fig, metrics_dpath, 'ovr_pr_coi_vs_bg.png')
 
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures2.draw(key='roc', fnum=2, prefix='coi-vs-bg-only')
-            writefig(fig, metrics_dpath, 'perclass_roc_coi_vs_bg.png')
+            writefig(fig, metrics_dpath, 'ovr_roc_coi_vs_bg.png')
 
         dump_config = {
             # 'keys': ['mcc', 'g1', 'f1', 'acc', 'ppv', 'tpr', 'mk', 'bm']
@@ -874,7 +947,7 @@ class CocoSingleResult(ub.NiceRepr):
         for key in dump_config['keys']:
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures.draw(fnum=2, key=key)
-            writefig(fig, metrics_dpath, 'perclass_{}.png'.format(key))
+            writefig(fig, metrics_dpath, 'ovr_{}.png'.format(key))
 
         # NOTE: The threshold on these confusion matrices is VERY low.
         # FIXME: robustly skip in cases where predictions have no class information
@@ -1048,7 +1121,7 @@ def main(cmdline=True, **kw):
     else:
         truth_dset = None
 
-    if truth_dset is not None:
+    if truth_dset is not None and getattr(results, 'cfsn_vecs', None):
         print('Attempting to draw examples')
         gid_to_stats = {}
         import kwarray
