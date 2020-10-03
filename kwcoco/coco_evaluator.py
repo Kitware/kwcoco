@@ -2,6 +2,15 @@
 Evaluates a predicted coco dataset against a truth coco dataset.
 
 The components in this module work programatically or as a command line script.
+
+TODO:
+    - [ ] does evaluate return one result or multiple results
+          based on different configurations?
+
+    - [ ] max_dets - TODO: in original pycocoutils but not here
+
+    - [ ] How do we note what iou_thresh and area-range were in
+          the result plots?
 """
 import glob
 import numpy as np
@@ -16,17 +25,13 @@ from os.path import join
 import scriptconfig as scfg
 import warnings
 import json
-# from kwcoco.metrics.util import DictProxy
 
 
-from kwcoco.category_tree import CategoryTree
 try:
     import ndsampler
-    CATEGORY_TREE_CLS = (CategoryTree, ndsampler.CategoryTree)
     COCO_SAMPLER_CLS = ndsampler.CocoSampler
 except Exception:
     COCO_SAMPLER_CLS = None
-    CATEGORY_TREE_CLS = (CategoryTree,)
 
 
 class CocoEvalConfig(scfg.Config):
@@ -37,27 +42,107 @@ class CocoEvalConfig(scfg.Config):
         'true_dataset': scfg.Value(None, type=str, help='coercable true detections'),
         'pred_dataset': scfg.Value(None, type=str, help='coercable predicted detections'),
 
-        'classes_of_interest': scfg.Value(None, type=list, help='if specified only these classes are given weight'),
-        'ignore_classes': scfg.Value(None, type=list, help='classes to ignore (give them zero weight)'),
-
-        # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
-
-        'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
+        'ignore_classes': scfg.Value(
+            None, type=list, help='classes to ignore (give them zero weight)'),
 
         'implicit_negative_classes': scfg.Value(['background']),
 
         'implicit_ignore_classes': scfg.Value(['ignore']),
 
-        'use_image_names': scfg.Value(False, help='if True use image file_name to associate images instead of ids'),
+        'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
 
-        'ovthresh': scfg.Value(0.5, help='IoU overlap threshold for detection assignment'),
-        'area_range': scfg.Value((None, None), help='minimum and maximum object areas to consider TODO'),
+        'iou_thresh': scfg.Value(
+            value=0.5,
+            help='one or more IoU overlap threshold for detection assignment',
+            # alias=['ovthresh']
+        ),
 
-        # These should go into the CLI args, not the class config args
-        'expt_title': scfg.Value('', type=str, help='title for plots'),
-        'draw': scfg.Value(True, help='draw metric plots'),
-        'out_dpath': scfg.Value('./coco_metrics', type=str),
+        'compat': scfg.Value(
+            value='mutex',
+            choices=['all', 'mutex', 'ancestors'],
+            help=ub.paragraph(
+                '''
+                matching strategy for which true annots are allowed to match
+                which predicted annots.
+                mutex means true boxes can only match predictions where the
+                true class has highest probability.
+                all means any class can match any other class.
+                dont use ancestors it is broken.
+                ''')),
+
+        'monotonic_ppv': scfg.Value(True, help=ub.paragraph(
+            '''
+            if True forces precision to be monotonic. Defaults to True for
+            compatibility with pycocotools, but that might not be the best
+            option.
+            ''')),
+
+        # TODO options:
+
+        'area_range': scfg.Value(
+            value='0-inf',
+            # value='0-inf,0-32,32-96,96-inf',
+            help=(
+                'minimum and maximum object areas to consider. '
+                'may be specified as a comma-separated code: <min>-<max>. '
+                'also accepts keys all, small, medium, and large. '
+            )),
+
+        'max_dets': scfg.Value(np.inf, help=(
+            'maximum number of predictions to consider')),
+
+        # Extra options
+
+        # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
+
+        'assign_workers': scfg.Value(8, help='number of background workers for assignment'),
+
+        'ovthresh': scfg.Value(None, help='alias for iou_thresh'),
+
+        'classes_of_interest': scfg.Value(
+            None, type=list,
+            help='if specified only these classes are given weight'),
+
+        'use_image_names': scfg.Value(
+            False, help='if True use image file_name to associate images instead of ids'),
     }
+
+    def normalize(self):
+        if self['ovthresh'] is not None:
+            warnings.warn('ovthresh is deprecated use iou_thresh')
+            self['iou_thresh'] = self['ovthresh']
+
+        if self['area_range'] is not None:
+            parsed = []
+            code = self['area_range']
+
+            parts = []
+            if ub.iterable(code):
+                for p in code:
+                    if isinstance(p, str) and ',' in p:
+                        parts.extend(p.split(','))
+                    else:
+                        parts.append(p)
+            else:
+                if not isinstance(code, str):
+                    raise TypeError('bad area code {}'.format(code))
+                parts = [code]
+
+            for p in parts:
+                if isinstance(p, str):
+                    if p == 'small':
+                        p = [0 ** 2, 32 ** 2],
+                    if p == 'medium':
+                        p = [32 ** 2, 96 ** 2],
+                    if p == 'large':
+                        p = [96 ** 2, 1e5 ** 2],
+                    if p == 'all':
+                        p = [0, float('inf')],
+                    else:
+                        p = p.split('-')
+                minmax = tuple(map(float, p))
+                parsed.append(minmax)
+            self['area_range'] = parsed
 
 
 class CocoEvaluator(object):
@@ -69,27 +154,11 @@ class CocoEvaluator(object):
     higher level script that produces the predictions and then sends them to
     this evaluator.
 
-    Ignore:
-        >>> pred_fpath1 = ub.expandpath("$HOME/remote/viame/work/bioharn/fit/nice/bioharn-det-mc-cascade-rgb-fine-coi-v43/eval/may_priority_habcam_cfarm_v7_test.mscoc/bioharn-det-mc-cascade-rgb-fine-coi-v43__epoch_00000007/c=0.1,i=window,n=0.8,window_d=512,512,window_o=0.0/all_pred.mscoco.json")
-        >>> pred_fpath2 = ub.expandpath('$HOME/tmp/cached_clf_out_cli/reclassified.mscoco.json')
-        >>> true_fpath = ub.expandpath('$HOME/remote/namek/data/noaa_habcam/combos/habcam_cfarm_v8_test.mscoco.json')
-        >>> config = {
-        >>>     'true_dataset': true_fpath,
-        >>>     'pred_dataset': pred_fpath2,
-        >>>     'out_dpath': ub.expandpath('$HOME/remote/namek/tmp/reclassified_eval'),
-        >>>     'classes_of_interest': [],
-        >>> }
-        >>> coco_eval = CocoEvaluator(config)
-        >>> config = coco_eval.config
-        >>> coco_eval._init()
-        >>> coco_eval.evaluate()
-
     Example:
         >>> from kwcoco.coco_evaluator import CocoEvaluator
-        >>> import kwcoco
-        >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
-        >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
         >>> from kwcoco.demo.perterb import perterb_coco
+        >>> import kwcoco
+        >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
         >>> kwargs = {
         >>>     'box_noise': 0.5,
         >>>     'n_fp': (0, 10),
@@ -100,12 +169,12 @@ class CocoEvaluator(object):
         >>> config = {
         >>>     'true_dataset': true_dset,
         >>>     'pred_dataset': pred_dset,
-        >>>     'out_dpath': dpath,
         >>>     'classes_of_interest': [],
         >>> }
         >>> coco_eval = CocoEvaluator(config)
         >>> results = coco_eval.evaluate()
     """
+    Config = CocoEvalConfig
 
     def __init__(coco_eval, config):
         coco_eval.config = CocoEvalConfig(config)
@@ -296,7 +365,7 @@ class CocoEvaluator(object):
         #     for node1, id1 in true_classes.node_to_id.items():
         #         if node1 not in pred_classes.node_to_id:
         #             graph2.add_node(node1, id=id1)
-        #     classes = ndsampler.CategoryTree(graph2)
+        #     classes = kwcoco.CategoryTree(graph2)
 
         return classes, unified_cid_maps
 
@@ -410,6 +479,52 @@ class CocoEvaluator(object):
 
         return gid_to_det, extra
 
+    def _build_dmet(coco_eval):
+        """
+        Builds the detection metrics object
+
+        Returns:
+            DetectionMetrics - object that can perform assignment and
+                build confusion vectors.
+
+        Ignore:
+            dmet = coco_eval._build_dmet()
+        """
+        coco_eval._ensure_init()
+        classes = coco_eval.classes
+
+        gid_to_true = coco_eval.gid_to_true
+        gid_to_pred = coco_eval.gid_to_pred
+
+        if 0:
+            true_names = []
+            for det in coco_eval.gid_to_true.values():
+                class_idxs = det.data['class_idxs']
+                cnames = list(ub.take(det.meta['classes'], class_idxs))
+                true_names += cnames
+            ub.dict_hist(true_names)
+
+            pred_names = []
+            for det in coco_eval.gid_to_pred.values():
+                class_idxs = det.data['class_idxs']
+                cnames = list(ub.take(det.meta['classes'], class_idxs))
+                pred_names += cnames
+            ub.dict_hist(pred_names)
+
+        from kwcoco.metrics import DetectionMetrics
+        dmet = DetectionMetrics(classes=classes)
+        for gid in ub.ProgIter(coco_eval.gids):
+            pred_dets = gid_to_pred[gid]
+            true_dets = gid_to_true[gid]
+            dmet.add_predictions(pred_dets, gid=gid)
+            dmet.add_truth(true_dets, gid=gid)
+
+        if 0:
+            voc_info = dmet.score_voc(ignore_classes='ignore')
+            print('voc_info = {!r}'.format(voc_info))
+
+        return dmet
+
     def evaluate(coco_eval):
         """
         Executes the main evaluation logic. Performs assignments between
@@ -442,7 +557,7 @@ class CocoEvaluator(object):
             >>> config = {
             >>>     'true_dataset': true_dset,
             >>>     'pred_dataset': pred_dset,
-            >>>     #'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)]
+            >>>     'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)]
             >>> }
             >>> coco_eval = CocoEvaluator(config)
             >>> results = coco_eval.evaluate()
@@ -455,12 +570,12 @@ class CocoEvaluator(object):
             >>>     xdev.view_directory(dpath)
         """
         coco_eval.log('evaluating')
-        coco_eval._ensure_init()
-        classes = coco_eval.classes
+        # print('coco_eval.config = {}'.format(ub.repr2(dict(coco_eval.config), nl=3)))
+
+        dmet = coco_eval._build_dmet()
 
         # Ignore any categories with too few tests instances
-        # print('coco_eval.config = {}'.format(ub.repr2(dict(coco_eval.config), nl=1)))
-
+        classes = coco_eval.classes
         negative_classes = coco_eval.config['implicit_negative_classes']
         classes_of_interest = coco_eval.config['classes_of_interest']
         ignore_classes = set(coco_eval.config['implicit_ignore_classes'])
@@ -468,164 +583,125 @@ class CocoEvaluator(object):
             ignore_classes.update(coco_eval.config['ignore_classes'])
         if classes_of_interest:
             ignore_classes.update(set(classes) - set(classes_of_interest))
+
         coco_eval.log('negative_classes = {!r}'.format(negative_classes))
         coco_eval.log('classes_of_interest = {!r}'.format(classes_of_interest))
         coco_eval.log('ignore_classes = {!r}'.format(ignore_classes))
 
-        gid_to_true = coco_eval.gid_to_true
-        gid_to_pred = coco_eval.gid_to_pred
+        area_ranges = coco_eval.config['area_range']
+        iou_thresholds = coco_eval.config['iou_thresh']
+        if not ub.iterable(iou_thresholds):
+            iou_thresholds = [iou_thresholds]
 
-        if 0:
-            true_names = []
-            for det in coco_eval.gid_to_true.values():
-                class_idxs = det.data['class_idxs']
-                cnames = list(ub.take(det.meta['classes'], class_idxs))
-                true_names += cnames
-            ub.dict_hist(true_names)
+        if not area_ranges:
+            area_ranges = [(0, float('inf'))]
 
-            pred_names = []
-            for det in coco_eval.gid_to_pred.values():
-                class_idxs = det.data['class_idxs']
-                cnames = list(ub.take(det.meta['classes'], class_idxs))
-                pred_names += cnames
-            ub.dict_hist(pred_names)
+        for iou_threshold in iou_thresholds:
+            # Detection only scoring
+            print('Building confusion vectors')
+            cfsn_vecs = dmet.confusion_vectors(
+                ignore_classes=ignore_classes,
+                compat=coco_eval.config['compat'],
+                iou_thresh=iou_threshold,
+                workers=coco_eval.config['assign_workers'],
+                monotonic_ppv=coco_eval.config['monotonic_ppv'],
+                max_dets=coco_eval.config['max_dets'],
+            )
 
-        fp_cutoff = coco_eval.config['fp_cutoff']
-
-        from kwcoco.metrics import DetectionMetrics
-        dmet = DetectionMetrics(classes=classes)
-        for gid in ub.ProgIter(coco_eval.gids):
-            pred_dets = gid_to_pred[gid]
-            true_dets = gid_to_true[gid]
-            dmet.add_predictions(pred_dets, gid=gid)
-            dmet.add_truth(true_dets, gid=gid)
-
-        if 0:
-            voc_info = dmet.score_voc(ignore_classes='ignore')
-            print('voc_info = {!r}'.format(voc_info))
-
-        # Detection only scoring
-        print('Building confusion vectors')
-        cfsn_vecs = dmet.confusion_vectors(
-            ignore_classes=ignore_classes, compat='all',
-            ovthresh=coco_eval.config['ovthresh'], workers=8)
-
-        if False:
-            """
-            TODO:
-                - [ ] parametarize area-range
-
-                - [ ] does evaluate return one result or multiple results
-                      based on different configurations?
-
-                - [ ] How do we parametarize that we want to run over multiple
-                      configurations?
-
-                - [ ] What are configuration options that we might change
-                      ovthresh - iou overlap
-                      area_range - iou overlap
-                      max_dets - TODO: in original pycocoutils but not here
-
-                - [ ] What happens if we can reuse old assignments?
-                      Do we just redo them and be inefficient, or can
-                      we save those values somehow?
-
-                - [ ] How do we note what ovthresh and area-range were in
-                      the result plots?
-
-            Notes:
-                COCO DEFINITIONS
-                    areaRng = [[0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]
-                    areaRngLbl = ['small', 'medium', 'large']
-            """
-            #
             # Basic logic to handle area-range by weight modification.
-            #
-            # Note: pycocoutils does this in the assignment stage, but I think
-            # its probably fine to do it as a post processing step (and may be
-            # lead to smoother scores across fine-grained size levels)
-            area_min = 0
-            area_max = 47 ** 2
-            gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
-            new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
-            for gid, groupx in zip(gids, groupxs):
-                # Ignore any truth outside the area range
-                true_area = dmet.gid_to_true_dets[gid].boxes.area
-                txs = cfsn_vecs.data['txs'][groupx]
-                tx_flags = txs > -1
-                tarea = true_area[txs[tx_flags]].ravel()
-                is_toob = ((tarea < area_min) | (tarea < area_max))
-                toob_idxs = groupx[tx_flags][is_toob]
+            orig_weights = cfsn_vecs.data['weight'].copy()
 
-                # Ignore any *unassigned* prediction outside the area range
-                pred_area = dmet.gid_to_pred_dets[gid].boxes.area
-                pxs = cfsn_vecs.data['pxs'][groupx]
-                px_flags = (pxs > -1) & (txs < 0)
-                parea = pred_area[pxs[px_flags]].ravel()
-                is_poob = ((parea < area_min) | (parea < area_max))
-                poob_idxs = groupx[px_flags][is_poob]
-                new_ignore[poob_idxs] = True
-                new_ignore[toob_idxs] = True
+            for minmax in area_ranges:
+                area_min, area_max = minmax
+                gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
+                new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
+                for gid, groupx in zip(gids, groupxs):
+                    # Ignore any truth outside the area range
+                    true_area = dmet.gid_to_true_dets[gid].boxes.area
+                    txs = cfsn_vecs.data['txs'][groupx]
+                    tx_flags = txs > -1
+                    tarea = true_area[txs[tx_flags]].ravel()
+                    is_toob = ((tarea < area_min) | (tarea < area_max))
+                    toob_idxs = groupx[tx_flags][is_toob]
 
-            # Overwrite weights (we should probably store originals?)
-            cfsn_vecs.data['weight'][new_ignore] = 0
+                    # Ignore any *unassigned* prediction outside the area range
+                    pred_area = dmet.gid_to_pred_dets[gid].boxes.area
+                    pxs = cfsn_vecs.data['pxs'][groupx]
+                    px_flags = (pxs > -1) & (txs < 0)
+                    parea = pred_area[pxs[px_flags]].ravel()
+                    is_poob = ((parea < area_min) | (parea < area_max))
+                    poob_idxs = groupx[px_flags][is_poob]
+                    new_ignore[poob_idxs] = True
+                    new_ignore[toob_idxs] = True
 
-        # NOTE: translating to classless confusion vectors only works when
-        # compat='all', otherwise we would need to redo confusion vector
-        # computation.
+                new_weights = orig_weights.copy()
+                new_weights[new_ignore] = 0
+                print('new_weights = {!r}'.format(new_weights))
 
-        # Get classless per-item detection results
-        binvecs = cfsn_vecs.binarize_peritem(negative_classes=negative_classes)
+                # Overwrite weights (we should probably store originals?)
+                cfsn_vecs.data['weight'] = new_weights
 
-        measures = binvecs.measures(fp_cutoff=fp_cutoff)
-        print('measures = {}'.format(ub.repr2(measures, nl=1)))
+            # NOTE: translating to classless confusion vectors only works when
+            # compat='all', otherwise we would need to redo confusion vector
+            # computation.
 
-        # Get per-class detection results
-        ovr_binvecs = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
-        ovr_measures = ovr_binvecs.measures(fp_cutoff=fp_cutoff)['perclass']
-        print('ovr_measures = {!r}'.format(ovr_measures))
+            # Get classless per-item detection results
+            binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
 
-        # Remove large datasets values in configs that are not file references
-        meta = dict(coco_eval.config)
-        if not isinstance(meta['true_dataset'], str):
-            meta['true_dataset'] = '<not-a-file-ref>'
-        if not isinstance(meta['pred_dataset'], str):
-            meta['pred_dataset'] = '<not-a-file-ref>'
+            fp_cutoff = coco_eval.config['fp_cutoff']
+            measures = binvecs.measures(fp_cutoff=fp_cutoff)
+            print('measures = {}'.format(ub.repr2(measures, nl=1)))
 
-        results = CocoResults(
-            measures,
-            ovr_measures,
-            cfsn_vecs,
-            meta,
-        )
+            # Get per-class detection results
+            ovr_binvecs = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
+            ovr_measures = ovr_binvecs.measures(fp_cutoff=fp_cutoff)['perclass']
+            print('ovr_measures = {!r}'.format(ovr_measures))
 
-        # TODO: when making the ovr localization curves, it might be a good
-        # idea to include a second version where any COI prediction assigned
-        # to a non-COI truth is given a weight of zero, so we can focus on
-        # our TPR and FPR with respect to the COI itself and the background.
-        # This metric is useful when we assume we have a subsequent classifier.
-        if classes_of_interest:
-            ovr_binvecs2 = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
-            for key, vecs in ovr_binvecs2.cx_to_binvecs.items():
-                cx = cfsn_vecs.classes.index(key)
-                vecs.data['weight'] = vecs.data['weight'].copy()
+            # Remove large datasets values in configs that are not file references
+            meta = dict(coco_eval.config)
+            if not isinstance(meta['true_dataset'], str):
+                meta['true_dataset'] = '<not-a-file-ref>'
+            if not isinstance(meta['pred_dataset'], str):
+                meta['pred_dataset'] = '<not-a-file-ref>'
+            # meta['iou_thresh'] = iou_thresh
+            # meta['iou_thresh'] = iou_thresh
 
-                assert not np.may_share_memory(ovr_binvecs[key].data['weight'], vecs.data['weight'])
+            results = CocoResults(
+                measures,
+                ovr_measures,
+                cfsn_vecs,
+                meta,
+            )
 
-                # Find locations where the predictions or truth was COI
-                pred_coi = cfsn_vecs.data['pred'] == cx
-                # Find truth locations that are either background or this COI
-                true_coi_or_bg = kwarray.isect_flags(
-                        cfsn_vecs.data['true'], {cx, -1})
+            # TODO: when making the ovr localization curves, it might be a good
+            # idea to include a second version where any COI prediction assigned
+            # to a non-COI truth is given a weight of zero, so we can focus on
+            # our TPR and FPR with respect to the COI itself and the background.
+            # This metric is useful when we assume we have a subsequent classifier.
+            if classes_of_interest:
+                ovr_binvecs2 = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
+                for key, vecs in ovr_binvecs2.cx_to_binvecs.items():
+                    cx = cfsn_vecs.classes.index(key)
+                    vecs.data['weight'] = vecs.data['weight'].copy()
 
-                # Find locations where we predicted this COI, but truth was a
-                # valid classes, but not this non-COI
-                ignore_flags = (pred_coi & (~true_coi_or_bg))
-                vecs.data['weight'][ignore_flags] = 0
+                    assert not np.may_share_memory(
+                        ovr_binvecs[key].data['weight'],
+                        vecs.data['weight'])
 
-            ovr_measures2 = ovr_binvecs2.measures(fp_cutoff=fp_cutoff)['perclass']
-            print('ovr_measures2 = {!r}'.format(ovr_measures2))
-            results.ovr_measures2 = ovr_measures2
+                    # Find locations where the predictions or truth was COI
+                    pred_coi = cfsn_vecs.data['pred'] == cx
+                    # Find truth locations that are either background or this COI
+                    true_coi_or_bg = kwarray.isect_flags(
+                            cfsn_vecs.data['true'], {cx, -1})
+
+                    # Find locations where we predicted this COI, but truth was a
+                    # valid classes, but not this non-COI
+                    ignore_flags = (pred_coi & (~true_coi_or_bg))
+                    vecs.data['weight'][ignore_flags] = 0
+
+                ovr_measures2 = ovr_binvecs2.measures(fp_cutoff=fp_cutoff)['perclass']
+                print('ovr_measures2 = {!r}'.format(ovr_measures2))
+                results.ovr_measures2 = ovr_measures2
         return results
 
 
@@ -885,41 +961,56 @@ class CocoEvalCLIConfig(scfg.Config):
 
 
 def main(cmdline=True, **kw):
-    config = CocoEvalCLIConfig(cmdline=cmdline, default=kw)
-    print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+    """
+    TODO: should live in kwcoco.cli.coco_eval
 
-    coco_eval = CocoEvaluator(config)
+    CommandLine:
+
+        # Generate test data
+        xdoctest -m kwcoco.cli.coco_eval CocoEvalCLI.main
+
+        kwcoco eval \
+            --true_dataset=$HOME/.cache/kwcoco/tests/eval/true.mscoco.json \
+            --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
+            --out_dpath=$HOME/.cache/kwcoco/tests/eval/out
+    """
+    cli_config = CocoEvalCLIConfig(cmdline=cmdline, default=kw)
+    print('cli_config = {}'.format(ub.repr2(dict(cli_config), nl=1)))
+
+    eval_config = ub.dict_subset(cli_config, CocoEvaluator.Config.default)
+
+    coco_eval = CocoEvaluator(eval_config)
     coco_eval._init()
 
     results = coco_eval.evaluate()
 
-    ub.ensuredir(config['out_dpath'])
+    ub.ensuredir(cli_config['out_dpath'])
 
     if 1:
-        metrics_fpath = join(config['out_dpath'], 'metrics.json')
+        metrics_fpath = join(cli_config['out_dpath'], 'metrics.json')
         print('dumping metrics_fpath = {!r}'.format(metrics_fpath))
         results.dump(metrics_fpath, indent='    ')
     else:
-        with open(join(config['out_dpath'], 'meta.json'), 'w') as file:
+        with open(join(cli_config['out_dpath'], 'meta.json'), 'w') as file:
             state = results.meta
             json.dump(state, file, indent='    ')
 
-        with open(join(config['out_dpath'], 'measures.json'), 'w') as file:
+        with open(join(cli_config['out_dpath'], 'measures.json'), 'w') as file:
             state = results.measures.__json__()
             json.dump(state, file, indent='    ')
 
-        with open(join(config['out_dpath'], 'ovr_measures.json'), 'w') as file:
+        with open(join(cli_config['out_dpath'], 'ovr_measures.json'), 'w') as file:
             state = results.ovr_measures.__json__()
             json.dump(state, file, indent='    ')
 
-        with open(join(config['out_dpath'], 'cfsn_vecs.json'), 'w') as file:
+        with open(join(cli_config['out_dpath'], 'cfsn_vecs.json'), 'w') as file:
             state = results.cfsn_vecs.__json__()
             json.dump(state, file, indent='    ')
 
-    if config['draw']:
+    if cli_config['draw']:
         results.dump_figures(
-            config['out_dpath'],
-            expt_title=config['expt_title']
+            cli_config['out_dpath'],
+            expt_title=cli_config['expt_title']
         )
 
     if 'coco_dset' in coco_eval.true_extra:
@@ -968,7 +1059,7 @@ def main(cmdline=True, **kw):
             canvas = truth_dets.draw_on(canvas, color='green', sseg=False)
             canvas = pred_dets.draw_on(canvas, color='blue', sseg=False)
 
-            viz_dpath = ub.ensuredir((config['out_dpath'], 'viz'))
+            viz_dpath = ub.ensuredir((cli_config['out_dpath'], 'viz'))
             fig_fpath = join(viz_dpath, 'eval-gid={}.jpg'.format(gid))
             kwimage.imwrite(fig_fpath, canvas)
 

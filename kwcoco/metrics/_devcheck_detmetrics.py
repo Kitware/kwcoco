@@ -60,7 +60,7 @@ def _multiclass_ap(y):
     return np.array(precision), np.array(recall), avg
 
 
-def voc_eval(lines, recs, classname, ovthresh=0.5, method=False, bias=1):
+def voc_eval(lines, recs, classname, iou_thresh=0.5, method=False, bias=1):
     import copy
     # imagenames = ([x.strip().split(' ')[0] for x in lines])
     imagenames = ([x[0] for x in lines])
@@ -126,7 +126,7 @@ def voc_eval(lines, recs, classname, ovthresh=0.5, method=False, bias=1):
             ovmax = np.max(overlaps)
             jmax = np.argmax(overlaps)
 
-        if ovmax > ovthresh:
+        if ovmax > iou_thresh:
             if not R['difficult'][jmax]:
                 if not R['det'][jmax]:
                     tp[d] = 1.
@@ -203,7 +203,7 @@ def _devcheck_voc_consistency2():
         dmet = DetectionMetrics.demo(
             nimgs=20,
             nboxes=(0, 20),
-            nclasses=3,
+            classes=3,
             rng=0,
             # anchors=np.array([[.5, .5], [.3, .3], [.1, .3], [.2, .1]]),
             box_noise=box_noise,
@@ -289,7 +289,7 @@ def _devcheck_voc_consistency():
     nbad = 1
 
     bg_weight=1.0
-    ovthresh=0.5
+    iou_thresh=0.5
     bg_cls=-1
 
     xdata = []
@@ -361,7 +361,7 @@ def _devcheck_voc_consistency():
             y = pd.DataFrame(detection_confusions(true_boxes, true_cxs,
                                                   true_weights, pred_boxes,
                                                   pred_scores, pred_cxs,
-                                                  bg_weight=1.0, ovthresh=0.5,
+                                                  bg_weight=1.0, iou_thresh=0.5,
                                                   bg_cls=-1, bias=bias))
             y['gx'] = int(imgname)
             y = (y)
@@ -381,7 +381,7 @@ def _devcheck_voc_consistency():
 
         mine_ap = score_detection_assignment(y, method=method)['ap']
         voc_rec, voc_prec, voc_ap = voc_eval(lines, recs, classname,
-                                             ovthresh=0.5, method=method,
+                                             iou_thresh=0.5, method=method,
                                              bias=bias)
         eav_prec, eav_rec, eav_ap1 = _multiclass_ap(y)
 

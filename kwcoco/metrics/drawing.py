@@ -3,91 +3,25 @@ import ubelt as ub
 import warnings
 
 
-def draw_roc(roc_info, prefix='', fnum=1, **kw):
-    """
-    NOTE: There needs to be enough negative examples for using ROC
-    to make any sense!
-
-    Example:
-        >>> # xdoctest: +REQUIRES(module:kwplot, module:seaborn)
-        >>> from kwcoco.metrics.drawing import *  # NOQA
-        >>> from kwcoco.metrics import DetectionMetrics
-        >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, nclasses=3,
-        >>>                              nboxes=10, n_fp=10, box_noise=0.3,
-        >>>                              with_probs=False)
-        >>> dmet.true_detections(0).data
-        >>> cfsn_vecs = dmet.confusion_vectors(compat='mutex', prioritize='iou', bias=0)
-        >>> print(cfsn_vecs.data._pandas().sort_values('score'))
-        >>> classes = cfsn_vecs.classes
-        >>> roc_info = ub.peek(cfsn_vecs.binarize_ovr().measures()['perclass'].values())
-        >>> # xdoctest: +REQUIRES(--show)
-        >>> import kwplot
-        >>> kwplot.autompl()
-        >>> draw_roc(roc_info)
-        >>> kwplot.show_if_requested()
-    """
-    import kwplot
-    try:
-        fp_count = roc_info['trunc_fp_count']
-        fp_rate = roc_info['trunc_fpr']
-        tp_rate = roc_info['trunc_tpr']
-        auc = roc_info['trunc_auc']
-    except KeyError:
-        fp_count = roc_info['fp_count']
-        fp_rate = roc_info['fpr']
-        tp_rate = roc_info['tpr']
-        auc = roc_info['auc']
-    realpos_total = roc_info['realpos_total']
-
-    title = prefix + 'AUC*: {:.4f}'.format(auc)
-    falsepos_total = fp_count[-1]
-
-    if 0:
-        # TODO: deprecate multi_plot for seaborn
-        fig = kwplot.figure(fnum=fnum)
-        ax = fig.gca()
-        import seaborn as sns
-        xlabel = 'fpr (count={})'.format(falsepos_total)
-        ylabel = 'tpr (count={})'.format(int(realpos_total))
-        data = {
-            xlabel: list(fp_rate),
-            ylabel: list(tp_rate),
-        }
-        sns.lineplot(data=data, x=xlabel, y=ylabel, markers='', ax=ax)
-        ax.set_title(title)
-    else:
-        ax = kwplot.multi_plot(
-            list(fp_rate), list(tp_rate), marker='',
-            # xlabel='FA count (false positive count)',
-            xlabel='fpr (count={})'.format(falsepos_total),
-            ylabel='tpr (count={})'.format(int(realpos_total)),
-            title=title,
-            ylim=(0, 1), ypad=1e-2,
-            xlim=(0, 1), xpad=1e-2,
-            fnum=fnum, **kw)
-
-    return ax
-
-
-def draw_perclass_roc(cx_to_rocinfo, classes=None, prefix='', fnum=1,
+def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
                       fp_axis='count', **kw):
     """
+    Args:
+        cx_to_info (PerClass_Measures | Dict):
 
-    fp_axis can be count or rate
-
-                cx_to_rocinfo = roc_perclass
+        fp_axis (str): can be count or rate
     """
     import kwplot
     # Sort by descending AP
-    cxs = list(cx_to_rocinfo.keys())
-    priority = np.array([item['auc'] for item in cx_to_rocinfo.values()])
+    cxs = list(cx_to_info.keys())
+    priority = np.array([item['auc'] for item in cx_to_info.values()])
     priority[np.isnan(priority)] = -np.inf
     cxs = list(ub.take(cxs, np.argsort(priority)))[::-1]
     xydata = ub.odict()
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', 'Mean of empty slice', RuntimeWarning)
-        mAUC = np.nanmean([item['auc'] for item in cx_to_rocinfo.values()])
+        mAUC = np.nanmean([item['auc'] for item in cx_to_info.values()])
 
     if fp_axis == 'count':
         xlabel = 'FP-count'
@@ -97,28 +31,28 @@ def draw_perclass_roc(cx_to_rocinfo, classes=None, prefix='', fnum=1,
         raise KeyError(fp_axis)
 
     for cx in cxs:
-        peritem = cx_to_rocinfo[cx]
+        info = cx_to_info[cx]
 
         catname = classes[cx] if isinstance(cx, int) else cx
 
         try:
-            auc = peritem['trunc_auc']
-            tpr = peritem['trunc_tpr']
-            fp_count = peritem['trunc_fp_count']
-            fpr = peritem['trunc_fpr']
+            auc = info['trunc_auc']
+            tpr = info['trunc_tpr']
+            fp_count = info['trunc_fp_count']
+            fpr = info['trunc_fpr']
         except KeyError:
-            auc = peritem['auc']
-            tpr = peritem['tpr']
-            fp_count = peritem['fp_count']
-            fpr = peritem['fpr']
+            auc = info['auc']
+            tpr = info['tpr']
+            fp_count = info['fp_count']
+            fpr = info['fpr']
 
-        nsupport = int(peritem['nsupport'])
-        if 'realpos_total' in peritem:
-            z = peritem['realpos_total']
+        nsupport = int(info['nsupport'])
+        if 'realpos_total' in info:
+            z = info['realpos_total']
             if abs(z - int(z)) < 1e-8:
-                label = 'auc={:0.2f}: {} ({:d}/{:d})'.format(auc, catname, int(peritem['realpos_total']), round(nsupport, 2))
+                label = 'auc={:0.2f}: {} ({:d}/{:d})'.format(auc, catname, int(info['realpos_total']), round(nsupport, 2))
             else:
-                label = 'auc={:0.2f}: {} ({:.2f}/{:d})'.format(auc, catname, round(peritem['realpos_total'], 2), round(nsupport, 2))
+                label = 'auc={:0.2f}: {} ({:.2f}/{:d})'.format(auc, catname, round(info['realpos_total'], 2), round(nsupport, 2))
         else:
             label = 'auc={:0.2f}: {} ({:d})'.format(auc, catname, round(nsupport, 2))
 
@@ -138,22 +72,25 @@ def draw_perclass_roc(cx_to_rocinfo, classes=None, prefix='', fnum=1,
     return ax
 
 
-def draw_perclass_prcurve(cx_to_peritem, classes=None, prefix='', fnum=1, **kw):
+def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
     """
+    Args:
+        cx_to_info (PerClass_Measures | Dict):
+
     Example:
         >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=3, nboxes=(0, 10), n_fp=(0, 3), n_fn=(0, 2), nclasses=3, score_noise=0.1, box_noise=0.1, with_probs=False)
+        >>>     nimgs=3, nboxes=(0, 10), n_fp=(0, 3), n_fn=(0, 2), classes=3, score_noise=0.1, box_noise=0.1, with_probs=False)
         >>> cfsn_vecs = dmet.confusion_vectors()
         >>> print(cfsn_vecs.data.pandas())
         >>> classes = cfsn_vecs.classes
-        >>> cx_to_peritem = cfsn_vecs.binarize_ovr().measures()['perclass']
-        >>> print('cx_to_peritem = {}'.format(ub.repr2(cx_to_peritem, nl=1)))
+        >>> cx_to_info = cfsn_vecs.binarize_ovr().measures()['perclass']
+        >>> print('cx_to_info = {}'.format(ub.repr2(cx_to_info, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
-        >>> draw_perclass_prcurve(cx_to_peritem, classes)
+        >>> draw_perclass_prcurve(cx_to_info, classes)
         >>> # xdoctest: +REQUIRES(--show)
         >>> kwplot.show_if_requested()
 
@@ -165,24 +102,24 @@ def draw_perclass_prcurve(cx_to_peritem, classes=None, prefix='', fnum=1, **kw):
     """
     import kwplot
     # Sort by descending AP
-    cxs = list(cx_to_peritem.keys())
-    priority = np.array([item['ap'] for item in cx_to_peritem.values()])
+    cxs = list(cx_to_info.keys())
+    priority = np.array([item['ap'] for item in cx_to_info.values()])
     priority[np.isnan(priority)] = -np.inf
     cxs = list(ub.take(cxs, np.argsort(priority)))[::-1]
     aps = []
     xydata = ub.odict()
     for cx in cxs:
-        peritem = cx_to_peritem[cx]
+        info = cx_to_info[cx]
         catname = classes[cx] if isinstance(cx, int) else cx
-        ap = peritem['ap']
-        if 'pr' in peritem:
-            pr = peritem['pr']
-        elif 'ppv' in peritem:
-            pr = (peritem['ppv'], peritem['tpr'])
-        elif 'prec' in peritem:
-            pr = (peritem['prec'], peritem['rec'])
+        ap = info['ap']
+        if 'pr' in info:
+            pr = info['pr']
+        elif 'ppv' in info:
+            pr = (info['ppv'], info['tpr'])
+        elif 'prec' in info:
+            pr = (info['prec'], info['rec'])
         else:
-            raise KeyError('pr, prec, or ppv not in peritem')
+            raise KeyError('pr, prec, or ppv not in info')
 
         if np.isfinite(ap):
             aps.append(ap)
@@ -195,13 +132,13 @@ def draw_perclass_prcurve(cx_to_peritem, classes=None, prefix='', fnum=1, **kw):
             # I thought AP=nan in this case, but I missed something
             precision, recall = [0], [0]
 
-        nsupport = int(peritem['nsupport'])
-        if 'realpos_total' in peritem:
-            z = peritem['realpos_total']
+        nsupport = int(info['nsupport'])
+        if 'realpos_total' in info:
+            z = info['realpos_total']
             if abs(z - int(z)) < 1e-8:
-                label = 'ap={:0.2f}: {} ({:d}/{:d})'.format(ap, catname, int(peritem['realpos_total']), round(nsupport, 2))
+                label = 'ap={:0.2f}: {} ({:d}/{:d})'.format(ap, catname, int(info['realpos_total']), round(nsupport, 2))
             else:
-                label = 'ap={:0.2f}: {} ({:.2f}/{:d})'.format(ap, catname, round(peritem['realpos_total'], 2), round(nsupport, 2))
+                label = 'ap={:0.2f}: {} ({:.2f}/{:d})'.format(ap, catname, round(info['realpos_total'], 2), round(nsupport, 2))
         else:
             label = 'ap={:0.2f}: {} ({:d})'.format(ap, catname, round(nsupport, 2))
         xydata[label] = (recall, precision)
@@ -265,8 +202,11 @@ def draw_perclass_prcurve(cx_to_peritem, classes=None, prefix='', fnum=1, **kw):
     return ax
 
 
-def draw_perclass_thresholds(cx_to_peritem, key='mcc', classes=None, prefix='', fnum=1, **kw):
+def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnum=1, **kw):
     """
+    Args:
+        cx_to_info (PerClass_Measures | Dict):
+
     Notes:
         Each category is inspected independently of one another, there is no
         notion of confusion.
@@ -278,20 +218,20 @@ def draw_perclass_thresholds(cx_to_peritem, key='mcc', classes=None, prefix='', 
         >>> cfsn_vecs = ConfusionVectors.demo()
         >>> classes = cfsn_vecs.classes
         >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
-        >>> cx_to_peritem = ovr_cfsn.measures()['perclass']
+        >>> cx_to_info = ovr_cfsn.measures()['perclass']
         >>> import kwplot
         >>> kwplot.autompl()
         >>> key = 'mcc'
-        >>> draw_perclass_thresholds(cx_to_peritem, key, classes)
+        >>> draw_perclass_thresholds(cx_to_info, key, classes)
         >>> # xdoctest: +REQUIRES(--show)
         >>> kwplot.show_if_requested()
     """
     import kwplot
     # Sort by descending "best value"
-    cxs = list(cx_to_peritem.keys())
+    cxs = list(cx_to_info.keys())
 
     try:
-        priority = np.array([item['_max_' + key][0] for item in cx_to_peritem.values()])
+        priority = np.array([item['_max_' + key][0] for item in cx_to_info.values()])
         priority[np.isnan(priority)] = -np.inf
         cxs = list(ub.take(cxs, np.argsort(priority)))[::-1]
     except KeyError:
@@ -299,26 +239,26 @@ def draw_perclass_thresholds(cx_to_peritem, key='mcc', classes=None, prefix='', 
 
     xydata = ub.odict()
     for cx in cxs:
-        peritem = cx_to_peritem[cx]
+        info = cx_to_info[cx]
         catname = classes[cx] if isinstance(cx, int) else cx
 
-        thresholds = peritem['thresholds']
-        measure = peritem[key]
+        thresholds = info['thresholds']
+        measure = info[key]
         try:
-            best_label = peritem['max_{}'.format(key)]
+            best_label = info['max_{}'.format(key)]
         except KeyError:
             max_idx = measure.argmax()
             best_thresh = thresholds[max_idx]
             best_measure = measure[max_idx]
             best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
 
-        nsupport = int(peritem['nsupport'])
-        if 'realpos_total' in peritem:
-            z = peritem['realpos_total']
+        nsupport = int(info['nsupport'])
+        if 'realpos_total' in info:
+            z = info['realpos_total']
             if abs(z - int(z)) < 1e-8:
-                label = '{}: {} ({:d}/{:d})'.format(best_label, catname, int(peritem['realpos_total']), round(nsupport, 2))
+                label = '{}: {} ({:d}/{:d})'.format(best_label, catname, int(info['realpos_total']), round(nsupport, 2))
             else:
-                label = '{}: {} ({:.2f}/{:d})'.format(best_label, catname, round(peritem['realpos_total'], 2), round(nsupport, 2))
+                label = '{}: {} ({:.2f}/{:d})'.format(best_label, catname, round(info['realpos_total'], 2), round(nsupport, 2))
         else:
             label = '{}: {} ({:d})'.format(best_label, catname, round(nsupport, 2))
         xydata[label] = (thresholds, measure)
@@ -337,36 +277,109 @@ def draw_perclass_thresholds(cx_to_peritem, key='mcc', classes=None, prefix='', 
     return ax
 
 
-def draw_prcurve(peritem, prefix='', fnum=1, **kw):
+def draw_roc(info, prefix='', fnum=1, **kw):
     """
-    TODO: rename to draw prcurve. Just draws a single pr curve.
+    Args:
+        info (Measures | Dict)
+
+    NOTE:
+        There needs to be enough negative examples for using ROC to make any
+        sense!
+
+    Example:
+        >>> # xdoctest: +REQUIRES(module:kwplot, module:seaborn)
+        >>> from kwcoco.metrics.drawing import *  # NOQA
+        >>> from kwcoco.metrics import DetectionMetrics
+        >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, classes=3,
+        >>>                              nboxes=10, n_fp=10, box_noise=0.3,
+        >>>                              with_probs=False)
+        >>> dmet.true_detections(0).data
+        >>> cfsn_vecs = dmet.confusion_vectors(compat='mutex', prioritize='iou', bias=0)
+        >>> print(cfsn_vecs.data._pandas().sort_values('score'))
+        >>> classes = cfsn_vecs.classes
+        >>> info = ub.peek(cfsn_vecs.binarize_ovr().measures()['perclass'].values())
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> draw_roc(info)
+        >>> kwplot.show_if_requested()
+    """
+    import kwplot
+    try:
+        fp_count = info['trunc_fp_count']
+        fp_rate = info['trunc_fpr']
+        tp_rate = info['trunc_tpr']
+        auc = info['trunc_auc']
+    except KeyError:
+        fp_count = info['fp_count']
+        fp_rate = info['fpr']
+        tp_rate = info['tpr']
+        auc = info['auc']
+    realpos_total = info['realpos_total']
+
+    title = prefix + 'AUC*: {:.4f}'.format(auc)
+    falsepos_total = fp_count[-1]
+
+    if 0:
+        # TODO: deprecate multi_plot for seaborn?
+        fig = kwplot.figure(fnum=fnum)
+        ax = fig.gca()
+        import seaborn as sns
+        xlabel = 'fpr (count={})'.format(falsepos_total)
+        ylabel = 'tpr (count={})'.format(int(realpos_total))
+        data = {
+            xlabel: list(fp_rate),
+            ylabel: list(tp_rate),
+        }
+        sns.lineplot(data=data, x=xlabel, y=ylabel, markers='', ax=ax)
+        ax.set_title(title)
+    else:
+        ax = kwplot.multi_plot(
+            list(fp_rate), list(tp_rate), marker='',
+            # xlabel='FA count (false positive count)',
+            xlabel='fpr (count={})'.format(falsepos_total),
+            ylabel='tpr (count={})'.format(int(realpos_total)),
+            title=title,
+            ylim=(0, 1), ypad=1e-2,
+            xlim=(0, 1), xpad=1e-2,
+            fnum=fnum, **kw)
+
+    return ax
+
+
+def draw_prcurve(info, prefix='', fnum=1, **kw):
+    """
+    Draws a single pr curve.
+
+    Args:
+        info (Measures | Dict)
 
     Example:
         >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
+        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), classes=3)
         >>> cfsn_vecs = dmet.confusion_vectors()
 
         >>> classes = cfsn_vecs.classes
-        >>> peritem = cfsn_vecs.binarize_peritem().measures()
+        >>> info = cfsn_vecs.binarize_classless().measures()
         >>> import kwplot
         >>> kwplot.autompl()
-        >>> draw_prcurve(peritem)
+        >>> draw_prcurve(info)
         >>> # xdoctest: +REQUIRES(--show)
         >>> kwplot.show_if_requested()
     """
     import kwplot
     aps = []
-    ap = peritem['ap']
-    if 'pr' in peritem:
-        pr = peritem['pr']
-    elif 'ppv' in peritem:
-        pr = (peritem['ppv'], peritem['tpr'])
-    elif 'prec' in peritem:
-        pr = (peritem['prec'], peritem['rec'])
+    ap = info['ap']
+    if 'pr' in info:
+        pr = info['pr']
+    elif 'ppv' in info:
+        pr = (info['ppv'], info['tpr'])
+    elif 'prec' in info:
+        pr = (info['prec'], info['rec'])
     else:
-        raise KeyError('pr, prec, or ppv not in peritem')
+        raise KeyError('pr, prec, or ppv not in info')
     if np.isfinite(ap):
         aps.append(ap)
         (precision, recall) = pr
@@ -376,13 +389,13 @@ def draw_prcurve(peritem, prefix='', fnum=1, **kw):
         # I thought AP=nan in this case, but I missed something
         precision, recall = [0], [0]
 
-    nsupport = int(peritem['nsupport'])
-    if 'realpos_total' in peritem:
-        z = peritem['realpos_total']
+    nsupport = int(info['nsupport'])
+    if 'realpos_total' in info:
+        z = info['realpos_total']
         if abs(z - int(z)) < 1e-8:
-            label = 'ap={:0.2f}: ({:d}/{:d})'.format(ap, int(peritem['realpos_total']), round(nsupport, 2))
+            label = 'ap={:0.2f}: ({:d}/{:d})'.format(ap, int(info['realpos_total']), round(nsupport, 2))
         else:
-            label = 'ap={:0.2f}: ({:.2f}/{:d})'.format(ap, round(peritem['realpos_total'], 2), round(nsupport, 2))
+            label = 'ap={:0.2f}: ({:.2f}/{:d})'.format(ap, round(info['realpos_total'], 2), round(nsupport, 2))
     else:
         label = 'ap={:0.2f}: ({:d})'.format(ap, nsupport)
 
@@ -390,7 +403,7 @@ def draw_prcurve(peritem, prefix='', fnum=1, **kw):
         xdata=recall, ydata=precision, fnum=fnum, label=label,
         xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
         xlabel='recall', ylabel='precision',
-        title=prefix + 'peritem AP={:.4f}'.format(ap),
+        title=prefix + 'classless AP={:.4f}'.format(ap),
         legend_loc='lower right',
         color='distinct', linestyle='cycle', marker='cycle', **kw
     )
@@ -399,6 +412,9 @@ def draw_prcurve(peritem, prefix='', fnum=1, **kw):
 
 def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     """
+    Args:
+        info (Measures | Dict)
+
     Example:
         >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> import sys, ubelt
@@ -406,9 +422,9 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
+        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), classes=3)
         >>> cfsn_vecs = dmet.confusion_vectors()
-        >>> info = cfsn_vecs.binarize_peritem().measures()
+        >>> info = cfsn_vecs.binarize_classless().measures()
         >>> keys = None
         >>> import kwplot
         >>> kwplot.autompl()

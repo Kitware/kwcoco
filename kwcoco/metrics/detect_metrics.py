@@ -18,7 +18,7 @@ class DetectionMetrics(ub.NiceRepr):
 
     Example:
         >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8, score_noise=0.9, hacked=False)
+        >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), classes=8, score_noise=0.9, hacked=False)
         >>> print(dmet.score_kwcoco(bias=0, compat='mutex', prioritize='iou')['mAP'])
         ...
         >>> # NOTE: IN GENERAL NETHARN AND VOC ARE NOT THE SAME
@@ -140,17 +140,17 @@ class DetectionMetrics(ub.NiceRepr):
         """ gets Detections representation for predictions in an image """
         return dmet.gid_to_pred_dets[gid]
 
-    def confusion_vectors(dmet, ovthresh=0.5, bias=0, gids=None, compat='mutex',
+    def confusion_vectors(dmet, iou_thresh=0.5, bias=0, gids=None, compat='mutex',
                           prioritize='iou', ignore_classes='ignore',
                           background_class=ub.NoParam, verbose='auto',
-                          workers=0, track_probs='try'):
+                          workers=0, track_probs='try', max_dets=None):
         """
         Assigns predicted boxes to the true boxes so we can transform the
         detection problem into a classification problem for scoring.
 
         Args:
 
-            ovthresh (float, default=0.5):
+            iou_thresh (float, default=0.5):
                 bounding box overlap iou threshold required for assignment
 
             bias (float, default=0.0):
@@ -172,7 +172,7 @@ class DetectionMetrics(ub.NiceRepr):
                 can be ('iou' | 'class' | 'correct') determines which box to
                 assign to if mutiple true boxes overlap a predicted box.  if
                 prioritize is iou, then the true box with maximum iou (above
-                ovthresh) will be chosen.  If prioritize is class, then it will
+                iou_thresh) will be chosen.  If prioritize is class, then it will
                 prefer matching a compatible class above a higher iou. If
                 prioritize is correct, then ancestors of the true class are
                 preferred over descendents of the true class, over unreleated
@@ -236,9 +236,9 @@ class DetectionMetrics(ub.NiceRepr):
             pred_dets = dmet.pred_detections(gid)
             job = jobs.submit(
                 _assign_confusion_vectors, true_dets, pred_dets,
-                bg_weight=1, ovthresh=ovthresh, bg_cidx=-1, bias=bias,
+                bg_weight=1, iou_thresh=iou_thresh, bg_cidx=-1, bias=bias,
                 classes=dmet.classes, compat=compat, prioritize=prioritize,
-                ignore_classes=ignore_classes)
+                ignore_classes=ignore_classes, max_dets=max_dets)
             job.gid = gid
 
         for job in ub.ProgIter(jobs.jobs, desc='assign detections',
@@ -311,7 +311,7 @@ class DetectionMetrics(ub.NiceRepr):
 
         return cfsn_vecs
 
-    def score_kwant(dmet, ovthresh=0.5):
+    def score_kwant(dmet, iou_thresh=0.5):
         """
         Scores the detections using kwant
         """
@@ -352,7 +352,7 @@ class DetectionMetrics(ub.NiceRepr):
         pred_kw18 = pred_kw18s
 
         roc_info = kwant.score_events(true_kw18s, pred_kw18s,
-                                      ovthresh=ovthresh, prefiltered=True,
+                                      iou_thresh=iou_thresh, prefiltered=True,
                                       verbose=3)
 
         fp = roc_info['fp'].values
@@ -394,10 +394,10 @@ class DetectionMetrics(ub.NiceRepr):
 
         return info
 
-    def score_kwcoco(dmet, ovthresh=0.5, bias=0, gids=None,
+    def score_kwcoco(dmet, iou_thresh=0.5, bias=0, gids=None,
                       compat='all', prioritize='iou'):
         """ our scoring method """
-        cfsn_vecs = dmet.confusion_vectors(ovthresh=ovthresh, bias=bias,
+        cfsn_vecs = dmet.confusion_vectors(iou_thresh=iou_thresh, bias=bias,
                                            gids=gids,
                                            compat=compat,
                                            prioritize=prioritize)
@@ -412,14 +412,14 @@ class DetectionMetrics(ub.NiceRepr):
             info['mAP'] = perclass['mAP']
         return info
 
-    def score_voc(dmet, ovthresh=0.5, bias=1, method='voc2012', gids=None,
+    def score_voc(dmet, iou_thresh=0.5, bias=1, method='voc2012', gids=None,
                   ignore_classes='ignore'):
         """
         score using voc method
 
         Example:
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8,
+            >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), classes=8,
             >>>     score_noise=.5)
             >>> print(dmet.score_voc()['mAP'])
             0.9399...
@@ -437,14 +437,14 @@ class DetectionMetrics(ub.NiceRepr):
 
             if ignore_classes is not None:
                 true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
-                    true_dets, pred_dets, ovthresh=ovthresh,
+                    true_dets, pred_dets, iou_thresh=iou_thresh,
                     ignore_classes=ignore_classes)
                 true_dets = true_dets.compress(~true_ignore_flags)
                 pred_dets = pred_dets.compress(~pred_ignore_flags)
 
             vmet.add_truth(true_dets, gid=gid)
             vmet.add_predictions(pred_dets, gid=gid)
-        voc_scores = vmet.score(ovthresh, bias=bias, method=method)
+        voc_scores = vmet.score(iou_thresh, bias=bias, method=method)
         return voc_scores
 
     def _to_coco(dmet):
@@ -508,7 +508,7 @@ class DetectionMetrics(ub.NiceRepr):
             >>> # xdoctest: +REQUIRES(--pycocotools)
             >>> from kwcoco.metrics.detect_metrics import *
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=10, nboxes=(0, 3), n_fn=(0, 1), n_fp=(0, 1), nclasses=8, with_probs=False)
+            >>>     nimgs=10, nboxes=(0, 3), n_fn=(0, 1), n_fp=(0, 1), classes=8, with_probs=False)
             >>> print(dmet.score_coco()['mAP'])
             0.711016...
 
@@ -594,7 +594,8 @@ class DetectionMetrics(ub.NiceRepr):
         offset from the truth.
 
         Kwargs:
-            nclasses (int, default=1): number of foreground classes.
+            classes (int, default=1): class list or the number of foreground
+                classes.
             nimgs (int, default=1): number of images in the coco datasts.
             nboxes (int, default=1): boxes per image.
             n_fp (int, default=0): number of false positives.
@@ -620,7 +621,7 @@ class DetectionMetrics(ub.NiceRepr):
             >>> # Size parameters determine how big the data is
             >>> kwargs['nimgs'] = 5
             >>> kwargs['nboxes'] = 7
-            >>> kwargs['nclasses'] = 11
+            >>> kwargs['classes'] = 11
             >>> # Noise parameters perterb predictions further from the truth
             >>> kwargs['n_fp'] = 3
             >>> kwargs['box_noise'] = 0.1
@@ -636,14 +637,14 @@ class DetectionMetrics(ub.NiceRepr):
 
         Example:
             >>> # Test case with null predicted categories
-            >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, nclasses=3,
+            >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, classes=3,
             >>>                              nboxes=10, n_fp=3, box_noise=0.1,
             >>>                              with_probs=False)
             >>> dmet.gid_to_pred_dets[0].data
             >>> dmet.gid_to_true_dets[0].data
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> binvecs_ovr = cfsn_vecs.binarize_ovr()
-            >>> binvecs_per = cfsn_vecs.binarize_peritem()
+            >>> binvecs_per = cfsn_vecs.binarize_classless()
             >>> measures_per = binvecs_per.measures()
             >>> measures_ovr = binvecs_ovr.measures()
             >>> print('measures_per = {!r}'.format(measures_per))
@@ -658,7 +659,7 @@ class DetectionMetrics(ub.NiceRepr):
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
             >>>     n_fp=(0, 1), n_fn=(0, 1), nimgs=512, nboxes=(0, 32),
-            >>>     nclasses=3, rng=0, newstyle=1, box_noise=0.5, cls_noise=0.0, score_noise=0.3, with_probs=False)
+            >>>     classes=3, rng=0, newstyle=1, box_noise=0.5, cls_noise=0.0, score_noise=0.3, with_probs=False)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -672,14 +673,11 @@ class DetectionMetrics(ub.NiceRepr):
         # Parse kwargs
         rng = kwarray.ensure_rng(kwargs.get('rng', 0))
 
-        # todo: accept and coerce classes instead of nclasses
+        # todo: accept and coerce classes instead of classes
         classes = kwargs.get('classes', None)
-        nclasses = kwargs.get('nclasses', None)
 
-        if classes is not None and nclasses is not None:
-            raise ValueError('cant specify both classes and nclasses')
-        elif classes is None and nclasses is None:
-            nclasses = 1
+        if classes is None:
+            classes = 1
 
         nimgs = kwargs.get('nimgs', 1)
         box_noise = kwargs.get('box_noise', 0)
@@ -749,10 +747,10 @@ class DetectionMetrics(ub.NiceRepr):
                 mean=false_mean, std=.5, low=0, high=false_high, rng=rng)
 
             # Create the category hierarcy
-            if nclasses is not None:
+            if isinstance(classes, int):
                 graph = nx.DiGraph()
                 graph.add_node('background', id=0)
-                for cid in range(1, nclasses + 1):
+                for cid in range(1, classes + 1):
                     # binary heap encoding of a tree
                     cx = cid - 1
                     parent_cx = (cx - 1) // 2
@@ -857,7 +855,7 @@ class DetectionMetrics(ub.NiceRepr):
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
             >>>     n_fp=(0, 128), n_fn=(0, 4), nimgs=512, nboxes=(0, 32),
-            >>>     nclasses=3, rng=0)
+            >>>     classes=3, rng=0)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -872,7 +870,7 @@ class DetectionMetrics(ub.NiceRepr):
             ovr_measures = ovr_cfsn.measures()
             summary['ovr_measures'] = ovr_measures
         if with_bin:
-            bin_cfsn = cfsn_vecs.binarize_peritem()
+            bin_cfsn = cfsn_vecs.binarize_classless()
             bin_measures = bin_cfsn.measures()
             summary['bin_measures'] = bin_measures
         if plot:
