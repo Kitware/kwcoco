@@ -344,8 +344,11 @@ class ConfusionVectors(ub.NiceRepr):
         binvecs = BinaryConfusionVectors(bin_data)
         return binvecs
 
-    def binarize_ovr(cfsn_vecs, mode=1, keyby='name',
-                     ignore_classes={'ignore'}, approx=0):
+    def binarize_ovr(cfsn_vecs,
+                     mode=1,
+                     keyby='name',
+                     ignore_classes={'ignore'},
+                     approx=0):
         """
         Transforms cfsn_vecs into one-vs-rest BinaryConfusionVectors for each
         category.
@@ -353,10 +356,13 @@ class ConfusionVectors(ub.NiceRepr):
         Args:
             mode (int, default=1): 0 for heirarchy aware or 1 for voc like.
                 MODE 0 IS PROBABLY BROKEN
+
             keyby (int | str) : can be cx or name
+
             ignore_classes (Set[str]): category names to ignore
-            approx (bool, default=0): if True try and approximate missing scores
-                otherwise assume they are irrecoverable and use -inf
+
+            approx (bool, default=0): if True try and approximate missing
+                scores otherwise assume they are irrecoverable and use -inf
 
         Returns:
             OneVsRestConfusionVectors: which behaves like
@@ -583,7 +589,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         self.classes = classes
 
     def __nice__(self):
-        return ub.repr2(self.cx_to_binvecs, strvals=True)
+        return ub.repr2(self.cx_to_binvecs, strvals=True, align=':')
 
     @classmethod
     def demo(cls):
@@ -740,7 +746,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         return ub.repr2({
             'catname': self.catname,
             'data': self.data.__nice__(),
-        }, nl=0, strvals=True)
+        }, nl=0, strvals=True, align=':')
 
     def __len__(self):
         return len(self.data)
@@ -1338,7 +1344,7 @@ class Measures(ub.NiceRepr, DictProxy):
         return self.get('node', None)
 
     def __nice__(self):
-        return ub.repr2(self.summary(), nl=0, precision=3, strvals=True)
+        return ub.repr2(self.summary(), nl=0, precision=3, strvals=True, align=':')
 
     def __json__(self):
         import numbers
@@ -1367,7 +1373,7 @@ class Measures(ub.NiceRepr, DictProxy):
             'max_f1': self['max_f1'],
             # 'max_g1': self['max_g1'],
             'nsupport': self['nsupport'],
-            'realpos_total': self['realpos_total'],
+            # 'realpos_total': self['realpos_total'],
             # 'realneg_total': self['realneg_total'],
             'catname': self.get('node', None),
         }
@@ -1426,7 +1432,7 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
         self.proxy = cx_to_info
 
     def __nice__(self):
-        return ub.repr2(self.proxy, nl=2, strvals=True)
+        return ub.repr2(self.proxy, nl=2, strvals=True, align=':')
 
     def summary(self):
         return {k: v.summary() for k, v in self.items()}

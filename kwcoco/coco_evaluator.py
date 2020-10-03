@@ -604,57 +604,28 @@ class CocoEvaluator(object):
                 compat=coco_eval.config['compat'],
                 iou_thresh=iou_threshold,
                 workers=coco_eval.config['assign_workers'],
-                monotonic_ppv=coco_eval.config['monotonic_ppv'],
                 max_dets=coco_eval.config['max_dets'],
             )
 
-            # Basic logic to handle area-range by weight modification.
-            orig_weights = cfsn_vecs.data['weight'].copy()
-
-            for minmax in area_ranges:
-                area_min, area_max = minmax
-                gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
-                new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
-                for gid, groupx in zip(gids, groupxs):
-                    # Ignore any truth outside the area range
-                    true_area = dmet.gid_to_true_dets[gid].boxes.area
-                    txs = cfsn_vecs.data['txs'][groupx]
-                    tx_flags = txs > -1
-                    tarea = true_area[txs[tx_flags]].ravel()
-                    is_toob = ((tarea < area_min) | (tarea < area_max))
-                    toob_idxs = groupx[tx_flags][is_toob]
-
-                    # Ignore any *unassigned* prediction outside the area range
-                    pred_area = dmet.gid_to_pred_dets[gid].boxes.area
-                    pxs = cfsn_vecs.data['pxs'][groupx]
-                    px_flags = (pxs > -1) & (txs < 0)
-                    parea = pred_area[pxs[px_flags]].ravel()
-                    is_poob = ((parea < area_min) | (parea < area_max))
-                    poob_idxs = groupx[px_flags][is_poob]
-                    new_ignore[poob_idxs] = True
-                    new_ignore[toob_idxs] = True
-
-                new_weights = orig_weights.copy()
-                new_weights[new_ignore] = 0
-                print('new_weights = {!r}'.format(new_weights))
-
-                # Overwrite weights (we should probably store originals?)
-                cfsn_vecs.data['weight'] = new_weights
+            dmet_area_flags(dmet, cfsn_vecs, area_ranges)
 
             # NOTE: translating to classless confusion vectors only works when
             # compat='all', otherwise we would need to redo confusion vector
             # computation.
 
             # Get classless per-item detection results
-            binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
 
-            fp_cutoff = coco_eval.config['fp_cutoff']
-            measures = binvecs.measures(fp_cutoff=fp_cutoff)
-            print('measures = {}'.format(ub.repr2(measures, nl=1)))
+            measurekw = dict(
+                fp_cutoff=coco_eval.config['fp_cutoff'],
+                monotonic_ppv=coco_eval.config['monotonic_ppv'],
+            )
 
-            # Get per-class detection results
-            ovr_binvecs = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
-            ovr_measures = ovr_binvecs.measures(fp_cutoff=fp_cutoff)['perclass']
+            # Get classless and ovr binary detection measures
+            nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
+            ovr_binvecs   = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
+            nocls_measures = nocls_binvecs.measures(**measurekw)
+            ovr_measures = ovr_binvecs.measures(**measurekw)['perclass']
+            print('nocls_measures = {}'.format(ub.repr2(nocls_measures, nl=1, align=':')))
             print('ovr_measures = {!r}'.format(ovr_measures))
 
             # Remove large datasets values in configs that are not file references
@@ -666,7 +637,7 @@ class CocoEvaluator(object):
             # meta['iou_thresh'] = iou_thresh
             # meta['iou_thresh'] = iou_thresh
 
-            results = CocoResults(
+            result = CocoResults(
                 measures,
                 ovr_measures,
                 cfsn_vecs,
@@ -701,74 +672,106 @@ class CocoEvaluator(object):
 
                 ovr_measures2 = ovr_binvecs2.measures(fp_cutoff=fp_cutoff)['perclass']
                 print('ovr_measures2 = {!r}'.format(ovr_measures2))
-                results.ovr_measures2 = ovr_measures2
+                result.ovr_measures2 = ovr_measures2
         return results
 
 
+def dmet_area_flags(dmet, cfsn_vecs, area_ranges):
+    # Basic logic to handle area-range by weight modification.
+    orig_weights = cfsn_vecs.data['weight'].copy()
+    for minmax in area_ranges:
+        area_min, area_max = minmax
+        gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
+        new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
+        for gid, groupx in zip(gids, groupxs):
+            # Ignore any truth outside the area range
+            true_area = dmet.gid_to_true_dets[gid].boxes.area
+            txs = cfsn_vecs.data['txs'][groupx]
+            tx_flags = txs > -1
+            tarea = true_area[txs[tx_flags]].ravel()
+            is_toob = ((tarea < area_min) | (tarea < area_max))
+            toob_idxs = groupx[tx_flags][is_toob]
+
+            # Ignore any *unassigned* prediction outside the area range
+            pred_area = dmet.gid_to_pred_dets[gid].boxes.area
+            pxs = cfsn_vecs.data['pxs'][groupx]
+            px_flags = (pxs > -1) & (txs < 0)
+            parea = pred_area[pxs[px_flags]].ravel()
+            is_poob = ((parea < area_min) | (parea < area_max))
+            poob_idxs = groupx[px_flags][is_poob]
+            new_ignore[poob_idxs] = True
+            new_ignore[toob_idxs] = True
+
+        new_weights = orig_weights.copy()
+        new_weights[new_ignore] = 0
+        print('new_weights = {!r}'.format(new_weights))
+
+        # Overwrite weights (we should probably store originals?)
+        cfsn_vecs.data['weight'] = new_weights
+
+
 class CocoResults(ub.NiceRepr):
+    def __init__(results, cfsn_vecs=None):
+        results.cfsn_vecs = cfsn_vecs
+
+
+class CocoSingleResult(ub.NiceRepr):
     """
     Container class to store, draw, summarize, and serialize results from
     CocoEvaluator.
     """
 
-    def __init__(results, measures, ovr_measures, cfsn_vecs, meta=None):
-        results.measures = measures
-        results.ovr_measures = ovr_measures
-        results.cfsn_vecs = cfsn_vecs
-        results.meta = meta
+    def __init__(result, measures, ovr_measures, cfsn_vecs, meta=None):
+        result.measures = measures
+        result.ovr_measures = ovr_measures
+        result.cfsn_vecs = cfsn_vecs
+        result.meta = meta
 
-    def __nice__(results):
+    def __nice__(result):
         text = ub.repr2({
-            'measures': results.measures,
-            'ovr_measures': results.ovr_measures,
+            'measures': result.measures,
+            'ovr_measures': result.ovr_measures,
         }, sv=1)
         return text
 
-    def __json__(results):
+    def __json__(result):
         state = {
-            'measures': results.measures.__json__(),
-            'ovr_measures': results.ovr_measures.__json__(),
-            'cfsn_vecs': results.cfsn_vecs.__json__(),
-            'meta': results.meta,
+            'measures': result.measures.__json__(),
+            'ovr_measures': result.ovr_measures.__json__(),
+            'cfsn_vecs': result.cfsn_vecs.__json__(),
+            'meta': result.meta,
         }
         from kwcoco.util.util_json import ensure_json_serializable
         ensure_json_serializable(state, normalize_containers=True, verbose=0)
         return state
 
-    def dump(results, file, indent='    '):
+    def dump(result, file, indent='    '):
         """
         Serialize to json file
         """
         if isinstance(file, str):
             with open(file, 'w') as fp:
-                return results.dump(fp, indent=indent)
+                return result.dump(fp, indent=indent)
         else:
-            state = results.__json__()
+            state = result.__json__()
             json.dump(state, file, indent=indent)
 
-    def dump_figures(results, out_dpath, expt_title=None):
-        # classes_of_interest=[], ignore_classes=None,
-        # if 0:
-        #     cname = 'flatfish'
-        #     cx = cfsn_vecs.classes.index(cname)
-        #     is_true = (cfsn_vecs.data['true'] == cx)
-        #     num_localized = (cfsn_vecs.data['pred'][is_true] != -1).sum()
-        #     num_missed = is_true.sum() - num_localized
-        # metrics_dpath = ub.ensuredir(coco_eval.config['out_dpath'])
+    def dump_figures(result, out_dpath, expt_title=None):
         if expt_title is None:
-            expt_title = results.meta.get('expt_title', '')
+            expt_title = result.meta.get('expt_title', '')
         metrics_dpath = ub.ensuredir(out_dpath)
-        # coco_eval.config['out_dpath'])
 
-        measures = results.measures
-        ovr_measures = results.ovr_measures
+        measures = result.measures
+        ovr_measures = result.ovr_measures
 
         # TODO: separate into standalone method that is able to run on
         # serialized / cached metrics on disk.
         print('drawing evaluation metrics')
         import kwplot
+        import matplotlib as mpl
         # TODO: kwcoco matplotlib backend context
-        kwplot.autompl()
+        ctx = kwplot.BackendContext(backend='agg')
+        ctx.__enter__()
 
         try:
             import seaborn
@@ -778,80 +781,59 @@ class CocoResults(ub.NiceRepr):
 
         figsize = (9, 7)
 
-        fig = kwplot.figure(fnum=1, pnum=(1, 2, 1), doclf=True,
-                            figtitle=expt_title)
-        fig.set_size_inches(figsize)
+        def writefig(fig: mpl.pyplot.Figure, dpath: str, fname: str):
+            fig_fpath = join(metrics_dpath, 'loc_pr_roc.png')
+            print('write fig_fpath = {!r}'.format(fig_fpath))
+            fig.set_size_inches(figsize)
+            fig.savefig(fig_fpath, bbox_inches='tight')
+
+        figkw = dict(figtitle=expt_title)
+        fig = kwplot.figure(fnum=1, pnum=(1, 2, 1), doclf=True, **figkw)
         measures.draw(key='pr')
         kwplot.figure(fnum=1, pnum=(1, 2, 2))
         measures.draw(key='roc')
-        fig_fpath = join(metrics_dpath, 'loc_pr_roc.png')
-        print('write fig_fpath = {!r}'.format(fig_fpath))
-        fig.savefig(fig_fpath)
+        writefig(fig, metrics_dpath, 'loc_pr_roc.png')
 
-        fig = kwplot.figure(fnum=1, pnum=(1, 1, 1), doclf=True,
-                            figtitle=expt_title)
-        fig.set_size_inches(figsize)
+        fig = kwplot.figure(fnum=1, pnum=(1, 1, 1), doclf=True, **figkw)
         measures.draw(key='thresh')
-        fig_fpath = join(metrics_dpath, 'loc_thresh.png')
-        print('write fig_fpath = {!r}'.format(fig_fpath))
-        fig.savefig(fig_fpath)
+        writefig(fig, metrics_dpath, 'loc_thresh.png')
 
-        fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                            figtitle=expt_title)
-        fig.set_size_inches(figsize)
+        fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
         ovr_measures.draw(key='roc', fnum=2)
+        writefig(fig, metrics_dpath, 'perclass_roc.png')
 
-        fig_fpath = join(metrics_dpath, 'perclass_roc.png')
-        print('write fig_fpath = {!r}'.format(fig_fpath))
-        fig.savefig(fig_fpath)
-
-        fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                            figtitle=expt_title)
-        fig.set_size_inches(figsize)
+        fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
         ovr_measures.draw(key='pr', fnum=2)
-        fig_fpath = join(metrics_dpath, 'perclass_pr.png')
-        print('write fig_fpath = {!r}'.format(fig_fpath))
-        fig.savefig(fig_fpath)
+        writefig(fig, metrics_dpath, 'perclass_pr.png')
 
-        if hasattr(results, 'ovr_measures2'):
-            ovr_measures2 = results.ovr_measures2
-            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                                figtitle=expt_title)
-            fig.set_size_inches(figsize)
+        if hasattr(result, 'ovr_measures2'):
+            ovr_measures2 = result.ovr_measures2
+            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures2.draw(key='pr', fnum=2, prefix='coi-vs-bg-only')
-            fig_fpath = join(metrics_dpath, 'perclass_pr_coi_vs_bg.png')
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            fig.savefig(fig_fpath)
+            writefig(fig, metrics_dpath, 'perclass_pr_coi_vs_bg.png')
 
-            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                                figtitle=expt_title)
-            fig.set_size_inches(figsize)
+            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures2.draw(key='roc', fnum=2, prefix='coi-vs-bg-only')
-            fig_fpath = join(metrics_dpath, 'perclass_roc_coi_vs_bg.png')
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            fig.savefig(fig_fpath)
+            writefig(fig, metrics_dpath, 'perclass_roc_coi_vs_bg.png')
 
-        # keys = ['mcc', 'g1', 'f1', 'acc', 'ppv', 'tpr', 'mk', 'bm']
-        keys = ['mcc', 'f1', 'ppv', 'tpr']
-        for key in keys:
-            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True,
-                                figtitle=expt_title)
-            fig.set_size_inches(figsize)
+        dump_config = {
+            # 'keys': ['mcc', 'g1', 'f1', 'acc', 'ppv', 'tpr', 'mk', 'bm']
+            'keys': ['mcc', 'f1'],
+        }
+
+        for key in dump_config['keys']:
+            fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures.draw(fnum=2, key=key)
-            fig_fpath = join(metrics_dpath, 'perclass_{}.png'.format(key))
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            fig.savefig(fig_fpath)
+            writefig(fig, metrics_dpath, 'perclass_{}.png'.format(key))
 
         # NOTE: The threshold on these confusion matrices is VERY low.
         # FIXME: robustly skip in cases where predictions have no class information
         try:
-            cfsn_vecs = results.cfsn_vecs
+            cfsn_vecs = result.cfsn_vecs
             fig = kwplot.figure(fnum=3, doclf=True)
             confusion = cfsn_vecs.confusion_matrix()
             ax = kwplot.plot_matrix(confusion, fnum=3, showvals=0, logscale=True)
-            fig_fpath = join(metrics_dpath, 'confusion.png')
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            ax.figure.savefig(fig_fpath)
+            writefig(fig, metrics_dpath, 'confusion.png')
 
             # classes_of_interest = coco_eval.config['classes_of_interest']
             # if classes_of_interest:
@@ -859,7 +841,7 @@ class CocoResults(ub.NiceRepr):
             #     subkeys = ['background'] + classes_of_interest
             #     coi_confusion = confusion[subkeys].loc[subkeys]
             #     ax = kwplot.plot_matrix(coi_confusion, fnum=3, showvals=0, logscale=True)
-            #     fig_fpath = join(metrics_dpath, 'confusion_coi.png')
+            #     writefig(fig, metrics_dpath, 'confusion_coi.png')
             #     print('write fig_fpath = {!r}'.format(fig_fpath))
             #     ax.figure.savefig(fig_fpath)
 
@@ -868,18 +850,14 @@ class CocoResults(ub.NiceRepr):
             row_norm_cfsn = row_norm_cfsn.fillna(0)
             ax = kwplot.plot_matrix(row_norm_cfsn, fnum=3, showvals=0, logscale=0)
             ax.set_title('Row (truth) normalized confusions')
-            fig_fpath = join(metrics_dpath, 'row_confusion.png')
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            ax.figure.savefig(fig_fpath)
+            writefig(fig, metrics_dpath, 'row_confusion.png')
 
             fig = kwplot.figure(fnum=3, doclf=True)
             col_norm_cfsn = confusion / confusion.values.sum(axis=0, keepdims=True)
             col_norm_cfsn = col_norm_cfsn.fillna(0)
             ax = kwplot.plot_matrix(col_norm_cfsn, fnum=3, showvals=0, logscale=0)
             ax.set_title('Column (pred) normalized confusions')
-            fig_fpath = join(metrics_dpath, 'col_confusion.png')
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            ax.figure.savefig(fig_fpath)
+            writefig(fig, metrics_dpath, 'col_confusion.png')
         except Exception:
             pass
 
