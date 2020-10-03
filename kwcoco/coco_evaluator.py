@@ -557,7 +557,8 @@ class CocoEvaluator(object):
             >>> config = {
             >>>     'true_dataset': true_dset,
             >>>     'pred_dataset': pred_dset,
-            >>>     'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)]
+            >>>     'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)],
+            >>>     'iou_thresh': [0.3, 0.5, 0.95],
             >>> }
             >>> coco_eval = CocoEvaluator(config)
             >>> results = coco_eval.evaluate()
@@ -596,89 +597,90 @@ class CocoEvaluator(object):
         if not area_ranges:
             area_ranges = [(0, float('inf'))]
 
-        for iou_threshold in iou_thresholds:
+        # Remove large datasets values in configs that are not file references
+        base_meta = dict(coco_eval.config)
+        if not isinstance(base_meta['true_dataset'], str):
+            base_meta['true_dataset'] = '<not-a-file-ref>'
+        if not isinstance(base_meta['pred_dataset'], str):
+            base_meta['pred_dataset'] = '<not-a-file-ref>'
+
+        resdata = {}
+        for iou_thresh in iou_thresholds:
             # Detection only scoring
             print('Building confusion vectors')
             cfsn_vecs = dmet.confusion_vectors(
                 ignore_classes=ignore_classes,
                 compat=coco_eval.config['compat'],
-                iou_thresh=iou_threshold,
+                iou_thresh=iou_thresh,
                 workers=coco_eval.config['assign_workers'],
                 max_dets=coco_eval.config['max_dets'],
             )
-
-            dmet_area_flags(dmet, cfsn_vecs, area_ranges)
+            print('cfsn_vecs = {!r}'.format(cfsn_vecs))
 
             # NOTE: translating to classless confusion vectors only works when
             # compat='all', otherwise we would need to redo confusion vector
             # computation.
-
-            # Get classless per-item detection results
-
             measurekw = dict(
                 fp_cutoff=coco_eval.config['fp_cutoff'],
                 monotonic_ppv=coco_eval.config['monotonic_ppv'],
             )
+            orig_weights = cfsn_vecs.data['weight'].copy()
 
-            # Get classless and ovr binary detection measures
-            nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
-            ovr_binvecs   = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
-            nocls_measures = nocls_binvecs.measures(**measurekw)
-            ovr_measures = ovr_binvecs.measures(**measurekw)['perclass']
-            print('nocls_measures = {}'.format(ub.repr2(nocls_measures, nl=1, align=':')))
-            print('ovr_measures = {!r}'.format(ovr_measures))
+            for minmax, new_weights in zip(area_ranges, dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges)):
+                cfsn_vecs.data['weight'] = new_weights
+                # Get classless and ovr binary detection measures
+                nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
+                ovr_binvecs   = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
+                nocls_measures = nocls_binvecs.measures(**measurekw)
+                ovr_measures = ovr_binvecs.measures(**measurekw)['perclass']
+                # print('minmax = {!r}'.format(minmax))
+                # print('nocls_measures = {}'.format(ub.repr2(nocls_measures, nl=1, align=':')))
+                # print('ovr_measures = {!r}'.format(ovr_measures))
+                meta = base_meta.copy()
+                meta['iou_thresh'] = iou_thresh
+                meta['area_minmax'] = minmax
+                result = CocoSingleResult(
+                    nocls_measures, ovr_measures, cfsn_vecs, meta,
+                )
+                # TODO: when making the ovr localization curves, it might be a good
+                # idea to include a second version where any COI prediction assigned
+                # to a non-COI truth is given a weight of zero, so we can focus on
+                # our TPR and FPR with respect to the COI itself and the background.
+                # This metric is useful when we assume we have a subsequent classifier.
+                if classes_of_interest:
+                    ovr_binvecs2 = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
+                    for key, vecs in ovr_binvecs2.cx_to_binvecs.items():
+                        cx = cfsn_vecs.classes.index(key)
+                        vecs.data['weight'] = vecs.data['weight'].copy()
 
-            # Remove large datasets values in configs that are not file references
-            meta = dict(coco_eval.config)
-            if not isinstance(meta['true_dataset'], str):
-                meta['true_dataset'] = '<not-a-file-ref>'
-            if not isinstance(meta['pred_dataset'], str):
-                meta['pred_dataset'] = '<not-a-file-ref>'
-            # meta['iou_thresh'] = iou_thresh
-            # meta['iou_thresh'] = iou_thresh
+                        assert not np.may_share_memory(
+                            ovr_binvecs[key].data['weight'],
+                            vecs.data['weight'])
 
-            result = CocoResults(
-                measures,
-                ovr_measures,
-                cfsn_vecs,
-                meta,
-            )
+                        # Find locations where the predictions or truth was COI
+                        pred_coi = cfsn_vecs.data['pred'] == cx
+                        # Find truth locations that are either background or this COI
+                        true_coi_or_bg = kwarray.isect_flags(
+                                cfsn_vecs.data['true'], {cx, -1})
 
-            # TODO: when making the ovr localization curves, it might be a good
-            # idea to include a second version where any COI prediction assigned
-            # to a non-COI truth is given a weight of zero, so we can focus on
-            # our TPR and FPR with respect to the COI itself and the background.
-            # This metric is useful when we assume we have a subsequent classifier.
-            if classes_of_interest:
-                ovr_binvecs2 = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
-                for key, vecs in ovr_binvecs2.cx_to_binvecs.items():
-                    cx = cfsn_vecs.classes.index(key)
-                    vecs.data['weight'] = vecs.data['weight'].copy()
+                        # Find locations where we predicted this COI, but truth was a
+                        # valid classes, but not this non-COI
+                        ignore_flags = (pred_coi & (~true_coi_or_bg))
+                        vecs.data['weight'][ignore_flags] = 0
 
-                    assert not np.may_share_memory(
-                        ovr_binvecs[key].data['weight'],
-                        vecs.data['weight'])
+                    ovr_measures2 = ovr_binvecs2.measures(**measurekw)['perclass']
+                    # print('ovr_measures2 = {!r}'.format(ovr_measures2))
+                    result.ovr_measures2 = ovr_measures2
 
-                    # Find locations where the predictions or truth was COI
-                    pred_coi = cfsn_vecs.data['pred'] == cx
-                    # Find truth locations that are either background or this COI
-                    true_coi_or_bg = kwarray.isect_flags(
-                            cfsn_vecs.data['true'], {cx, -1})
-
-                    # Find locations where we predicted this COI, but truth was a
-                    # valid classes, but not this non-COI
-                    ignore_flags = (pred_coi & (~true_coi_or_bg))
-                    vecs.data['weight'][ignore_flags] = 0
-
-                ovr_measures2 = ovr_binvecs2.measures(fp_cutoff=fp_cutoff)['perclass']
-                print('ovr_measures2 = {!r}'.format(ovr_measures2))
-                result.ovr_measures2 = ovr_measures2
-        return results
+                print('iou_thresh = {!r}'.format(iou_thresh))
+                print('minmax = {!r}'.format(minmax))
+                print('result = {!r}'.format(result))
+                resdata[str((iou_thresh, minmax))] = result
+        return resdata
 
 
-def dmet_area_flags(dmet, cfsn_vecs, area_ranges):
+def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
     # Basic logic to handle area-range by weight modification.
-    orig_weights = cfsn_vecs.data['weight'].copy()
     for minmax in area_ranges:
         area_min, area_max = minmax
         gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
@@ -704,41 +706,87 @@ def dmet_area_flags(dmet, cfsn_vecs, area_ranges):
 
         new_weights = orig_weights.copy()
         new_weights[new_ignore] = 0
-        print('new_weights = {!r}'.format(new_weights))
-
-        # Overwrite weights (we should probably store originals?)
-        cfsn_vecs.data['weight'] = new_weights
+        yield new_weights
 
 
 class CocoResults(ub.NiceRepr):
-    def __init__(results, cfsn_vecs=None):
-        results.cfsn_vecs = cfsn_vecs
+    def __init__(results, resdata=None):
+        results.resdata = resdata
+
+    def dump_figures(result, out_dpath, expt_title=None):
+        pass
 
 
 class CocoSingleResult(ub.NiceRepr):
     """
     Container class to store, draw, summarize, and serialize results from
     CocoEvaluator.
+
+    Ignore:
+        >>> from kwcoco.coco_evaluator import *  # NOQA
+        >>> from kwcoco.coco_evaluator import CocoEvaluator
+        >>> import kwcoco
+        >>> true_dset = kwcoco.CocoDataset.demo('shapes1')
+        >>> from kwcoco.demo.perterb import perterb_coco
+        >>> kwargs = {
+        >>>     'box_noise': 0.5,
+        >>>     'n_fp': (0, 10),
+        >>>     'n_fn': (0, 10),
+        >>>     'with_probs': True,
+        >>> }
+        >>> pred_dset = perterb_coco(true_dset, **kwargs)
+        >>> print('true_dset = {!r}'.format(true_dset))
+        >>> print('pred_dset = {!r}'.format(pred_dset))
+        >>> config = {
+        >>>     'true_dataset': true_dset,
+        >>>     'pred_dataset': pred_dset,
+        >>>     'area_range': [(0, 32 ** 2), (32 ** 2, 96 ** 2)],
+        >>>     'iou_thresh': [0.3, 0.5, 0.95],
+        >>> }
+        >>> coco_eval = CocoEvaluator(config)
+        >>> results = coco_eval.evaluate()
+        >>> result = ub.peek(results.values())
+        >>> state = result.__json__()
+        >>> print('state = {}'.format(ub.repr2(state, nl=-1)))
+        >>> recon = CocoSingleResult.from_json(state)
+        >>> state = recon.__json__()
     """
 
-    def __init__(result, measures, ovr_measures, cfsn_vecs, meta=None):
-        result.measures = measures
+    def __init__(result, nocls_measures, ovr_measures, cfsn_vecs, meta=None):
+        result.nocls_measures = nocls_measures
         result.ovr_measures = ovr_measures
         result.cfsn_vecs = cfsn_vecs
         result.meta = meta
 
     def __nice__(result):
         text = ub.repr2({
-            'measures': result.measures,
+            'nocls_measures': result.nocls_measures,
             'ovr_measures': result.ovr_measures,
         }, sv=1)
         return text
 
+    @classmethod
+    def from_json(cls, state):
+        from kwcoco.metrics.confusion_vectors import Measures
+        from kwcoco.metrics.confusion_vectors import PerClass_Measures
+        state['nocls_measures'] = Measures.from_json(state['nocls_measures'])
+        state['ovr_measures'] = PerClass_Measures.from_json(state['ovr_measures'])
+        if state.get('cfsn_vecs', None):
+            from kwcoco.metrics.confusion_vectors import ConfusionVectors
+            state['cfsn_vecs'] = ConfusionVectors.from_json(state['cfsn_vecs'])
+        else:
+            state['cfsn_vecs'] = None
+        self = cls(**state)
+        return self
+
     def __json__(result):
+        """
+        print(ub.repr2(result.__json__(), nl=-1))
+        """
         state = {
-            'measures': result.measures.__json__(),
+            'nocls_measures': result.nocls_measures.__json__(),
             'ovr_measures': result.ovr_measures.__json__(),
-            'cfsn_vecs': result.cfsn_vecs.__json__(),
+            # 'cfsn_vecs': result.cfsn_vecs.__json__(),
             'meta': result.meta,
         }
         from kwcoco.util.util_json import ensure_json_serializable
@@ -761,7 +809,7 @@ class CocoSingleResult(ub.NiceRepr):
             expt_title = result.meta.get('expt_title', '')
         metrics_dpath = ub.ensuredir(out_dpath)
 
-        measures = result.measures
+        nocls_measures = result.nocls_measures
         ovr_measures = result.ovr_measures
 
         # TODO: separate into standalone method that is able to run on
@@ -787,16 +835,19 @@ class CocoSingleResult(ub.NiceRepr):
             fig.set_size_inches(figsize)
             fig.savefig(fig_fpath, bbox_inches='tight')
 
+        # --- classless (nocls)
+
         figkw = dict(figtitle=expt_title)
         fig = kwplot.figure(fnum=1, pnum=(1, 2, 1), doclf=True, **figkw)
-        measures.draw(key='pr')
+        nocls_measures.draw(key='pr')
         kwplot.figure(fnum=1, pnum=(1, 2, 2))
-        measures.draw(key='roc')
+        nocls_measures.draw(key='roc')
         writefig(fig, metrics_dpath, 'loc_pr_roc.png')
-
         fig = kwplot.figure(fnum=1, pnum=(1, 1, 1), doclf=True, **figkw)
-        measures.draw(key='thresh')
+        nocls_measures.draw(key='thresh')
         writefig(fig, metrics_dpath, 'loc_thresh.png')
+
+        # --- perclass (ovr)
 
         fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
         ovr_measures.draw(key='roc', fnum=2)
@@ -820,7 +871,6 @@ class CocoSingleResult(ub.NiceRepr):
             # 'keys': ['mcc', 'g1', 'f1', 'acc', 'ppv', 'tpr', 'mk', 'bm']
             'keys': ['mcc', 'f1'],
         }
-
         for key in dump_config['keys']:
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures.draw(fnum=2, key=key)

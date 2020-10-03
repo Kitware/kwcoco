@@ -269,7 +269,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     _pred_cxs = pred_dets.class_idxs.take(_pred_sortx, axis=0)
     _pred_scores = _scores.take(_pred_sortx, axis=0)
 
-    if max_dets is not None:
+    if max_dets is not None and np.isfinite(max_dets):
         # for pycocoutils compat, probably not the most efficient way of
         # handling this
         _pred_sortx = _pred_sortx[0:max_dets]

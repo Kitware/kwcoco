@@ -59,11 +59,10 @@ class ConfusionVectors(ub.NiceRepr):
         >>> measures = cx_to_binvecs.measures()['perclass']
         >>> print('measures = {!r}'.format(measures))
         measures = <PerClass_Measures({
-            'cat_1': <Measures({'ap': 0.7501, 'auc': 0.7170, 'catname': cat_1, 'max_f1': f1=0.77@0.41, 'max_mcc': mcc=0.71@0.44, 'nsupport': 787.0000, 'realneg_total': 594.0000, 'realpos_total': 193.0000})>,
-            'cat_2': <Measures({'ap': 0.8288, 'auc': 0.8137, 'catname': cat_2, 'max_f1': f1=0.83@0.40, 'max_mcc': mcc=0.78@0.40, 'nsupport': 787.0000, 'realneg_total': 589.0000, 'realpos_total': 198.0000})>,
-            'cat_3': <Measures({'ap': 0.7536, 'auc': 0.7150, 'catname': cat_3, 'max_f1': f1=0.77@0.40, 'max_mcc': mcc=0.71@0.42, 'nsupport': 787.0000, 'realneg_total': 578.0000, 'realpos_total': 209.0000})>,
-        }) at 0x7f1b9b0d6130>
-
+            'cat_1': <Measures({'ap': 0.227, 'auc': 0.507, 'catname': cat_1, 'max_f1': f1=0.45@0.47, 'nsupport': 788.000})>,
+            'cat_2': <Measures({'ap': 0.288, 'auc': 0.572, 'catname': cat_2, 'max_f1': f1=0.51@0.43, 'nsupport': 788.000})>,
+            'cat_3': <Measures({'ap': 0.225, 'auc': 0.484, 'catname': cat_3, 'max_f1': f1=0.46@0.40, 'nsupport': 788.000})>,
+        }) at 0x7facf77bdfd0>
         >>> kwplot.figure(fnum=1, doclf=True)
         >>> measures.draw(key='pr', fnum=1, pnum=(1, 3, 1))
         >>> measures.draw(key='roc', fnum=1, pnum=(1, 3, 2))
@@ -810,244 +809,10 @@ class BinaryConfusionVectors(ub.NiceRepr):
         # compute mcc, f1, g1, etc
         info = self._binary_clf_curves(stabalize_thresh=stabalize_thresh,
                                        fp_cutoff=fp_cutoff)
-
-        tp = info['tp_count']
-        fp = info['fp_count']
-        tn = info['tn_count']
-        fn = info['fn_count']
-        thresh = info['thresholds']
-
-        with warnings.catch_warnings():
-
-            # It is very possible that we will divide by zero in this func
-            warnings.filterwarnings('ignore', message='invalid .* true_divide')
-            warnings.filterwarnings('ignore', message='invalid value')
-
-            pred_pos = (tp + fp)  # number of predicted positives
-            ppv = tp / pred_pos  # precision
-            ppv[np.isnan(ppv)] = 0
-
-            if monotonic_ppv:
-                # trick to make precision monotonic (which is probably not correct)
-                ppv = np.maximum.accumulate(ppv[::-1])[::-1]
-
-            # can set tpr_denom denominator to one
-            tpr_denom = (tp + fn)  #
-            tpr_denom[~(tpr_denom > 0)] = 1
-            tpr = tp / tpr_denom  # recall
-
-            debug = 0
-            if debug:
-                assert ub.allsame(tpr_denom), 'tpr denom should be constant'
-                # tpr_denom should be equal to info['realpos_total']
-                if np.any(tpr_denom != info['realpos_total']):
-                    warnings.warn('realpos_total is inconsistent')
-
-            # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
-            mcc_numer = (tp * tn) - (fp * fn)
-            mcc_denom = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-            mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
-            info['mcc'] = mcc_numer / mcc_denom
-
-            # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
-            info['g1'] = np.sqrt(ppv * tpr)
-
-            f1_numer = (2 * ppv * tpr)
-            f1_denom = (ppv + tpr)
-            f1_denom[f1_denom == 0] = 1
-            info['f1'] =  f1_numer / f1_denom
-
-            tnr_denom = (tn + fp)
-            tnr_denom[tnr_denom == 0] = 1
-            tnr = tn / tnr_denom
-
-            pnv_denom = (tn + fn)
-            pnv_denom[pnv_denom == 0] = 1
-            npv = tn / pnv_denom
-
-            info['ppv'] = ppv
-            info['tpr'] = tpr
-
-            # fpr_denom is a proxy for fp + tn as tn is generally unknown in
-            # the case where all negatives are specified in the confusion
-            # vectors fpr_denom will be exactly (fp + tn)
-            # fpr = fp / (fp + tn)
-            finite_fp = fp[np.isfinite(fp)]
-            fpr_denom = finite_fp[-1] if len(finite_fp) else 0
-            if fpr_denom == 0:
-                fpr_denom = 1
-            info['fpr'] = info['fp_count'] / fpr_denom
-            # info['fpr'] = info['fp_count'] / info['realneg_total']
-            # info['fpr'][np.isinf(info['fp_count'])] = 1
-
-            info['acc'] = (tp + tn) / (tp + tn + fp + fn)
-
-            info['bm'] = tpr + tnr - 1  # informedness
-            info['mk'] = ppv + npv - 1  # markedness
-
-            keys = ['mcc', 'g1', 'f1', 'acc']
-            for key in keys:
-                measure = info[key]
-                try:
-                    max_idx = np.nanargmax(measure)
-                except ValueError:
-                    best_thresh = np.nan
-                    best_measure = np.nan
-                else:
-                    best_thresh = float(thresh[max_idx])
-                    best_measure = float(measure[max_idx])
-                best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
-                info['max_{}'.format(key)] = best_label
-                info['_max_{}'.format(key)] = (best_measure, best_thresh)
-
-            import sklearn.metrics  # NOQA
-            finite_trunc_fp = info['trunc_fp_count']
-            finite_trunc_fp = finite_trunc_fp[np.isfinite(finite_trunc_fp)]
-            trunc_fpr_denom = finite_trunc_fp[-1] if len(finite_trunc_fp) else 0
-            if trunc_fpr_denom == 0:
-                trunc_fpr_denom = 1
-            info['trunc_tpr'] = info['trunc_tp_count'] / info['realpos_total']
-            info['trunc_fpr'] = info['trunc_fp_count'] / trunc_fpr_denom
-            try:
-                info['trunc_auc'] = sklearn.metrics.auc(info['trunc_fpr'], info['trunc_tpr'])
-            except ValueError:
-                # At least 2 points are needed to compute area under curve, but x.shape = 1
-                info['trunc_auc'] = np.nan
-
-            info['auc'] = info['trunc_auc']
-            """
-            Notes:
-                Apparently, consistent scoring is really hard to get right.
-
-                For detection problems scoring via
-                confusion_vectors+sklearn produces noticably different
-                results than the VOC method. There are a few reasons for
-                this.  The VOC method stops counting true positives after
-                all assigned predicted boxes have been counted. It simply
-                remembers the amount of original true positives to
-                normalize the true positive reate. On the other hand,
-                confusion vectors maintains a list of these unassigned true
-                boxes and gives them a predicted index of -1 and a score of
-                zero. This means that this function sees them as having a
-                y_true of 1 and a y_score of 0, which allows the
-                scikit-learn fp and tp counts to effectively get up to
-                100% recall when the threshold is zero. The VOC method
-                simply ignores these and handles them implicitly. The
-                problem is that if you remove these from the scikit-learn
-                inputs, it wont see the correct number of positives and it
-                will incorrectly normalize the recall.  In summary:
-
-                    VOC:
-                        * remembers realpos_total
-                        * doesn't count unassigned truths as TP when the
-                        threshold is zero.
-
-                    CV+SKL:
-                        * counts unassigned truths as TP with score=0.
-                        * NEW: now counts unassigned truth as TP with score=-np.inf
-                        * Always ensure tpr=1, ppv=0 and ppv=1, tpr=0 cases
-                        exist.
-            """
-
-            # ---
-            # sklearn definition
-            # AP = sum((R[n] - R[n - 1]) * P[n] for n in range(len(thresholds)))
-            # stop when full recall attained
-            last_ind = tpr.searchsorted(tpr[-1])
-            rec  = np.r_[0, tpr[:last_ind + 1]]
-            prec = np.r_[1, ppv[:last_ind + 1]]
-            scores = np.r_[0, thresh[:last_ind + 1]]
-
-            # Precisions are weighted by the change in recall
-            diff_items = np.diff(rec)
-            prec_items = prec[1:]
-
-            # basline way
-            # ap_alt = integrate.trapz(y=prec, x=rec)
-            ap = info['sklish_ap'] = float(np.sum(diff_items * prec_items))
-
-            PYCOCOTOOLS_AP = True
-            if PYCOCOTOOLS_AP:
-                # similar to pycocotools style "AP"
-                R = 101
-                pr = prec
-                rc = rec
-                recThrs = np.linspace(0, 1.0, R)
-                inds = np.searchsorted(rc, recThrs, side='left')
-                q  = np.zeros((R,))
-                ss = np.zeros((R,))
-
-                try:
-                    for ri, pi in enumerate(inds):
-                        q[ri] = pr[pi]
-                        ss[ri] = scores[pi]
-                except Exception:
-                    pass
-
-                pycocotools_ap = q.mean()
-                info['pycocotools_ap'] = float(pycocotools_ap)
-
-            OUTLIER_AP = 1
-            if OUTLIER_AP:
-                # Remove extreme outliers from ap calculation
-                # only do this on the first or last 2 items.
-                # Hueristically chosen.
-                flags = diff_items > 0.1
-                idxs = np.where(flags)[0]
-                max_idx = len(flags) - 1
-                idx_thresh = 2
-                try:
-                    idx_dist = np.minimum(idxs, max_idx - idxs)
-                    outlier_idxs = idxs[idx_dist < idx_thresh]
-                    import kwarray
-                    outlier_flags = kwarray.boolmask(outlier_idxs, len(diff_items))
-                    inlier_flags = ~outlier_flags
-
-                    score = prec_items.copy()
-                    score[outlier_flags] = score[inlier_flags].min()
-                    score[outlier_flags] = 0
-
-                    ap = outlier_ap = np.sum(score * diff_items)
-
-                    info['outlier_ap'] = float(outlier_ap)
-                except Exception:
-                    pass
-
-            INF_THRESH_AP = 1
-            if INF_THRESH_AP:
-                from scipy import integrate
-                # MODIFIED SKLEARN AVERAGE PRECISION FOR -INF THRESH
-                #
-                # Better way of marked unassigned truth as never-recallable.
-                # We need to prevent these unassigned truths from incorrectly
-                # bringing up our true positive rate at low thresholds.
-                #
-                # Simply bump last_ind to ensure it is
-                feasible_idxs = np.where(thresh > -np.inf)[0]
-                if len(feasible_idxs) == 0:
-                    info['inf_thresh_ap'] = np.nan
-                else:
-                    feasible_tpr = tpr[feasible_idxs[-1]]
-                    last_ind = tpr.searchsorted(feasible_tpr)
-                    rec  = np.r_[0, tpr[:last_ind + 1]]
-                    prec = np.r_[1, ppv[:last_ind + 1]]
-
-                    diff_items = np.diff(rec)
-                    prec_items = prec[1:]
-
-                    # Not sure which is beset here, we no longer have
-                    # assumption of max-tpr = 1
-                    # ap = float(np.sum(diff_items * prec_items))
-                    # info['inf_thresh_ap'] = ap
-
-                    ap = integrate.trapz(y=prec, x=rec)
-                    info['inf_thresh_ap'] = ap
-
-            # print('ap = {!r}'.format(ap))
-            # print('ap = {!r}'.format(ap))
-            # ap = np.sum(np.diff(rec) * prec[1:])
-            info['ap'] = float(ap)
-
+        info['monotonic_ppv'] = monotonic_ppv
+        info['cx'] = self.cx
+        info['classes'] = self.classes
+        populate_info(info)
         return Measures(info)
 
     def _binary_clf_curves(self, stabalize_thresh=7, fp_cutoff=None):
@@ -1139,60 +904,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
         tns = realneg_total - fps
         fns = realpos_total - tps
 
-        trunc_fps = fps
-        # Cutoff the curves at a comparable point
-        if fp_cutoff is None:
-            fp_cutoff = np.inf
-        elif isinstance(fp_cutoff, str):
-            if fp_cutoff == 'num_true':
-                fp_cutoff = int(np.ceil(realpos_total))
-            else:
-                raise KeyError(fp_cutoff)
-
-        if np.isfinite(fp_cutoff):
-            idxs = np.where(trunc_fps > fp_cutoff)[0]
-            if len(idxs) == 0:
-                trunc_idx = len(trunc_fps)
-            else:
-                trunc_idx = idxs[0]
-        else:
-            trunc_idx = None
-
-        if trunc_idx is None and np.any(np.isinf(fps)):
-            idxs = np.where(np.isinf(fps))[0]
-            if len(idxs):
-                trunc_idx = idxs[0]
-
-        if trunc_idx is None:
-            trunc_fps = fps
-            trunc_tps = tps
-            trunc_thresholds = thresholds
-        else:
-            trunc_fps = fps[:trunc_idx]
-            trunc_tps = tps[:trunc_idx]
-            trunc_thresholds = thresholds[:trunc_idx]
-
-        # if the cuttoff was not reached, horizontally extend the curve
-        # This will hurt the scores (aka we may be bias against small
-        # scenes), but this will ensure that big scenes are comparable
-        from kwcoco.metrics import assignment
-        if len(trunc_fps) == 0:
-            trunc_fps = np.array([fp_cutoff])
-            trunc_tps = np.array([0])
-
-            if assignment.USE_NEG_INF:
-                trunc_thresholds = np.array([-np.inf])
-            else:
-                trunc_thresholds = np.array([0])
-            # THIS WILL CAUSE AUC TO RAISE AN ERROR IF IT GETS HIT
-        elif trunc_fps[-1] <= fp_cutoff and np.isfinite(fp_cutoff):
-            trunc_fps = np.hstack([trunc_fps, [fp_cutoff]])
-            trunc_tps = np.hstack([trunc_tps, [trunc_tps[-1]]])
-            if assignment.USE_NEG_INF:
-                trunc_thresholds = np.hstack([trunc_thresholds, [-np.inf]])
-            else:
-                trunc_thresholds = np.hstack([trunc_thresholds, [0]])
-
         info = {
             'fp_count': fps,
             'tp_count': tps,
@@ -1201,11 +912,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
             'thresholds': thresholds,
             'realpos_total': realpos_total,
             'realneg_total': realneg_total,
-
-            'trunc_idx': trunc_idx,
-            'trunc_fp_count': trunc_fps,
-            'trunc_tp_count': trunc_tps,
-            'trunc_thresholds': trunc_thresholds,
 
             'nsupport': nsupport,
 
@@ -1316,9 +1022,9 @@ class BinaryConfusionVectors(ub.NiceRepr):
     #     Deprecated, all information lives in measures now
     #     """
     #     warnings.warn('use measures instead', DeprecationWarning)
-    #     roc_info = self.measures(
+    #     info = self.measures(
     #         fp_cutoff=fp_cutoff, stabalize_thresh=stabalize_thresh)
-    #     return roc_info
+    #     return info
 
 
 class Measures(ub.NiceRepr, DictProxy):
@@ -1336,8 +1042,8 @@ class Measures(ub.NiceRepr, DictProxy):
         >>> self.draw(key='roc', pnum=(1, 2, 2))
         >>> kwplot.show_if_requested()
     """
-    def __init__(self, roc_info):
-        self.proxy = roc_info
+    def __init__(self, info):
+        self.proxy = info
 
     @property
     def catname(self):
@@ -1346,23 +1052,60 @@ class Measures(ub.NiceRepr, DictProxy):
     def __nice__(self):
         return ub.repr2(self.summary(), nl=0, precision=3, strvals=True, align=':')
 
+    def reconstruct(self):
+        populate_info(info=self)
+
+    @classmethod
+    def from_json(cls, state):
+        populate_info(state)
+        return cls(state)
+
     def __json__(self):
-        import numbers
+        """
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> binvecs = BinaryConfusionVectors.demo(n=10, p_error=0.5)
+            >>> self = binvecs.measures()
+            >>> info = self.__json__()
+            >>> print('info = {}'.format(ub.repr2(info, nl=1)))
+            >>> populate_info(info)
+            >>> print('info = {}'.format(ub.repr2(info, nl=1)))
+            >>> recon = Measures.from_json(info)
+        """
         state = {}
-        for k, v in self.proxy.items():
-            if isinstance(v, np.ndarray):
-                state[k] = v.tolist()
-            elif isinstance(v, numbers.Integral):
-                v = int(v)
-            elif isinstance(v, numbers.Real):
-                v = float(v)
-                state[k] = v
-            else:
-                debug = 1
-                if debug:
-                    import json
-                    json.dumps(v)
-                    json.dumps(k)
+        minimal = {
+            'fp_count',
+            'tp_count',
+            'tn_count',
+            'fn_count',
+            'thresholds',
+            'realpos_total',
+            'realneg_total',
+
+            'trunc_idx',
+
+            'nsupport',
+
+            'fp_cutoff',
+            'stabalize_thresh',
+            'cx',
+            'node',
+            'monotonic_ppv',
+
+            #  recomputable
+            # 'mcc', 'g1', 'f1', 'ppv', 'tpr', 'fpr', 'acc', 'bm', 'mk',
+            # 'max_mcc', '_max_mcc', 'max_g1', '_max_g1', 'max_f1',
+            # '_max_f1', 'max_acc', '_max_acc',
+            # 'trunc_tpr', 'trunc_fpr',
+
+            'trunc_auc', 'auc', 'ap',
+            # 'sklish_ap',
+            'pycocotools_ap',
+            # 'outlier_ap', 'inf_thresh_ap',
+        }
+        state = ub.dict_isect(self.proxy, minimal)
+        import kwcoco
+        state = kwcoco.util.util_json.ensure_json_serializable(state)
         return state
 
     def summary(self):
@@ -1436,6 +1179,12 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
 
     def summary(self):
         return {k: v.summary() for k, v in self.items()}
+
+    @classmethod
+    def from_json(cls, state):
+        state = ub.map_vals(Measures.from_json, state)
+        self = cls(state)
+        return self
 
     def __json__(self):
         return {k: v.__json__() for k, v in self.items()}
@@ -1537,6 +1286,307 @@ def _stabalize_data(y_true, y_score, sample_weight, npad=7):
     y_score = np.hstack([y_score, pad_score])
     sample_weight = np.hstack([sample_weight, pad_weight])
     return y_true, y_score, sample_weight
+
+
+def populate_info(info):
+    fp_cutoff = info['fp_cutoff']
+    realpos_total = info['realpos_total']
+    realpos_total = info['realpos_total']
+    monotonic_ppv = info['monotonic_ppv']
+
+    info['tp_count'] = tp = np.array(info['tp_count'])
+    info['fp_count'] = fp = np.array(info['fp_count'])
+    info['tn_count'] = tn = np.array(info['tn_count'])
+    info['fn_count'] = fn = np.array(info['fn_count'])
+    info['thresholds'] = thresh = np.array(info['thresholds'])
+
+    trunc_fp = fp
+    # Cutoff the curves at a comparable point
+    if fp_cutoff is None:
+        fp_cutoff = np.inf
+    elif isinstance(fp_cutoff, str):
+        if fp_cutoff == 'num_true':
+            fp_cutoff = int(np.ceil(realpos_total))
+        else:
+            raise KeyError(fp_cutoff)
+
+    if np.isfinite(fp_cutoff):
+        idxs = np.where(trunc_fp > fp_cutoff)[0]
+        if len(idxs) == 0:
+            trunc_idx = len(trunc_fp)
+        else:
+            trunc_idx = idxs[0]
+    else:
+        trunc_idx = None
+
+    if trunc_idx is None and np.any(np.isinf(fp)):
+        idxs = np.where(np.isinf(fp))[0]
+        if len(idxs):
+            trunc_idx = idxs[0]
+
+    if trunc_idx is None:
+        trunc_fp = fp
+        trunc_tp = tp
+        trunc_thresholds = thresh
+    else:
+        trunc_fp = fp[:trunc_idx]
+        trunc_tp = tp[:trunc_idx]
+        trunc_thresholds = thresh[:trunc_idx]
+
+    # if the cuttoff was not reached, horizontally extend the curve
+    # This will hurt the scores (aka we may be bias against small
+    # scenes), but this will ensure that big scenes are comparable
+    from kwcoco.metrics import assignment
+    if len(trunc_fp) == 0:
+        trunc_fp = np.array([fp_cutoff])
+        trunc_tp = np.array([0])
+
+        if assignment.USE_NEG_INF:
+            trunc_thresholds = np.array([-np.inf])
+        else:
+            trunc_thresholds = np.array([0])
+        # THIS WILL CAUSE AUC TO RAISE AN ERROR IF IT GETS HIT
+    elif trunc_fp[-1] <= fp_cutoff and np.isfinite(fp_cutoff):
+        trunc_fp = np.hstack([trunc_fp, [fp_cutoff]])
+        trunc_tp = np.hstack([trunc_tp, [trunc_tp[-1]]])
+        if assignment.USE_NEG_INF:
+            trunc_thresholds = np.hstack([trunc_thresholds, [-np.inf]])
+        else:
+            trunc_thresholds = np.hstack([trunc_thresholds, [0]])
+    info['trunc_idx'] = trunc_idx
+    info['trunc_fp_count'] = trunc_fp
+    info['trunc_tp_count'] = trunc_tp
+    info['trunc_thresholds'] = trunc_thresholds
+
+    with warnings.catch_warnings():
+        # It is very possible that we will divide by zero in this func
+        warnings.filterwarnings('ignore', message='invalid .* true_divide')
+        warnings.filterwarnings('ignore', message='invalid value')
+
+        pred_pos = (tp + fp)  # number of predicted positives
+        ppv = tp / pred_pos  # precision
+        ppv[np.isnan(ppv)] = 0
+
+        if monotonic_ppv:
+            # trick to make precision monotonic (which is probably not correct)
+            ppv = np.maximum.accumulate(ppv[::-1])[::-1]
+
+        # can set tpr_denom denominator to one
+        tpr_denom = (tp + fn)  #
+        tpr_denom[~(tpr_denom > 0)] = 1
+        tpr = tp / tpr_denom  # recall
+
+        debug = 0
+        if debug:
+            assert ub.allsame(tpr_denom), 'tpr denom should be constant'
+            # tpr_denom should be equal to info['realpos_total']
+            if np.any(tpr_denom != info['realpos_total']):
+                warnings.warn('realpos_total is inconsistent')
+
+        # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
+        mcc_numer = (tp * tn) - (fp * fn)
+        mcc_denom = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+        mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
+        info['mcc'] = mcc_numer / mcc_denom
+
+        # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
+        info['g1'] = np.sqrt(ppv * tpr)
+
+        f1_numer = (2 * ppv * tpr)
+        f1_denom = (ppv + tpr)
+        f1_denom[f1_denom == 0] = 1
+        info['f1'] =  f1_numer / f1_denom
+
+        tnr_denom = (tn + fp)
+        tnr_denom[tnr_denom == 0] = 1
+        tnr = tn / tnr_denom
+
+        pnv_denom = (tn + fn)
+        pnv_denom[pnv_denom == 0] = 1
+        npv = tn / pnv_denom
+
+        info['ppv'] = ppv
+        info['tpr'] = tpr
+
+        # fpr_denom is a proxy for fp + tn as tn is generally unknown in
+        # the case where all negatives are specified in the confusion
+        # vectors fpr_denom will be exactly (fp + tn)
+        # fpr = fp / (fp + tn)
+        finite_fp = fp[np.isfinite(fp)]
+        fpr_denom = finite_fp[-1] if len(finite_fp) else 0
+        if fpr_denom == 0:
+            fpr_denom = 1
+        info['fpr'] = info['fp_count'] / fpr_denom
+        # info['fpr'] = info['fp_count'] / info['realneg_total']
+        # info['fpr'][np.isinf(info['fp_count'])] = 1
+
+        info['acc'] = (tp + tn) / (tp + tn + fp + fn)
+
+        info['bm'] = tpr + tnr - 1  # informedness
+        info['mk'] = ppv + npv - 1  # markedness
+
+        keys = ['mcc', 'g1', 'f1', 'acc']
+        for key in keys:
+            measure = info[key]
+            try:
+                max_idx = np.nanargmax(measure)
+            except ValueError:
+                best_thresh = np.nan
+                best_measure = np.nan
+            else:
+                best_thresh = float(thresh[max_idx])
+                best_measure = float(measure[max_idx])
+            best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+            info['max_{}'.format(key)] = best_label
+            info['_max_{}'.format(key)] = (best_measure, best_thresh)
+
+        import sklearn.metrics  # NOQA
+        finite_trunc_fp = info['trunc_fp_count']
+        finite_trunc_fp = finite_trunc_fp[np.isfinite(finite_trunc_fp)]
+        trunc_fpr_denom = finite_trunc_fp[-1] if len(finite_trunc_fp) else 0
+        if trunc_fpr_denom == 0:
+            trunc_fpr_denom = 1
+        info['trunc_tpr'] = info['trunc_tp_count'] / info['realpos_total']
+        info['trunc_fpr'] = info['trunc_fp_count'] / trunc_fpr_denom
+        try:
+            info['trunc_auc'] = sklearn.metrics.auc(info['trunc_fpr'], info['trunc_tpr'])
+        except ValueError:
+            # At least 2 points are needed to compute area under curve, but x.shape = 1
+            info['trunc_auc'] = np.nan
+
+        info['auc'] = info['trunc_auc']
+        """
+        Notes:
+            Apparently, consistent scoring is really hard to get right.
+
+            For detection problems scoring via
+            confusion_vectors+sklearn produces noticably different
+            results than the VOC method. There are a few reasons for
+            this.  The VOC method stops counting true positives after
+            all assigned predicted boxes have been counted. It simply
+            remembers the amount of original true positives to
+            normalize the true positive reate. On the other hand,
+            confusion vectors maintains a list of these unassigned true
+            boxes and gives them a predicted index of -1 and a score of
+            zero. This means that this function sees them as having a
+            y_true of 1 and a y_score of 0, which allows the
+            scikit-learn fp and tp counts to effectively get up to
+            100% recall when the threshold is zero. The VOC method
+            simply ignores these and handles them implicitly. The
+            problem is that if you remove these from the scikit-learn
+            inputs, it wont see the correct number of positives and it
+            will incorrectly normalize the recall.  In summary:
+
+                VOC:
+                    * remembers realpos_total
+                    * doesn't count unassigned truths as TP when the
+                    threshold is zero.
+
+                CV+SKL:
+                    * counts unassigned truths as TP with score=0.
+                    * NEW: now counts unassigned truth as TP with score=-np.inf
+                    * Always ensure tpr=1, ppv=0 and ppv=1, tpr=0 cases
+                    exist.
+        """
+
+        # ---
+        # sklearn definition
+        # AP = sum((R[n] - R[n - 1]) * P[n] for n in range(len(thresholds)))
+        # stop when full recall attained
+        last_ind = tpr.searchsorted(tpr[-1])
+        rec  = np.r_[0, tpr[:last_ind + 1]]
+        prec = np.r_[1, ppv[:last_ind + 1]]
+        scores = np.r_[0, thresh[:last_ind + 1]]
+
+        # Precisions are weighted by the change in recall
+        diff_items = np.diff(rec)
+        prec_items = prec[1:]
+
+        # basline way
+        # ap_alt = integrate.trapz(y=prec, x=rec)
+        ap = info['sklish_ap'] = float(np.sum(diff_items * prec_items))
+
+        PYCOCOTOOLS_AP = True
+        if PYCOCOTOOLS_AP:
+            # similar to pycocotools style "AP"
+            R = 101
+            pr = prec
+            rc = rec
+            recThrs = np.linspace(0, 1.0, R)
+            inds = np.searchsorted(rc, recThrs, side='left')
+            q  = np.zeros((R,))
+            ss = np.zeros((R,))
+
+            try:
+                for ri, pi in enumerate(inds):
+                    q[ri] = pr[pi]
+                    ss[ri] = scores[pi]
+            except Exception:
+                pass
+
+            pycocotools_ap = q.mean()
+            info['pycocotools_ap'] = float(pycocotools_ap)
+
+        OUTLIER_AP = 1
+        if OUTLIER_AP:
+            # Remove extreme outliers from ap calculation
+            # only do this on the first or last 2 items.
+            # Hueristically chosen.
+            flags = diff_items > 0.1
+            idxs = np.where(flags)[0]
+            max_idx = len(flags) - 1
+            idx_thresh = 2
+            try:
+                idx_dist = np.minimum(idxs, max_idx - idxs)
+                outlier_idxs = idxs[idx_dist < idx_thresh]
+                import kwarray
+                outlier_flags = kwarray.boolmask(outlier_idxs, len(diff_items))
+                inlier_flags = ~outlier_flags
+
+                score = prec_items.copy()
+                score[outlier_flags] = score[inlier_flags].min()
+                score[outlier_flags] = 0
+
+                ap = outlier_ap = np.sum(score * diff_items)
+
+                info['outlier_ap'] = float(outlier_ap)
+            except Exception:
+                pass
+
+        INF_THRESH_AP = 1
+        if INF_THRESH_AP:
+            from scipy import integrate
+            # MODIFIED SKLEARN AVERAGE PRECISION FOR -INF THRESH
+            #
+            # Better way of marked unassigned truth as never-recallable.
+            # We need to prevent these unassigned truths from incorrectly
+            # bringing up our true positive rate at low thresholds.
+            #
+            # Simply bump last_ind to ensure it is
+            feasible_idxs = np.where(thresh > -np.inf)[0]
+            if len(feasible_idxs) == 0:
+                info['inf_thresh_ap'] = np.nan
+            else:
+                feasible_tpr = tpr[feasible_idxs[-1]]
+                last_ind = tpr.searchsorted(feasible_tpr)
+                rec  = np.r_[0, tpr[:last_ind + 1]]
+                prec = np.r_[1, ppv[:last_ind + 1]]
+
+                diff_items = np.diff(rec)
+                prec_items = prec[1:]
+
+                # Not sure which is beset here, we no longer have
+                # assumption of max-tpr = 1
+                # ap = float(np.sum(diff_items * prec_items))
+                # info['inf_thresh_ap'] = ap
+
+                ap = integrate.trapz(y=prec, x=rec)
+                info['inf_thresh_ap'] = ap
+
+        # print('ap = {!r}'.format(ap))
+        # print('ap = {!r}'.format(ap))
+        # ap = np.sum(np.diff(rec) * prec[1:])
+        info['ap'] = float(ap)
 
 
 if __name__ == '__main__':
