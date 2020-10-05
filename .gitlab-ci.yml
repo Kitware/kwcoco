@@ -442,17 +442,17 @@ test_full/cp36-cp36m-linux:
 # ---------------
 # Python 3.5 Jobs
 
-build/cp35-cp35m-linux:
-    <<: 
-        - *build_template
-    image:
-        python:3.5
+#build/cp35-cp35m-linux:
+#    <<: 
+#        - *build_template
+#    image:
+#        python:3.5
 
-test_full/cp35-cp35m-linux:
-    <<: 
-        - *test_full_template
-    image:
-        python:3.5
+#test_full/cp35-cp35m-linux:
+#    <<: 
+#        - *test_full_template
+#    image:
+#        python:3.5
 
 
 # ---------------
