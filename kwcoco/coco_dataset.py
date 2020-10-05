@@ -2078,7 +2078,6 @@ class MixinCocoExtras(object):
     def reroot(self, new_root=None,
                old_prefix=None,
                new_prefix=None,
-               old_root=None,
                absolute=False,
                check=True,
                safe=True,
@@ -2089,18 +2088,19 @@ class MixinCocoExtras(object):
         Args:
             new_root (str, default=None):
                 New image root. If unspecified the current ``self.img_root`` is
-                used.
+                used. If old_prefix and new_prefix are unspecified, they will
+                attempt to be determined based on the current root (which
+                assumes the file paths exist at that root) and this new root.
 
             old_prefix (str, default=None):
                 If specified, removes this prefix from file names.
+                This also prevents any inferences that might be made via
+                "new_root".
 
             new_prefix (str, default=None):
                 If specified, adds this prefix to the file names.
-
-            old_root (str, default=None):
-                DEPRECATED DO NOT USE
-                If specified, removes the root from file names. If unspecified,
-                then the existing paths MUST be relative to ``new_root``.
+                This also prevents any inferences that might be made via
+                "new_root".
 
             absolute (bool, default=False):
                 if True, file names are stored as absolute paths, otherwise
@@ -2118,7 +2118,7 @@ class MixinCocoExtras(object):
                 smart.
 
         CommandLine:
-            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py MixinCocoExtras.reroot
+            xdoctest -m kwcoco.coco_dataset MixinCocoExtras.reroot
 
         TODO:
             - [ ] Incorporate maximum ordered subtree embedding once completed?
@@ -2221,7 +2221,7 @@ class MixinCocoExtras(object):
             >>> img_root = ub.expandpath('~')
             >>> print(self.imgs[1]['file_name'])
             >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
-            >>> self.reroot(img_root)
+            >>> self.reroot(new_root=img_root)
             >>> print(self.imgs[1]['file_name'])
             >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
@@ -2240,6 +2240,12 @@ class MixinCocoExtras(object):
         def _reroot_path(file_name):
             """ Reroot a single file """
 
+            # TODO: can this logic be cleaned up, its difficult to follow and
+            # describe. The gist is we want reroot to modify the file names of
+            # the images based on the new root, unless we are explicitly given
+            # information about new and old prefixes. Can we do better than
+            # this?
+
             cur_gpath = join(cur_img_root, file_name)
 
             if old_prefix is not None:
@@ -2247,6 +2253,14 @@ class MixinCocoExtras(object):
                     file_name = relpath(file_name, old_prefix)
                 elif cur_gpath.startswith(old_prefix):
                     file_name = relpath(cur_gpath, old_prefix)
+
+            # If we don't specify new or old prefixes, but new_root was
+            # specified then modify relative file names to be correct with
+            # respect to this new root (assuming the previous root was also
+            # valid)
+            if old_prefix is None and new_prefix is None:
+                if new_img_root is not None and cur_gpath.startswith(new_img_root):
+                    file_name = relpath(cur_gpath, new_img_root)
 
             if new_prefix is not None:
                 file_name = join(new_prefix, file_name)

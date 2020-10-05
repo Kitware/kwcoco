@@ -1074,6 +1074,8 @@ def main(cmdline=True, **kw):
             --true_dataset=$HOME/.cache/kwcoco/tests/eval/true.mscoco.json \
             --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
             --out_dpath=$HOME/.cache/kwcoco/tests/eval/out
+
+        nautilus $HOME/.cache/kwcoco/tests/eval/out
     """
     cli_config = CocoEvalCLIConfig(cmdline=cmdline, default=kw)
     print('cli_config = {}'.format(ub.repr2(dict(cli_config), nl=1)))
