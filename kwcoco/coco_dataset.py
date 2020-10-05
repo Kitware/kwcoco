@@ -113,18 +113,18 @@ Dataset Spec:
         We also have a new top-level dictionary to specify all the possible
         keypoint categories.
 
-    Auxillary Channels:
+    Auxiliary Channels:
         For multimodal or multispectral images it is possible to specify
-        auxillary channels in an image dictionary as follows:
+        auxiliary channels in an image dictionary as follows:
 
         {
             'id': int, 'file_name': str
             'channels': <spec>,  # a spec code that indicates the layout of these channels.
-            'auxillary': [  # information about auxillary channels
+            'auxiliary': [  # information about auxiliary channels
                 {
                     'file_name':
                     'channels': <spec>
-                }, ... # can have many auxillary channels with unique specs
+                }, ... # can have many auxiliary channels with unique specs
             ]
         }
 
@@ -977,34 +977,44 @@ class MixinCocoExtras(object):
         gpath = join(self.img_root, img['file_name'])
         return gpath
 
-    def _get_img_auxillary(self, gid_or_img, channels):
-        """ returns the auxillary dictionary for a specific channel """
+    def _get_img_auxiliary(self, gid_or_img, channels):
+        """ returns the auxiliary dictionary for a specific channel """
         img = self._resolve_to_img(gid_or_img)
         found = None
-        for aux in img['auxillary']:
+        if 'auxiliary' in img:
+            auxlist = img['auxiliary']
+        elif 'auxillary' in img:
+            auxlist = img['auxillary']
+        else:
+            raise KeyError('no auxilary data')
+        for aux in auxlist:
             if aux['channels'] == channels:
                 found = aux
                 break
         if found is None:
-            raise Exception('Image does not have auxillary channels={}'.format(channels))
+            raise Exception('Image does not have auxiliary channels={}'.format(channels))
         return found
 
-    def get_auxillary_fpath(self, gid_or_img, channels):
+    def get_auxiliary_fpath(self, gid_or_img, channels):
         """
-        Returns the full path to auxillary data for an image
+        Returns the full path to auxiliary data for an image
 
         Args:
             gid_or_img (int | dict): an image or its id
-            channels (str): the auxillary channel to load (e.g. disparity)
+            channels (str): the auxiliary channel to load (e.g. disparity)
 
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
-            >>> self.get_auxillary_fpath(1, 'disparity')
+            >>> self.get_auxiliary_fpath(1, 'disparity')
         """
-        aux = self._get_img_auxillary(gid_or_img, channels)
+        aux = self._get_img_auxiliary(gid_or_img, channels)
         fpath = join(self.img_root, aux['file_name'])
         return fpath
+
+    # old misspellings for backwards compat
+    _get_img_auxillary = _get_img_auxiliary
+    get_auxillary_fpath = get_auxiliary_fpath
 
     def load_annot_sample(self, aid_or_ann, image=None, pad=None):
         """
@@ -1736,7 +1746,7 @@ class MixinCocoExtras(object):
 
         Args:
             check_aux (bool, default=Fasle):
-                if specified also checks auxillary images
+                if specified also checks auxiliary images
 
         Returns:
             List[Tuple[int, str]]: bad indexes and paths
@@ -2205,17 +2215,17 @@ class MixinCocoExtras(object):
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
         Example:
-            >>> # demo with auxillary data
+            >>> # demo with auxiliary data
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
             >>> img_root = ub.expandpath('~')
             >>> print(self.imgs[1]['file_name'])
-            >>> print(self.imgs[1]['auxillary'][0]['file_name'])
+            >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
             >>> self.reroot(img_root)
             >>> print(self.imgs[1]['file_name'])
-            >>> print(self.imgs[1]['auxillary'][0]['file_name'])
+            >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
-            >>> assert self.imgs[1]['auxillary'][0]['file_name'].startswith('.cache')
+            >>> assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
         """
         from os.path import exists, relpath
 
@@ -2269,7 +2279,13 @@ class MixinCocoExtras(object):
                     gid_to_new[gid] = new = {
                         'file_name': _reroot_path(img['file_name'])
                     }
-                    if 'auxillary' in img:
+                    if 'auxiliary' in img:
+                        new['auxiliary'] = aux_fname = []
+                        for aux in img.get('auxiliary', []):
+                            aux_fname.append(_reroot_path(aux['file_name']))
+                    elif 'auxillary' in img:
+                        warnings.warn('incorrect spelling of auxiliary will be '
+                                      'unsupported in the future', DeprecationWarning)
                         new['auxillary'] = aux_fname = []
                         for aux in img.get('auxillary', []):
                             aux_fname.append(_reroot_path(aux['file_name']))
@@ -2280,7 +2296,12 @@ class MixinCocoExtras(object):
             for gid, new in gid_to_new.items():
                 img = self.imgs[gid]
                 img['file_name'] = new['file_name']
-                if 'auxillary' in new:
+                if 'auxiliary' in new:
+                    for aux_fname, aux in zip(new['auxiliary'], img['auxiliary']):
+                        aux['file_name'] = aux_fname
+                elif 'auxillary' in new:
+                    warnings.warn('incorrect spelling of auxiliary will be '
+                                  'unsupported in the future', DeprecationWarning)
                     for aux_fname, aux in zip(new['auxillary'], img['auxillary']):
                         aux['file_name'] = aux_fname
         else:
@@ -2288,7 +2309,11 @@ class MixinCocoExtras(object):
                 try:
                     # _reroot_path(img['file_name'])
                     img['file_name'] = _reroot_path(img['file_name'])
+                    for aux in img.get('auxiliary', []):
+                        aux['file_name'] = _reroot_path(aux['file_name'])
                     for aux in img.get('auxillary', []):
+                        warnings.warn('incorrect spelling of auxiliary will be '
+                                      'unsupported in the future', DeprecationWarning)
                         aux['file_name'] = _reroot_path(aux['file_name'])
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))

@@ -83,7 +83,7 @@
                     "timestamp": {"type": "number", "description": "todo describe format. flicks?"},
                     "frame_index": {"type": "integer"},
                     "channels": {"type": "string", "title": "CHANNEL_SPEC", "description": "experimental. todo: refine"},
-                    "auxillary": {
+                    "auxiliary": {
                         "type": "array",
                         "items": {
                             "type": "object",
