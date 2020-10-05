@@ -50,7 +50,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
 
         rng (RandomState): the random state used to seed the process
 
-        aux: if specified builds auxillary channels
+        aux: if specified builds auxiliary channels
 
     CommandLine:
         xdoctest -m kwcoco.demo.toydata demodata_toy_img:0 --profile
@@ -92,7 +92,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         >>> import kwplot
         >>> kwplot.autompl()
         >>> kwplot.imshow(img['imdata'], pnum=(1, 2, 1), fnum=1)
-        >>> auxdata = img['auxillary'][0]['imdata']
+        >>> auxdata = img['auxiliary'][0]['imdata']
         >>> kwplot.imshow(auxdata, pnum=(1, 2, 2), fnum=1)
         >>> kwplot.show_if_requested()
 
@@ -254,7 +254,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         auxdata = (auxdata / max(1e-8, auxdata.max()))
         auxdata = auxdata.clip(0, 1)
         # Hack aux data is always disparity for now
-        img['auxillary'] = [{
+        img['auxiliary'] = [{
             'imdata': auxdata,
             'channels': 'disparity',
         }]
@@ -404,7 +404,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                 'file_name': fpath,
                 'channels': 'rgb',
             })
-            auxillaries = img.pop('auxillary', None)
+            auxillaries = img.pop('auxiliary', None)
             if auxillaries is not None:
                 for auxdict in auxillaries:
                     aux_dpath = ub.ensuredir(
@@ -421,7 +421,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                     except Exception:
                         kwimage.imwrite(aux_fpath, auxdata)
 
-                img['auxillary'] = auxillaries
+                img['auxiliary'] = auxillaries
 
             dataset['images'].append(img)
             for ann in anns:
@@ -621,7 +621,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     for frame_idx, gid in enumerate(image_ids):
         dset.add_image(**{
             'id': gid,
-            'file_name': '<todo-generate>',
+            'file_name': '<todo-generate-{}-{}>'.format(video_id, frame_idx),
             'width': gsize[0],
             'height': gsize[1],
             'frame_index': frame_idx,
@@ -803,7 +803,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
             'file_name': fpath,
             'channels': 'rgb',
         })
-        auxillaries = img.pop('auxillary', None)
+        auxillaries = img.pop('auxiliary', None)
         if auxillaries is not None:
             for auxdict in auxillaries:
                 aux_dpath = ub.ensuredir(
@@ -817,7 +817,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
                     kwimage.imwrite(aux_fpath, auxdata, backend='gdal')
                 except Exception:
                     kwimage.imwrite(aux_fpath, auxdata)
-            img['auxillary'] = auxillaries
+            img['auxiliary'] = auxillaries
 
         kwimage.imwrite(fpath, imdata)
     dset._build_index()
@@ -977,7 +977,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         auxdata = (auxdata / max(1e-8, auxdata.max()))
         auxdata = auxdata.clip(0, 1)
         # Hack aux data is always disparity for now
-        img['auxillary'] = [{
+        img['auxiliary'] = [{
             'imdata': auxdata,
             'channels': 'disparity',
         }]

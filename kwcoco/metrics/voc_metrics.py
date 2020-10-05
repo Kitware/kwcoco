@@ -58,7 +58,7 @@ class VOC_Metrics(ub.NiceRepr):
             voc_line = [gid, score] + list(bbox)
             self.cx_to_lines[cx].append(voc_line)
 
-    def score(self, ovthresh=0.5, bias=1, method='voc2012'):
+    def score(self, iou_thresh=0.5, bias=1, method='voc2012'):
         """
         Compute VOC scores for every category
 
@@ -66,7 +66,7 @@ class VOC_Metrics(ub.NiceRepr):
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> from kwcoco.metrics.voc_metrics import *  # NOQA
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=1, nboxes=(0, 100), n_fp=(0, 30), n_fn=(0, 30), nclasses=2, score_noise=0.9)
+            >>>     nimgs=1, nboxes=(0, 100), n_fp=(0, 30), n_fn=(0, 30), classes=2, score_noise=0.9)
             >>> self = VOC_Metrics(classes=dmet.classes)
             >>> self.add_truth(dmet.true_detections(0), 0)
             >>> self.add_predictions(dmet.pred_detections(0), 0)
@@ -90,7 +90,7 @@ class VOC_Metrics(ub.NiceRepr):
             lines = self.cx_to_lines[cx]
             classname = cx
             roc_info = _voc_eval(lines, self.recs, classname,
-                                 ovthresh=ovthresh, bias=bias, method=method)
+                                 iou_thresh=iou_thresh, bias=bias, method=method)
             roc_info['cx'] = cx
             if self.classes is not None:
                 catname = self.classes[cx]
@@ -211,7 +211,7 @@ def _pr_curves(y, method='voc2012'):
     return ap, prec, rec
 
 
-def _voc_eval(lines, recs, classname, ovthresh=0.5, method='voc2012',
+def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
               bias=1.0):
     """
     VOC AP evaluation for a single category.
@@ -313,7 +313,7 @@ def _voc_eval(lines, recs, classname, ovthresh=0.5, method='voc2012',
                 ovmax = np.max(overlaps)
                 jmax = np.argmax(overlaps)
 
-            if ovmax > ovthresh:
+            if ovmax > iou_thresh:
                 if not R['difficult'][jmax]:
                     if not R['det'][jmax]:
                         # Mark that this true box has been used.

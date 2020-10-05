@@ -9,6 +9,7 @@ class CocoEvalCLI:
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
+
         Example:
             >>> import ubelt as ub
             >>> from kwcoco.cli.coco_eval import *  # NOQA

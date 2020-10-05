@@ -21,10 +21,13 @@ import numpy as np
 import ubelt as ub
 
 
+USE_NEG_INF = True
+
+
 def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
-                              ovthresh=0.5, bg_cidx=-1, bias=0.0, classes=None,
+                              iou_thresh=0.5, bg_cidx=-1, bias=0.0, classes=None,
                               compat='all', prioritize='iou',
-                              ignore_classes='ignore'):
+                              ignore_classes='ignore', max_dets=None):
     """
     Create confusion vectors for detections by assigning to ground true boxes
 
@@ -38,7 +41,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         pred_dets (Detections):
             predictions with boxes, classes, and scores
 
-        ovthresh (float, default=0.5):
+        iou_thresh (float, default=0.5):
             bounding box overlap iou threshold required for assignment
 
         bias (float, default=0.0):
@@ -60,7 +63,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             can be ('iou' | 'class' | 'correct') determines which box to
             assign to if mutiple true boxes overlap a predicted box.  if
             prioritize is iou, then the true box with maximum iou (above
-            ovthresh) will be chosen.  If prioritize is class, then it will
+            iou_thresh) will be chosen.  If prioritize is class, then it will
             prefer matching a compatible class above a higher iou. If
             prioritize is correct, then ancestors of the true class are
             preferred over descendents of the true class, over unreleated
@@ -78,9 +81,14 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         ignore_classes (str | List[str]):
             class name(s) indicating ignore regions
 
+        max_dets (int): maximum number of detections to consider
+
     TODO:
         - [ ] This is a bottleneck function. An implementation in C / C++ /
         Cython would likely improve the overall system.
+
+        - [ ] Implement crowd truth. Allow multiple predictions to match any
+              truth objet marked as "iscrowd".
 
     Returns:
         dict: with relevant confusion vectors. This keys of this dict can be
@@ -113,25 +121,25 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>>     class_idxs=np.array([0, 0, 1, 2, 0, 1]))
         >>> bg_weight = 1.0
         >>> compat = 'all'
-        >>> ovthresh = 0.5
+        >>> iou_thresh = 0.5
         >>> bias = 0.0
         >>> import kwcoco
         >>> classes = kwcoco.CategoryTree.from_mutex(list(range(3)))
         >>> bg_cidx = -1
         >>> y = _assign_confusion_vectors(true_dets, pred_dets, bias=bias,
-        >>>                               bg_weight=bg_weight, ovthresh=ovthresh,
+        >>>                               bg_weight=bg_weight, iou_thresh=iou_thresh,
         >>>                               compat=compat)
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
-           pred_raw  pred  true  score  weight     iou  txs  pxs
-        0         1     1     2 0.5000  1.0000  1.0000    3    5
-        1         0     0    -1 0.5000  1.0000 -1.0000   -1    4
-        2         2     2    -1 0.5000  1.0000 -1.0000   -1    3
-        3         1     1    -1 0.5000  1.0000 -1.0000   -1    2
-        4         0     0    -1 0.5000  1.0000 -1.0000   -1    1
-        5         0     0     0 0.5000  0.0000  0.6061    1    0
-        6        -1    -1     0 0.0000  1.0000 -1.0000    0   -1
-        7        -1    -1     1 0.0000  0.9000 -1.0000    2   -1
+           pred  true  score  weight     iou  txs  pxs
+        0     1     2 0.5000  1.0000  1.0000    3    5
+        1     0    -1 0.5000  1.0000 -1.0000   -1    4
+        2     2    -1 0.5000  1.0000 -1.0000   -1    3
+        3     1    -1 0.5000  1.0000 -1.0000   -1    2
+        4     0    -1 0.5000  1.0000 -1.0000   -1    1
+        5     0     0 0.5000  0.0000  0.6061    1    0
+        6    -1     0 0.0000  1.0000 -1.0000    0   -1
+        7    -1     1 0.0000  0.9000 -1.0000    2   -1
 
     Ignore:
         from xinspect.dynamic_kwargs import get_func_kwargs
@@ -152,13 +160,11 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>>                               compat='all', prioritize='class')
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
-        >>> print(y[(y.pred_raw != y.pred)])
         >>> y = _assign_confusion_vectors(true_dets, pred_dets,
         >>>                               classes=dmet.classes,
-        >>>                               compat='ancestors', ovthresh=.5)
+        >>>                               compat='ancestors', iou_thresh=.5)
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
-        >>> print(y[(y.pred_raw != y.pred)])
     """
     import kwarray
     valid_compat_keys = {'ancestors', 'mutex', 'all'}
@@ -231,18 +237,19 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                 true_dets.boxes[true_idxs], bias=bias)
             _px_to_iou = dict(zip(pred_idxs, ious))
             iou_lookup.update(_px_to_iou)
-    isvalid_lookup = {px: ious > ovthresh for px, ious in iou_lookup.items()}
+    isvalid_lookup = {px: ious > iou_thresh for px, ious in iou_lookup.items()}
 
     y =  _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
-                        cx_to_matchable_txs, bg_weight, prioritize, ovthresh,
+                        cx_to_matchable_txs, bg_weight, prioritize, iou_thresh,
                         pdist_priority, cx_to_ancestors, bg_cidx,
-                        ignore_classes=ignore_classes)
+                        ignore_classes=ignore_classes, max_dets=max_dets)
     return y
 
 
 def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
-                   cx_to_matchable_txs, bg_weight, prioritize, ovthresh,
-                   pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes):
+                   cx_to_matchable_txs, bg_weight, prioritize, iou_thresh,
+                   pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes,
+                   max_dets):
     # Notes:
     # * Preallocating numpy arrays does not help
     # * It might be useful to code this critical loop up in C / Cython
@@ -262,19 +269,31 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     _pred_cxs = pred_dets.class_idxs.take(_pred_sortx, axis=0)
     _pred_scores = _scores.take(_pred_sortx, axis=0)
 
+    if max_dets is not None and np.isfinite(max_dets):
+        # for pycocoutils compat, probably not the most efficient way of
+        # handling this
+        _pred_sortx = _pred_sortx[0:max_dets]
+        _pred_cxs = _pred_cxs[0:max_dets]
+        _pred_scores = _pred_scores[0:max_dets]
+
     if ignore_classes is not None:
         # Remove certain ignore regions from scoring
-        true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
-            true_dets, pred_dets, ovthresh=ovthresh, ignore_classes=ignore_classes)
 
+        # FIXME: does this use the iou threshold correctly?
+        # iou_thresh is being used as iooa not iou to determine which
+        # pred regions are ignored.
+        true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
+            true_dets, pred_dets, iou_thresh=iou_thresh, ignore_classes=ignore_classes)
+
+        # Remove ignored predicted regions from assignment consideration
         _pred_keep_flags = ~pred_ignore_flags[_pred_sortx]
         _pred_sortx = _pred_sortx[_pred_keep_flags]
         _pred_cxs = _pred_cxs[_pred_keep_flags]
         _pred_scores = _pred_scores[_pred_keep_flags]
 
+        # Remove ignored truth regions from assignment consideration
         true_unused[true_ignore_flags] = False
 
-    y_pred_raw = []
     y_pred = []
     y_true = []
     y_score = []
@@ -293,7 +312,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     for px, pred_cx, score in zip(_pred_sortx, _pred_cxs, _pred_scores):
 
         # Find compatible truth indices
-        raw_pred_cx = pred_cx
         true_idxs = cx_to_matchable_txs[pred_cx]
         # Filter out any truth that has already been used
         unused = true_unused[true_idxs]
@@ -319,7 +337,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                     cand_ious = iou_lookup[px].compress(unused)
                     ovidx = cand_ious.argmax()
                     ovmax = cand_ious[ovidx]
-                    if ovmax > ovthresh:
+                    if ovmax > iou_thresh:
                         tx = cand_true_idxs[ovidx]
                 elif used_truth_policy == 'mark_false':
                     # Consider a match to a previously used truth a false (note
@@ -329,7 +347,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                     cand_ious = iou_lookup[px]
                     ovidx = cand_ious.argmax()
                     ovmax = cand_ious[ovidx]
-                    if ovmax > ovthresh:
+                    if ovmax > iou_thresh:
                         tx = true_idxs[ovidx]
                         if not unused[ovidx]:
                             tx = -1
@@ -384,7 +402,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             if pred_cx is not None and true_cx in cx_to_ancestors[pred_cx]:
                 pred_cx = true_cx
 
-            y_pred_raw.append(raw_pred_cx)
             y_pred.append(pred_cx)
             y_true.append(true_cx)
             y_score.append(score)
@@ -396,7 +413,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             # Assign this prediction to a the background
             # Mark this prediction as a false positive
 
-            y_pred_raw.append(raw_pred_cx)
             y_pred.append(pred_cx)
             y_true.append(bg_cidx)
             y_score.append(score)
@@ -417,37 +433,18 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     else:
         unused_y_weight = [1.0] * n
 
-    y_pred_raw.extend([-1] * n)
     y_pred.extend([-1] * n)
     y_true.extend(unused_y_true)
-    y_score.extend([0.0] * n)
+    if USE_NEG_INF:
+        y_score.extend([-np.inf] * n)
+    else:
+        y_score.extend([0] * n)
     y_iou.extend([-1] * n)
     y_weight.extend(unused_y_weight)
     y_pxs.extend([bg_px] * n)
     y_txs.extend(unused_txs.tolist())
 
-    # TODO:
-    # Can we augment these vectors to balance these false negatives with
-    # implicit false positives?
-
-    BALANCE_FN = False
-    if BALANCE_FN:
-        # balance each false negatives with a false positive
-        # Note: doing this is more correct, but is also more expensive Upweight
-        # these True negative examples to capture the fact that there are
-        # effectively infinite true negatives.
-        w_factor = 10000000
-        y_pred_raw.extend(unused_y_true)
-        y_pred.extend(unused_y_true)
-        y_true.extend([-1] * n)
-        y_score.extend([0.0] * n)
-        y_iou.extend([-1] * n)
-        y_weight.extend((np.array(unused_y_weight) * w_factor).tolist())
-        y_pxs.extend([bg_px] * n)
-        y_txs.extend([bg_px] * n)
-
     y = {
-        'pred_raw': y_pred_raw,
         'pred': y_pred,
         'true': y_true,
         'score': y_score,
@@ -514,7 +511,7 @@ def _fast_pdist_priority(classes, prioritize, _cache={}):
     return pdist_priority
 
 
-def _filter_ignore_regions(true_dets, pred_dets, ovthresh=0.5,
+def _filter_ignore_regions(true_dets, pred_dets, iou_thresh=0.5,
                            ignore_classes='ignore'):
     """
     Determine which true and predicted detections should be ignored.
@@ -531,16 +528,16 @@ def _filter_ignore_regions(true_dets, pred_dets, ovthresh=0.5,
         >>> true_dets = kwimage.Detections.random(
         >>>     segmentations=True, classes=['a', 'b', 'c', 'ignore'])
         >>> ignore_classes = {'ignore', 'b'}
-        >>> ovthresh = 0.5
+        >>> iou_thresh = 0.5
         >>> print('true_dets = {!r}'.format(true_dets))
         >>> print('pred_dets = {!r}'.format(pred_dets))
         >>> flags1, flags2 = _filter_ignore_regions(
-        >>>     true_dets, pred_dets, ovthresh=ovthresh, ignore_classes=ignore_classes)
+        >>>     true_dets, pred_dets, iou_thresh=iou_thresh, ignore_classes=ignore_classes)
         >>> print('flags1 = {!r}'.format(flags1))
         >>> print('flags2 = {!r}'.format(flags2))
 
         >>> flags3, flags4 = _filter_ignore_regions(
-        >>>     true_dets, pred_dets, ovthresh=ovthresh,
+        >>>     true_dets, pred_dets, iou_thresh=iou_thresh,
         >>>     ignore_classes={c.upper() for c in ignore_classes})
         >>> assert np.all(flags1 == flags3)
         >>> assert np.all(flags2 == flags4)
@@ -591,7 +588,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ovthresh=0.5,
                                   pred_boxes.area).clip(0, 1).sum(axis=1)
                 ignore_overlap = np.nan_to_num(ignore_overlap)
 
-            ignore_idxs = np.where(ignore_overlap > ovthresh)[0]
+            ignore_idxs = np.where(ignore_overlap > iou_thresh)[0]
 
             if ignore_sseg is not None:
                 from shapely.ops import cascaded_union
@@ -617,7 +614,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ovthresh=0.5,
                         ignore_overlap[idx] = overlap
                     except Exception as ex:
                         warnings.warn('ex = {!r}'.format(ex))
-            pred_ignore_flags = ignore_overlap > ovthresh
+            pred_ignore_flags = ignore_overlap > iou_thresh
     return true_ignore_flags, pred_ignore_flags
 
 if __name__ == '__main__':

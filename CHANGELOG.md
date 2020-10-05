@@ -5,7 +5,25 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.5 - Unreleased
+## Version 0.1.6 - Unreleased
+
+### Added
+* `kwcoco.kw18.KW18.to_coco` can now accept `image_paths` and `video_name`
+
+### Changed
+* Yet more change to `reroot`, this needs to get reviewed and fixed.
+* Fix spelling of auxillary to auxiliary
+
+### Fixed
+* Added version flag to the CLI
+* Fixes to `ensure_json_serializable` for edge cases and recursion depth
+
+
+### Removed
+* Removed `pred_raw` from ConfusionVectors
+
+
+## Version 0.1.5 - Released 2020-08-26
 
 ### Added
 
@@ -21,7 +39,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Fixed
-
 * the `_check_index` method now works correctly.
 * `add_image` with `video_id` now works even if the video doesn't exist yet.
 * `add_annotation` no longer fails if `category_id` is None.

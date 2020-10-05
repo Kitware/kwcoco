@@ -169,7 +169,7 @@ IMAGE = OBJECT(OrderedDict((
     # TODO: optional world localization information
     # TODO: camera information?
 
-    ('auxillary', ARRAY(
+    ('auxiliary', ARRAY(
         TYPE=OBJECT({
             'file_name': PATH,
             'channels': CHANNELS,

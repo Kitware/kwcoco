@@ -15,6 +15,7 @@ class CocoUnionCLI(object):
         default = {
             'src': scfg.Value([], nargs='+', help='path to multiple input datasets'),
             'dst': scfg.Value('combo.mscoco.json', help='path to output dataset'),
+            'absolute': scfg.Value(False, help='if True, converts paths to absolute paths before doing union')
         }
         epilog = """
         Example Usage:
@@ -35,7 +36,7 @@ class CocoUnionCLI(object):
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
         if config['src'] is None:
-            raise Exception('must specify sources: '.format(config['src']))
+            raise Exception('must specify sources: {}'.format(config['src']))
 
         if len(config['src']) == 0:
             raise ValueError('Must provide at least one input dataset')
@@ -45,6 +46,10 @@ class CocoUnionCLI(object):
                                  verbose=1):
             print('reading fpath = {!r}'.format(fpath))
             dset = kwcoco.CocoDataset.coerce(fpath)
+
+            if config['absolute']:
+                dset.reroot(absolute=True)
+
             datasets.append(dset)
 
         combo = kwcoco.CocoDataset.union(*datasets)

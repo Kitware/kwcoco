@@ -12,7 +12,7 @@ segmentation formats than the original COCO format. Despite being written in
 Python, this data structure is reasonably efficient.
 
 """
-__version__ = '0.1.5'
+__version__ = '0.1.6'
 
 __submodules__ = ['coco_dataset']
 

@@ -8,6 +8,9 @@ from kwcoco.metrics.assignment import _assign_confusion_vectors
 
 class DetectionMetrics(ub.NiceRepr):
     """
+    Object that computes associations between detections and can convert them
+    into sklearn-compatible representations for scoring.
+
     Attributes:
         gid_to_true_dets (Dict): maps image ids to truth
         gid_to_pred_dets (Dict): maps image ids to predictions
@@ -15,7 +18,7 @@ class DetectionMetrics(ub.NiceRepr):
 
     Example:
         >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8, score_noise=0.9, hacked=False)
+        >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), classes=8, score_noise=0.9, hacked=False)
         >>> print(dmet.score_kwcoco(bias=0, compat='mutex', prioritize='iou')['mAP'])
         ...
         >>> # NOTE: IN GENERAL NETHARN AND VOC ARE NOT THE SAME
@@ -56,13 +59,14 @@ class DetectionMetrics(ub.NiceRepr):
 
         Example:
             >>> import kwcoco
+            >>> from kwcoco.demo.perterb import perterb_coco
             >>> true_coco = kwcoco.CocoDataset.demo('shapes')
-            >>> pred_coco = true_coco
+            >>> perterbkw = dict(box_noise=0.5, cls_noise=0.5, score_noise=0.5)
+            >>> pred_coco = perterb_coco(true_coco, **perterbkw)
             >>> self = DetectionMetrics.from_coco(true_coco, pred_coco)
             >>> self.score_voc()
         """
-        import kwimage
-
+        # import kwimage
         classes = true_coco.object_categories()
         self = DetectionMetrics(classes)
 
@@ -70,12 +74,13 @@ class DetectionMetrics(ub.NiceRepr):
             gids = sorted(set(true_coco.imgs.keys()) & set(pred_coco.imgs.keys()))
 
         def _coco_to_dets(coco_dset, desc=''):
+            import kwimage
             for gid in ub.ProgIter(gids, desc=desc, verbose=verbose):
                 img = coco_dset.imgs[gid]
-                gid = img['id']
                 imgname = img['file_name']
                 aids = coco_dset.gid_to_aids[gid]
                 annots = [coco_dset.anns[aid] for aid in aids]
+                # dets = true_coco.annots(gid=gid).detections
                 dets = kwimage.Detections.from_coco_annots(
                     annots, dset=coco_dset, classes=classes)
                 yield dets, imgname, gid
@@ -135,17 +140,17 @@ class DetectionMetrics(ub.NiceRepr):
         """ gets Detections representation for predictions in an image """
         return dmet.gid_to_pred_dets[gid]
 
-    def confusion_vectors(dmet, ovthresh=0.5, bias=0, gids=None, compat='all',
+    def confusion_vectors(dmet, iou_thresh=0.5, bias=0, gids=None, compat='mutex',
                           prioritize='iou', ignore_classes='ignore',
                           background_class=ub.NoParam, verbose='auto',
-                          workers=0, track_probs='try'):
+                          workers=0, track_probs='try', max_dets=None):
         """
         Assigns predicted boxes to the true boxes so we can transform the
         detection problem into a classification problem for scoring.
 
         Args:
 
-            ovthresh (float, default=0.5):
+            iou_thresh (float, default=0.5):
                 bounding box overlap iou threshold required for assignment
 
             bias (float, default=0.0):
@@ -167,7 +172,7 @@ class DetectionMetrics(ub.NiceRepr):
                 can be ('iou' | 'class' | 'correct') determines which box to
                 assign to if mutiple true boxes overlap a predicted box.  if
                 prioritize is iou, then the true box with maximum iou (above
-                ovthresh) will be chosen.  If prioritize is class, then it will
+                iou_thresh) will be chosen.  If prioritize is class, then it will
                 prefer matching a compatible class above a higher iou. If
                 prioritize is correct, then ancestors of the true class are
                 preferred over descendents of the true class, over unreleated
@@ -231,9 +236,9 @@ class DetectionMetrics(ub.NiceRepr):
             pred_dets = dmet.pred_detections(gid)
             job = jobs.submit(
                 _assign_confusion_vectors, true_dets, pred_dets,
-                bg_weight=1, ovthresh=ovthresh, bg_cidx=-1, bias=bias,
+                bg_weight=1, iou_thresh=iou_thresh, bg_cidx=-1, bias=bias,
                 classes=dmet.classes, compat=compat, prioritize=prioritize,
-                ignore_classes=ignore_classes)
+                ignore_classes=ignore_classes, max_dets=max_dets)
             job.gid = gid
 
         for job in ub.ProgIter(jobs.jobs, desc='assign detections',
@@ -274,44 +279,13 @@ class DetectionMetrics(ub.NiceRepr):
             for k, v in y.items():
                 y_accum[k].extend(v)
 
-        # else:
-        #     for gid in ub.ProgIter(gids, desc='assign detections', verbose=verbose):
-        #         true_dets = dmet.true_detections(gid)
-        #         pred_dets = dmet.pred_detections(gid)
-
-        #         y = _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1,
-        #                                       ovthresh=ovthresh, bg_cidx=-1,
-        #                                       bias=bias, classes=dmet.classes,
-        #                                       compat=compat, prioritize=prioritize,
-        #                                       ignore_classes=ignore_classes)
-
-        #         if _tracking_probs:
-        #             # Keep track of per-class probs
-        #             try:
-        #                 pred_probs = pred_dets.probs
-        #             except KeyError:
-        #                 _tracking_probs = False
-        #             else:
-        #                 pxs = np.array(y['pxs'], dtype=np.int)
-        #                 flags = pxs > -1
-        #                 probs = np.zeros((len(pxs), pred_probs.shape[1]),
-        #                                  dtype=np.float32)
-        #                 bg_idx = dmet.classes.node_to_idx['background']
-        #                 probs[:, bg_idx] = 1
-        #                 probs[flags] = pred_probs[pxs[flags]]
-        #                 prob_accum.append(probs)
-
-        #         y['gid'] = [gid] * len(y['pred'])
-        #         for k, v in y.items():
-        #             y_accum[k].extend(v)
-
         _data = {}
         for k, v in ub.ProgIter(list(y_accum.items()), desc='ndarray convert', verbose=verbose):
             # Try to use 32 bit types for large evaluation problems
             kw = dict()
             if k in {'iou', 'score', 'weight'}:
                 kw['dtype'] = np.float32
-            if k in {'pxs', 'txs', 'gid', 'pred', 'true', 'pred_raw'}:
+            if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
                 kw['dtype'] = np.int32
             try:
                 _data[k] = np.asarray(v, **kw)
@@ -337,7 +311,7 @@ class DetectionMetrics(ub.NiceRepr):
 
         return cfsn_vecs
 
-    def score_kwant(dmet, ovthresh=0.5):
+    def score_kwant(dmet, iou_thresh=0.5):
         """
         Scores the detections using kwant
         """
@@ -378,7 +352,7 @@ class DetectionMetrics(ub.NiceRepr):
         pred_kw18 = pred_kw18s
 
         roc_info = kwant.score_events(true_kw18s, pred_kw18s,
-                                      ovthresh=ovthresh, prefiltered=True,
+                                      iou_thresh=iou_thresh, prefiltered=True,
                                       verbose=3)
 
         fp = roc_info['fp'].values
@@ -412,8 +386,6 @@ class DetectionMetrics(ub.NiceRepr):
                             ylabel='pd (tpr)', fnum=1,
                             title='kwant roc_auc={:.4f}'.format(roc_auc))
 
-            import kwil
-            kwil.autompl()
             kwil.multi_plot(tpr, ppv,
                             xlabel='recall (fpr)',
                             ylabel='precision (tpr)',
@@ -422,10 +394,10 @@ class DetectionMetrics(ub.NiceRepr):
 
         return info
 
-    def score_kwcoco(dmet, ovthresh=0.5, bias=0, gids=None,
+    def score_kwcoco(dmet, iou_thresh=0.5, bias=0, gids=None,
                       compat='all', prioritize='iou'):
         """ our scoring method """
-        cfsn_vecs = dmet.confusion_vectors(ovthresh=ovthresh, bias=bias,
+        cfsn_vecs = dmet.confusion_vectors(iou_thresh=iou_thresh, bias=bias,
                                            gids=gids,
                                            compat=compat,
                                            prioritize=prioritize)
@@ -440,14 +412,14 @@ class DetectionMetrics(ub.NiceRepr):
             info['mAP'] = perclass['mAP']
         return info
 
-    def score_voc(dmet, ovthresh=0.5, bias=1, method='voc2012', gids=None,
+    def score_voc(dmet, iou_thresh=0.5, bias=1, method='voc2012', gids=None,
                   ignore_classes='ignore'):
         """
         score using voc method
 
         Example:
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8,
+            >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), classes=8,
             >>>     score_noise=.5)
             >>> print(dmet.score_voc()['mAP'])
             0.9399...
@@ -465,14 +437,14 @@ class DetectionMetrics(ub.NiceRepr):
 
             if ignore_classes is not None:
                 true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
-                    true_dets, pred_dets, ovthresh=ovthresh,
+                    true_dets, pred_dets, iou_thresh=iou_thresh,
                     ignore_classes=ignore_classes)
                 true_dets = true_dets.compress(~true_ignore_flags)
                 pred_dets = pred_dets.compress(~pred_ignore_flags)
 
             vmet.add_truth(true_dets, gid=gid)
             vmet.add_predictions(pred_dets, gid=gid)
-        voc_scores = vmet.score(ovthresh, bias=bias, method=method)
+        voc_scores = vmet.score(iou_thresh, bias=bias, method=method)
         return voc_scores
 
     def _to_coco(dmet):
@@ -528,26 +500,55 @@ class DetectionMetrics(ub.NiceRepr):
 
         return pred, true
 
-    def score_coco(dmet, verbose=0):
+    def score_coco(dmet, with_evaler=False, verbose=0):
         """
         score using ms-coco method
 
         Example:
             >>> # xdoctest: +REQUIRES(--pycocotools)
+            >>> from kwcoco.metrics.detect_metrics import *
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=100, nboxes=(0, 3), n_fp=(0, 1), nclasses=8)
+            >>>     nimgs=10, nboxes=(0, 3), n_fn=(0, 1), n_fp=(0, 1), classes=8, with_probs=False)
             >>> print(dmet.score_coco()['mAP'])
             0.711016...
+
+        Notes:
+            by default pycocotools computes average precision as the literal
+            average of computed precisions at 101 uniformly spaced recall
+            thresholds.
+
+            pycocoutils seems to only allow predictions with the same category
+            as the truth to match those truth objects. This should be the
+            same as calling dmet.confusion_vectors with compat = mutex
+
+            pycocoutils does not take into account the fact that each box often
+            has a score for each category.
+
+            pycocoutils will be incorrect if any annotation has an id of 0
+
+            a major difference in the way kwcoco scores versus pycocoutils is
+            the calculation of AP. The assignment between truth and predicted
+            detections produces similar enough results. Given our confusion
+            vectors we use the scikit-learn definition of AP, whereas
+            pycocoutils seems to compute precision and recall --- more or less
+            correctly --- but then it resamples the precision at various
+            specified recall thresholds (in the `accumulate` function,
+            specifically how `pr` is resampled into the `q` array). This
+            can lead to a large difference in reported scores.
+
+            pycocoutils also smooths out the precision such that it is
+            monotonic decreasing, which might not be the best idea.
+
         """
-        from pycocotools import coco
+        from pycocotools import coco  # NOQA
         from pycocotools import cocoeval
-        # The original pycoco-api prints to much, supress it
-        import kwcoco as nh
+        from kwcoco.util.util_monkey import SupressPrint
 
         pred, true = dmet._to_coco()
 
+        # The original pycoco-api prints to much, supress it
         quiet = verbose == 0
-        with nh.util.SupressPrint(coco, cocoeval, enabled=quiet):
+        with SupressPrint(coco, cocoeval, enabled=quiet):
             cocoGt = true._aspycoco()
             cocoDt = pred._aspycoco()
 
@@ -564,12 +565,26 @@ class DetectionMetrics(ub.NiceRepr):
             evaler = cocoeval.COCOeval(cocoGt, cocoDt, iouType='bbox')
             evaler.evaluate()
             evaler.accumulate()
+
+            if 0:
+                # Get curves at a specific pycocoutils param
+                Tx = np.where(evaler.params.iouThrs == 0.5)[0]
+                Rx = slice(0, len(evaler.params.recThrs))
+                Kx = slice(0, len(evaler.params.catIds))
+                Ax = evaler.params.areaRng.index([0, 10000000000.0])
+                Mx = evaler.params.maxDets.index(100)
+                perclass_prec = evaler.eval['precision'][Tx, Rx, Kx, Ax, Mx]
+                perclass_rec = evaler.eval['recall'][Tx, Kx, Ax, Mx]
+                perclass_score = evaler.eval['scores'][Tx, Rx, Kx, Ax, Mx]
+
             evaler.summarize()
             coco_ap = evaler.stats[1]
-            coco_scores = {
-                'mAP': coco_ap,
-                'evalar_stats': evaler.stats
-            }
+        coco_scores = {
+            'mAP': coco_ap,
+            'evalar_stats': evaler.stats
+        }
+        if with_evaler:
+            coco_scores['evaler'] = evaler
         return coco_scores
 
     @classmethod
@@ -579,7 +594,8 @@ class DetectionMetrics(ub.NiceRepr):
         offset from the truth.
 
         Kwargs:
-            nclasses (int, default=1): number of foreground classes.
+            classes (int, default=1): class list or the number of foreground
+                classes.
             nimgs (int, default=1): number of images in the coco datasts.
             nboxes (int, default=1): boxes per image.
             n_fp (int, default=0): number of false positives.
@@ -595,6 +611,9 @@ class DetectionMetrics(ub.NiceRepr):
             with_probs (bool, default=1):
                 if True, includes per-class probabilities with predictions
 
+        CommandLine:
+            xdoctest -m kwcoco.metrics.detect_metrics DetectionMetrics.demo:2 --show
+
         Example:
             >>> kwargs = {}
             >>> # Seed the RNG
@@ -602,7 +621,7 @@ class DetectionMetrics(ub.NiceRepr):
             >>> # Size parameters determine how big the data is
             >>> kwargs['nimgs'] = 5
             >>> kwargs['nboxes'] = 7
-            >>> kwargs['nclasses'] = 11
+            >>> kwargs['classes'] = 11
             >>> # Noise parameters perterb predictions further from the truth
             >>> kwargs['n_fp'] = 3
             >>> kwargs['box_noise'] = 0.1
@@ -618,14 +637,14 @@ class DetectionMetrics(ub.NiceRepr):
 
         Example:
             >>> # Test case with null predicted categories
-            >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, nclasses=3,
-            >>>                              nboxes=10, n_fp=10, box_noise=0.3,
+            >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, classes=3,
+            >>>                              nboxes=10, n_fp=3, box_noise=0.1,
             >>>                              with_probs=False)
             >>> dmet.gid_to_pred_dets[0].data
             >>> dmet.gid_to_true_dets[0].data
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> binvecs_ovr = cfsn_vecs.binarize_ovr()
-            >>> binvecs_per = cfsn_vecs.binarize_peritem()
+            >>> binvecs_per = cfsn_vecs.binarize_classless()
             >>> measures_per = binvecs_per.measures()
             >>> measures_ovr = binvecs_ovr.measures()
             >>> print('measures_per = {!r}'.format(measures_per))
@@ -633,8 +652,20 @@ class DetectionMetrics(ub.NiceRepr):
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
-            >>> pr_per.draw(fnum=1)
             >>> measures_ovr['perclass'].draw(key='pr', fnum=2)
+
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
+            >>> dmet = DetectionMetrics.demo(
+            >>>     n_fp=(0, 1), n_fn=(0, 1), nimgs=512, nboxes=(0, 32),
+            >>>     classes=3, rng=0, newstyle=1, box_noise=0.5, cls_noise=0.0, score_noise=0.3, with_probs=False)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> summary = dmet.summarize(plot=True, title='DetectionMetrics summary demo', with_ovr=True, with_bin=False)
+            >>> summary['bin_measures']
+            >>> kwplot.show_if_requested()
         """
         import kwimage
         import kwarray
@@ -642,16 +673,11 @@ class DetectionMetrics(ub.NiceRepr):
         # Parse kwargs
         rng = kwarray.ensure_rng(kwargs.get('rng', 0))
 
-        # TODO: use kwcoco.demo.perterb instead of rolling the logic here
-
-        # todo: accept and coerce classes instead of nclasses
+        # todo: accept and coerce classes instead of classes
         classes = kwargs.get('classes', None)
-        nclasses = kwargs.get('nclasses', None)
 
-        if classes is not None and nclasses is not None:
-            raise ValueError('cant specify both classes and nclasses')
-        elif classes is None and nclasses is None:
-            nclasses = 1
+        if classes is None:
+            classes = 1
 
         nimgs = kwargs.get('nimgs', 1)
         box_noise = kwargs.get('box_noise', 0)
@@ -666,150 +692,170 @@ class DetectionMetrics(ub.NiceRepr):
         anchors = kwargs.get('anchors', None)
         scale = 100.0
 
-        # Build random variables
-        from kwarray import distributions
-        DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)
-        def _parse_arg(key, default):
-            value = kwargs.get(key, default)
-            try:
-                low, high = value
-                return (low, high + 1)
-            except Exception:
-                return (0, value + 1)
-        nboxes_RV = DiscreteUniform(*_parse_arg('nboxes', 1))
-        n_fp_RV = DiscreteUniform(*_parse_arg('n_fp', 0))
-        n_fn_RV = DiscreteUniform(*_parse_arg('n_fn', 0))
+        if kwargs.get('newstyle'):
+            perterbkw = ub.dict_isect(kwargs, {
+                'rng': 0,
+                'box_noise': 0,
+                'cls_noise': 0,
+                'null_pred': False,
+                'with_probs': False,
+                'score_noise': 0.2,
+                'n_fp': 0,
+                'n_fn': 0,
+                'hacked': 1})
 
-        box_noise_RV = distributions.Normal(0, box_noise, rng=rng)
-        cls_noise_RV = distributions.Bernoulli(cls_noise, rng=rng)
-
-        # the values of true and false scores starts off with no overlap and
-        # the overlap increases as the score noise increases.
-        def _interp(v1, v2, alpha):
-            return v1 * alpha + (1 - alpha) * v2
-        mid = 0.5
-        # true_high = 2.0
-        true_high = 1.0
-        true_low   = _interp(0, mid, score_noise)
-        false_high = _interp(true_high, mid - 1e-3, score_noise)
-        true_mean  = _interp(0.5, .8, score_noise)
-        false_mean = _interp(0.5, .2, score_noise)
-
-        true_score_RV = distributions.TruncNormal(
-            mean=true_mean, std=.5, low=true_low, high=true_high, rng=rng)
-        false_score_RV = distributions.TruncNormal(
-            mean=false_mean, std=.5, low=0, high=false_high, rng=rng)
-
-        # Create the category hierarcy
-        if nclasses is not None:
-            graph = nx.DiGraph()
-            graph.add_node('background', id=0)
-            for cid in range(1, nclasses + 1):
-                # binary heap encoding of a tree
-                cx = cid - 1
-                parent_cx = (cx - 1) // 2
-                node = 'cat_{}'.format(cid)
-                graph.add_node(node, id=cid)
-                if parent_cx > 0:
-                    supercategory = 'cat_{}'.format(parent_cx + 1)
-                    graph.add_edge(supercategory, node)
-            classes = kwcoco.CategoryTree(graph)
-            frgnd_cx_RV = distributions.DiscreteUniform(1, len(classes), rng=rng)
+            # TODO: use kwcoco.demo.perterb instead of rolling the logic here
+            from kwcoco.demo import perterb
+            # TODO
+            # true_dset = kwcoco.CocoDataset.random()  # TODO
+            true_dset = kwcoco.CocoDataset.demo('shapes{}'.format(nimgs))  # FIXME
+            pred_dset = perterb.perterb_coco(true_dset, **perterbkw)
+            dmet = cls.from_coco(true_dset, pred_dset)
         else:
-            classes = kwcoco.CategoryTree.coerce(classes)
-            # TODO: remove background classes via rejection sampling
-            frgnd_cx_RV = distributions.DiscreteUniform(0, len(classes), rng=rng)
+            # Build random variables
+            from kwarray import distributions
+            DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)
+            def _parse_arg(key, default):
+                value = kwargs.get(key, default)
+                try:
+                    low, high = value
+                    return (low, high + 1)
+                except Exception:
+                    return (0, value + 1)
+            nboxes_RV = DiscreteUniform(*_parse_arg('nboxes', 1))
+            n_fp_RV = DiscreteUniform(*_parse_arg('n_fp', 0))
+            n_fn_RV = DiscreteUniform(*_parse_arg('n_fn', 0))
 
-        dmet = cls()
-        dmet.classes = classes
+            box_noise_RV = distributions.Normal(0, box_noise, rng=rng)
+            cls_noise_RV = distributions.Bernoulli(cls_noise, rng=rng)
 
-        for gid in range(nimgs):
+            # the values of true and false scores starts off with no overlap and
+            # the overlap increases as the score noise increases.
+            def _interp(v1, v2, alpha):
+                return v1 * alpha + (1 - alpha) * v2
+            mid = 0.5
+            # true_high = 2.0
+            true_high = 1.0
+            true_low   = _interp(0, mid, score_noise)
+            false_high = _interp(true_high, mid - 1e-3, score_noise)
+            true_mean  = _interp(0.5, .8, score_noise)
+            false_mean = _interp(0.5, .2, score_noise)
 
-            # Sample random variables
-            nboxes_ = nboxes_RV()
-            n_fp_ = n_fp_RV()
-            n_fn_ = n_fn_RV()
+            true_score_RV = distributions.TruncNormal(
+                mean=true_mean, std=.5, low=true_low, high=true_high, rng=rng)
+            false_score_RV = distributions.TruncNormal(
+                mean=false_mean, std=.5, low=0, high=false_high, rng=rng)
 
-            imgname = 'img_{}'.format(gid)
-            dmet._register_imagename(imgname, gid)
+            # Create the category hierarcy
+            if isinstance(classes, int):
+                graph = nx.DiGraph()
+                graph.add_node('background', id=0)
+                for cid in range(1, classes + 1):
+                    # binary heap encoding of a tree
+                    cx = cid - 1
+                    parent_cx = (cx - 1) // 2
+                    node = 'cat_{}'.format(cid)
+                    graph.add_node(node, id=cid)
+                    if parent_cx > 0:
+                        supercategory = 'cat_{}'.format(parent_cx + 1)
+                        graph.add_edge(supercategory, node)
+                classes = kwcoco.CategoryTree(graph)
+                frgnd_cx_RV = distributions.DiscreteUniform(1, len(classes), rng=rng)
+            else:
+                classes = kwcoco.CategoryTree.coerce(classes)
+                # TODO: remove background classes via rejection sampling
+                frgnd_cx_RV = distributions.DiscreteUniform(0, len(classes), rng=rng)
 
-            # Generate random ground truth detections
-            true_boxes = kwimage.Boxes.random(num=nboxes_, scale=scale,
-                                              anchors=anchors, rng=rng,
-                                              format='cxywh')
-            # Prevent 0 sized boxes: increase w/h by 1
-            true_boxes.data[..., 2:4] += 1
-            true_cxs = frgnd_cx_RV(len(true_boxes))
-            true_weights = np.ones(len(true_boxes), dtype=np.int32)
+            dmet = cls()
+            dmet.classes = classes
 
-            # Initialize predicted detections as a copy of truth
-            pred_boxes = true_boxes.copy()
-            pred_cxs = true_cxs.copy()
+            for gid in range(nimgs):
 
-            # Perterb box coordinates
-            pred_boxes.data = np.abs(pred_boxes.data.astype(np.float) +
-                                     box_noise_RV())
+                # Sample random variables
+                nboxes_ = nboxes_RV()
+                n_fp_ = n_fp_RV()
+                n_fn_ = n_fn_RV()
 
-            # Perterb class predictions
-            change = cls_noise_RV(len(pred_cxs))
-            pred_cxs_swap = frgnd_cx_RV(len(pred_cxs))
-            pred_cxs[change] = pred_cxs_swap[change]
+                imgname = 'img_{}'.format(gid)
+                dmet._register_imagename(imgname, gid)
 
-            # Drop true positive boxes
-            if n_fn_:
-                pred_boxes.data = pred_boxes.data[n_fn_:]
-                pred_cxs = pred_cxs[n_fn_:]
+                # Generate random ground truth detections
+                true_boxes = kwimage.Boxes.random(num=nboxes_, scale=scale,
+                                                  anchors=anchors, rng=rng,
+                                                  format='cxywh')
+                # Prevent 0 sized boxes: increase w/h by 1
+                true_boxes.data[..., 2:4] += 1
+                true_cxs = frgnd_cx_RV(len(true_boxes))
+                true_weights = np.ones(len(true_boxes), dtype=np.int32)
 
-            # pred_scores = np.linspace(true_min, true_max, len(pred_boxes))[::-1]
-            n_tp_ = len(pred_boxes)
-            pred_scores = true_score_RV(n_tp_)
+                # Initialize predicted detections as a copy of truth
+                pred_boxes = true_boxes.copy()
+                pred_cxs = true_cxs.copy()
 
-            # Add false positive boxes
-            if n_fp_:
-                false_boxes = kwimage.Boxes.random(num=n_fp_, scale=scale,
-                                                   rng=rng, format='cxywh')
-                false_cxs = frgnd_cx_RV(n_fp_)
-                false_scores = false_score_RV(n_fp_)
+                # Perterb box coordinates
+                pred_boxes.data = np.abs(pred_boxes.data.astype(np.float) +
+                                         box_noise_RV())
 
-                pred_boxes.data = np.vstack([pred_boxes.data, false_boxes.data])
-                pred_cxs = np.hstack([pred_cxs, false_cxs])
-                pred_scores = np.hstack([pred_scores, false_scores])
+                # Perterb class predictions
+                change = cls_noise_RV(len(pred_cxs))
+                pred_cxs_swap = frgnd_cx_RV(len(pred_cxs))
+                pred_cxs[change] = pred_cxs_swap[change]
 
-            # Transform the scores for the assigned class into a predicted
-            # probability for each class. (Currently a bit hacky).
-            class_probs = _demo_construct_probs(
-                pred_cxs, pred_scores, classes, rng,
-                hacked=kwargs.get('hacked', 1))
+                # Drop true positive boxes
+                if n_fn_:
+                    pred_boxes.data = pred_boxes.data[n_fn_:]
+                    pred_cxs = pred_cxs[n_fn_:]
 
-            true_dets = kwimage.Detections(boxes=true_boxes,
-                                           class_idxs=true_cxs,
-                                           weights=true_weights)
+                # pred_scores = np.linspace(true_min, true_max, len(pred_boxes))[::-1]
+                n_tp_ = len(pred_boxes)
+                pred_scores = true_score_RV(n_tp_)
 
-            pred_dets = kwimage.Detections(boxes=pred_boxes,
-                                           class_idxs=pred_cxs,
-                                           scores=pred_scores)
+                # Add false positive boxes
+                if n_fp_:
+                    false_boxes = kwimage.Boxes.random(num=n_fp_, scale=scale,
+                                                       rng=rng, format='cxywh')
+                    false_cxs = frgnd_cx_RV(n_fp_)
+                    false_scores = false_score_RV(n_fp_)
 
-            # Hack in the probs
-            if with_probs:
-                pred_dets.data['probs'] = class_probs
+                    pred_boxes.data = np.vstack([pred_boxes.data, false_boxes.data])
+                    pred_cxs = np.hstack([pred_cxs, false_cxs])
+                    pred_scores = np.hstack([pred_scores, false_scores])
 
-            if null_pred:
-                pred_dets.data['class_idxs'] = np.array(
-                    [None] * len(pred_dets), dtype=object)
+                # Transform the scores for the assigned class into a predicted
+                # probability for each class. (Currently a bit hacky).
+                class_probs = _demo_construct_probs(
+                    pred_cxs, pred_scores, classes, rng,
+                    hacked=kwargs.get('hacked', 1))
 
-            dmet.add_truth(true_dets, imgname=imgname)
-            dmet.add_predictions(pred_dets, imgname=imgname)
+                true_dets = kwimage.Detections(boxes=true_boxes,
+                                               class_idxs=true_cxs,
+                                               weights=true_weights)
+
+                pred_dets = kwimage.Detections(boxes=pred_boxes,
+                                               class_idxs=pred_cxs,
+                                               scores=pred_scores)
+
+                # Hack in the probs
+                if with_probs:
+                    pred_dets.data['probs'] = class_probs
+
+                if null_pred:
+                    pred_dets.data['class_idxs'] = np.array(
+                        [None] * len(pred_dets), dtype=object)
+
+                dmet.add_truth(true_dets, imgname=imgname)
+                dmet.add_predictions(pred_dets, imgname=imgname)
 
         return dmet
 
-    def summarize(dmet, out_dpath=None, plot=False, title=''):
+    def summarize(dmet, out_dpath=None, plot=False, title='', with_bin='auto', with_ovr='auto'):
         """
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
             >>>     n_fp=(0, 128), n_fn=(0, 4), nimgs=512, nboxes=(0, 32),
-            >>>     nclasses=3, rng=0)
+            >>>     classes=3, rng=0)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -817,30 +863,26 @@ class DetectionMetrics(ub.NiceRepr):
             >>> kwplot.show_if_requested()
         """
         cfsn_vecs = dmet.confusion_vectors()
-        ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
-        bin_cfsn = cfsn_vecs.binarize_peritem()
 
-        ovr_measures = ovr_cfsn.measures()
-        bin_measures = bin_cfsn.measures()
-        summary = {
-            'ovr_measures': ovr_measures,
-            'bin_measures': bin_measures,
-        }
+        summary = {}
+        if with_ovr:
+            ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
+            ovr_measures = ovr_cfsn.measures()
+            summary['ovr_measures'] = ovr_measures
+        if with_bin:
+            bin_cfsn = cfsn_vecs.binarize_classless()
+            bin_measures = bin_cfsn.measures()
+            summary['bin_measures'] = bin_measures
         if plot:
             print('summary = {}'.format(ub.repr2(summary, nl=1)))
             print('out_dpath = {!r}'.format(out_dpath))
 
-            ovr_measures['perclass']
+            if with_bin:
+                bin_measures.summary_plot(title=title, fnum=1, subplots=with_bin)
 
-            if out_dpath:
-                pass
-
-            perclass = ovr_measures['perclass']
-            ovr_measures['mAUC']
-            ovr_measures['mAP']
-
-            bin_measures.summary_plot(title=title, fnum=1)
-            perclass.summary_plot(title=title, fnum=2)
+            if with_ovr:
+                perclass = ovr_measures['perclass']
+                perclass.summary_plot(title=title, fnum=2, subplots=with_ovr)
             # # Is this micro-versus-macro average?
             # bin_measures['ap']
             # bin_measures['auc']

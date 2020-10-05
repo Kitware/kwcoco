@@ -1,17 +1,11 @@
 import numpy as np
 import ubelt as ub
 import warnings
+import six
 from kwcoco.metrics.functional import fast_confusion_matrix
+from kwcoco.metrics.sklearn_alts import _binary_clf_curve2
 from kwcoco.metrics.util import DictProxy
-
-
 from kwcoco.category_tree import CategoryTree
-
-try:
-    import ndsampler
-    CATEGORY_TREE_CLS = (CategoryTree, ndsampler.CategoryTree)
-except Exception:
-    CATEGORY_TREE_CLS = (CategoryTree,)
 
 
 class ConfusionVectors(ub.NiceRepr):
@@ -29,7 +23,7 @@ class ConfusionVectors(ub.NiceRepr):
         >>> # xdoctest: IGNORE_WANT
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
+        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), classes=3)
         >>> cfsn_vecs = dmet.confusion_vectors()
         >>> print(cfsn_vecs.data._pandas())
              pred  true   score  weight     iou  txs  pxs  gid
@@ -60,16 +54,15 @@ class ConfusionVectors(ub.NiceRepr):
         >>> kwplot.autompl()
         >>> from kwcoco.metrics.confusion_vectors import ConfusionVectors
         >>> cfsn_vecs = ConfusionVectors.demo(
-        >>>     nimgs=128, nboxes=(0, 10), n_fp=(0, 3), n_fn=(0, 3), nclasses=3)
+        >>>     nimgs=128, nboxes=(0, 10), n_fp=(0, 3), n_fn=(0, 3), classes=3)
         >>> cx_to_binvecs = cfsn_vecs.binarize_ovr()
         >>> measures = cx_to_binvecs.measures()['perclass']
         >>> print('measures = {!r}'.format(measures))
         measures = <PerClass_Measures({
-            'cat_1': <Measures({'ap': 0.7501, 'auc': 0.7170, 'catname': cat_1, 'max_f1': f1=0.77@0.41, 'max_mcc': mcc=0.71@0.44, 'nsupport': 787.0000, 'realneg_total': 594.0000, 'realpos_total': 193.0000})>,
-            'cat_2': <Measures({'ap': 0.8288, 'auc': 0.8137, 'catname': cat_2, 'max_f1': f1=0.83@0.40, 'max_mcc': mcc=0.78@0.40, 'nsupport': 787.0000, 'realneg_total': 589.0000, 'realpos_total': 198.0000})>,
-            'cat_3': <Measures({'ap': 0.7536, 'auc': 0.7150, 'catname': cat_3, 'max_f1': f1=0.77@0.40, 'max_mcc': mcc=0.71@0.42, 'nsupport': 787.0000, 'realneg_total': 578.0000, 'realpos_total': 209.0000})>,
-        }) at 0x7f1b9b0d6130>
-
+            'cat_1': <Measures({'ap': 0.227, 'auc': 0.507, 'catname': cat_1, 'max_f1': f1=0.45@0.47, 'nsupport': 788.000})>,
+            'cat_2': <Measures({'ap': 0.288, 'auc': 0.572, 'catname': cat_2, 'max_f1': f1=0.51@0.43, 'nsupport': 788.000})>,
+            'cat_3': <Measures({'ap': 0.225, 'auc': 0.484, 'catname': cat_3, 'max_f1': f1=0.46@0.40, 'nsupport': 788.000})>,
+        }) at 0x7facf77bdfd0>
         >>> kwplot.figure(fnum=1, doclf=True)
         >>> measures.draw(key='pr', fnum=1, pnum=(1, 3, 1))
         >>> measures.draw(key='roc', fnum=1, pnum=(1, 3, 2))
@@ -91,7 +84,7 @@ class ConfusionVectors(ub.NiceRepr):
 
         Example:
             >>> from kwcoco.metrics import ConfusionVectors
-            >>> self = ConfusionVectors.demo(n_imgs=1, nclasses=2, n_fp=0, nboxes=1)
+            >>> self = ConfusionVectors.demo(n_imgs=1, classes=2, n_fp=0, nboxes=1)
             >>> state = self.__json__()
             >>> print('state = {}'.format(ub.repr2(state, nl=2, precision=2, align=1)))
             >>> recon = ConfusionVectors.from_json(state)
@@ -119,6 +112,12 @@ class ConfusionVectors(ub.NiceRepr):
     @classmethod
     def demo(cfsn_vecs, **kw):
         """
+        Args:
+            **kwargs: See :func:`kwcoco.metrics.DetectionMetrics.demo`
+
+        Returns:
+            ConfusionVectors
+
         Example:
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> print('cfsn_vecs = {!r}'.format(cfsn_vecs))
@@ -131,6 +130,7 @@ class ConfusionVectors(ub.NiceRepr):
             'nboxes': (0, 10),
             'n_fp': (0, 1),
             'n_fn': 0,
+            'classes': 3,
         }
         demokw = default.copy()
         demokw.update(kw)
@@ -165,7 +165,7 @@ class ConfusionVectors(ub.NiceRepr):
         import kwarray
         if pred is None:
             if probs is not None:
-                if isinstance(classes, CATEGORY_TREE_CLS):
+                if isinstance(classes, CategoryTree):
                     if not classes.is_mutex():
                         raise Exception('Graph categories require explicit pred')
                 # We can assume all classes are mutually exclusive here
@@ -185,12 +185,13 @@ class ConfusionVectors(ub.NiceRepr):
         cfsn_vecs = ConfusionVectors(cfsn_data, probs=probs, classes=classes)
         return cfsn_vecs
 
-    def confusion_matrix(cfsn_vecs, raw=False, compress=False):
+    def confusion_matrix(cfsn_vecs, compress=False):
         """
         Builds a confusion matrix from the confusion vectors.
 
         Args:
-            raw (bool): if True uses 'pred_raw' otherwise used 'pred'
+            compress (bool, default=False):
+                if True removes rows / columns with no entries
 
         Returns:
             pd.DataFrame : cm : the labeled confusion matrix
@@ -198,30 +199,27 @@ class ConfusionVectors(ub.NiceRepr):
                  this use case. #remove_pandas)
 
         CommandLine:
-            xdoctest -m ~/code/kwcoco/kwcoco/metrics/confusion_vectors.py ConfusionVectors.confusion_matrix
+            xdoctest -m kwcoco.metrics.confusion_vectors ConfusionVectors.confusion_matrix
 
         Example:
             >>> from kwcoco.metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), n_fn=(0, 1), nclasses=3, cls_noise=.2)
+            >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), n_fn=(0, 1), classes=3, cls_noise=.2)
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> cm = cfsn_vecs.confusion_matrix()
             ...
             >>> print(cm.to_string(float_format=lambda x: '%.2f' % x))
             pred        background  cat_1  cat_2  cat_3
             real
-            background        0.00   1.00   1.00   1.00
-            cat_1             2.00  12.00   0.00   1.00
-            cat_2             2.00   0.00  14.00   1.00
-            cat_3             1.00   0.00   1.00  17.00
+            background        0.00   1.00   2.00   3.00
+            cat_1             3.00  12.00   0.00   0.00
+            cat_2             3.00   0.00  14.00   0.00
+            cat_3             2.00   0.00   0.00  17.00
         """
         data = cfsn_vecs.data
 
         y_true = data['true'].copy()
-        if raw:
-            y_pred = data['pred_raw'].copy()
-        else:
-            y_pred = data['pred'].copy()
+        y_pred = data['pred'].copy()
 
         # FIXME: hard-coded background class
         if 'background' in cfsn_vecs.classes:
@@ -253,10 +251,13 @@ class ConfusionVectors(ub.NiceRepr):
     def coarsen(cfsn_vecs, cxs):
         """
         Creates a coarsened set of vectors
+
+        Returns:
+            ConfusionVectors
         """
         import kwarray
         assert cfsn_vecs.probs is not None, 'need probs'
-        if not isinstance(cfsn_vecs.classes, CATEGORY_TREE_CLS):
+        if not isinstance(cfsn_vecs.classes, CategoryTree):
             raise TypeError('classes must be a kwcoco.CategoryTree')
 
         descendent_map = cfsn_vecs.classes.idx_to_descendants_idxs(include_cfsn_vecs=True)
@@ -284,7 +285,7 @@ class ConfusionVectors(ub.NiceRepr):
         coarse_cfsn_vecs = ConfusionVectors(new_y_df, cfsn_vecs.classes, cfsn_vecs.probs)
         return coarse_cfsn_vecs
 
-    def binarize_peritem(cfsn_vecs, negative_classes=None):
+    def binarize_classless(cfsn_vecs, negative_classes=None):
         """
         Creates a binary representation useful for measuring the performance of
         detectors. It is assumed that scores of "positive" classes should be
@@ -301,14 +302,14 @@ class ConfusionVectors(ub.NiceRepr):
         Example:
             >>> from kwcoco.metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
+            >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), n_fn=(0, 1), classes=3)
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> class_idxs = list(dmet.classes.node_to_idx.values())
-            >>> binvecs = cfsn_vecs.binarize_peritem()
+            >>> binvecs = cfsn_vecs.binarize_classless()
         """
         import kwarray
         # import warnings
-        # warnings.warn('binarize_peritem DOES NOT PRODUCE CORRECT RESULTS')
+        # warnings.warn('binarize_classless DOES NOT PRODUCE CORRECT RESULTS')
 
         negative_cidxs = {-1}
         if negative_classes is not None:
@@ -319,7 +320,6 @@ class ConfusionVectors(ub.NiceRepr):
                         'classes must be known if negative_classes are strings')
                 return [c.lower() for c in cfsn_vecs.classes]
             for c in negative_classes:
-                import six
                 if isinstance(c, six.string_types):
                     classes = _lower_classes()
                     try:
@@ -343,25 +343,39 @@ class ConfusionVectors(ub.NiceRepr):
         binvecs = BinaryConfusionVectors(bin_data)
         return binvecs
 
-    def binarize_ovr(cfsn_vecs, mode=1, keyby='name', ignore_classes={'ignore'}):
+    def binarize_ovr(cfsn_vecs,
+                     mode=1,
+                     keyby='name',
+                     ignore_classes={'ignore'},
+                     approx=0):
         """
-        Transforms cfsn_vecs into one-vs-rest BinaryConfusionVectors for each category.
+        Transforms cfsn_vecs into one-vs-rest BinaryConfusionVectors for each
+        category.
 
         Args:
             mode (int, default=1): 0 for heirarchy aware or 1 for voc like.
                 MODE 0 IS PROBABLY BROKEN
+
             keyby (int | str) : can be cx or name
+
             ignore_classes (Set[str]): category names to ignore
+
+            approx (bool, default=0): if True try and approximate missing
+                scores otherwise assume they are irrecoverable and use -inf
 
         Returns:
             OneVsRestConfusionVectors: which behaves like
                 Dict[int, BinaryConfusionVectors]: cx_to_binvecs
 
         Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> print('cfsn_vecs = {!r}'.format(cfsn_vecs))
             >>> catname_to_binvecs = cfsn_vecs.binarize_ovr(keyby='name')
             >>> print('catname_to_binvecs = {!r}'.format(catname_to_binvecs))
+
+            cfsn_vecs.data.pandas()
+            catname_to_binvecs.cx_to_binvecs['class_1'].data.pandas()
 
         Notes:
             Consider we want to measure how well we can classify beagles.
@@ -454,14 +468,24 @@ class ConfusionVectors(ub.NiceRepr):
                 # More VOC-like, not heirarchy friendly
 
                 if cfsn_vecs.probs is not None:
+
+                    # TODO: perhaps we shouldn't use these or at least
+                    # allow for configuration?
+
                     # We know the actual score predicted for this category in
                     # this case.
                     is_true = cfsn_vecs.data['true'] == cx
                     pred_score = cfsn_vecs.probs[:, cx]
+
+                    from kwcoco.metrics import assignment
+                    if assignment.USE_NEG_INF:
+                        pred_score[cfsn_vecs.data['pred'] == -1] = -np.inf
                 else:
-                    import warnings
-                    warnings.warn(
-                        'Binarize ovr is only approximate if not all probabilities are known')
+                    if approx:
+                        import warnings
+                        warnings.warn(
+                            'Binarize ovr is only approximate if not all '
+                            'probabilities are known')
                     # If we don't know the probabilities for non-predicted
                     # categories then we have to guess.
                     is_true = cfsn_vecs.data['true'] == cx
@@ -470,17 +494,28 @@ class ConfusionVectors(ub.NiceRepr):
                     score_is_unknown = data['pred'] != cx
                     pred_score = data['score'].copy()
 
+                    from kwcoco.metrics import assignment
+                    if assignment.USE_NEG_INF:
+                        missing_score = -np.inf
+                    else:
+                        missing_score = 0
+
                     # These scores were for a different class, so assume
                     # other classes were predicted with a uniform prior
-                    approx_score = (1 - pred_score[score_is_unknown]) / (len(classes) - 1)
+                    if approx == 0:
+                        approx_score = np.full(
+                            sum(score_is_unknown),
+                            fill_value=missing_score)
+                    else:
+                        approx_score = ((1 - pred_score[score_is_unknown]) /
+                                        (len(classes) - 1))
 
                     # Except in the case where predicted class is -1. In this
                     # case no prediction was actually made (above a threshold)
                     # so the assumed score should be significantly lower, we
                     # conservatively choose zero.
                     unknown_preds = data['pred'][score_is_unknown]
-                    approx_score[unknown_preds == -1] = 0
-
+                    approx_score[unknown_preds == -1] = missing_score
                     pred_score[score_is_unknown] = approx_score
 
                 bin_data = {
@@ -543,7 +578,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
     Example:
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
-        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), nclasses=3)
+        >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), classes=3)
         >>> cfsn_vecs = dmet.confusion_vectors()
         >>> self = cfsn_vecs.binarize_ovr(keyby='name')
         >>> print('self = {!r}'.format(self))
@@ -553,12 +588,18 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         self.classes = classes
 
     def __nice__(self):
-        # return ub.repr2(ub.map_vals(len, self.cx_to_binvecs))
-        return ub.repr2(self.cx_to_binvecs, strvals=True)
+        return ub.repr2(self.cx_to_binvecs, strvals=True, align=':')
 
     @classmethod
     def demo(cls):
-        cfsn_vecs = ConfusionVectors.demo()
+        """
+        Args:
+            **kwargs: See :func:`kwcoco.metrics.DetectionMetrics.demo`
+
+        Returns:
+            ConfusionVectors
+        """
+        cfsn_vecs = ConfusionVectors.demo(n_fp=(0, 10), n_fn=(0, 10), classes=3)
         self = cfsn_vecs.binarize_ovr(keyby='name')
         return self
 
@@ -568,14 +609,37 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
     def __getitem__(self, cx):
         return self.cx_to_binvecs[cx]
 
-    def measures(self, **kwargs):
+    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False):
         """
+        Creates binary confusion measures for every one-versus-rest category.
+
+        Args:
+            stabalize_thresh (int, default=7):
+                if fewer than this many data points inserts dummy stabalization
+                data so curves can still be drawn.
+
+            fp_cutoff (int, default=None):
+                maximum number of false positives in the truncated roc curves.
+                ``None`` is equivalent to ``float('inf')``
+
+            monotonic_ppv (bool, default=False):
+                if True ensures that precision is always increasing as recall
+                decreases. This is done in pycocoutils scoring, but I'm not
+                sure its a good idea.
+
+        SeeAlso:
+            :func:`BinaryConfusionVectors.measures`
+
         Example:
             >>> self = OneVsRestConfusionVectors.demo()
             >>> thresh_result = self.measures()['perclass']
         """
         perclass = PerClass_Measures({
-            cx: binvecs.measures(**kwargs)
+            cx: binvecs.measures(
+                stabalize_thresh=stabalize_thresh,
+                fp_cutoff=fp_cutoff,
+                monotonic_ppv=monotonic_ppv,
+            )
             for cx, binvecs in self.cx_to_binvecs.items()
         })
         with warnings.catch_warnings():
@@ -604,23 +668,19 @@ class BinaryConfusionVectors(ub.NiceRepr):
         `weight` - sample weight of the example
 
     Example:
+        >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
         >>> self = BinaryConfusionVectors.demo(n=10)
         >>> print('self = {!r}'.format(self))
-        >>> print('pr = {}'.format(ub.repr2(self.measures())))
-        >>> print('roc = {}'.format(ub.repr2(self.roc())))
+        >>> print('measures = {}'.format(ub.repr2(self.measures())))
 
         >>> self = BinaryConfusionVectors.demo(n=0)
-        >>> print('pr = {}'.format(ub.repr2(self.measures())))
-        >>> print('roc = {}'.format(ub.repr2(self.roc())))
+        >>> print('measures = {}'.format(ub.repr2(self.measures())))
 
         >>> self = BinaryConfusionVectors.demo(n=1)
-        >>> print('pr = {}'.format(ub.repr2(self.measures())))
-        >>> print('roc = {}'.format(ub.repr2(self.roc())))
+        >>> print('measures = {}'.format(ub.repr2(self.measures())))
 
         >>> self = BinaryConfusionVectors.demo(n=2)
-        >>> print('self = {!r}'.format(self))
-        >>> print('pr = {}'.format(ub.repr2(self.measures())))
-        >>> print('roc = {}'.format(ub.repr2(self.roc())))
+        >>> print('measures = {}'.format(ub.repr2(self.measures())))
     """
 
     def __init__(self, data, cx=None, classes=None):
@@ -629,13 +689,23 @@ class BinaryConfusionVectors(ub.NiceRepr):
         self.classes = classes
 
     @classmethod
-    def demo(cls, n=10, p_true=0.5, p_error=0.2, rng=None):
+    def demo(cls, n=10, p_true=0.5, p_error=0.2, p_miss=0.0, rng=None):
         """
         Create random data for tests
 
+        Args:
+            n (int): number of rows
+            p_true (int): fraction of real positive cases
+            p_error (int): probability of making a recoverable mistake
+            p_miss (int): probability of making a unrecoverable mistake
+            rng (int | RandomState): random seed / state
+
+        Returns:
+            BinaryConfusionVectors
+
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-            >>> cfsn = BinaryConfusionVectors.demo(n=1000, p_error=0.1)
+            >>> cfsn = BinaryConfusionVectors.demo(n=1000, p_error=0.1, p_miss=0.1)
             >>> measures = cfsn.measures()
             >>> print('measures = {}'.format(ub.repr2(measures, nl=1)))
             >>> # xdoctest: +REQUIRES(--show)
@@ -655,8 +725,11 @@ class BinaryConfusionVectors(ub.NiceRepr):
             'pred_score': score,
         })
 
-        flags = rng.rand(n) < p_error
-        data['is_true'][flags] = 1 - data['is_true'][flags]
+        flip_flags = rng.rand(n) < p_error
+        data['is_true'][flip_flags] = 1 - data['is_true'][flip_flags]
+
+        miss_flags = rng.rand(n) < p_miss
+        data['pred_score'][miss_flags] = -np.inf
 
         classes = ['c1', 'c2', 'c3']
         self = cls(data, cx=1, classes=classes)
@@ -672,10 +745,186 @@ class BinaryConfusionVectors(ub.NiceRepr):
         return ub.repr2({
             'catname': self.catname,
             'data': self.data.__nice__(),
-        }, nl=0, strvals=True)
+        }, nl=0, strvals=True, align=':')
 
     def __len__(self):
         return len(self.data)
+
+    # @ub.memoize_method
+    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False):
+        """
+        Get statistics (F1, G1, MCC) versus thresholds
+
+        Args:
+            stabalize_thresh (int, default=7):
+                if fewer than this many data points inserts dummy stabalization
+                data so curves can still be drawn.
+
+            fp_cutoff (int, default=None):
+                maximum number of false positives in the truncated roc curves.
+                ``None`` is equivalent to ``float('inf')``
+
+            monotonic_ppv (bool, default=False):
+                if True ensures that precision is always increasing as recall
+                decreases. This is done in pycocoutils scoring, but I'm not
+                sure its a good idea.
+
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> self = BinaryConfusionVectors.demo(n=0)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+
+            >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.5, p_error=0.5, p_miss=0.3)
+            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> print('measures = {}'.format(ub.repr2(ub.odict(self.measures()))))
+
+        Ignore:
+
+            # import matplotlib.cm as cm
+            # kwargs = {}
+            # cmap = kwargs.get('cmap', mpl.cm.coolwarm)
+            # n = len(x)
+            # xgrid = np.tile(x[None, :], (n, 1))
+            # ygrid = np.tile(y[None, :], (n, 1))
+            # zdata = np.tile(z[None, :], (n, 1))
+            # ax.contour(xgrid, ygrid, zdata, zdir='x', cmap=cmap)
+            # ax.contour(xgrid, ygrid, zdata, zdir='y', cmap=cmap)
+            # ax.contour(xgrid, ygrid, zdata, zdir='z', cmap=cmap)
+
+        References:
+            https://en.wikipedia.org/wiki/Confusion_matrix
+            https://en.wikipedia.org/wiki/Precision_and_recall
+            https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
+
+        Ignore:
+            self.measures().summary_plot()
+            import xdev
+            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.measures._func))
+        """
+        # compute tp, fp, tn, fn at each operating point
+        # compute mcc, f1, g1, etc
+        info = self._binary_clf_curves(stabalize_thresh=stabalize_thresh,
+                                       fp_cutoff=fp_cutoff)
+        info['monotonic_ppv'] = monotonic_ppv
+        info['cx'] = self.cx
+        info['classes'] = self.classes
+        populate_info(info)
+        return Measures(info)
+
+    def _binary_clf_curves(self, stabalize_thresh=7, fp_cutoff=None):
+        """
+        Compute TP, FP, TN, and FN counts for this binary confusion vector.
+
+        Code common to ROC, PR, and threshold measures, computes the elements
+        of the binary confusion matrix at all relevant operating point
+        thresholds.
+
+        Args:
+            stabalize_thresh (int): if fewer than this many data points insert
+                stabalization data.
+
+            fp_cutoff (int): maximum number of false positives
+
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
+            >>> self._binary_clf_curves()
+
+            >>> self = BinaryConfusionVectors.demo(n=0, p_true=0.5, p_error=0.5)
+            >>> self._binary_clf_curves()
+
+            >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.5, p_error=0.5)
+            >>> self._binary_clf_curves()
+
+        Ignore:
+            import xdev
+            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors._binary_clf_curves))
+            >>> self = BinaryConfusionVectors.demo(n=10, p_true=0.7, p_error=0.3, p_miss=0.2)
+            >>> print('measures = {}'.format(ub.repr2(self._binary_clf_curves())))
+            >>> info = self.measures()
+            >>> info = ub.dict_isect(info, ['tpr', 'fpr', 'ppv', 'fp_count'])
+            >>> print('measures = {}'.format(ub.repr2(ub.odict(i))))
+        """
+        # try:
+        #     from sklearn.metrics._ranking import _binary_clf_curve
+        # except ImportError:
+        #     from sklearn.metrics.ranking import _binary_clf_curve
+        data = self.data
+        y_true = data['is_true'].astype(np.uint8)
+        y_score = data['pred_score']
+        sample_weight = data._data.get('weight', None)
+
+        npad = 0
+        if len(self) == 0:
+            fps = np.array([np.nan])
+            fns = np.array([np.nan])
+            tps = np.array([np.nan])
+            thresholds = np.array([np.nan])
+
+            realpos_total = 0
+            realneg_total = 0
+            nsupport = 0
+        else:
+            if len(self) < stabalize_thresh:
+                # add dummy data to stabalize the computation
+                if sample_weight is None:
+                    sample_weight = np.ones(len(self))
+                npad = stabalize_thresh - len(self)
+                y_true, y_score, sample_weight = _stabalize_data(
+                    y_true, y_score, sample_weight, npad=npad)
+
+            # Get the total weight (typically number of) positive and negative
+            # examples of this class
+            if sample_weight is None:
+                weight = 1
+                nsupport = len(y_true) - bool(npad)
+            else:
+                weight = sample_weight
+                nsupport = sample_weight.sum() - bool(npad)
+
+            realpos_total = (y_true * weight).sum()
+            realneg_total = ((1 - y_true) * weight).sum()
+
+            fps, tps, thresholds = _binary_clf_curve2(
+                y_true, y_score, pos_label=1.0,
+                sample_weight=sample_weight)
+
+            # Adjust weighted totals to be robust to floating point errors
+            if np.isclose(realneg_total, fps[-1]):
+                realneg_total = max(realneg_total, fps[-1])
+            if np.isclose(realpos_total, tps[-1]):
+                realpos_total = max(realpos_total, tps[-1])
+
+            fps[thresholds == -np.inf] = np.inf
+
+        tns = realneg_total - fps
+        fns = realpos_total - tps
+
+        info = {
+            'fp_count': fps,
+            'tp_count': tps,
+            'tn_count': tns,
+            'fn_count': fns,
+            'thresholds': thresholds,
+            'realpos_total': realpos_total,
+            'realneg_total': realneg_total,
+
+            'nsupport': nsupport,
+
+            'fp_cutoff': fp_cutoff,
+            'stabalize_thresh': fp_cutoff,
+        }
+
+        if self.cx is not None:
+            info.update({
+                'cx': self.cx,
+                'node': self.classes[self.cx],
+            })
+        return info
 
     def draw_distribution(self):
         data = self.data
@@ -699,26 +948,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
         import kwplot
         return kwplot.multi_plot(xdata=xdata, ydata=ydata, color=color)
 
-    def precision_recall(self, stabalize_thresh=7, stabalize_pad=7, method='sklearn'):
-        """
-        Deprecated, all information lives in measures now
-        """
-        warnings.warn('use measures instead', DeprecationWarning)
-        measures = self.measures(
-            fp_cutoff=None, stabalize_thresh=stabalize_thresh,
-            stabalize_pad=stabalize_pad)
-        return measures
-
-    def roc(self, fp_cutoff=None, stabalize_thresh=7, stabalize_pad=7):
-        """
-        Deprecated, all information lives in measures now
-        """
-        warnings.warn('use measures instead', DeprecationWarning)
-        roc_info = self.measures(
-            fp_cutoff=fp_cutoff, stabalize_thresh=stabalize_thresh,
-            stabalize_pad=stabalize_pad)
-        return roc_info
-
     def _3dplot(self):
         """
         Example:
@@ -726,32 +955,23 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
             >>>     n_fp=(0, 1), n_fn=(0, 2), nimgs=256, nboxes=(0, 10),
-            >>>     nclasses=1)
+            >>>     classes=1)
             >>> cfsn_vecs = dmet.confusion_vectors()
-            >>> self = bin_cfsn = cfsn_vecs.binarize_peritem()
+            >>> self = bin_cfsn = cfsn_vecs.binarize_classless()
             >>> dmet.summarize(plot=True)
             >>> import kwplot
             >>> kwplot.autompl()
             >>> kwplot.figure(fnum=3)
             >>> self._3dplot()
         """
-        # import kwplot
         from mpl_toolkits.mplot3d import Axes3D  # NOQA
         import matplotlib.pyplot as plt
-        # import scipy
         import matplotlib as mpl
         info = self.measures()
 
         tpr = info['tpr']
         fpr = info['fpr']
         ppv = info['ppv']
-        # thresholds = info['thresholds']
-
-        # tpr_to_fpr = scipy.interpolate.interp1d(tpr, fpr)
-        # tpr_to_ppv = scipy.interpolate.interp1d(tpr, ppv)
-        # tpr_range = np.linspace(tpr.min(), tpr.max(), 16)
-        # fpr_range = tpr_to_fpr(tpr_range)
-        # ppv_range = tpr_to_ppv(tpr_range)
 
         kwargs = {}
         cmap = kwargs.get('cmap', mpl.cm.coolwarm)
@@ -787,427 +1007,24 @@ class BinaryConfusionVectors(ub.NiceRepr):
         # Color the ROC line by PPV
         # color the PR line by FPR
 
-    @ub.memoize_method
-    def measures(self, stabalize_thresh=7, stabalize_pad=7, fp_cutoff=None):
-        """
-        Get statistics (F1, G1, MCC) versus thresholds
-
-        Example:
-            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-            >>> self = BinaryConfusionVectors.demo(n=0)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
-            >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
-            >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
-            >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.7, p_error=0.3)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
-
-        Ignore:
-
-            # import matplotlib.cm as cm
-            # kwargs = {}
-            # cmap = kwargs.get('cmap', mpl.cm.coolwarm)
-            # n = len(x)
-            # xgrid = np.tile(x[None, :], (n, 1))
-            # ygrid = np.tile(y[None, :], (n, 1))
-            # zdata = np.tile(z[None, :], (n, 1))
-            # ax.contour(xgrid, ygrid, zdata, zdir='x', cmap=cmap)
-            # ax.contour(xgrid, ygrid, zdata, zdir='y', cmap=cmap)
-            # ax.contour(xgrid, ygrid, zdata, zdir='z', cmap=cmap)
-
-        Ignore:
-            self.measures().summary_plot()
-            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.measures._func))
-        """
-        # compute tp, fp, tn, fn at each point
-        # compute mcc, f1, g1, etc
-        # write plot functions
-        info = self._binary_clf_curves(stabalize_thresh=stabalize_thresh,
-                                       stabalize_pad=stabalize_pad,
-                                       fp_cutoff=fp_cutoff)
-
-        tp = info['tp_count']
-        fp = info['fp_count']
-        tn = info['tn_count']
-        fn = info['fn_count']
-
-        pred_pos = (tp + fp)  # number of predicted positives
-        ppv = tp / pred_pos  # precision
-        ppv[np.isnan(ppv)] = 0
-
-        # can set tpr_denom denominator to one
-        tpr_denom = (tp + fn)  #
-        tpr_denom[~(tpr_denom > 0)] = 1
-        tpr = tp / tpr_denom  # recall
-
-        debug = 0
-        if debug:
-            assert ub.allsame(tpr_denom), 'tpr denom should be constant'
-            # tpr_denom should be equal to info['realpos_total']
-            if np.any(tpr_denom != info['realpos_total']):
-                warnings.warn('realpos_total is inconsistent')
-
-        # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
-        mcc_numer = (tp * tn) - (fp * fn)
-        mcc_denom = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-        mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
-        info['mcc'] = mcc_numer / mcc_denom
-
-        """
-        import sympy
-        sqrt = sympy.sqrt
-
-        tp, tn, fp, fn, B = sympy.symbols(['tp', 'tn', 'fp', 'fn', 'B'], integer=True,
-        negative=False)
-        numer = (tp * tn - fp * fn)
-        denom = ((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn)) ** 0.5
-        mcc = numer / denom
-
-        ppv = tp / (tp + fp)
-        tpr = tp / (tp + fn)
-
-        FM = ((tp / (tp + fn)) * (tp / (tp + fp))) ** 0.5
-
-        B2 = (B ** 2)
-        B2_1 = (1 + B2)
-
-        F_beta_v1 = (B2_1 * (ppv * tpr)) / ((B2 * ppv) + tpr)
-        F_beta_v2 = (B2_1 * tp) / (B2_1 * tp + B2 * fn + fp)
-
-        # Demo how Beta interacts with harmonic mean weights for F-Beta
-        w1 = 1
-        w2 = 1
-        x1 = tpr
-        x2 = ppv
-        harmonic_mean = (w1 + w2) / ((w1 / x1) + (w2 / x2))
-        harmonic_mean = sympy.simplify(harmonic_mean)
-        expr = sympy.simplify(harmonic_mean - F_beta_v1)
-        sympy.solve(expr, B2)
-
-        geometric_mean = ((x1 ** w1) * (x2 ** w2)) ** (1 / (w1 + w2))
-        geometric_mean = sympy.simplify(geometric_mean)
-        assert sympy.simplify(sympy.simplify(geometric_mean) - sympy.simplify(FM)) == 0
-
-        print('geometric_mean = {!r}'.format(geometric_mean))
-
-        # How do we apply weights to precision and recall when tn is included
-        # in mcc?
-
-        print(sympy.simplify(F_beta_v1))
-        print(sympy.simplify(F_beta_v2))
-        assert sympy.simplify(sympy.simplify(F_beta_v1) - sympy.simplify(F_beta_v2)) == 0
-
-
-        tnr_denom = (tn + fp)
-        tnr = tn / tnr_denom
-
-        pnv_denom = (tn + fn)
-        npv = tn / pnv_denom
-
-        mk = ppv + npv - 1  # markedness (precision analog)
-        bm = tpr + tnr - 1  # informedness (recall analog)
-
-        # Demo how Beta interacts with harmonic mean weights for F-Beta
-        w1 = 2
-        w2 = 1
-        x1 = mk  # precision analog
-        x2 = bm  # recall analog
-        geometric_mean = ((x1 ** w1) * (x2 ** w2)) ** (1 / (w1 + w2))
-        geometric_mean = sympy.simplify(geometric_mean)
-        print('geometric_mean w1=2 = {!r}'.format(geometric_mean))
-
-        w1 = 0.5
-        w2 = 1
-        geometric_mean = ((x1 ** w1) * (x2 ** w2)) ** (1 / (w1 + w2))
-        geometric_mean = sympy.simplify(geometric_mean)
-        print('geometric_mean w1=.5 = {!r}'.format(geometric_mean))
-
-        # By taking the weighted geometric mean of bm and mk we can effectively
-        # create a mcc-beta measure
-
-        values = {fn: 3, fp: 10, tp: 100, tn: 200}
-
-        # Cant seem to verify that gmean(bm, mk) == mcc, with sympy, but it is true
-        values = {fn: np.random.rand() * 10, fp: np.random.rand() * 10, tp: np.random.rand() * 10, tn: np.random.rand() * 10}
-        print(geometric_mean.subs(values))
-        print(abs(mcc).subs(values))
-
-        delta = sympy.simplify(sympy.simplify(geometric_mean) - sympy.simplify(sympy.functions.Abs(mcc)))
-        # assert sympy.simplify(sympy.simplify(geometric_mean) - sympy.simplify(sympy.functions.Abs(mcc))) == 0
-        """
-
-        # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
-        info['g1'] = np.sqrt(ppv * tpr)
-
-        f1_numer = (2 * ppv * tpr)
-        f1_denom = (ppv + tpr)
-        f1_denom[f1_denom == 0] = 1
-        info['f1'] =  f1_numer / f1_denom
-
-        tnr_denom = (tn + fp)
-        tnr_denom[tnr_denom == 0] = 1
-        tnr = tn / tnr_denom
-
-        pnv_denom = (tn + fn)
-        pnv_denom[pnv_denom == 0] = 1
-        npv = tn / pnv_denom
-
-        info['ppv'] = ppv
-
-        info['tpr'] = tpr
-        info['fpr'] = info['fp_count'] / info['fp_count'][-1]
-
-        info['acc'] = (tp + tn) / (tp + tn + fp + fn)
-
-        info['bm'] = tpr + tnr - 1  # informedness
-
-        info['mk'] = ppv + npv - 1  # markedness
-
-        keys = ['mcc', 'g1', 'f1', 'acc']
-        for key in keys:
-            measure = info[key]
-            max_idx = measure.argmax()
-            best_thresh = float(info['thresholds'][max_idx])
-            best_measure = float(measure[max_idx])
-            best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
-            info['max_{}'.format(key)] = best_label
-            info['_max_{}'.format(key)] = (best_measure, best_thresh)
-
-        import sklearn.metrics  # NOQA
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='invalid .* true_divide')
-            info['trunc_tpr'] = info['trunc_tp_count'] / info['realpos_total']
-            info['trunc_fpr'] = info['trunc_fp_count'] / info['trunc_fp_count'][-1]
-            try:
-                info['trunc_auc'] = sklearn.metrics.auc(info['trunc_fpr'], info['trunc_tpr'])
-            except ValueError:
-                # At least 2 points are needed to compute area under curve, but x.shape = 1
-                info['trunc_auc'] = np.nan
-
-            info['auc'] = info['trunc_auc']
-            """
-            Notes:
-                Apparently, consistent scoring is really hard to get right.
-
-                For detection problems scoring via
-                confusion_vectors+sklearn produces noticably different
-                results than the VOC method. There are a few reasons for
-                this.  The VOC method stops counting true positives after
-                all assigned predicted boxes have been counted. It simply
-                remembers the amount of original true positives to
-                normalize the true positive reate. On the other hand,
-                confusion vectors maintains a list of these unassigned true
-                boxes and gives them a predicted index of -1 and a score of
-                zero. This means that this function sees them as having a
-                y_true of 1 and a y_score of 0, which allows the
-                scikit-learn fps and tps counts to effectively get up to
-                100% recall when the threshold is zero. The VOC method
-                simply ignores these and handles them implicitly. The
-                problem is that if you remove these from the scikit-learn
-                inputs, it wont see the correct number of positives and it
-                will incorrectly normalize the recall.  In summary:
-
-                    VOC:
-                        * remembers realpos_total
-                        * doesn't count unassigned truths as TP when the
-                        threshold is zero.
-
-                    CV+SKL:
-                        * counts unassigned truths as TP with score=0.
-                        * Always ensure tpr=1, ppv=0 and ppv=1, tpr=0 cases
-                        exist.
-            """
-            warnings.filterwarnings('ignore', message='invalid .* true_divide')
-
-            # sklearn definition
-            # AP = sum((R[n] - R[n - 1]) * P[n] for n in range(len(thresholds)))
-            # stop when full recall attained
-            last_ind = tpr.searchsorted(tpr[-1])
-            rec = np.r_[0, tpr[:last_ind + 1]]
-            prec = np.r_[1, ppv[:last_ind + 1]]
-
-            OUTLIER_AP = 1
-
-            # Precisions are weighted by the change in recall
-            diff_items = np.diff(rec)
-            prec_items = prec[1:]
-
-            # basline way
-            ap = info['sklish_ap'] = float(np.sum(diff_items * prec_items))
-
-            if OUTLIER_AP:
-                # Remove extreme outliers from ap calculation
-                # only do this on the first or last 2 items.
-                # Hueristically chosen.
-                flags = diff_items > 0.1
-                idxs = np.where(flags)[0]
-                max_idx = len(flags) - 1
-                thresh = 2
-                try:
-                    idx_dist = np.minimum(idxs, max_idx - idxs)
-                    outlier_idxs = idxs[idx_dist < thresh]
-                    import kwarray
-                    outlier_flags = kwarray.boolmask(outlier_idxs, len(diff_items))
-                    inlier_flags = ~outlier_flags
-
-                    score = prec_items.copy()
-                    score[outlier_flags] = score[inlier_flags].min()
-                    score[outlier_flags] = 0
-
-                    ap = outlier_ap = np.sum(score * diff_items)
-
-                    info['outlier_ap'] = float(outlier_ap)
-                except Exception:
-                    pass
-
-            # print('ap = {!r}'.format(ap))
-            # print('ap = {!r}'.format(ap))
-            # ap = np.sum(np.diff(rec) * prec[1:])
-            info['ap'] = float(ap)
-
-        return Measures(info)
-
-    def _binary_clf_curves(self, stabalize_thresh=7, stabalize_pad=7,
-                           fp_cutoff=None):
-        """
-        Code common to ROC, PR, and threshold measures
-
-        TODO: refactor ROC and PR curves to use this code, perhaps even
-        memoizing it.
-
-        Example:
-            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-            >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
-            >>> self._binary_clf_curves()
-
-            >>> self = BinaryConfusionVectors.demo(n=0, p_true=0.5, p_error=0.5)
-            >>> self._binary_clf_curves()
-        """
-        try:
-            from sklearn.metrics._ranking import _binary_clf_curve
-        except ImportError:
-            from sklearn.metrics.ranking import _binary_clf_curve
-        data = self.data
-        y_true = data['is_true'].astype(np.uint8)
-        y_score = data['pred_score']
-        sample_weight = data._data.get('weight', None)
-
-        npad = 0
-        if len(self) == 0:
-            fps = np.array([np.nan])
-            fns = np.array([np.nan])
-            tps = np.array([np.nan])
-            thresholds = np.array([np.nan])
-
-            realpos_total = 0
-            realneg_total = 0
-            nsupport = 0
-        else:
-            if len(self) <= stabalize_thresh:
-                # add dummy data to stabalize the computation
-                if sample_weight is None:
-                    sample_weight = np.ones(len(self))
-                npad = stabalize_pad
-                y_true, y_score, sample_weight = _stabalilze_data(
-                    y_true, y_score, sample_weight, npad=npad)
-
-            # Get the total weight (typically number of) positive and negative
-            # examples of this class
-            if sample_weight is None:
-                weight = 1
-                nsupport = len(y_true) - bool(npad)
-            else:
-                weight = sample_weight
-                nsupport = sample_weight.sum() - bool(npad)
-
-            realpos_total = (y_true * weight).sum()
-            realneg_total = ((1 - y_true) * weight).sum()
-
-            fps, tps, thresholds = _binary_clf_curve(
-                y_true, y_score, pos_label=1.0,
-                sample_weight=sample_weight)
-
-            # Adjust weighted totals to be robust to floating point errors
-            if np.isclose(realneg_total, fps[-1]):
-                realneg_total = max(realneg_total, fps[-1])
-            if np.isclose(realpos_total, tps[-1]):
-                realpos_total = max(realpos_total, tps[-1])
-
-        tns = realneg_total - fps
-        fns = realpos_total - tps
-
-        trunc_fps = fps
-        # Cutoff the curves at a comparable point
-        if fp_cutoff is None:
-            fp_cutoff = np.inf
-        elif isinstance(fp_cutoff, str):
-            if fp_cutoff == 'num_true':
-                fp_cutoff = int(np.ceil(realpos_total))
-            else:
-                raise KeyError(fp_cutoff)
-
-        if np.isfinite(fp_cutoff):
-            idxs = np.where(trunc_fps > fp_cutoff)[0]
-            if len(idxs) == 0:
-                trunc_idx = len(trunc_fps)
-            else:
-                trunc_idx = idxs[0]
-            trunc_fps = fps[:trunc_idx]
-            trunc_tps = tps[:trunc_idx]
-            trunc_thresholds = thresholds[:trunc_idx]
-        else:
-            trunc_idx = None
-            trunc_fps = fps
-            trunc_tps = tps
-            trunc_thresholds = thresholds
-
-        # if the cuttoff was not reached, horizontally extend the curve
-        # This will hurt the scores (aka we may be bias against small
-        # scenes), but this will ensure that big scenes are comparable
-        if len(trunc_fps) == 0:
-            trunc_fps = np.array([fp_cutoff])
-            trunc_tps = np.array([0])
-            trunc_thresholds = np.array([0])
-            # THIS WILL CAUSE AUC TO RAISE AN ERROR IF IT GETS HIT
-        elif trunc_fps[-1] < fp_cutoff and np.isfinite(fp_cutoff):
-            trunc_fps = np.hstack([trunc_fps, [fp_cutoff]])
-            trunc_tps = np.hstack([trunc_tps, [trunc_tps[-1]]])
-            trunc_thresholds = np.hstack([trunc_thresholds, [0]])
-
-        info = {
-            'fp_count': fps,
-            'tp_count': tps,
-            'tn_count': tns,
-            'fn_count': fns,
-            'thresholds': thresholds,
-            'realpos_total': realpos_total,
-            'realneg_total': realneg_total,
-
-            'trunc_idx': trunc_idx,
-            'trunc_fp_count': trunc_fps,
-            'trunc_tp_count': trunc_tps,
-            'trunc_thresholds': trunc_thresholds,
-
-            'nsupport': nsupport,
-
-            'fp_cutoff': fp_cutoff,
-            'stabalize_thresh': fp_cutoff,
-            'stabalize_pad': stabalize_pad,
-        }
-
-        # if True:
-        #     # hack
-        #     import sklearn
-        #     info['_ap'] = sklearn.metrics.average_precision_score(
-        #         y_score=y_score, y_true=y_true,
-        #         sample_weight=sample_weight)
-        if self.cx is not None:
-            info.update({
-                'cx': self.cx,
-                'node': self.classes[self.cx],
-            })
-        return info
+    # def precision_recall(self, stabalize_thresh=7, method='sklearn'):
+    #     """
+    #     Deprecated, all information lives in measures now
+    #     """
+    #     warnings.warn('use measures instead', DeprecationWarning)
+    #     measures = self.measures(
+    #         fp_cutoff=None, stabalize_thresh=stabalize_thresh
+    #     )
+    #     return measures
+
+    # def roc(self, fp_cutoff=None, stabalize_thresh=7):
+    #     """
+    #     Deprecated, all information lives in measures now
+    #     """
+    #     warnings.warn('use measures instead', DeprecationWarning)
+    #     info = self.measures(
+    #         fp_cutoff=fp_cutoff, stabalize_thresh=stabalize_thresh)
+    #     return info
 
 
 class Measures(ub.NiceRepr, DictProxy):
@@ -1225,45 +1042,82 @@ class Measures(ub.NiceRepr, DictProxy):
         >>> self.draw(key='roc', pnum=(1, 2, 2))
         >>> kwplot.show_if_requested()
     """
-    def __init__(self, roc_info):
-        self.proxy = roc_info
+    def __init__(self, info):
+        self.proxy = info
 
     @property
     def catname(self):
         return self.get('node', None)
 
     def __nice__(self):
-        return ub.repr2(self.summary(), nl=0, precision=4, strvals=True)
+        return ub.repr2(self.summary(), nl=0, precision=3, strvals=True, align=':')
+
+    def reconstruct(self):
+        populate_info(info=self)
+
+    @classmethod
+    def from_json(cls, state):
+        populate_info(state)
+        return cls(state)
 
     def __json__(self):
-        import numbers
+        """
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> binvecs = BinaryConfusionVectors.demo(n=10, p_error=0.5)
+            >>> self = binvecs.measures()
+            >>> info = self.__json__()
+            >>> print('info = {}'.format(ub.repr2(info, nl=1)))
+            >>> populate_info(info)
+            >>> print('info = {}'.format(ub.repr2(info, nl=1)))
+            >>> recon = Measures.from_json(info)
+        """
         state = {}
-        for k, v in self.proxy.items():
-            if isinstance(v, np.ndarray):
-                state[k] = v.tolist()
-            elif isinstance(v, numbers.Integral):
-                v = int(v)
-            elif isinstance(v, numbers.Real):
-                v = float(v)
-                state[k] = v
-            else:
-                debug = 1
-                if debug:
-                    import json
-                    json.dumps(v)
-                    json.dumps(k)
+        minimal = {
+            'fp_count',
+            'tp_count',
+            'tn_count',
+            'fn_count',
+            'thresholds',
+            'realpos_total',
+            'realneg_total',
+
+            'trunc_idx',
+
+            'nsupport',
+
+            'fp_cutoff',
+            'stabalize_thresh',
+            'cx',
+            'node',
+            'monotonic_ppv',
+
+            #  recomputable
+            # 'mcc', 'g1', 'f1', 'ppv', 'tpr', 'fpr', 'acc', 'bm', 'mk',
+            # 'max_mcc', '_max_mcc', 'max_g1', '_max_g1', 'max_f1',
+            # '_max_f1', 'max_acc', '_max_acc',
+            # 'trunc_tpr', 'trunc_fpr',
+
+            'trunc_auc', 'auc', 'ap',
+            # 'sklish_ap',
+            'pycocotools_ap',
+            # 'outlier_ap', 'inf_thresh_ap',
+        }
+        state = ub.dict_isect(self.proxy, minimal)
+        from kwcoco.util.util_json import ensure_json_serializable
+        state = ensure_json_serializable(state)
         return state
 
     def summary(self):
         return {
             'ap': self['ap'],
             'auc': self['auc'],
-            'max_mcc': self['max_mcc'],
+            # 'max_mcc': self['max_mcc'],
             'max_f1': self['max_f1'],
             # 'max_g1': self['max_g1'],
             'nsupport': self['nsupport'],
-            'realpos_total': self['realpos_total'],
-            'realneg_total': self['realneg_total'],
+            # 'realpos_total': self['realpos_total'],
+            # 'realneg_total': self['realneg_total'],
             'catname': self.get('node', None),
         }
 
@@ -1285,12 +1139,12 @@ class Measures(ub.NiceRepr, DictProxy):
         elif key == 'roc':
             return drawing.draw_roc(self, prefix=prefix, **kw)
 
-    def summary_plot(self, fnum=1, title=''):
+    def summary_plot(self, fnum=1, title='', subplots='auto'):
         """
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> cfsn_vecs = ConfusionVectors.demo(n=100, p_error=0.5)
-            >>> binvecs = cfsn_vecs.binarize_peritem()
+            >>> binvecs = cfsn_vecs.binarize_classless()
             >>> self = binvecs.measures()
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
@@ -1298,14 +1152,20 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> self.summary_plot()
             >>> kwplot.show_if_requested()
         """
+        if subplots == 'auto':
+            subplots = ['pr', 'roc', 'thresh']
         import kwplot
         kwplot.figure(fnum=fnum, figtitle=title)
-        kwplot.figure(fnum=fnum, pnum=(1, 3, 1))
-        self.draw('pr')
-        kwplot.figure(fnum=fnum, pnum=(1, 3, 2))
-        self.draw('roc')
-        kwplot.figure(fnum=fnum, pnum=(1, 3, 3))
-        self.draw('thresh', keys=['mcc', 'f1', 'acc'])
+
+        pnum_ = kwplot.PlotNums(nSubplots=len(subplots))
+        for key in subplots:
+            kwplot.figure(fnum=fnum, pnum=pnum_())
+            self.draw(key)
+
+            # kwplot.figure(fnum=fnum, pnum=(1, 3, 2))
+            # self.draw('roc')
+            # kwplot.figure(fnum=fnum, pnum=(1, 3, 3))
+            # self.draw('thresh', keys=['mcc', 'f1', 'acc'])
 
 
 class PerClass_Measures(ub.NiceRepr, DictProxy):
@@ -1315,10 +1175,16 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
         self.proxy = cx_to_info
 
     def __nice__(self):
-        return ub.repr2(self.proxy, nl=2, strvals=True)
+        return ub.repr2(self.proxy, nl=2, strvals=True, align=':')
 
     def summary(self):
         return {k: v.summary() for k, v in self.items()}
+
+    @classmethod
+    def from_json(cls, state):
+        state = ub.map_vals(Measures.from_json, state)
+        self = cls(state)
+        return self
 
     def __json__(self):
         return {k: v.__json__() for k, v in self.items()}
@@ -1350,45 +1216,59 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
         from kwcoco.metrics import drawing
         return drawing.draw_perclass_prcurve(self, prefix=prefix, **kw)
 
-    def summary_plot(self, fnum=1, title=''):
+    def summary_plot(self, fnum=1, title='', subplots='auto'):
         """
 
         CommandLine:
             python ~/code/kwcoco/kwcoco/metrics/confusion_vectors.py PerClass_Measures.summary_plot --show
 
-
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
-            >>>     n_fp=(0, 5), n_fn=(0, 5), nimgs=128, nboxes=(0, 10),
-            >>>     nclasses=3)
+            >>>     n_fp=(0, 1), n_fn=(0, 3), nimgs=512, nboxes=(0, 32),
+            >>>     classes=3, rng=0, newstyle=1, box_noise=0.7, cls_noise=0.2, score_noise=0.3, with_probs=False)
             >>> cfsn_vecs = dmet.confusion_vectors()
-            >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
+            >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name', ignore_classes=['vector', 'raster'])
             >>> self = ovr_cfsn.measures()['perclass']
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
-            >>> self.summary_plot(title='demo summary_plot ovr')
+            >>> import seaborn as sns
+            >>> sns.set()
+            >>> self.summary_plot(title='demo summary_plot ovr', subplots=['pr', 'roc'])
             >>> kwplot.show_if_requested()
+            >>> self.summary_plot(title='demo summary_plot ovr', subplots=['mcc', 'acc'], fnum=2)
         """
+        if subplots == 'auto':
+            subplots = ['pr', 'roc', 'mcc', 'f1', 'acc']
         import kwplot
-        pnum_ = kwplot.PlotNums(nSubplots=5)
+        pnum_ = kwplot.PlotNums(nSubplots=len(subplots))
         kwplot.figure(fnum=fnum, doclf=True, figtitle=title)
-        self.draw('pr', fnum=fnum, pnum=pnum_())
-        self.draw('roc', fnum=fnum, pnum=pnum_())
-        self.draw('mcc', fnum=fnum, pnum=pnum_())
-        self.draw('f1', fnum=fnum, pnum=pnum_())
-        self.draw('acc', fnum=fnum, pnum=pnum_())
+        for key in subplots:
+            self.draw(key, fnum=fnum, pnum=pnum_())
 
 
-def _stabalilze_data(y_true, y_score, sample_weight, npad=7):
+def _stabalize_data(y_true, y_score, sample_weight, npad=7):
     """
     Adds ideally calibrated dummy values to curves with few positive examples.
     This acts somewhat like a Baysian prior and smooths out the curve.
+
+    Example:
+        y_score = np.array([0.5, 0.6])
+        y_true = np.array([1, 1])
+        sample_weight = np.array([1, 1])
+        npad = 7
+        _stabalize_data(y_true, y_score, sample_weight, npad=npad)
     """
-    min_score = y_score.min()
-    max_score = y_score.max()
+    finite_scores = y_score[np.isfinite(y_score)]
+
+    if len(finite_scores):
+        min_score = finite_scores.min()
+        max_score = finite_scores.max()
+    else:
+        min_score = 0
+        max_score = 1
 
     if max_score <= 1.0 and min_score >= 0.0:
         max_score = 1.0
@@ -1406,6 +1286,321 @@ def _stabalilze_data(y_true, y_score, sample_weight, npad=7):
     y_score = np.hstack([y_score, pad_score])
     sample_weight = np.hstack([sample_weight, pad_weight])
     return y_true, y_score, sample_weight
+
+
+def populate_info(info):
+    fp_cutoff = info['fp_cutoff']
+    realpos_total = info['realpos_total']
+    realpos_total = info['realpos_total']
+    monotonic_ppv = info['monotonic_ppv']
+
+    info['tp_count'] = tp = np.array(info['tp_count'])
+    info['fp_count'] = fp = np.array(info['fp_count'])
+    info['tn_count'] = tn = np.array(info['tn_count'])
+    info['fn_count'] = fn = np.array(info['fn_count'])
+    info['thresholds'] = thresh = np.array(info['thresholds'])
+
+    finite_flags = np.isfinite(thresh)
+
+    trunc_fp = fp
+    # Cutoff the curves at a comparable point
+    if fp_cutoff is None:
+        fp_cutoff = np.inf
+    elif isinstance(fp_cutoff, str):
+        if fp_cutoff == 'num_true':
+            fp_cutoff = int(np.ceil(realpos_total))
+        else:
+            raise KeyError(fp_cutoff)
+
+    if np.isfinite(fp_cutoff):
+        idxs = np.where(trunc_fp > fp_cutoff)[0]
+        if len(idxs) == 0:
+            trunc_idx = len(trunc_fp)
+        else:
+            trunc_idx = idxs[0]
+    else:
+        trunc_idx = None
+
+    if trunc_idx is None and np.any(np.isinf(fp)):
+        idxs = np.where(np.isinf(fp))[0]
+        if len(idxs):
+            trunc_idx = idxs[0]
+
+    if trunc_idx is None:
+        trunc_fp = fp
+        trunc_tp = tp
+        trunc_thresholds = thresh
+    else:
+        trunc_fp = fp[:trunc_idx]
+        trunc_tp = tp[:trunc_idx]
+        trunc_thresholds = thresh[:trunc_idx]
+
+    # if the cuttoff was not reached, horizontally extend the curve
+    # This will hurt the scores (aka we may be bias against small
+    # scenes), but this will ensure that big scenes are comparable
+    from kwcoco.metrics import assignment
+    if len(trunc_fp) == 0:
+        trunc_fp = np.array([fp_cutoff])
+        trunc_tp = np.array([0])
+
+        if assignment.USE_NEG_INF:
+            trunc_thresholds = np.array([-np.inf])
+        else:
+            trunc_thresholds = np.array([0])
+        # THIS WILL CAUSE AUC TO RAISE AN ERROR IF IT GETS HIT
+    elif trunc_fp[-1] <= fp_cutoff and np.isfinite(fp_cutoff):
+        trunc_fp = np.hstack([trunc_fp, [fp_cutoff]])
+        trunc_tp = np.hstack([trunc_tp, [trunc_tp[-1]]])
+        if assignment.USE_NEG_INF:
+            trunc_thresholds = np.hstack([trunc_thresholds, [-np.inf]])
+        else:
+            trunc_thresholds = np.hstack([trunc_thresholds, [0]])
+    info['trunc_idx'] = trunc_idx
+    info['trunc_fp_count'] = trunc_fp
+    info['trunc_tp_count'] = trunc_tp
+    info['trunc_thresholds'] = trunc_thresholds
+
+    with warnings.catch_warnings():
+        # It is very possible that we will divide by zero in this func
+        warnings.filterwarnings('ignore', message='invalid .* true_divide')
+        warnings.filterwarnings('ignore', message='invalid value')
+
+        pred_pos = (tp + fp)  # number of predicted positives
+        ppv = tp / pred_pos  # precision
+        ppv[np.isnan(ppv)] = 0
+
+        if monotonic_ppv:
+            # trick to make precision monotonic (which is probably not correct)
+            ppv = np.maximum.accumulate(ppv[::-1])[::-1]
+
+        # can set tpr_denom denominator to one
+        tpr_denom = (tp + fn)  #
+        tpr_denom[~(tpr_denom > 0)] = 1
+        tpr = tp / tpr_denom  # recall
+
+        debug = 0
+        if debug:
+            assert ub.allsame(tpr_denom), 'tpr denom should be constant'
+            # tpr_denom should be equal to info['realpos_total']
+            if np.any(tpr_denom != info['realpos_total']):
+                warnings.warn('realpos_total is inconsistent')
+
+        # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
+        mcc_numer = (tp * tn) - (fp * fn)
+        mcc_denom = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+        mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
+        info['mcc'] = mcc_numer / mcc_denom
+
+        # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
+        info['g1'] = np.sqrt(ppv * tpr)
+
+        f1_numer = (2 * ppv * tpr)
+        f1_denom = (ppv + tpr)
+        f1_denom[f1_denom == 0] = 1
+        info['f1'] =  f1_numer / f1_denom
+
+        tnr_denom = (tn + fp)
+        tnr_denom[tnr_denom == 0] = 1
+        tnr = tn / tnr_denom
+
+        pnv_denom = (tn + fn)
+        pnv_denom[pnv_denom == 0] = 1
+        npv = tn / pnv_denom
+
+        info['ppv'] = ppv
+        info['tpr'] = tpr
+
+        # fpr_denom is a proxy for fp + tn as tn is generally unknown in
+        # the case where all negatives are specified in the confusion
+        # vectors fpr_denom will be exactly (fp + tn)
+        # fpr = fp / (fp + tn)
+        finite_fp = fp[np.isfinite(fp)]
+        fpr_denom = finite_fp[-1] if len(finite_fp) else 0
+        if fpr_denom == 0:
+            fpr_denom = 1
+        info['fpr'] = info['fp_count'] / fpr_denom
+        # info['fpr'] = info['fp_count'] / info['realneg_total']
+        # info['fpr'][np.isinf(info['fp_count'])] = 1
+
+        info['acc'] = (tp + tn) / (tp + tn + fp + fn)
+
+        info['bm'] = tpr + tnr - 1  # informedness
+        info['mk'] = ppv + npv - 1  # markedness
+
+        keys = ['mcc', 'g1', 'f1', 'acc']
+        finite_thresh = thresh[finite_flags]
+        for key in keys:
+            measure = info[key][finite_flags]
+            try:
+                max_idx = np.nanargmax(measure)
+            except ValueError:
+                best_thresh = np.nan
+                best_measure = np.nan
+            else:
+                best_thresh = float(finite_thresh[max_idx])
+                best_measure = float(measure[max_idx])
+
+            best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+
+            # if np.isinf(best_thresh) or np.isnan(best_measure):
+            #     print('key = {!r}'.format(key))
+            #     print('finite_flags = {!r}'.format(finite_flags))
+            #     print('measure = {!r}'.format(measure))
+            #     print('best_label = {!r}'.format(best_label))
+            #     import xdev
+            #     xdev.embed()
+            info['max_{}'.format(key)] = best_label
+            info['_max_{}'.format(key)] = (best_measure, best_thresh)
+
+        import sklearn.metrics  # NOQA
+        finite_trunc_fp = info['trunc_fp_count']
+        finite_trunc_fp = finite_trunc_fp[np.isfinite(finite_trunc_fp)]
+        trunc_fpr_denom = finite_trunc_fp[-1] if len(finite_trunc_fp) else 0
+        if trunc_fpr_denom == 0:
+            trunc_fpr_denom = 1
+        info['trunc_tpr'] = info['trunc_tp_count'] / info['realpos_total']
+        info['trunc_fpr'] = info['trunc_fp_count'] / trunc_fpr_denom
+        try:
+            info['trunc_auc'] = sklearn.metrics.auc(info['trunc_fpr'], info['trunc_tpr'])
+        except ValueError:
+            # At least 2 points are needed to compute area under curve, but x.shape = 1
+            info['trunc_auc'] = np.nan
+
+        info['auc'] = info['trunc_auc']
+        """
+        Notes:
+            Apparently, consistent scoring is really hard to get right.
+
+            For detection problems scoring via
+            confusion_vectors+sklearn produces noticably different
+            results than the VOC method. There are a few reasons for
+            this.  The VOC method stops counting true positives after
+            all assigned predicted boxes have been counted. It simply
+            remembers the amount of original true positives to
+            normalize the true positive reate. On the other hand,
+            confusion vectors maintains a list of these unassigned true
+            boxes and gives them a predicted index of -1 and a score of
+            zero. This means that this function sees them as having rsync -avr --stats $HOME/data/public_data_registry/.dvc/cache/ hermes:/data/shared/dvc-cache/public_data_registry/
+a
+            y_true of 1 and a y_score of 0, which allows the
+            scikit-learn fp and tp counts to effectively get up to
+            100% recall when the threshold is zero. The VOC method
+            simply ignores these and handles them implicitly. The
+            problem is that if you remove these from the scikit-learn
+            inputs, it wont see the correct number of positives and it
+            will incorrectly normalize the recall.  In summary:
+
+                VOC:
+                    * remembers realpos_total
+                    * doesn't count unassigned truths as TP when the
+                    threshold is zero.
+
+                CV+SKL:
+                    * counts unassigned truths as TP with score=0.
+                    * NEW: now counts unassigned truth as TP with score=-np.inf
+                    * Always ensure tpr=1, ppv=0 and ppv=1, tpr=0 cases
+                    exist.
+        """
+
+        # ---
+        # sklearn definition
+        # AP = sum((R[n] - R[n - 1]) * P[n] for n in range(len(thresholds)))
+        # stop when full recall attained
+        last_ind = tpr.searchsorted(tpr[-1])
+        rec  = np.r_[0, tpr[:last_ind + 1]]
+        prec = np.r_[1, ppv[:last_ind + 1]]
+        scores = np.r_[0, thresh[:last_ind + 1]]
+
+        # Precisions are weighted by the change in recall
+        diff_items = np.diff(rec)
+        prec_items = prec[1:]
+
+        # basline way
+        # ap_alt = integrate.trapz(y=prec, x=rec)
+        ap = info['sklish_ap'] = float(np.sum(diff_items * prec_items))
+
+        PYCOCOTOOLS_AP = True
+        if PYCOCOTOOLS_AP:
+            # similar to pycocotools style "AP"
+            R = 101
+            pr = prec
+            rc = rec
+            recThrs = np.linspace(0, 1.0, R)
+            inds = np.searchsorted(rc, recThrs, side='left')
+            q  = np.zeros((R,))
+            ss = np.zeros((R,))
+
+            try:
+                for ri, pi in enumerate(inds):
+                    q[ri] = pr[pi]
+                    ss[ri] = scores[pi]
+            except Exception:
+                pass
+
+            pycocotools_ap = q.mean()
+            info['pycocotools_ap'] = float(pycocotools_ap)
+
+        OUTLIER_AP = 1
+        if OUTLIER_AP:
+            # Remove extreme outliers from ap calculation
+            # only do this on the first or last 2 items.
+            # Hueristically chosen.
+            flags = diff_items > 0.1
+            idxs = np.where(flags)[0]
+            max_idx = len(flags) - 1
+            idx_thresh = 2
+            try:
+                idx_dist = np.minimum(idxs, max_idx - idxs)
+                outlier_idxs = idxs[idx_dist < idx_thresh]
+                import kwarray
+                outlier_flags = kwarray.boolmask(outlier_idxs, len(diff_items))
+                inlier_flags = ~outlier_flags
+
+                score = prec_items.copy()
+                score[outlier_flags] = score[inlier_flags].min()
+                score[outlier_flags] = 0
+
+                ap = outlier_ap = np.sum(score * diff_items)
+
+                info['outlier_ap'] = float(outlier_ap)
+            except Exception:
+                pass
+
+        INF_THRESH_AP = 1
+        if INF_THRESH_AP:
+            from scipy import integrate
+            # MODIFIED SKLEARN AVERAGE PRECISION FOR -INF THRESH
+            #
+            # Better way of marked unassigned truth as never-recallable.
+            # We need to prevent these unassigned truths from incorrectly
+            # bringing up our true positive rate at low thresholds.
+            #
+            # Simply bump last_ind to ensure it is
+            feasible_idxs = np.where(thresh > -np.inf)[0]
+            if len(feasible_idxs) == 0:
+                info['inf_thresh_ap'] = np.nan
+            else:
+                feasible_tpr = tpr[feasible_idxs[-1]]
+                last_ind = tpr.searchsorted(feasible_tpr)
+                rec  = np.r_[0, tpr[:last_ind + 1]]
+                prec = np.r_[1, ppv[:last_ind + 1]]
+
+                diff_items = np.diff(rec)
+                prec_items = prec[1:]
+
+                # Not sure which is beset here, we no longer have
+                # assumption of max-tpr = 1
+                # ap = float(np.sum(diff_items * prec_items))
+                # info['inf_thresh_ap'] = ap
+
+                ap = integrate.trapz(y=prec, x=rec)
+                info['inf_thresh_ap'] = ap
+
+        # print('ap = {!r}'.format(ap))
+        # print('ap = {!r}'.format(ap))
+        # ap = np.sum(np.diff(rec) * prec[1:])
+        info['ap'] = float(ap)
+
 
 if __name__ == '__main__':
     """
