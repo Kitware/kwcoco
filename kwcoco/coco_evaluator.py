@@ -78,7 +78,13 @@ class CocoEvalConfig(scfg.Config):
             option.
             ''')),
 
-        # TODO options:
+        'use_area_attr': scfg.Value(
+            False, help=ub.paragraph(
+                '''
+                if True (pycocotools setting) uses the area coco attribute to
+                filter area range instead of bbox area. Otherwise just filters
+                based on bbox area.
+                ''')),
 
         'area_range': scfg.Value(
             value=['all', 'small'],
@@ -89,6 +95,7 @@ class CocoEvalConfig(scfg.Config):
                 'also accepts keys all, small, medium, and large. '
             )),
 
+        # TODO options:
         'max_dets': scfg.Value(np.inf, help=(
             'maximum number of predictions to consider')),
 
@@ -629,7 +636,8 @@ class CocoEvaluator(object):
                 monotonic_ppv=coco_eval.config['monotonic_ppv'],
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
-            for minmax, new_weights in zip(area_ranges, dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges)):
+            weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
+            for minmax, new_weights in weight_gen:
                 print('new_weights = {!r}'.format(new_weights.sum()))
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
@@ -687,7 +695,19 @@ class CocoEvaluator(object):
         return results
 
 
-def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
+def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
+                      use_area_attr=False):
+    """
+    Hacky function to compute confusion vector ignore weights for different
+    area thresholds. Needs to be slightly refactored.
+    """
+    if use_area_attr:
+        coco_true = coco_eval.true_extra['coco_dset']
+        try:
+            coco_pred = coco_eval.pred_extra['coco_dset']
+        except Exception:
+            pass
+
     # Basic logic to handle area-range by weight modification.
     for minmax in area_ranges:
         print('minmax = {!r}'.format(minmax))
@@ -704,8 +724,28 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
         gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
         new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
         for gid, groupx in zip(gids, groupxs):
+            if use_area_attr:
+                # Use coco area attribute (if available)
+                true_dets = dmet.gid_to_true_dets[gid]
+                true_annots = coco_true.annots(true_dets.data['aids'])
+                true_area = np.array(true_annots.lookup('area'))
+                # Yet another pycocotools inconsistency:
+                # We typically dont have segmentation area for predictions,
+                # so we have to use bbox area for predictions (which only
+                # matters if they are not assigned to a truth)
+                try:
+                    pred_dets = dmet.gid_to_pred_dets[gid]
+                    pred_annots = coco_pred.annots(pred_dets.data['aids'])
+                    pred_area = np.array(pred_annots.lookup('area'))
+                except Exception:
+                    import warnings
+                    warnings.warn('Predictions do not have area attributes')
+                    pred_area = dmet.gid_to_pred_dets[gid].boxes.area
+            else:
+                true_area = dmet.gid_to_true_dets[gid].boxes.area
+                pred_area = dmet.gid_to_pred_dets[gid].boxes.area
+
             # Ignore any truth outside the area range
-            true_area = dmet.gid_to_true_dets[gid].boxes.area
             txs = cfsn_vecs.data['txs'][groupx]
             tx_flags = txs > -1
             tarea = true_area[txs[tx_flags]].ravel()
@@ -713,7 +753,6 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
             toob_idxs = groupx[tx_flags][is_toob]
 
             # Ignore any *unassigned* prediction outside the area range
-            pred_area = dmet.gid_to_pred_dets[gid].boxes.area
             pxs = cfsn_vecs.data['pxs'][groupx]
             px_flags = (pxs > -1) & (txs < 0)
             parea = pred_area[pxs[px_flags]].ravel()

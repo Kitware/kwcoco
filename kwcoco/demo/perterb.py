@@ -6,6 +6,15 @@ def perterb_coco(coco_dset, **kwargs):
     """
     Perterbs a coco dataset
 
+    Args:
+        rng (int, default=0):
+        box_noise (int, default=0):
+        cls_noise (int, default=0):
+        null_pred (bool, default=False):
+        with_probs (bool, default=False):
+        score_noise (float, default=0.2):
+        hacked (int, default=1):
+
     Example:
         >>> from kwcoco.demo.perterb import *  # NOQA
         >>> from kwcoco.demo.perterb import _demo_construct_probs
@@ -22,7 +31,10 @@ def perterb_coco(coco_dset, **kwargs):
     Ignore:
         import xdev
         from kwcoco.demo.perterb import perterb_coco  # NOQA
-        xdev.get_func_kwargs(perterb_coco)
+        defaultkw = xdev.get_func_kwargs(perterb_coco)
+        for k, v in defaultkw.items():
+            desc = ''
+            print('{} ({}, default={}): {}'.format(k, type(v).__name__, v, desc))
 
     """
     import kwimage
