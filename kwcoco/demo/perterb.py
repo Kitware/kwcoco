@@ -109,7 +109,14 @@ def perterb_coco(coco_dset, **kwargs):
         for aid in aids:
             # Perterb box coordinates
             ann = new_dset.anns[aid]
-            ann['bbox'] = (np.array(ann['bbox']) + box_noise_RV(4)).tolist()
+
+            new_bbox = (np.array(ann['bbox']) + box_noise_RV(4)).tolist()
+            new_x, new_y, new_w, new_h = new_bbox
+            allow_neg_boxes = 0
+            if not allow_neg_boxes:
+                new_w = max(new_w, 0)
+                new_h = max(new_h, 0)
+            ann['bbox'] = [new_x, new_y, new_w, new_h]
             ann['score'] = float(true_score_RV(1)[0])
 
             if cls_noise_RV():

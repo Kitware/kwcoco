@@ -634,6 +634,7 @@ class CocoEvaluator(object):
             measurekw = dict(
                 fp_cutoff=coco_eval.config['fp_cutoff'],
                 monotonic_ppv=coco_eval.config['monotonic_ppv'],
+                ap_method='pycocotools',
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
             weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
@@ -745,18 +746,21 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
                 true_area = dmet.gid_to_true_dets[gid].boxes.area
                 pred_area = dmet.gid_to_pred_dets[gid].boxes.area
 
-            # Ignore any truth outside the area range
+            # pycocotools is inclusive (valid if min <= area <= max) on both
+            # ends of the area range so we are following that here as well.
+
+            # Ignore any truth outside the area bounds
             txs = cfsn_vecs.data['txs'][groupx]
             tx_flags = txs > -1
             tarea = true_area[txs[tx_flags]].ravel()
-            is_toob = ((tarea < area_min) | (tarea >= area_max))
+            is_toob = ((tarea < area_min) | (tarea > area_max))
             toob_idxs = groupx[tx_flags][is_toob]
 
-            # Ignore any *unassigned* prediction outside the area range
+            # Ignore any *unassigned* prediction outside the area bounds
             pxs = cfsn_vecs.data['pxs'][groupx]
             px_flags = (pxs > -1) & (txs < 0)
             parea = pred_area[pxs[px_flags]].ravel()
-            is_poob = ((parea < area_min) | (parea >= area_max))
+            is_poob = ((parea < area_min) | (parea > area_max))
             poob_idxs = groupx[px_flags][is_poob]
             new_ignore[poob_idxs] = True
             new_ignore[toob_idxs] = True

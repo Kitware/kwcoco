@@ -500,12 +500,12 @@ class DetectionMetrics(ub.NiceRepr):
 
         return pred, true
 
-    def score_coco(dmet, with_evaler=False, verbose=0):
+    def score_pycocotools(dmet, with_evaler=False, verbose=0):
         """
         score using ms-coco method
 
         Example:
-            >>> # xdoctest: +REQUIRES(--pycocotools)
+            >>> # xdoctest: +REQUIRES(module:pycocotools)
             >>> from kwcoco.metrics.detect_metrics import *
             >>> dmet = DetectionMetrics.demo(
             >>>     nimgs=10, nboxes=(0, 3), n_fn=(0, 1), n_fp=(0, 1), classes=8, with_probs=False)
@@ -538,6 +538,9 @@ class DetectionMetrics(ub.NiceRepr):
 
             pycocoutils also smooths out the precision such that it is
             monotonic decreasing, which might not be the best idea.
+
+            pycocotools area ranges are inclusive on both ends, that means the
+            "small" and "medium" truth selections do overlap somewhat.
 
         """
         from pycocotools import coco  # NOQA
@@ -586,6 +589,8 @@ class DetectionMetrics(ub.NiceRepr):
         if with_evaler:
             coco_scores['evaler'] = evaler
         return coco_scores
+
+    score_coco = score_pycocotools
 
     @classmethod
     def demo(cls, **kwargs):

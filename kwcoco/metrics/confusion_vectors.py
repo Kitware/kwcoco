@@ -466,7 +466,6 @@ class ConfusionVectors(ub.NiceRepr):
 
             elif mode == 1:
                 # More VOC-like, not heirarchy friendly
-
                 if cfsn_vecs.probs is not None:
 
                     # TODO: perhaps we shouldn't use these or at least
@@ -609,7 +608,8 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
     def __getitem__(self, cx):
         return self.cx_to_binvecs[cx]
 
-    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False):
+    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False,
+                 ap_method='pycocotools'):
         """
         Creates binary confusion measures for every one-versus-rest category.
 
@@ -624,7 +624,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
 
             monotonic_ppv (bool, default=False):
                 if True ensures that precision is always increasing as recall
-                decreases. This is done in pycocoutils scoring, but I'm not
+                decreases. This is done in pycocotools scoring, but I'm not
                 sure its a good idea.
 
         SeeAlso:
@@ -639,6 +639,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
                 stabalize_thresh=stabalize_thresh,
                 fp_cutoff=fp_cutoff,
                 monotonic_ppv=monotonic_ppv,
+                ap_method=ap_method,
             )
             for cx, binvecs in self.cx_to_binvecs.items()
         })
@@ -751,7 +752,8 @@ class BinaryConfusionVectors(ub.NiceRepr):
         return len(self.data)
 
     # @ub.memoize_method
-    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False):
+    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False,
+                 ap_method='pycocotools'):
         """
         Get statistics (F1, G1, MCC) versus thresholds
 
@@ -766,7 +768,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
             monotonic_ppv (bool, default=False):
                 if True ensures that precision is always increasing as recall
-                decreases. This is done in pycocoutils scoring, but I'm not
+                decreases. This is done in pycocotools scoring, but I'm not
                 sure its a good idea.
 
         Example:
@@ -810,6 +812,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         info = self._binary_clf_curves(stabalize_thresh=stabalize_thresh,
                                        fp_cutoff=fp_cutoff)
         info['monotonic_ppv'] = monotonic_ppv
+        info['ap_method'] = ap_method
         info['cx'] = self.cx
         info['classes'] = self.classes
         populate_info(info)
@@ -1294,6 +1297,8 @@ def populate_info(info):
     realpos_total = info['realpos_total']
     monotonic_ppv = info['monotonic_ppv']
 
+    info['ap_method'] = info.get('ap_method', 'pycocotools')
+
     info['tp_count'] = tp = np.array(info['tp_count'])
     info['fp_count'] = fp = np.array(info['fp_count'])
     info['tn_count'] = tn = np.array(info['tn_count'])
@@ -1371,7 +1376,11 @@ def populate_info(info):
 
         if monotonic_ppv:
             # trick to make precision monotonic (which is probably not correct)
+            if 0:
+                print('ppv = {!r}'.format(ppv))
             ppv = np.maximum.accumulate(ppv[::-1])[::-1]
+            if 0:
+                print('ppv = {!r}'.format(ppv))
 
         # can set tpr_denom denominator to one
         tpr_denom = (tp + fn)  #
@@ -1480,8 +1489,7 @@ def populate_info(info):
             normalize the true positive reate. On the other hand,
             confusion vectors maintains a list of these unassigned true
             boxes and gives them a predicted index of -1 and a score of
-            zero. This means that this function sees them as having rsync -avr --stats $HOME/data/public_data_registry/.dvc/cache/ hermes:/data/shared/dvc-cache/public_data_registry/
-a
+            zero. This means that this function sees them as having a
             y_true of 1 and a y_score of 0, which allows the
             scikit-learn fp and tp counts to effectively get up to
             100% recall when the threshold is zero. The VOC method
@@ -1506,39 +1514,48 @@ a
         # sklearn definition
         # AP = sum((R[n] - R[n - 1]) * P[n] for n in range(len(thresholds)))
         # stop when full recall attained
-        last_ind = tpr.searchsorted(tpr[-1])
-        rec  = np.r_[0, tpr[:last_ind + 1]]
-        prec = np.r_[1, ppv[:last_ind + 1]]
-        scores = np.r_[0, thresh[:last_ind + 1]]
+        SKLISH_AP = 1
+        if SKLISH_AP:
+            last_ind = tpr.searchsorted(tpr[-1])
+            rec  = np.r_[0, tpr[:last_ind + 1]]
+            prec = np.r_[1, ppv[:last_ind + 1]]
+            # scores = np.r_[0, thresh[:last_ind + 1]]
 
-        # Precisions are weighted by the change in recall
-        diff_items = np.diff(rec)
-        prec_items = prec[1:]
+            # Precisions are weighted by the change in recall
+            diff_items = np.diff(rec)
+            prec_items = prec[1:]
 
-        # basline way
-        # ap_alt = integrate.trapz(y=prec, x=rec)
-        ap = info['sklish_ap'] = float(np.sum(diff_items * prec_items))
+            # basline way
+            info['sklish_ap'] = float(np.sum(diff_items * prec_items))
 
         PYCOCOTOOLS_AP = True
         if PYCOCOTOOLS_AP:
             # similar to pycocotools style "AP"
             R = 101
-            pr = prec
-            rc = rec
-            recThrs = np.linspace(0, 1.0, R)
-            inds = np.searchsorted(rc, recThrs, side='left')
-            q  = np.zeros((R,))
-            ss = np.zeros((R,))
 
-            try:
-                for ri, pi in enumerate(inds):
-                    q[ri] = pr[pi]
-                    ss[ri] = scores[pi]
-            except Exception:
-                pass
+            feasible_idxs = np.where(thresh > -np.inf)[0]
+            if len(feasible_idxs) == 0:
+                info['pycocotools_ap'] = np.nan
+            else:
+                feasible_tpr = tpr[feasible_idxs[-1]]
+                last_ind = tpr.searchsorted(feasible_tpr)
+                rc  = tpr[:last_ind + 1]
+                pr = ppv[:last_ind + 1]
 
-            pycocotools_ap = q.mean()
-            info['pycocotools_ap'] = float(pycocotools_ap)
+                recThrs = np.linspace(0, 1.0, R)
+                inds = np.searchsorted(rc, recThrs, side='left')
+                q  = np.zeros((R,))
+                # ss = np.zeros((R,))
+
+                try:
+                    for ri, pi in enumerate(inds):
+                        q[ri] = pr[pi]
+                        # ss[ri] = scores[pi]
+                except Exception:
+                    pass
+
+                pycocotools_ap = q.mean()
+                info['pycocotools_ap'] = float(pycocotools_ap)
 
         OUTLIER_AP = 1
         if OUTLIER_AP:
@@ -1568,6 +1585,8 @@ a
 
         INF_THRESH_AP = 1
         if INF_THRESH_AP:
+            # This may become the de-facto scikit-learn implementation in the
+            # future.
             from scipy import integrate
             # MODIFIED SKLEARN AVERAGE PRECISION FOR -INF THRESH
             #
@@ -1592,9 +1611,18 @@ a
                 # assumption of max-tpr = 1
                 # ap = float(np.sum(diff_items * prec_items))
                 # info['inf_thresh_ap'] = ap
+                info['inf_thresh_ap'] = integrate.trapz(y=prec, x=rec)
 
-                ap = integrate.trapz(y=prec, x=rec)
-                info['inf_thresh_ap'] = ap
+        if info['ap_method'] == 'pycocotools':
+            ap = info['pycocotools_ap']
+        elif info['ap_method'] == 'outlier':
+            ap = info['outlier_ap']
+        elif info['ap_method'] == 'inf_thresh':
+            ap = info['inf_thresh_ap']
+        elif info['ap_method'] == 'sklish':
+            ap = info['sklish_ap']
+        else:
+            raise KeyError(info['ap_method'])
 
         # print('ap = {!r}'.format(ap))
         # print('ap = {!r}'.format(ap))

@@ -237,12 +237,15 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                 true_dets.boxes[true_idxs], bias=bias)
             _px_to_iou = dict(zip(pred_idxs, ious))
             iou_lookup.update(_px_to_iou)
+
+
     isvalid_lookup = {px: ious > iou_thresh for px, ious in iou_lookup.items()}
 
     y =  _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                         cx_to_matchable_txs, bg_weight, prioritize, iou_thresh,
                         pdist_priority, cx_to_ancestors, bg_cidx,
                         ignore_classes=ignore_classes, max_dets=max_dets)
+
     return y
 
 
@@ -277,8 +280,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         _pred_scores = _pred_scores[0:max_dets]
 
     if ignore_classes is not None:
-        # Remove certain ignore regions from scoring
-
+q
         # FIXME: does this use the iou threshold correctly?
         # iou_thresh is being used as iooa not iou to determine which
         # pred regions are ignored.
@@ -302,6 +304,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     y_pxs = []
     y_txs = []
 
+    # NOTE: I don't think this actualy does anything anymore
     if prioritize == 'correct' or prioritize == 'class':
         used_truth_policy = 'next_best'
     else:
@@ -328,10 +331,14 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             cand_true_idxs = unused_true_idxs
 
             if prioritize == 'iou':
-                # simply match the true box with the highest iou regardless of
-                # category
+                # simply match the true box with the highest iou (that is also
+                # considered matchable)
 
                 if used_truth_policy == 'next_best':
+
+                    # TODO: VERIFY THIS IS NO DIFFERENT THAN "MARK_FALSE" AND
+                    # REMOVE.
+
                     # Dont even consider matches to previously used groundtruth
                     # (note this means it will be marked as a false positive)
                     cand_ious = iou_lookup[px].compress(unused)
