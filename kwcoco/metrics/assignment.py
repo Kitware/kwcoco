@@ -238,7 +238,6 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             _px_to_iou = dict(zip(pred_idxs, ious))
             iou_lookup.update(_px_to_iou)
 
-
     isvalid_lookup = {px: ious > iou_thresh for px, ious in iou_lookup.items()}
 
     y =  _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
@@ -280,7 +279,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         _pred_scores = _pred_scores[0:max_dets]
 
     if ignore_classes is not None:
-q
         # FIXME: does this use the iou threshold correctly?
         # iou_thresh is being used as iooa not iou to determine which
         # pred regions are ignored.
