@@ -407,6 +407,23 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
         legend_loc='lower right',
         color='distinct', linestyle='cycle', marker='cycle', **kw
     )
+
+    # if 0:
+    #     # TODO: should show contour lines with F1 scores
+    #     x = np.arange(0.0, 1.0, 1e-3)
+    #     X, Y = np.meshgrid(x, x)
+    #     Z = np.round(2.XY/(X+Y),3)
+    #     Z[np.isnan(Z)] = 0
+    #     levels =  np.round(np.arange(0.1, 1.0, .1),1)
+    #     CS = ax.contour(X, Y, Z,
+    #                     levels=levels,
+    #                     linewidths=0.75,
+    #                     cmap='copper')
+    #     location = zip(levels, levels)
+    #     ax.clabel(CS, inline=1, fontsize=9, manual=location, fmt='%.1f')
+    #     for c in CS.collections:
+    #         c.set_linestyle('dashed')
+
     return ax
 
 

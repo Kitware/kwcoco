@@ -958,10 +958,11 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
             >>>     n_fp=(0, 1), n_fn=(0, 2), nimgs=256, nboxes=(0, 10),
+            >>>     bbox_noise=10,
             >>>     classes=1)
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> self = bin_cfsn = cfsn_vecs.binarize_classless()
-            >>> dmet.summarize(plot=True)
+            >>> #dmet.summarize(plot=True)
             >>> import kwplot
             >>> kwplot.autompl()
             >>> kwplot.figure(fnum=3)
@@ -972,34 +973,36 @@ class BinaryConfusionVectors(ub.NiceRepr):
         import matplotlib as mpl
         info = self.measures()
 
-        tpr = info['tpr']
-        fpr = info['fpr']
-        ppv = info['ppv']
+        thresh = info['thresholds']
+        flags = thresh > -np.inf
+        tpr = info['tpr'][flags]
+        fpr = info['fpr'][flags]
+        ppv = info['ppv'][flags]
 
         kwargs = {}
-        cmap = kwargs.get('cmap', mpl.cm.coolwarm)
+        # cmap = kwargs.get('cmap', mpl.cm.coolwarm)
         # cmap = kwargs.get('cmap', mpl.cm.plasma)
-        # cmap = kwargs.get('cmap', mpl.cm.hot)
+        cmap = kwargs.get('cmap', mpl.cm.hot)
         # cmap = kwargs.get('cmap', mpl.cm.magma)
         fig = plt.gcf()
         fig.clf()
-        ax = fig.add_subplot('111', projection='3d')
+        ax = fig.add_subplot(projection='3d')
 
         x = tpr
         y = fpr
         z = ppv
 
-        mcc_color = cmap(np.maximum(info['mcc'], 0))[:, 0:3]
+        mcc_color = cmap(np.maximum(info['mcc'][flags], 0))[:, 0:3]
 
+        ax.plot3D(xs=x, ys=[0] * len(y), zs=z, c='orange')
+        ax.plot3D(xs=x, ys=y, zs=[1] * len(z), c='pink')
         ax.plot3D(xs=x, ys=y, zs=z, c='blue')
-        ax.plot3D(xs=x, ys=[0] * len(y), zs=z, c='lightblue')
-        ax.plot3D(xs=x, ys=y, zs=0, c='lightblue')
 
         ax.scatter(x, y, z, c=mcc_color)
+        ax.scatter(x, y, [1] * len(z), c=mcc_color)
         ax.scatter(x, [0] * len(y), z, c=mcc_color)
-        ax.scatter(x, y, [0] * len(z), c=mcc_color)
 
-        ax.set_title('roc + auc')
+        ax.set_title('roc + PR')
         ax.set_xlabel('tpr')
         ax.set_ylabel('fpr')
         ax.set_zlabel('ppv')
