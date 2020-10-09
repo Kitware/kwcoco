@@ -639,7 +639,6 @@ class CocoEvaluator(object):
             orig_weights = cfsn_vecs.data['weight'].copy()
             weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
             for minmax, new_weights in weight_gen:
-                print('new_weights = {!r}'.format(new_weights.sum()))
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
                 nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
@@ -711,7 +710,6 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
 
     # Basic logic to handle area-range by weight modification.
     for minmax in area_ranges:
-        print('minmax = {!r}'.format(minmax))
         if isinstance(minmax, str):
             if minmax == 'small':
                 minmax = [0 ** 2, 32 ** 2]
@@ -767,7 +765,7 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
 
         new_weights = orig_weights.copy()
         new_weights[new_ignore] = 0
-        yield new_weights
+        yield minmax, new_weights
 
 
 class CocoResults(ub.NiceRepr, DictProxy):
