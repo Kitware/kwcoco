@@ -1128,7 +1128,7 @@ def main(cmdline=True, **kw):
         kwcoco eval \
             --true_dataset=$HOME/.cache/kwcoco/tests/eval/true.mscoco.json \
             --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
-            --out_dpath=$HOME/.cache/kwcoco/tests/eval/out
+            --out_dpath=$HOME/.cache/kwcoco/tests/eval/out --force_pycocoutils=True
 
         nautilus $HOME/.cache/kwcoco/tests/eval/out
     """
@@ -1141,6 +1141,10 @@ def main(cmdline=True, **kw):
     coco_eval._init()
 
     results = coco_eval.evaluate()
+
+    if coco_eval.config['force_pycocoutils']:
+        print('forced pycocotools, no other analysis will be done')
+        return
 
     ub.ensuredir(cli_config['out_dpath'])
 
