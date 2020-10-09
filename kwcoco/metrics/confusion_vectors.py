@@ -1113,7 +1113,7 @@ class Measures(ub.NiceRepr, DictProxy):
             'trunc_auc', 'auc', 'ap',
             # 'sklish_ap',
             'pycocotools_ap',
-            # 'outlier_ap', 'inf_thresh_ap',
+            # 'outlier_ap', 'sklearn',
         }
         state = ub.dict_isect(self.proxy, minimal)
         from kwcoco.util.util_json import ensure_json_serializable
@@ -1606,7 +1606,7 @@ def populate_info(info):
             # Simply bump last_ind to ensure it is
             feasible_idxs = np.where(thresh > -np.inf)[0]
             if len(feasible_idxs) == 0:
-                info['inf_thresh_ap'] = np.nan
+                info['sklearn_ap'] = np.nan
             else:
                 feasible_tpr = tpr[feasible_idxs[-1]]
                 last_ind = tpr.searchsorted(feasible_tpr)
@@ -1619,15 +1619,14 @@ def populate_info(info):
                 # Not sure which is beset here, we no longer have
                 # assumption of max-tpr = 1
                 # ap = float(np.sum(diff_items * prec_items))
-                # info['inf_thresh_ap'] = ap
-                info['inf_thresh_ap'] = integrate.trapz(y=prec, x=rec)
+                info['sklearn_ap'] = integrate.trapz(y=prec, x=rec)
 
         if info['ap_method'] == 'pycocotools':
             ap = info['pycocotools_ap']
         elif info['ap_method'] == 'outlier':
             ap = info['outlier_ap']
-        elif info['ap_method'] == 'inf_thresh':
-            ap = info['inf_thresh_ap']
+        elif info['ap_method'] == 'sklearn':
+            ap = info['sklearn_ap']
         elif info['ap_method'] == 'sklish':
             ap = info['sklish_ap']
         else:

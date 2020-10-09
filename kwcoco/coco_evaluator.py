@@ -50,11 +50,11 @@ class CocoEvalConfig(scfg.Config):
 
         'implicit_ignore_classes': scfg.Value(['ignore']),
 
-        'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
+        'fp_cutoff': scfg.Value(float('inf'), help='False positive cutoff for ROC'),
 
         'iou_thresh': scfg.Value(
             value=0.5,
-            help='one or more IoU overlap threshold for detection assignment',
+            help='One or more IoU overlap threshold for detection assignment',
             # alias=['ovthresh']
         ),
 
@@ -63,12 +63,12 @@ class CocoEvalConfig(scfg.Config):
             choices=['all', 'mutex', 'ancestors'],
             help=ub.paragraph(
                 '''
-                matching strategy for which true annots are allowed to match
+                Matching strategy for which true annots are allowed to match
                 which predicted annots.
-                mutex means true boxes can only match predictions where the
-                true class has highest probability.
-                all means any class can match any other class.
-                dont use ancestors it is broken.
+                `mutex` means true boxes can only match predictions where the
+                true class has highest probability (pycocotools setting).
+                `all` means any class can match any other class.
+                Dont use `ancestors`, it is broken.
                 ''')),
 
         'monotonic_ppv': scfg.Value(True, help=ub.paragraph(
@@ -76,6 +76,13 @@ class CocoEvalConfig(scfg.Config):
             if True forces precision to be monotonic. Defaults to True for
             compatibility with pycocotools, but that might not be the best
             option.
+            ''')),
+
+        'ap_method': scfg.Value('pycocotools', help=ub.paragraph(
+            '''
+            Method for computing AP. Defaults to a setting comparable to
+            pycocotools. Can also be set to sklearn to use an alterative
+            method.
             ''')),
 
         'use_area_attr': scfg.Value(
@@ -634,7 +641,7 @@ class CocoEvaluator(object):
             measurekw = dict(
                 fp_cutoff=coco_eval.config['fp_cutoff'],
                 monotonic_ppv=coco_eval.config['monotonic_ppv'],
-                ap_method='pycocotools',
+                ap_method=coco_eval.config['ap_method'],
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
             weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
