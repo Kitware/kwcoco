@@ -86,11 +86,12 @@ class CocoEvalConfig(scfg.Config):
             ''')),
 
         'use_area_attr': scfg.Value(
-            False, help=ub.paragraph(
+            'try', help=ub.paragraph(
                 '''
                 if True (pycocotools setting) uses the area coco attribute to
                 filter area range instead of bbox area. Otherwise just filters
-                based on bbox area.
+                based on bbox area. If 'try' then it tries to use it but will
+                fallback if it does not exist.
                 ''')),
 
         'area_range': scfg.Value(
@@ -105,6 +106,9 @@ class CocoEvalConfig(scfg.Config):
         # TODO options:
         'max_dets': scfg.Value(np.inf, help=(
             'maximum number of predictions to consider')),
+
+        'iou_bias': scfg.Value(1, help=(
+            'pycocotools setting is 1, but 0 may be better')),
 
         # Extra options
         'force_pycocoutils': scfg.Value(False, help=(
@@ -585,7 +589,7 @@ class CocoEvaluator(object):
             >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
             >>> results.dump_figures(dpath)
             >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
-            >>> # xdoctest: +REQUIRES(--show)
+            >>> # xdoctest: +REQUIRES(--vd)
             >>> if ub.argflag('--vd') or 1:
             >>>     import xdev
             >>>     xdev.view_directory(dpath)
@@ -594,11 +598,6 @@ class CocoEvaluator(object):
         # print('coco_eval.config = {}'.format(ub.repr2(dict(coco_eval.config), nl=3)))
 
         dmet = coco_eval._build_dmet()
-
-        if coco_eval.config['force_pycocoutils']:
-            # TODO: extract the PR curves from pycocotools
-            coco_scores = dmet.score_pycocotools(verbose=3, with_evaler=True)
-            return coco_scores
 
         # Ignore any categories with too few tests instances
         classes = coco_eval.classes
@@ -622,6 +621,27 @@ class CocoEvaluator(object):
         if not area_ranges:
             area_ranges = ['all']
 
+        print('Building confusion vectors')
+        if coco_eval.config['force_pycocoutils']:
+            # TODO: extract the PR curves from pycocotools
+            coco_scores = dmet.score_pycocotools(
+                verbose=3,
+                with_evaler=True,
+                with_confusion=True,
+                iou_thresholds=iou_thresholds,
+                # max_dets=coco_eval.config['max_dets'],
+            )
+            iou_to_cfsn_vecs = coco_scores['iou_to_cfsn_vecs']
+        else:
+            iou_to_cfsn_vecs = dmet.confusion_vectors(
+                ignore_classes=ignore_classes,
+                compat=coco_eval.config['compat'],
+                iou_thresh=iou_thresholds,
+                workers=coco_eval.config['assign_workers'],
+                bias=coco_eval.config['iou_bias'],
+                max_dets=coco_eval.config['max_dets'],
+            )
+
         # Remove large datasets values in configs that are not file references
         base_meta = dict(coco_eval.config)
         if not isinstance(base_meta['true_dataset'], str):
@@ -630,16 +650,9 @@ class CocoEvaluator(object):
             base_meta['pred_dataset'] = '<not-a-file-ref>'
 
         resdata = {}
+
         for iou_thresh in iou_thresholds:
-            # Detection only scoring
-            print('Building confusion vectors')
-            cfsn_vecs = dmet.confusion_vectors(
-                ignore_classes=ignore_classes,
-                compat=coco_eval.config['compat'],
-                iou_thresh=iou_thresh,
-                workers=coco_eval.config['assign_workers'],
-                max_dets=coco_eval.config['max_dets'],
-            )
+            cfsn_vecs = iou_to_cfsn_vecs[iou_thresh]
             print('cfsn_vecs = {!r}'.format(cfsn_vecs))
 
             # NOTE: translating to classless confusion vectors only works when
@@ -656,7 +669,8 @@ class CocoEvaluator(object):
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
                 nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
-                ovr_binvecs   = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
+                ovr_binvecs   = cfsn_vecs.binarize_ovr(
+                    ignore_classes=ignore_classes, approx=0, mode=1)
                 nocls_measures = nocls_binvecs.measures(**measurekw)
                 ovr_measures = ovr_binvecs.measures(**measurekw)['perclass']
                 # print('minmax = {!r}'.format(minmax))
@@ -702,6 +716,8 @@ class CocoEvaluator(object):
                     dict(area_range=minmax, iou_thresh=iou_thresh),
                     nl=0, explicit=1, itemsep='', nobr=1)
                 resdata[reskey] = result
+                if coco_eval.config['force_pycocoutils']:
+                    resdata['pct_stats'] = coco_scores['evalar_stats'].tolist()
                 print('reskey = {!r}'.format(reskey))
                 print('result = {!r}'.format(result))
 
@@ -739,9 +755,13 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
         for gid, groupx in zip(gids, groupxs):
             if use_area_attr:
                 # Use coco area attribute (if available)
-                true_dets = dmet.gid_to_true_dets[gid]
-                true_annots = coco_true.annots(true_dets.data['aids'])
-                true_area = np.array(true_annots.lookup('area'))
+                try:
+                    true_dets = dmet.gid_to_true_dets[gid]
+                    true_annots = coco_true.annots(true_dets.data['aids'])
+                    true_area = np.array(true_annots.lookup('area'))
+                except Exception:
+                    if use_area_attr != 'try':
+                        raise
                 # Yet another pycocotools inconsistency:
                 # We typically dont have segmentation area for predictions,
                 # so we have to use bbox area for predictions (which only
@@ -751,8 +771,9 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
                     pred_annots = coco_pred.annots(pred_dets.data['aids'])
                     pred_area = np.array(pred_annots.lookup('area'))
                 except Exception:
-                    import warnings
-                    warnings.warn('Predictions do not have area attributes')
+                    if use_area_attr != 'try':
+                        import warnings
+                        warnings.warn('Predictions do not have area attributes')
                     pred_area = dmet.gid_to_pred_dets[gid].boxes.area
             else:
                 true_area = dmet.gid_to_true_dets[gid].boxes.area
@@ -1142,9 +1163,9 @@ def main(cmdline=True, **kw):
 
     results = coco_eval.evaluate()
 
-    if coco_eval.config['force_pycocoutils']:
-        print('forced pycocotools, no other analysis will be done')
-        return
+    # if coco_eval.config['force_pycocoutils']:
+    #     print('forced pycocotools, no other analysis will be done')
+    #     return
 
     ub.ensuredir(cli_config['out_dpath'])
 

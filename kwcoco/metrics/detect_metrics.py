@@ -150,8 +150,9 @@ class DetectionMetrics(ub.NiceRepr):
 
         Args:
 
-            iou_thresh (float, default=0.5):
+            iou_thresh (float | List[float], default=0.5):
                 bounding box overlap iou threshold required for assignment
+                if a list, then return type is a dict
 
             bias (float, default=0.0):
                 for computing bounding box overlap, either 1 or 0
@@ -196,15 +197,37 @@ class DetectionMetrics(ub.NiceRepr):
                 if truthy, we assume probabilities for multiple classes are
                 available.
 
+        Returns:
+            ConfusionVectors | Dict[float, ConfusionVectors]
+
         Ignore:
             globals().update(xdev.get_func_kwargs(dmet.confusion_vectors))
+
+        Example:
+            >>> dmet = DetectionMetrics.demo(nimgs=30, classes=3,
+            >>>                              nboxes=10, n_fp=3, box_noise=10,
+            >>>                              with_probs=False)
+            >>> iou_to_cfsn = dmet.confusion_vectors(iou_thresh=[0.3, 0.5, 0.9])
+            >>> for t, cfsn in iou_to_cfsn.items():
+            >>>     print('t = {!r}'.format(t))
+            ...     print(cfsn.binarize_ovr().measures())
+            ...     print(cfsn.binarize_classless().measures())
+
         """
         import kwarray
-        y_accum = ub.ddict(list)
-
         _tracking_probs = bool(track_probs)
+        iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh
+
+        iou_to_yaccum = {
+            t: ub.ddict(list)
+            for t in iou_thresh_list
+        }
+
         if _tracking_probs:
-            prob_accum = []
+            iou_to_probaccum = {
+                t: []
+                for t in iou_thresh_list
+            }
 
         if gids is None:
             gids = sorted(dmet._imgname_to_gid.values())
@@ -236,80 +259,93 @@ class DetectionMetrics(ub.NiceRepr):
             pred_dets = dmet.pred_detections(gid)
             job = jobs.submit(
                 _assign_confusion_vectors, true_dets, pred_dets,
-                bg_weight=1, iou_thresh=iou_thresh, bg_cidx=-1, bias=bias,
+                bg_weight=1, iou_thresh=iou_thresh_list, bg_cidx=-1, bias=bias,
                 classes=dmet.classes, compat=compat, prioritize=prioritize,
                 ignore_classes=ignore_classes, max_dets=max_dets)
             job.gid = gid
 
         for job in ub.ProgIter(jobs.jobs, desc='assign detections',
                                verbose=verbose):
-            y = job.result()
+            iou_thresh_to_y = job.result()
             gid = job.gid
 
-            if _tracking_probs:
-                # Keep track of per-class probs
-                pred_dets = dmet.pred_detections(gid)
-                try:
-                    pred_probs = pred_dets.probs
-                    if pred_probs is None:
-                        raise KeyError
-                except KeyError:
-                    _tracking_probs = False
-                    if track_probs == 'force':
-                        raise Exception('unable to track probs')
-                    elif track_probs == 'try':
-                        pass
+            for t, y in iou_thresh_to_y.items():
+                y_accum = iou_to_yaccum[t]
+
+                if _tracking_probs:
+                    prob_accum = iou_to_probaccum[t]
+                    # Keep track of per-class probs
+                    pred_dets = dmet.pred_detections(gid)
+                    try:
+                        pred_probs = pred_dets.probs
+                        if pred_probs is None:
+                            raise KeyError
+                    except KeyError:
+                        _tracking_probs = False
+                        if track_probs == 'force':
+                            raise Exception('unable to track probs')
+                        elif track_probs == 'try':
+                            pass
+                        else:
+                            raise KeyError(track_probs)
                     else:
-                        raise KeyError(track_probs)
-                else:
-                    pxs = np.array(y['pxs'], dtype=np.int)
+                        pxs = np.array(y['pxs'], dtype=np.int)
 
-                    # For unassigned truths, we need to create dummy probs
-                    # where a background class has probability 1.
-                    flags = pxs > -1
-                    probs = np.zeros((len(pxs), pred_probs.shape[1]),
-                                     dtype=np.float32)
-                    if background_class is not None:
-                        bg_idx = dmet.classes.index(background_class)
-                        probs[:, bg_idx] = 1
-                    probs[flags] = pred_probs[pxs[flags]]
-                    prob_accum.append(probs)
+                        # For unassigned truths, we need to create dummy probs
+                        # where a background class has probability 1.
+                        flags = pxs > -1
+                        probs = np.zeros((len(pxs), pred_probs.shape[1]),
+                                         dtype=np.float32)
+                        if background_class is not None:
+                            bg_idx = dmet.classes.index(background_class)
+                            probs[:, bg_idx] = 1
+                        probs[flags] = pred_probs[pxs[flags]]
+                        prob_accum.append(probs)
 
-            y['gid'] = [gid] * len(y['pred'])
-            for k, v in y.items():
-                y_accum[k].extend(v)
+                y['gid'] = [gid] * len(y['pred'])
+                for k, v in y.items():
+                    y_accum[k].extend(v)
 
-        _data = {}
-        for k, v in ub.ProgIter(list(y_accum.items()), desc='ndarray convert', verbose=verbose):
-            # Try to use 32 bit types for large evaluation problems
-            kw = dict()
-            if k in {'iou', 'score', 'weight'}:
-                kw['dtype'] = np.float32
-            if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
-                kw['dtype'] = np.int32
-            try:
-                _data[k] = np.asarray(v, **kw)
-            except TypeError:
-                _data[k] = np.asarray(v)
+        iou_to_cfsn = {}
 
-        # Avoid pandas when possible
-        cfsn_data = kwarray.DataFrameArray(_data)
+        for t, y_accum in iou_to_yaccum.items():
+            _data = {}
+            for k, v in ub.ProgIter(list(y_accum.items()), desc='ndarray convert', verbose=verbose):
+                # Try to use 32 bit types for large evaluation problems
+                kw = dict()
+                if k in {'iou', 'score', 'weight'}:
+                    kw['dtype'] = np.float32
+                if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
+                    kw['dtype'] = np.int32
+                try:
+                    _data[k] = np.asarray(v, **kw)
+                except TypeError:
+                    _data[k] = np.asarray(v)
 
-        if 0:
-            import xdev
-            nbytes = 0
-            for k, v in _data.items():
-                nbytes += v.size * v.dtype.itemsize
-            print(xdev.byte_str(nbytes))
+            # Avoid pandas when possible
+            cfsn_data = kwarray.DataFrameArray(_data)
 
-        if _tracking_probs:
-            y_prob = np.vstack(prob_accum)
+            if 0:
+                import xdev
+                nbytes = 0
+                for k, v in _data.items():
+                    nbytes += v.size * v.dtype.itemsize
+                print(xdev.byte_str(nbytes))
+
+            if _tracking_probs:
+                prob_accum = iou_to_probaccum[t]
+                y_prob = np.vstack(prob_accum)
+            else:
+                y_prob = None
+            cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes,
+                                         probs=y_prob)
+            iou_to_cfsn[t] = cfsn_vecs
+
+        if ub.iterable(iou_thresh):
+            return iou_to_cfsn
         else:
-            y_prob = None
-        cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes,
-                                     probs=y_prob)
-
-        return cfsn_vecs
+            cfsn_vecs = iou_to_cfsn[t]
+            return cfsn_vecs
 
     def score_kwant(dmet, iou_thresh=0.5):
         """
@@ -437,7 +473,7 @@ class DetectionMetrics(ub.NiceRepr):
 
             if ignore_classes is not None:
                 true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
-                    true_dets, pred_dets, iou_thresh=iou_thresh,
+                    true_dets, pred_dets, ioaa_thresh=iou_thresh,
                     ignore_classes=ignore_classes)
                 true_dets = true_dets.compress(~true_ignore_flags)
                 pred_dets = pred_dets.compress(~pred_ignore_flags)
@@ -450,10 +486,15 @@ class DetectionMetrics(ub.NiceRepr):
     def _to_coco(dmet):
         """
         Convert to a coco representation of truth and predictions
+
+        with inverse aid mappings
         """
         import kwcoco
         true = kwcoco.CocoDataset()
         pred = kwcoco.CocoDataset()
+
+        gt_aid_to_tx = {}
+        dt_aid_to_px = {}
 
         for node in dmet.classes:
             # cid = dmet.classes.graph.node[node]['id']
@@ -484,8 +525,13 @@ class DetectionMetrics(ub.NiceRepr):
                 pred_scores = np.ones(len(pred_dets))
             pred_cids = list(ub.take(idx_to_id, pred_dets.class_idxs))
             pred_xywh = pred_boxes.to_xywh().data.tolist()
+
+            dt_aids = []
             for bbox, cid, score in zip(pred_xywh, pred_cids, pred_scores):
-                pred.add_annotation(gid, cid, bbox=bbox, score=score)
+                aid = pred.add_annotation(gid, cid, bbox=bbox, score=score)
+                dt_aids.append(aid)
+
+            dt_aid_to_px.update(dict(zip(dt_aids, range(len(dt_aids)))))
 
         for gid, true_dets in dmet.gid_to_true_dets.items():
             true_boxes = true_dets.boxes
@@ -495,22 +541,40 @@ class DetectionMetrics(ub.NiceRepr):
                 true_weights = np.ones(len(true_boxes))
             true_cids = list(ub.take(idx_to_id, true_dets.class_idxs))
             true_xywh = true_boxes.to_xywh().data.tolist()
+
+            gt_aids = []
             for bbox, cid, weight in zip(true_xywh, true_cids, true_weights):
-                true.add_annotation(gid, cid, bbox=bbox, weight=weight)
+                aid = true.add_annotation(gid, cid, bbox=bbox, weight=weight)
+                gt_aids.append(aid)
 
-        return pred, true
+            gt_aid_to_tx.update(dict(zip(gt_aids, range(len(gt_aids)))))
 
-    def score_pycocotools(dmet, with_evaler=False, verbose=0):
+        return pred, true, gt_aid_to_tx, dt_aid_to_px
+
+    def score_pycocotools(dmet, with_evaler=False, with_confusion=False,
+                          verbose=0, iou_thresholds=None):
         """
         score using ms-coco method
+
+        Returns:
+            Dict : dictionary with pct info
 
         Example:
             >>> # xdoctest: +REQUIRES(module:pycocotools)
             >>> from kwcoco.metrics.detect_metrics import *
             >>> dmet = DetectionMetrics.demo(
             >>>     nimgs=10, nboxes=(0, 3), n_fn=(0, 1), n_fp=(0, 1), classes=8, with_probs=False)
-            >>> print(dmet.score_coco()['mAP'])
-            0.711016...
+            >>> pct_info = dmet.score_pycocotools(verbose=1,
+            >>>                                   with_evaler=True,
+            >>>                                   with_confusion=True,
+            >>>                                   iou_thresholds=[0.5, 0.9])
+            >>> evaler = pct_info['evaler']
+            >>> iou_to_cfsn_vecs = pct_info['iou_to_cfsn_vecs']
+            >>> for iou_thresh in iou_to_cfsn_vecs.keys():
+            >>>     print('iou_thresh = {!r}'.format(iou_thresh))
+            >>>     cfsn_vecs = iou_to_cfsn_vecs[iou_thresh]
+            >>>     ovr_measures = cfsn_vecs.binarize_ovr().measures()
+            >>>     print('ovr_measures = {}'.format(ub.repr2(ovr_measures, nl=1, precision=4)))
 
         Notes:
             by default pycocotools computes average precision as the literal
@@ -547,7 +611,7 @@ class DetectionMetrics(ub.NiceRepr):
         from pycocotools import cocoeval
         from kwcoco.util.util_monkey import SupressPrint
 
-        pred, true = dmet._to_coco()
+        pred, true, gt_aid_to_tx, dt_aid_to_px = dmet._to_coco()
 
         # The original pycoco-api prints to much, supress it
         quiet = verbose == 0
@@ -566,6 +630,19 @@ class DetectionMetrics(ub.NiceRepr):
                 ann['area'] = w * h
 
             evaler = cocoeval.COCOeval(cocoGt, cocoDt, iouType='bbox')
+
+            modified_params = False
+            if iou_thresholds is None:
+                iou_thresholds = evaler.params.iouThrs
+            else:
+                iou_thresholds = np.array(iou_thresholds)
+
+                if len(iou_thresholds) != len(evaler.params.iouThrs) or np.allclose(iou_thresholds, evaler.params.iouThrs):
+                    evaler.params.iouThrs = iou_thresholds
+                    modified_params = True
+
+            print('evaler.params.iouThrs = {!r}'.format(evaler.params.iouThrs))
+
             evaler.evaluate()
             evaler.accumulate()
 
@@ -580,15 +657,37 @@ class DetectionMetrics(ub.NiceRepr):
                 perclass_rec = evaler.eval['recall'][Tx, Kx, Ax, Mx]
                 perclass_score = evaler.eval['scores'][Tx, Rx, Kx, Ax, Mx]
 
-            evaler.summarize()
-            coco_ap = evaler.stats[1]
-        coco_scores = {
-            'mAP': coco_ap,
-            'evalar_stats': evaler.stats
-        }
+            pct_info = {}
+
+            if modified_params:
+                print('modified params')
+                stats = pct_summarize2(evaler)
+                evaler.stats = stats
+            else:
+                print('standard pycocotools params')
+                evaler.summarize()
+                coco_ap = evaler.stats[1]
+                pct_info['mAP'] = coco_ap
+
+            pct_info['evalar_stats'] = evaler.stats
+
+        # 'mAP': coco_ap,
         if with_evaler:
-            coco_scores['evaler'] = evaler
-        return coco_scores
+            pct_info['evaler'] = evaler
+
+        if with_confusion:
+            iou_to_cfsn_vecs = {}
+
+            for iou_thresh in iou_thresholds:
+                cfsn_vecs = pycocotools_confusion_vectors(
+                    dmet, evaler, iou_thresh=iou_thresh)
+                cfsn_vecs.data['pxs'] = np.array(list(ub.take(dt_aid_to_px, cfsn_vecs.data['dt_aid'], default=-1)))
+                cfsn_vecs.data['txs'] = np.array(list(ub.take(gt_aid_to_tx, cfsn_vecs.data['gt_aid'], default=-1)))
+                iou_to_cfsn_vecs[iou_thresh] = cfsn_vecs
+
+            pct_info['iou_to_cfsn_vecs'] = iou_to_cfsn_vecs
+
+        return pct_info
 
     score_coco = score_pycocotools
 
@@ -971,8 +1070,131 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
     # return class_probs
 
 
+def pycocotools_confusion_vectors(dmet, evaler, iou_thresh=0.5, verbose=0):
+    """
+    Example:
+        >>> from kwcoco.metrics.detect_metrics import *
+        >>> dmet = DetectionMetrics.demo(
+        >>>     nimgs=10, nboxes=(0, 3), n_fn=(0, 1), n_fp=(0, 1), classes=8, with_probs=False)
+        >>> coco_scores = dmet.score_pycocotools(with_evaler=True)
+        >>> evaler = coco_scores['evaler']
+        >>> cfsn_vecs = pycocotools_confusion_vectors(dmet, evaler, verbose=1)
+
+    """
+    import numpy as np
+    import kwarray
+    import ubelt as ub
+    import copy
+
+    target_areaRng = [0, 10000000000.0]
+    target_iou = iou_thresh
+    target_maxDet = 100
+
+    # Get curves at a specific pycocoutils param
+    Tx = np.where(evaler.params.iouThrs == target_iou)[0]
+    # Rx = slice(0, len(evaler.params.recThrs))
+    # Kx = slice(0, len(evaler.params.catIds))
+    # Ax = evaler.params.areaRng.index(target_areaRng)
+    # Mx = evaler.params.maxDets.index(target_maxDet)
+
+    # prints match info for each category
+    y_accum = ub.ddict(list)
+
+    for info in evaler.evalImgs:
+        if info is None:
+            continue
+        info = copy.deepcopy(info)
+        if info['aRng'] == target_areaRng and info['maxDet'] == target_maxDet:
+            info['dtMatches'] = info['dtMatches'][Tx]
+            info['gtMatches'] = info['gtMatches'][Tx]
+            info['dtIgnore'] = info['dtIgnore'][Tx]
+
+            # Transform pycocotools assignments into a confusion vector
+            y = dict(
+                pred=[],
+                true=[],
+                score=[],
+                weight=[],
+                iou=[],
+                gt_aid=[],
+                dt_aid=[],
+                gid=[],
+            )
+            cidx = info['category_id']
+            gid = info['image_id']
+
+            # cidx = dmet.classes.id_to_idx[cid]
+            for dtid, gtid, score, ignore in zip(info['dtIds'], info['dtMatches'][0], info['dtScores'], info['dtIgnore'][0]):
+                if gtid == 0:
+                    y['pred'].append(cidx)
+                    y['true'].append(-1)
+                    y['score'].append(score)
+                    y['weight'].append(1 - float(ignore))
+                    y['iou'].append(-1)
+
+                    # TODO: can we find the indexes instead?
+                    # To better match dmet? Or are aids better?
+
+                    y['gt_aid'].append(-1)
+                    y['dt_aid'].append(dtid)
+                    y['gid'].append(info['image_id'])
+                else:
+                    y['pred'].append(cidx)
+                    y['true'].append(cidx)
+                    y['score'].append(score)
+                    y['weight'].append(1 - float(ignore))
+                    y['iou'].append(np.nan)  # TODO, we should be able to find this
+                    y['gt_aid'].append(gtid)
+                    y['dt_aid'].append(dtid)
+                    y['gid'].append(gid)
+
+            flags = ~kwarray.isect_flags(info['gtMatches'][0], info['dtIds'])
+            gt_aids = list(ub.compress(info['gtIds'], flags))
+            gtignores = info['gtIgnore'][flags]
+
+            for gtid, ignore in zip(gt_aids, gtignores):
+                y['pred'].append(-1)
+                y['true'].append(cidx)
+                y['score'].append(-np.inf)
+                y['weight'].append(1 - float(ignore))
+                y['iou'].append(-1)
+                y['gt_aid'].append(gtid)
+                y['dt_aid'].append(-1)
+                y['gid'].append(gid)
+            # y
+            # y = kwarray.DataFrameArray.from_pandas(y.pandas())
+            for k, v in y.items():
+                y_accum[k].extend(v)
+
+        _data = {}
+        for k, v in ub.ProgIter(list(y_accum.items()), desc='ndarray convert', verbose=verbose):
+            # Try to use 32 bit types for large evaluation problems
+            kw = dict()
+            if k in {'iou', 'score', 'weight'}:
+                kw['dtype'] = np.float32
+            if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
+                kw['dtype'] = np.int32
+            try:
+                _data[k] = np.asarray(v, **kw)
+            except TypeError:
+                _data[k] = np.asarray(v)
+
+        # Avoid pandas when possible
+        cfsn_data = kwarray.DataFrameArray(_data)
+
+        # if _tracking_probs:
+        #     y_prob = np.vstack(prob_accum)
+        # else:
+        y_prob = None
+        cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes,
+                                     probs=y_prob)
+    return cfsn_vecs
+
+
 def eval_detections_cli(**kw):
     """
+    DEPRECATED USE `kwcoco eval` instead
+
     CommandLine:
         xdoctest -m ~/code/kwcoco/kwcoco/metrics/detect_metrics.py eval_detections_cli
     """
@@ -1071,6 +1293,73 @@ def eval_detections_cli(**kw):
         )
         plt.plot(thresh[mcc_idx], f1[mcc_idx], 'r*', markersize=20)
         plt.plot(thresh[f1_idx], f1[f1_idx], 'k*', markersize=20)
+
+
+def _summarize(self, ap=1, iouThr=None, areaRngLbl='all', maxDets=100):
+    import numpy as np
+    p = self.params
+    iStr = '{:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'  # noqa: E501
+    titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
+    typeStr = '(AP)' if ap == 1 else '(AR)'
+    iouStr = '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1]) \
+        if iouThr is None else '{:0.2f}'.format(iouThr)
+
+    aind = [
+        i for i, aRng in enumerate(p.areaRngLbl) if aRng == areaRngLbl
+    ]
+    mind = [i for i, mDet in enumerate(p.maxDets) if mDet == maxDets]
+    if ap == 1:
+        # dimension of precision: [TxRxKxAxM]
+        s = self.eval['precision']
+        # IoU
+        if iouThr is not None:
+            t = np.where(iouThr == p.iouThrs)[0]
+            if len(t):
+                Tx = t[0]
+                Ax = aind[0]
+                Mx = mind[0]
+                pct_perclass_ap = s[Tx, :, :, Ax, Mx].mean(axis=0)
+                catnames = [self.cocoGt.cats[cid]['name'] for cid in self.params.catIds]
+                catname_to_ap = ub.dzip(catnames, pct_perclass_ap)
+                pct_map = pct_perclass_ap.mean()
+                print('catname_to_ap = {}'.format(ub.repr2(catname_to_ap, nl=1, precision=2)))
+                # print('pct_perclass_ap = {}'.format(ub.repr2(pct_perclass_ap.tolist(), nl=1, precision=2)))
+                print('pct_map = {}'.format(ub.repr2(pct_map.tolist(), nl=0, precision=2)))
+            else:
+                raise Exception('not known iou')
+        if iouThr is not None:
+            t = np.where(iouThr == p.iouThrs)[0]
+            s = s[t]
+        s = s[:, :, :, aind, mind]
+
+    else:
+        # dimension of recall: [TxKxAxM]
+        s = self.eval['recall']
+        if iouThr is not None:
+            t = np.where(iouThr == p.iouThrs)[0]
+            s = s[t]
+        s = s[:, :, aind, mind]
+    if len(s[s > -1]) == 0:
+        mean_s = -1
+    else:
+        mean_s = np.mean(s[s > -1])
+    print(
+        iStr.format(titleStr, typeStr, iouStr, areaRngLbl, maxDets,
+                    mean_s))
+    return mean_s
+
+
+def pct_summarize2(self):
+    stats = []
+    for ap in [1, 0]:
+        for areaRngLbl in self.params.areaRngLbl:
+            stats.append(_summarize(self, ap=ap, iouThr=None, areaRngLbl=areaRngLbl))
+            if areaRngLbl == 'all':
+                if len(self.params.iouThrs) > 1:
+                    for iouThr in self.params.iouThrs:
+                        stats.append(_summarize(self, ap=ap, iouThr=iouThr,
+                                                areaRngLbl=areaRngLbl))
+    return stats
 
 
 if __name__ == '__main__':

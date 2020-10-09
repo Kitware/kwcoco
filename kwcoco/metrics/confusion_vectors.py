@@ -608,7 +608,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
     def __getitem__(self, cx):
         return self.cx_to_binvecs[cx]
 
-    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False,
+    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=True,
                  ap_method='pycocotools'):
         """
         Creates binary confusion measures for every one-versus-rest category.
@@ -622,7 +622,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
                 maximum number of false positives in the truncated roc curves.
                 ``None`` is equivalent to ``float('inf')``
 
-            monotonic_ppv (bool, default=False):
+            monotonic_ppv (bool, default=True):
                 if True ensures that precision is always increasing as recall
                 decreases. This is done in pycocotools scoring, but I'm not
                 sure its a good idea.
@@ -648,8 +648,8 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
             mAUC = np.nanmean([item['trunc_auc'] for item in perclass.values()])
             mAP = np.nanmean([item['ap'] for item in perclass.values()])
         return {
-            'mAUC': mAUC,
             'mAP': mAP,
+            'mAUC': mAUC,
             'perclass': perclass,
         }
 
@@ -752,7 +752,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         return len(self.data)
 
     # @ub.memoize_method
-    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=False,
+    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=True,
                  ap_method='pycocotools'):
         """
         Get statistics (F1, G1, MCC) versus thresholds
@@ -766,7 +766,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
                 maximum number of false positives in the truncated roc curves.
                 ``None`` is equivalent to ``float('inf')``
 
-            monotonic_ppv (bool, default=False):
+            monotonic_ppv (bool, default=True):
                 if True ensures that precision is always increasing as recall
                 decreases. This is done in pycocotools scoring, but I'm not
                 sure its a good idea.
