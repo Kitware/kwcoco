@@ -107,6 +107,8 @@ class CocoEvalConfig(scfg.Config):
             'maximum number of predictions to consider')),
 
         # Extra options
+        'force_pycocoutils': scfg.Value(False, help=(
+            'ignore all other options and just use pycocoutils to score')),
 
         # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
 
@@ -592,6 +594,11 @@ class CocoEvaluator(object):
         # print('coco_eval.config = {}'.format(ub.repr2(dict(coco_eval.config), nl=3)))
 
         dmet = coco_eval._build_dmet()
+
+        if coco_eval.config['force_pycocoutils']:
+            # TODO: extract the PR curves from pycocotools
+            coco_scores = dmet.score_pycocotools(verbose=3, with_evaler=True)
+            return coco_scores
 
         # Ignore any categories with too few tests instances
         classes = coco_eval.classes
