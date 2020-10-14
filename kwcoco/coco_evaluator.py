@@ -714,7 +714,7 @@ class CocoEvaluator(object):
 
                 reskey = ub.repr2(
                     dict(area_range=minmax, iou_thresh=iou_thresh),
-                    nl=0, explicit=1, itemsep='', nobr=1, strval=1)
+                    nl=0, explicit=1, itemsep='', nobr=1, sv=1)
                 resdata[reskey] = result
                 if coco_eval.config['force_pycocoutils']:
                     resdata['pct_stats'] = coco_scores['evalar_stats'].tolist()
