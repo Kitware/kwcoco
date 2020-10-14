@@ -118,7 +118,7 @@ class CocoEvalConfig(scfg.Config):
 
         'assign_workers': scfg.Value(8, help='number of background workers for assignment'),
 
-        'ovthresh': scfg.Value(None, help='alias for iou_thresh'),
+        'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
 
         'classes_of_interest': scfg.Value(
             None, type=list,
@@ -666,6 +666,7 @@ class CocoEvaluator(object):
             orig_weights = cfsn_vecs.data['weight'].copy()
             weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
             for minmax, new_weights in weight_gen:
+                print('new_weights.sum() = {}'.format(new_weights.sum()))
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
                 nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
