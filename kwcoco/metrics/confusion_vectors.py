@@ -299,6 +299,13 @@ class ConfusionVectors(ub.NiceRepr):
         Returns:
             BinaryConfusionVectors
 
+        Notes:
+            The "classlessness" of this depends on the compat="all" argument
+            being used when constructing confusion vectors, otherwise it
+            becomes something like a macro-average because the class
+            information was used in deciding which true and predicted boxes
+            were allowed to match.
+
         Example:
             >>> from kwcoco.metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
@@ -336,12 +343,12 @@ class ConfusionVectors(ub.NiceRepr):
             'is_true': ~is_false,
             'pred_score': cfsn_vecs.data['score'],
         }
-        extra = ub.dict_isect(_data, [
+        extra = ub.dict_isect(cfsn_vecs.data._data, [
             'txs', 'pxs', 'gid', 'weight'])
         _data.update(extra)
         bin_data = kwarray.DataFrameArray(_data)
-        binvecs = BinaryConfusionVectors(bin_data)
-        return binvecs
+        nocls_binvecs = BinaryConfusionVectors(bin_data)
+        return nocls_binvecs
 
     def binarize_ovr(cfsn_vecs,
                      mode=1,

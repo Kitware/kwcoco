@@ -666,7 +666,6 @@ class CocoEvaluator(object):
             orig_weights = cfsn_vecs.data['weight'].copy()
             weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
             for minmax, new_weights in weight_gen:
-                print('new_weights.sum() = {}'.format(new_weights.sum()))
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
                 nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
@@ -718,7 +717,7 @@ class CocoEvaluator(object):
                     nl=0, explicit=1, itemsep='', nobr=1, sv=1)
                 resdata[reskey] = result
                 if coco_eval.config['force_pycocoutils']:
-                    resdata['pct_stats'] = coco_scores['evalar_stats'].tolist()
+                    resdata['pct_stats'] = coco_scores['evalar_stats']
                 print('reskey = {!r}'.format(reskey))
                 print('result = {!r}'.format(result))
 
@@ -849,8 +848,12 @@ class CocoResults(ub.NiceRepr, DictProxy):
         """
         print(ub.repr2(results.__json__(), nl=-1))
         """
-        # from kwcoco.util.util_json import ensure_json_serializable
-        state = {k: v.__json__() for k, v in results.items()}
+        from kwcoco.util.util_json import ensure_json_serializable
+        state = {
+            k: (ensure_json_serializable(v)
+                if not hasattr(v, '__json__') else v.__json__())
+            for k, v in results.items()
+        }
         # ensure_json_serializable(state, normalize_containers=True, verbose=0)
         return state
 
@@ -1150,7 +1153,9 @@ def main(cmdline=True, **kw):
         kwcoco eval \
             --true_dataset=$HOME/.cache/kwcoco/tests/eval/true.mscoco.json \
             --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
-            --out_dpath=$HOME/.cache/kwcoco/tests/eval/out --force_pycocoutils=True
+            --out_dpath=$HOME/.cache/kwcoco/tests/eval/out \
+            --force_pycocoutils=False \
+            --area_range=all,0-4096,4096-inf
 
         nautilus $HOME/.cache/kwcoco/tests/eval/out
     """
