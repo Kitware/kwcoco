@@ -18,6 +18,8 @@ class CocoStatsCLI:
             'catfreq': scfg.Value(True, help='show category frequency stats'),
             'boxes': scfg.Value(False, help='show bounding box stats'),
             'annot_attrs': scfg.Value(False, help='show annot attribute information'),
+
+            'embed': scfg.Value(False, help='embed into interactive shell'),
         }
         epilog = """
         Example Usage:
@@ -101,7 +103,7 @@ class CocoStatsCLI:
                 print('dset.tag = {!r}'.format(dset.tag))
                 print(ub.repr2(dset.boxsize_stats(), nl=-1, precision=2))
 
-        if ub.argflag('--embed'):
+        if config['embed']:
             # Hidden hack
             import xdev
             xdev.embed()
