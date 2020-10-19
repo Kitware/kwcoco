@@ -648,6 +648,10 @@ class CocoEvaluator(object):
             base_meta['true_dataset'] = '<not-a-file-ref>'
         if not isinstance(base_meta['pred_dataset'], str):
             base_meta['pred_dataset'] = '<not-a-file-ref>'
+        # Add machine-specific metadata
+        import platform
+        base_meta['hostname'] = platform.node()
+        base_meta['timestamp'] = ub.timestamp()
 
         resdata = {}
 
