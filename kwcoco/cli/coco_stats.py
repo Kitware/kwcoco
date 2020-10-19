@@ -95,7 +95,14 @@ class CocoStatsCLI:
             print('Annot Attrs')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
-                print(ub.repr2(dset.boxsize_stats(), nl=-1, precision=2))
+
+                attrs = ub.ddict(lambda: 0)
+                for ann in dset.anns.values():
+                    for key, value in ann.items():
+                        if value:
+                            attrs[key] += 1
+
+                print('annot attrs = {!r}'.format(attrs))
 
         if config['boxes']:
             print('Box stats')
