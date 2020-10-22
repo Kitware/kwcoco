@@ -131,7 +131,6 @@ def find_json_unserializable(data, quickcheck=False):
         >>>         assert part['data'] is curr
     """
     needs_check = True
-    # is_serializable = None
     if quickcheck:
         try:
             # Might be a more efficient way to do this check. We duplicate a lot of
@@ -162,41 +161,6 @@ def find_json_unserializable(data, quickcheck=False):
                 yield {'loc': root + [['.keys', key]], 'data': key}
             elif not isinstance(value, serializable_types):
                 yield {'loc': prefix, 'data': value}
-        # else:
-        #     if isinstance(data, list):
-        #         for idx, item in enumerate(data):
-        #             subparts_item = find_json_unserializable(item, quickcheck=False)
-        #             for sub in subparts_item:
-        #                 sub['loc'].appendleft(idx)
-        #                 yield sub
-        #     elif isinstance(data, dict):
-        #         for key, value in data.items():
-        #             subparts_key = find_json_unserializable(key, quickcheck=False)
-        #             for sub in subparts_key:
-        #                 # Special case where a dict key is the error value
-        #                 # Purposely make loc non-hashable so its not confused with
-        #                 # an address. All we can know in this case is that they key
-        #                 # is at this level, there is no concept of where.
-        #                 sub['loc'].appendleft(['.keys', key])
-        #                 yield sub
-
-        #             subparts_val = find_json_unserializable(value, quickcheck=False)
-        #             for sub in subparts_val:
-        #                 sub['loc'].appendleft(key)
-        #                 yield sub
-        #     else:
-        #         if is_serializable is None:
-        #             try:
-        #                 # Might be a more efficient way to do this check. We duplicate a lot of
-        #                 # work by doing the check for unserializable data this way.
-        #                 json.dumps(data)
-        #             except Exception:
-        #                 is_serializable = False
-        #             else:
-        #                 is_serializable = True
-
-        #         if is_serializable is False:
-        #             yield {'loc': deque(), 'data': data}
 
 
 class IndexableWalker(Generator):
@@ -234,6 +198,19 @@ class IndexableWalker(Generator):
         >>>         walker[path] = 'changed the value of c'
         >>> print('data = {}'.format(ub.repr2(data, nl=True)))
         >>> assert data['foo']['c'] == 'changed the value of c'
+
+    Example:
+        >>> # Test sending false for every data item
+        >>> import numpy as np
+        >>> data = {1: 1}
+        >>> walker = IndexableWalker(data)
+        >>> for path, value in walker:
+        >>>     print('walk path = {}'.format(ub.repr2(path, nl=0)))
+        >>>     walker.send(False)
+        >>> data = {}
+        >>> walker = IndexableWalker(data)
+        >>> for path, value in walker:
+        >>>     walker.send(False)
     """
 
     def __init__(self, data, dict_cls=(dict,), list_cls=(list, tuple)):
@@ -334,11 +311,11 @@ class IndexableWalker(Generator):
                 # If the value at this path is also indexable, then continue
                 # the traversal, unless the False message was explicitly sent
                 # by the caller.
-                if isinstance(value, self.indexable_cls):
-                    if message is False:
-                        # Because the `send` method will return the next value,
-                        # we yield a dummy value so we don't clobber the next
-                        # item in the traversal.
-                        yield None
-                    else:
+                if message is False:
+                    # Because the `send` method will return the next value,
+                    # we yield a dummy value so we don't clobber the next
+                    # item in the traversal.
+                    yield None
+                else:
+                    if isinstance(value, self.indexable_cls):
                         stack.append((value, path))

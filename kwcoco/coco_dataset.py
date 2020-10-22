@@ -1095,10 +1095,16 @@ class MixinCocoExtras(object):
             >>>     kwplot.imshow(canvas, pnum=pnums[gx], fnum=fnum)
             >>>     #dset.show_image(gid=gid, pnum=pnums[gx])
             >>> kwplot.show_if_requested()
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes5-aux', num_frames=1,
+            >>>                                verbose=0, rng=None)
         """
+        import parse
+        from kwcoco.demo import toydata
+
         if key.startswith('shapes'):
-            from kwcoco.demo import toydata
-            import parse
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:
                 kw['n_imgs'] = int(res.named['num_imgs'])
@@ -1107,16 +1113,20 @@ class MixinCocoExtras(object):
             dataset = toydata.demodata_toy_dset(**kw)
             self = cls(dataset, tag=key)
         elif key.startswith('vidshapes'):
-            from kwcoco.demo import toydata
-            import parse
-            res = parse.parse('{prefix}{num_videos:d}', key)
-
+            res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
             vidkw = {
                 'render': True,
                 'num_videos': 2,
             }
             if res:
                 kw['num_videos'] = int(res.named['num_videos'])
+                suff_parts = res.named['suffix'].split('-')
+            else:
+                suff_parts = []
+
+            if 'aux' in suff_parts:
+                vidkw['aux'] = True
+
             # if 'rng' not in kw and 'n_imgs' in kw:
             #     kw['rng'] = kw['n_imgs']
             vidkw.update(kw)
