@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.6 - Unreleased
+## Version 0.1.8 - Unreleased
+
+
+## Version 0.1.6 - Released 2020-10-23
 
 ### Added
 * `kwcoco.kw18.KW18.to_coco` can now accept `image_paths` and `video_name`
@@ -72,7 +75,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add `perterb_coco`
 * Add `CocoEvaluator` and CLI `kwcoco eval`
 
-## Version 0.1.1 - Unreleased
+## Version 0.1.1 - Released 2020-10-23
 
 ### Added
 * stats CLI can now accept multiple datasets.
@@ -98,4 +101,4 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Initial version
 
-## Version 0.1.7 - Unreleased
+## Version 0.1.7 - Released 2020-10-23
