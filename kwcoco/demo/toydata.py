@@ -1,4 +1,11 @@
 # -*- coding: utf-8 -*-
+"""
+Notes:
+    The implementation of `demodata_toy_img` and `demodata_toy_dset` should be
+    redone using the tools built for `random_video_dset`, which have more
+    extensible implementations.
+
+"""
 from __future__ import absolute_import, division, print_function
 from os.path import join
 import six
@@ -404,9 +411,9 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                 'file_name': fpath,
                 'channels': 'rgb',
             })
-            auxillaries = img.pop('auxiliary', None)
-            if auxillaries is not None:
-                for auxdict in auxillaries:
+            auxiliaries = img.pop('auxiliary', None)
+            if auxiliaries is not None:
+                for auxdict in auxiliaries:
                     aux_dpath = ub.ensuredir(
                         (root_dpath, 'aux_' + auxdict['channels']))
                     aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
@@ -421,7 +428,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                     except Exception:
                         kwimage.imwrite(aux_fpath, auxdata)
 
-                img['auxiliary'] = auxillaries
+                img['auxiliary'] = auxiliaries
 
             dataset['images'].append(img)
             for ann in anns:
@@ -455,18 +462,28 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
 
 def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
-        gsize=(600, 600), verbose=3, render=False, rng=None):
+        gsize=(600, 600), verbose=3, render=False, aux=None, rng=None,
+        dpath=None):
     """
     Create a toy Coco Video Dataset
 
     Args:
-        num_videos : number of videos
-        num_frames : number of images per video
-        num_tracks : number of tracks per video
+        num_videos (int) : number of videos
+
+        num_frames (int) : number of images per video
+
+        num_tracks (int) : number of tracks per video
+
         gsize : image size
-        render (bool | dict): if truthy the toy annotations are synthetically
-            rendered. See ``render_toy_image`` for details.
+
+        render (bool | dict):
+            if truthy the toy annotations are synthetically rendered. See
+            :func:`render_toy_image` for details.
+
         rng (int | None | RandomState): random seed / state
+
+        dpath (str): only used if render is truthy, place to write rendered
+            images.
 
     SeeAlso:
         random_single_video_dset
@@ -490,7 +507,7 @@ def random_video_dset(
         dset = random_single_video_dset(
             gsize=gsize, num_frames=num_frames, num_tracks=num_tracks,
             tid_start=tid_start, anchors=anchors, gid_start=gid_start,
-            video_id=vidid, render=False, autobuild=False, rng=rng)
+            video_id=vidid, render=False, autobuild=False, aux=aux, rng=rng)
 
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
@@ -519,7 +536,7 @@ def random_video_dset(
         if not render:
             renderkw = None
     if renderkw:
-        render_toy_dataset(dset, rng=rng, renderkw=renderkw)
+        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw)
 
     dset._build_index()
     return dset
@@ -528,7 +545,7 @@ def random_video_dset(
 def random_single_video_dset(gsize=(600, 600), num_frames=5,
                              num_tracks=3, tid_start=1, gid_start=1,
                              video_id=1, anchors=None, rng=None, render=False,
-                             autobuild=True, verbose=3):
+                             autobuild=True, verbose=3, aux=None):
     """
     Create the video scene layout of object positions.
 
@@ -560,6 +577,10 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     TODO:
         - [ ] Need maximum allowed object overlap measure
         - [ ] Need better parameterized path generation
+
+    Ignore:
+        import xdev
+        globals().update(xdev.get_func_kwargs(random_single_video_dset))
 
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
@@ -607,6 +628,13 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         >>> for gid in gids:
         >>>     dset.show_image(gid, pnum=pnums(), fnum=1, title=False)
         >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
+
+    Example:
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> dset = random_single_video_dset(num_frames=10, num_tracks=10, aux=True)
+        >>> assert 'auxiliary' in dset.imgs[1]
+        >>> assert dset.imgs[1]['auxiliary'][0]['channels']
+        >>> assert dset.imgs[1]['auxiliary'][1]['channels']
     """
     import pandas as pd
     import kwcoco
@@ -619,18 +647,49 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     dset.add_video(name='toy_video_{}'.format(video_id), id=video_id)
 
     for frame_idx, gid in enumerate(image_ids):
-        dset.add_image(**{
+        img = {
             'id': gid,
             'file_name': '<todo-generate-{}-{}>'.format(video_id, frame_idx),
             'width': gsize[0],
             'height': gsize[1],
             'frame_index': frame_idx,
             'video_id': video_id,
-        })
+        }
+        if aux:
+            if aux is True:
+                aux = ['disparity', 'flowx|flowy']
+            aux = aux if ub.iterable(aux) else [aux]
+            img['auxiliary'] = []
+            for chaninfo in aux:
+                if isinstance(chaninfo, str):
+                    chaninfo = {
+                        'channels': chaninfo,
+                        'width': gsize[0],
+                        'height': gsize[1],
+                    }
+                # Add placeholder for auxiliary image data
+                auxitem = {
+                    'file_name': '<todo-generate-{}-{}>'.format(video_id, frame_idx),
+                }
+                auxitem.update(chaninfo)
+                img['auxiliary'].append(auxitem)
+
+        dset.add_image(**img)
 
     classes = ['star', 'superstar', 'eff']
     for catname in classes:
         dset.ensure_category(name=catname)
+
+    catpats = CategoryPatterns.coerce(classes, rng=rng)
+
+    if True:
+        # TODO: add ensure keypoint category to dset
+        # Add newstyle keypoint categories
+        kpname_to_id = {}
+        dset.dataset['keypoint_categories'] = []
+        for kpcat in catpats.keypoint_categories:
+            dset.dataset['keypoint_categories'].append(kpcat)
+            kpname_to_id[kpcat['name']] = kpcat['id']
 
     # Generate paths in a way that they are dependant on each other
     paths = random_multi_object_path(
@@ -726,13 +785,44 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
             classes=classes,
         )
 
-        anns = list(dets.to_coco(dset=dset))
+        WITH_KPTS_SSEG = True
+        if WITH_KPTS_SSEG:
+            kpts = []
+            ssegs = []
+            ddims = boxes.data[:, 2:4].astype(np.int)[:, ::-1]
+            offsets = boxes.data[:, 0:2].astype(np.int)
+            cnames = [classes[cidx] for cidx in dets.class_idxs]
+            for dims, xy_offset, cname in zip(ddims, offsets, cnames):
+                info = catpats._todo_refactor_geometric_info(cname, xy_offset, dims)
+                kpts.append(info['kpts'])
+
+                if False and rng.rand() > 0.5:
+                    # sseg dropout
+                    ssegs.append(None)
+                else:
+                    ssegs.append(info['segmentation'])
+
+            dets.data['keypoints'] = kwimage.PointsList(kpts)
+            dets.data['segmentations'] = kwimage.SegmentationList(ssegs)
+
+        anns = list(dets.to_coco(dset=dset, style='new'))
+
         start_frame = 0
         for frame_index, ann in enumerate(anns, start=start_frame):
             ann['track_id'] = tid
             ann['image_id'] = dset.dataset['images'][frame_index]['id']
             dset.add_annotation(**ann)
         tid_to_anns[tid] = anns
+
+    HACK_FIX_COCO_KPTS_FORMAT = True
+    if HACK_FIX_COCO_KPTS_FORMAT:
+        # Hack to fix coco formatting from Detections.to_coco
+        kpt_cats = dset.keypoint_categories()
+        for ann in dset.dataset['annotations']:
+            for kpt in ann['keypoints']:
+                if 'keypoint_category_id' not in kpt:
+                    kp_catname = kpt.pop('keypoint_category')
+                    kpt['keypoint_category_id'] = kpt_cats.node_to_id[kp_catname]
 
     # The dataset has been prepared, now we just render it and we have
     # a nice video dataset.
@@ -783,19 +873,21 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     dset._ensure_json_serializable()
     hashid = dset._build_hashid()[0:24]
 
-    dpath = None
+    print('dpath = {!r}'.format(dpath))
     if dpath is None:
         dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
     else:
         ub.ensuredir(dpath)
     root_dpath = ub.ensuredir((dpath, 'render_{}'.format(hashid)))
     img_dpath = ub.ensuredir((root_dpath, 'images'))
+    print('img_dpath = {!r}'.format(img_dpath))
 
     for gid in dset.imgs.keys():
 
-        render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
+        # Render data inside the image
+        img = render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
 
-        img = dset.imgs[gid]
+        # Extract the data from memory and write it to disk
         imdata = img.pop('imdata')
         fname = 'img_{:05d}.png'.format(gid)
         fpath = join(img_dpath, fname)
@@ -803,9 +895,9 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
             'file_name': fpath,
             'channels': 'rgb',
         })
-        auxillaries = img.pop('auxiliary', None)
-        if auxillaries is not None:
-            for auxdict in auxillaries:
+        auxiliaries = img.pop('auxiliary', None)
+        if auxiliaries is not None:
+            for auxdict in auxiliaries:
                 aux_dpath = ub.ensuredir(
                     (root_dpath, 'aux_' + auxdict['channels']))
                 aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
@@ -814,10 +906,10 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
                 auxdict['file_name'] = aux_fpath
                 try:
                     import gdal  # NOQA
-                    kwimage.imwrite(aux_fpath, auxdata, backend='gdal')
+                    kwimage.imwrite(aux_fpath, auxdata, backend='gdal', space=None)
                 except Exception:
-                    kwimage.imwrite(aux_fpath, auxdata)
-            img['auxiliary'] = auxillaries
+                    kwimage.imwrite(aux_fpath, auxdata, space=None)
+            img['auxiliary'] = auxiliaries
 
         kwimage.imwrite(fpath, imdata)
     dset._build_index()
@@ -842,6 +934,9 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
              with_kpts (bool): include keypoint info
              with_sseg (bool): include segmentation info
 
+    Returns:
+        Dict: the inplace-modified image dictionary
+
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
         >>> gsize=(600, 600)
@@ -850,21 +945,37 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         >>> rng = None
         >>> import kwarray
         >>> rng = kwarray.ensure_rng(rng)
-        >>> dset = random_video_dset(
-        >>>     gsize=gsize, num_frames=num_frames, verbose=verbose, rng=rng, num_videos=2)
+        >>> aux = 'mx'
+        >>> dset = random_single_video_dset(
+        >>>     gsize=gsize, num_frames=num_frames, verbose=verbose, aux=aux, rng=rng)
         >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
         >>> gid = 1
-        >>> renderkw = dict(
-        ...    gray=0,
-        ... )
+        >>> renderkw = {}
         >>> render_toy_image(dset, gid, rng, renderkw=renderkw)
-        >>> gid = 1
-        >>> canvas = dset.imgs[gid]['imdata']
+        >>> img = dset.imgs[gid]
+        >>> canvas = img['imdata']
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
-        >>> kwplot.imshow(canvas, doclf=True)
+        >>> kwplot.autompl()
+        >>> kwplot.imshow(canvas, doclf=True, pnum=(1, 2, 1))
         >>> dets = dset.annots(gid=gid).detections
         >>> dets.draw()
+
+        >>> auxdata = img['auxiliary'][0]['imdata']
+        >>> aux_canvas = false_color(auxdata)
+        >>> kwplot.imshow(aux_canvas, pnum=(1, 2, 2))
+        >>> _ = dets.draw()
+
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> img, anns = demodata_toy_img(gsize=(172, 172), rng=None, aux=True)
+        >>> print('anns = {}'.format(ub.repr2(anns, nl=1)))
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> kwplot.imshow(img['imdata'], pnum=(1, 2, 1), fnum=1)
+        >>> auxdata = img['auxiliary'][0]['imdata']
+        >>> kwplot.imshow(auxdata, pnum=(1, 2, 2), fnum=1)
+        >>> kwplot.show_if_requested()
+
     """
     rng = kwarray.ensure_rng(rng)
 
@@ -887,39 +998,18 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     if with_kpts and newstyle:
         # TODO: add ensure keypoint category to dset
         # Add newstyle keypoint categories
-        kpname_to_id = {}
+        # kpname_to_id = {}
         dset.dataset['keypoint_categories'] = []
         for kpcat in catpats.keypoint_categories:
             dset.dataset['keypoint_categories'].append(kpcat)
-            kpname_to_id[kpcat['name']] = kpcat['id']
+            # kpname_to_id[kpcat['name']] = kpcat['id']
 
     img = dset.imgs[gid]
     gw, gh = img['width'], img['height']
     dims = (gh, gw)
     annots = dset.annots(gid=gid)
 
-    def render_background():
-        # This is 2x as fast for gsize=(300,300)
-        if gray:
-            gshape = (gh, gw, 1)
-            imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
-                                               rng=rng, dtype=np.float32)
-        else:
-            gshape = (gh, gw, 3)
-            # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
-            #                                    rng=rng, dtype=np.float32)
-            # hack because 3 channels is slower
-            imdata = kwarray.uniform(0, 1, gshape, rng=rng, dtype=np.float32)
-        np.clip(imdata, 0, 1, out=imdata)
-
-        aux = 0
-        if aux:
-            auxdata = np.zeros(gshape, dtype=np.float32)
-        else:
-            auxdata = None
-        return imdata, auxdata
-
-    def render_foreground(imdata, auxdata):
+    def render_foreground(imdata, chan_to_auxinfo):
         boxes = annots.boxes
         tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(np.int)
 
@@ -927,6 +1017,9 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         for ann, tlbr in zip(annots.objs, tlbr_boxes):
             catname = dset._resolve_to_cat(ann['category_id'])['name']
             tl_x, tl_y, br_x, br_y = tlbr
+
+            # TODO: Use pad-infinite-slices to fix a bug here
+
             chip_index = tuple([slice(tl_y, br_y), slice(tl_x, br_x)])
             chip = imdata[chip_index]
             xy_offset = (tl_x, tl_y)
@@ -947,16 +1040,18 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
                 if with_kpts:
                     ann['keypoints'] = info['keypoints']
 
-                if auxdata is not None:
-                    if with_sseg:
-                        seg = kwimage.Segmentation.coerce(info['segmentation'])
+                if chan_to_auxinfo is not None:
+                    coco_sseg = ann.get('segmentation', None)
+                    if coco_sseg:
+                        seg = kwimage.Segmentation.coerce(coco_sseg)
                         seg = seg.to_multi_polygon()
-                        val = rng.uniform(0.2, 1.0)
-                        auxdata = seg.fill(auxdata, value=val)
-        return imdata, auxdata
+                        for chankey, auxinfo in chan_to_auxinfo.items():
+                            val = rng.uniform(0.2, 1.0)
+                            auxinfo['imdata'] = seg.fill(auxinfo['imdata'], value=val)
+        return imdata, chan_to_auxinfo
 
-    imdata, auxdata = render_background()
-    imdata, auxdata = render_foreground(imdata, auxdata)
+    imdata, chan_to_auxinfo = render_background(img, rng, gray, bg_intensity, bg_scale)
+    imdata, chan_to_auxinfo = render_foreground(imdata, chan_to_auxinfo)
 
     imdata = (imdata * 255).astype(np.uint8)
     imdata = kwimage.atleast_3channels(imdata)
@@ -969,18 +1064,87 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         'imdata': imdata,
         'channels': main_channels,
     })
-
-    if auxdata is not None:
+    for auxinfo in img.get('auxiliary', []):
+        # Postprocess the auxiliary data so it looks interesting
+        # It would be really cool if we could do this based on what
+        # the simulated channel was.
+        chankey = auxinfo['channels']
+        auxdata = chan_to_auxinfo[chankey]['imdata']
         mask = rng.rand(*auxdata.shape[0:2]) > 0.5
         auxdata = kwimage.fourier_mask(auxdata, mask)
         auxdata = (auxdata - auxdata.min())
         auxdata = (auxdata / max(1e-8, auxdata.max()))
         auxdata = auxdata.clip(0, 1)
-        # Hack aux data is always disparity for now
-        img['auxiliary'] = [{
-            'imdata': auxdata,
-            'channels': 'disparity',
-        }]
+        auxinfo['imdata'] = auxdata
+
+    return img
+
+
+def false_color(twochan):
+    if 0:
+        import sklearn
+        model = sklearn.decomposition.PCA(3)
+        X = twochan.reshape(-1, 2)
+        model.fit(X)
+    else:
+        import sklearn
+        ndim = twochan.ndim
+        dims = twochan.shape[0:2]
+        if ndim == 2:
+            in_channels = 1
+        else:
+            in_channels = twochan.shape[2]
+
+        if in_channels > 1:
+            model = sklearn.decomposition.PCA(1)
+            X = twochan.reshape(-1, in_channels)
+            X_ = model.fit_transform(X)
+            gray = X_.reshape(dims)
+            viz = kwimage.make_heatmask(gray, with_alpha=1)[:, :, 0:3]
+        else:
+            gray = twochan.reshape(dims)
+            viz = gray
+        return viz
+
+
+def render_background(img, rng, gray, bg_intensity, bg_scale):
+    # This is 2x as fast for gsize=(300,300)
+    gw, gh = img['width'], img['height']
+    if gray:
+        gshape = (gh, gw, 1)
+        imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
+                                           rng=rng, dtype=np.float32)
+    else:
+        gshape = (gh, gw, 3)
+        # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
+        #                                    rng=rng, dtype=np.float32)
+        # hack because 3 channels is slower
+        imdata = kwarray.uniform(0, 1, gshape, rng=rng, dtype=np.float32)
+    np.clip(imdata, 0, 1, out=imdata)
+
+    chan_to_auxinfo = {}
+    for auxinfo in img.get('auxiliary', []):
+        chankey = auxinfo['channels']
+        # TODO:
+        # Need to incorporate ChannelSpec abstraction here
+        if chankey in ['mx|my', 'motion']:
+            aux_bands = 2
+        elif chankey == 'flowx|flowy':
+            aux_bands = 2
+        elif chankey == 'disparity':
+            aux_bands = 1
+        else:
+            aux_bands = 1
+        # TODO: make non-aligned auxiliary information?
+        aux_width = auxinfo.get('width', gw)
+        aux_height = auxinfo.get('height', gh)
+        auxshape = (aux_height, aux_width, aux_bands)
+        # auxdata = np.zeros(auxshape, dtype=np.float32)
+        auxdata = kwarray.uniform(0, 0.01, auxshape, rng=rng, dtype=np.float32)
+        auxinfo['imdata'] = auxdata
+        chan_to_auxinfo[chankey] = auxinfo
+
+    return imdata, chan_to_auxinfo
 
 
 def random_multi_object_path(num_objects, num_frames, rng=None):

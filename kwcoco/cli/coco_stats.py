@@ -17,6 +17,9 @@ class CocoStatsCLI:
             'extended': scfg.Value(True, help='show extended stats'),
             'catfreq': scfg.Value(True, help='show category frequency stats'),
             'boxes': scfg.Value(False, help='show bounding box stats'),
+            'annot_attrs': scfg.Value(False, help='show annot attribute information'),
+
+            'embed': scfg.Value(False, help='embed into interactive shell'),
         }
         epilog = """
         Example Usage:
@@ -88,11 +91,29 @@ class CocoStatsCLI:
             df = pd.DataFrame.from_dict(tag_to_freq)
             print(df.to_string(float_format=lambda x: '%0.3f' % x))
 
+        if config['annot_attrs']:
+            print('Annot Attrs')
+            for dset in datasets:
+                print('dset.tag = {!r}'.format(dset.tag))
+
+                attrs = ub.ddict(lambda: 0)
+                for ann in dset.anns.values():
+                    for key, value in ann.items():
+                        if value:
+                            attrs[key] += 1
+
+                print('annot attrs = {!r}'.format(attrs))
+
         if config['boxes']:
             print('Box stats')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
                 print(ub.repr2(dset.boxsize_stats(), nl=-1, precision=2))
+
+        if config['embed']:
+            # Hidden hack
+            import xdev
+            xdev.embed()
 
         # for dset in datasets:
         #     # dset = datasets[0]

@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * Yet more change to `reroot`, this needs to get reviewed and fixed.
 * Fix spelling of auxillary to auxiliary
+* Better auxiliary channel support in toydata
 
 ### Fixed
 * Added version flag to the CLI
@@ -96,3 +97,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Initial version
+
+## Version 0.1.7 - Unreleased

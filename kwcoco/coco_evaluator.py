@@ -50,11 +50,11 @@ class CocoEvalConfig(scfg.Config):
 
         'implicit_ignore_classes': scfg.Value(['ignore']),
 
-        'fp_cutoff': scfg.Value(float('inf'), help='false positive cutoff for ROC'),
+        'fp_cutoff': scfg.Value(float('inf'), help='False positive cutoff for ROC'),
 
         'iou_thresh': scfg.Value(
             value=0.5,
-            help='one or more IoU overlap threshold for detection assignment',
+            help='One or more IoU overlap threshold for detection assignment',
             # alias=['ovthresh']
         ),
 
@@ -63,12 +63,12 @@ class CocoEvalConfig(scfg.Config):
             choices=['all', 'mutex', 'ancestors'],
             help=ub.paragraph(
                 '''
-                matching strategy for which true annots are allowed to match
+                Matching strategy for which true annots are allowed to match
                 which predicted annots.
-                mutex means true boxes can only match predictions where the
-                true class has highest probability.
-                all means any class can match any other class.
-                dont use ancestors it is broken.
+                `mutex` means true boxes can only match predictions where the
+                true class has highest probability (pycocotools setting).
+                `all` means any class can match any other class.
+                Dont use `ancestors`, it is broken.
                 ''')),
 
         'monotonic_ppv': scfg.Value(True, help=ub.paragraph(
@@ -78,10 +78,24 @@ class CocoEvalConfig(scfg.Config):
             option.
             ''')),
 
-        # TODO options:
+        'ap_method': scfg.Value('pycocotools', help=ub.paragraph(
+            '''
+            Method for computing AP. Defaults to a setting comparable to
+            pycocotools. Can also be set to sklearn to use an alterative
+            method.
+            ''')),
+
+        'use_area_attr': scfg.Value(
+            'try', help=ub.paragraph(
+                '''
+                if True (pycocotools setting) uses the area coco attribute to
+                filter area range instead of bbox area. Otherwise just filters
+                based on bbox area. If 'try' then it tries to use it but will
+                fallback if it does not exist.
+                ''')),
 
         'area_range': scfg.Value(
-            value=['all', 'small'],
+            value=['all'],
             # value='0-inf,0-32,32-96,96-inf',
             help=(
                 'minimum and maximum object areas to consider. '
@@ -89,16 +103,22 @@ class CocoEvalConfig(scfg.Config):
                 'also accepts keys all, small, medium, and large. '
             )),
 
+        # TODO options:
         'max_dets': scfg.Value(np.inf, help=(
             'maximum number of predictions to consider')),
 
+        'iou_bias': scfg.Value(1, help=(
+            'pycocotools setting is 1, but 0 may be better')),
+
         # Extra options
+        'force_pycocoutils': scfg.Value(False, help=(
+            'ignore all other options and just use pycocoutils to score')),
 
         # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
 
         'assign_workers': scfg.Value(8, help='number of background workers for assignment'),
 
-        'ovthresh': scfg.Value(None, help='alias for iou_thresh'),
+        'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
 
         'classes_of_interest': scfg.Value(
             None, type=list,
@@ -569,7 +589,7 @@ class CocoEvaluator(object):
             >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
             >>> results.dump_figures(dpath)
             >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
-            >>> # xdoctest: +REQUIRES(--show)
+            >>> # xdoctest: +REQUIRES(--vd)
             >>> if ub.argflag('--vd') or 1:
             >>>     import xdev
             >>>     xdev.view_directory(dpath)
@@ -601,24 +621,42 @@ class CocoEvaluator(object):
         if not area_ranges:
             area_ranges = ['all']
 
+        print('Building confusion vectors')
+        if coco_eval.config['force_pycocoutils']:
+            # TODO: extract the PR curves from pycocotools
+            coco_scores = dmet.score_pycocotools(
+                verbose=3,
+                with_evaler=True,
+                with_confusion=True,
+                iou_thresholds=iou_thresholds,
+                # max_dets=coco_eval.config['max_dets'],
+            )
+            iou_to_cfsn_vecs = coco_scores['iou_to_cfsn_vecs']
+        else:
+            iou_to_cfsn_vecs = dmet.confusion_vectors(
+                ignore_classes=ignore_classes,
+                compat=coco_eval.config['compat'],
+                iou_thresh=iou_thresholds,
+                workers=coco_eval.config['assign_workers'],
+                bias=coco_eval.config['iou_bias'],
+                max_dets=coco_eval.config['max_dets'],
+            )
+
         # Remove large datasets values in configs that are not file references
         base_meta = dict(coco_eval.config)
         if not isinstance(base_meta['true_dataset'], str):
             base_meta['true_dataset'] = '<not-a-file-ref>'
         if not isinstance(base_meta['pred_dataset'], str):
             base_meta['pred_dataset'] = '<not-a-file-ref>'
+        # Add machine-specific metadata
+        import platform
+        base_meta['hostname'] = platform.node()
+        base_meta['timestamp'] = ub.timestamp()
 
         resdata = {}
+
         for iou_thresh in iou_thresholds:
-            # Detection only scoring
-            print('Building confusion vectors')
-            cfsn_vecs = dmet.confusion_vectors(
-                ignore_classes=ignore_classes,
-                compat=coco_eval.config['compat'],
-                iou_thresh=iou_thresh,
-                workers=coco_eval.config['assign_workers'],
-                max_dets=coco_eval.config['max_dets'],
-            )
+            cfsn_vecs = iou_to_cfsn_vecs[iou_thresh]
             print('cfsn_vecs = {!r}'.format(cfsn_vecs))
 
             # NOTE: translating to classless confusion vectors only works when
@@ -627,14 +665,16 @@ class CocoEvaluator(object):
             measurekw = dict(
                 fp_cutoff=coco_eval.config['fp_cutoff'],
                 monotonic_ppv=coco_eval.config['monotonic_ppv'],
+                ap_method=coco_eval.config['ap_method'],
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
-            for minmax, new_weights in zip(area_ranges, dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges)):
-                print('new_weights = {!r}'.format(new_weights.sum()))
+            weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
+            for minmax_key, minmax, new_weights in weight_gen:
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
                 nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
-                ovr_binvecs   = cfsn_vecs.binarize_ovr(ignore_classes=ignore_classes)
+                ovr_binvecs   = cfsn_vecs.binarize_ovr(
+                    ignore_classes=ignore_classes, approx=0, mode=1)
                 nocls_measures = nocls_binvecs.measures(**measurekw)
                 ovr_measures = ovr_binvecs.measures(**measurekw)['perclass']
                 # print('minmax = {!r}'.format(minmax))
@@ -677,9 +717,11 @@ class CocoEvaluator(object):
                     result.ovr_measures2 = ovr_measures2
 
                 reskey = ub.repr2(
-                    dict(area_range=minmax, iou_thresh=iou_thresh),
-                    nl=0, explicit=1, itemsep='', nobr=1)
+                    dict(area_range=minmax_key, iou_thresh=iou_thresh),
+                    nl=0, explicit=1, itemsep='', nobr=1, sv=1)
                 resdata[reskey] = result
+                if coco_eval.config['force_pycocoutils']:
+                    resdata['pct_stats'] = coco_scores['evalar_stats']
                 print('reskey = {!r}'.format(reskey))
                 print('result = {!r}'.format(result))
 
@@ -687,44 +729,86 @@ class CocoEvaluator(object):
         return results
 
 
-def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges):
+def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
+                      use_area_attr=False):
+    """
+    Hacky function to compute confusion vector ignore weights for different
+    area thresholds. Needs to be slightly refactored.
+    """
+    if use_area_attr:
+        coco_true = coco_eval.true_extra['coco_dset']
+        try:
+            coco_pred = coco_eval.pred_extra['coco_dset']
+        except Exception:
+            pass
+
     # Basic logic to handle area-range by weight modification.
-    for minmax in area_ranges:
-        print('minmax = {!r}'.format(minmax))
-        if isinstance(minmax, str):
-            if minmax == 'small':
+    for minmax_key in area_ranges:
+        if isinstance(minmax_key, str):
+            if minmax_key == 'small':
                 minmax = [0 ** 2, 32 ** 2]
-            if minmax == 'medium':
+            elif minmax_key == 'medium':
                 minmax = [32 ** 2, 96 ** 2]
-            if minmax == 'large':
+            elif minmax_key == 'large':
                 minmax = [96 ** 2, 1e5 ** 2]
-            if minmax == 'all':
+            elif minmax_key == 'all':
                 minmax = [0, float('inf')]
+            else:
+                raise KeyError(minmax_key)
+        else:
+            minmax = minmax_key
         area_min, area_max = minmax
         gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
         new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
         for gid, groupx in zip(gids, groupxs):
-            # Ignore any truth outside the area range
-            true_area = dmet.gid_to_true_dets[gid].boxes.area
+            if use_area_attr:
+                # Use coco area attribute (if available)
+                try:
+                    true_dets = dmet.gid_to_true_dets[gid]
+                    true_annots = coco_true.annots(true_dets.data['aids'])
+                    true_area = np.array(true_annots.lookup('area'))
+                except Exception:
+                    if use_area_attr != 'try':
+                        raise
+                # Yet another pycocotools inconsistency:
+                # We typically dont have segmentation area for predictions,
+                # so we have to use bbox area for predictions (which only
+                # matters if they are not assigned to a truth)
+                try:
+                    pred_dets = dmet.gid_to_pred_dets[gid]
+                    pred_annots = coco_pred.annots(pred_dets.data['aids'])
+                    pred_area = np.array(pred_annots.lookup('area'))
+                except Exception:
+                    if use_area_attr != 'try':
+                        import warnings
+                        warnings.warn('Predictions do not have area attributes')
+                    pred_area = dmet.gid_to_pred_dets[gid].boxes.area
+            else:
+                true_area = dmet.gid_to_true_dets[gid].boxes.area
+                pred_area = dmet.gid_to_pred_dets[gid].boxes.area
+
+            # pycocotools is inclusive (valid if min <= area <= max) on both
+            # ends of the area range so we are following that here as well.
+
+            # Ignore any truth outside the area bounds
             txs = cfsn_vecs.data['txs'][groupx]
             tx_flags = txs > -1
             tarea = true_area[txs[tx_flags]].ravel()
-            is_toob = ((tarea < area_min) | (tarea >= area_max))
+            is_toob = ((tarea < area_min) | (tarea > area_max))
             toob_idxs = groupx[tx_flags][is_toob]
 
-            # Ignore any *unassigned* prediction outside the area range
-            pred_area = dmet.gid_to_pred_dets[gid].boxes.area
+            # Ignore any *unassigned* prediction outside the area bounds
             pxs = cfsn_vecs.data['pxs'][groupx]
             px_flags = (pxs > -1) & (txs < 0)
             parea = pred_area[pxs[px_flags]].ravel()
-            is_poob = ((parea < area_min) | (parea >= area_max))
+            is_poob = ((parea < area_min) | (parea > area_max))
             poob_idxs = groupx[px_flags][is_poob]
             new_ignore[poob_idxs] = True
             new_ignore[toob_idxs] = True
 
         new_weights = orig_weights.copy()
         new_weights[new_ignore] = 0
-        yield new_weights
+        yield minmax_key, minmax, new_weights
 
 
 class CocoResults(ub.NiceRepr, DictProxy):
@@ -772,8 +856,12 @@ class CocoResults(ub.NiceRepr, DictProxy):
         """
         print(ub.repr2(results.__json__(), nl=-1))
         """
-        # from kwcoco.util.util_json import ensure_json_serializable
-        state = {k: v.__json__() for k, v in results.items()}
+        from kwcoco.util.util_json import ensure_json_serializable
+        state = {
+            k: (ensure_json_serializable(v)
+                if not hasattr(v, '__json__') else v.__json__())
+            for k, v in results.items()
+        }
         # ensure_json_serializable(state, normalize_containers=True, verbose=0)
         return state
 
@@ -1073,7 +1161,9 @@ def main(cmdline=True, **kw):
         kwcoco eval \
             --true_dataset=$HOME/.cache/kwcoco/tests/eval/true.mscoco.json \
             --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
-            --out_dpath=$HOME/.cache/kwcoco/tests/eval/out
+            --out_dpath=$HOME/.cache/kwcoco/tests/eval/out \
+            --force_pycocoutils=False \
+            --area_range=all,0-4096,4096-inf
 
         nautilus $HOME/.cache/kwcoco/tests/eval/out
     """
@@ -1086,6 +1176,10 @@ def main(cmdline=True, **kw):
     coco_eval._init()
 
     results = coco_eval.evaluate()
+
+    # if coco_eval.config['force_pycocoutils']:
+    #     print('forced pycocotools, no other analysis will be done')
+    #     return
 
     ub.ensuredir(cli_config['out_dpath'])
 

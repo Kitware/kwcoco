@@ -1095,10 +1095,29 @@ class MixinCocoExtras(object):
             >>>     kwplot.imshow(canvas, pnum=pnums[gx], fnum=fnum)
             >>>     #dset.show_image(gid=gid, pnum=pnums[gx])
             >>> kwplot.show_if_requested()
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes5-aux', num_frames=1,
+            >>>                                verbose=0, rng=None)
+
+        Ignore:
+            >>> # Test the cache
+            >>> key = 'vidshapes8-aux'
+            >>> kw = {}
+            >>> self1 = cls.demo(key=key, use_cache=False, **kw)
+            >>> self2 = cls.demo(key=key, use_cache=True, **kw)
+            >>> self2 = cls.demo(key=key, use_cache=True, **kw)
+            >>> # The non-cached version should be exactly the same as the
+            >>> # cached version.
+            >>> assert self1.fpath == self2.fpath
+            >>> assert self1.dataset == self2.dataset
+            >>> assert self1.dataset is not self2.dataset
         """
+        import parse
+        from kwcoco.demo import toydata
+
         if key.startswith('shapes'):
-            from kwcoco.demo import toydata
-            import parse
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:
                 kw['n_imgs'] = int(res.named['num_imgs'])
@@ -1107,20 +1126,56 @@ class MixinCocoExtras(object):
             dataset = toydata.demodata_toy_dset(**kw)
             self = cls(dataset, tag=key)
         elif key.startswith('vidshapes'):
-            from kwcoco.demo import toydata
-            import parse
-            res = parse.parse('{prefix}{num_videos:d}', key)
-
+            res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
             vidkw = {
                 'render': True,
-                'num_videos': 2,
+                'num_videos': 1,
+                'num_frames': 2,
+                'anchors': None,
+                'gsize': (600, 600),
+                'aux': None,
             }
             if res:
                 kw['num_videos'] = int(res.named['num_videos'])
-            # if 'rng' not in kw and 'n_imgs' in kw:
-            #     kw['rng'] = kw['n_imgs']
+                suff_parts = res.named['suffix'].split('-')
+            else:
+                suff_parts = []
+
+            if 'aux' in suff_parts:
+                vidkw['aux'] = True
+
             vidkw.update(kw)
-            self = toydata.random_video_dset(**vidkw)
+            use_cache = vidkw.pop('use_cache', True)
+
+            if 'rng' not in vidkw:
+                # Make rng determined by other params by default
+                vidkw['rng'] = int(ub.hash_data(ub.repr2(vidkw))[0:8], 16)
+            cfgstr = ub.hash_data(ub.repr2(vidkw))[0:32]
+
+            tag = key + '_' + cfgstr
+
+            dpath = vidkw.get('dpath', None)
+            if dpath is None:
+                # Even if the cache is off, we still will need this because it
+                # will write rendered data to disk. Perhaps we can make this
+                # optional in the future.
+                dpath = vidkw['dpath'] = ub.ensure_app_cache_dir('kwcoco', 'toy_dset', tag)
+            fpath = join(dpath, tag + '.kwcoco.json')
+            stamp = ub.CacheStamp(key, dpath=dpath, cfgstr=cfgstr,
+                                  enabled=use_cache, product=[fpath],
+                                  verbose=100,
+                                  # meta=vidkw  # requires ubelt>=0.9.3
+                                  )
+            if stamp.expired():
+                self = toydata.random_video_dset(**vidkw)
+                self.reroot(dpath)
+                self.fpath = fpath
+                if fpath is not None:
+                    self.dump(fpath, newlines=True)
+                    stamp.renew()
+            else:
+                self = cls(fpath)
+
             # self = cls(dataset, tag=key)
         elif key == 'photos':
             dataset = demo_coco_data()
@@ -2023,41 +2078,8 @@ class MixinCocoExtras(object):
 
     def _ensure_json_serializable(self):
         # inplace convert any ndarrays to lists
-
-        def _walk_json(data, prefix=[]):
-            items = None
-            if isinstance(data, list):
-                items = enumerate(data)
-            elif isinstance(data, dict):
-                items = data.items()
-            else:
-                raise TypeError(type(data))
-
-            root = prefix
-            level = {}
-            for key, value in items:
-                level[key] = value
-
-            # yield a dict so the user can choose to not walk down a path
-            yield root, level
-
-            for key, value in level.items():
-                if isinstance(value, (dict, list)):
-                    path = prefix + [key]
-                    for _ in _walk_json(value, prefix=path):
-                        yield _
-
-        to_convert = []
-        for root, level in ub.ProgIter(_walk_json(self.dataset), desc='walk json'):
-            for key, value in level.items():
-                if isinstance(value, np.ndarray):
-                    to_convert.append((root, key))
-
-        for root, key in to_convert:
-            d = self.dataset
-            for k in root:
-                d = d[k]
-            d[key] = d[key].tolist()
+        from kwcoco.util.util_json import ensure_json_serializable
+        _ = ensure_json_serializable(self.dataset, verbose=1)
 
     def _aspycoco(self):
         # Converts to the official pycocotools.coco.COCO object

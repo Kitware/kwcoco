@@ -237,17 +237,28 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                 true_dets.boxes[true_idxs], bias=bias)
             _px_to_iou = dict(zip(pred_idxs, ious))
             iou_lookup.update(_px_to_iou)
-    isvalid_lookup = {px: ious > iou_thresh for px, ious in iou_lookup.items()}
 
-    y =  _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
-                        cx_to_matchable_txs, bg_weight, prioritize, iou_thresh,
-                        pdist_priority, cx_to_ancestors, bg_cidx,
-                        ignore_classes=ignore_classes, max_dets=max_dets)
-    return y
+    iou_thresh_list = (
+        [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh)
+
+    iou_thresh_to_y = {}
+    for iou_thresh_ in iou_thresh_list:
+        isvalid_lookup = {px: ious > iou_thresh_ for px, ious in iou_lookup.items()}
+
+        y =  _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
+                            cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
+                            pdist_priority, cx_to_ancestors, bg_cidx,
+                            ignore_classes=ignore_classes, max_dets=max_dets)
+        iou_thresh_to_y[iou_thresh_] = y
+
+    if ub.iterable(iou_thresh):
+        return iou_thresh_to_y
+    else:
+        return y
 
 
 def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
-                   cx_to_matchable_txs, bg_weight, prioritize, iou_thresh,
+                   cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                    pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes,
                    max_dets):
     # Notes:
@@ -277,13 +288,11 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         _pred_scores = _pred_scores[0:max_dets]
 
     if ignore_classes is not None:
-        # Remove certain ignore regions from scoring
-
         # FIXME: does this use the iou threshold correctly?
         # iou_thresh is being used as iooa not iou to determine which
         # pred regions are ignored.
         true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
-            true_dets, pred_dets, iou_thresh=iou_thresh, ignore_classes=ignore_classes)
+            true_dets, pred_dets, ioaa_thresh=iou_thresh_, ignore_classes=ignore_classes)
 
         # Remove ignored predicted regions from assignment consideration
         _pred_keep_flags = ~pred_ignore_flags[_pred_sortx]
@@ -302,6 +311,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     y_pxs = []
     y_txs = []
 
+    # NOTE: I don't think this actualy does anything anymore
     if prioritize == 'correct' or prioritize == 'class':
         used_truth_policy = 'next_best'
     else:
@@ -328,16 +338,20 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             cand_true_idxs = unused_true_idxs
 
             if prioritize == 'iou':
-                # simply match the true box with the highest iou regardless of
-                # category
+                # simply match the true box with the highest iou (that is also
+                # considered matchable)
 
                 if used_truth_policy == 'next_best':
+
+                    # TODO: VERIFY THIS IS NO DIFFERENT THAN "MARK_FALSE" AND
+                    # REMOVE.
+
                     # Dont even consider matches to previously used groundtruth
                     # (note this means it will be marked as a false positive)
                     cand_ious = iou_lookup[px].compress(unused)
                     ovidx = cand_ious.argmax()
                     ovmax = cand_ious[ovidx]
-                    if ovmax > iou_thresh:
+                    if ovmax > iou_thresh_:
                         tx = cand_true_idxs[ovidx]
                 elif used_truth_policy == 'mark_false':
                     # Consider a match to a previously used truth a false (note
@@ -347,7 +361,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                     cand_ious = iou_lookup[px]
                     ovidx = cand_ious.argmax()
                     ovmax = cand_ious[ovidx]
-                    if ovmax > iou_thresh:
+                    if ovmax > iou_thresh_:
                         tx = true_idxs[ovidx]
                         if not unused[ovidx]:
                             tx = -1
@@ -511,10 +525,19 @@ def _fast_pdist_priority(classes, prioritize, _cache={}):
     return pdist_priority
 
 
-def _filter_ignore_regions(true_dets, pred_dets, iou_thresh=0.5,
+def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
                            ignore_classes='ignore'):
     """
     Determine which true and predicted detections should be ignored.
+
+    Args:
+
+        true_dets (Detections)
+
+        pred_dets (Detections)
+
+        ioaa_thresh (float): intersection over other area thresh for ignoring
+            a region.
 
     Returns:
         Tuple[ndarray, ndarray]: flags indicating which true and predicted
@@ -528,16 +551,16 @@ def _filter_ignore_regions(true_dets, pred_dets, iou_thresh=0.5,
         >>> true_dets = kwimage.Detections.random(
         >>>     segmentations=True, classes=['a', 'b', 'c', 'ignore'])
         >>> ignore_classes = {'ignore', 'b'}
-        >>> iou_thresh = 0.5
+        >>> ioaa_thresh = 0.5
         >>> print('true_dets = {!r}'.format(true_dets))
         >>> print('pred_dets = {!r}'.format(pred_dets))
         >>> flags1, flags2 = _filter_ignore_regions(
-        >>>     true_dets, pred_dets, iou_thresh=iou_thresh, ignore_classes=ignore_classes)
+        >>>     true_dets, pred_dets, ioaa_thresh=ioaa_thresh, ignore_classes=ignore_classes)
         >>> print('flags1 = {!r}'.format(flags1))
         >>> print('flags2 = {!r}'.format(flags2))
 
         >>> flags3, flags4 = _filter_ignore_regions(
-        >>>     true_dets, pred_dets, iou_thresh=iou_thresh,
+        >>>     true_dets, pred_dets, ioaa_thresh=ioaa_thresh,
         >>>     ignore_classes={c.upper() for c in ignore_classes})
         >>> assert np.all(flags1 == flags3)
         >>> assert np.all(flags2 == flags4)
@@ -588,7 +611,7 @@ def _filter_ignore_regions(true_dets, pred_dets, iou_thresh=0.5,
                                   pred_boxes.area).clip(0, 1).sum(axis=1)
                 ignore_overlap = np.nan_to_num(ignore_overlap)
 
-            ignore_idxs = np.where(ignore_overlap > iou_thresh)[0]
+            ignore_idxs = np.where(ignore_overlap > ioaa_thresh)[0]
 
             if ignore_sseg is not None:
                 from shapely.ops import cascaded_union
@@ -614,7 +637,7 @@ def _filter_ignore_regions(true_dets, pred_dets, iou_thresh=0.5,
                         ignore_overlap[idx] = overlap
                     except Exception as ex:
                         warnings.warn('ex = {!r}'.format(ex))
-            pred_ignore_flags = ignore_overlap > iou_thresh
+            pred_ignore_flags = ignore_overlap > ioaa_thresh
     return true_ignore_flags, pred_ignore_flags
 
 if __name__ == '__main__':

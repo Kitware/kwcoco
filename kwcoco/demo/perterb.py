@@ -6,6 +6,15 @@ def perterb_coco(coco_dset, **kwargs):
     """
     Perterbs a coco dataset
 
+    Args:
+        rng (int, default=0):
+        box_noise (int, default=0):
+        cls_noise (int, default=0):
+        null_pred (bool, default=False):
+        with_probs (bool, default=False):
+        score_noise (float, default=0.2):
+        hacked (int, default=1):
+
     Example:
         >>> from kwcoco.demo.perterb import *  # NOQA
         >>> from kwcoco.demo.perterb import _demo_construct_probs
@@ -22,7 +31,10 @@ def perterb_coco(coco_dset, **kwargs):
     Ignore:
         import xdev
         from kwcoco.demo.perterb import perterb_coco  # NOQA
-        xdev.get_func_kwargs(perterb_coco)
+        defaultkw = xdev.get_func_kwargs(perterb_coco)
+        for k, v in defaultkw.items():
+            desc = ''
+            print('{} ({}, default={}): {}'.format(k, type(v).__name__, v, desc))
 
     """
     import kwimage
@@ -97,7 +109,14 @@ def perterb_coco(coco_dset, **kwargs):
         for aid in aids:
             # Perterb box coordinates
             ann = new_dset.anns[aid]
-            ann['bbox'] = (np.array(ann['bbox']) + box_noise_RV(4)).tolist()
+
+            new_bbox = (np.array(ann['bbox']) + box_noise_RV(4)).tolist()
+            new_x, new_y, new_w, new_h = new_bbox
+            allow_neg_boxes = 0
+            if not allow_neg_boxes:
+                new_w = max(new_w, 0)
+                new_h = max(new_h, 0)
+            ann['bbox'] = [new_x, new_y, new_w, new_h]
             ann['score'] = float(true_score_RV(1)[0])
 
             if cls_noise_RV():
