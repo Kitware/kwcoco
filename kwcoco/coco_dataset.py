@@ -1163,7 +1163,9 @@ class MixinCocoExtras(object):
             fpath = join(dpath, tag + '.kwcoco.json')
             stamp = ub.CacheStamp(key, dpath=dpath, cfgstr=cfgstr,
                                   enabled=use_cache, product=[fpath],
-                                  verbose=100, meta=vidkw)
+                                  verbose=100,
+                                  # meta=vidkw  # requires ubelt>=0.9.3
+                                  )
             if stamp.expired():
                 self = toydata.random_video_dset(**vidkw)
                 self.reroot(dpath)

@@ -1073,6 +1073,7 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
 def pycocotools_confusion_vectors(dmet, evaler, iou_thresh=0.5, verbose=0):
     """
     Example:
+        >>> # xdoctest: +REQUIRES(module:pycocotools)
         >>> from kwcoco.metrics.detect_metrics import *
         >>> dmet = DetectionMetrics.demo(
         >>>     nimgs=10, nboxes=(0, 3), n_fn=(0, 1), n_fp=(0, 1), classes=8, with_probs=False)
