@@ -8,6 +8,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.1.8 - Unreleased
 
 
+## Version 0.1.7 - Released 2020-10-23
+
+### Changed
+* Better support for pycocotools 
+* Better evaluation code
+* Better auxiliary data
+* Tweaks in CLI stats script
+
 ## Version 0.1.6 - Released 2020-10-23
 
 ### Added
@@ -100,5 +108,3 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Initial version
-
-## Version 0.1.7 - Released 2020-10-23
