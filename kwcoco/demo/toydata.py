@@ -411,9 +411,9 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                 'file_name': fpath,
                 'channels': 'rgb',
             })
-            auxillaries = img.pop('auxiliary', None)
-            if auxillaries is not None:
-                for auxdict in auxillaries:
+            auxiliaries = img.pop('auxiliary', None)
+            if auxiliaries is not None:
+                for auxdict in auxiliaries:
                     aux_dpath = ub.ensuredir(
                         (root_dpath, 'aux_' + auxdict['channels']))
                     aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
@@ -428,7 +428,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                     except Exception:
                         kwimage.imwrite(aux_fpath, auxdata)
 
-                img['auxiliary'] = auxillaries
+                img['auxiliary'] = auxiliaries
 
             dataset['images'].append(img)
             for ann in anns:
@@ -462,7 +462,8 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
 
 def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
-        gsize=(600, 600), verbose=3, render=False, aux=None, rng=None):
+        gsize=(600, 600), verbose=3, render=False, aux=None, rng=None,
+        dpath=None):
     """
     Create a toy Coco Video Dataset
 
@@ -480,6 +481,9 @@ def random_video_dset(
             :func:`render_toy_image` for details.
 
         rng (int | None | RandomState): random seed / state
+
+        dpath (str): only used if render is truthy, place to write rendered
+            images.
 
     SeeAlso:
         random_single_video_dset
@@ -532,7 +536,7 @@ def random_video_dset(
         if not render:
             renderkw = None
     if renderkw:
-        render_toy_dataset(dset, rng=rng, renderkw=renderkw)
+        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw)
 
     dset._build_index()
     return dset
@@ -869,19 +873,21 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     dset._ensure_json_serializable()
     hashid = dset._build_hashid()[0:24]
 
-    dpath = None
+    print('dpath = {!r}'.format(dpath))
     if dpath is None:
         dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
     else:
         ub.ensuredir(dpath)
     root_dpath = ub.ensuredir((dpath, 'render_{}'.format(hashid)))
     img_dpath = ub.ensuredir((root_dpath, 'images'))
+    print('img_dpath = {!r}'.format(img_dpath))
 
     for gid in dset.imgs.keys():
 
-        render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
+        # Render data inside the image
+        img = render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
 
-        img = dset.imgs[gid]
+        # Extract the data from memory and write it to disk
         imdata = img.pop('imdata')
         fname = 'img_{:05d}.png'.format(gid)
         fpath = join(img_dpath, fname)
@@ -889,9 +895,9 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
             'file_name': fpath,
             'channels': 'rgb',
         })
-        auxillaries = img.pop('auxiliary', None)
-        if auxillaries is not None:
-            for auxdict in auxillaries:
+        auxiliaries = img.pop('auxiliary', None)
+        if auxiliaries is not None:
+            for auxdict in auxiliaries:
                 aux_dpath = ub.ensuredir(
                     (root_dpath, 'aux_' + auxdict['channels']))
                 aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
@@ -903,7 +909,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
                     kwimage.imwrite(aux_fpath, auxdata, backend='gdal', space=None)
                 except Exception:
                     kwimage.imwrite(aux_fpath, auxdata, space=None)
-            img['auxiliary'] = auxillaries
+            img['auxiliary'] = auxiliaries
 
         kwimage.imwrite(fpath, imdata)
     dset._build_index()
@@ -927,6 +933,9 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
              newstyle (bool): use new kwcoco datastructure formats
              with_kpts (bool): include keypoint info
              with_sseg (bool): include segmentation info
+
+    Returns:
+        Dict: the inplace-modified image dictionary
 
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
@@ -1056,7 +1065,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         'channels': main_channels,
     })
     for auxinfo in img.get('auxiliary', []):
-        # Postprocess the auxillary data so it looks interesting
+        # Postprocess the auxiliary data so it looks interesting
         # It would be really cool if we could do this based on what
         # the simulated channel was.
         chankey = auxinfo['channels']
@@ -1067,6 +1076,8 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         auxdata = (auxdata / max(1e-8, auxdata.max()))
         auxdata = auxdata.clip(0, 1)
         auxinfo['imdata'] = auxdata
+
+    return img
 
 
 def false_color(twochan):
@@ -1124,7 +1135,7 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
             aux_bands = 1
         else:
             aux_bands = 1
-        # TODO: make non-aligned auxillary information?
+        # TODO: make non-aligned auxiliary information?
         aux_width = auxinfo.get('width', gw)
         aux_height = auxinfo.get('height', gh)
         auxshape = (aux_height, aux_width, aux_bands)

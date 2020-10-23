@@ -95,7 +95,7 @@ class CocoEvalConfig(scfg.Config):
                 ''')),
 
         'area_range': scfg.Value(
-            value=['all', 'small'],
+            value=['all'],
             # value='0-inf,0-32,32-96,96-inf',
             help=(
                 'minimum and maximum object areas to consider. '
@@ -669,7 +669,7 @@ class CocoEvaluator(object):
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
             weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
-            for minmax, new_weights in weight_gen:
+            for minmax_key, minmax, new_weights in weight_gen:
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
                 nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
@@ -717,7 +717,7 @@ class CocoEvaluator(object):
                     result.ovr_measures2 = ovr_measures2
 
                 reskey = ub.repr2(
-                    dict(area_range=minmax, iou_thresh=iou_thresh),
+                    dict(area_range=minmax_key, iou_thresh=iou_thresh),
                     nl=0, explicit=1, itemsep='', nobr=1, sv=1)
                 resdata[reskey] = result
                 if coco_eval.config['force_pycocoutils']:
@@ -743,16 +743,20 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
             pass
 
     # Basic logic to handle area-range by weight modification.
-    for minmax in area_ranges:
-        if isinstance(minmax, str):
-            if minmax == 'small':
+    for minmax_key in area_ranges:
+        if isinstance(minmax_key, str):
+            if minmax_key == 'small':
                 minmax = [0 ** 2, 32 ** 2]
-            if minmax == 'medium':
+            elif minmax_key == 'medium':
                 minmax = [32 ** 2, 96 ** 2]
-            if minmax == 'large':
+            elif minmax_key == 'large':
                 minmax = [96 ** 2, 1e5 ** 2]
-            if minmax == 'all':
+            elif minmax_key == 'all':
                 minmax = [0, float('inf')]
+            else:
+                raise KeyError(minmax_key)
+        else:
+            minmax = minmax_key
         area_min, area_max = minmax
         gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
         new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
@@ -804,7 +808,7 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
 
         new_weights = orig_weights.copy()
         new_weights[new_ignore] = 0
-        yield minmax, new_weights
+        yield minmax_key, minmax, new_weights
 
 
 class CocoResults(ub.NiceRepr, DictProxy):
