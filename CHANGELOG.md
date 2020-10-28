@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.8 - Unreleased
 
+### Changed
+* Make kwplot, matplotlib, and seaborn optional
+
 
 ## Version 0.1.7 - Released 2020-10-23
 

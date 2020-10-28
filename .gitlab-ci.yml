@@ -270,8 +270,40 @@ stages:
         - pip install pip -U
         - pip install pip setuptools -U
         - python -V  # Print out python version for debugging
-        - pip install -r requirements.txt
-        - pip install .  
+        - pip install .[all]
+        # FIXME: we should start from a docker iamge that already has LibGL setup
+        - apt update && apt install libgl1-mesa-glx -y && rm -rf /var/lib/apt/lists/*  
+
+    script: 
+        - ./run_tests.py
+
+    cache:
+        paths:
+            - .cache/pip
+            - venv/
+
+    # Coverage is a regex that will parse the coverage from the test stdout
+    coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+
+
+.test_minimal_template: &test_minimal_template
+    # Tags define which runners will accept which jobs
+    <<: 
+        - *common_template
+
+    stage: 
+        test
+    
+    before_script:
+        - python -V  # Print out python version for debugging
+        - export PYVER=$(python -c "import sys; print('{}{}'.format(*sys.version_info[0:2]))")
+        - pip install virtualenv
+        - virtualenv venv$PYVER
+        - source venv$PYVER/bin/activate
+        - pip install pip -U
+        - pip install pip setuptools -U
+        - python -V  # Print out python version for debugging
+        - pip install .[tests]  
         # FIXME: we should start from a docker iamge that already has LibGL setup
         - apt update && apt install libgl1-mesa-glx -y && rm -rf /var/lib/apt/lists/*  
 
@@ -392,6 +424,11 @@ test_full/cp38-cp38-linux:
     image:
         python:3.8
 
+test_minimal/cp38-cp38-linux:
+    <<: 
+        - *test_minimal_template
+    image:
+        python:3.8
 
 # for universal builds we only need to gpg sign once
 gpgsign/cp38-cp38-linux:
@@ -422,6 +459,11 @@ test_full/cp37-cp37m-linux:
     image:
         python:3.7
 
+test_minimal/cp37-cp37m-linux:
+    <<: 
+        - *test_minimal_template
+    image:
+        python:3.7
 
 # ---------------
 # Python 3.6 Jobs
@@ -438,6 +480,12 @@ test_full/cp36-cp36m-linux:
     image:
         python:3.6
 
+
+test_minimal/cp36-cp36m-linux:
+    <<: 
+        - *test_minimal_template
+    image:
+        python:3.6
 
 # ---------------
 # Python 3.5 Jobs
