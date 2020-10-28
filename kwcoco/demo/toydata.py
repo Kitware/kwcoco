@@ -1149,83 +1149,215 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
 
 def random_multi_object_path(num_objects, num_frames, rng=None):
     """
-    num_objects = 30
-    num_frames = 30
+
+    import kwarray
+    import kwplot
+    plt = kwplot.autoplt()
+
+    num_objects = 5
+    num_frames = 100
+    rng = kwarray.ensure_rng(0)
 
     from kwcoco.demo.toydata import *  # NOQA
     paths = random_multi_object_path(num_objects, num_frames, rng)
 
-    import kwplot
-    plt = kwplot.autoplt()
-    ax = plt.gca()
+    from mpl_toolkits.mplot3d import Axes3D  # NOQA
+    ax = plt.gca(projection='3d')
     ax.cla()
-    ax.set_xlim(-.01, 1.01)
-    ax.set_ylim(-.01, 1.01)
-
-    rng = None
 
     for path in paths:
-        ax.plot(path.T[0], path.T[1], 'x-')
+        time = np.arange(len(path))
+        ax.plot(time, path.T[0] * 1, path.T[1] * 1, 'o-')
+    ax.set_xlim(0, num_frames)
+    ax.set_ylim(-.01, 1.01)
+    ax.set_zlim(-.01, 1.01)
+
     """
     import kwarray
-    import torch
-    from torch.nn import functional as F
     rng = kwarray.ensure_rng(rng)
 
-    max_speed = rng.rand(num_objects, 1) * 0.01
-    max_speed = np.concatenate([max_speed, max_speed], axis=1)
+    USE_TORCH = 0
 
-    max_speed = torch.from_numpy(max_speed)
+    if not USE_TORCH:
+        # TODO: can we do BOID bird based flock simulation here?
+        # https://www.youtube.com/watch?v=mhjuuHl6qHM
+        # https://medium.com/better-programming/boids-simulating-birds-flock-behavior-in-python-9fff99375118
+        perception_thresh = 0.2
 
-    # TODO: can we do better?
-    torch.optim.SGD
-    class Positions(torch.nn.Module):
-        def __init__(model):
-            super().__init__()
-            _pos = torch.from_numpy(rng.rand(num_objects, 2))
-            model.pos = torch.nn.Parameter(_pos)
+        max_speed = 0.02
+        max_force = 0.005
 
-        def forward(model, noise):
-            loss_parts = {}
+        from scipy.spatial.distance import pdist, squareform
+        # Generate random starting positions, velocities, and accelerations
+        pos = rng.rand(num_objects, 2)
+        vel = rng.rand(num_objects, 2) * max_speed
+        acc = rng.rand(num_objects, 2) * max_force
 
-            # Push objects away from each other
-            utriu_dists = torch.nn.functional.pdist(model.pos)
-            respulsive = (1 / (utriu_dists ** 2)).sum() / num_objects
-            loss_parts['repulsive'] = 0.01 * respulsive.sum()
+        def clamp_mag(vec, mag, axis=None):
+            """
+            vec = np.random.rand(10, 2)
+            mag = 1.0
+            axis = 1
+            new_vec = clamp_mag(vec, mag, axis)
+            np.linalg.norm(new_vec, axis=axis)
+            """
+            norm = np.linalg.norm(vec, axis=axis, keepdims=True)
+            flags = norm > mag
+            flags = np.squeeze(flags, axis)
+            vec[flags] = (vec[flags] / norm[flags]) * mag
+            return vec
 
-            # Push objects in random directions
-            loss_parts['random'] = (model.pos * noise).sum()
+        # I think there are bugs in my quickly implemented boid simulator
 
-            # Push objects away from the boundary
-            margin = 0
-            x = model.pos
-            y = F.softplus((x - 0.5) + margin)
-            y = torch.max(F.softplus(-(x - 0.5) + margin), y)
-            loss_parts['boundary'] = y.sum() * 2
+        positions = []
+        for i in range(num_frames):
 
-            return sum(loss_parts.values())
+            utriu_dists = pdist(pos)
+            # utriu_neighbors = utriu_dists < perception_thresh
+            dists = squareform(utriu_dists)
+            neighbors = dists < perception_thresh
+            neighbors[np.diag_indices(len(neighbors))] = 0
 
-    model = Positions()
-    params = list(model.parameters())
-    optim = torch.optim.SGD(params, lr=1.00, momentum=0.9)
+            # Randomly drop perception of neighbors
+            neighbors[rng.rand(*neighbors.shape) > 0.3] = 0
 
-    positions = []
-    for i in range(num_frames):
-        optim.zero_grad()
-        noise = torch.from_numpy(rng.rand(2))
-        loss = model.forward(noise)
-        loss.backward()
+            # Alignment
+            neigh_num = neighbors.sum(axis=1)
+            # print('neigh_num = {!r}'.format(neigh_num))
+            neigh_vel = (neighbors[..., None] * vel[None, :]).sum(axis=1) / neigh_num[..., None]
+            neigh_dir = neigh_vel / np.linalg.norm(neigh_vel, axis=1)[:, None]
+            neigh_dir = np.nan_to_num(neigh_dir)
+            neigh_dir = clamp_mag(neigh_dir, max_speed, axis=1)
+            align_steering = (neigh_dir * max_speed) - vel
+            align_steering = np.nan_to_num(align_steering)
+            align_steering[neigh_num == 0] = 0
+            align_steering = clamp_mag(align_steering, max_force, axis=1)
 
-        if max_speed is not None:
-            # Enforce a per-object speed limit
-            model.pos.grad.data[:] = torch.min(model.pos.grad, max_speed)
-            model.pos.grad.data[:] = torch.max(model.pos.grad, -max_speed)
+            # Cohesion
+            neigh_com = (neighbors[..., None] * pos[None, :]).sum(axis=1) / neigh_num[..., None]
+            com_dir = neigh_com - pos
+            com_dir = clamp_mag(com_dir, max_speed, axis=1)
+            com_steering = com_dir - vel
+            com_steering = np.nan_to_num(com_steering)
+            com_steering[neigh_num == 0] = 0
+            com_steering = clamp_mag(com_steering, max_force, axis=1)
 
-        optim.step()
+            # Separation
+            # pos_delta = (pos[None, :, :] - pos[:, None, :])
+            pos_delta = (pos[:, None, :] - pos[None, :, :])
+            dir_to_neighb = (pos_delta / dists[..., None])
+            dir_to_neighb[~np.isfinite(dir_to_neighb)] = 0
+            ave_dir = (dir_to_neighb * neighbors[..., None]).sum(axis=1) / neigh_num[..., None]
+            ave_dir = np.nan_to_num(ave_dir)
+            ave_dir = clamp_mag(ave_dir, max_speed, axis=1)
+            sep_steering = ave_dir - vel
+            sep_steering = np.nan_to_num(sep_steering)
+            sep_steering[neigh_num == 0] = 0
+            sep_steering = clamp_mag(sep_steering, max_force, axis=1)
 
-        # Enforce boundry conditions
-        model.pos.data.clamp_(0, 1)
-        positions.append(model.pos.data.numpy().copy())
+            # Centerness
+            center = np.array([0.5, 0.5])
+            center_delta = center[None, :] - pos
+            center_dir = center_delta / np.linalg.norm(center_delta, keepdims=True)
+            center_dir = clamp_mag(center_dir, max_speed, axis=1)
+            center_steering = center_dir - vel
+            center_steering = np.nan_to_num(center_steering)
+            center_steering = clamp_mag(center_steering, max_force, axis=1)
+
+            # print('align_steering = {}'.format(ub.repr2(align_steering, precision=2, nl=1)))
+            # print('com_steering = {}'.format(ub.repr2(com_steering, precision=2, nl=1)))
+            # print('sep_steering = {}'.format(ub.repr2(sep_steering, precision=2, nl=1)))
+            # print('center_steering = {}'.format(ub.repr2(center_steering, precision=2, nl=1)))
+            # print('acc = {}'.format(ub.repr2(acc, precision=2, nl=1)))
+
+            rand_steering = clamp_mag(rng.randn(num_objects, 2), max_force, axis=1) * 0.1
+
+            # print('pos = {!r}'.format(pos))
+            pos += vel
+
+            # Clamp positions
+            lower_boundry_violators = (pos < 0)
+            upper_boundry_violators = (pos > 1)
+            if np.any(lower_boundry_violators):
+                pos[lower_boundry_violators] = 0
+                vel[lower_boundry_violators] *= 0.5
+                acc[lower_boundry_violators] *= 0.5
+
+            if np.any(upper_boundry_violators):
+                pos[upper_boundry_violators] = 1
+                vel[upper_boundry_violators] *= 0.5
+                acc[upper_boundry_violators] *= 0.5
+
+            vel += acc
+            vel = clamp_mag(vel, max_speed, axis=1)
+
+            acc += rand_steering * 2.0
+            acc += com_steering
+            acc += sep_steering
+            acc += align_steering
+            acc += center_steering * 0.03
+            acc = clamp_mag(acc, max_force, axis=1)
+
+            positions.append(pos.copy())
+
+    else:
+        import torch
+        from torch.nn import functional as F
+
+        max_speed = rng.rand(num_objects, 1) * 0.01
+        max_speed = np.concatenate([max_speed, max_speed], axis=1)
+
+        max_speed = torch.from_numpy(max_speed)
+
+        # TODO: can we do better?
+        torch.optim.SGD
+        class Positions(torch.nn.Module):
+            def __init__(model):
+                super().__init__()
+                _pos = torch.from_numpy(rng.rand(num_objects, 2))
+                model.pos = torch.nn.Parameter(_pos)
+
+            def forward(model, noise):
+                loss_parts = {}
+
+                # Push objects away from each other
+                utriu_dists = torch.nn.functional.pdist(model.pos)
+                respulsive = (1 / (utriu_dists ** 2)).sum() / num_objects
+                loss_parts['repulsive'] = 0.01 * respulsive.sum()
+
+                # Push objects in random directions
+                loss_parts['random'] = (model.pos * noise).sum()
+
+                # Push objects away from the boundary
+                margin = 0
+                x = model.pos
+                y = F.softplus((x - 0.5) + margin)
+                y = torch.max(F.softplus(-(x - 0.5) + margin), y)
+                loss_parts['boundary'] = y.sum() * 2
+
+                return sum(loss_parts.values())
+
+        model = Positions()
+        params = list(model.parameters())
+        optim = torch.optim.SGD(params, lr=1.00, momentum=0.9)
+
+        positions = []
+        for i in range(num_frames):
+            optim.zero_grad()
+            noise = torch.from_numpy(rng.rand(2))
+            loss = model.forward(noise)
+            loss.backward()
+
+            if max_speed is not None:
+                # Enforce a per-object speed limit
+                model.pos.grad.data[:] = torch.min(model.pos.grad, max_speed)
+                model.pos.grad.data[:] = torch.max(model.pos.grad, -max_speed)
+
+            optim.step()
+
+            # Enforce boundry conditions
+            model.pos.data.clamp_(0, 1)
+            positions.append(model.pos.data.numpy().copy())
 
     paths = np.concatenate([p[:, None] for p in positions], axis=1)
     return paths
