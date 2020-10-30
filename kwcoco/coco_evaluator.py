@@ -221,12 +221,13 @@ class CocoEvaluator(object):
 
         # FIXME: What is the image names line up correctly, but the image ids
         # do not? This will be common if an external detector is used.
+        load_workers = 0
         gid_to_true, true_extra = CocoEvaluator._coerce_dets(
-            coco_eval.config['true_dataset'])
+            coco_eval.config['true_dataset'], workers=load_workers)
 
         coco_eval.log('init pred dset')
         gid_to_pred, pred_extra = CocoEvaluator._coerce_dets(
-            coco_eval.config['pred_dataset'])
+            coco_eval.config['pred_dataset'], workers=load_workers)
 
         if coco_eval.config['use_image_names']:
             # TODO: currently this is a hacky implementation that modifies the
@@ -393,7 +394,7 @@ class CocoEvaluator(object):
         return classes, unified_cid_maps
 
     @classmethod
-    def _coerce_dets(CocoEvaluator, dataset, verbose=0):
+    def _coerce_dets(CocoEvaluator, dataset, verbose=0, workers=0):
         """
         Coerce the input to a mapping from image-id to kwimage.Detection
 
@@ -468,7 +469,8 @@ class CocoEvaluator(object):
             # Input is an ndsampler.CocoSampler object
             extra['sampler'] = sampler = dataset
             coco_dset = sampler.dset
-            gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
+            gid_to_det, _extra = CocoEvaluator._coerce_dets(
+                coco_dset, verbose, workers=workers)
             extra.update(_extra)
         elif isinstance(dataset, six.string_types):
             if exists(dataset):
@@ -480,7 +482,7 @@ class CocoEvaluator(object):
                     extra['coco_dpath'] = coco_dpath = dataset
                     pat = join(coco_dpath, '**/*.json')
                     coco_fpaths = sorted(glob.glob(pat, recursive=True))
-                    dets, coco_dset = _load_dets(coco_fpaths)
+                    dets, coco_dset = _load_dets(coco_fpaths, workers=workers)
                     extra['coco_dset'] = coco_dset
                     # coco_dset = kwcoco.CocoDataset.from_coco_paths(
                     #     coco_fpaths, max_workers=6, verbose=1, mode='process')
@@ -491,7 +493,8 @@ class CocoEvaluator(object):
                         print('Loading mscoco file')
                     extra['dataset_fpath'] = coco_fpath = dataset
                     coco_dset = kwcoco.CocoDataset(coco_fpath)
-                    gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
+                    gid_to_det, _extra = CocoEvaluator._coerce_dets(
+                        coco_dset, verbose, workers=workers)
                     extra.update(_extra)
                 else:
                     raise NotImplementedError
