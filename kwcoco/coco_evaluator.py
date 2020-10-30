@@ -118,6 +118,8 @@ class CocoEvalConfig(scfg.Config):
 
         'assign_workers': scfg.Value(8, help='number of background workers for assignment'),
 
+        'load_workers': scfg.Value(0, help='number of workers to load cached detections'),
+
         'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
 
         'classes_of_interest': scfg.Value(
@@ -221,7 +223,7 @@ class CocoEvaluator(object):
 
         # FIXME: What is the image names line up correctly, but the image ids
         # do not? This will be common if an external detector is used.
-        load_workers = 0
+        load_workers = coco_eval.config['load_workers']
         gid_to_true, true_extra = CocoEvaluator._coerce_dets(
             coco_eval.config['true_dataset'], workers=load_workers)
 
