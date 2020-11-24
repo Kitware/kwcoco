@@ -4413,7 +4413,12 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
     @classmethod
     def from_image_paths(CocoDataset, gpaths, img_root=None):
         """
-        Constructor from a list of images paths
+        Constructor from a list of images paths.
+
+        This is a convinience method.
+
+        Args:
+            gpaths (List[str]): list of image paths
 
         Example:
             >>> coco_dset = CocoDataset.from_image_paths(['a.png', 'b.png'])

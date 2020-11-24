@@ -1078,7 +1078,7 @@ class CocoSingleResult(ub.NiceRepr):
             pass
 
 
-def _load_dets(pred_fpaths, workers=6):
+def _load_dets(pred_fpaths, workers=0):
     """
     Example:
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker

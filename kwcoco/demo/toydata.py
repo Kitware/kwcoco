@@ -1210,95 +1210,98 @@ def random_multi_object_path(num_objects, num_frames, rng=None):
         # I think there are bugs in my quickly implemented boid simulator
 
         positions = []
-        for i in range(num_frames):
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='invalid .* true_divide')
 
-            utriu_dists = pdist(pos)
-            # utriu_neighbors = utriu_dists < perception_thresh
-            dists = squareform(utriu_dists)
-            neighbors = dists < perception_thresh
-            neighbors[np.diag_indices(len(neighbors))] = 0
+            for i in range(num_frames):
+                utriu_dists = pdist(pos)
+                # utriu_neighbors = utriu_dists < perception_thresh
+                dists = squareform(utriu_dists)
+                neighbors = dists < perception_thresh
+                neighbors[np.diag_indices(len(neighbors))] = 0
 
-            # Randomly drop perception of neighbors
-            neighbors[rng.rand(*neighbors.shape) > 0.3] = 0
+                # Randomly drop perception of neighbors
+                neighbors[rng.rand(*neighbors.shape) > 0.3] = 0
 
-            # Alignment
-            neigh_num = neighbors.sum(axis=1)
-            # print('neigh_num = {!r}'.format(neigh_num))
-            neigh_vel = (neighbors[..., None] * vel[None, :]).sum(axis=1) / neigh_num[..., None]
-            neigh_dir = neigh_vel / np.linalg.norm(neigh_vel, axis=1)[:, None]
-            neigh_dir = np.nan_to_num(neigh_dir)
-            neigh_dir = clamp_mag(neigh_dir, max_speed, axis=1)
-            align_steering = (neigh_dir * max_speed) - vel
-            align_steering = np.nan_to_num(align_steering)
-            align_steering[neigh_num == 0] = 0
-            align_steering = clamp_mag(align_steering, max_force, axis=1)
+                # Alignment
+                neigh_num = neighbors.sum(axis=1)
+                # print('neigh_num = {!r}'.format(neigh_num))
+                neigh_vel = (neighbors[..., None] * vel[None, :]).sum(axis=1) / neigh_num[..., None]
+                neigh_dir = neigh_vel / np.linalg.norm(neigh_vel, axis=1)[:, None]
+                neigh_dir = np.nan_to_num(neigh_dir)
+                neigh_dir = clamp_mag(neigh_dir, max_speed, axis=1)
+                align_steering = (neigh_dir * max_speed) - vel
+                align_steering = np.nan_to_num(align_steering)
+                align_steering[neigh_num == 0] = 0
+                align_steering = clamp_mag(align_steering, max_force, axis=1)
 
-            # Cohesion
-            neigh_com = (neighbors[..., None] * pos[None, :]).sum(axis=1) / neigh_num[..., None]
-            com_dir = neigh_com - pos
-            com_dir = clamp_mag(com_dir, max_speed, axis=1)
-            com_steering = com_dir - vel
-            com_steering = np.nan_to_num(com_steering)
-            com_steering[neigh_num == 0] = 0
-            com_steering = clamp_mag(com_steering, max_force, axis=1)
+                # Cohesion
+                neigh_com = (neighbors[..., None] * pos[None, :]).sum(axis=1) / neigh_num[..., None]
+                com_dir = neigh_com - pos
+                com_dir = clamp_mag(com_dir, max_speed, axis=1)
+                com_steering = com_dir - vel
+                com_steering = np.nan_to_num(com_steering)
+                com_steering[neigh_num == 0] = 0
+                com_steering = clamp_mag(com_steering, max_force, axis=1)
 
-            # Separation
-            # pos_delta = (pos[None, :, :] - pos[:, None, :])
-            pos_delta = (pos[:, None, :] - pos[None, :, :])
-            dir_to_neighb = (pos_delta / dists[..., None])
-            dir_to_neighb[~np.isfinite(dir_to_neighb)] = 0
-            ave_dir = (dir_to_neighb * neighbors[..., None]).sum(axis=1) / neigh_num[..., None]
-            ave_dir = np.nan_to_num(ave_dir)
-            ave_dir = clamp_mag(ave_dir, max_speed, axis=1)
-            sep_steering = ave_dir - vel
-            sep_steering = np.nan_to_num(sep_steering)
-            sep_steering[neigh_num == 0] = 0
-            sep_steering = clamp_mag(sep_steering, max_force, axis=1)
+                # Separation
+                # pos_delta = (pos[None, :, :] - pos[:, None, :])
+                pos_delta = (pos[:, None, :] - pos[None, :, :])
+                dir_to_neighb = (pos_delta / dists[..., None])
+                dir_to_neighb[~np.isfinite(dir_to_neighb)] = 0
+                ave_dir = (dir_to_neighb * neighbors[..., None]).sum(axis=1) / neigh_num[..., None]
+                ave_dir = np.nan_to_num(ave_dir)
+                ave_dir = clamp_mag(ave_dir, max_speed, axis=1)
+                sep_steering = ave_dir - vel
+                sep_steering = np.nan_to_num(sep_steering)
+                sep_steering[neigh_num == 0] = 0
+                sep_steering = clamp_mag(sep_steering, max_force, axis=1)
 
-            # Centerness
-            center = np.array([0.5, 0.5])
-            center_delta = center[None, :] - pos
-            center_dir = center_delta / np.linalg.norm(center_delta, keepdims=True)
-            center_dir = clamp_mag(center_dir, max_speed, axis=1)
-            center_steering = center_dir - vel
-            center_steering = np.nan_to_num(center_steering)
-            center_steering = clamp_mag(center_steering, max_force, axis=1)
+                # Centerness
+                center = np.array([0.5, 0.5])
+                center_delta = center[None, :] - pos
+                center_dir = center_delta / np.linalg.norm(center_delta, keepdims=True)
+                center_dir = clamp_mag(center_dir, max_speed, axis=1)
+                center_steering = center_dir - vel
+                center_steering = np.nan_to_num(center_steering)
+                center_steering = clamp_mag(center_steering, max_force, axis=1)
 
-            # print('align_steering = {}'.format(ub.repr2(align_steering, precision=2, nl=1)))
-            # print('com_steering = {}'.format(ub.repr2(com_steering, precision=2, nl=1)))
-            # print('sep_steering = {}'.format(ub.repr2(sep_steering, precision=2, nl=1)))
-            # print('center_steering = {}'.format(ub.repr2(center_steering, precision=2, nl=1)))
-            # print('acc = {}'.format(ub.repr2(acc, precision=2, nl=1)))
+                # print('align_steering = {}'.format(ub.repr2(align_steering, precision=2, nl=1)))
+                # print('com_steering = {}'.format(ub.repr2(com_steering, precision=2, nl=1)))
+                # print('sep_steering = {}'.format(ub.repr2(sep_steering, precision=2, nl=1)))
+                # print('center_steering = {}'.format(ub.repr2(center_steering, precision=2, nl=1)))
+                # print('acc = {}'.format(ub.repr2(acc, precision=2, nl=1)))
 
-            rand_steering = clamp_mag(rng.randn(num_objects, 2), max_force, axis=1) * 0.1
+                rand_steering = clamp_mag(rng.randn(num_objects, 2), max_force, axis=1) * 0.1
 
-            # print('pos = {!r}'.format(pos))
-            pos += vel
+                # print('pos = {!r}'.format(pos))
+                pos += vel
 
-            # Clamp positions
-            lower_boundry_violators = (pos < 0)
-            upper_boundry_violators = (pos > 1)
-            if np.any(lower_boundry_violators):
-                pos[lower_boundry_violators] = 0
-                vel[lower_boundry_violators] *= 0.5
-                acc[lower_boundry_violators] *= 0.5
+                # Clamp positions
+                lower_boundry_violators = (pos < 0)
+                upper_boundry_violators = (pos > 1)
+                if np.any(lower_boundry_violators):
+                    pos[lower_boundry_violators] = 0
+                    vel[lower_boundry_violators] *= 0.5
+                    acc[lower_boundry_violators] *= 0.5
 
-            if np.any(upper_boundry_violators):
-                pos[upper_boundry_violators] = 1
-                vel[upper_boundry_violators] *= 0.5
-                acc[upper_boundry_violators] *= 0.5
+                if np.any(upper_boundry_violators):
+                    pos[upper_boundry_violators] = 1
+                    vel[upper_boundry_violators] *= 0.5
+                    acc[upper_boundry_violators] *= 0.5
 
-            vel += acc
-            vel = clamp_mag(vel, max_speed, axis=1)
+                vel += acc
+                vel = clamp_mag(vel, max_speed, axis=1)
 
-            acc += rand_steering * 2.0
-            acc += com_steering
-            acc += sep_steering
-            acc += align_steering
-            acc += center_steering * 0.03
-            acc = clamp_mag(acc, max_force, axis=1)
+                acc += rand_steering * 2.0
+                acc += com_steering
+                acc += sep_steering
+                acc += align_steering
+                acc += center_steering * 0.03
+                acc = clamp_mag(acc, max_force, axis=1)
 
-            positions.append(pos.copy())
+                positions.append(pos.copy())
 
     else:
         import torch
