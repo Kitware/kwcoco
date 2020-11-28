@@ -363,7 +363,7 @@ def clamp_mag(vec, mag, axis=None):
 
 
 def triu_condense_multi_index(multi_index, dims, symetric=False):
-    """
+    r"""
     Like np.ravel_multi_index but returns positions in an upper triangular
     condensed square matrix
 
@@ -508,21 +508,6 @@ def closest_point_on_line_segment(pt, e1, e2):
         >>> e1, e2 = verts[0:2]
         >>> pt = pt_list[0]
         >>> closest_point_on_line_segment(pt, e1, e2)
-        >>> close_pts = np.array([closest_point_on_line_segment(pt, verts) for pt in pt_list])
-        >>> # xdoctest: +REQUIRES(--show)
-        >>> import kwplot
-        >>> plt = kwplot.autoplt()
-        >>> plt.plot(pt_list.T[0], pt_list.T[1], 'ro', label='original point')
-        >>> plt.plot(close_pts.T[0], close_pts.T[1], 'rx', label='closest point on shape')
-        >>> for x, y in list(zip(pt_list, close_pts)):
-        >>>     z = np.array(list(zip(x, y)))
-        >>>     plt.plot(z[0], z[1], 'r--')
-        >>> plt.legend()
-        >>> plt.plot(verts.T[0], verts.T[1], 'b-')
-        >>> plt.xlim(0, 30)
-        >>> plt.ylim(0, 30)
-        >>> plt.axis('equal')
-        >>> kwplot.show_if_requested()
     """
     # shift e1 to origin
     de = (dx, dy) = e2 - e1
