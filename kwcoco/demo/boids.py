@@ -46,7 +46,7 @@ class Boids(ub.NiceRepr):
         _ = xdev.profile_now(self.update_neighbors)()
 
     Ignore:
-        self = Boids(num=30, rng=0, perception_thresh=0.2, max_speed=0.01, max_force=0.001).initialize()
+        self = Boids(num=5, rng=0).initialize()
         self.pos
 
         fig = kwplot.figure(fnum=10, do_clf=True)
@@ -138,9 +138,6 @@ class Boids(ub.NiceRepr):
         self.vel = self.rng.rand(self.num, self.dims) * self.config['max_speed']
         self.acc = self.rng.rand(self.num, self.dims) * self.config['max_force']
         return self
-
-    def steer_alignment(self):
-        pass
 
     def update_neighbors(self):
         # TODO: this should be done with a fast spatial index, but
@@ -274,14 +271,14 @@ class Boids(ub.NiceRepr):
             # # Edge avoidance
             # # Each boid does not want to hit an edge
             avoid_steering = np.zeros_like(self.pos)
-            edge_thresh = self.config['perception_thresh']
-            edges = [
-                np.array([(0, 0), (1, 0)]),  # bottom
-                np.array([(0, 0), (0, 1)]),  # left
-                np.array([(1, 0), (1, 1)]),  # right
-                np.array([(0, 1), (1, 1)]),  # top
-            ]
-            for edge in edges:
+            edge_thresh = self.config['perception_thresh'] * 1
+            edges = {
+                'bot': np.array([(0, 0), (1, 0)]),
+                'left': np.array([(0, 0), (0, 1)]),
+                'top': np.array([(0, 1), (1, 1)]),
+                'right': np.array([(1, 0), (1, 1)]),
+            }
+            for edge_name, edge in edges.items():
                 e1, e2 = edge
                 edge_pt = closest_point_on_line_segment(self.pos, e1, e2)
                 edge_vec = self.pos - edge_pt
@@ -329,8 +326,8 @@ class Boids(ub.NiceRepr):
         self.vel = clamp_mag(self.vel, self.config['max_speed'], axis=1)
 
         # Dampen acceleration
-        # self.acc[:] *= 0.1
-        self.acc[:] = 0
+        self.acc[:] *= 0.1
+        # self.acc[:] = 0
 
         self.boundary_conditions()
         return self.pos
