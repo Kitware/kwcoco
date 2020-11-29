@@ -16,37 +16,37 @@ class Boids(ub.NiceRepr):
         https://en.wikipedia.org/wiki/Boids
 
     Example:
-        from kwcoco.demo.boids import *  # NOQA
-        num_frames = 500
-        num_objects = 30
-        rng = None
-        self = Boids(num=num_objects, rng=rng).initialize()
-        paths = self.paths(num_frames)
-
-        # xdoctest: +REQUIRES(--show)
-        import kwplot
-        plt = kwplot.autoplt()
-        from mpl_toolkits.mplot3d import Axes3D  # NOQA
-        ax = plt.gca(projection='3d')
-        ax.cla()
-
-        for path in paths:
-            time = np.arange(len(path))
-            ax.plot(time, path.T[0] * 1, path.T[1] * 1, ',-')
-        ax.set_xlim(0, num_frames)
-        ax.set_ylim(-.01, 1.01)
-        ax.set_zlim(-.01, 1.01)
-        ax.set_xlabel('time')
-        ax.set_ylabel('u-pos')
-        ax.set_zlabel('v-pos')
-        kwplot.show_if_requested()
+        >>> from kwcoco.demo.boids import *  # NOQA
+        >>> num_frames = 1000
+        >>> num_objects = 30
+        >>> rng = None
+        >>> self = Boids(num=num_objects, rng=rng).initialize()
+        >>> paths = self.paths(num_frames)
+        >>> #
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> plt = kwplot.autoplt()
+        >>> from mpl_toolkits.mplot3d import Axes3D  # NOQA
+        >>> ax = plt.gca(projection='3d')
+        >>> ax.cla()
+        >>> #
+        >>> for path in paths:
+        >>>     time = np.arange(len(path))
+        >>>     ax.plot(time, path.T[0] * 1, path.T[1] * 1, ',-')
+        >>> ax.set_xlim(0, num_frames)
+        >>> ax.set_ylim(-.01, 1.01)
+        >>> ax.set_zlim(-.01, 1.01)
+        >>> ax.set_xlabel('time')
+        >>> ax.set_ylabel('u-pos')
+        >>> ax.set_zlabel('v-pos')
+        >>> kwplot.show_if_requested()
 
         import xdev
-        xdev.profile_now(self.compute_forces)()
-        xdev.profile_now(self.update_neighbors)()
+        _ = xdev.profile_now(self.compute_forces)()
+        _ = xdev.profile_now(self.update_neighbors)()
 
     Ignore:
-        self = Boids(num=30, rng=0, perception_thresh=0.1).initialize()
+        self = Boids(num=30, rng=0, perception_thresh=0.2, max_speed=0.01, max_force=0.001).initialize()
         self.pos
 
         fig = kwplot.figure(fnum=10, do_clf=True)
@@ -113,10 +113,15 @@ class Boids(ub.NiceRepr):
         self.num = num
         self.dims = dims
 
+        # self.config = {
+        #     'perception_thresh': 0.08,
+        #     'max_speed': 0.005,
+        #     'max_force': 0.0003,
+        # }
         self.config = {
-            'perception_thresh': 0.08,
-            'max_speed': 0.005,
-            'max_force': 0.0003,
+            'perception_thresh': 0.2,
+            'max_speed': 0.01,
+            'max_force': 0.001,
         }
         self.config.update(ub.dict_isect(kwargs, self.config))
 
@@ -156,18 +161,18 @@ class Boids(ub.NiceRepr):
 
         rx_to_neighb_cxs = ub.dzip(group_rxs, group_cxs)
 
-        n = len(self.pos)
-        rx_to_neighb_utriu_idxs = {}
-        for rx, cxs in rx_to_neighb_cxs.items():
-            rxs = np.full_like(cxs, fill_value=rx)
-            multi_index = (rxs, cxs)
-            utriu_idxs = triu_condense_multi_index(
-                multi_index, dims=(n, n), symetric=True)
-            rx_to_neighb_utriu_idxs[rx] = utriu_idxs
+        # n = len(self.pos)
+        # rx_to_neighb_utriu_idxs = {}
+        # for rx, cxs in rx_to_neighb_cxs.items():
+        #     rxs = np.full_like(cxs, fill_value=rx)
+        #     multi_index = (rxs, cxs)
+        #     utriu_idxs = triu_condense_multi_index(
+        #         multi_index, dims=(n, n), symetric=True)
+        #     rx_to_neighb_utriu_idxs[rx] = utriu_idxs
 
-        self.utriu_dists = utriu_dists
+        # self.utriu_dists = utriu_dists
         self.rx_to_neighb_cxs = rx_to_neighb_cxs
-        self.rx_to_neighb_utriu_idxs = rx_to_neighb_utriu_idxs
+        # self.rx_to_neighb_utriu_idxs = rx_to_neighb_utriu_idxs
 
         # Compute speed and direction of every boid
         self.speeds = np.linalg.norm(self.vel, axis=1)
@@ -185,7 +190,7 @@ class Boids(ub.NiceRepr):
         com_steering = np.zeros((num, 2))
         sep_steering = np.zeros((num, 2))
 
-        for rx in self.rx_to_neighb_utriu_idxs.keys():
+        for rx in self.rx_to_neighb_cxs.keys():
             cxs = self.rx_to_neighb_cxs[rx]
 
             # Alignment
@@ -225,7 +230,7 @@ class Boids(ub.NiceRepr):
                 # neigh_dist = neigh_dist1
                 neigh_dist2 = np.linalg.norm(neigh_vec, axis=1, keepdims=1)
                 neigh_dist = neigh_dist2
-                # assert neigh_dist.max() <= self.config['perception_thresh']
+                assert neigh_dist.max() <= self.config['perception_thresh']
 
                 flags = neigh_dist.ravel() > 0
                 # neigh_dir = neigh_vec[flags]
@@ -251,6 +256,8 @@ class Boids(ub.NiceRepr):
 
         align_steering = clamp_mag(align_steering, 1.0 * self.config['max_force'], axis=None)
         com_steering = clamp_mag(com_steering, 1.0 * self.config['max_force'], axis=None)
+
+        # Separation and obstical avoidance should override alignment and COM
         sep_steering = clamp_mag(sep_steering, 3.0 * self.config['max_force'], axis=None)
 
         self.sep_steering = sep_steering
@@ -264,42 +271,32 @@ class Boids(ub.NiceRepr):
         ])
 
         if 1:
-            avoid_steering = []
+            # # Edge avoidance
+            # # Each boid does not want to hit an edge
+            avoid_steering = np.zeros_like(self.pos)
+            edge_thresh = self.config['perception_thresh']
+            edges = [
+                np.array([(0, 0), (1, 0)]),  # bottom
+                np.array([(0, 0), (0, 1)]),  # left
+                np.array([(1, 0), (1, 1)]),  # right
+                np.array([(0, 1), (1, 1)]),  # top
+            ]
+            for edge in edges:
+                e1, e2 = edge
+                edge_pt = closest_point_on_line_segment(self.pos, e1, e2)
+                edge_vec = self.pos - edge_pt
+                edge_dist = np.linalg.norm(edge_vec, axis=1, keepdims=1)
+                flags = ((edge_dist < edge_thresh) & (edge_dist > 0)).ravel()
+                rxs = np.where(flags)[0]
 
-            # Edge avoidance
-            # Each boid does not want to hit an edge
-            bottom = np.array([(0, 0), (1, 0)])
-            left = np.array([(0, 0), (0, 1)])
-            right = np.array([(1, 0), (1, 1)])
-            top = np.array([(0, 1), (1, 1)])
-            for rx, pt in enumerate(self.pos):
-                bound1 = closest_point_on_line_segment(pt, bottom[0], bottom[1])
-                bound2 = closest_point_on_line_segment(pt, left[0], left[1])
-                bound3 = closest_point_on_line_segment(pt, right[0], right[1])
-                bound4 = closest_point_on_line_segment(pt, top[0], top[1])
+                if len(rxs):
+                    avoid_vec = edge_vec[rxs]
+                    avoid_dist = edge_dist[rxs]
+                    avoid_vec = avoid_vec / (avoid_dist ** 3)
+                    avoid_steering_ = avoid_vec - self.vel[rxs]
+                    avoid_steering[rxs] += avoid_steering_
 
-                dist1 = np.linalg.norm(pt - bound1)
-                dist2 = np.linalg.norm(pt - bound2)
-                dist3 = np.linalg.norm(pt - bound3)
-                dist4 = np.linalg.norm(pt - bound4)
-
-                bound_pts = [bound1, bound2, bound3, bound4]
-                bound_dist = [dist1, dist2, dist3, dist4]
-                min_idx = np.argmin(bound_dist)
-                avoid_dist = bound_dist[min_idx]
-
-                if avoid_dist < 0.1:
-                    avoid_pt = bound_pts[min_idx]
-
-                    avoid_vec = pt - avoid_pt
-                    if avoid_dist > 0:
-                        avoid_vec = avoid_vec / (avoid_dist ** 3)
-                    avoid_steering_ = avoid_vec - self.vel[rx]
-                else:
-                    avoid_steering_ = np.array([0, 0])
-                avoid_steering.append(avoid_steering_)
-            avoid_steering = np.array(avoid_steering)
-            avoid_steering = clamp_mag(avoid_steering, 3.0 * self.config['max_force'], axis=None)
+            avoid_steering = clamp_mag(avoid_steering, 1.0 * self.config['max_force'], axis=None)
             steering += avoid_steering
             self.avoid_steering = avoid_steering
 
@@ -413,6 +410,12 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
         >>> conden_mat[condensed_idxs] = np.arange(len(condensed_idxs)) + 1
         >>> square_mat = squareform(conden_mat)
         >>> print('square_mat =\n{}'.format(ub.repr2(square_mat, nl=1)))
+
+    Ignore:
+        >>> n = 30
+        >>> symetric = True
+        >>> multi_index = np.triu_indices(n=n, k=1)
+        >>> condensed_idxs = xdev.profile_now(triu_condense_multi_index)(multi_index, [n] * 2)
     """
     if len(dims) != 2:
         raise NotImplementedError('only 2d matrices for now')
@@ -421,13 +424,15 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
 
     rxs, cxs = multi_index
 
-    if np.any(rxs == cxs):
-        raise NotImplementedError(
-            'multi_index contains diagonal elements, which are not '
-            'allowed in a condensed matrix')
+    triu_flags = rxs < cxs
+    if not np.all(triu_flags):
+        if np.any(rxs == cxs):
+            raise NotImplementedError(
+                'multi_index contains diagonal elements, which are not '
+                'allowed in a condensed matrix')
 
-    tril_flags = rxs > cxs
-    if np.any(tril_flags):
+        tril_flags = ~triu_flags
+
         if not symetric:
             raise ValueError(
                 'multi_index cannot contain inputs from '
@@ -446,7 +451,16 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
     # with - i*(i+1)/2 you remove lower triangle (including diagonal) in all lines before i;
     # with - i you remove positions in line i before the diagonal;
     # with - 1 you remove positions in line i on the diagonal.
+    """
+    import sympy
+    rxs, n, cxs = sympy.symbols(['rxs', 'n', 'cxs'])
     condensed_indices = (n * rxs + cxs) - (rxs * (rxs + 1) // 2) - rxs - 1
+    sympy.simplify(condensed_indices)
+    %timeit cxs + (n - 1) * rxs - rxs*(rxs + 1)//2 - 1
+    %timeit (n * rxs + cxs) - (rxs * (rxs + 1) // 2) - rxs - 1
+    """
+    condensed_indices = cxs + (n - 1) * rxs - (rxs * (rxs + 1) // 2) - 1
+    # condensed_indices = (n * rxs + cxs) - (rxs * (rxs + 1) // 2) - rxs - 1
     return condensed_indices
 
 
@@ -477,12 +491,12 @@ def _spatial_index_scratch():
     """
 
 
-def closest_point_on_line_segment(pt, e1, e2):
+def closest_point_on_line_segment(pts, e1, e2):
     """
     Finds the closet point from p on line segment (e1, e2)
 
     Args:
-        pt (ndarray): and xy point
+        pts (ndarray): xy points [Nx2]
         e1 (ndarray): the first xy endpoint of the segment
         e2 (ndarray): the second xy endpoint of the segment
 
@@ -493,8 +507,6 @@ def closest_point_on_line_segment(pt, e1, e2):
         http://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
         http://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
 
-    TODO: vectorize
-
     Example:
         >>> # ENABLE_DOCTEST
         >>> from kwcoco.demo.boids import *  # NOQA
@@ -504,27 +516,32 @@ def closest_point_on_line_segment(pt, e1, e2):
         >>>                   [ 13.16987298,   8.16987298],
         >>>                   [ 21.83012702,  13.16987298]])
         >>> rng = np.random.RandomState(0)
-        >>> pt_list = rng.rand(64, 2) * 20 + 5
+        >>> pts = rng.rand(64, 2) * 20 + 5
         >>> e1, e2 = verts[0:2]
-        >>> pt = pt_list[0]
-        >>> closest_point_on_line_segment(pt, e1, e2)
+        >>> closest_point_on_line_segment(pts, e1, e2)
     """
     # shift e1 to origin
-    de = (dx, dy) = e2 - e1
+    de = (e2 - e1)[None, :]
     # make point vector wrt orgin
-    pv = pt - e1
+    pv = pts - e1
     # Project pv onto de
-    mag = np.linalg.norm(de)
-    pt_on_line_ = pv.dot(de / mag) * de / mag
+    mag = np.linalg.norm(de, axis=1)
+    de_norm = (de / mag)
+
+    pt_on_line_ = pv.dot(de_norm.T) * de_norm
+
     # Check if normalized dot product is between 0 and 1
     # Determines if pt is between 0,0 and de
-    t = de.dot(pt_on_line_) / mag ** 2
+    t = (de.dot(pt_on_line_.T) / (mag ** 2))[0]
+
     # t is an interpolation factor indicating how far past the line segment we
     # are. We are on the line segment if it is in the range 0 to 1.
-    if t < 0:
-        pt_on_seg = e1
-    elif t > 1:
-        pt_on_seg = e2
-    else:
-        pt_on_seg = pt_on_line_ + e1
+    oob_left  = t < 0
+    oob_right = t > 1
+
+    # Compute the point on the extended line defined by the line segment.
+    pt_on_seg = pt_on_line_ + e1
+    # Clamp to the endpoints if out of bounds
+    pt_on_seg[oob_left] = e1
+    pt_on_seg[oob_right] = e2
     return pt_on_seg
