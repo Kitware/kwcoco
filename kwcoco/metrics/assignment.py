@@ -102,8 +102,8 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             any predicted annotation.
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:pandas)
         >>> import pandas as pd
-        >>> import kwcoco as nh
         >>> import kwimage
         >>> # Given a raw numpy representation construct Detection wrappers
         >>> true_dets = kwimage.Detections(
@@ -146,6 +146,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         globals().update(get_func_kwargs(_assign_confusion_vectors))
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:pandas)
         >>> import pandas as pd
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(nimgs=1, nclasses=8,

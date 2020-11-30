@@ -28,6 +28,7 @@ def classification_report(y_true, y_pred, target_names=None,
     Example:
         >>> # xdoctest: +IGNORE_WANT
         >>> # xdoctest: +REQUIRES(module:sklearn)
+        >>> # xdoctest: +REQUIRES(module:pandas)
         >>> y_true = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3]
         >>> y_pred = [1, 2, 1, 3, 1, 2, 2, 3, 2, 2, 3, 3, 2, 3, 3, 3, 1, 3]
         >>> target_names = None
@@ -358,6 +359,7 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     Example:
         >>> # xdoctest: +IGNORE_WANT
         >>> # xdoctest: +REQUIRES(module:sklearn)
+        >>> # xdoctest: +REQUIRES(module:pandas)
         >>> from kwcoco.metrics.clf_report import *  # NOQA
         >>> y_true = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0]
         >>> y_probs = np.random.rand(len(y_true), max(y_true) + 1)
