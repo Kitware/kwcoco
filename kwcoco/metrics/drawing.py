@@ -466,11 +466,17 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     for idx, key in enumerate(keys):
         color = idx_to_colors[idx]
         measure = info[key][finite_flags]
-        max_idx = np.nanargmax(measure)
-        offset = (~finite_flags[:max_idx]).sum()
-        max_idx += offset
-        best_thresh = thresh[max_idx]
-        best_measure = measure[max_idx]
+
+        if len(measure):
+            max_idx = np.nanargmax(measure)
+            offset = (~finite_flags[:max_idx]).sum()
+            max_idx += offset
+            best_thresh = thresh[max_idx]
+            best_measure = measure[max_idx]
+            best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+        else:
+            best_thresh = np.nan
+            best_measure = np.nan
         best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
 
         nsupport = int(info['nsupport'])

@@ -7,8 +7,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.8 - Unreleased
 
+### Added
+* Standalone algorithm for BOID positions
+
 ### Changed
 * Make kwplot, matplotlib, and seaborn optional
+
+### Fixed
+* Fixed bug in `draw_threshold_curves` when measures are empty.
 
 
 ## Version 0.1.7 - Released 2020-10-23
