@@ -592,8 +592,9 @@ class CocoEvaluator(object):
             >>> results = coco_eval.evaluate()
             >>> # Now we can draw / serialize the results as we please
             >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
-            >>> results.dump_figures(dpath)
             >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
+            >>> # xdoctest: +REQUIRES(module:kwplot)
+            >>> results.dump_figures(dpath)
             >>> # xdoctest: +REQUIRES(--vd)
             >>> if ub.argflag('--vd') or 1:
             >>>     import xdev

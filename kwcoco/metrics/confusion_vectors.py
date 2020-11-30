@@ -967,6 +967,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
     def _3dplot(self):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> # xdoctest: +REQUIRES(module:pandas)
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
@@ -1150,6 +1151,7 @@ class Measures(ub.NiceRepr, DictProxy):
     def draw(self, key=None, prefix='', **kw):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> # xdoctest: +REQUIRES(module:pandas)
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
@@ -1219,6 +1221,7 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
     def draw(self, key='mcc', prefix='', **kw):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name')
             >>> self = ovr_cfsn.measures()['perclass']

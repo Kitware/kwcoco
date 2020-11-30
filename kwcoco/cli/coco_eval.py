@@ -11,6 +11,7 @@ class CocoEvalCLI:
         """
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> import ubelt as ub
             >>> from kwcoco.cli.coco_eval import *  # NOQA
             >>> from kwcoco.coco_evaluator import CocoEvaluator
