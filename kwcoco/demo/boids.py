@@ -103,9 +103,7 @@ class Boids(ub.NiceRepr):
             ax.set_xlim(0, 1)
             ax.set_ylim(0, 1)
             xdev.InteractiveIter.draw()
-
         rx = 0
-
     """
 
     def __init__(self, num, dims=2, rng=None, **kwargs):
@@ -409,10 +407,20 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
         >>> print('square_mat =\n{}'.format(ub.repr2(square_mat, nl=1)))
 
     Ignore:
+        >>> import xdev
         >>> n = 30
         >>> symetric = True
         >>> multi_index = np.triu_indices(n=n, k=1)
         >>> condensed_idxs = xdev.profile_now(triu_condense_multi_index)(multi_index, [n] * 2)
+
+    Ignore:
+        # Numba helps here when ub.allsame is gone
+        from numba import jit
+        triu_condense_multi_index2 = jit(nopython=True)(triu_condense_multi_index)
+        triu_condense_multi_index2 = jit()(triu_condense_multi_index)
+        triu_condense_multi_index2(multi_index, [n] * 2)
+        %timeit triu_condense_multi_index(multi_index, [n] * 2)
+        %timeit triu_condense_multi_index2(multi_index, [n] * 2)
     """
     if len(dims) != 2:
         raise NotImplementedError('only 2d matrices for now')
@@ -516,6 +524,13 @@ def closest_point_on_line_segment(pts, e1, e2):
         >>> pts = rng.rand(64, 2) * 20 + 5
         >>> e1, e2 = verts[0:2]
         >>> closest_point_on_line_segment(pts, e1, e2)
+
+    Ignore:
+        from numba import jit
+        closest_point_on_line_segment2 = jit(closest_point_on_line_segment)
+        closest_point_on_line_segment2(pts, e1, e2)
+        %timeit closest_point_on_line_segment(pts, e1, e2)
+        %timeit closest_point_on_line_segment2(pts, e1, e2)
     """
     # shift e1 to origin
     de = (e2 - e1)[None, :]

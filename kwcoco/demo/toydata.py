@@ -1247,7 +1247,7 @@ def random_multi_object_path(num_objects, num_frames, rng=None):
     # path = np.array(positions) % 1
 
 
-def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
+def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
     """
     Create a random path using a bezier curve.
 
@@ -1266,7 +1266,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
         >>> dimension = 2
         >>> degree = 3
         >>> rng = None
-        >>> path = random_path(num, degree, dimension, rng, mode='walk')
+        >>> path = random_path(num, degree, dimension, rng, mode='boid')
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> plt = kwplot.autoplt()
@@ -1276,7 +1276,11 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
     import bezier
     rng = kwarray.ensure_rng(rng)
 
-    if mode == 'walk':
+    if mode == 'boid':
+        from kwcoco.demo.boids import Boids
+        boids = Boids(1, rng=rng).initialize()
+        path = boids.paths(num)[0]
+    elif mode == 'walk':
         # TODO: can we do better?
         import torch
         torch.optim.SGD
