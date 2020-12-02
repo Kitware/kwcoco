@@ -567,18 +567,21 @@ def closest_point_on_line_segment(pts, e1, e2):
 
 def _pygame_render_boids():
     """
-    Fast and responsible BOID rendering
+    Fast and responsive BOID rendering. This is an easter egg.
 
     Requirements:
         pip install pygame
 
     CommandLine:
-        xdoctest -m kwcoco.demo.boids _pygame_render_boids
+        python -m kwcoco.demo.boids
     """
-    import pygame
+    try:
+        import pygame
+    except ImportError:
+        raise Exception('Please pip install pygame before using this function')
     pygame.init()
-    w = 2000
-    h = 2000
+    w = 1500
+    h = 1500
     screen = pygame.display.set_mode([w, h])
     pygame.display.set_caption('YEAH BOID!')
     strokeweight = 5
@@ -592,19 +595,25 @@ def _pygame_render_boids():
 
     flock = Boids(256, **kw).initialize()
 
-    # DRAW
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
+    try:
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
 
-        screen.fill((255, 255, 255))
+            screen.fill((255, 255, 255))
 
-        positions = flock.step()
-        for pos in positions:
-            x, y = pos * (w, h)
-            r = 10
-            pygame.draw.ellipse(screen, (255, 0, 0), (x, y, r, r))
-            pygame.draw.ellipse(screen, (0, 0, 0), (x, y, r, r), strokeweight)
+            positions = flock.step()
+            for pos in positions:
+                x, y = pos * (w, h)
+                r = 15
+                pygame.draw.ellipse(screen, (255, 0, 0), (x, y, r, r))
+                pygame.draw.ellipse(screen, (0, 0, 0), (x, y, r, r), strokeweight)
 
-        pygame.display.flip()
+            pygame.display.flip()
+    except pygame.error:
+        print('exiting')
+
+
+if __name__ == '__main__':
+    _pygame_render_boids()
