@@ -120,6 +120,7 @@ class Boids(ub.NiceRepr):
             'perception_thresh': 0.2,
             'max_speed': 0.01,
             'max_force': 0.001,
+            'damping': 0.99,
         }
         self.config.update(ub.dict_isect(kwargs, self.config))
 
@@ -133,8 +134,8 @@ class Boids(ub.NiceRepr):
     def initialize(self):
         # Generate random starting positions, velocities, and accelerations
         self.pos = self.rng.rand(self.num, self.dims)
-        self.vel = self.rng.rand(self.num, self.dims) * self.config['max_speed']
-        self.acc = self.rng.rand(self.num, self.dims) * self.config['max_force']
+        self.vel = self.rng.randn(self.num, self.dims) * self.config['max_speed']
+        self.acc = self.rng.randn(self.num, self.dims) * self.config['max_force']
         return self
 
     def update_neighbors(self):
@@ -249,20 +250,25 @@ class Boids(ub.NiceRepr):
         # align_steering[
         # com_steering = clamp_mag(com_steering, self.config['max_force'], axis=None)
 
-        align_steering = clamp_mag(align_steering, 1.0 * self.config['max_force'], axis=None)
-        com_steering = clamp_mag(com_steering, 1.0 * self.config['max_force'], axis=None)
+        align_steering = clamp_mag(align_steering, 0.33 * self.config['max_force'], axis=None)
+        com_steering = clamp_mag(com_steering, 0.33 * self.config['max_force'], axis=None)
 
         # Separation and obstical avoidance should override alignment and COM
-        sep_steering = clamp_mag(sep_steering, 3.0 * self.config['max_force'], axis=None)
+        sep_steering = clamp_mag(sep_steering, 1.0 * self.config['max_force'], axis=None)
+
+        # Add some small random movement
+        rand_steering = clamp_mag(np.random.randn(*self.pos.shape), 0.08 * self.config['max_force'], axis=None)
 
         self.sep_steering = sep_steering
         self.com_steering = com_steering
         self.align_steering = align_steering
+        self.rand_steering = rand_steering
 
         steering = sum([
             com_steering,
             align_steering,
             sep_steering,
+            rand_steering,
         ])
 
         if 1:
@@ -324,7 +330,7 @@ class Boids(ub.NiceRepr):
         self.vel = clamp_mag(self.vel, self.config['max_speed'], axis=1)
 
         # Dampen acceleration
-        self.acc[:] *= 0.1
+        self.acc[:] *= max(1, min(0, (1 - self.config['damping'])))
         # self.acc[:] = 0
 
         self.boundary_conditions()
@@ -557,3 +563,48 @@ def closest_point_on_line_segment(pts, e1, e2):
     pt_on_seg[oob_left] = e1
     pt_on_seg[oob_right] = e2
     return pt_on_seg
+
+
+def _pygame_render_boids():
+    """
+    Fast and responsible BOID rendering
+
+    Requirements:
+        pip install pygame
+
+    CommandLine:
+        xdoctest -m kwcoco.demo.boids _pygame_render_boids
+    """
+    import pygame
+    pygame.init()
+    w = 2000
+    h = 2000
+    screen = pygame.display.set_mode([w, h])
+    pygame.display.set_caption('YEAH BOID!')
+    strokeweight = 5
+
+    kw = {
+        'perception_thresh': 0.20,
+        'max_speed': 0.005,
+        'max_force': 0.0003,
+        'damping': 0.99,
+    }
+
+    flock = Boids(256, **kw).initialize()
+
+    # DRAW
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+
+        screen.fill((255, 255, 255))
+
+        positions = flock.step()
+        for pos in positions:
+            x, y = pos * (w, h)
+            r = 10
+            pygame.draw.ellipse(screen, (255, 0, 0), (x, y, r, r))
+            pygame.draw.ellipse(screen, (0, 0, 0), (x, y, r, r), strokeweight)
+
+        pygame.display.flip()
