@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.8 - Unreleased
+## Version 0.1.9 - Unreleased
+
+
+## Version 0.1.8 - Released 2020-12-02
 
 ### Added
 * Standalone algorithm for BOID positions
