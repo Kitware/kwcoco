@@ -1149,90 +1149,105 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
 
 def random_multi_object_path(num_objects, num_frames, rng=None):
     """
-    num_objects = 30
-    num_frames = 30
+
+    import kwarray
+    import kwplot
+    plt = kwplot.autoplt()
+
+    num_objects = 5
+    num_frames = 100
+    rng = kwarray.ensure_rng(0)
 
     from kwcoco.demo.toydata import *  # NOQA
     paths = random_multi_object_path(num_objects, num_frames, rng)
 
-    import kwplot
-    plt = kwplot.autoplt()
-    ax = plt.gca()
+    from mpl_toolkits.mplot3d import Axes3D  # NOQA
+    ax = plt.gca(projection='3d')
     ax.cla()
-    ax.set_xlim(-.01, 1.01)
-    ax.set_ylim(-.01, 1.01)
-
-    rng = None
 
     for path in paths:
-        ax.plot(path.T[0], path.T[1], 'x-')
+        time = np.arange(len(path))
+        ax.plot(time, path.T[0] * 1, path.T[1] * 1, 'o-')
+    ax.set_xlim(0, num_frames)
+    ax.set_ylim(-.01, 1.01)
+    ax.set_zlim(-.01, 1.01)
+
     """
     import kwarray
-    import torch
-    from torch.nn import functional as F
     rng = kwarray.ensure_rng(rng)
 
-    max_speed = rng.rand(num_objects, 1) * 0.01
-    max_speed = np.concatenate([max_speed, max_speed], axis=1)
+    USE_TORCH = 0
 
-    max_speed = torch.from_numpy(max_speed)
+    if not USE_TORCH:
+        from kwcoco.demo.boids import Boids
+        boids = Boids(num_objects, rng=rng).initialize()
+        paths = boids.paths(num_frames)
+        return paths
+    else:
+        import torch
+        from torch.nn import functional as F
 
-    # TODO: can we do better?
-    torch.optim.SGD
-    class Positions(torch.nn.Module):
-        def __init__(model):
-            super().__init__()
-            _pos = torch.from_numpy(rng.rand(num_objects, 2))
-            model.pos = torch.nn.Parameter(_pos)
+        max_speed = rng.rand(num_objects, 1) * 0.01
+        max_speed = np.concatenate([max_speed, max_speed], axis=1)
 
-        def forward(model, noise):
-            loss_parts = {}
+        max_speed = torch.from_numpy(max_speed)
 
-            # Push objects away from each other
-            utriu_dists = torch.nn.functional.pdist(model.pos)
-            respulsive = (1 / (utriu_dists ** 2)).sum() / num_objects
-            loss_parts['repulsive'] = 0.01 * respulsive.sum()
+        # TODO: can we do better?
+        torch.optim.SGD
+        class Positions(torch.nn.Module):
+            def __init__(model):
+                super().__init__()
+                _pos = torch.from_numpy(rng.rand(num_objects, 2))
+                model.pos = torch.nn.Parameter(_pos)
 
-            # Push objects in random directions
-            loss_parts['random'] = (model.pos * noise).sum()
+            def forward(model, noise):
+                loss_parts = {}
 
-            # Push objects away from the boundary
-            margin = 0
-            x = model.pos
-            y = F.softplus((x - 0.5) + margin)
-            y = torch.max(F.softplus(-(x - 0.5) + margin), y)
-            loss_parts['boundary'] = y.sum() * 2
+                # Push objects away from each other
+                utriu_dists = torch.nn.functional.pdist(model.pos)
+                respulsive = (1 / (utriu_dists ** 2)).sum() / num_objects
+                loss_parts['repulsive'] = 0.01 * respulsive.sum()
 
-            return sum(loss_parts.values())
+                # Push objects in random directions
+                loss_parts['random'] = (model.pos * noise).sum()
 
-    model = Positions()
-    params = list(model.parameters())
-    optim = torch.optim.SGD(params, lr=1.00, momentum=0.9)
+                # Push objects away from the boundary
+                margin = 0
+                x = model.pos
+                y = F.softplus((x - 0.5) + margin)
+                y = torch.max(F.softplus(-(x - 0.5) + margin), y)
+                loss_parts['boundary'] = y.sum() * 2
 
-    positions = []
-    for i in range(num_frames):
-        optim.zero_grad()
-        noise = torch.from_numpy(rng.rand(2))
-        loss = model.forward(noise)
-        loss.backward()
+                return sum(loss_parts.values())
 
-        if max_speed is not None:
-            # Enforce a per-object speed limit
-            model.pos.grad.data[:] = torch.min(model.pos.grad, max_speed)
-            model.pos.grad.data[:] = torch.max(model.pos.grad, -max_speed)
+        model = Positions()
+        params = list(model.parameters())
+        optim = torch.optim.SGD(params, lr=1.00, momentum=0.9)
 
-        optim.step()
+        positions = []
+        for i in range(num_frames):
+            optim.zero_grad()
+            noise = torch.from_numpy(rng.rand(2))
+            loss = model.forward(noise)
+            loss.backward()
 
-        # Enforce boundry conditions
-        model.pos.data.clamp_(0, 1)
-        positions.append(model.pos.data.numpy().copy())
+            if max_speed is not None:
+                # Enforce a per-object speed limit
+                model.pos.grad.data[:] = torch.min(model.pos.grad, max_speed)
+                model.pos.grad.data[:] = torch.max(model.pos.grad, -max_speed)
+
+            optim.step()
+
+            # Enforce boundry conditions
+            model.pos.data.clamp_(0, 1)
+            positions.append(model.pos.data.numpy().copy())
 
     paths = np.concatenate([p[:, None] for p in positions], axis=1)
     return paths
     # path = np.array(positions) % 1
 
 
-def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
+def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
     """
     Create a random path using a bezier curve.
 
@@ -1251,7 +1266,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
         >>> dimension = 2
         >>> degree = 3
         >>> rng = None
-        >>> path = random_path(num, degree, dimension, rng, mode='walk')
+        >>> path = random_path(num, degree, dimension, rng, mode='boid')
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> plt = kwplot.autoplt()
@@ -1261,7 +1276,11 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='walk'):
     import bezier
     rng = kwarray.ensure_rng(rng)
 
-    if mode == 'walk':
+    if mode == 'boid':
+        from kwcoco.demo.boids import Boids
+        boids = Boids(1, rng=rng).initialize()
+        path = boids.paths(num)[0]
+    elif mode == 'walk':
         # TODO: can we do better?
         import torch
         torch.optim.SGD

@@ -118,6 +118,8 @@ class CocoEvalConfig(scfg.Config):
 
         'assign_workers': scfg.Value(8, help='number of background workers for assignment'),
 
+        'load_workers': scfg.Value(0, help='number of workers to load cached detections'),
+
         'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
 
         'classes_of_interest': scfg.Value(
@@ -221,12 +223,13 @@ class CocoEvaluator(object):
 
         # FIXME: What is the image names line up correctly, but the image ids
         # do not? This will be common if an external detector is used.
+        load_workers = coco_eval.config['load_workers']
         gid_to_true, true_extra = CocoEvaluator._coerce_dets(
-            coco_eval.config['true_dataset'])
+            coco_eval.config['true_dataset'], workers=load_workers)
 
         coco_eval.log('init pred dset')
         gid_to_pred, pred_extra = CocoEvaluator._coerce_dets(
-            coco_eval.config['pred_dataset'])
+            coco_eval.config['pred_dataset'], workers=load_workers)
 
         if coco_eval.config['use_image_names']:
             # TODO: currently this is a hacky implementation that modifies the
@@ -393,7 +396,7 @@ class CocoEvaluator(object):
         return classes, unified_cid_maps
 
     @classmethod
-    def _coerce_dets(CocoEvaluator, dataset, verbose=0):
+    def _coerce_dets(CocoEvaluator, dataset, verbose=0, workers=0):
         """
         Coerce the input to a mapping from image-id to kwimage.Detection
 
@@ -468,7 +471,8 @@ class CocoEvaluator(object):
             # Input is an ndsampler.CocoSampler object
             extra['sampler'] = sampler = dataset
             coco_dset = sampler.dset
-            gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
+            gid_to_det, _extra = CocoEvaluator._coerce_dets(
+                coco_dset, verbose, workers=workers)
             extra.update(_extra)
         elif isinstance(dataset, six.string_types):
             if exists(dataset):
@@ -480,7 +484,7 @@ class CocoEvaluator(object):
                     extra['coco_dpath'] = coco_dpath = dataset
                     pat = join(coco_dpath, '**/*.json')
                     coco_fpaths = sorted(glob.glob(pat, recursive=True))
-                    dets, coco_dset = _load_dets(coco_fpaths)
+                    dets, coco_dset = _load_dets(coco_fpaths, workers=workers)
                     extra['coco_dset'] = coco_dset
                     # coco_dset = kwcoco.CocoDataset.from_coco_paths(
                     #     coco_fpaths, max_workers=6, verbose=1, mode='process')
@@ -491,7 +495,8 @@ class CocoEvaluator(object):
                         print('Loading mscoco file')
                     extra['dataset_fpath'] = coco_fpath = dataset
                     coco_dset = kwcoco.CocoDataset(coco_fpath)
-                    gid_to_det, _extra = CocoEvaluator._coerce_dets(coco_dset, verbose)
+                    gid_to_det, _extra = CocoEvaluator._coerce_dets(
+                        coco_dset, verbose, workers=workers)
                     extra.update(_extra)
                 else:
                     raise NotImplementedError
@@ -587,8 +592,9 @@ class CocoEvaluator(object):
             >>> results = coco_eval.evaluate()
             >>> # Now we can draw / serialize the results as we please
             >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
-            >>> results.dump_figures(dpath)
             >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
+            >>> # xdoctest: +REQUIRES(module:kwplot)
+            >>> results.dump_figures(dpath)
             >>> # xdoctest: +REQUIRES(--vd)
             >>> if ub.argflag('--vd') or 1:
             >>>     import xdev
@@ -1073,7 +1079,7 @@ class CocoSingleResult(ub.NiceRepr):
             pass
 
 
-def _load_dets(pred_fpaths, workers=6):
+def _load_dets(pred_fpaths, workers=0):
     """
     Example:
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
