@@ -819,6 +819,7 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
 
 class CocoResults(ub.NiceRepr, DictProxy):
     """
+    Example:
         >>> from kwcoco.coco_evaluator import *  # NOQA
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> import kwcoco
@@ -844,6 +845,10 @@ class CocoResults(ub.NiceRepr, DictProxy):
         >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
         >>> results.dump_figures(dpath)
         >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
+        >>> #
+        >>> # test deserialization works
+        >>> state = results.__json__()
+        >>> self2 = CocoResults.from_json(state)
 
     """
     def __init__(results, resdata=None):
@@ -870,6 +875,14 @@ class CocoResults(ub.NiceRepr, DictProxy):
         }
         # ensure_json_serializable(state, normalize_containers=True, verbose=0)
         return state
+
+    @classmethod
+    def from_json(cls, state):
+        self = cls({})
+        for key, val in state.items():
+            result = CocoSingleResult.from_json(val)
+            self[key] = result
+        return self
 
     def dump(result, file, indent='    '):
         """

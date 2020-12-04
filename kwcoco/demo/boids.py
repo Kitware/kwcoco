@@ -574,6 +574,7 @@ def _pygame_render_boids():
 
     CommandLine:
         python -m kwcoco.demo.boids
+        pip install pygame kwcoco -U && python -m kwcoco.demo.boids
     """
     try:
         import pygame

@@ -3507,6 +3507,7 @@ class MixinCocoAddRemove(object):
         remove_info = {'annotations': None}
         # Do nothing if given no input
         if aids_or_anns:
+
             # build mapping from aid to index O(n)
             # TODO: it would be nice if this mapping was as part of the index.
             aid_to_index = {
