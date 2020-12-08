@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.9 - Unreleased
 
+### Added
+* Add `remove_video` method to CocoDataset
+
 
 ## Version 0.1.8 - Released 2020-12-02
 

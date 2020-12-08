@@ -1459,6 +1459,18 @@ class MixinCocoExtras(object):
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
 
+    def _resolve_to_vidid(self, id_or_name_or_dict):
+        """
+        Ensures output is an video id
+        """
+        if isinstance(id_or_name_or_dict, INT_TYPES):
+            resolved_id = id_or_name_or_dict
+        elif isinstance(id_or_name_or_dict, six.string_types):
+            resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']
+        else:
+            resolved_id = id_or_name_or_dict['id']
+        return resolved_id
+
     def _resolve_to_ann(self, aid_or_ann):
         """
         Ensures output is an annotation dictionary
@@ -3592,12 +3604,12 @@ class MixinCocoAddRemove(object):
             remove_info['categories'] = len(remove_cids)
             if verbose > 1:
                 print('Removing {} category entries'.format(len(remove_cids)))
-            cid_to_index = {
+            id_to_index = {
                 cat['id']: index
                 for index, cat in enumerate(self.dataset['categories'])
             }
             # Lookup the indices to remove, sort in descending order
-            remove_idxs = list(ub.take(cid_to_index, remove_cids))
+            remove_idxs = list(ub.take(id_to_index, remove_cids))
             _delitems(self.dataset['categories'], remove_idxs)
 
             self.index._remove_categories(remove_cids, verbose=verbose)
@@ -3607,6 +3619,8 @@ class MixinCocoAddRemove(object):
 
     def remove_images(self, gids_or_imgs, verbose=0, safe=True):
         """
+        Remove images and any annotations contained by them
+
         Args:
             gids_or_imgs (List): list of image dicts, names, or ids
 
@@ -3634,7 +3648,7 @@ class MixinCocoAddRemove(object):
         if gids_or_imgs:
 
             if verbose > 1:
-                print('Removing annots of removed images')
+                print('Removing images')
 
             remove_gids = list(map(self._resolve_to_gid, gids_or_imgs))
             if safe:
@@ -3653,17 +3667,76 @@ class MixinCocoAddRemove(object):
             remove_info['images'] = len(remove_gids)
             if verbose > 1:
                 print('Removing {} image entries'.format(len(remove_gids)))
-            gid_to_index = {
+            id_to_index = {
                 img['id']: index
                 for index, img in enumerate(self.dataset['images'])
             }
             # Lookup the indices to remove, sort in descending order
-            remove_idxs = list(ub.take(gid_to_index, remove_gids))
+            remove_idxs = list(ub.take(id_to_index, remove_gids))
             _delitems(self.dataset['images'], remove_idxs)
 
             self.index._remove_images(remove_gids, verbose=verbose)
             self._invalidate_hashid(['images', 'annotations'])
 
+        return remove_info
+
+    def remove_videos(self, vidids_or_videos, verbose=0, safe=True):
+        """
+        Remove videos and any images / annotations contained by them
+
+        Args:
+            vidids_or_videos (List): list of video dicts, names, or ids
+
+            safe (bool, default=True): if True, we perform checks to remove
+                duplicates and non-existing identifiers.
+
+        Returns:
+            Dict: num_removed: information on the number of items removed
+
+        Example:
+            >>> from kwcoco.coco_dataset import *
+            >>> self = CocoDataset.demo('vidshapes8')
+            >>> assert len(self.dataset['videos']) == 1
+            >>> vidids_or_videos = [self.dataset['videos'][0]['id']]
+            >>> self.remove_videos(vidids_or_videos)  # xdoc: +IGNORE_WANT
+            {'annotations': 4, 'images': 2, 'videos': 1}
+            >>> assert len(self.dataset['videos']) == 0
+            >>> self._check_index()
+        """
+        remove_info = {'annotations': None, 'images': None, 'videos': None}
+        if vidids_or_videos:
+
+            if verbose > 1:
+                print('Removing videos')
+
+            remove_vidids = list(map(self._resolve_to_vidid, vidids_or_videos))
+            if safe:
+                remove_vidids = sorted(set(remove_vidids))
+            # First remove any annotation that belongs to those images
+            if self.index.vidid_to_gids:
+                remove_gids = list(it.chain(*[self.index.vidid_to_gids[vidid]
+                                              for vidid in remove_vidids]))
+            else:
+                remove_gids = [ann['id'] for ann in self.dataset['videos']
+                               if ann['image_id'] in remove_gids]
+
+            rminfo = self.remove_images(remove_gids, verbose=verbose,
+                                        safe=safe)
+            remove_info.update(rminfo)
+
+            remove_info['videos'] = len(remove_vidids)
+            if verbose > 1:
+                print('Removing {} video entries'.format(len(remove_vidids)))
+            id_to_index = {
+                video['id']: index
+                for index, video in enumerate(self.dataset['videos'])
+            }
+            # Lookup the indices to remove, sort in descending order
+            remove_idxs = list(ub.take(id_to_index, remove_vidids))
+            _delitems(self.dataset['videos'], remove_idxs)
+
+            self.index._remove_videos(remove_vidids, verbose=verbose)
+            self._invalidate_hashid(['videos', 'images', 'annotations'])
         return remove_info
 
     def remove_annotation_keypoints(self, kp_identifiers):
@@ -4021,6 +4094,20 @@ class CocoIndex(object):
                 del index.file_name_to_img[img['file_name']]
             if verbose > 2:
                 print('Updated image index')
+
+    def _remove_videos(index, remove_vidids, verbose=0):
+        # dynamically update the video index
+        lut = index.videos
+        if lut is not None:
+            for item_id in remove_vidids:
+                item = lut.pop(item_id)
+                del index.vidid_to_gids[item_id]
+                if index.name_to_video is not None:
+                    raise NotImplementedError(
+                        'need to ensure name_to_video is maintained correctly')
+                    del index.name_to_video[item['name']]
+            if verbose > 2:
+                print('Updated video index')
 
     def clear(index):
         index.anns = None
