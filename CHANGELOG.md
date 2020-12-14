@@ -11,6 +11,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add `remove_video` method to CocoDataset
 
 
+### Changed
+* `CocoDataset.union` now will remap track-ids assuming all input datasets are
+  disjoint by default.
+
+
 ## Version 0.1.8 - Released 2020-12-02
 
 ### Added
