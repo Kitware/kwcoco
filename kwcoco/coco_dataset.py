@@ -1056,7 +1056,9 @@ class MixinCocoExtras(object):
 
     @classmethod
     def coerce(cls, key, **kw):
-        if key.startswith('special:'):
+        if isinstance(key, cls):
+            return key
+        elif key.startswith('special:'):
             demokey = key.split(':')[1]
             self = cls.demo(key=demokey, **kw)
         elif key.endswith('.json'):
