@@ -517,15 +517,19 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
             class_metrics[key] = k_metrics
 
     ovr_metrics = pd.DataFrame.from_dict(class_metrics, orient='index')
-    weight = ovr_metrics.loc[:, 'support'] / ovr_metrics.loc[:, 'support'].sum()
-    ovr_metrics['weight'] = weight
 
     if remove_unsupported:
         ovr_metrics = ovr_metrics[ovr_metrics['support'] > 0]
 
-    weighted = ovr_metrics.drop(columns=['support', 'weight'])
+    weight = ovr_metrics.loc[:, 'support'] / ovr_metrics.loc[:, 'support'].sum()
+    ovr_metrics['weight'] = weight
+
+    # weighted = ovr_metrics.drop(columns=['support', 'weight'])
+    weighted = ovr_metrics.copy()
     weighted.iloc[:] = weighted.values * weight.values[:, None]
     weighted_ave = weighted.sum(axis=0)
+    weighted_ave['support'] = ovr_metrics['support'].sum()
+    weighted_ave['weight'] = ovr_metrics['weight'].sum()
 
     report = {
         'ovr': ovr_metrics,
@@ -536,5 +540,5 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
         ovr_metrics = report['ovr']
         weighted_ave = report['ave']
         print('ovr_metrics')
-        print(pd.concat([ovr_metrics, weighted_ave.to_frame('__mean__').T]))
+        print(pd.concat([ovr_metrics, weighted_ave.to_frame('__accum__').T]))
     return report
