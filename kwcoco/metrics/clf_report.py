@@ -348,13 +348,24 @@ def classification_report(y_true, y_pred, target_names=None,
 
 
 def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
-                              sample_weight=None, metrics=None):
+                              sample_weight=None, metrics=None, verbose=0,
+                              remove_unsupported=False):
     """
     One-vs-rest classification report
 
     Args:
-        mc_y_true: multiclass truth labels (integer label format)
-        mc_probs: multiclass probabilities for each class [N x C]
+        mc_y_true (ndarray[int]): multiclass truth labels (integer label
+            format). Shape [N].
+
+        mc_probs (ndarray): multiclass probabilities for each class.
+            Shape [N x C].
+
+        target_names (Dict[int, str] : mapping from int label to string name
+
+        sample_weight (ndarray): weight for each item. Shape [N].
+
+        metrics (List[str]): names of metrics to compute
+
 
     Example:
         >>> # xdoctest: +IGNORE_WANT
@@ -401,7 +412,16 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
 
     # Preallocate common datas
     bin_probs = np.empty((len(mc_probs), 2), dtype=mc_probs.dtype)
-    total_probs = mc_probs.T.sum(axis=0)
+
+    import kwimage  # TODO: move to kwarray
+    import kwarray
+    # Map everything onto 0-1 range
+    ranked_cidxs = kwarray.argmaxima(mc_probs, 2, axis=1)
+    ranked_scores = np.array([a[x] for a, x in zip(mc_probs, ranked_cidxs)])  # probably better numpy way to do this
+
+    mc_scores = kwimage.normalize(mc_probs, mode='linear')
+    total_scores = mc_scores.sum(axis=1, keepdims=0)
+    # max_scores = mc_scores.max(axis=1, keepdims=0)
 
     class_metrics = ub.odict()
     with warnings.catch_warnings():
@@ -410,16 +430,34 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
         warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
         warnings.filterwarnings('ignore', message='divide by zero')
         warnings.filterwarnings('ignore', message='due to no true nor predicted samples')
+        warnings.filterwarnings('ignore', message='ill-defined')
 
-        for k in range(n_classes):
+        for cidx in range(n_classes):
             k_metrics = ub.odict()
 
+            class_score = mc_scores.T[cidx]
+            is_other = (ranked_cidxs != cidx)
+            other_score = np.array([a[f][0] for a, f in zip(ranked_scores, is_other)])
+
+            # HEURISTIC:
+            # We need to compute a score or "probability" of other
+            # is there a better way to do this?
+            # other_prob = total_scores - class_prob
+            # class_prob = class_score
+            # other_prob = max_scores
+            # other_prob = (max_scores - class_score)
+            class_prob = class_score / total_scores
+            other_prob = other_score / total_scores
+            # other_prob = (max_scores - class_score) / total_scores
+
             # Consider each class a one-vs-rest problem
-            bin_probs[:, 1] = mc_probs.T[k]
-            bin_probs[:, 0] = total_probs - bin_probs[:, 1]
+            # Populate the first column
+
+            bin_probs[:, 1] = class_prob
+            bin_probs[:, 0] = other_prob
 
             # Index of the true class
-            k_true = ohvec_true.T[k]
+            k_true = ohvec_true.T[cidx]
             # Index of the predicted class
             k_pred = np.argmax(bin_probs, axis=1)  # NOTE: ASSUME MUTEX CLASSES
 
@@ -436,7 +474,10 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
 
             if 'ap' in metrics:
                 k_metrics['ap'] = sklearn.metrics.average_precision_score(
-                    bin_truth, bin_probs, sample_weight=sample_weight)
+                    bin_truth, bin_probs, sample_weight=sample_weight,
+                    # zero_division=1,
+                    # np.nan
+                )
 
             if 'kappa' in metrics:
                 k_metrics['kappa'] = sklearn.metrics.cohen_kappa_score(
@@ -448,11 +489,15 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
 
             if 'f1' in metrics:
                 k_metrics['f1'] = sklearn.metrics.fbeta_score(
-                    k_true, k_pred, beta=1.0, sample_weight=sample_weight)
+                    k_true, k_pred, beta=1.0, sample_weight=sample_weight,
+                    zero_division=0,
+                    # zero_division=1,
+                    # zero_division=np.nan,
+                )
 
             if 'brier' in metrics:
                 # Get the probablity of the real class for each example
-                rprobs = np.clip(true_probs / total_probs, 0, 1)
+                rprobs = np.clip(true_probs / total_scores, 0, 1)
                 rwants = np.ones(len(rprobs))
                 # Use custom brier implemention until sklearn is fixed.
                 mse = (rwants - rprobs) ** 2
@@ -468,12 +513,16 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
             else:
                 k_metrics['support'] = (sample_weight * k_true).sum()
 
-            key = k if target_names is None else target_names[k]
+            key = cidx if target_names is None else target_names[cidx]
             class_metrics[key] = k_metrics
 
     ovr_metrics = pd.DataFrame.from_dict(class_metrics, orient='index')
     weight = ovr_metrics.loc[:, 'support'] / ovr_metrics.loc[:, 'support'].sum()
     ovr_metrics['weight'] = weight
+
+    if remove_unsupported:
+        ovr_metrics = ovr_metrics[ovr_metrics['support'] > 0]
+
     weighted = ovr_metrics.drop(columns=['support', 'weight'])
     weighted.iloc[:] = weighted.values * weight.values[:, None]
     weighted_ave = weighted.sum(axis=0)
@@ -482,4 +531,10 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
         'ovr': ovr_metrics,
         'ave': weighted_ave,
     }
+
+    if verbose:
+        ovr_metrics = report['ovr']
+        weighted_ave = report['ave']
+        print('ovr_metrics')
+        print(pd.concat([ovr_metrics, weighted_ave.to_frame('__mean__').T]))
     return report

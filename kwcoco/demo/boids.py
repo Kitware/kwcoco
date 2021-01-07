@@ -581,11 +581,14 @@ def _pygame_render_boids():
     except ImportError:
         raise Exception('Please pip install pygame before using this function')
     pygame.init()
-    w = 1500
-    h = 1500
-    screen = pygame.display.set_mode([w, h])
+    display_info = pygame.display.Info()
+
+    w = display_info.current_w // 2
+    h = display_info.current_h // 2
+
+    screen = pygame.display.set_mode([w, h], flags=pygame.RESIZABLE)
     pygame.display.set_caption('YEAH BOID!')
-    strokeweight = 5
+    strokeweight = 2
 
     kw = {
         'perception_thresh': 0.20,
@@ -607,7 +610,7 @@ def _pygame_render_boids():
             positions = flock.step()
             for pos in positions:
                 x, y = pos * (w, h)
-                r = 15
+                r = 8
                 pygame.draw.ellipse(screen, (255, 0, 0), (x, y, r, r))
                 pygame.draw.ellipse(screen, (0, 0, 0), (x, y, r, r), strokeweight)
 
