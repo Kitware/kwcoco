@@ -843,12 +843,14 @@ class CocoResults(ub.NiceRepr, DictProxy):
         >>> results = coco_eval.evaluate()
         >>> # Now we can draw / serialize the results as we please
         >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
-        >>> results.dump_figures(dpath)
-        >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
         >>> #
         >>> # test deserialization works
         >>> state = results.__json__()
         >>> self2 = CocoResults.from_json(state)
+        >>> #
+        >>> # xdoctest: +REQUIRES(module:kwplot)
+        >>> results.dump_figures(dpath)
+        >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
 
     """
     def __init__(results, resdata=None):

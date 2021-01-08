@@ -5,7 +5,20 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.8 - Unreleased
+## Version 0.1.9 - Unreleased
+
+### Added
+* Add `remove_video` method to CocoDataset
+
+
+### Changed
+* `CocoDataset.union` now will remap track-ids assuming all input datasets are
+  disjoint by default.
+
+* Fixed issues in metrics classification report
+
+
+## Version 0.1.8 - Released 2020-12-02
 
 ### Added
 * Standalone algorithm for BOID positions

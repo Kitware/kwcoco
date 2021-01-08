@@ -1056,7 +1056,9 @@ class MixinCocoExtras(object):
 
     @classmethod
     def coerce(cls, key, **kw):
-        if key.startswith('special:'):
+        if isinstance(key, cls):
+            return key
+        elif key.startswith('special:'):
             demokey = key.split(':')[1]
             self = cls.demo(key=demokey, **kw)
         elif key.endswith('.json'):
@@ -1455,6 +1457,18 @@ class MixinCocoExtras(object):
             resolved_id = id_or_name_or_dict
         elif isinstance(id_or_name_or_dict, six.string_types):
             resolved_id = self.index.file_name_to_img[id_or_name_or_dict]['id']
+        else:
+            resolved_id = id_or_name_or_dict['id']
+        return resolved_id
+
+    def _resolve_to_vidid(self, id_or_name_or_dict):
+        """
+        Ensures output is an video id
+        """
+        if isinstance(id_or_name_or_dict, INT_TYPES):
+            resolved_id = id_or_name_or_dict
+        elif isinstance(id_or_name_or_dict, six.string_types):
+            resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']
         else:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
@@ -2818,6 +2832,77 @@ class _NextId(object):
         return new_id
 
 
+class _ID_Remapper(object):
+    """
+    Helper to recycle ids for unions.
+
+    For each dataset we create a mapping between each old id and a new id.  If
+    possible and reuse=True we allow the new id to match the old id.  After
+    each dataset is finished we mark all those ids as used and subsequent
+    new-ids cannot be chosen from that pool.
+
+    Args:
+        reuse (bool): if True we are allowed to reuse ids
+            as long as they haven't been used before.
+
+    Example:
+        >>> video_trackids = [[1, 1, 3, 3, 200, 4], [204, 1, 2, 3, 3, 4, 5, 9]]
+        >>> self = _ID_Remapper(reuse=True)
+        >>> for tids in video_trackids:
+        >>>     new_tids = [self.remap(old_tid) for old_tid in tids]
+        >>>     self.block_seen()
+        >>>     print('new_tids = {!r}'.format(new_tids))
+        new_tids = [1, 1, 3, 3, 200, 4]
+        new_tids = [204, 205, 2, 206, 206, 207, 5, 9]
+        >>> #
+        >>> self = _ID_Remapper(reuse=False)
+        >>> for tids in video_trackids:
+        >>>     new_tids = [self.remap(old_tid) for old_tid in tids]
+        >>>     self.block_seen()
+        >>>     print('new_tids = {!r}'.format(new_tids))
+        new_tids = [0, 0, 1, 1, 2, 3]
+        new_tids = [4, 5, 6, 7, 7, 8, 9, 10]
+    """
+    def __init__(self, reuse=False):
+        self.blocklist = set()
+        self.mapping = dict()
+        self.reuse = reuse
+        self._nextid = 0
+
+    def remap(self, old_id):
+        """
+        Convert a old-id into a new-id. If self.reuse is True then we will
+        return the same id if it hasn't been blocked yet.
+        """
+        if old_id in self.mapping:
+            new_id = self.mapping[old_id]
+        else:
+            if not self.reuse or old_id in self.blocklist:
+                # We cannot reuse the old-id
+                new_id = self.next_id()
+            else:
+                # We can reuse the old-id
+                new_id = old_id
+                if isinstance(old_id, int) and old_id >= self._nextid:
+                    self._nextid = old_id + 1
+            self.mapping[old_id] = new_id
+        return new_id
+
+    def block_seen(self):
+        """
+        Mark all seen ids as unable to be used.
+        Any ids sent to remap will now generate new ids.
+        """
+        self.blocklist.update(self.mapping.values())
+        self.mapping = dict()
+
+    def next_id(self):
+        """ Generate a new id that hasnt been used yet """
+        next_id = self._nextid
+        self._nextid += 1
+        return next_id
+
+
 class MixinCocoDraw(object):
     """
     Matplotlib / display functionality
@@ -3592,12 +3677,12 @@ class MixinCocoAddRemove(object):
             remove_info['categories'] = len(remove_cids)
             if verbose > 1:
                 print('Removing {} category entries'.format(len(remove_cids)))
-            cid_to_index = {
+            id_to_index = {
                 cat['id']: index
                 for index, cat in enumerate(self.dataset['categories'])
             }
             # Lookup the indices to remove, sort in descending order
-            remove_idxs = list(ub.take(cid_to_index, remove_cids))
+            remove_idxs = list(ub.take(id_to_index, remove_cids))
             _delitems(self.dataset['categories'], remove_idxs)
 
             self.index._remove_categories(remove_cids, verbose=verbose)
@@ -3607,6 +3692,8 @@ class MixinCocoAddRemove(object):
 
     def remove_images(self, gids_or_imgs, verbose=0, safe=True):
         """
+        Remove images and any annotations contained by them
+
         Args:
             gids_or_imgs (List): list of image dicts, names, or ids
 
@@ -3634,7 +3721,7 @@ class MixinCocoAddRemove(object):
         if gids_or_imgs:
 
             if verbose > 1:
-                print('Removing annots of removed images')
+                print('Removing images')
 
             remove_gids = list(map(self._resolve_to_gid, gids_or_imgs))
             if safe:
@@ -3653,17 +3740,76 @@ class MixinCocoAddRemove(object):
             remove_info['images'] = len(remove_gids)
             if verbose > 1:
                 print('Removing {} image entries'.format(len(remove_gids)))
-            gid_to_index = {
+            id_to_index = {
                 img['id']: index
                 for index, img in enumerate(self.dataset['images'])
             }
             # Lookup the indices to remove, sort in descending order
-            remove_idxs = list(ub.take(gid_to_index, remove_gids))
+            remove_idxs = list(ub.take(id_to_index, remove_gids))
             _delitems(self.dataset['images'], remove_idxs)
 
             self.index._remove_images(remove_gids, verbose=verbose)
             self._invalidate_hashid(['images', 'annotations'])
 
+        return remove_info
+
+    def remove_videos(self, vidids_or_videos, verbose=0, safe=True):
+        """
+        Remove videos and any images / annotations contained by them
+
+        Args:
+            vidids_or_videos (List): list of video dicts, names, or ids
+
+            safe (bool, default=True): if True, we perform checks to remove
+                duplicates and non-existing identifiers.
+
+        Returns:
+            Dict: num_removed: information on the number of items removed
+
+        Example:
+            >>> from kwcoco.coco_dataset import *
+            >>> self = CocoDataset.demo('vidshapes8')
+            >>> assert len(self.dataset['videos']) == 1
+            >>> vidids_or_videos = [self.dataset['videos'][0]['id']]
+            >>> self.remove_videos(vidids_or_videos)  # xdoc: +IGNORE_WANT
+            {'annotations': 4, 'images': 2, 'videos': 1}
+            >>> assert len(self.dataset['videos']) == 0
+            >>> self._check_index()
+        """
+        remove_info = {'annotations': None, 'images': None, 'videos': None}
+        if vidids_or_videos:
+
+            if verbose > 1:
+                print('Removing videos')
+
+            remove_vidids = list(map(self._resolve_to_vidid, vidids_or_videos))
+            if safe:
+                remove_vidids = sorted(set(remove_vidids))
+            # First remove any annotation that belongs to those images
+            if self.index.vidid_to_gids:
+                remove_gids = list(it.chain(*[self.index.vidid_to_gids[vidid]
+                                              for vidid in remove_vidids]))
+            else:
+                remove_gids = [ann['id'] for ann in self.dataset['videos']
+                               if ann['image_id'] in remove_gids]
+
+            rminfo = self.remove_images(remove_gids, verbose=verbose,
+                                        safe=safe)
+            remove_info.update(rminfo)
+
+            remove_info['videos'] = len(remove_vidids)
+            if verbose > 1:
+                print('Removing {} video entries'.format(len(remove_vidids)))
+            id_to_index = {
+                video['id']: index
+                for index, video in enumerate(self.dataset['videos'])
+            }
+            # Lookup the indices to remove, sort in descending order
+            remove_idxs = list(ub.take(id_to_index, remove_vidids))
+            _delitems(self.dataset['videos'], remove_idxs)
+
+            self.index._remove_videos(remove_vidids, verbose=verbose)
+            self._invalidate_hashid(['videos', 'images', 'annotations'])
         return remove_info
 
     def remove_annotation_keypoints(self, kp_identifiers):
@@ -4021,6 +4167,20 @@ class CocoIndex(object):
                 del index.file_name_to_img[img['file_name']]
             if verbose > 2:
                 print('Updated image index')
+
+    def _remove_videos(index, remove_vidids, verbose=0):
+        # dynamically update the video index
+        lut = index.videos
+        if lut is not None:
+            for item_id in remove_vidids:
+                item = lut.pop(item_id)
+                del index.vidid_to_gids[item_id]
+                if index.name_to_video is not None:
+                    raise NotImplementedError(
+                        'need to ensure name_to_video is maintained correctly')
+                    del index.name_to_video[item['name']]
+            if verbose > 2:
+                print('Updated video index')
 
     def clear(index):
         index.anns = None
@@ -4752,7 +4912,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
     def _build_index(self):
         self.index.build(self)
 
-    def union(self, *others, **kwargs):
+    def union(self, *others, disjoint_tracks=True, **kwargs):
         """
         Merges multiple :class:`CocoDataset` items into one. Names and
         associations are retained, but ids may be different.
@@ -4762,7 +4922,14 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 or a class method.  If it is a class method, then this is the
                 class type, otherwise the instance will also be unioned with
                 ``others``.
+
             *others : a series of CocoDatasets that we will merge
+
+            disjoint_tracks (bool, default=True):
+                if True, we will assume track-ids are disjoint and if two
+                datasets share the same track-id, we will disambiguate them.
+                Otherwise they will be copied over as-is.
+
             **kwargs : constructor options for the new merged CocoDataset
 
         Returns:
@@ -4820,11 +4987,26 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> print('merged.imgs = {}'.format(ub.repr2(merged.imgs, nl=1)))
             >>> assert set(merged.imgs) & set([1, 2, 3, 4, 5]) == set(merged.imgs)
 
+            >>> # Test track-ids are mapped correctly
+            >>> dset1 = kwcoco.CocoDataset.demo('vidshapes1')
+            >>> dset2 = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> dset3 = kwcoco.CocoDataset.demo('vidshapes3')
+            >>> others = (dset1, dset2, dset3)
+            >>> for dset in others:
+            >>>     [a.pop('segmentation') for a in dset.anns.values()]
+            >>>     [a.pop('keypoints') for a in dset.anns.values()]
+            >>> cls = self = kwcoco.CocoDataset
+            >>> merged = cls.union(*others, disjoint_tracks=1)
+            >>> print('dset1.anns = {}'.format(ub.repr2(dset1.anns, nl=1)))
+            >>> print('dset2.anns = {}'.format(ub.repr2(dset2.anns, nl=1)))
+            >>> print('dset3.anns = {}'.format(ub.repr2(dset3.anns, nl=1)))
+            >>> print('merged.anns = {}'.format(ub.repr2(merged.anns, nl=1)))
+
         TODO:
             - [ ] are supercategories broken?
             - [ ] reuse image ids where possible
             - [ ] reuse annotation / category ids where possible
-            - [ ] disambiguate track-ids
+            - [x] disambiguate track-ids
             - [x] disambiguate video-ids
         """
         if self.__class__ is type:
@@ -4867,13 +5049,21 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                     seen.add(item)
                 return False
 
+            # Check if the image-ids are unique and can be preserved
             _all_imgs = (img for _, d in relative_dsets for img in d['images'])
             _all_gids = (img['id'] for img in _all_imgs)
             preserve_gids = not _has_duplicates(_all_gids)
 
-            _all_videos = (video for _, d in relative_dsets for video in (d.get('videos', None) or []))
+            # Check if the video-ids are unique and can be preserved
+            _all_videos = (video for _, d in relative_dsets
+                           for video in (d.get('videos', None) or []))
             _all_vidids = (video['id'] for video in _all_videos)
             preserve_vidids = not _has_duplicates(_all_vidids)
+
+            # If disjoint_tracks is True keep track of track-ids we've seen in
+            # so far in previous datasets and ensure we dont reuse them.
+            # TODO: do this Remapper class with other ids?
+            track_id_map = _ID_Remapper(reuse=False)
 
             for subdir, old_dset in relative_dsets:
                 # Create temporary indexes to map from old to new
@@ -4980,22 +5170,24 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                     old_img_id = old_annot['image_id']
                     new_cat_id = cat_id_map.get(old_cat_id, ub.NoParam)
                     new_img_id = img_id_map.get(old_img_id, None)
+
                     if new_cat_id is ub.NoParam:
                         # NOTE: category_id is allowed to be None
                         warnings.warn('annot {} in {} has bad category-id {}'.format(
                             old_annot, subdir, old_cat_id))
-                        # raise Exception
                     if new_img_id is None:
                         warnings.warn('annot {} in {} has bad image-id {}'.format(
                             old_annot, subdir, old_img_id))
-                        # sanity check:
-                        # if any(img['id'] == old_img_id for img in old_dset['images']):
-                        #     raise Exception('Image id {} does not exist in {}'.format(old_img_id, subdir))
                     new_annot = _dict([
                         ('id', len(merged['annotations']) + 1),
                         ('image_id', new_img_id),
                         ('category_id', new_cat_id),
                     ])
+                    if disjoint_tracks:
+                        old_track_id = old_annot.get('track_id', None)
+                        if old_track_id is not None:
+                            new_track_id = track_id_map.remap(old_track_id)
+                            new_annot['track_id'] = new_track_id
                     update_ifnotin(new_annot, old_annot)
 
                     if kpcat_id_map:
@@ -5009,6 +5201,10 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                                     kp['keypoint_category_id'], None)
                             new_annot['keypoints'] = new_keypoints
                     merged['annotations'].append(new_annot)
+
+                # Mark that we are not allowed to use the same track-ids again
+                track_id_map.block_seen()
+
             return merged
 
         # handle soft data roots

@@ -6,7 +6,8 @@ import ubelt as ub
 
 
 def classification_report(y_true, y_pred, target_names=None,
-                          sample_weight=None, verbose=False):
+                          sample_weight=None, verbose=False,
+                          remove_unsupported=False, log=None):
     """
     Computes a classification report which is a collection of various metrics
     commonly used to evaulate classification quality. This can handle binary
@@ -75,9 +76,13 @@ def classification_report(y_true, y_pred, target_names=None,
         >>> kwplot.multi_plot(ydata_list=ys)
     """
     import pandas as pd
-    import scipy as sp
+    import scipy as sp  # NOQA
     import sklearn.metrics
     from sklearn.preprocessing import LabelEncoder
+
+    if verbose or log:
+        if log is None:
+            log = print
 
     if target_names is None:
         unique_labels = np.unique(np.hstack([y_true, y_pred]))
@@ -123,6 +128,7 @@ def classification_report(y_true, y_pred, target_names=None,
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='invalid .* true_divide')
         warnings.filterwarnings('ignore', message='divide by zero')
+        warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
 
         tprs = n_tps / real_total  # true pos rate (recall)
         tpas = n_tps / pred_total  # true pos accuracy (precision)
@@ -205,72 +211,67 @@ def classification_report(y_true, y_pred, target_names=None,
         ('support', real_total.sum()),
     ])
 
-    # Not sure how to compute this. Should it agree with the sklearn impl?
-    if verbose == 'hack':
-        verbose = False
-        mcc_known = sklearn.metrics.matthews_corrcoef(
-            y_true, y_pred, sample_weight=sample_weight)
-        mcc_raw = np.sign(bm) * np.sqrt(np.abs(bm * mk))
+    # # Not sure how to compute this. Should it agree with the sklearn impl?
+    # if verbose == 'hack':
+    #     verbose = False
+    #     mcc_known = sklearn.metrics.matthews_corrcoef(
+    #         y_true, y_pred, sample_weight=sample_weight)
+    #     mcc_raw = np.sign(bm) * np.sqrt(np.abs(bm * mk))
 
-        def gmean(x, w=None):
-            if w is None:
-                return sp.stats.gmean(x)
-            return np.exp(np.nansum(w * np.log(x)) / np.nansum(w))
+    #     def gmean(x, w=None):
+    #         if w is None:
+    #             return sp.stats.gmean(x)
+    #         return np.exp(np.nansum(w * np.log(x)) / np.nansum(w))
 
-        def hmean(x, w=None):
-            if w is None:
-                return sp.stats.hmean(x)
-            return 1 / (np.nansum(w * (1 / x)) / np.nansum(w))
+    #     def hmean(x, w=None):
+    #         if w is None:
+    #             return sp.stats.hmean(x)
+    #         return 1 / (np.nansum(w * (1 / x)) / np.nansum(w))
 
-        def amean(x, w=None):
-            if w is None:
-                return np.mean(x)
-            return np.nansum(w * x) / np.nansum(w)
+    #     def amean(x, w=None):
+    #         if w is None:
+    #             return np.mean(x)
+    #         return np.nansum(w * x) / np.nansum(w)
 
-        report = {
-            'target': mcc_known,
-            'raw': mcc_raw,
-        }
+    #     report = {
+    #         'target': mcc_known,
+    #         'raw': mcc_raw,
+    #     }
 
-        # print('%r <<<' % (mcc_known,))
-        means = {
-            'a': amean,
-            # 'h': hmean,
-            'g': gmean,
-        }
-        weights = {
-            'p': pprob,
-            'r': rprob,
-            '': None,
-        }
-        for mean_key, mean in means.items():
-            for w_key, w in weights.items():
-                # Hack of very wrong items
-                if mean_key == 'g':
-                    if w_key in ['r', 'p', '']:
-                        continue
-                if mean_key == 'g':
-                    if w_key in ['r']:
-                        continue
-                m = mean(mccs, w)
-                r_key = '{} {}'.format(mean_key, w_key)
-                report[r_key] = m
-                # print(r_key)
-                # print(np.abs(m - mcc_known))
+    #     means = {
+    #         'a': amean,
+    #         # 'h': hmean,
+    #         'g': gmean,
+    #     }
+    #     weights = {
+    #         'p': pprob,
+    #         'r': rprob,
+    #         '': None,
+    #     }
+    #     for mean_key, mean in means.items():
+    #         for w_key, w in weights.items():
+    #             # Hack of very wrong items
+    #             if mean_key == 'g':
+    #                 if w_key in ['r', 'p', '']:
+    #                     continue
+    #             if mean_key == 'g':
+    #                 if w_key in ['r']:
+    #                     continue
+    #             m = mean(mccs, w)
+    #             r_key = '{} {}'.format(mean_key, w_key)
+    #             report[r_key] = m
+    #             # log(r_key)
+    #             # log(np.abs(m - mcc_known))
 
-        # print(ut.repr4(report, precision=8))
-        return report
-        # print('mcc_known = %r' % (mcc_known,))
-        # print('mcc_combo1 = %r' % (mcc_combo1,))
-        # print('mcc_combo2 = %r' % (mcc_combo2,))
-        # print('mcc_combo3 = %r' % (mcc_combo3,))
-
-    # if len(target_names) > len(perclass_data['precision']):
-    #     target_names = target_names[:len(perclass_data['precision'])]
+    #     return report
 
     index = pd.Index(target_names, name='class')
 
     perclass_df = pd.DataFrame(perclass_data, index=index)
+
+    if remove_unsupported:
+        perclass_df = perclass_df[perclass_df['support'] > 0]
+
     # combined_df = pd.DataFrame(combined_data, index=['ave/sum'])
     combined_df = pd.DataFrame(combined_data, index=['combined'])
 
@@ -299,15 +300,13 @@ def classification_report(y_true, y_pred, target_names=None,
 
     if verbose:
         cfsm_str = confusion_df.to_string(float_format=lambda x: '%.1f' % (x,))
-        print('Confusion Matrix (real × pred) :')
-        print(ub.indent(cfsm_str))
+        log('Confusion Matrix (real × pred) :\n' + ub.indent(cfsm_str))
 
         # ut.cprint('\nExtended Report', 'turquoise')
-        print('\nEvaluation Metric Report:')
         float_precision = 2
         float_format = '%.' + str(float_precision) + 'f'
         ext_report = metric_df.to_string(float_format=float_format)
-        print(ub.indent(ext_report))
+        log('\nEvaluation Metric Report:' + '\n' + ub.indent(ext_report))
 
     report = {
         'metrics': metric_df,
@@ -318,43 +317,58 @@ def classification_report(y_true, y_pred, target_names=None,
     # and BM * MK MCC?
 
     try:
-        mcc = sklearn.metrics.matthews_corrcoef(
-            y_true, y_pred, sample_weight=sample_weight)
-        # mcc = matthews_corrcoef(y_true, y_pred, sample_weight=sample_weight)
-        # These scales are chosen somewhat arbitrarily in the context of a
-        # computer vision application with relatively reasonable quality data
-        # https://stats.stackexchange.com/questions/118219/how-to-interpret
-        mcc_significance_scales = ub.odict([
-            (1.0, 'perfect'),
-            (0.9, 'very strong'),
-            (0.7, 'strong'),
-            (0.5, 'significant'),
-            (0.3, 'moderate'),
-            (0.2, 'weak'),
-            (0.0, 'negligible'),
-        ])
-        for k, v in mcc_significance_scales.items():
-            if np.abs(mcc) >= k:
-                if verbose:
-                    print('classifier correlation is %s' % (v,))
-                break
-        if verbose:
-            float_precision = 2
-            print(('MCC\' = %.' + str(float_precision) + 'f') % (mcc,))
-        report['mcc'] = mcc
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+
+            mcc = sklearn.metrics.matthews_corrcoef(
+                y_true, y_pred, sample_weight=sample_weight)
+            # mcc = matthews_corrcoef(y_true, y_pred, sample_weight=sample_weight)
+            # These scales are chosen somewhat arbitrarily in the context of a
+            # computer vision application with relatively reasonable quality data
+            # https://stats.stackexchange.com/questions/118219/how-to-interpret
+            mcc_significance_scales = ub.odict([
+                (1.0, 'perfect'),
+                (0.9, 'very strong'),
+                (0.7, 'strong'),
+                (0.5, 'significant'),
+                (0.3, 'moderate'),
+                (0.2, 'weak'),
+                (0.0, 'negligible'),
+            ])
+            for k, v in mcc_significance_scales.items():
+                if np.abs(mcc) >= k:
+                    if verbose:
+                        log('classifier correlation is %s' % (v,))
+                    break
+            if verbose:
+                float_precision = 2
+                log(('MCC\' = %.' + str(float_precision) + 'f') % (mcc,))
+            report['mcc'] = mcc
     except ValueError:
         report['mcc'] = None
     return report
 
 
 def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
-                              sample_weight=None, metrics=None):
+                              sample_weight=None, metrics=None, verbose=0,
+                              remove_unsupported=False, log=None):
     """
     One-vs-rest classification report
 
     Args:
-        mc_y_true: multiclass truth labels (integer label format)
-        mc_probs: multiclass probabilities for each class [N x C]
+        mc_y_true (ndarray[int]): multiclass truth labels (integer label
+            format). Shape [N].
+
+        mc_probs (ndarray): multiclass probabilities for each class.
+            Shape [N x C].
+
+        target_names (Dict[int, str] : mapping from int label to string name
+
+        sample_weight (ndarray): weight for each item. Shape [N].
+
+        metrics (List[str]): names of metrics to compute
+
 
     Example:
         >>> # xdoctest: +IGNORE_WANT
@@ -401,7 +415,16 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
 
     # Preallocate common datas
     bin_probs = np.empty((len(mc_probs), 2), dtype=mc_probs.dtype)
-    total_probs = mc_probs.T.sum(axis=0)
+
+    import kwimage  # TODO: move to kwarray
+    import kwarray
+    # Map everything onto 0-1 range
+    ranked_cidxs = kwarray.argmaxima(mc_probs, 2, axis=1)
+    ranked_scores = np.array([a[x] for a, x in zip(mc_probs, ranked_cidxs)])  # probably better numpy way to do this
+
+    mc_scores = kwimage.normalize(mc_probs, mode='linear')
+    total_scores = mc_scores.sum(axis=1, keepdims=0)
+    # max_scores = mc_scores.max(axis=1, keepdims=0)
 
     class_metrics = ub.odict()
     with warnings.catch_warnings():
@@ -410,16 +433,34 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
         warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
         warnings.filterwarnings('ignore', message='divide by zero')
         warnings.filterwarnings('ignore', message='due to no true nor predicted samples')
+        warnings.filterwarnings('ignore', message='ill-defined')
 
-        for k in range(n_classes):
+        for cidx in range(n_classes):
             k_metrics = ub.odict()
 
+            class_score = mc_scores.T[cidx]
+            is_other = (ranked_cidxs != cidx)
+            other_score = np.array([a[f][0] for a, f in zip(ranked_scores, is_other)])
+
+            # HEURISTIC:
+            # We need to compute a score or "probability" of other
+            # is there a better way to do this?
+            # other_prob = total_scores - class_prob
+            # class_prob = class_score
+            # other_prob = max_scores
+            # other_prob = (max_scores - class_score)
+            class_prob = class_score / total_scores
+            other_prob = other_score / total_scores
+            # other_prob = (max_scores - class_score) / total_scores
+
             # Consider each class a one-vs-rest problem
-            bin_probs[:, 1] = mc_probs.T[k]
-            bin_probs[:, 0] = total_probs - bin_probs[:, 1]
+            # Populate the first column
+
+            bin_probs[:, 1] = class_prob
+            bin_probs[:, 0] = other_prob
 
             # Index of the true class
-            k_true = ohvec_true.T[k]
+            k_true = ohvec_true.T[cidx]
             # Index of the predicted class
             k_pred = np.argmax(bin_probs, axis=1)  # NOTE: ASSUME MUTEX CLASSES
 
@@ -436,7 +477,10 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
 
             if 'ap' in metrics:
                 k_metrics['ap'] = sklearn.metrics.average_precision_score(
-                    bin_truth, bin_probs, sample_weight=sample_weight)
+                    bin_truth, bin_probs, sample_weight=sample_weight,
+                    # zero_division=1,
+                    # np.nan
+                )
 
             if 'kappa' in metrics:
                 k_metrics['kappa'] = sklearn.metrics.cohen_kappa_score(
@@ -448,11 +492,15 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
 
             if 'f1' in metrics:
                 k_metrics['f1'] = sklearn.metrics.fbeta_score(
-                    k_true, k_pred, beta=1.0, sample_weight=sample_weight)
+                    k_true, k_pred, beta=1.0, sample_weight=sample_weight,
+                    zero_division=0,
+                    # zero_division=1,
+                    # zero_division=np.nan,
+                )
 
             if 'brier' in metrics:
                 # Get the probablity of the real class for each example
-                rprobs = np.clip(true_probs / total_probs, 0, 1)
+                rprobs = np.clip(true_probs / total_scores, 0, 1)
                 rwants = np.ones(len(rprobs))
                 # Use custom brier implemention until sklearn is fixed.
                 mse = (rwants - rprobs) ** 2
@@ -468,18 +516,34 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
             else:
                 k_metrics['support'] = (sample_weight * k_true).sum()
 
-            key = k if target_names is None else target_names[k]
+            key = cidx if target_names is None else target_names[cidx]
             class_metrics[key] = k_metrics
 
     ovr_metrics = pd.DataFrame.from_dict(class_metrics, orient='index')
+
+    if remove_unsupported:
+        ovr_metrics = ovr_metrics[ovr_metrics['support'] > 0]
+
     weight = ovr_metrics.loc[:, 'support'] / ovr_metrics.loc[:, 'support'].sum()
     ovr_metrics['weight'] = weight
-    weighted = ovr_metrics.drop(columns=['support', 'weight'])
+
+    # weighted = ovr_metrics.drop(columns=['support', 'weight'])
+    weighted = ovr_metrics.copy()
     weighted.iloc[:] = weighted.values * weight.values[:, None]
     weighted_ave = weighted.sum(axis=0)
+    weighted_ave['support'] = ovr_metrics['support'].sum()
+    weighted_ave['weight'] = ovr_metrics['weight'].sum()
 
     report = {
         'ovr': ovr_metrics,
         'ave': weighted_ave,
     }
+
+    if verbose or log:
+        if log is None:
+            log = print
+        ovr_metrics = report['ovr']
+        weighted_ave = report['ave']
+        log('ovr_metrics')
+        log(pd.concat([ovr_metrics, weighted_ave.to_frame('__accum__').T]))
     return report
