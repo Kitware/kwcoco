@@ -7,7 +7,7 @@ import ubelt as ub
 
 def classification_report(y_true, y_pred, target_names=None,
                           sample_weight=None, verbose=False,
-                          remove_unsupported=False):
+                          remove_unsupported=False, log=None):
     """
     Computes a classification report which is a collection of various metrics
     commonly used to evaulate classification quality. This can handle binary
@@ -76,9 +76,13 @@ def classification_report(y_true, y_pred, target_names=None,
         >>> kwplot.multi_plot(ydata_list=ys)
     """
     import pandas as pd
-    import scipy as sp
+    import scipy as sp  # NOQA
     import sklearn.metrics
     from sklearn.preprocessing import LabelEncoder
+
+    if verbose or log:
+        if log is None:
+            log = print
 
     if target_names is None:
         unique_labels = np.unique(np.hstack([y_true, y_pred]))
@@ -207,68 +211,59 @@ def classification_report(y_true, y_pred, target_names=None,
         ('support', real_total.sum()),
     ])
 
-    # Not sure how to compute this. Should it agree with the sklearn impl?
-    if verbose == 'hack':
-        verbose = False
-        mcc_known = sklearn.metrics.matthews_corrcoef(
-            y_true, y_pred, sample_weight=sample_weight)
-        mcc_raw = np.sign(bm) * np.sqrt(np.abs(bm * mk))
+    # # Not sure how to compute this. Should it agree with the sklearn impl?
+    # if verbose == 'hack':
+    #     verbose = False
+    #     mcc_known = sklearn.metrics.matthews_corrcoef(
+    #         y_true, y_pred, sample_weight=sample_weight)
+    #     mcc_raw = np.sign(bm) * np.sqrt(np.abs(bm * mk))
 
-        def gmean(x, w=None):
-            if w is None:
-                return sp.stats.gmean(x)
-            return np.exp(np.nansum(w * np.log(x)) / np.nansum(w))
+    #     def gmean(x, w=None):
+    #         if w is None:
+    #             return sp.stats.gmean(x)
+    #         return np.exp(np.nansum(w * np.log(x)) / np.nansum(w))
 
-        def hmean(x, w=None):
-            if w is None:
-                return sp.stats.hmean(x)
-            return 1 / (np.nansum(w * (1 / x)) / np.nansum(w))
+    #     def hmean(x, w=None):
+    #         if w is None:
+    #             return sp.stats.hmean(x)
+    #         return 1 / (np.nansum(w * (1 / x)) / np.nansum(w))
 
-        def amean(x, w=None):
-            if w is None:
-                return np.mean(x)
-            return np.nansum(w * x) / np.nansum(w)
+    #     def amean(x, w=None):
+    #         if w is None:
+    #             return np.mean(x)
+    #         return np.nansum(w * x) / np.nansum(w)
 
-        report = {
-            'target': mcc_known,
-            'raw': mcc_raw,
-        }
+    #     report = {
+    #         'target': mcc_known,
+    #         'raw': mcc_raw,
+    #     }
 
-        # print('%r <<<' % (mcc_known,))
-        means = {
-            'a': amean,
-            # 'h': hmean,
-            'g': gmean,
-        }
-        weights = {
-            'p': pprob,
-            'r': rprob,
-            '': None,
-        }
-        for mean_key, mean in means.items():
-            for w_key, w in weights.items():
-                # Hack of very wrong items
-                if mean_key == 'g':
-                    if w_key in ['r', 'p', '']:
-                        continue
-                if mean_key == 'g':
-                    if w_key in ['r']:
-                        continue
-                m = mean(mccs, w)
-                r_key = '{} {}'.format(mean_key, w_key)
-                report[r_key] = m
-                # print(r_key)
-                # print(np.abs(m - mcc_known))
+    #     means = {
+    #         'a': amean,
+    #         # 'h': hmean,
+    #         'g': gmean,
+    #     }
+    #     weights = {
+    #         'p': pprob,
+    #         'r': rprob,
+    #         '': None,
+    #     }
+    #     for mean_key, mean in means.items():
+    #         for w_key, w in weights.items():
+    #             # Hack of very wrong items
+    #             if mean_key == 'g':
+    #                 if w_key in ['r', 'p', '']:
+    #                     continue
+    #             if mean_key == 'g':
+    #                 if w_key in ['r']:
+    #                     continue
+    #             m = mean(mccs, w)
+    #             r_key = '{} {}'.format(mean_key, w_key)
+    #             report[r_key] = m
+    #             # log(r_key)
+    #             # log(np.abs(m - mcc_known))
 
-        # print(ut.repr4(report, precision=8))
-        return report
-        # print('mcc_known = %r' % (mcc_known,))
-        # print('mcc_combo1 = %r' % (mcc_combo1,))
-        # print('mcc_combo2 = %r' % (mcc_combo2,))
-        # print('mcc_combo3 = %r' % (mcc_combo3,))
-
-    # if len(target_names) > len(perclass_data['precision']):
-    #     target_names = target_names[:len(perclass_data['precision'])]
+    #     return report
 
     index = pd.Index(target_names, name='class')
 
@@ -305,15 +300,13 @@ def classification_report(y_true, y_pred, target_names=None,
 
     if verbose:
         cfsm_str = confusion_df.to_string(float_format=lambda x: '%.1f' % (x,))
-        print('Confusion Matrix (real × pred) :')
-        print(ub.indent(cfsm_str))
+        log('Confusion Matrix (real × pred) :\n' + ub.indent(cfsm_str))
 
         # ut.cprint('\nExtended Report', 'turquoise')
-        print('\nEvaluation Metric Report:')
         float_precision = 2
         float_format = '%.' + str(float_precision) + 'f'
         ext_report = metric_df.to_string(float_format=float_format)
-        print(ub.indent(ext_report))
+        log('\nEvaluation Metric Report:' + '\n' + ub.indent(ext_report))
 
     report = {
         'metrics': metric_df,
@@ -346,11 +339,11 @@ def classification_report(y_true, y_pred, target_names=None,
             for k, v in mcc_significance_scales.items():
                 if np.abs(mcc) >= k:
                     if verbose:
-                        print('classifier correlation is %s' % (v,))
+                        log('classifier correlation is %s' % (v,))
                     break
             if verbose:
                 float_precision = 2
-                print(('MCC\' = %.' + str(float_precision) + 'f') % (mcc,))
+                log(('MCC\' = %.' + str(float_precision) + 'f') % (mcc,))
             report['mcc'] = mcc
     except ValueError:
         report['mcc'] = None
@@ -359,7 +352,7 @@ def classification_report(y_true, y_pred, target_names=None,
 
 def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
                               sample_weight=None, metrics=None, verbose=0,
-                              remove_unsupported=False):
+                              remove_unsupported=False, log=None):
     """
     One-vs-rest classification report
 
@@ -546,9 +539,11 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
         'ave': weighted_ave,
     }
 
-    if verbose:
+    if verbose or log:
+        if log is None:
+            log = print
         ovr_metrics = report['ovr']
         weighted_ave = report['ave']
-        print('ovr_metrics')
-        print(pd.concat([ovr_metrics, weighted_ave.to_frame('__accum__').T]))
+        log('ovr_metrics')
+        log(pd.concat([ovr_metrics, weighted_ave.to_frame('__accum__').T]))
     return report
