@@ -6,7 +6,8 @@ import ubelt as ub
 
 
 def classification_report(y_true, y_pred, target_names=None,
-                          sample_weight=None, verbose=False):
+                          sample_weight=None, verbose=False,
+                          remove_unsupported=False):
     """
     Computes a classification report which is a collection of various metrics
     commonly used to evaulate classification quality. This can handle binary
@@ -123,6 +124,7 @@ def classification_report(y_true, y_pred, target_names=None,
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='invalid .* true_divide')
         warnings.filterwarnings('ignore', message='divide by zero')
+        warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
 
         tprs = n_tps / real_total  # true pos rate (recall)
         tpas = n_tps / pred_total  # true pos accuracy (precision)
@@ -271,6 +273,10 @@ def classification_report(y_true, y_pred, target_names=None,
     index = pd.Index(target_names, name='class')
 
     perclass_df = pd.DataFrame(perclass_data, index=index)
+
+    if remove_unsupported:
+        perclass_df = perclass_df[perclass_df['support'] > 0]
+
     # combined_df = pd.DataFrame(combined_data, index=['ave/sum'])
     combined_df = pd.DataFrame(combined_data, index=['combined'])
 
@@ -318,30 +324,34 @@ def classification_report(y_true, y_pred, target_names=None,
     # and BM * MK MCC?
 
     try:
-        mcc = sklearn.metrics.matthews_corrcoef(
-            y_true, y_pred, sample_weight=sample_weight)
-        # mcc = matthews_corrcoef(y_true, y_pred, sample_weight=sample_weight)
-        # These scales are chosen somewhat arbitrarily in the context of a
-        # computer vision application with relatively reasonable quality data
-        # https://stats.stackexchange.com/questions/118219/how-to-interpret
-        mcc_significance_scales = ub.odict([
-            (1.0, 'perfect'),
-            (0.9, 'very strong'),
-            (0.7, 'strong'),
-            (0.5, 'significant'),
-            (0.3, 'moderate'),
-            (0.2, 'weak'),
-            (0.0, 'negligible'),
-        ])
-        for k, v in mcc_significance_scales.items():
-            if np.abs(mcc) >= k:
-                if verbose:
-                    print('classifier correlation is %s' % (v,))
-                break
-        if verbose:
-            float_precision = 2
-            print(('MCC\' = %.' + str(float_precision) + 'f') % (mcc,))
-        report['mcc'] = mcc
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+
+            mcc = sklearn.metrics.matthews_corrcoef(
+                y_true, y_pred, sample_weight=sample_weight)
+            # mcc = matthews_corrcoef(y_true, y_pred, sample_weight=sample_weight)
+            # These scales are chosen somewhat arbitrarily in the context of a
+            # computer vision application with relatively reasonable quality data
+            # https://stats.stackexchange.com/questions/118219/how-to-interpret
+            mcc_significance_scales = ub.odict([
+                (1.0, 'perfect'),
+                (0.9, 'very strong'),
+                (0.7, 'strong'),
+                (0.5, 'significant'),
+                (0.3, 'moderate'),
+                (0.2, 'weak'),
+                (0.0, 'negligible'),
+            ])
+            for k, v in mcc_significance_scales.items():
+                if np.abs(mcc) >= k:
+                    if verbose:
+                        print('classifier correlation is %s' % (v,))
+                    break
+            if verbose:
+                float_precision = 2
+                print(('MCC\' = %.' + str(float_precision) + 'f') % (mcc,))
+            report['mcc'] = mcc
     except ValueError:
         report['mcc'] = None
     return report
