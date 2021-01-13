@@ -28,6 +28,19 @@ class CocoShowCLI:
                 'Save the image to the specified file. '
                 'If unspecified, the image is shown with pyplot')),
 
+            'mode': scfg.Value(
+                'matplotlib', choices=['matplotlib', 'opencv'],
+                help='method used to draw the image'
+            ),
+
+            'channels': scfg.Value(
+                None, type=str, help=ub.paragraph(
+                    '''
+                    By default uses the default channels (usually this is rgb),
+                    otherwise specify the name of an auxillary channels
+                    ''')
+            ),
+
             'show_annots': scfg.Value(True, help=(
                 'Overlay annotations on dispaly')),
         }
@@ -35,6 +48,9 @@ class CocoShowCLI:
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
+        TODO:
+            - [ ] Visualize auxillary data
+
         Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}
@@ -43,16 +59,18 @@ class CocoShowCLI:
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
+        import kwimage
+        import kwplot
+
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
         if config['src'] is None:
-            raise Exception('must specify source: '.format(config['src']))
+            raise Exception('must specify source: {}'.format(config['src']))
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
         print('dset.fpath = {!r}'.format(dset.fpath))
 
-        import kwplot
         plt = kwplot.autoplt()
 
         gid = config['gid']
@@ -63,22 +81,32 @@ class CocoShowCLI:
         if gid is None and aid is None:
             gid = ub.peek(dset.imgs)
 
-        show_kw = {
-            'show_annots': config['show_annots'],
-        }
-        if config['show_annots'] == 'both':
-            show_kw.pop('show_annots')
-            show_kw['title'] = ''
-            ax = dset.show_image(gid=gid, aid=aid, pnum=(1, 2, 1),
-                                 show_annots=False, **show_kw)
-            ax = dset.show_image(gid=gid, aid=aid, pnum=(1, 2, 2),
-                                 show_annots=True, **show_kw)
+        if config['mode'] == 'matplotlib':
+            show_kw = {
+                'show_annots': config['show_annots'],
+            }
+            if config['show_annots'] == 'both':
+                show_kw.pop('show_annots')
+                show_kw['title'] = ''
+                ax = dset.show_image(gid=gid, aid=aid, pnum=(1, 2, 1),
+                                     show_annots=False, **show_kw)
+                ax = dset.show_image(gid=gid, aid=aid, pnum=(1, 2, 2),
+                                     show_annots=True, **show_kw)
+            else:
+                ax = dset.show_image(gid=gid, aid=aid, **show_kw)
+            if out_fpath is None:
+                plt.show()
+            else:
+                ax.figure.savefig(out_fpath)
+        elif config['mode'] == 'opencv':
+            canvas = dset.draw_image(gid, channels=config['channels'])
+            if out_fpath is None:
+                kwplot.imshow(canvas)
+            else:
+                kwimage.imwrite(out_fpath, canvas)
+
         else:
-            ax = dset.show_image(gid=gid, aid=aid, **show_kw)
-        if out_fpath is None:
-            plt.show()
-        else:
-            ax.figure.savefig(out_fpath)
+            raise KeyError(config['mode'])
 
 
 _CLI = CocoShowCLI

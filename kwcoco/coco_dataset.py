@@ -941,18 +941,20 @@ class MixinCocoExtras(object):
     Misc functions for coco
     """
 
-    def load_image(self, gid_or_img):
+    def load_image(self, gid_or_img, channels=None):
         """
         Reads an image from disk and
 
         Args:
             gid_or_img (int or dict): image id or image dict
+            channels (str | None): if specified, load data from an auxillary
+                channels instead
 
         Returns:
             np.ndarray : the image
         """
         import kwimage
-        gpath = self.get_image_fpath(gid_or_img)
+        gpath = self.get_image_fpath(gid_or_img, channels=channels)
         np_img = kwimage.imread(gpath)
         return np_img
 
@@ -963,18 +965,23 @@ class MixinCocoExtras(object):
             DeprecationWarning)
         return self.get_image_fpath(gid_or_img)
 
-    def get_image_fpath(self, gid_or_img):
+    def get_image_fpath(self, gid_or_img, channels=None):
         """
         Returns the full path to the image
 
         Args:
             gid_or_img (int or dict): image id or image dict
+            channels (str, default=None): if specified, return a path to data
+                containing auxillary channels instead
 
         Returns:
             PathLike: full path to the image
         """
-        img = self._resolve_to_img(gid_or_img)
-        gpath = join(self.img_root, img['file_name'])
+        if channels is not None:
+            gpath = self.get_auxiliary_fpath(gid_or_img, channels)
+        else:
+            img = self._resolve_to_img(gid_or_img)
+            gpath = join(self.img_root, img['file_name'])
         return gpath
 
     def _get_img_auxiliary(self, gid_or_img, channels):
@@ -2914,7 +2921,7 @@ class MixinCocoDraw(object):
         """
         return self.load_image(gid)
 
-    def draw_image(self, gid):
+    def draw_image(self, gid, channels=None):
         """
         Use kwimage to draw all annotations on an image and return the pixels
         as a numpy array.
@@ -2934,7 +2941,9 @@ class MixinCocoDraw(object):
         """
         import kwimage
         # Load the raw image pixels
-        canvas = self.load_image(gid)
+        canvas = self.load_image(gid, channels=channels)
+        # TODO: account for auxilliary transforms if the exist
+
         # Get annotation IDs from this image
         aids = self.index.gid_to_aids[gid]
         # Grab relevant annotation dictionaries
