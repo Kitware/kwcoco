@@ -103,6 +103,7 @@ class CocoShowCLI:
             canvas = dset.draw_image(gid, channels=config['channels'])
             if out_fpath is None:
                 kwplot.imshow(canvas)
+                plt.show()
             else:
                 kwimage.imwrite(out_fpath, canvas)
 
