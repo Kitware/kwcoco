@@ -2972,7 +2972,7 @@ class MixinCocoDraw(object):
         canvas = dets.draw_on(canvas)
         return canvas
 
-    def show_image(self, gid=None, aids=None, aid=None, **kwargs):
+    def show_image(self, gid=None, aids=None, aid=None, channels=None, **kwargs):
         """
         Use matplotlib to show an image with annotations overlaid
 
@@ -3184,7 +3184,7 @@ class MixinCocoDraw(object):
                             raise TypeError(type(sseg))
 
         # Show image
-        np_img = self.load_image(img)
+        np_img = self.load_image(img, channels=channels)
 
         np_img = kwimage.atleast_3channels(np_img)
 

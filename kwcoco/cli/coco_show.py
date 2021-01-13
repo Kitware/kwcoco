@@ -84,6 +84,7 @@ class CocoShowCLI:
         if config['mode'] == 'matplotlib':
             show_kw = {
                 'show_annots': config['show_annots'],
+                'channels': config['channels'],
             }
             if config['show_annots'] == 'both':
                 show_kw.pop('show_annots')
