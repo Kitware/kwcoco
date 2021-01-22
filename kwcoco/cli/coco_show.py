@@ -19,7 +19,7 @@ class CocoShowCLI:
         """
         default = {
             'src': scfg.Value(None, help=(
-                'Path to the coco dataset')),
+                'Path to the coco dataset'), position=1),
             'gid': scfg.Value(None, help=(
                 'Image id to show, if unspecified the first image is shown')),
             'aid': scfg.Value(None, help=(
