@@ -96,11 +96,17 @@ class CocoEvalConfig(scfg.Config):
 
         'area_range': scfg.Value(
             value=['all'],
-            # value='0-inf,0-32,32-96,96-inf',
-            help=(
-                'minimum and maximum object areas to consider. '
-                'may be specified as a comma-separated code: <min>-<max>. '
-                'also accepts keys all, small, medium, and large. '
+            help=ub.paragraph(
+                '''
+                Minimum and maximum object areas to consider.  May specified as
+                a comma-separated code: '<min>-<max>'.  These ranges are
+                inclusive.  Also accepts scientific notation, inf, and special
+                keys all, small, medium, and large, which are equivalent to
+                small='0-1024', medium='1024-9216', large='9216-1e10', and
+                all='0-inf'. Note these are areas, e.g. 16x16 boxes are
+                considered small, but 17x16 boxes are medium. These can be
+                mixed an matched, e.g.: `--area_range=0-4e3,small,1024-inf`.
+                '''
             )),
 
         # TODO options:

@@ -62,7 +62,31 @@ def main(cmdline=True, **kw):
         subparser = subconfig.argparse(subparser)
         subparser.set_defaults(main=cli_cls.main)
 
-    ns = parser.parse_args()
+    if 0:
+        """
+        Debugging positional or keyword args
+
+            python -m kwcoco.cli.coco_stats special:shapes8
+
+            python -m kwcoco.cli.coco_stats --src=special:shapes8
+
+            >>> kw = {'src': 'special:shapes8'}
+            >>> cmdline = False
+            >>> cls = CocoStatsCLI
+
+            python -c "from kwcoco.cli.coco_stats import *; print(CocoStatsCLI.CLIConfig()._read_argv())" --src foo bar
+            python -c "from kwcoco.cli.coco_stats import *; print(CocoStatsCLI.CLIConfig()._read_argv())" a --basic=True baz biz --src f a a
+
+        """
+        for action in parser._actions:
+            print('action = {!r}'.format(action))
+            pass
+        for sub in parser._subparsers:
+            parser._subparsers._actions
+            pass
+
+    ns = parser.parse_known_args()[0]
+    # print('ns = {!r}'.format(ns))
 
     # Execute the subcommand without additional CLI parsing
     kw = ns.__dict__
