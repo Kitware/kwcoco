@@ -102,7 +102,7 @@ class CocoStatsCLI:
                         if value:
                             attrs[key] += 1
 
-                print('annot attrs = {!r}'.format(attrs))
+                print('annot_attrs = {}'.format(ub.repr2(attrs, nl=1)))
 
         if config['boxes']:
             print('Box stats')
