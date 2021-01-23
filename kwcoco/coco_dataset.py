@@ -1068,7 +1068,7 @@ class MixinCocoExtras(object):
         elif key.startswith('special:'):
             demokey = key.split(':')[1]
             self = cls.demo(key=demokey, **kw)
-        elif key.endswith('.json'):
+        elif key.endswith('.json') or '.json.' in key:
             self = cls(key, **kw)
         else:
             self = cls.demo(key=key, **kw)
