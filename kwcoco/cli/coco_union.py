@@ -13,7 +13,7 @@ class CocoUnionCLI(object):
         Combine multiple COCO datasets into a single merged dataset.
         """
         default = {
-            'src': scfg.Value([], nargs='+', help='path to multiple input datasets'),
+            'src': scfg.Value([], nargs='+', help='path to multiple input datasets', position=1),
             'dst': scfg.Value('combo.mscoco.json', help='path to output dataset'),
             'absolute': scfg.Value(False, help='if True, converts paths to absolute paths before doing union')
         }
