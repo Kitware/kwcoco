@@ -5,7 +5,7 @@ kwarray >= 0.4.0
 kwimage >= 0.6.6
 six >= 1.11.0
 numpy >= 1.9.0
-scikit-learn >= 0.19.1
+scikit-learn >= 0.24.0
 bezier >= 0.8.0;python_version>='3.6' 
 bezier <= 0.8.0;python_version<='3.5' 
 pandas >= 1.1.4

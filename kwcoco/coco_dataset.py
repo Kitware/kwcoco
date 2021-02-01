@@ -3120,7 +3120,7 @@ class MixinCocoDraw(object):
                                 for (kp_x, kp_y), kpname in zip(xys, kpnames):
                                     texts.append((kp_x, kp_y, kpname, textkw))
 
-                if 'segmentation' in ann and kwargs.get('show_segmentation', True):
+                if ann.get('segmentation', None) is not None and kwargs.get('show_segmentation', True):
                     sseg = ann['segmentation']
                     # Respect the 'color' attribute of categories
                     if cat is not None:

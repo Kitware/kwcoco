@@ -7,6 +7,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.10 - Unreleased
 
+### Added
+* Add `ascii_only` keyword to clf-report to disable unicode glyphs
+
+### Fixed
+* Fix bug in `show_image` when segmentation is None
+
 
 ## Version 0.1.9 - Released 2021-01-08
 
