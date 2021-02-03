@@ -22,15 +22,18 @@ takes 850MB of RAM. Using the duck-typed SQL backend only uses 500MB (which
 includes the cost of caching), but runs at 45Hz (which includes the benefit
 of caching).
 
+However, once I scale up to 100,000 images I start seeing benefits.  The
+in-memory dictionary interface chugs at 1.05HZ, and is taking more than 4GB
+of memory at the time I killed the process (eta was over an hour). The SQL
+backend ran at 45Hz and took about 3 minutes and used about 2.45GB of memory.
+
 Without a cache, SQL runs at 30HZ and takes 400MB for 10,000 images, and
 for 100,000 images it gets 30Hz with 1.1GB. There is also a much larger startup
 time. I'm not exactly sure what it is yet, but its probably some preprocessing
 I'm doing.
 
-However, once I scale up to 100,000 images I start seeing benefits.  The
-in-memory dictionary interface chugs at 1.05HZ, and is taking more than 4GB
-of memory at the time I killed the process (eta was over an hour). The SQL
-backend ran at 45Hz and took about 3 minutes and used about 2.45GB of memory.
+Using a LRU cache we get 45Hz and 1.05GB of memory, so that's a clear win.  We
+do need to be sure to disable the cache if we ever implement write mode.
 
 I'd like to be a bit faster on the medium sized datasets (I'd really like
 to avoid caching rows, which is why the speed is currently
@@ -186,6 +189,18 @@ def orm_to_dict(obj):
     return item
 
 
+def _new_proxy_cache():
+    """
+    By returning None, we wont use item caching
+    """
+    # return None
+    try:
+        from ndsampler.utils import util_lru
+        return util_lru.LRUDict.new(max_size=100, impl='auto')
+    except Exception:
+        return {}
+
+
 class SqlListProxy(ub.NiceRepr):
     """
     A view of an SQL table that behaves like a Python list
@@ -283,8 +298,7 @@ class SqlDictProxy(ub.NiceRepr, DictLike):
         proxy.ALCHEMY_MODE = 0
 
         # ONLY DO THIS IN READONLY MODE
-        # proxy._cache = {}
-        proxy._cache = None
+        proxy._cache = _new_proxy_cache()
 
     def __len__(proxy):
         query = proxy.session.query(proxy.cls)
@@ -482,8 +496,7 @@ class SqlIdGroupDictProxy(DictLike, ub.NiceRepr):
         proxy.session = session
         proxy.parent_keyattr = parent_keyattr
         proxy.ALCHEMY_MODE = 0
-        # proxy._cache = {}
-        proxy._cache = None
+        proxy._cache = _new_proxy_cache()
 
     def __nice__(self):
         return str(len(self))
@@ -857,6 +870,33 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         import pandas as pd
         table_df = pd.read_sql_table(table_name, con=self.engine)
         return table_df
+
+    def tabular_targets(self):
+        # stmt = 'SELECT id, image_id, category_id, bbox_x + (bbox_w / 2), bbox_y + (bbox_h / 2), bbox_w, bbox_h FROM annotations'
+        import kwarray
+        stmt = ('SELECT annotations.id, image_id, category_id, bbox_x + (bbox_w / 2), bbox_y + (bbox_h / 2), bbox_w, bbox_h, width, height '
+                'FROM annotations JOIN images on images.id = annotations.image_id')
+        result = self.session.execute(stmt)
+        columns = result.fetchall()
+        aids, gids, cids, cxs, cys, ws, hs, img_ws, img_hs = list(zip(*columns))
+
+        table = {
+            # Annotation / Image / Category ids
+            'aid': np.array(aids, dtype=np.int32),
+            'gid': np.array(gids, dtype=np.int32),
+            'category_id': np.array(cids, dtype=np.int32),
+            # Subpixel box localizations wrt parent image
+            'cx': np.array(cxs, dtype=np.float32),
+            'cy': np.array(cys, dtype=np.float32),
+            'width': np.array(ws, dtype=np.float32),
+            'height': np.array(hs, dtype=np.float32),
+        }
+
+        # Parent image id and width / height
+        table['img_width'] = np.array(img_ws, dtype=np.int32)
+        table['img_height'] = np.array(img_hs, dtype=np.int32)
+        targets = kwarray.DataFrameArray(table)
+        return targets
 
 
 def ensure_sql_coco_view(dset, db_fpath=None):
