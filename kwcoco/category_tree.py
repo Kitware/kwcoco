@@ -163,7 +163,7 @@ class CategoryTree(ub.NiceRepr):
         graph = nx.DiGraph()
         for cat in categories:
             graph.add_node(cat['name'], **cat)
-            if 'supercategory' in cat:
+            if cat.get('supercategory', None) is not None:
                 graph.add_edge(cat['supercategory'], cat['name'])
         self = cls(graph)
         return self
