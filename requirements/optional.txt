@@ -1,2 +1,3 @@
 kwplot >= 0.4.0
 seaborn >= 0.9.0
+sqlalchemy >= 1.3.22
