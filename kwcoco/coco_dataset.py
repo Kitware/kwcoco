@@ -1434,7 +1434,8 @@ class MixinCocoAccessors(object):
             >>> names = self._keypoint_category_names()
             >>> print(names)
         """
-        if 'keypoint_categories' in self.dataset:
+        kpcats = self.dataset.get('keypoint_categories', None)
+        if kpcats is not None:
             return [c['name'] for c in self.dataset['keypoint_categories']]
         else:
             names = []
