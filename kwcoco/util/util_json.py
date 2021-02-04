@@ -269,6 +269,22 @@ class IndexableWalker(Generator):
             d = d[k]
         d[key] = value
 
+    def __getitem__(self, path):
+        """
+        Get nested value by path
+
+        Args:
+            path (List): list of indexes into the nested structure
+
+        Returns:
+            value
+        """
+        d = self.data
+        *prefix, key = path
+        for k in prefix:
+            d = d[k]
+        return d[key]
+
     def __delitem__(self, path):
         """
         Remove nested value by path

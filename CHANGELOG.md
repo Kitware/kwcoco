@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Add `ascii_only` keyword to clf-report to disable unicode glyphs
+* Initial implementation for `CocoSqlDatabase`
 
 ### Fixed
 * Fix bug in `show_image` when segmentation is None

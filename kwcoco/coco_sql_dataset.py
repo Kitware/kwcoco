@@ -61,14 +61,28 @@ There are a few questions I still have if anyone has insight:
       Is there a way in PostgreSQL or some other backend sqlalchemy
       supports?
 
+
+I found that PostgreSQL does support hash indexes:
+https://www.postgresql.org/docs/13/indexes-types.html I'm really not
+interested in setting up a global service though 😞. I also found a 10-year
+old thread with a hash-index feature request for SQLite, which I
+unabashedly resurrected
+http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
+
 """
 from sqlalchemy.sql.schema import Column
 from sqlalchemy.types import Float, Integer, String, JSON
 from sqlalchemy.ext.declarative import declarative_base
-# from sqlalchemy.orm import relationship
 import sqlalchemy
 import ubelt as ub
 from os.path import exists
+from kwcoco.util.dict_like import DictLike  # NOQA
+
+
+from kwcoco.coco_dataset import (  # NOQA
+    MixinCocoJSONAccessors, MixinCocoAccessors, MixinCocoAttrs,
+    MixinCocoStats, MixinCocoDraw
+)
 
 import sqlite3
 import numpy as np
@@ -92,7 +106,7 @@ class Category(CocoBase):
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
 
-    foreign = Column(JSON)
+    foreign = Column(JSON, default=dict())
 
 
 class KeypointCategory(CocoBase):
@@ -103,7 +117,7 @@ class KeypointCategory(CocoBase):
     supercategory = Column(String(256), doc='coarser category name')
     reflection_id = Column(Integer, doc='if augmentation reflects the image, change keypoint id to this')
 
-    foreign = Column(JSON)
+    foreign = Column(JSON, default=dict())
 
 
 class Video(CocoBase):
@@ -111,7 +125,8 @@ class Video(CocoBase):
     id = Column(Integer, primary_key=True, doc='unique internal id')
     name = Column(String(256), nullable=False, index=True, unique=True)
     caption = Column(String(256), nullable=True)
-    foreign = Column(JSON)
+
+    foreign = Column(JSON, default=dict())
 
 
 class Image(CocoBase):
@@ -126,10 +141,10 @@ class Image(CocoBase):
     timestamp = Column(Float)
     frame_index = Column(Integer)
 
-    foreign = Column(JSON)
-
     channels = Column(JSON)
     auxiliary = Column(JSON)
+
+    foreign = Column(JSON, default=dict())
 
 
 class Annotation(CocoBase):
@@ -137,18 +152,16 @@ class Annotation(CocoBase):
     id = Column(Integer, primary_key=True)
     image_id = Column(Integer, doc='', index=True, unique=False)
     category_id = Column(Integer, doc='', index=True, unique=False)
-    track_id = Column(String, index=True, unique=False)
+    track_id = Column(JSON, index=True, unique=False)
 
     segmentation = Column(JSON)
     keypoints = Column(JSON)
 
-    foreign = Column(JSON)
-
     bbox = Column(JSON)
-    bbox_x = Column(Float)
-    bbox_y = Column(Float)
-    bbox_w = Column(Float)
-    bbox_h = Column(Float)
+    _bbox_x = Column(Float)
+    _bbox_y = Column(Float)
+    _bbox_w = Column(Float)
+    _bbox_h = Column(Float)
     weight = Column(Float)
 
     score = Column(Float)
@@ -158,35 +171,34 @@ class Annotation(CocoBase):
     iscrowd = Column(Integer)
     caption = Column(JSON)
 
-    # @property
-    # def bbox(self):
-    #     return [self.bbox_x, self.bbox_y, self.bbox_w, self.bbox_h]
+    foreign = Column(JSON, default=dict())
 
 
 # Global book keeping
-TBLNAME_TO_CLASS = {}
+CocoBase.TBLNAME_TO_CLASS = {}
 for classname, cls in CocoBase._decl_class_registry.items():
     if not classname.startswith('_'):
         tblname = cls.__tablename__
-        TBLNAME_TO_CLASS[tblname] = cls
-
-
-class CocoSqlRuntime:
-    """
-    Singleton class
-    """
-    def __init__(self):
-        self
-
-
-
-from scriptconfig.dict_like import DictLike  # NOQA
+        CocoBase.TBLNAME_TO_CLASS[tblname] = cls
 
 
 def orm_to_dict(obj):
     item = obj.__dict__.copy()
     item.pop('_sa_instance_state', None)
     return item
+
+
+def _yield_per(result, size=300):
+    if 1:
+        chunk = result.fetchall()
+        for item in chunk:
+            yield item
+    else:
+        chunk = result.fetchmany(size)
+        while chunk:
+            for item in chunk:
+                yield item
+            chunk = result.fetchmany(size)
 
 
 def _new_proxy_cache():
@@ -224,7 +236,6 @@ class SqlListProxy(ub.NiceRepr):
         for timer in ti.reset('iter naive'):
             with timer:
                 [proxy[idx] for idx in range(len(proxy))]
-
     """
     def __init__(proxy, session, cls):
         proxy.cls = cls
@@ -254,7 +265,6 @@ class SqlListProxy(ub.NiceRepr):
             # Using raw SQL seems much faster
             result = proxy.session.execute(
                 'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
-
             for row in _yield_per(result):
                 item = dict(zip(colnames, row))
                 yield item
@@ -281,11 +291,22 @@ class SqlListProxy(ub.NiceRepr):
         raise Exception('SqlListProxy is immutable')
 
 
-class SqlDictProxy(ub.NiceRepr, DictLike):
+class SqlDictProxy(DictLike):
     """
+    Duck-types an SQL table as a dictionary of dictionaries.
+
+    The key is specified by an indexed column (by default it is the `id`
+    column). The values are dictionaries containing all data for that row.
+
+    Notes:
+        With SQLite indexes are B-Trees so lookup is O(log(N)) and not O(1) as
+        will regular dictionaries. Iteration should still be O(N), but
+        databases have much more overhead than Python dictionaries.
+
     Args:
         session (Session): the sqlalchemy session
         cls (Type): the declarative sqlalchemy table class
+        keyattr : the indexed column to use as the keys
     """
     def __init__(proxy, session, cls, keyattr=None):
         proxy.cls = cls
@@ -324,11 +345,6 @@ class SqlDictProxy(ub.NiceRepr, DictLike):
             if obj is None:
                 raise KeyError(key)
         else:
-            # keyattr = proxy.keyattr
-            # str(sqlalchemy.select([cls]).compile())
-            # print(str(sqlalchemy.select([cls]).where(keyattr == 3).compile()))
-            # stmt = sqlalchemy.select([cls]).where(keyattr == key)
-            # session.execute(stmt)
             keyattr = proxy.keyattr
             query = session.query(cls)
             results = query.filter(keyattr == key).all()
@@ -336,7 +352,8 @@ class SqlDictProxy(ub.NiceRepr, DictLike):
                 raise KeyError(key)
             elif len(results) > 1:
                 raise AssertionError('Should only have 1 result')
-            obj = results[0]
+            else:
+                obj = results[0]
         item = orm_to_dict(obj)
         if proxy._cache is not None:
             proxy._cache[key] = item
@@ -374,43 +391,6 @@ class SqlDictProxy(ub.NiceRepr, DictLike):
             key = list(proxy.keys())[-1]
             proxy[key]
             list(proxy.values())
-
-            import timerit
-            ti = timerit.Timerit(4, bestof=2, verbose=2)
-
-            proxy.ALCHEMY_MODE = 1
-            for timer in ti.reset('keys alc sql'):
-                with timer:
-                    list(proxy.keys())
-
-            proxy.ALCHEMY_MODE = 0
-            for timer in ti.reset('keys raw sql'):
-                with timer:
-                    list(proxy.keys())
-
-            proxy.ALCHEMY_MODE = 1
-            for timer in ti.reset('values alc sql'):
-                with timer:
-                    list(proxy.values())
-
-            proxy.ALCHEMY_MODE = 0
-            for timer in ti.reset('values raw sql'):
-                with timer:
-                    list(proxy.values())
-
-            proxy.ALCHEMY_MODE = 1
-            for timer in ti.reset('items alc sql'):
-                with timer:
-                    list(proxy.items())
-
-            proxy.ALCHEMY_MODE = 0
-            for timer in ti.reset('items raw sql'):
-                with timer:
-                    list(proxy.items())
-
-            for timer in ti.reset('naive items'):
-                with timer:
-                    [proxy[key] for key in proxy.keys()]
 
             print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
 
@@ -476,20 +456,99 @@ class SqlDictProxy(ub.NiceRepr, DictLike):
     values = itervalues
 
 
-def _yield_per(result, size=300):
-    if 1:
-        chunk = result.fetchall()
-        for item in chunk:
-            yield item
-    else:
-        chunk = result.fetchmany(size)
-        while chunk:
-            for item in chunk:
-                yield item
-            chunk = result.fetchmany(size)
+def _benchmark_dict_proxy_ops(proxy):
+    """
+    Get insight on the efficiency of operations
+    """
+    import timerit
+    orig_mode = proxy.ALCHEMY_MODE
+
+    ti = timerit.Timerit(1, bestof=1, verbose=2)
+
+    results = ub.ddict(dict)
+
+    proxy.ALCHEMY_MODE = 1
+    for timer in ti.reset('keys alc sql'):
+        with timer:
+            results['keys']['alc'] = list(proxy.keys())
+
+    proxy.ALCHEMY_MODE = 0
+    for timer in ti.reset('keys raw sql'):
+        with timer:
+            results['keys']['raw'] = list(proxy.keys())
+
+    proxy.ALCHEMY_MODE = 1
+    for timer in ti.reset('values alc sql'):
+        with timer:
+            results['vals']['alc'] = list(proxy.values())
+
+    proxy.ALCHEMY_MODE = 0
+    for timer in ti.reset('values raw sql'):
+        with timer:
+            results['vals']['raw'] = list(proxy.values())
+
+    proxy.ALCHEMY_MODE = 1
+    for timer in ti.reset('naive values'):
+        with timer:
+            results['vals']['alc-naive'] = [proxy[key] for key in proxy.keys()]
+
+    proxy.ALCHEMY_MODE = 0
+    for timer in ti.reset('naive values'):
+        with timer:
+            results['vals']['raw-naive'] = [proxy[key] for key in proxy.keys()]
+
+    proxy.ALCHEMY_MODE = 1
+    for timer in ti.reset('items alc sql'):
+        with timer:
+            results['items']['alc'] = list(proxy.items())
+
+    proxy.ALCHEMY_MODE = 0
+    for timer in ti.reset('items raw sql'):
+        with timer:
+            results['items']['raw'] = list(proxy.items())
+
+    for key, modes in results.items():
+        if not ub.allsame(modes.values()):
+            raise AssertionError('Inconsistency in {!r}'.format(key))
+
+    proxy.ALCHEMY_MODE = orig_mode
+    return ti
 
 
-class SqlIdGroupDictProxy(DictLike, ub.NiceRepr):
+class SqlIdGroupDictProxy(DictLike):
+    """
+    Similar to :class:`SqlDictProxy`, but maps ids to groups of other ids.
+
+    Simulates a dictionary that maps ids of a parent table to all ids of
+    another table corresponding to rows where a specific column has that parent
+    id.
+
+    For example, imagine two tables: images with one column (id) and
+    annotations with two columns (id, image_id). This class can help provide a
+    mpaping from each `image.id` to a `Set[annotation.id]` where those
+    annotation rows have `annotation.image_id = image.id`.
+
+    Example:
+        >>> from kwcoco.coco_sql_dataset import *  # NOQA
+        >>> sql_dset, dct_dset = demo(num=10)
+        >>> proxy = sql_dset.index.gid_to_aids
+        >>> proxy.ALCHEMY_MODE = 1
+
+        >>> keys = list(proxy.keys())
+        >>> values = list(proxy.values())
+        >>> items = list(proxy.items())
+        >>> item_keys = [t[0] for t in items]
+        >>> item_vals = [t[1] for t in items]
+        >>> lut_vals = [proxy[key] for key in keys]
+        >>> assert item_vals == lut_vals == values
+        >>> assert item_keys == keys
+        >>> assert len(proxy) == len(keys)
+
+        >>> # xdoctest: +SKIP
+        >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
+        >>> ti = _benchmark_dict_proxy_ops(proxy)
+        >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
+    """
     def __init__(proxy, session, valattr, keyattr, parent_keyattr):
         proxy.valattr = valattr
         proxy.keyattr = keyattr
@@ -524,6 +583,7 @@ class SqlIdGroupDictProxy(DictLike, ub.NiceRepr):
             )
             result = proxy.session.execute(sql_expr, params={'key': key})
             item = [row[0] for row in result.fetchall()]
+        item = set(item)
         if proxy._cache is not None:
             proxy._cache[key] = item
         return item
@@ -553,37 +613,6 @@ class SqlIdGroupDictProxy(DictLike, ub.NiceRepr):
             with ub.Timer('0'):
                 print(list(proxy.values())[-4:])
 
-            proxy.ALCHEMY_MODE = 1
-            import timerit
-            ti = timerit.Timerit(1, bestof=1, verbose=2)
-            for timer in ti.reset('keys sql alchemy'):
-                with timer:
-                    list(proxy.keys())
-
-            proxy.ALCHEMY_MODE = 0
-            for timer in ti.reset('keys sql raw'):
-                with timer:
-                    list(proxy.keys())
-
-            proxy.ALCHEMY_MODE = 1
-            for timer in ti.reset('items sql alchemy'):
-                with timer:
-                    list(proxy.items())
-
-            proxy.ALCHEMY_MODE = 0
-            for timer in ti.reset('items sql raw'):
-                with timer:
-                    list(proxy.items())
-
-            proxy.ALCHEMY_MODE = 1
-            for timer in ti.reset('values sql alchemy'):
-                with timer:
-                    list(proxy.values())
-
-            proxy.ALCHEMY_MODE = 0
-            for timer in ti.reset('keys sql raw'):
-                with timer:
-                    list(proxy.values())
 
             sql_expr = 'EXPLAIN QUERY PLAN SELECT {} FROM {} WHERE {}={}'.format(
                 proxy.valattr.name,
@@ -612,8 +641,8 @@ class SqlIdGroupDictProxy(DictLike, ub.NiceRepr):
     def iteritems(proxy):
         if proxy.ALCHEMY_MODE:
             # Not Implemented
-            # return DictLike.iteritems(proxy)
-            return super().iteritems()
+            for item in super().iteritems():
+                yield item
         else:
             import json
             parent_table = proxy.parent_keyattr.class_.__tablename__
@@ -638,13 +667,16 @@ class SqlIdGroupDictProxy(DictLike, ub.NiceRepr):
                 key = row[0]
                 group = json.loads(row[1])
                 if group[0] is None:
-                    group = []
+                    group = set()
+                else:
+                    group = set(group)
                 tup = (key, group)
                 yield tup
 
     def itervalues(proxy):
         if proxy.ALCHEMY_MODE:
-            return super().itervalues()
+            for item in super().itervalues():
+                yield item
         else:
             import json
             parent_table = proxy.parent_keyattr.class_.__tablename__
@@ -668,7 +700,9 @@ class SqlIdGroupDictProxy(DictLike, ub.NiceRepr):
             for row in result.fetchall():
                 group = json.loads(row[1])
                 if group[0] is None:
-                    group = []
+                    group = set()
+                else:
+                    group = set(group)
                 yield group
 
 
@@ -720,18 +754,21 @@ class CocoSqlIndex(object):
         }
 
 
-
-from kwcoco.coco_dataset import (  # NOQA
-    MixinCocoJSONAccessors, MixinCocoAccessors, MixinCocoAttrs, MixinCocoStats,
-    MixinCocoDraw
-)
-
-
 class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
                       MixinCocoAttrs, MixinCocoStats, MixinCocoDraw,
                       ub.NiceRepr):
     """
-    Attempts to provide the CocoDatabase API but with an SQL backend
+    Provides an API nearly identical to :class:`kwcoco.CocoDatabase`, but uses
+    an SQL backend data store. This makes it robust to copy-on-write memory
+    issues that arise when forking, as discussed in [1]_.
+
+    References:
+        .. [1] https://github.com/pytorch/pytorch/issues/13246
+
+    Example:
+        >>> from kwcoco.coco_sql_dataset import *  # NOQA
+        >>> sql_dset, dct_dset = demo()
+        >>> assert_dsets_allclose(sql_dset, dct_dset)
     """
 
     MEMORY_URI = 'sqlite:///:memory:'
@@ -758,7 +795,39 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         return ', '.join(parts)
 
     def __getstate__(self):
-        print('\n\nRETURNING STATE FOR SQL DATABASE')
+        """
+        Return only the minimal info when pickling this object.
+
+        Note:
+            This object IS pickling when the multiprocessing context is
+            "spawn".
+
+            This object is NOT pickled when the multiprocessing context is
+            "fork".  In this case the user needs to be careful to create new
+            connections in the forked subprocesses.
+
+        Example:
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> sql_dset, dct_dset = demo()
+            >>> # Test pickling works correctly
+            >>> import pickle
+            >>> serialized = pickle.dumps(sql_dset)
+            >>> assert len(serialized) < 3e4, 'should be very small'
+            >>> copy = pickle.loads(serialized)
+            >>> dset1, dset2, tag1, tag2 = sql_dset, copy, 'orig', 'copy'
+            >>> assert_dsets_allclose(dset1, dset2, tag1, tag2)
+            >>> # --- other methods of copying ---
+            >>> rw_copy = CocoSqlDatabase(
+            >>>     sql_dset.uri, img_root=sql_dset.img_root, tag=sql_dset.tag)
+            >>> rw_copy.connect()
+            >>> ro_copy = CocoSqlDatabase(
+            >>>     sql_dset.uri, img_root=sql_dset.img_root, tag=sql_dset.tag)
+            >>> ro_copy.connect(readonly=True)
+            >>> assert_dsets_allclose(dset1, ro_copy, tag1, 'ro-copy')
+            >>> assert_dsets_allclose(dset1, rw_copy, tag1, 'rw-copy')
+        """
+        if self.uri == self.MEMORY_URI:
+            raise Exception('Cannot Pickle Anonymous In-Memory Databases')
         return {
             'uri': self.uri,
             'img_root': self.img_root,
@@ -766,7 +835,9 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         }
 
     def __setstate__(self, state):
-        print('\n\nSETTING STATE FOR SQL DATABASE')
+        """
+        Reopen new readonly connnections when unpickling the object.
+        """
         self.__dict__.update(state)
         self.session = None
         self.engine = None
@@ -775,27 +846,22 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         self.connect(readonly=True)
 
     def connect(self, readonly=False):
+        """
+        References:
+            # details on read only mode, some of these didnt seem to work
+            https://github.com/sqlalchemy/sqlalchemy/blob/master/lib/sqlalchemy/dialects/sqlite/pysqlite.py#L71
+            https://github.com/pudo/dataset/issues/136
+            https://writeonly.wordpress.com/2009/07/16/simple-read-only-sqlalchemy-sessions/
+        """
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
         # Create an engine that stores data at a specific uri location
-
         uri = self.uri
         if readonly:
-            # https://github.com/sqlalchemy/sqlalchemy/blob/master/lib/sqlalchemy/dialects/sqlite/pysqlite.py#L71
             uri = uri + '?mode=ro&uri=true'
         elif uri.startswith('sqlite:///file:'):
             uri = uri + '?uri=true'
-
-        # if readonly:
-        #     # https://github.com/pudo/dataset/issues/136
-        #     connect_args = {'uri': True}
-        # else:
-        #     connect_args = {}
-        # self.engine = create_engine(uri, connect_args=connect_args)
-        print('\n\nMAKING SQLITE CONNECTION TO uri = {!r}'.format(uri))
-
         self.engine = create_engine(uri)
-
         if len(self.engine.table_names()) == 0:
             # Opened an empty database, need to create the tables
             # Create all tables in the engine.
@@ -803,15 +869,8 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
             # if readonly:
             #     raise AssertionError('must open existing table in readonly mode')
             CocoBase.metadata.create_all(self.engine)
-
         DBSession = sessionmaker(bind=self.engine)
         self.session = DBSession()
-        # if readonly:
-        #     # https://writeonly.wordpress.com/2009/07/16/simple-read-only-sqlalchemy-sessions/
-        #     def abort_ro(*args, **kwargs):
-        #         pass
-        #     self.session.flush = abort_ro
-
         self._build_index()
 
     def delete(self):
@@ -820,6 +879,22 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
             ub.delete(fpath)
 
     def populate_from(self, dset):
+        """
+        Copy the information in a :class:`CocoDataset` into this SQL database.
+
+        Example:
+            >>> import kwcoco
+            >>> from kwcoco.coco_sql_dataset import *
+            >>> dset2 = dset = kwcoco.CocoDataset.demo()
+            >>> dset1 = self = CocoSqlDatabase('sqlite:///:memory:')
+            >>> self.connect()
+            >>> self.populate_from(dset)
+            >>> assert_dsets_allclose(dset1, dset2, tag1='sql', tag2='dct')
+            >>> ti_sql = _benchmark_dset_readtime(dset1, 'sql')
+            >>> ti_dct = _benchmark_dset_readtime(dset2, 'dct')
+            >>> print('ti_sql.rankings = {}'.format(ub.repr2(ti_sql.rankings, nl=2, precision=6, align=':')))
+            >>> print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
+        """
         from sqlalchemy import inspect
         session = self.session
         inspector = inspect(self.engine)
@@ -827,18 +902,18 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
             colinfo = inspector.get_columns(key)
             colnames = {c['name'] for c in colinfo}
             # TODO: is there a better way to grab this information?
-            cls = TBLNAME_TO_CLASS[key]
+            cls = CocoBase.TBLNAME_TO_CLASS[key]
             for item in dset.dataset.get(key, []):
                 item_ = ub.dict_isect(item, colnames)
                 # Everything else is a foreign key
-                item['foreign'] = ub.dict_diff(item, item_)
+                item_['foreign'] = ub.dict_diff(item, item_)
                 if key == 'annotations':
                     # Need custom code to translate list-based properties
-                    x, y, w, h = item['bbox']
-                    item_['bbox_x'] = x
-                    item_['bbox_y'] = y
-                    item_['bbox_w'] = w
-                    item_['bbox_h'] = h
+                    x, y, w, h = item_.get('bbox', [None, None, None, None])
+                    item_['_bbox_x'] = x
+                    item_['_bbox_y'] = y
+                    item_['_bbox_w'] = w
+                    item_['_bbox_h'] = h
                 row = cls(**item_)
                 session.add(row)
         session.commit()
@@ -867,18 +942,50 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         return self.index.name_to_cat
 
     def raw_table(self, table_name):
+        """
+        Loads an entire SQL table as a pandas DataFrame
+
+        Args:
+            table_name (str): name of the table
+
+        Returns:
+            DataFrame
+
+        Example:
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> self, dset = demo()
+            >>> table_df = self.raw_table('annotations')
+            >>> print(table_df)
+        """
         import pandas as pd
         table_df = pd.read_sql_table(table_name, con=self.engine)
         return table_df
 
     def tabular_targets(self):
-        # stmt = 'SELECT id, image_id, category_id, bbox_x + (bbox_w / 2), bbox_y + (bbox_h / 2), bbox_w, bbox_h FROM annotations'
+        """
+        Convinience method to create an in-memory summary of basic annotation
+        properties with minimal SQL overhead.
+
+        Example:
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> self, dset = demo()
+            >>> targets = self.tabular_targets()
+            >>> print(targets.pandas())
+        """
+        # stmt = 'SELECT id, image_id, category_id, _bbox_x + (_bbox_w / 2), _bbox_y + (_bbox_h / 2), _bbox_w, _bbox_h FROM annotations'
         import kwarray
-        stmt = ('SELECT annotations.id, image_id, category_id, bbox_x + (bbox_w / 2), bbox_y + (bbox_h / 2), bbox_w, bbox_h, width, height '
-                'FROM annotations JOIN images on images.id = annotations.image_id')
+        stmt = ub.paragraph(
+            '''
+            SELECT
+                annotations.id, image_id, category_id,
+                _bbox_x + (_bbox_w / 2), _bbox_y + (_bbox_h / 2),
+                _bbox_w, _bbox_h, images.width, images.height
+            FROM annotations
+            JOIN images on images.id = annotations.image_id
+            ''')
         result = self.session.execute(stmt)
-        columns = result.fetchall()
-        aids, gids, cids, cxs, cys, ws, hs, img_ws, img_hs = list(zip(*columns))
+        rows = result.fetchall()
+        aids, gids, cids, cxs, cys, ws, hs, img_ws, img_hs = list(zip(*rows))
 
         table = {
             # Annotation / Image / Category ids
@@ -904,7 +1011,7 @@ def ensure_sql_coco_view(dset, db_fpath=None):
     Create an SQL view of the COCO dataset
     """
     if db_fpath is None:
-        db_fpath = ub.augpath(dset.fpath, prefix='.', ext='.sqlite')
+        db_fpath = ub.augpath(dset.fpath, prefix='.', ext='.view.v002.sqlite')
 
     db_uri = 'sqlite:///file:' + db_fpath
     # dpath = dirname(dset.fpath)
@@ -929,53 +1036,211 @@ def ensure_sql_coco_view(dset, db_fpath=None):
     return self
 
 
-def demo():
+def demo(num=10):
     import kwcoco
     dset = kwcoco.CocoDataset.demo(
-        'vidshapes', num_videos=1, num_frames=1000, gsize=(64, 64))
-
+        'vidshapes', num_videos=1, num_frames=num, gsize=(64, 64))
     HACK = 1
     if HACK:
         gids = list(dset.imgs.keys())
         aids1 = dset.gid_to_aids[gids[-2]]
         aids2 = dset.gid_to_aids[gids[-4]]
-        print('aids1 = {!r}'.format(aids1))
-        print('aids2 = {!r}'.format(aids2))
+        # print('aids1 = {!r}'.format(aids1))
+        # print('aids2 = {!r}'.format(aids2))
         dset.remove_annotations(aids1 | aids2)
-        dset.fpath = ub.augpath(dset.fpath, suffix='_mod', multidot=True)
+        dset.fpath = ub.augpath(dset.fpath, suffix='_hack', multidot=True)
         if not exists(dset.fpath):
             dset.dump(dset.fpath, newlines=True)
-
     self = ensure_sql_coco_view(dset)
     return self, dset
 
 
+def indexable_allclose(dct1, dct2, return_info=False):
+    """
+    Args:
+        dct1: a nested indexable item
+        dct2: a nested indexable item
+
+    Example:
+        >>> dct1 = {
+        >>>     'foo': [1.222222, 1.333],
+        >>>     'bar': 1,
+        >>>     'baz': [],
+        >>> }
+        >>> dct2 = {
+        >>>     'foo': [1.22222, 1.333],
+        >>>     'bar': 1,
+        >>>     'baz': [],
+        >>> }
+        >>> assert indexable_allclose(dct1, dct2)
+    """
+    from kwcoco.util.util_json import IndexableWalker
+    walker1 = IndexableWalker(dct1)
+    walker2 = IndexableWalker(dct2)
+    flat_items1 = [
+        (path, value) for path, value in walker1
+        if not isinstance(value, walker1.indexable_cls) or len(value) == 0]
+    flat_items2 = [
+        (path, value) for path, value in walker2
+        if not isinstance(value, walker1.indexable_cls) or len(value) == 0]
+
+    flat_items1 = sorted(flat_items1)
+    flat_items2 = sorted(flat_items2)
+
+    if len(flat_items1) != len(flat_items2):
+        info = {
+            'faillist': ['length mismatch']
+        }
+        final_flag = False
+    else:
+        passlist = []
+        faillist = []
+
+        for t1, t2 in zip(flat_items1, flat_items2):
+            p1, v1 = t1
+            p2, v2 = t2
+            assert p1 == p2
+
+            flag = (v1 == v2)
+            if not flag:
+                if isinstance(v1, float) and isinstance(v2, float) and np.isclose(v1, v2):
+                    flag = True
+            if flag:
+                passlist.append(p1)
+            else:
+                faillist.append((p1, v1, v2))
+
+        final_flag = len(faillist) == 0
+        info = {
+            'passlist': passlist,
+            'faillist': faillist,
+        }
+
+    if return_info:
+        return final_flag, info
+    else:
+        return final_flag
+
+
+def assert_dsets_allclose(dset1, dset2, tag1='sql', tag2='dct'):
+    # Test that the duck types are working
+    compare = {}
+    compare['gid_to_aids'] = {
+        tag1: dict(dset1.index.gid_to_aids),
+        tag2: dict(dset2.index.gid_to_aids)}
+    compare['cid_to_aids'] = {
+        tag1: dict(dset1.index.cid_to_aids),
+        tag2: dict(dset2.index.cid_to_aids)}
+    compare['vidid_to_gids'] = {
+        tag1: dict(dset1.index.vidid_to_gids),
+        tag2: dict(dset2.index.vidid_to_gids)}
+    for key, pair in compare.items():
+        lut1 = pair[tag1]
+        lut2 = pair[tag2]
+        assert lut1 == lut2, (
+            'Failed {} on lut1={!r}, lut2={!r}'.format(key, lut1, lut2))
+    # ------
+    # The row dictionaries may have extra Nones on the SQL side
+    # So the comparison logic is slightly more involved here
+    compare = {}
+    compare['imgs'] = {
+        tag1: dict(dset1.index.imgs),
+        tag2: dict(dset2.index.imgs)}
+    compare['anns'] = {
+        tag1: dict(dset1.index.anns),
+        tag2: dict(dset2.index.anns)}
+    compare['cats'] = {
+        tag1: dict(dset1.index.cats),
+        tag2: dict(dset2.index.cats)}
+    compare['file_name_to_img'] = {
+        tag1: dict(dset1.index.file_name_to_img),
+        tag2: dict(dset2.index.file_name_to_img)}
+    compare['name_to_cat'] = {
+        tag1: dict(dset1.index.name_to_cat),
+        tag2: dict(dset2.index.name_to_cat)}
+    special_cols = {'_bbox_x', '_bbox_y', '_bbox_w', '_bbox_h'}
+    for key, pair in compare.items():
+        lut1 = pair[tag1]
+        lut2 = pair[tag2]
+        keys = set(lut1.keys()) & set(lut2.keys())
+        assert len(keys) == len(lut2) == len(lut1)
+        for key in keys:
+            item1 = ub.dict_diff(lut1[key], special_cols)
+            item2 = ub.dict_diff(lut2[key], special_cols)
+            item1.update(item1.pop('foreign', {}))
+            item2.update(item2.pop('foreign', {}))
+            common1 = ub.dict_isect(item2, item1)
+            common2 = ub.dict_isect(item1, item2)
+            diff1 = ub.dict_diff(item1, common2)
+            diff2 = ub.dict_diff(item2, common1)
+            assert indexable_allclose(common2, common1)
+            assert all(v is None for v in diff2.values())
+            assert all(v is None for v in diff1.values())
+
+
+def _benchmark_dset_readtime(dset, tag='?'):
+    """
+    Helper for understanding the time differences between backends
+    """
+
+    import timerit
+    ti = timerit.Timerit(4, bestof=2, verbose=2)
+
+    for timer in ti.reset('{} dict(gid_to_aids)'.format(tag)):
+        with timer:
+            dict(dset.index.gid_to_aids)
+
+    for timer in ti.reset('{} dict(cid_to_aids)'.format(tag)):
+        with timer:
+            dict(dset.index.cid_to_aids)
+
+    for timer in ti.reset('{} dict(imgs)'.format(tag)):
+        with timer:
+            dict(dset.index.imgs)
+
+    for timer in ti.reset('{} dict(cats)'.format(tag)):
+        with timer:
+            dict(dset.index.cats)
+
+    for timer in ti.reset('{} dict(anns)'.format(tag)):
+        with timer:
+            dict(dset.index.anns)
+
+    for timer in ti.reset('{} dict(vidid_to_gids)'.format(tag)):
+        with timer:
+            dict(dset.index.vidid_to_gids)
+
+    for timer in ti.reset('{} ann list iteration'.format(tag)):
+        with timer:
+            list(dset.dataset['annotations'])
+
+    for timer in ti.reset('{} ann dict iteration'.format(tag)):
+        with timer:
+            list(dset.index.anns.items())
+
+    for timer in ti.reset('{} ann random lookup'.format(tag)):
+        aids = list(dset.index.anns.keys())[0:10]
+        with timer:
+            for aid in aids:
+                dset.index.anns[aid]
+
+    return ti
+
+
 def devcheck():
     """
+    Scratch work for things that should eventually become unit or doc tests
+
     from kwcoco.coco_sql_dataset import *  # NOQA
+    self, dset = demo()
     """
     # self = ensure_sql_coco_view(dset, db_fpath=':memory:')
     self, dset = demo()
 
-    import timerit
-
-    with timerit.Timer('gid_to_aids'):
-        self.index.gid_to_aids.to_dict()
-
-    with timerit.Timer('cid_to_aids'):
-        self.index.cid_to_aids.to_dict()
-
-    with timerit.Timer('imgs'):
-        self.index.imgs.to_dict()
-
-    with timerit.Timer('cats'):
-        self.index.cats.to_dict()
-
-    with timerit.Timer('anns'):
-        self.index.anns.to_dict()
-
-    with timerit.Timer('vidid_to_gids'):
-        self.index.vidid_to_gids.to_dict()
+    ti_sql = _benchmark_dset_readtime(self, 'sql')
+    ti_dct = _benchmark_dset_readtime(dset, 'dct')
+    print('ti_sql.rankings = {}'.format(ub.repr2(ti_sql.rankings, nl=2, precision=6, align=':')))
+    print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
 
     # Read the sql tables into pandas
     for key in self.engine.table_names():
@@ -983,38 +1248,6 @@ def devcheck():
         print('key = {!r}'.format(key))
         table_df = self.raw_table(key)
         print(table_df)
-
-    # Check the speed difference in data access
-
-    ti = timerit.Timerit(4, bestof=2, verbose=2)
-
-    for ref in [dset, self]:
-
-        for timer in ti.reset('{} dataset iteration'.format(ref)):
-            with timer:
-                list(ref.dataset['annotations'])
-
-        for timer in ti.reset('{} index ann iteration'.format(ref)):
-            with timer:
-                list(ref.index.anns.items())
-
-        for timer in ti.reset('{} ann id lookup'.format(ref)):
-            aids = list(ref.index.anns.keys())[0:10]
-            with timer:
-                for aid in aids:
-                    ref.index.anns[aid]
-
-    print('ti.rankings = {}'.format(ub.repr2(ti.rankings, nl=2, precision=8)))
-
-    import pickle
-    serialized = pickle.dumps(self)
-    copy = pickle.loads(serialized)
-
-    rw_copy = CocoSqlDatabase(self.uri, img_root=self.img_root, tag=self.tag)
-    rw_copy.connect()
-
-    ro_copy = CocoSqlDatabase(self.uri, img_root=self.img_root, tag=self.tag)
-    ro_copy.connect(readonly=True)
 
     import ndsampler
     self.hashid = 'foobarjunk'
@@ -1026,6 +1259,7 @@ def devcheck():
     regions.get_positive(1)
     regions.get_negative()
 
+    import timerit
     with timerit.Timer('annots'):
         self.annots()
 
