@@ -85,6 +85,7 @@ from kwcoco.coco_dataset import (  # NOQA
 )
 
 import sqlite3
+import json
 import numpy as np
 sqlite3.register_adapter(np.int64, int)
 sqlite3.register_adapter(np.int32, int)
@@ -188,7 +189,20 @@ def orm_to_dict(obj):
     return item
 
 
-def _yield_per(result, size=300):
+def _orm_yielder(query, size=300):
+    """
+    TODO: figure out the best way to yield, in batches or otherwise
+    """
+    if 1:
+        yield from query.all()
+    else:
+        yield from query.yield_per(size)
+
+
+def _raw_yielder(result, size=300):
+    """
+    TODO: figure out the best way to yield, in batches or otherwise
+    """
     if 1:
         chunk = result.fetchall()
         for item in chunk:
@@ -247,26 +261,50 @@ class SqlListProxy(ub.NiceRepr):
         query = proxy.session.query(proxy.cls)
         return query.count()
 
+    def __nice__(proxy):
+        return '{}: {}'.format(proxy.cls.__tablename__, len(proxy))
+
     def __iter__(proxy):
-        # TODO: our non-alchemy implementation doesn't handle json
-        if 1 or proxy.ALCHEMY_MODE:
+        if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
-            for obj in query.yield_per(300):
+            for obj in _orm_yielder(query):
                 item = orm_to_dict(obj)
                 yield item
         else:
             if proxy._colnames is None:
                 from sqlalchemy import inspect
+                import json
                 inspector = inspect(proxy.session.get_bind())
                 colinfo = inspector.get_columns(proxy.cls.__tablename__)
+                # Huge hack to fixup json columns.
+                # the session.execute seems to do this for
+                # some columns, but not all, hense the isinstance
+                def _json_caster(x):
+                    if isinstance(x, str):
+                        return json.loads(x)
+                    else:
+                        return x
+                casters = []
+                for c in colinfo:
+                    t = c['type']
+                    caster = ub.identity
+                    if t.__class__.__name__ == 'JSON':
+                        caster = _json_caster
+                    # caster = t.result_processor(dialect, t)
+                    casters.append(caster)
+                proxy._casters = casters
                 proxy._colnames = [c['name'] for c in colinfo]
             colnames = proxy._colnames
+            casters = proxy._casters
 
             # Using raw SQL seems much faster
             result = proxy.session.execute(
                 'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
-            for row in _yield_per(result):
-                item = dict(zip(colnames, row))
+
+            for row in _raw_yielder(result):
+                cast_row = [f(x) for f, x in zip(proxy._casters, row)]
+                # Note: assert colnames == list(result.keys())
+                item = dict(zip(colnames, cast_row))
                 yield item
 
     def __getitem__(proxy, index):
@@ -307,53 +345,147 @@ class SqlDictProxy(DictLike):
         session (Session): the sqlalchemy session
         cls (Type): the declarative sqlalchemy table class
         keyattr : the indexed column to use as the keys
+
+    Example:
+        >>> from kwcoco.coco_sql_dataset import *  # NOQA
+        >>> import pytest
+        >>> sql_dset, dct_dset = demo(num=10)
+        >>> proxy = sql_dset.index.anns
+
+        >>> keys = list(proxy.keys())
+        >>> values = list(proxy.values())
+        >>> items = list(proxy.items())
+        >>> item_keys = [t[0] for t in items]
+        >>> item_vals = [t[1] for t in items]
+        >>> lut_vals = [proxy[key] for key in keys]
+        >>> assert item_vals == lut_vals == values
+        >>> assert item_keys == keys
+        >>> assert len(proxy) == len(keys)
+
+        >>> goodkey1 = keys[1]
+        >>> badkey1 = -100000000000
+        >>> badkey2 = 'foobarbazbiz'
+        >>> badkey3 = object()
+        >>> assert goodkey1 in proxy
+        >>> assert badkey1 not in proxy
+        >>> assert badkey2 not in proxy
+        >>> assert badkey3 not in proxy
+        >>> with pytest.raises(KeyError):
+        >>>     proxy[badkey1]
+        >>> with pytest.raises(KeyError):
+        >>>     proxy[badkey2]
+        >>> with pytest.raises(KeyError):
+        >>>     proxy[badkey3]
+
+        >>> # xdoctest: +SKIP
+        >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
+        >>> ti = _benchmark_dict_proxy_ops(proxy)
+        >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
+
+    Example:
+        >>> from kwcoco.coco_sql_dataset import *  # NOQA
+        >>> import pytest
+        >>> sql_dset, dct_dset = demo(num=10)
+        >>> proxy = sql_dset.index.name_to_cat
+
+        >>> keys = list(proxy.keys())
+        >>> values = list(proxy.values())
+        >>> items = list(proxy.items())
+        >>> item_keys = [t[0] for t in items]
+        >>> item_vals = [t[1] for t in items]
+        >>> lut_vals = [proxy[key] for key in keys]
+        >>> assert item_vals == lut_vals == values
+        >>> assert item_keys == keys
+        >>> assert len(proxy) == len(keys)
+
+        >>> goodkey1 = keys[1]
+        >>> badkey1 = -100000000000
+        >>> badkey2 = 'foobarbazbiz'
+        >>> badkey3 = object()
+        >>> assert goodkey1 in proxy
+        >>> assert badkey1 not in proxy
+        >>> assert badkey2 not in proxy
+        >>> assert badkey3 not in proxy
+        >>> with pytest.raises(KeyError):
+        >>>     proxy[badkey1]
+        >>> with pytest.raises(KeyError):
+        >>>     proxy[badkey2]
+        >>> with pytest.raises(KeyError):
+        >>>     proxy[badkey3]
+
+        >>> # xdoctest: +SKIP
+        >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
+        >>> ti = _benchmark_dict_proxy_ops(proxy)
+        >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
     """
     def __init__(proxy, session, cls, keyattr=None):
         proxy.cls = cls
         proxy.session = session
         proxy.keyattr = keyattr
         proxy._colnames = None
+        proxy._casters = None
 
         # It seems like writing the raw sql ourselves is fater than
         # using the ORM in most cases.
         proxy.ALCHEMY_MODE = 0
 
-        # ONLY DO THIS IN READONLY MODE
+        # ONLY DO THIS IN READONLInterfaceError:Y MODE
         proxy._cache = _new_proxy_cache()
 
     def __len__(proxy):
         query = proxy.session.query(proxy.cls)
         return query.count()
 
+    def __nice__(proxy):
+        if proxy.keyattr is None:
+            return 'id -> {}: {}'.format(proxy.cls.__tablename__, len(proxy))
+        else:
+            return '{} -> {}: {}'.format(proxy.keyattr.name, proxy.cls.__tablename__, len(proxy))
+
     def __contains__(proxy, key):
+        if proxy._cache is not None:
+            if key in proxy._cache:
+                return True
         keyattr = proxy.keyattr
         if keyattr is None:
             keyattr = proxy.cls.id
-        query = proxy.session.query(proxy.cls.id).filter(keyattr == key)
-        flag = query.count() > 0
+        try:
+            query = proxy.session.query(proxy.cls.id).filter(keyattr == key)
+            flag = query.count() > 0
+        except sqlalchemy.exc.InterfaceError as ex:
+            if 'unsupported type' in str(ex):
+                return False
+            else:
+                raise
         return flag
 
     def __getitem__(proxy, key):
         if proxy._cache is not None:
             if key in proxy._cache:
                 return proxy._cache[key]
-        session = proxy.session
-        cls = proxy.cls
-        if proxy.keyattr is None:
-            query = session.query(cls)
-            obj = query.get(key)
-            if obj is None:
-                raise KeyError(key)
-        else:
-            keyattr = proxy.keyattr
-            query = session.query(cls)
-            results = query.filter(keyattr == key).all()
-            if len(results) == 0:
-                raise KeyError(key)
-            elif len(results) > 1:
-                raise AssertionError('Should only have 1 result')
+        try:
+            session = proxy.session
+            cls = proxy.cls
+            if proxy.keyattr is None:
+                query = session.query(cls)
+                obj = query.get(key)
+                if obj is None:
+                    raise KeyError(key)
             else:
-                obj = results[0]
+                keyattr = proxy.keyattr
+                query = session.query(cls)
+                results = query.filter(keyattr == key).all()
+                if len(results) == 0:
+                    raise KeyError(key)
+                elif len(results) > 1:
+                    raise AssertionError('Should only have 1 result')
+                else:
+                    obj = results[0]
+        except sqlalchemy.exc.InterfaceError as ex:
+            if 'unsupported type' in str(ex):
+                raise KeyError(key)
+            else:
+                raise
         item = orm_to_dict(obj)
         if proxy._cache is not None:
             proxy._cache[key] = item
@@ -365,44 +497,15 @@ class SqlDictProxy(DictLike):
             from kwcoco.coco_sql_dataset import *  # NOQA
             import pytest
             self, dset = demo()
-
-            proxy = self.imgs
-            proxy[2]
-            with pytest.raises(KeyError):
-                proxy['efffdsf']
-            with pytest.raises(KeyError):
-                proxy[100000000000]
-            assert 'efffdsf' not in proxy
-            assert 2 in proxy
-            assert 300000000 not in proxy
-
             proxy = self.index.name_to_cat
-
-            proxy['eff']
-            with pytest.raises(KeyError):
-                proxy['efffdsf']
-            with pytest.raises(KeyError):
-                proxy[3]
-            assert 'efffdsf' not in proxy
-            assert 'eff' in proxy
-            assert 3 not in proxy
-
-            proxy = self.imgs
-            key = list(proxy.keys())[-1]
-            proxy[key]
-            list(proxy.values())
-
-            print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
-
-            # sub = proxy.session.query(Annotation.id).group_by(Annotation.image_id).subquery()
         """
         if proxy.ALCHEMY_MODE:
             if proxy.keyattr is None:
-                query = proxy.session.query(proxy.cls.id)
+                query = proxy.session.query(proxy.cls.id).order_by(proxy.cls.id)
             else:
-                query = proxy.session.query(proxy.keyattr)
+                query = proxy.session.query(proxy.keyattr).order_by(proxy.cls.id)
 
-            for item in query.yield_per(300):
+            for item in _orm_yielder(query):
                 key = item[0]
                 yield key
         else:
@@ -416,35 +519,53 @@ class SqlDictProxy(DictLike):
                     'SELECT {} FROM {} ORDER BY id'.format(
                         proxy.keyattr.key, proxy.cls.__tablename__))
 
-            for item in _yield_per(result):
+            for item in _raw_yielder(result):
                 yield item[0]
 
     def itervalues(proxy):
-        # TODO: our non-alchemy implementation doesn't handle json
-        if 1 or proxy.ALCHEMY_MODE:
+        if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
-            for obj in query.yield_per(300):
+            for obj in _orm_yielder(query):
                 item = orm_to_dict(obj)
                 yield item
         else:
             if proxy._colnames is None:
                 from sqlalchemy import inspect
+                import json
                 inspector = inspect(proxy.session.get_bind())
                 colinfo = inspector.get_columns(proxy.cls.__tablename__)
+                # Huge hack to fixup json columns.
+                # the session.execute seems to do this for
+                # some columns, but not all, hense the isinstance
+                def _json_caster(x):
+                    if isinstance(x, str):
+                        return json.loads(x)
+                    else:
+                        return x
+                casters = []
+                for c in colinfo:
+                    t = c['type']
+                    caster = ub.identity
+                    if t.__class__.__name__ == 'JSON':
+                        caster = _json_caster
+                    # caster = t.result_processor(dialect, t)
+                    casters.append(caster)
+                proxy._casters = casters
                 proxy._colnames = [c['name'] for c in colinfo]
             colnames = proxy._colnames
+            casters = proxy._casters
 
             # Using raw SQL seems much faster
             result = proxy.session.execute(
                 'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
-            for row in _yield_per(result):
-                item = dict(zip(colnames, row))
+
+            for row in _raw_yielder(result):
+                cast_row = [f(x) for f, x in zip(proxy._casters, row)]
+                # Note: assert colnames == list(result.keys())
+                item = dict(zip(colnames, cast_row))
                 yield item
 
     def iteritems(proxy):
-        # if proxy.ALCHEMY_MODE:
-        #     return ((key, proxy[key]) for key in proxy.keys())
-        # else:
         if proxy.keyattr is None:
             keyattr_name = 'id'
         else:
@@ -454,65 +575,6 @@ class SqlDictProxy(DictLike):
 
     items = iteritems
     values = itervalues
-
-
-def _benchmark_dict_proxy_ops(proxy):
-    """
-    Get insight on the efficiency of operations
-    """
-    import timerit
-    orig_mode = proxy.ALCHEMY_MODE
-
-    ti = timerit.Timerit(1, bestof=1, verbose=2)
-
-    results = ub.ddict(dict)
-
-    proxy.ALCHEMY_MODE = 1
-    for timer in ti.reset('keys alc sql'):
-        with timer:
-            results['keys']['alc'] = list(proxy.keys())
-
-    proxy.ALCHEMY_MODE = 0
-    for timer in ti.reset('keys raw sql'):
-        with timer:
-            results['keys']['raw'] = list(proxy.keys())
-
-    proxy.ALCHEMY_MODE = 1
-    for timer in ti.reset('values alc sql'):
-        with timer:
-            results['vals']['alc'] = list(proxy.values())
-
-    proxy.ALCHEMY_MODE = 0
-    for timer in ti.reset('values raw sql'):
-        with timer:
-            results['vals']['raw'] = list(proxy.values())
-
-    proxy.ALCHEMY_MODE = 1
-    for timer in ti.reset('naive values'):
-        with timer:
-            results['vals']['alc-naive'] = [proxy[key] for key in proxy.keys()]
-
-    proxy.ALCHEMY_MODE = 0
-    for timer in ti.reset('naive values'):
-        with timer:
-            results['vals']['raw-naive'] = [proxy[key] for key in proxy.keys()]
-
-    proxy.ALCHEMY_MODE = 1
-    for timer in ti.reset('items alc sql'):
-        with timer:
-            results['items']['alc'] = list(proxy.items())
-
-    proxy.ALCHEMY_MODE = 0
-    for timer in ti.reset('items raw sql'):
-        with timer:
-            results['items']['raw'] = list(proxy.items())
-
-    for key, modes in results.items():
-        if not ub.allsame(modes.values()):
-            raise AssertionError('Inconsistency in {!r}'.format(key))
-
-    proxy.ALCHEMY_MODE = orig_mode
-    return ti
 
 
 class SqlIdGroupDictProxy(DictLike):
@@ -532,7 +594,6 @@ class SqlIdGroupDictProxy(DictLike):
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
         >>> sql_dset, dct_dset = demo(num=10)
         >>> proxy = sql_dset.index.gid_to_aids
-        >>> proxy.ALCHEMY_MODE = 1
 
         >>> keys = list(proxy.keys())
         >>> values = list(proxy.values())
@@ -589,9 +650,18 @@ class SqlIdGroupDictProxy(DictLike):
         return item
 
     def __contains__(proxy, key):
-        query = proxy.session.query(
-            proxy.parent_keyattr).filter(proxy.parent_keyattr == key)
-        flag = query.count() > 0
+        if proxy._cache is not None:
+            if key in proxy._cache:
+                return True
+        try:
+            query = (proxy.session.query(proxy.parent_keyattr)
+                     .filter(proxy.parent_keyattr == key))
+            flag = query.count() > 0
+        except sqlalchemy.exc.InterfaceError as ex:
+            if 'unsupported type' in str(ex):
+                return False
+            else:
+                raise
         return flag
 
     def keys(proxy):
@@ -599,20 +669,6 @@ class SqlIdGroupDictProxy(DictLike):
         Ignore:
             from kwcoco.coco_sql_dataset import *  # NOQA
             self, dset = demo()
-
-            proxy = self.index.gid_to_aids
-
-            print(list(proxy.keys())[-4:])
-            proxy[10000]
-            proxy[9999]
-
-            proxy.ALCHEMY_MODE = 1
-            with ub.Timer('1'):
-                print(list(proxy.values())[-4:])
-            proxy.ALCHEMY_MODE = 0
-            with ub.Timer('0'):
-                print(list(proxy.values())[-4:])
-
 
             sql_expr = 'EXPLAIN QUERY PLAN SELECT {} FROM {} WHERE {}={}'.format(
                 proxy.valattr.name,
@@ -623,11 +679,10 @@ class SqlIdGroupDictProxy(DictLike):
             result = proxy.session.execute(sql_expr)
             result.fetchall()
             item = [row[0] for row in result.fetchall()]
-
         """
         if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.parent_keyattr)
-            for item in query.yield_per(300):
+            for item in _orm_yielder(query):
                 key = item[0]
                 yield key
         else:
@@ -635,16 +690,56 @@ class SqlIdGroupDictProxy(DictLike):
                 'SELECT {} FROM {}'.format(
                     proxy.parent_keyattr.name,
                     proxy.parent_keyattr.class_.__tablename__))
-            for item in _yield_per(result):
+            for item in _raw_yielder(result):
                 yield item[0]
 
     def iteritems(proxy):
         if proxy.ALCHEMY_MODE:
-            # Not Implemented
-            for item in super().iteritems():
-                yield item
+            parent_keyattr = proxy.parent_keyattr
+            keyattr = proxy.keyattr
+            valattr = proxy.valattr
+            session = proxy.session
+
+            parent_table = parent_keyattr.class_.__table__
+            table = keyattr.class_.__table__
+
+            """
+            WANT:
+                SELECT images.id, json_group_array(annotations.id)
+                FROM images
+                LEFT OUTER JOIN annotations
+                ON annotations.image_id = images.id
+                GROUP BY images.id ORDER BY images.id
+
+            GOT:
+                SELECT images.id, json_group_array(annotations.id) AS json_group_array_1
+                FROM images, annotations, images
+                LEFT OUTER JOIN annotations
+                ON images.id = annotations.image_id
+                GROUP BY images.id ORDER BY images.id
+
+            """
+            grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
+            # Hack: have to cast to str because I don't know how to make
+            # the json type work
+            query = (
+                session.query(parent_keyattr, str(grouped_vals))
+                .outerjoin(table, parent_keyattr == keyattr)
+                .group_by(parent_keyattr)
+                .order_by(parent_keyattr)
+            )
+
+            for row in query.all():
+                key = row[0]
+                group = json.loads(row[1])
+                if group[0] is None:
+                    group = set()
+                else:
+                    group = set(group)
+                tup = (key, group)
+                yield tup
+
         else:
-            import json
             parent_table = proxy.parent_keyattr.class_.__tablename__
             table = proxy.keyattr.class_.__tablename__
             parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
@@ -661,7 +756,7 @@ class SqlIdGroupDictProxy(DictLike):
                     keycol=keycol,
                     valcol=valcol,
                 )
-            # print(expr)
+            print(expr)
             result = proxy.session.execute(expr)
             for row in result.fetchall():
                 key = row[0]
@@ -675,10 +770,33 @@ class SqlIdGroupDictProxy(DictLike):
 
     def itervalues(proxy):
         if proxy.ALCHEMY_MODE:
-            for item in super().itervalues():
-                yield item
+            # Hack:
+            for key, val in proxy.items():
+                yield val
+            # parent_keyattr = proxy.parent_keyattr
+            # keyattr = proxy.keyattr
+            # valattr = proxy.valattr
+            # session = proxy.session
+
+            # parent_table = parent_keyattr.class_.__table__
+            # table = proxy.keyattr.class_.__tablename__
+
+            # # TODO: This might have to be different for PostgreSQL
+            # grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
+            # query = (
+            #     session.query(grouped_vals)
+            #     .outerjoin(table, parent_keyattr == keyattr)
+            #     .group_by(parent_keyattr)
+            #     .order_by(parent_keyattr)
+            # )
+            # for row in _orm_yielder(query):
+            #     group = row[0]
+            #     if group[0] is None:
+            #         group = set()
+            #     else:
+            #         group = set(group)
+            #     yield group
         else:
-            import json
             parent_table = proxy.parent_keyattr.class_.__tablename__
             table = proxy.keyattr.class_.__tablename__
             parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
@@ -1224,6 +1342,65 @@ def _benchmark_dset_readtime(dset, tag='?'):
             for aid in aids:
                 dset.index.anns[aid]
 
+    return ti
+
+
+def _benchmark_dict_proxy_ops(proxy):
+    """
+    Get insight on the efficiency of operations
+    """
+    import timerit
+    orig_mode = proxy.ALCHEMY_MODE
+
+    ti = timerit.Timerit(1, bestof=1, verbose=2)
+
+    results = ub.ddict(dict)
+
+    proxy.ALCHEMY_MODE = 1
+    for timer in ti.reset('keys alc sql'):
+        with timer:
+            results['keys']['alc'] = list(proxy.keys())
+
+    proxy.ALCHEMY_MODE = 0
+    for timer in ti.reset('keys raw sql'):
+        with timer:
+            results['keys']['raw'] = list(proxy.keys())
+
+    proxy.ALCHEMY_MODE = 1
+    for timer in ti.reset('values alc sql'):
+        with timer:
+            results['vals']['alc'] = list(proxy.values())
+
+    proxy.ALCHEMY_MODE = 0
+    for timer in ti.reset('values raw sql'):
+        with timer:
+            results['vals']['raw'] = list(proxy.values())
+
+    proxy.ALCHEMY_MODE = 1
+    for timer in ti.reset('naive values'):
+        with timer:
+            results['vals']['alc-naive'] = [proxy[key] for key in proxy.keys()]
+
+    proxy.ALCHEMY_MODE = 0
+    for timer in ti.reset('naive values'):
+        with timer:
+            results['vals']['raw-naive'] = [proxy[key] for key in proxy.keys()]
+
+    proxy.ALCHEMY_MODE = 1
+    for timer in ti.reset('items alc sql'):
+        with timer:
+            results['items']['alc'] = list(proxy.items())
+
+    proxy.ALCHEMY_MODE = 0
+    for timer in ti.reset('items raw sql'):
+        with timer:
+            results['items']['raw'] = list(proxy.items())
+
+    for key, modes in results.items():
+        if not ub.allsame(modes.values()):
+            raise AssertionError('Inconsistency in {!r}'.format(key))
+
+    proxy.ALCHEMY_MODE = orig_mode
     return ti
 
 
