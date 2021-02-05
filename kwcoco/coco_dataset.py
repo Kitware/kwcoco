@@ -847,7 +847,8 @@ class MixinCocoDepricate(object):
         # DEPRICATE
         """
         import warnings
-        warnings.warn('DEPRECATED: this method should not be used', DeprecationWarning)
+        warnings.warn('DEPRECATED: this method should not be used',
+                      DeprecationWarning)
         for gid, img in self.imgs.items():
             aids = self.gid_to_aids.get(gid, [])
             # If there is at least one annotation, always mark as has_annots
@@ -863,7 +864,8 @@ class MixinCocoDepricate(object):
 
     def _find_bad_annotations(self):
         import warnings
-        warnings.warn('DEPRECATED: this method should not be used', DeprecationWarning)
+        warnings.warn('DEPRECATED: this method should not be used',
+                      DeprecationWarning)
         to_remove = []
         for ann in self.dataset['annotations']:
             if ann['image_id'] is None or ann['category_id'] is None:
@@ -884,7 +886,8 @@ class MixinCocoDepricate(object):
             >>> self._remove_keypoint_annotations()
         """
         import warnings
-        warnings.warn('DEPRECATED: this method should not be used', DeprecationWarning)
+        warnings.warn('DEPRECATED: this method should not be used',
+                      DeprecationWarning)
         to_remove = []
         for ann in self.dataset['annotations']:
             roi_shape = ann.get('roi_shape', None)
@@ -900,7 +903,8 @@ class MixinCocoDepricate(object):
 
     def _remove_bad_annotations(self, rebuild=True):
         import warnings
-        warnings.warn('DEPRECATED: this method should not be used', DeprecationWarning)
+        warnings.warn('DEPRECATED: this method should not be used',
+                      DeprecationWarning)
         to_remove = []
         for ann in self.dataset['annotations']:
             if ann['image_id'] is None or ann['category_id'] is None:
@@ -912,7 +916,8 @@ class MixinCocoDepricate(object):
 
     def _remove_radius_annotations(self, rebuild=False):
         import warnings
-        warnings.warn('DEPRECATED: this method should not be used', DeprecationWarning)
+        warnings.warn('DEPRECATED: this method should not be used',
+                      DeprecationWarning)
         to_remove = []
         for ann in self.dataset['annotations']:
             if 'radius' in ann:
@@ -924,7 +929,8 @@ class MixinCocoDepricate(object):
 
     def _remove_empty_images(self):
         import warnings
-        warnings.warn('DEPRECATED: this method should not be used', DeprecationWarning)
+        warnings.warn('DEPRECATED: this method should not be used',
+                      DeprecationWarning)
         to_remove = []
         for gid in self.imgs.keys():
             aids = self.gid_to_aids.get(gid, [])
@@ -936,23 +942,64 @@ class MixinCocoDepricate(object):
         self._build_index()
 
 
-class MixinCocoExtras(object):
+class MixinCocoJSONAccessors(object):
     """
-    Misc functions for coco
+    TODO: better name.
+
+    The modivation is that we want to define an API that we can conform to
+    with either json or sql backends.
     """
 
-    def load_image(self, gid_or_img):
+    def iter_images(self):
+        if self.index.imgs is not None:
+            return self.index.imgs.values()
+        else:
+            return iter(self.dataset['images'])
+
+    def iter_categories(self):
+        if self.index.imgs is not None:
+            return self.index.cats.values()
+        else:
+            return iter(self.dataset['categories'])
+
+    def iter_annotations(self):
+        if self.index.imgs is not None:
+            return self.index.anns.values()
+        else:
+            return iter(self.dataset['annotations'])
+
+    def iter_videos(self):
+        if self.index.imgs is not None:
+            return self.index.videos.values()
+        else:
+            return iter(self.dataset['videos'])
+
+    def iter_keypoint_categories(self):
+        if self.index.kpcats is not None:
+            return self.index.kpcats.values()
+        else:
+            return iter(self.dataset['keypoint_categories'])
+
+
+class MixinCocoAccessors(object):
+    """
+    TODO: better name
+    """
+
+    def load_image(self, gid_or_img, channels=None):
         """
         Reads an image from disk and
 
         Args:
             gid_or_img (int or dict): image id or image dict
+            channels (str | None): if specified, load data from an auxillary
+                channels instead
 
         Returns:
             np.ndarray : the image
         """
         import kwimage
-        gpath = self.get_image_fpath(gid_or_img)
+        gpath = self.get_image_fpath(gid_or_img, channels=channels)
         np_img = kwimage.imread(gpath)
         return np_img
 
@@ -963,18 +1010,23 @@ class MixinCocoExtras(object):
             DeprecationWarning)
         return self.get_image_fpath(gid_or_img)
 
-    def get_image_fpath(self, gid_or_img):
+    def get_image_fpath(self, gid_or_img, channels=None):
         """
         Returns the full path to the image
 
         Args:
             gid_or_img (int or dict): image id or image dict
+            channels (str, default=None): if specified, return a path to data
+                containing auxillary channels instead
 
         Returns:
             PathLike: full path to the image
         """
-        img = self._resolve_to_img(gid_or_img)
-        gpath = join(self.img_root, img['file_name'])
+        if channels is not None:
+            gpath = self.get_auxiliary_fpath(gid_or_img, channels)
+        else:
+            img = self._resolve_to_img(gid_or_img)
+            gpath = join(self.img_root, img['file_name'])
         return gpath
 
     def _get_img_auxiliary(self, gid_or_img, channels):
@@ -992,7 +1044,8 @@ class MixinCocoExtras(object):
                 found = aux
                 break
         if found is None:
-            raise Exception('Image does not have auxiliary channels={}'.format(channels))
+            raise Exception(
+                'Image does not have auxiliary channels={}'.format(channels))
         return found
 
     def get_auxiliary_fpath(self, gid_or_img, channels):
@@ -1054,6 +1107,366 @@ class MixinCocoExtras(object):
         }
         return sample
 
+    def _resolve_to_id(self, id_or_dict):
+        """
+        Ensures output is an id
+        """
+        if isinstance(id_or_dict, INT_TYPES):
+            resolved_id = id_or_dict
+        else:
+            resolved_id = id_or_dict['id']
+        return resolved_id
+
+    def _resolve_to_cid(self, id_or_name_or_dict):
+        """
+        Ensures output is an category id
+
+        Note: this does not resolve aliases (yet), for that see _alias_to_cat
+        Todo: we could maintain an alias index to make this fast
+        """
+        if isinstance(id_or_name_or_dict, INT_TYPES):
+            resolved_id = id_or_name_or_dict
+        elif isinstance(id_or_name_or_dict, six.string_types):
+            resolved_id = self.index.name_to_cat[id_or_name_or_dict]['id']
+        else:
+            resolved_id = id_or_name_or_dict['id']
+        return resolved_id
+
+    def _resolve_to_gid(self, id_or_name_or_dict):
+        """
+        Ensures output is an category id
+        """
+        if isinstance(id_or_name_or_dict, INT_TYPES):
+            resolved_id = id_or_name_or_dict
+        elif isinstance(id_or_name_or_dict, six.string_types):
+            resolved_id = self.index.file_name_to_img[id_or_name_or_dict]['id']
+        else:
+            resolved_id = id_or_name_or_dict['id']
+        return resolved_id
+
+    def _resolve_to_vidid(self, id_or_name_or_dict):
+        """
+        Ensures output is an video id
+        """
+        if isinstance(id_or_name_or_dict, INT_TYPES):
+            resolved_id = id_or_name_or_dict
+        elif isinstance(id_or_name_or_dict, six.string_types):
+            resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']
+        else:
+            resolved_id = id_or_name_or_dict['id']
+        return resolved_id
+
+    def _resolve_to_ann(self, aid_or_ann):
+        """
+        Ensures output is an annotation dictionary
+        """
+        if isinstance(aid_or_ann, INT_TYPES):
+            resolved_ann = None
+            if self.anns is not None:
+                resolved_ann = self.anns[aid_or_ann]
+            else:
+                for ann in self.dataset['annotations']:
+                    if ann['id'] == aid_or_ann:
+                        resolved_ann = ann
+                        break
+                if not resolved_ann:
+                    raise IndexError(
+                        'aid {} not in dataset'.format(aid_or_ann))
+        else:
+            resolved_ann = aid_or_ann
+        return resolved_ann
+
+    def _resolve_to_img(self, gid_or_img):
+        """
+        Ensures output is an image dictionary
+        """
+        if isinstance(gid_or_img, INT_TYPES):
+            resolved_img = None
+            if self.imgs is not None:
+                resolved_img = self.imgs[gid_or_img]
+            else:
+                for img in self.iter_images():
+                    if img['id'] == gid_or_img:
+                        resolved_img = img
+                        break
+                if not resolved_img:
+                    raise IndexError(
+                        'gid {} not in dataset'.format(gid_or_img))
+        else:
+            resolved_img = gid_or_img
+        return resolved_img
+
+    def _resolve_to_kpcat(self, kp_identifier):
+        """
+        Lookup a keypoint-category dict via its name or id
+
+        Args:
+            kp_identifier (int | str | dict): either the keypoint category
+                name, alias, or its keypoint_category_id.
+
+        Returns:
+            Dict: keypoint category dictionary
+
+        Example:
+            >>> self = CocoDataset.demo('shapes')
+            >>> kpcat1 = self._resolve_to_kpcat(1)
+            >>> kpcat2 = self._resolve_to_kpcat('left_eye')
+            >>> assert kpcat1 is kpcat2
+            >>> import pytest
+            >>> with pytest.raises(KeyError):
+            >>>     self._resolve_to_cat('human')
+        """
+        if 'keypoint_categories' not in self.dataset:
+            raise NotImplementedError('Must have newstyle keypoints to use')
+
+        # TODO: add keypoint categories to the index and optimize
+        if isinstance(kp_identifier, INT_TYPES):
+            kpcat = None
+            for _kpcat in self.dataset['keypoint_categories']:
+                if _kpcat['id'] == kp_identifier:
+                    kpcat = _kpcat
+            if kpcat is None:
+                raise KeyError('unable to find keypoint category')
+        elif isinstance(kp_identifier, six.string_types):
+            kpcat = None
+            for _kpcat in self.dataset['keypoint_categories']:
+                if _kpcat['name'] == kp_identifier:
+                    kpcat = _kpcat
+            if kpcat is None:
+                for _kpcat in self.dataset['keypoint_categories']:
+                    alias = _kpcat.get('alias', {})
+                    alias = alias if ub.iterable(alias) else {alias}
+                    if kp_identifier in alias:
+                        kpcat = _kpcat
+            if kpcat is None:
+                raise KeyError('unable to find keypoint category')
+        elif isinstance(kp_identifier, dict):
+            kpcat = kp_identifier
+        else:
+            raise TypeError(type(kp_identifier))
+        return kpcat
+
+    def _resolve_to_cat(self, cat_identifier):
+        """
+        Lookup a coco-category dict via its name, alias, or id.
+
+        Args:
+            cat_identifier (int | str | dict): either the category name,
+                alias, or its category_id.
+
+        Raises:
+            KeyError: if the category doesn't exist.
+
+        Notes:
+            If the index is not built, the method will work but may be slow.
+
+        Example:
+            >>> self = CocoDataset.demo()
+            >>> cat = self._resolve_to_cat('human')
+            >>> import pytest
+            >>> assert self._resolve_to_cat(cat['id']) is cat
+            >>> assert self._resolve_to_cat(cat) is cat
+            >>> with pytest.raises(KeyError):
+            >>>     self._resolve_to_cat(32)
+            >>> self.index.clear()
+            >>> assert self._resolve_to_cat(cat['id']) is cat
+            >>> with pytest.raises(KeyError):
+            >>>     self._resolve_to_cat(32)
+        """
+        if isinstance(cat_identifier, INT_TYPES):
+            if self.cats:
+                cat = self.cats[cat_identifier]
+            else:
+                # If the index is not built
+                found = None
+                for cat in self.dataset['categories']:
+                    if cat['id'] == cat_identifier:
+                        found = cat
+                        break
+                if found is None:
+                    raise KeyError(
+                        'Cannot find a category with id={}'.format(cat_identifier))
+        elif isinstance(cat_identifier, six.string_types):
+            cat = self._alias_to_cat(cat_identifier)
+        elif isinstance(cat_identifier, dict):
+            cat = cat_identifier
+        else:
+            raise TypeError(type(cat_identifier))
+        return cat
+
+    def _alias_to_cat(self, alias_catname):
+        """
+        Lookup a coco-category via its name or an "alias" name.
+        In production code, use :method:`_resolve_to_cat` instead.
+
+        Args:
+            alias_catname (str): category name or alias
+
+        Returns:
+            dict: coco category dictionary
+
+        Example:
+            >>> self = CocoDataset.demo()
+            >>> cat = self._alias_to_cat('human')
+            >>> import pytest
+            >>> with pytest.raises(KeyError):
+            >>>     self._alias_to_cat('person')
+            >>> cat['alias'] = ['person']
+            >>> self._alias_to_cat('person')
+            >>> cat['alias'] = 'person'
+            >>> self._alias_to_cat('person')
+            >>> assert self._alias_to_cat(None) is None
+        """
+        if alias_catname is None:
+            return None
+        if self.name_to_cat and alias_catname in self.name_to_cat:
+            fixed_catname = alias_catname
+            fixed_cat = self.name_to_cat[fixed_catname]
+        else:
+            # Try to find an alias
+            fixed_catname = None
+            fixed_cat = None
+            for cat in self.dataset['categories']:
+                alias_list = cat.get('alias', [])
+                if isinstance(alias_list, six.string_types):
+                    alias_list = [alias_list]
+                assert isinstance(alias_list, list)
+                alias_list = alias_list + [cat['name']]
+                for alias in alias_list:
+                    if alias_catname.lower() == alias.lower():
+                        fixed_cat = cat
+                        fixed_catname = cat['name']
+                        break
+                if fixed_cat is not None:
+                    break
+
+            if fixed_cat is None:
+                raise KeyError('Unknown category: {}'.format(alias_catname))
+
+        return fixed_cat
+
+    def category_graph(self):
+        """
+        Construct a networkx category hierarchy
+
+        Returns:
+            network.DiGraph: graph: a directed graph where category names are
+                the nodes, supercategories define edges, and items in each
+                category dict (e.g. category id) are added as node properties.
+
+        Example:
+            >>> self = CocoDataset.demo()
+            >>> graph = self.category_graph()
+            >>> assert 'astronaut' in graph.nodes()
+            >>> assert 'keypoints' in graph.nodes['human']
+
+            import graphid
+            graphid.util.show_nx(graph)
+        """
+        # TODO: should supercategories that don't exist as nodes be added here?
+        import networkx as nx
+        graph = nx.DiGraph()
+        for cat in self.iter_categories():
+            graph.add_node(cat['name'], **cat)
+            if cat.get('supercategory', None) is not None:
+                u = cat['supercategory']
+                v = cat['name']
+                if u != v:
+                    graph.add_edge(u, v)
+        return graph
+
+    def object_categories(self):
+        """
+        Construct a consistent CategoryTree representation of object classes
+
+        Returns:
+            kwcoco.CategoryTree: category data structure
+
+        Example:
+            >>> self = CocoDataset.demo()
+            >>> classes = self.object_categories()
+            >>> print('classes = {}'.format(classes))
+        """
+        from kwcoco.category_tree import CategoryTree
+        graph = self.category_graph()
+        classes = CategoryTree(graph)
+        return classes
+
+    def keypoint_categories(self):
+        """
+        Construct a consistent CategoryTree representation of keypoint classes
+
+        Returns:
+            kwcoco.CategoryTree: category data structure
+
+        Example:
+            >>> self = CocoDataset.demo()
+            >>> classes = self.keypoint_categories()
+            >>> print('classes = {}'.format(classes))
+        """
+        from kwcoco.category_tree import CategoryTree
+        try:
+            kpcats = self.iter_keypoint_categories()
+        except KeyError:
+            catnames = self._keypoint_category_names()
+            classes = CategoryTree.coerce(catnames)
+        else:
+            import networkx as nx
+            graph = nx.DiGraph()
+            for cat in kpcats:
+                graph.add_node(cat['name'], **cat)
+                if cat.get('supercategory', None) is not None:
+                    graph.add_edge(cat['supercategory'], cat['name'])
+            classes = CategoryTree(graph)
+        return classes
+
+    def _keypoint_category_names(self):
+        """
+        Construct keypoint categories names.
+
+        Uses new-style if possible, otherwise this falls back on old-style.
+
+        Returns:
+            List[str]: names: list of keypoint category names
+
+        Example:
+            >>> self = CocoDataset.demo()
+            >>> names = self._keypoint_category_names()
+            >>> print(names)
+        """
+        kpcats = self.dataset.get('keypoint_categories', None)
+        if kpcats is not None:
+            return [c['name'] for c in self.dataset['keypoint_categories']]
+        else:
+            names = []
+            cats = sorted(self.iter_categories(), key=lambda c: c['id'])
+            for cat in cats:
+                if 'keypoints' in cat:
+                    names.extend(cat['keypoints'])
+            return names
+
+    def _lookup_kpnames(self, cid):
+        """ Get the keypoint categories for a certain class """
+        kpnames = None
+        orig_cat = self.cats[cid]
+        while kpnames is None:
+            # Extract keypoint names for each annotation
+            cat = self.cats[cid]
+            parent = cat.get('supercategory', None)
+            if 'keypoints' in cat:
+                kpnames = cat['keypoints']
+            elif parent is not None:
+                cid = self.name_to_cat[cat['supercategory']]['id']
+            else:
+                raise KeyError('could not find keypoint names for cid={}, cat={}, orig_cat={}'.format(cid, cat, orig_cat))
+        return kpnames
+
+
+class MixinCocoExtras(object):
+    """
+    Misc functions for coco
+    """
+
     @classmethod
     def coerce(cls, key, **kw):
         if isinstance(key, cls):
@@ -1061,7 +1474,7 @@ class MixinCocoExtras(object):
         elif key.startswith('special:'):
             demokey = key.split(':')[1]
             self = cls.demo(key=demokey, **kw)
-        elif key.endswith('.json'):
+        elif key.endswith('.json') or '.json.' in key:
             self = cls(key, **kw)
         else:
             self = cls.demo(key=key, **kw)
@@ -1085,8 +1498,10 @@ class MixinCocoExtras(object):
 
         Example:
             >>> import kwcoco
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5, verbose=0, rng=None)
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5, num_tracks=4, verbose=0, rng=44)
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5,
+            >>>                                verbose=0, rng=None)
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5,
+            >>>                                num_tracks=4, verbose=0, rng=44)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -1210,6 +1625,10 @@ class MixinCocoExtras(object):
             >>> self = CocoDataset.demo()
             >>> self._build_hashid(hash_pixels=True, verbose=3)
             ...
+            >>> # Note: kwimage has changes the name of carl.png to carl.jpg
+            >>> # in 0.7.0, so that modifies some of the hash. Once 0.7.0
+            >>> # is landed, we can update this test to re-check for
+            >>> # those hashes.
             >>> print('self.hashid_parts = ' + ub.repr2(self.hashid_parts))
             >>> print('self.hashid = {!r}'.format(self.hashid))
             self.hashid_parts = {
@@ -1219,7 +1638,7 @@ class MixinCocoExtras(object):
                 },
                 'images': {
                     'pixels': '67d741fefc8...',
-                    'json': '6a446126490aa...',
+                    'json': '...',
                     'num': 3,
                 },
                 'categories': {
@@ -1227,7 +1646,16 @@ class MixinCocoExtras(object):
                     'num': 8,
                 },
             }
+            self.hashid = '...
+
+            # Old
+            'json': '6a446126490aa...',
             self.hashid = '4769119614e921...
+
+            # New
+            json': '2221c71496a0...
+            self.hashid = '77d445f05...
+
 
         Doctest:
             >>> self = CocoDataset.demo()
@@ -1424,357 +1852,6 @@ class MixinCocoExtras(object):
                     job.img['height'] = h
         return bad_images
 
-    def _resolve_to_id(self, id_or_dict):
-        """
-        Ensures output is an id
-        """
-        if isinstance(id_or_dict, INT_TYPES):
-            resolved_id = id_or_dict
-        else:
-            resolved_id = id_or_dict['id']
-        return resolved_id
-
-    def _resolve_to_cid(self, id_or_name_or_dict):
-        """
-        Ensures output is an category id
-
-        Note: this does not resolve aliases (yet), for that see _alias_to_cat
-        Todo: we could maintain an alias index to make this fast
-        """
-        if isinstance(id_or_name_or_dict, INT_TYPES):
-            resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
-            resolved_id = self.index.name_to_cat[id_or_name_or_dict]['id']
-        else:
-            resolved_id = id_or_name_or_dict['id']
-        return resolved_id
-
-    def _resolve_to_gid(self, id_or_name_or_dict):
-        """
-        Ensures output is an category id
-        """
-        if isinstance(id_or_name_or_dict, INT_TYPES):
-            resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
-            resolved_id = self.index.file_name_to_img[id_or_name_or_dict]['id']
-        else:
-            resolved_id = id_or_name_or_dict['id']
-        return resolved_id
-
-    def _resolve_to_vidid(self, id_or_name_or_dict):
-        """
-        Ensures output is an video id
-        """
-        if isinstance(id_or_name_or_dict, INT_TYPES):
-            resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
-            resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']
-        else:
-            resolved_id = id_or_name_or_dict['id']
-        return resolved_id
-
-    def _resolve_to_ann(self, aid_or_ann):
-        """
-        Ensures output is an annotation dictionary
-        """
-        if isinstance(aid_or_ann, INT_TYPES):
-            resolved_ann = None
-            if self.anns is not None:
-                resolved_ann = self.anns[aid_or_ann]
-            else:
-                for ann in self.dataset['annotations']:
-                    if ann['id'] == aid_or_ann:
-                        resolved_ann = ann
-                        break
-                if not resolved_ann:
-                    raise IndexError(
-                        'aid {} not in dataset'.format(aid_or_ann))
-        else:
-            resolved_ann = aid_or_ann
-        return resolved_ann
-
-    def _resolve_to_img(self, gid_or_img):
-        """
-        Ensures output is an image dictionary
-        """
-        if isinstance(gid_or_img, INT_TYPES):
-            resolved_img = None
-            if self.imgs is not None:
-                resolved_img = self.imgs[gid_or_img]
-            else:
-                for img in self.dataset['images']:
-                    if img['id'] == gid_or_img:
-                        resolved_img = img
-                        break
-                if not resolved_img:
-                    raise IndexError(
-                        'gid {} not in dataset'.format(gid_or_img))
-        else:
-            resolved_img = gid_or_img
-        return resolved_img
-
-    def _resolve_to_kpcat(self, kp_identifier):
-        """
-        Lookup a keypoint-category dict via its name or id
-
-        Args:
-            kp_identifier (int | str | dict): either the keypoint category
-                name, alias, or its keypoint_category_id.
-
-        Returns:
-            Dict: keypoint category dictionary
-
-        Example:
-            >>> self = CocoDataset.demo('shapes')
-            >>> kpcat1 = self._resolve_to_kpcat(1)
-            >>> kpcat2 = self._resolve_to_kpcat('left_eye')
-            >>> assert kpcat1 is kpcat2
-            >>> import pytest
-            >>> with pytest.raises(KeyError):
-            >>>     self._resolve_to_cat('human')
-        """
-        if 'keypoint_categories' not in self.dataset:
-            raise NotImplementedError('Must have newstyle keypoints to use')
-
-        # TODO: add keypoint categories to the index and optimize
-        if isinstance(kp_identifier, INT_TYPES):
-            kpcat = None
-            for _kpcat in self.dataset['keypoint_categories']:
-                if _kpcat['id'] == kp_identifier:
-                    kpcat = _kpcat
-            if kpcat is None:
-                raise KeyError('unable to find keypoint category')
-        elif isinstance(kp_identifier, six.string_types):
-            kpcat = None
-            for _kpcat in self.dataset['keypoint_categories']:
-                if _kpcat['name'] == kp_identifier:
-                    kpcat = _kpcat
-            if kpcat is None:
-                for _kpcat in self.dataset['keypoint_categories']:
-                    alias = _kpcat.get('alias', {})
-                    alias = alias if ub.iterable(alias) else {alias}
-                    if kp_identifier in alias:
-                        kpcat = _kpcat
-            if kpcat is None:
-                raise KeyError('unable to find keypoint category')
-        elif isinstance(kp_identifier, dict):
-            kpcat = kp_identifier
-        else:
-            raise TypeError(type(kp_identifier))
-        return kpcat
-
-    def _resolve_to_cat(self, cat_identifier):
-        """
-        Lookup a coco-category dict via its name, alias, or id.
-
-        Args:
-            cat_identifier (int | str | dict): either the category name,
-                alias, or its category_id.
-
-        Raises:
-            KeyError: if the category doesn't exist.
-
-        Notes:
-            If the index is not built, the method will work but may be slow.
-
-        Example:
-            >>> self = CocoDataset.demo()
-            >>> cat = self._resolve_to_cat('human')
-            >>> import pytest
-            >>> assert self._resolve_to_cat(cat['id']) is cat
-            >>> assert self._resolve_to_cat(cat) is cat
-            >>> with pytest.raises(KeyError):
-            >>>     self._resolve_to_cat(32)
-            >>> self.index.clear()
-            >>> assert self._resolve_to_cat(cat['id']) is cat
-            >>> with pytest.raises(KeyError):
-            >>>     self._resolve_to_cat(32)
-        """
-        if isinstance(cat_identifier, INT_TYPES):
-            if self.cats:
-                cat = self.cats[cat_identifier]
-            else:
-                # If the index is not built
-                found = None
-                for cat in self.dataset['categories']:
-                    if cat['id'] == cat_identifier:
-                        found = cat
-                        break
-                if found is None:
-                    raise KeyError(
-                        'Cannot find a category with id={}'.format(cat_identifier))
-        elif isinstance(cat_identifier, six.string_types):
-            cat = self._alias_to_cat(cat_identifier)
-        elif isinstance(cat_identifier, dict):
-            cat = cat_identifier
-        else:
-            raise TypeError(type(cat_identifier))
-        return cat
-
-    def _alias_to_cat(self, alias_catname):
-        """
-        Lookup a coco-category via its name or an "alias" name.
-        In production code, use :method:`_resolve_to_cat` instead.
-
-        Args:
-            alias_catname (str): category name or alias
-
-        Returns:
-            dict: coco category dictionary
-
-        Example:
-            >>> self = CocoDataset.demo()
-            >>> cat = self._alias_to_cat('human')
-            >>> import pytest
-            >>> with pytest.raises(KeyError):
-            >>>     self._alias_to_cat('person')
-            >>> cat['alias'] = ['person']
-            >>> self._alias_to_cat('person')
-            >>> cat['alias'] = 'person'
-            >>> self._alias_to_cat('person')
-            >>> assert self._alias_to_cat(None) is None
-        """
-        if alias_catname is None:
-            return None
-        if self.name_to_cat and alias_catname in self.name_to_cat:
-            fixed_catname = alias_catname
-            fixed_cat = self.name_to_cat[fixed_catname]
-        else:
-            # Try to find an alias
-            fixed_catname = None
-            fixed_cat = None
-            for cat in self.dataset['categories']:
-                alias_list = cat.get('alias', [])
-                if isinstance(alias_list, six.string_types):
-                    alias_list = [alias_list]
-                assert isinstance(alias_list, list)
-                alias_list = alias_list + [cat['name']]
-                for alias in alias_list:
-                    if alias_catname.lower() == alias.lower():
-                        fixed_cat = cat
-                        fixed_catname = cat['name']
-                        break
-                if fixed_cat is not None:
-                    break
-
-            if fixed_cat is None:
-                raise KeyError('Unknown category: {}'.format(alias_catname))
-
-        return fixed_cat
-
-    def category_graph(self):
-        """
-        Construct a networkx category hierarchy
-
-        Returns:
-            network.DiGraph: graph: a directed graph where category names are
-                the nodes, supercategories define edges, and items in each
-                category dict (e.g. category id) are added as node properties.
-
-        Example:
-            >>> self = CocoDataset.demo()
-            >>> graph = self.category_graph()
-            >>> assert 'astronaut' in graph.nodes()
-            >>> assert 'keypoints' in graph.nodes['human']
-
-            import graphid
-            graphid.util.show_nx(graph)
-        """
-        # TODO: should supercategories that don't exist as nodes be added here?
-        import networkx as nx
-        graph = nx.DiGraph()
-        for cat in self.dataset['categories']:
-            graph.add_node(cat['name'], **cat)
-            if 'supercategory' in cat:
-                u = cat['supercategory']
-                v = cat['name']
-                if u != v:
-                    graph.add_edge(u, v)
-        return graph
-
-    def object_categories(self):
-        """
-        Construct a consistent CategoryTree representation of object classes
-
-        Returns:
-            kwcoco.CategoryTree: category data structure
-
-        Example:
-            >>> self = CocoDataset.demo()
-            >>> classes = self.object_categories()
-            >>> print('classes = {}'.format(classes))
-        """
-        from kwcoco.category_tree import CategoryTree
-        graph = self.category_graph()
-        classes = CategoryTree(graph)
-        return classes
-
-    def keypoint_categories(self):
-        """
-        Construct a consistent CategoryTree representation of keypoint classes
-
-        Returns:
-            kwcoco.CategoryTree: category data structure
-
-        Example:
-            >>> self = CocoDataset.demo()
-            >>> classes = self.keypoint_categories()
-            >>> print('classes = {}'.format(classes))
-        """
-        from kwcoco.category_tree import CategoryTree
-        if 'keypoint_categories' in self.dataset:
-            import networkx as nx
-            graph = nx.DiGraph()
-            for cat in self.dataset['keypoint_categories']:
-                graph.add_node(cat['name'], **cat)
-                if 'supercategory' in cat:
-                    graph.add_edge(cat['supercategory'], cat['name'])
-            classes = CategoryTree(graph)
-        else:
-            catnames = self._keypoint_category_names()
-            classes = CategoryTree.coerce(catnames)
-        return classes
-
-    def _keypoint_category_names(self):
-        """
-        Construct keypoint categories names.
-
-        Uses new-style if possible, otherwise this falls back on old-style.
-
-        Returns:
-            List[str]: names: list of keypoint category names
-
-        Example:
-            >>> self = CocoDataset.demo()
-            >>> names = self._keypoint_category_names()
-            >>> print(names)
-        """
-        if 'keypoint_categories' in self.dataset:
-            return [c['name'] for c in self.dataset['keypoint_categories']]
-        else:
-            names = []
-            cats = sorted(self.dataset['categories'], key=lambda c: c['id'])
-            for cat in cats:
-                if 'keypoints' in cat:
-                    names.extend(cat['keypoints'])
-            return names
-
-    def _lookup_kpnames(self, cid):
-        """ Get the keypoint categories for a certain class """
-        kpnames = None
-        orig_cat = self.cats[cid]
-        while kpnames is None:
-            # Extract keypoint names for each annotation
-            cat = self.cats[cid]
-            parent = cat.get('supercategory', None)
-            if 'keypoints' in cat:
-                kpnames = cat['keypoints']
-            elif parent is not None:
-                cid = self.name_to_cat[cat['supercategory']]['id']
-            else:
-                raise KeyError('could not find keypoint names for cid={}, cat={}, orig_cat={}'.format(cid, cat, orig_cat))
-        return kpnames
-
     def _ensure_image_data(self, gids=None, verbose=1):
         """
         Download data from "url" fields if specified.
@@ -1783,7 +1860,7 @@ class MixinCocoExtras(object):
             gids (List): subset of images to download
         """
         def _gen_missing_imgs():
-            for img in self.dataset['images']:
+            for img in self.iter_images():
                 gpath = join(self.img_root, img['file_name'])
                 if not exists(gpath):
                     yield img
@@ -2914,7 +2991,7 @@ class MixinCocoDraw(object):
         """
         return self.load_image(gid)
 
-    def draw_image(self, gid):
+    def draw_image(self, gid, channels=None):
         """
         Use kwimage to draw all annotations on an image and return the pixels
         as a numpy array.
@@ -2934,7 +3011,9 @@ class MixinCocoDraw(object):
         """
         import kwimage
         # Load the raw image pixels
-        canvas = self.load_image(gid)
+        canvas = self.load_image(gid, channels=channels)
+        # TODO: account for auxilliary transforms if the exist
+
         # Get annotation IDs from this image
         aids = self.index.gid_to_aids[gid]
         # Grab relevant annotation dictionaries
@@ -2963,7 +3042,7 @@ class MixinCocoDraw(object):
         canvas = dets.draw_on(canvas)
         return canvas
 
-    def show_image(self, gid=None, aids=None, aid=None, **kwargs):
+    def show_image(self, gid=None, aids=None, aid=None, channels=None, **kwargs):
         """
         Use matplotlib to show an image with annotations overlaid
 
@@ -3111,7 +3190,7 @@ class MixinCocoDraw(object):
                                 for (kp_x, kp_y), kpname in zip(xys, kpnames):
                                     texts.append((kp_x, kp_y, kpname, textkw))
 
-                if 'segmentation' in ann and kwargs.get('show_segmentation', True):
+                if ann.get('segmentation', None) is not None and kwargs.get('show_segmentation', True):
                     sseg = ann['segmentation']
                     # Respect the 'color' attribute of categories
                     if cat is not None:
@@ -3175,7 +3254,7 @@ class MixinCocoDraw(object):
                             raise TypeError(type(sseg))
 
         # Show image
-        np_img = self.load_image(img)
+        np_img = self.load_image(img, channels=channels)
 
         np_img = kwimage.atleast_3channels(np_img)
 
@@ -3940,6 +4019,7 @@ class CocoIndex(object):
         index.imgs = None
         index.videos = None
         index.cats = None
+        index.kpcats = None
         index._id_lookup = None
 
         index.gid_to_aids = None
@@ -4187,6 +4267,7 @@ class CocoIndex(object):
         index.imgs = None
         index.videos = None
         index.cats = None
+        index.kpcats = None
         index._id_lookup = None
         index.gid_to_aids = None
         index.vidid_to_gids = None
@@ -4333,6 +4414,7 @@ class CocoIndex(object):
         index.anns = anns
         index.imgs = imgs
         index.cats = cats
+        index.kpcats = None  # TODO
         index.videos = videos
 
         # Remove defaultdict like behavior
@@ -4386,8 +4468,9 @@ class MixinCocoIndex(object):
 
 
 class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
-                  MixinCocoAttrs, MixinCocoDraw, MixinCocoExtras,
-                  MixinCocoIndex, MixinCocoDepricate):
+                  MixinCocoAttrs, MixinCocoDraw, MixinCocoJSONAccessors,
+                  MixinCocoAccessors, MixinCocoExtras, MixinCocoIndex,
+                  MixinCocoDepricate):
     """
     Notes:
         A keypoint annotation

@@ -3,11 +3,20 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import warnings
 import numpy as np
 import ubelt as ub
+import os
+
+
+# TODO : should we use locale or a ASCII_ONLY environ?
+# For now lets just expose this environ, even if it is not standard
+# ideally we would find a standard environ like NO_COLOR to accomplish this
+# https://stackoverflow.com/questions/3425294/how-to-detect-the-os-default-language-in-python
+ASCII_ONLY = os.environ.get('ASCII_ONLY', '')
 
 
 def classification_report(y_true, y_pred, target_names=None,
                           sample_weight=None, verbose=False,
-                          remove_unsupported=False, log=None):
+                          remove_unsupported=False, log=None,
+                          ascii_only=False):
     """
     Computes a classification report which is a collection of various metrics
     commonly used to evaulate classification quality. This can handle binary
@@ -26,6 +35,19 @@ def classification_report(y_true, y_pred, target_names=None,
         Jurman, Riccadonna, Furlanello, (2012). A Comparison of MCC and CEN
             Error Measures in MultiClass Prediction
 
+    Args:
+        y_true (array): true labels for each item
+        y_pred (array): predicted labels for each item
+        target_names (List): mapping from label to category name
+        sample_weight (ndarray): weight for each item
+        verbose (False): print if True
+        log (callable): print or logging function
+        remove_unsupported (bool, default=False): removes categories that have
+            no support.
+        ascii_only (bool, default=False): if True dont use unicode characters.
+            if the environ ASCII_ONLY is present this is forced to True and
+            cannot be undone.
+
     Example:
         >>> # xdoctest: +IGNORE_WANT
         >>> # xdoctest: +REQUIRES(module:sklearn)
@@ -34,7 +56,7 @@ def classification_report(y_true, y_pred, target_names=None,
         >>> y_pred = [1, 2, 1, 3, 1, 2, 2, 3, 2, 2, 3, 3, 2, 3, 3, 3, 1, 3]
         >>> target_names = None
         >>> sample_weight = None
-        >>> report = classification_report(y_true, y_pred, verbose=0)
+        >>> report = classification_report(y_true, y_pred, verbose=0, ascii_only=1)
         >>> print(report['confusion'])
         pred  1  2  3  Σr
         real
@@ -49,6 +71,19 @@ def classification_report(y_true, y_pred, target_names=None,
         2            0.6667  0.8000 0.1538      0.5833     0.6462 0.6139        5
         3            0.7500  0.7500 0.2000      0.5500     0.5500 0.5500        8
         combined     0.7269  0.7222 0.1530      0.5751     0.5761 0.5758       18
+
+    Example:
+        >>> # xdoctest: +IGNORE_WANT
+        >>> # xdoctest: +REQUIRES(module:sklearn)
+        >>> # xdoctest: +REQUIRES(module:pandas)
+        >>> from kwcoco.metrics.clf_report import *  # NOQA
+        >>> y_true = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3]
+        >>> y_pred = [1, 2, 1, 3, 1, 2, 2, 3, 2, 2, 3, 3, 2, 3, 3, 3, 1, 3]
+        >>> target_names = None
+        >>> sample_weight = None
+        >>> logs = []
+        >>> report = classification_report(y_true, y_pred, verbose=1, ascii_only=True, log=logs.append)
+        >>> print('\n'.join(logs))
 
     Ignore:
         >>> size = 100
@@ -79,6 +114,9 @@ def classification_report(y_true, y_pred, target_names=None,
     import scipy as sp  # NOQA
     import sklearn.metrics
     from sklearn.preprocessing import LabelEncoder
+
+    if ASCII_ONLY:
+        ascii_only = True
 
     if verbose or log:
         if log is None:
@@ -283,9 +321,18 @@ def classification_report(y_true, y_pred, target_names=None,
     real_id = ['%s' % m for m in target_names]
     confusion_df = pd.DataFrame(confusion, columns=pred_id, index=real_id)
 
+    if ascii_only :
+        sum_glyph = 'sum-'
+    else:
+        sum_glyph = 'Σ'
+
+    sum_real_key = sum_glyph + 'r'
+    sum_pred_key = sum_glyph + 'p'
+
     confusion_df = confusion_df.append(pd.DataFrame(
-        [confusion.sum(axis=0)], columns=pred_id, index=['Σp']))
-    confusion_df['Σr'] = np.hstack([confusion.sum(axis=1), [0]])
+        [confusion.sum(axis=0)], columns=pred_id, index=[sum_pred_key]))
+
+    confusion_df[sum_real_key] = np.hstack([confusion.sum(axis=1), [0]])
     confusion_df.index.name = 'real'
     confusion_df.columns.name = 'pred'
 
@@ -299,8 +346,13 @@ def classification_report(y_true, y_pred, target_names=None,
         confusion_df = confusion_df.astype(np.int)
 
     if verbose:
+        if ascii_only:
+            times_glyph = 'x'
+        else:
+            times_glyph = '×'
+
         cfsm_str = confusion_df.to_string(float_format=lambda x: '%.1f' % (x,))
-        log('Confusion Matrix (real × pred) :\n' + ub.indent(cfsm_str))
+        log('Confusion Matrix (real ' + times_glyph + ' pred) :\n' + ub.indent(cfsm_str))
 
         # ut.cprint('\nExtended Report', 'turquoise')
         float_precision = 2

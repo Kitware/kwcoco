@@ -12,7 +12,7 @@ class CocoStatsCLI:
         Compute summary statistics about a COCO dataset
         """
         default = {
-            'src': scfg.Value(['special:shapes8'], nargs='+', help='path to dataset'),
+            'src': scfg.Value(['special:shapes8'], nargs='+', help='path to dataset', position=1),
             'basic': scfg.Value(True, help='show basic stats'),
             'extended': scfg.Value(True, help='show extended stats'),
             'catfreq': scfg.Value(True, help='show category frequency stats'),
@@ -102,7 +102,7 @@ class CocoStatsCLI:
                         if value:
                             attrs[key] += 1
 
-                print('annot attrs = {!r}'.format(attrs))
+                print('annot_attrs = {}'.format(ub.repr2(attrs, nl=1)))
 
         if config['boxes']:
             print('Box stats')
@@ -146,6 +146,6 @@ _CLI = CocoStatsCLI
 if __name__ == '__main__':
     """
     CommandLine:
-        python -m kwcoco.coco_stats --src=special:shapes8
+        python -m kwcoco.cli.coco_stats --src=special:shapes8
     """
-    _CLI._main()
+    _CLI.main()

@@ -208,10 +208,12 @@ class CategoryPatterns(object):
 
         TODO: rectify with _from_elem
 
-        >>> self = CategoryPatterns.coerce(['superstar'])
-        >>> dims = (64, 64)
-        >>> cname = 'superstar'
-        >>> self._todo_refactor_geometric_info(cname, dims)
+        Example:
+            >>> self = CategoryPatterns.coerce(['superstar'])
+            >>> dims = (64, 64)
+            >>> cname = 'superstar'
+            >>> xy_offset = None
+            >>> self._todo_refactor_geometric_info(cname, xy_offset, dims)
         """
         elem_func = self._category_to_elemfunc[cname]
         x = max(dims)

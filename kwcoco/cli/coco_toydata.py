@@ -9,8 +9,8 @@ class CocoToyDataCLI(object):
         Create COCO toydata
         """
         default = {
-            'key': scfg.Value('shapes8', help='special demodata code'),
-            'dst': scfg.Value('test.mscoco.json', help='output path'),
+            'key': scfg.Value('shapes8', help='special demodata code', position=1),
+            'dst': scfg.Value('test.mscoco.json', help='output path', position=2),
         }
         epilog = """
         Example Usage:

@@ -5,10 +5,22 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.9 - Unreleased
+## Version 0.1.10 - Unreleased
+
+### Added
+* Add `ascii_only` keyword to clf-report to disable unicode glyphs
+* Add `ASCII_ONLY` environment variable to disable unicode glyphs
+* Initial implementation for `CocoSqlDatabase`
+
+### Fixed
+* Fix bug in `show_image` when segmentation is None
+
+
+## Version 0.1.9 - Released 2021-01-08
 
 ### Added
 * Add `remove_video` method to CocoDataset
+* kwcoco show can now show auxiliary data
 
 
 ### Changed

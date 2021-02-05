@@ -1172,7 +1172,7 @@ class Measures(ub.NiceRepr, DictProxy):
         """
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
-            >>> cfsn_vecs = ConfusionVectors.demo(n=100, p_error=0.5)
+            >>> cfsn_vecs = ConfusionVectors.demo(n=3, p_error=0.5)
             >>> binvecs = cfsn_vecs.binarize_classless()
             >>> self = binvecs.measures()
             >>> # xdoctest: +REQUIRES(--show)
@@ -1256,7 +1256,7 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
-            >>>     n_fp=(0, 1), n_fn=(0, 3), nimgs=512, nboxes=(0, 32),
+            >>>     n_fp=(0, 1), n_fn=(0, 3), nimgs=32, nboxes=(0, 32),
             >>>     classes=3, rng=0, newstyle=1, box_noise=0.7, cls_noise=0.2, score_noise=0.3, with_probs=False)
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> ovr_cfsn = cfsn_vecs.binarize_ovr(keyby='name', ignore_classes=['vector', 'raster'])

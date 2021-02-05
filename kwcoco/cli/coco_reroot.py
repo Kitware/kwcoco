@@ -34,7 +34,7 @@ class CocoRerootCLI:
         """
         default = {
             'src': scfg.Value(None, help=(
-                'Path to the coco dataset')),
+                'Path to the coco dataset'), position=1),
 
             'new_prefix': scfg.Value(None, help=(
                 'Path to the new image root.')),

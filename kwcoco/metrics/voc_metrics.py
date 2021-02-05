@@ -102,7 +102,13 @@ class VOC_Metrics(ub.NiceRepr):
                 perclass[cx] = Measures(roc_info)
 
         perclass = PerClass_Measures(perclass)
-        mAP = np.nanmean([d['ap'] for d in perclass.values()])
+
+        perclass_aps = [d['ap'] for d in perclass.values()]
+        if len(perclass_aps) == 0:
+            mAP = np.nan
+        else:
+            mAP = np.nanmean(perclass_aps)
+
         voc_scores = {
             'mAP': mAP,
             'perclass': perclass,
