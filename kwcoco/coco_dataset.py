@@ -1625,6 +1625,10 @@ class MixinCocoExtras(object):
             >>> self = CocoDataset.demo()
             >>> self._build_hashid(hash_pixels=True, verbose=3)
             ...
+            >>> # Note: kwimage has changes the name of carl.png to carl.jpg
+            >>> # in 0.7.0, so that modifies some of the hash. Once 0.7.0
+            >>> # is landed, we can update this test to re-check for
+            >>> # those hashes.
             >>> print('self.hashid_parts = ' + ub.repr2(self.hashid_parts))
             >>> print('self.hashid = {!r}'.format(self.hashid))
             self.hashid_parts = {
@@ -1634,7 +1638,7 @@ class MixinCocoExtras(object):
                 },
                 'images': {
                     'pixels': '67d741fefc8...',
-                    'json': '6a446126490aa...',
+                    'json': '...',
                     'num': 3,
                 },
                 'categories': {
@@ -1642,7 +1646,16 @@ class MixinCocoExtras(object):
                     'num': 8,
                 },
             }
+            self.hashid = '...
+
+            # Old
+            'json': '6a446126490aa...',
             self.hashid = '4769119614e921...
+
+            # New
+            json': '2221c71496a0...
+            self.hashid = '77d445f05...
+
 
         Doctest:
             >>> self = CocoDataset.demo()

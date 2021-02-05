@@ -80,16 +80,27 @@ from kwcoco.coco_dataset import (  # NOQA
     MixinCocoStats, MixinCocoDraw
 )
 
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.types import Float, Integer, String, JSON
-from sqlalchemy.ext.declarative import declarative_base
-import sqlalchemy
-import sqlite3
-sqlite3.register_adapter(np.int64, int)
-sqlite3.register_adapter(np.int32, int)
-
-
-CocoBase = declarative_base()
+try:
+    from sqlalchemy.sql.schema import Column
+    from sqlalchemy.types import Float, Integer, String, JSON
+    from sqlalchemy.ext.declarative import declarative_base
+    import sqlalchemy
+    import sqlite3
+    sqlite3.register_adapter(np.int64, int)
+    sqlite3.register_adapter(np.int32, int)
+    CocoBase = declarative_base()
+except ImportError:
+    # Hack: xdoctest should have been able to figure out that
+    # all of these tests were diabled due to the absense of sqlalchemy
+    # but apparently it has a bug. We can remove this hack once that is fixed
+    sqlalchemy = None
+    Float = ub.identity
+    String = ub.identity
+    JSON = ub.identity
+    Integer = ub.identity
+    Column = ub.identity
+    class CocoBase:
+        _decl_class_registry = {}
 
 
 class Category(CocoBase):
