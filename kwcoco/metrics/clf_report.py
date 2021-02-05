@@ -3,10 +3,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import warnings
 import numpy as np
 import ubelt as ub
+import os
 
 
 # TODO : should we use locale or a ASCII_ONLY environ?
+# For now lets just expose this environ, even if it is not standard
+# ideally we would find a standard environ like NO_COLOR to accomplish this
 # https://stackoverflow.com/questions/3425294/how-to-detect-the-os-default-language-in-python
+ASCII_ONLY = os.environ.get('ASCII_ONLY', '')
 
 
 def classification_report(y_true, y_pred, target_names=None,
@@ -40,7 +44,9 @@ def classification_report(y_true, y_pred, target_names=None,
         log (callable): print or logging function
         remove_unsupported (bool, default=False): removes categories that have
             no support.
-        ascii_only (bool, default=False): if True dont use unicode characters
+        ascii_only (bool, default=False): if True dont use unicode characters.
+            if the environ ASCII_ONLY is present this is forced to True and
+            cannot be undone.
 
     Example:
         >>> # xdoctest: +IGNORE_WANT
@@ -108,6 +114,9 @@ def classification_report(y_true, y_pred, target_names=None,
     import scipy as sp  # NOQA
     import sklearn.metrics
     from sklearn.preprocessing import LabelEncoder
+
+    if ASCII_ONLY:
+        ascii_only = True
 
     if verbose or log:
         if log is None:
@@ -312,7 +321,7 @@ def classification_report(y_true, y_pred, target_names=None,
     real_id = ['%s' % m for m in target_names]
     confusion_df = pd.DataFrame(confusion, columns=pred_id, index=real_id)
 
-    if ascii_only:
+    if ascii_only :
         sum_glyph = 'sum-'
     else:
         sum_glyph = 'Σ'
