@@ -68,7 +68,6 @@ interested in setting up a global service though 😞. I also found a 10-year
 old thread with a hash-index feature request for SQLite, which I
 unabashedly resurrected
 http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
-
 """
 import json
 import numpy as np
@@ -168,7 +167,7 @@ class Annotation(CocoBase):
     foreign = Column(JSON, default=dict())
 
 
-# Global book keeping
+# Global book keeping (It would be nice to find a way to avoid this)
 CocoBase.TBLNAME_TO_CLASS = {}
 for classname, cls in CocoBase._decl_class_registry.items():
     if not classname.startswith('_'):
@@ -223,26 +222,6 @@ def _new_proxy_cache():
 class SqlListProxy(ub.NiceRepr):
     """
     A view of an SQL table that behaves like a Python list
-
-    Ignore:
-        from kwcoco.coco_sql_dataset import *  # NOQA
-        self, dset = demo()
-        proxy = self.dataset['images']
-
-        proxy.ALCHEMY_MODE = 1
-        ti = timerit.Timerit(4, bestof=2, verbose=2)
-        for timer in ti.reset('iter alc sql'):
-            with timer:
-                list(proxy)
-
-        proxy.ALCHEMY_MODE = 0
-        for timer in ti.reset('iter raw sql'):
-            with timer:
-                list(proxy)
-
-        for timer in ti.reset('iter naive'):
-            with timer:
-                [proxy[idx] for idx in range(len(proxy))]
     """
     def __init__(proxy, session, cls):
         proxy.cls = cls
@@ -487,13 +466,6 @@ class SqlDictProxy(DictLike):
         return item
 
     def keys(proxy):
-        """
-        Ignore:
-            from kwcoco.coco_sql_dataset import *  # NOQA
-            import pytest
-            self, dset = demo()
-            proxy = self.index.name_to_cat
-        """
         if proxy.ALCHEMY_MODE:
             if proxy.keyattr is None:
                 query = proxy.session.query(proxy.cls.id).order_by(proxy.cls.id)
@@ -529,9 +501,8 @@ class SqlDictProxy(DictLike):
                 import json
                 inspector = inspect(proxy.session.get_bind())
                 colinfo = inspector.get_columns(proxy.cls.__tablename__)
-                # Huge hack to fixup json columns.
-                # the session.execute seems to do this for
-                # some columns, but not all, hense the isinstance
+                # HACK: to fixup json columns, session.execute seems to fix
+                # the type for some columns, but not all, hense the isinstance
                 def _json_caster(x):
                     if isinstance(x, str):
                         return json.loads(x)
@@ -661,21 +632,6 @@ class SqlIdGroupDictProxy(DictLike):
         return flag
 
     def keys(proxy):
-        """
-        Ignore:
-            from kwcoco.coco_sql_dataset import *  # NOQA
-            self, dset = demo()
-
-            sql_expr = 'EXPLAIN QUERY PLAN SELECT {} FROM {} WHERE {}={}'.format(
-                proxy.valattr.name,
-                proxy.keyattr.class_.__tablename__,
-                proxy.keyattr.name,
-                key
-            )
-            result = proxy.session.execute(sql_expr)
-            result.fetchall()
-            item = [row[0] for row in result.fetchall()]
-        """
         if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.parent_keyattr)
             for item in _orm_yielder(query):
@@ -699,22 +655,6 @@ class SqlIdGroupDictProxy(DictLike):
             parent_table = parent_keyattr.class_.__table__
             table = keyattr.class_.__table__
 
-            """
-            WANT:
-                SELECT images.id, json_group_array(annotations.id)
-                FROM images
-                LEFT OUTER JOIN annotations
-                ON annotations.image_id = images.id
-                GROUP BY images.id ORDER BY images.id
-
-            GOT:
-                SELECT images.id, json_group_array(annotations.id) AS json_group_array_1
-                FROM images, annotations, images
-                LEFT OUTER JOIN annotations
-                ON images.id = annotations.image_id
-                GROUP BY images.id ORDER BY images.id
-
-            """
             grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
             # Hack: have to cast to str because I don't know how to make
             # the json type work
@@ -1091,7 +1031,6 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
             >>> targets = self.tabular_targets()
             >>> print(targets.pandas())
         """
-        # stmt = 'SELECT id, image_id, category_id, _bbox_x + (_bbox_w / 2), _bbox_y + (_bbox_h / 2), _bbox_w, _bbox_h FROM annotations'
         import kwarray
         stmt = ub.paragraph(
             '''
@@ -1127,7 +1066,11 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
 
 def ensure_sql_coco_view(dset, db_fpath=None):
     """
-    Create an SQL view of the COCO dataset
+    Create a cached on-disk SQL view of an on-disk COCO dataset.
+
+    Note:
+        This function is fragile. It depends on looking at file modified
+        timestamps to determine if it needs to write the dataset.
     """
     if db_fpath is None:
         db_fpath = ub.augpath(dset.fpath, prefix='.', ext='.view.v002.sqlite')
@@ -1176,6 +1119,9 @@ def demo(num=10):
 
 def indexable_allclose(dct1, dct2, return_info=False):
     """
+    Walks through two nested data structures and ensures that everything is
+    roughly the same.
+
     Args:
         dct1: a nested indexable item
         dct2: a nested indexable item

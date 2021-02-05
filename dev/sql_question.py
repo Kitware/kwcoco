@@ -1,5 +1,8 @@
 """
-I've been able to figure out how to do this in raw SQLite. My question is how to do this in SQLAlchemy.
+https://stackoverflow.com/questions/66053491/sqlalchemy-sqlite-for-each-row-in-table-b-find-all-matching-rows-in-tablea
+
+I'm trying to do a LEFT OUTER JOIN but SQLAlchemy keeps inserting an extra table in my FROM statement, and I don't know how to work around that. I've been able to figure out how to do this in raw SQLite. My question is how to do this in SQLAlchemy.
+
 
 I have two tables: annotations:
 
@@ -76,6 +79,14 @@ def main():
     keyattr = Annotation.image_id
     valattr = Annotation.id
 
+    """
+
+    -----------
+
+    ## A Correct Solution With Raw SQL ##
+
+    """
+
     ###
     # Raw SQLite: Does exactly what I want
     ###
@@ -112,7 +123,15 @@ def main():
     print('final = {}'.format(ub.repr2(final, nl=1)))
 
     """
-    This returns:
+    This expands out to:
+
+        SELECT images.id, json_group_array(annotations.id)
+        FROM images
+        LEFT OUTER JOIN annotations
+        ON annotations.image_id = images.id
+        GROUP BY images.id ORDER BY images.id
+
+    and with some post-processing on row[1] returns:
 
     ```
     final = [
@@ -128,6 +147,12 @@ def main():
 
     But I'm having a very hard time figuring out how to do the equivalent
     behavior with SQLAlchemy. I've tried several variation:
+
+
+    -----------
+
+    ## An Almost Correct Solution With SQLAlchemy ##
+
     """
 
     # SQLite Alchemy
@@ -161,7 +186,13 @@ def main():
     print('final = {}'.format(ub.repr2(final, nl=1)))
 
     """
-    This returns:
+    This expands to:
+        SELECT annotations.image_id, json_group_array(annotations.id) AS json_group_array_1
+        FROM annotations LEFT OUTER JOIN images
+        ON images.id = annotations.image_id
+        GROUP BY images.id ORDER BY images.id
+
+    And returns:
 
     ```
     final = [
@@ -172,8 +203,11 @@ def main():
     ```
 
     which is missing the values for images 3 and 5. This is because I queried
-    on keyattr instead of parent_keyattr.
+    on `keyattr` (annotations.image_id) instead of `parent_keyattr` (images.id).
 
+    -----------
+
+    ## An Attempt To Fix The Issue ##
 
     But if I try to use parent_keyattr I get an error when I try the outer join
     """
@@ -196,9 +230,15 @@ def main():
     FROM images, annotations
     ```
 
+    The issue is the both images and annotations are in the FROM statement.
+
     I'm not sure if there is a way to force `grouped_vals` to think its FROM
     statement targets the annotations table. I've tried several variants but have
     had little luck sofar.
+
+    -----------
+
+    ## A Better But Not Perfect Fix ##
 
 
     The best luck I've had was by wrapping `grouped_vals` in a `str`. Which does
@@ -248,7 +288,7 @@ def main():
 
     x = session.query(parent_keyattr.expression, grouped_vals.select().select_from(parent_table)).subquery()
     x.outerjoin(table, parent_keyattr == keyattr)
-    .group_by(parent_keyattr).order_by(parent_keyattr)
+    # .group_by(parent_keyattr).order_by(parent_keyattr)
     print(x)
 
     z = session.query(parent_keyattr).outerjoin(table, parent_keyattr == keyattr)
@@ -269,7 +309,7 @@ def main():
     print(sub)
 
     print(session.query(z))
-    .all()
+    # .all()
 
     z = ojoin.select()
     session.execute(z).fetchall()

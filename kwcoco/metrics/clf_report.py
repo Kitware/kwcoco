@@ -5,6 +5,10 @@ import numpy as np
 import ubelt as ub
 
 
+# TODO : should we use locale or a ASCII_ONLY environ?
+# https://stackoverflow.com/questions/3425294/how-to-detect-the-os-default-language-in-python
+
+
 def classification_report(y_true, y_pred, target_names=None,
                           sample_weight=None, verbose=False,
                           remove_unsupported=False, log=None,
@@ -46,7 +50,7 @@ def classification_report(y_true, y_pred, target_names=None,
         >>> y_pred = [1, 2, 1, 3, 1, 2, 2, 3, 2, 2, 3, 3, 2, 3, 3, 3, 1, 3]
         >>> target_names = None
         >>> sample_weight = None
-        >>> report = classification_report(y_true, y_pred, verbose=0)
+        >>> report = classification_report(y_true, y_pred, verbose=0, ascii_only=1)
         >>> print(report['confusion'])
         pred  1  2  3  Σr
         real

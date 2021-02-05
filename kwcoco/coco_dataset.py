@@ -1498,8 +1498,10 @@ class MixinCocoExtras(object):
 
         Example:
             >>> import kwcoco
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5, verbose=0, rng=None)
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5, num_tracks=4, verbose=0, rng=44)
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5,
+            >>>                                verbose=0, rng=None)
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes5', num_frames=5,
+            >>>                                num_tracks=4, verbose=0, rng=44)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()

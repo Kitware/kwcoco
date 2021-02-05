@@ -308,6 +308,14 @@ class IndexableWalker(Generator):
     def _walk(self, data, prefix=[]):
         """
         Defines the underlying generator used by IndexableWalker
+
+        Yields:
+            Tuple[List, object] | None:
+                path (List) - a "path" through the nested data structure
+                value (object) - the value indexed by that "path".
+
+            Can also yield None in the case that `send` is called on the
+            generator.
         """
         stack = [(data, prefix)]
         while stack:
