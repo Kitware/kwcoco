@@ -70,34 +70,27 @@ unabashedly resurrected
 http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 
 """
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.types import Float, Integer, String, JSON
-from sqlalchemy.ext.declarative import declarative_base
-import sqlalchemy
+import json
+import numpy as np
 import ubelt as ub
 from os.path import exists
+
 from kwcoco.util.dict_like import DictLike  # NOQA
-
-
 from kwcoco.coco_dataset import (  # NOQA
     MixinCocoJSONAccessors, MixinCocoAccessors, MixinCocoAttrs,
     MixinCocoStats, MixinCocoDraw
 )
 
+from sqlalchemy.sql.schema import Column
+from sqlalchemy.types import Float, Integer, String, JSON
+from sqlalchemy.ext.declarative import declarative_base
+import sqlalchemy
 import sqlite3
-import json
-import numpy as np
 sqlite3.register_adapter(np.int64, int)
 sqlite3.register_adapter(np.int32, int)
 
 
 CocoBase = declarative_base()
-
-
-def column_names(cls):
-    for key, value in cls.__dict__.items():
-        if isinstance(value, sqlalchemy.orm.attributes.InstrumentedAttribute):
-            yield key
 
 
 class Category(CocoBase):
@@ -347,6 +340,7 @@ class SqlDictProxy(DictLike):
         keyattr : the indexed column to use as the keys
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
         >>> import pytest
         >>> sql_dset, dct_dset = demo(num=10)
@@ -383,6 +377,7 @@ class SqlDictProxy(DictLike):
         >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
         >>> import pytest
         >>> sql_dset, dct_dset = demo(num=10)
@@ -591,6 +586,7 @@ class SqlIdGroupDictProxy(DictLike):
     annotation rows have `annotation.image_id = image.id`.
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
         >>> sql_dset, dct_dset = demo(num=10)
         >>> proxy = sql_dset.index.gid_to_aids
@@ -884,6 +880,7 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         .. [1] https://github.com/pytorch/pytorch/issues/13246
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
         >>> sql_dset, dct_dset = demo()
         >>> assert_dsets_allclose(sql_dset, dct_dset)
@@ -925,6 +922,7 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
             connections in the forked subprocesses.
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
             >>> sql_dset, dct_dset = demo()
             >>> # Test pickling works correctly
@@ -1001,6 +999,7 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         Copy the information in a :class:`CocoDataset` into this SQL database.
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> import kwcoco
             >>> from kwcoco.coco_sql_dataset import *
             >>> dset2 = dset = kwcoco.CocoDataset.demo()
@@ -1070,6 +1069,7 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
             DataFrame
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
             >>> self, dset = demo()
             >>> table_df = self.raw_table('annotations')
@@ -1085,6 +1085,7 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         properties with minimal SQL overhead.
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
             >>> self, dset = demo()
             >>> targets = self.tabular_targets()
@@ -1180,6 +1181,7 @@ def indexable_allclose(dct1, dct2, return_info=False):
         dct2: a nested indexable item
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> dct1 = {
         >>>     'foo': [1.222222, 1.333],
         >>>     'bar': 1,
