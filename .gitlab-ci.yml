@@ -2,7 +2,7 @@
 # yaml merge-expand .gitlab-ci.yml _expandyml && cat _expandyml
 # 
 # GITLAB LINTER
-# https://gitlab.kitware.com/utils/kwcoco/-/ci/lint
+# https://gitlab.kitware.com/computer-vision/kwcoco/-/ci/lint
 
 
 # This CI file has 4 types of jobs:
@@ -19,7 +19,7 @@
         __doc__="""
 
         ============
-        INSTRUCTIONS
+        GITLAB-CI INSTRUCTIONS
         ============
 
         This file was designed to be used as a template. You can adapt it to
@@ -28,10 +28,11 @@
 
         ```bash
         cat .gitlab-ci.yml | \
-            sed 's|utils|<YOUR-GROUP>|g' | \
+            sed 's|computer-vision|<YOUR-GROUP>|g' | \
             sed 's|kwcoco|<YOUR-REPO>|g' | \
             sed 's|travis-ci-Erotemic|<YOUR-GPG-ID>|g' | \
             sed 's|CI_KITWARE_SECRET|<YOUR_CI_SECRET>|g' | \
+            sed 's|GITLAB_KITWARE_PUSH_TOKEN|<YOUR_GIT_PUSH_TOKEN>|g' | \
             sed 's|gitlab.kitware.com|gitlab.your-instance.com|g' | \
         tee /tmp/repl && colordiff .gitlab-ci.yml /tmp/repl
         ```
@@ -66,14 +67,25 @@
             This is only needed if you want to automatically sign published
             wheels with a gpg key.
 
-        * GIT_PUSH_TOKEN - 
+        * GITLAB_KITWARE_PUSH_TOKEN - 
             This is only needed if you want to automatically git-tag release branches.
 
-            Create a GIT_PUSH_TOKEN in User->Settings->Tokens, give it api and write permissions
-            see: https://gitlab.kitware.com/profile/personal_access_tokens
-            
-            Then add this as a secret variable here: https://gitlab.kitware.com/utils/kwcoco/-/settings/ci_cd
-            Note the value of GIT_PUSH_TOKEN will look something like: "{token-name}:{token-password}"
+            Create a new personall access token in User->Settings->Tokens, 
+            You can name the token GITLAB_KITWARE_PUSH_TOKEN_VALUE
+            Give it api and write repository permissions
+
+            SeeAlso: https://gitlab.kitware.com/profile/personal_access_tokens
+
+            Take this variable and record its value somewhere safe. I put it in my secrets file as such:
+
+                export GITLAB_KITWARE_PUSH_TOKEN_VALUE=<paste-the-value-here>
+
+            I also create another variable with the prefix "git-push-token", which is necessary
+
+                export GITLAB_KITWARE_PUSH_TOKEN=git-push-token:$GITLAB_KITWARE_PUSH_TOKEN_VALUE
+
+            Then add this as a secret variable here: https://gitlab.kitware.com/groups/computer-vision/-/settings/ci_cd
+            Note the value of GITLAB_KITWARE_PUSH_TOKEN will look something like: "git-push-token:{token-password}"
             For instance it may look like this: "git-push-token:62zutpzqga6tvrhklkdjqm"
 
             References:
@@ -83,14 +95,14 @@
 
         Before you do this ensure that your master and release branch are marked as protected
         and only editable by people that you trust. 
-        https://gitlab.kitware.com/utils/kwcoco/-/settings/repository#js-protected-branches-settings
+        https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/repository#js-protected-branches-settings
 
         WARNING: If an untrusted actor gains the ability to write to a
         protected branch, then they will be able to exfiltrate your secrets.
 
         Once you have protected the master and release branch, can add these
         variables as the following url
-        https://gitlab.kitware.com/utils/kwimage/-/settings/ci_cd 
+        https://gitlab.kitware.com/computer-vision/kwimage/-/settings/ci_cd 
         
         WARNING: These variables contain secret information. Ensure that these
         the protected and masked settings are enabled when you create them.
@@ -115,7 +127,7 @@
             export TWINE_USERNAME=<pypi-username>
             export TWINE_PASSWORD=<pypi-password>
             export CI_KITWARE_SECRET="<a-very-long-secret-string>"
-            export GIT_PUSH_TOKEN='git-push-token:<token-password>'
+            export GITLAB_KITWARE_PUSH_TOKEN='git-push-token:<token-password>'
         ```
 
         You should also make a secret_unloader.sh that points to a script that
@@ -136,12 +148,12 @@
         echo $TWINE_USERNAME
 
         # ADD RELEVANT VARIABLES TO GITLAB SECRET VARIABLES
-        # https://gitlab.kitware.com/utils/kwcoco/-/settings/ci_cd
+        # https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/ci_cd
         # Note that it is important to make sure that these variables are
         # only decrpyted on protected branches by selecting the protected
         # and masked option. Also make sure you have master and release
         # branches protected.
-        # https://gitlab.kitware.com/utils/kwcoco/-/settings/repository#js-protected-branches-settings
+        # https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/repository#js-protected-branches-settings
 
         # HOW TO ENCRYPT YOUR SECRET GPG KEY
         IDENTIFIER="travis-ci-Erotemic"
@@ -176,16 +188,14 @@
         git add dev/public_gpg_key
         ```
 
-
-        TEST GIT_PUSH_TOKEN 
+        TEST GITLAB_KITWARE_PUSH_TOKEN 
         -------------------
 
-        The following script tests if your GIT_PUSH_TOKEN environment variable is correctly setup.
+        The following script tests if your GITLAB_KITWARE_PUSH_TOKEN environment variable is correctly setup.
 
         ```bash
-        docker run -it ubuntu
-        apt update -y && apt install git -y
-        git clone https://gitlab.kitware.com/utils/kwcoco.git
+        docker run -it gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.8 bash
+        git clone https://gitlab.kitware.com/computer-vision/kwcoco.git
         cd kwcoco
         # do sed twice to handle the case of https clone with and without a read token
         git config user.email "ci@gitlab.kitware.com"
@@ -193,13 +203,12 @@
         URL_HOST=$(git remote get-url origin | sed -e 's|https\?://.*@||g' | sed -e 's|https\?://||g')
         echo "URL_HOST = $URL_HOST"
         git tag "test-tag4"
-        git push --tags "https://${GIT_PUSH_TOKEN}@${URL_HOST}"
+        git push --tags "https://${GITLAB_KITWARE_PUSH_TOKEN}@${URL_HOST}"
 
         # Cleanup after you verify the tags shows up on the remote
-        git push --delete origin test-tag4
+        git push --delete "https://${GITLAB_KITWARE_PUSH_TOKEN}@${URL_HOST}" test-tag4
         git tag --delete test-tag4
         ```
-
 
         """ # "  # hack for vim yml syntax highlighter
 
@@ -390,12 +399,21 @@ stages:
         # Have the server git-tag the release and push the tags
         - VERSION=$(python -c "import setup; print(setup.VERSION)")
         # do sed twice to handle the case of https clone with and without a read token
-        - URL_HOST=$(git remote get-url origin | sed -e 's|https\?://.*@||g' | sed -e 's|https\?://||g')
-        - echo "URL_HOST = $URL_HOST"
-        - git config user.email "ci@gitlab.kitware.com"
-        - git config user.name "Gitlab-CI"
-        - git tag $VERSION -m "tarball tag $VERSION"
-        - git push --tags "https://${GIT_PUSH_TOKEN}@${URL_HOST}"
+        - | 
+            URL_HOST=$(git remote get-url origin | sed -e 's|https\?://.*@||g' | sed -e 's|https\?://||g' | sed -e 's|git@||g' | sed -e 's|:|/|g')
+            echo "URL_HOST = $URL_HOST"
+            # A git config user name and email is required. Set if needed.
+            if [[ "$(git config user.email)" == "" ]]; then
+                git config user.email "ci@gitlab.kitware.com"
+                git config user.name "Gitlab-CI"
+            fi
+            if [ $(git tag -l "$VERSION") ]; then
+                echo "Tag already exists"
+            else
+                git tag $VERSION -m "tarball tag $VERSION"
+                git push --tags "https://${GITLAB_KITWARE_PUSH_TOKEN}@${URL_HOST}"
+            fi
+          
             
     only:
         refs:
