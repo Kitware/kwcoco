@@ -6,10 +6,9 @@ CommandLine:
 Example:
     >>> import kwcoco
     >>> from kwcoco.coco_schema import COCO_SCHEMA
-    >>> COCO_SCHEMA
-    >>> dset = kwcoco.CocoDataset.demo('shapes1')
     >>> import jsonschema
-    >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
+    >>> dset = kwcoco.CocoDataset.demo('shapes1')
+    >>> # print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
     >>> COCO_SCHEMA.validate(dset.dataset)
 
     >>> try:

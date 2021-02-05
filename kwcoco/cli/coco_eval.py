@@ -30,7 +30,11 @@ class CocoEvalCLI:
             >>> pred_dset.fpath = join(dpath, 'pred.mscoco.json')
             >>> true_dset.dump(true_dset.fpath)
             >>> pred_dset.dump(pred_dset.fpath)
-            >>> CocoEvalCLI.main(true_dataset=true_dset.fpath, pred_dataset=pred_dset.fpath)
+            >>> draw = False  # set to false for faster tests
+            >>> CocoEvalCLI.main(
+            >>>     true_dataset=true_dset.fpath,
+            >>>     pred_dataset=pred_dset.fpath,
+            >>>     draw=draw)
         """
         coco_evaluator.main(cmdline=True, **kw)
 

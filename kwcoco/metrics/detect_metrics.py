@@ -762,7 +762,7 @@ class DetectionMetrics(ub.NiceRepr):
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
-            >>>     n_fp=(0, 1), n_fn=(0, 1), nimgs=512, nboxes=(0, 32),
+            >>>     n_fp=(0, 1), n_fn=(0, 1), nimgs=32, nboxes=(0, 16),
             >>>     classes=3, rng=0, newstyle=1, box_noise=0.5, cls_noise=0.0, score_noise=0.3, with_probs=False)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot

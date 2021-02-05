@@ -17,8 +17,8 @@ class Boids(ub.NiceRepr):
 
     Example:
         >>> from kwcoco.demo.boids import *  # NOQA
-        >>> num_frames = 1000
-        >>> num_objects = 30
+        >>> num_frames = 10
+        >>> num_objects = 3
         >>> rng = None
         >>> self = Boids(num=num_objects, rng=rng).initialize()
         >>> paths = self.paths(num_frames)

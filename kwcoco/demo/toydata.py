@@ -10,6 +10,7 @@ from __future__ import absolute_import, division, print_function
 from os.path import join
 import six
 import glob
+import json
 import numpy as np
 import ubelt as ub
 import kwarray
@@ -17,6 +18,12 @@ import kwimage
 import skimage
 import skimage.morphology  # NOQA
 from kwcoco.toypatterns import CategoryPatterns
+
+
+try:
+    from xdev import profile
+except Exception:
+    profile = ub.identity
 
 
 def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
@@ -269,6 +276,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
     return img, anns
 
 
+@profile
 def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                       newstyle=True, dpath=None, aux=None, cache=True):
     """
@@ -328,7 +336,6 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     else:
         ub.ensuredir(dpath)
 
-    import kwarray
     rng = kwarray.ensure_rng(rng)
 
     catpats = CategoryPatterns.coerce([
@@ -361,11 +368,13 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         'rng': ub.hash_data(rng),
         'aux': aux,
     }
+    depends = ub.hash_data(cfg)[0:32]
     cacher = ub.Cacher('toy_dset_v3', dpath=ub.ensuredir(dpath, 'cache'),
-                       depends=cfg, verbose=verbose, enabled=0)
+                       depends=depends, verbose=verbose, enabled=0)
 
-    root_dpath = ub.ensuredir((dpath, 'shapes_{}_{}'.format(
-        cfg['n_imgs'], cacher._condense_cfgstr())))
+    depid = cacher._condense_cfgstr()
+    root_dpath = join(dpath, 'shapes_{}_{}'.format(cfg['n_imgs'], depid))
+    ub.ensuredir(root_dpath)
 
     img_dpath = ub.ensuredir((root_dpath, 'images'))
 
@@ -461,7 +470,6 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
 
             kwimage.imwrite(fpath, imdata)
 
-        import json
         with open(join(dpath, 'toy_dset.mscoco.json'), 'w') as file:
             if six.PY2:
                 json.dump(dataset, file, indent=4)
