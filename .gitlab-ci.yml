@@ -294,6 +294,13 @@ stages:
     # Coverage is a regex that will parse the coverage from the test stdout
     coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
 
+    except:
+        # Don't run the pipeline for new tags
+        - tags
+        # Dont run tests on the release branch (they already ran on master)
+        - refs:
+            - release
+
 
 .test_minimal_template: &test_minimal_template
     # Tags define which runners will accept which jobs
@@ -326,6 +333,13 @@ stages:
 
     # Coverage is a regex that will parse the coverage from the test stdout
     coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+
+    except:
+        # Don't run the pipeline for new tags
+        - tags
+        # Dont run tests on the release branch (they already ran on master)
+        - refs:
+            - release
 
 
 .gpgsign_template: &gpgsign_template
