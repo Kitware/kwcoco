@@ -1486,9 +1486,27 @@ class MixinCocoExtras(object):
         Create a toy coco dataset for testing and demo puposes
 
         Args:
-            key (str): either photos or shapes
+            key (str): either 'photos', 'shapes', or 'vidshapes'. There are
+                also undocumented sufixes that can control behavior.
+                TODO: better documentation for these demo datasets.
+
             **kw : if key is shapes, these arguments are passed to toydata
-                generation
+                generation. The Kwargs section of this docstring documents a
+                subset of the available options. For full details, see
+                :func:`demodata_toy_dset` and :func:`random_video_dset`.
+
+        Kwargs:
+            gsize (Tuple): size of the images
+
+            dpath (str): path to the output image directory, defaults to using
+                kwcoco cache dir.
+
+            aux (bool): if True generates dummy auxillary channels
+
+            rng (int | RandomState, default=0):
+                random number generator or seed
+
+            verbose (int, default=3): verbosity mode
 
         Example:
             >>> print(CocoDataset.demo('photos'))

@@ -507,6 +507,10 @@ def random_video_dset(
         dpath (str): only used if render is truthy, place to write rendered
             images.
 
+        verbose (int, default=3): verbosity mode
+
+        aux (bool): if True generates dummy auxillary channels
+
     SeeAlso:
         random_single_video_dset
 
@@ -867,6 +871,27 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     """
     Create toydata renderings for a preconstructed coco dataset.
 
+    Args:
+        dset (CocoDataset):
+            A dataset that contains special "renderable" annotations. (e.g.
+            the demo shapes). Each image can contain special fields that
+            influence how an image will be rendered.
+
+            Currently this process is simple, it just creates a noisy image
+            with the shapes superimposed over where they should exist as
+            indicated by the annotations. In the future this may become more
+            sophisticated.
+
+            Each item in `dset.dataset['images']` will be modified to add
+            the "file_name" field indicating where the rendered data is writen.
+
+        rng (int | None | RandomState): random state
+
+        dpath (str):
+            The location to write the images to.
+
+        renderkw (dict): See :func:`render_toy_image` for details.
+
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
         >>> import kwarray
@@ -895,14 +920,13 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     dset._ensure_json_serializable()
     hashid = dset._build_hashid()[0:24]
 
-    print('dpath = {!r}'.format(dpath))
     if dpath is None:
         dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
     else:
         ub.ensuredir(dpath)
+
     root_dpath = ub.ensuredir((dpath, 'render_{}'.format(hashid)))
     img_dpath = ub.ensuredir((root_dpath, 'images'))
-    print('img_dpath = {!r}'.format(img_dpath))
 
     for gid in dset.imgs.keys():
 
@@ -912,9 +936,9 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
         # Extract the data from memory and write it to disk
         imdata = img.pop('imdata')
         fname = 'img_{:05d}.png'.format(gid)
-        fpath = join(img_dpath, fname)
+        img_fpath = join(img_dpath, fname)
         img.update({
-            'file_name': fpath,
+            'file_name': img_fpath,
             'channels': 'rgb',
         })
         auxiliaries = img.pop('auxiliary', None)
@@ -933,7 +957,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
                     kwimage.imwrite(aux_fpath, auxdata, space=None)
             img['auxiliary'] = auxiliaries
 
-        kwimage.imwrite(fpath, imdata)
+        kwimage.imwrite(img_fpath, imdata)
     dset._build_index()
     return dset
 
