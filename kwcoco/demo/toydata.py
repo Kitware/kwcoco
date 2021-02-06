@@ -516,7 +516,8 @@ def random_video_dset(
 
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
-        >>> dset = random_video_dset(render=True, num_videos=3, num_frames=2, num_tracks=10)
+        >>> dset = random_video_dset(render=True, num_videos=3, num_frames=2,
+        >>>                          num_tracks=10)
         >>> # xdoctest: +REQUIRES(--show)
         >>> dset.show_image(1, doclf=True)
         >>> dset.show_image(2, doclf=True)
@@ -534,7 +535,6 @@ def random_video_dset(
             gsize=gsize, num_frames=num_frames, num_tracks=num_tracks,
             tid_start=tid_start, anchors=anchors, gid_start=gid_start,
             video_id=vidid, render=False, autobuild=False, aux=aux, rng=rng)
-
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
             tid_start = dset.dataset['annotations'][-1]['track_id'] + 1
@@ -644,7 +644,8 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         >>> anchors = np.array([ [0.2, 0.2],  [0.1, 0.1]])
         >>> gsize = np.array([(600, 600)])
         >>> print(anchors * gsize)
-        >>> dset = random_single_video_dset(render=True, num_frames=10, anchors=anchors, num_tracks=10)
+        >>> dset = random_single_video_dset(render=True, num_frames=10,
+        >>>                                 anchors=anchors, num_tracks=10)
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> plt = kwplot.autoplt()
@@ -929,7 +930,6 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     img_dpath = ub.ensuredir((root_dpath, 'images'))
 
     for gid in dset.imgs.keys():
-
         # Render data inside the image
         img = render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
 
