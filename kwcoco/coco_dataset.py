@@ -1552,6 +1552,8 @@ class MixinCocoExtras(object):
             key = 'shapes'
             globals().update(xdev.get_func_kwargs(kwcoco.CocoDataset.demo))
             kw = {}
+
+            kwcoco.CocoDataset.demo('vidshapes')
         """
         import parse
         from kwcoco.demo import toydata
@@ -1562,12 +1564,16 @@ class MixinCocoExtras(object):
                 kw['n_imgs'] = int(res.named['num_imgs'])
             if 'rng' not in kw and 'n_imgs' in kw:
                 kw['rng'] = kw['n_imgs']
+            print('kw = {}'.format(ub.repr2(kw, nl=1)))
             self = toydata.demodata_toy_dset(**kw)
             self.tag = key
             # .dataset
             # self = cls(dataset, tag=key)
         elif key.startswith('vidshapes'):
             res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
+            if res is None:
+                res = parse.parse('{prefix}{num_videos:d}', key)
+            print('res = {!r}'.format(res))
             vidkw = {
                 'render': True,
                 'num_videos': 1,
@@ -1576,10 +1582,13 @@ class MixinCocoExtras(object):
                 'gsize': (600, 600),
                 'aux': None,
             }
+            suff_parts = None
             if res:
                 kw['num_videos'] = int(res.named['num_videos'])
-                suff_parts = res.named['suffix'].split('-')
-            else:
+                if 'suffix' in res.named:
+                    suff_parts = res.named['suffix'].split('-')
+
+            if suff_parts is None:
                 suff_parts = []
 
             if 'aux' in suff_parts:
@@ -1591,7 +1600,10 @@ class MixinCocoExtras(object):
             if 'rng' not in vidkw:
                 # Make rng determined by other params by default
                 vidkw['rng'] = int(ub.hash_data(ub.repr2(vidkw))[0:8], 16)
-            cfgstr = ub.hash_data(ub.repr2(vidkw))[0:32]
+
+            print('vidkw = {!r}'.format(vidkw))
+            cfgstr = ub.hash_data(ub.repr2(vidkw), base='abc')[0:14]
+            print('cfgstr = {!r}'.format(cfgstr))
 
             tag = key + '_' + cfgstr
 
@@ -1604,13 +1616,13 @@ class MixinCocoExtras(object):
                 # Even if the cache is off, we still will need this because it
                 # will write rendered data to disk. Perhaps we can make this
                 # optional in the future.
-                basedir = ub.ensure_app_cache_dir('kwcoco', 'demo_visahapes')
-                bundle_dpath = vidkw['bundle_dpath'] = join(basedir, tag)
+                dpath = ub.ensure_app_cache_dir('kwcoco', 'demo_visahapes')
+                bundle_dpath = vidkw['bundle_dpath'] = join(dpath, tag)
 
             cache_dpath = join(bundle_dpath, '_cache')
             fpath = join(bundle_dpath, 'data.kwcoco.json')
 
-            stamp = ub.CacheStamp('vidshape_stamp_v7', dpath=cache_dpath, cfgstr=cfgstr,
+            stamp = ub.CacheStamp('vidshape_stamp_v13', dpath=cache_dpath, cfgstr=cfgstr,
                                   enabled=use_cache, product=[fpath],
                                   verbose=100,
                                   # meta=vidkw  # requires ubelt>=0.9.3
@@ -1622,7 +1634,8 @@ class MixinCocoExtras(object):
                 self = toydata.random_video_dset(**vidkw)
                 print('self.fpath = {!r}'.format(self.fpath))
                 print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
-                self.reroot(bundle_dpath)
+
+                # self.reroot(bundle_dpath)
                 self.fpath = fpath
                 if fpath is not None:
                     self.dump(fpath, newlines=True)
@@ -4630,7 +4643,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
     """
 
     def __init__(self, data=None, tag=None, bundle_dpath=None, img_root=None,
-                 autobuild=True):
+                 fname=None, autobuild=True):
         """
         Args:
 
@@ -4699,27 +4712,30 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 'but got: {!r}'.format(type(data)))
 
         if fpath is None and bundle_dpath is not None:
-            import glob
-            candidates = [
-                'data',
-                'data.json',
-                'data.kwcoco.json',
-                '*.kwcoco.json',
-                '*.mscoco.json',
-            ]
-            # Check for standard bundle manifest names
-            manifest_candidate_iter = iter(ub.oset(ub.flatten([
-                glob.glob(join(bundle_dpath, p))
-                for p in candidates])))
-            try:
-                fpath = ub.peek(manifest_candidate_iter)
-            except StopIteration:
-                fpath = join(bundle_dpath, 'data.kwcoco.json')
-                # raise Exception('No manifest in Dataset Bundle')
+            if fname is None:
+                import glob
+                candidates = [
+                    'data',
+                    'data.json',
+                    'data.kwcoco.json',
+                    '*.kwcoco.json',
+                    '*.mscoco.json',
+                ]
+                # Check for standard bundle manifest names
+                manifest_candidate_iter = iter(ub.oset(ub.flatten([
+                    glob.glob(join(bundle_dpath, p))
+                    for p in candidates])))
+                try:
+                    fpath = ub.peek(manifest_candidate_iter)
+                except StopIteration:
+                    fpath = join(bundle_dpath, 'data.kwcoco.json')
+                    # raise Exception('No manifest in Dataset Bundle')
+                else:
+                    remain = list(manifest_candidate_iter)
+                    if len(remain) > 0:
+                        raise Exception('Ambiguous Dataset Bundle {}: {}'.format(fpath, remain))
             else:
-                remain = list(manifest_candidate_iter)
-                if len(remain) > 0:
-                    raise Exception('Ambiguous Dataset Bundle')
+                fpath = join(bundle_dpath, fname)
             key = basename(bundle_dpath)
 
         if fpath is not None:

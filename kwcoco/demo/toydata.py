@@ -14,6 +14,7 @@ import ubelt as ub
 import kwarray
 import kwimage
 import skimage
+from os.path import basename
 import skimage.morphology  # NOQA
 from kwcoco.toypatterns import CategoryPatterns
 
@@ -280,7 +281,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                       dpath=None,
                       bundle_dpath=None,
                       aux=None,
-                      cache=True):
+                      use_cache=True):
     """
     Create a toy detection problem
 
@@ -304,7 +305,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
 
         verbose (int, default=3): verbosity mode
 
-        cache (bool, default=True): if True caches the generated json in the
+        use_cache (bool, default=True): if True caches the generated json in the
             `dpath`.
 
     Returns:
@@ -326,7 +327,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     Example:
         >>> from kwcoco.demo.toydata import *
         >>> import kwcoco
-        >>> dset = demodata_toy_dset(gsize=(300, 300), aux=True, cache=False)
+        >>> dset = demodata_toy_dset(gsize=(300, 300), aux=True, use_cache=False)
         >>> # xdoctest: +REQUIRES(--show)
         >>> print(ub.repr2(dset.dataset, nl=2))
         >>> import kwplot
@@ -335,13 +336,32 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         >>> ub.startfile(dset.bundle_dpath)
 
         dset._tree()
+
+        >>> from kwcoco.demo.toydata import *
+        >>> import kwcoco
+
+        dset = demodata_toy_dset(gsize=(300, 300), aux=True, use_cache=False)
+        print(dset.imgs[1])
+        dset._tree()
+
+        dset = demodata_toy_dset(gsize=(300, 300), aux=True, use_cache=False,
+            bundle_dpath='test_bundle')
+        print(dset.imgs[1])
+        dset._tree()
+
+        dset = demodata_toy_dset(
+            gsize=(300, 300), aux=True, use_cache=False, dpath='test_cache_dpath')
     """
     import kwcoco
-    if dpath is None:
-        # dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
-        dpath = ub.ensure_app_cache_dir('kwcoco', 'demodata_bundles')
+
+    if bundle_dpath is None:
+        if dpath is None:
+            # dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
+            dpath = ub.ensure_app_cache_dir('kwcoco', 'demodata_bundles')
+        else:
+            ub.ensuredir(dpath)
     else:
-        ub.ensuredir(dpath)
+        ub.ensuredir(bundle_dpath)
 
     rng = kwarray.ensure_rng(rng)
 
@@ -377,8 +397,14 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     }
 
     depends = ub.hash_data(cfg, base='abc')[0:14]
-    bundle_dname = 'shapes_{}_{}'.format(cfg['n_imgs'], depends)
-    bundle_dpath = ub.ensuredir((dpath, bundle_dname))
+
+    if bundle_dpath is None:
+        bundle_dname = 'shapes_{}_{}'.format(cfg['n_imgs'], depends)
+        bundle_dpath = ub.ensuredir((dpath, bundle_dname))
+
+    from os.path import abspath
+    bundle_dpath = abspath(bundle_dpath)
+
     cache_dpath = ub.ensuredir((bundle_dpath, '_cache'))
     assets_dpath = ub.ensuredir((bundle_dpath, '_assets'))
     img_dpath = ub.ensuredir((assets_dpath, 'images'))
@@ -388,12 +414,12 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     cache_dpath = ub.ensuredir(cache_dpath)
 
     stamp = ub.CacheStamp(
-        'toy_dset_stamp_v7',
+        'toy_dset_stamp_v14',
         dpath=cache_dpath, depends=depends, verbose=verbose, enabled=0)
 
     n_have = len(list(glob.glob(join(img_dpath, '*.png'))))
     # Hack: Only allow cache loading if the data seems to exist
-    stamp.cacher.enabled = (n_have == n_imgs) and cache
+    stamp.cacher.enabled = (n_have == n_imgs) and use_cache
 
     # TODO: parametarize
     bg_intensity = .1
@@ -484,10 +510,12 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
             kwimage.imwrite(fpath, imdata)
             # print('write fpath = {!r}'.format(fpath))
 
-        dset = kwcoco.CocoDataset(dataset, bundle_dpath=bundle_dpath)
+        fname = basename(dset_fpath)
+        dset = kwcoco.CocoDataset(dataset, bundle_dpath=bundle_dpath,
+                                  fname=fname)
         dset.dset_fpath = dset_fpath
         print('dump dset.dset_fpath = {!r}'.format(dset.dset_fpath))
-        dset.dump(dset.dset_fpath)
+        dset.dump(dset.dset_fpath, newlines=True)
         stamp.renew()
     else:
         # otherwise load the data
@@ -495,11 +523,11 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         print('read dset_fpath = {!r}'.format(dset_fpath))
         dset = kwcoco.CocoDataset(dset_fpath, bundle_dpath=bundle_dpath)
 
-    dset.tag = bundle_dname
+    dset.tag = basename(bundle_dpath)
     dset.fpath = dset_fpath
 
-    print('dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
-    dset.reroot(dset.bundle_dpath)
+    # print('dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
+    # dset.reroot(dset.bundle_dpath)
 
     return dset
 

@@ -1074,6 +1074,23 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         targets = kwarray.DataFrameArray(table)
         return targets
 
+    @property
+    def bundle_dpath(self):
+        return self.img_root
+
+    @bundle_dpath.setter
+    def bundle_dpath(self, value):
+        self.img_root = value
+
+    @property
+    def data_fpath(self):
+        """ data_fpath is an alias of fpath """
+        return self.fpath
+
+    @data_fpath.setter
+    def data_fpath(self, value):
+        self.fpath = value
+
 
 def ensure_sql_coco_view(dset, db_fpath=None):
     """
@@ -1084,11 +1101,12 @@ def ensure_sql_coco_view(dset, db_fpath=None):
         timestamps to determine if it needs to write the dataset.
     """
     if db_fpath is None:
-        db_fpath = ub.augpath(dset.fpath, prefix='.', ext='.view.v002.sqlite')
+        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v003.sqlite')
 
     db_uri = 'sqlite:///file:' + db_fpath
     # dpath = dirname(dset.fpath)
 
+    print('dset.img_root = {!r}'.format(dset.img_root))
     self = CocoSqlDatabase(db_uri, img_root=dset.img_root, tag=dset.tag)
 
     import os
