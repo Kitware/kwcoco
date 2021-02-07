@@ -1642,16 +1642,19 @@ class MixinCocoExtras(object):
         developer helper
 
         Ignore:
+            import kwcoco
             self = kwcoco.CocoDataset.demo('photos')
             print('self = {!r}'.format(self))
             self._tree()
 
             self = kwcoco.CocoDataset.demo('shapes1')
+            print(self.imgs[1])
             print('self = {!r}'.format(self))
             self._tree()
 
             self = kwcoco.CocoDataset.demo('vidshapes2')
             print('self = {!r}'.format(self))
+            print(self.imgs[1])
             self._tree()
         """
         print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
