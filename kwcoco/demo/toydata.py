@@ -8,9 +8,7 @@ Notes:
 """
 from __future__ import absolute_import, division, print_function
 from os.path import join
-import six
 import glob
-import json
 import numpy as np
 import ubelt as ub
 import kwarray
@@ -60,7 +58,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         exact (bool): if True, ensures that exactly the number of specified
             annots are generated.
 
-        newstyle (bool): use new-sytle mscoco format
+        newstyle (bool): use new-sytle kwcoco format
 
         rng (RandomState): the random state used to seed the process
 
@@ -278,7 +276,11 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
 
 @profile
 def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
-                      newstyle=True, dpath=None, aux=None, cache=True):
+                      newstyle=True,
+                      dpath=None,
+                      bundle_dpath=None,
+                      aux=None,
+                      cache=True):
     """
     Create a toy detection problem
 
@@ -292,8 +294,11 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
 
         newstyle (bool, default=True): create newstyle kwcoco data
 
-        dpath (str): path to the output image directory, defaults to using
-            kwcoco cache dir.
+        dpath (str): path to the directory that will contain the bundle,
+            (defaults to a kwcoco cache dir)
+
+        bundle_dpath (str): path to the directory that will store images.
+            If specified,
 
         aux (bool): if True generates dummy auxillary channels
 
@@ -303,7 +308,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
             `dpath`.
 
     Returns:
-        dict: dataset in mscoco format
+        kwcoco.CocoDataset :
 
     SeeAlso:
         random_video_dset
@@ -321,18 +326,20 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     Example:
         >>> from kwcoco.demo.toydata import *
         >>> import kwcoco
-        >>> dataset = demodata_toy_dset(gsize=(300, 300), aux=True, cache=False)
-        >>> dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
-        >>> dset = kwcoco.CocoDataset(dataset)
+        >>> dset = demodata_toy_dset(gsize=(300, 300), aux=True, cache=False)
         >>> # xdoctest: +REQUIRES(--show)
         >>> print(ub.repr2(dset.dataset, nl=2))
         >>> import kwplot
         >>> kwplot.autompl()
         >>> dset.show_image(gid=1)
-        >>> ub.startfile(dpath)
+        >>> ub.startfile(dset.bundle_dpath)
+
+        dset._tree()
     """
+    import kwcoco
     if dpath is None:
-        dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
+        # dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
+        dpath = ub.ensure_app_cache_dir('kwcoco', 'demodata_bundles')
     else:
         ub.ensuredir(dpath)
 
@@ -368,28 +375,35 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         'rng': ub.hash_data(rng),
         'aux': aux,
     }
-    depends = ub.hash_data(cfg)[0:32]
-    cacher = ub.Cacher('toy_dset_v3', dpath=ub.ensuredir(dpath, 'cache'),
-                       depends=depends, verbose=verbose, enabled=0)
 
-    depid = cacher._condense_cfgstr()
-    root_dpath = join(dpath, 'shapes_{}_{}'.format(cfg['n_imgs'], depid))
-    ub.ensuredir(root_dpath)
+    depends = ub.hash_data(cfg, base='abc')[0:14]
+    bundle_dname = 'shapes_{}_{}'.format(cfg['n_imgs'], depends)
+    bundle_dpath = ub.ensuredir((dpath, bundle_dname))
+    cache_dpath = ub.ensuredir((bundle_dpath, '_cache'))
+    assets_dpath = ub.ensuredir((bundle_dpath, '_assets'))
+    img_dpath = ub.ensuredir((assets_dpath, 'images'))
+    dset_fpath = join(bundle_dpath, 'data.kwcoco.json')
 
-    img_dpath = ub.ensuredir((root_dpath, 'images'))
+    img_dpath = ub.ensuredir(img_dpath)
+    cache_dpath = ub.ensuredir(cache_dpath)
+
+    stamp = ub.CacheStamp(
+        'toy_dset_stamp_v7',
+        dpath=cache_dpath, depends=depends, verbose=verbose, enabled=0)
 
     n_have = len(list(glob.glob(join(img_dpath, '*.png'))))
     # Hack: Only allow cache loading if the data seems to exist
-    cacher.enabled = (n_have == n_imgs) and cache
+    stamp.cacher.enabled = (n_have == n_imgs) and cache
 
+    # TODO: parametarize
     bg_intensity = .1
     fg_scale = 0.5
     bg_scale = 0.8
 
-    dataset = cacher.tryload(on_error='clear')
-    if dataset is None:
-        ub.delete(img_dpath)
+    if stamp.expired():
+        ub.delete(img_dpath, verbose=1)
         ub.ensuredir(img_dpath)
+
         dataset = {
             'images': [],
             'annotations': [],
@@ -422,7 +436,6 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
             imwrite_kwargs = {'backend': 'gdal'}
 
         for __ in ub.ProgIter(range(n_imgs), label='creating data'):
-
             # TODO: parallelize
             img, anns = demodata_toy_img(anchors, gsize=gsize,
                                          categories=catpats,
@@ -444,7 +457,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
             if auxiliaries is not None:
                 for auxdict in auxiliaries:
                     aux_dpath = ub.ensuredir(
-                        (root_dpath, 'aux_' + auxdict['channels']))
+                        (assets_dpath, 'aux', auxdict['channels']))
                     aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
                     ub.ensuredir(aux_dpath)
                     auxdata = (auxdict.pop('imdata') * 255).astype(np.uint8)
@@ -469,17 +482,26 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                 dataset['annotations'].append(ann)
 
             kwimage.imwrite(fpath, imdata)
+            # print('write fpath = {!r}'.format(fpath))
 
-        with open(join(dpath, 'toy_dset.mscoco.json'), 'w') as file:
-            if six.PY2:
-                json.dump(dataset, file, indent=4)
-            else:
-                json.dump(dataset, file, indent='    ')
+        dset = kwcoco.CocoDataset(dataset, bundle_dpath=bundle_dpath)
+        dset.dset_fpath = dset_fpath
+        print('dump dset.dset_fpath = {!r}'.format(dset.dset_fpath))
+        dset.dump(dset.dset_fpath)
+        stamp.renew()
+    else:
+        # otherwise load the data
+        # bundle_dpath = dirname(dset_fpath)
+        print('read dset_fpath = {!r}'.format(dset_fpath))
+        dset = kwcoco.CocoDataset(dset_fpath, bundle_dpath=bundle_dpath)
 
-        cacher.enabled = True
-        cacher.save(dataset)
+    dset.tag = bundle_dname
+    dset.fpath = dset_fpath
 
-    return dataset
+    print('dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
+    dset.reroot(dset.bundle_dpath)
+
+    return dset
 
 
 def random_video_dset(
@@ -522,6 +544,23 @@ def random_video_dset(
         >>> dset.show_image(1, doclf=True)
         >>> dset.show_image(2, doclf=True)
 
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        dset = random_video_dset(render=False, num_videos=3, num_frames=2,
+            num_tracks=10)
+        dset._tree()
+        dset.imgs[1]
+
+        dset = random_single_video_dset()
+        dset._tree()
+        dset.imgs[1]
+
+        from kwcoco.demo.toydata import *  # NOQA
+        dset = random_video_dset(render=True, num_videos=3, num_frames=2,
+           num_tracks=10)
+        print(dset.imgs[1])
+        print('dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
+        dset._tree()
+
         import xdev
         globals().update(xdev.get_func_kwargs(random_video_dset))
         num_videos = 2
@@ -561,8 +600,13 @@ def random_video_dset(
     else:
         if not render:
             renderkw = None
+
     if renderkw:
+        if dpath is None:
+            dpath = ub.ensure_app_cache_dir('kwcoco', 'demo_vidshapes')
+
         render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw)
+        dset.fpath = join(dpath, 'data.kwcoco.json')
 
     dset._build_index()
     return dset
@@ -571,7 +615,7 @@ def random_video_dset(
 def random_single_video_dset(gsize=(600, 600), num_frames=5,
                              num_tracks=3, tid_start=1, gid_start=1,
                              video_id=1, anchors=None, rng=None, render=False,
-                             autobuild=True, verbose=3, aux=None):
+                             dpath=None, autobuild=True, verbose=3, aux=None):
     """
     Create the video scene layout of object positions.
 
@@ -662,6 +706,13 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         >>> assert 'auxiliary' in dset.imgs[1]
         >>> assert dset.imgs[1]['auxiliary'][0]['channels']
         >>> assert dset.imgs[1]['auxiliary'][1]['channels']
+
+    Ignore:
+        dset = random_single_video_dset(render=True, num_frames=10,
+            anchors=anchors, num_tracks=10)
+
+        dset._tree()
+
     """
     import pandas as pd
     import kwcoco
@@ -768,7 +819,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
             Example:
                 >>> from kwimage.structs.boxes import *  # NOQA
                 >>> self = Boxes.random(10).scale(1).translate(-10)
-                >>> x_min, y_min, x_max, y_max = 10, 10, 20, 20
+                >> x_min, y_min, x_max, y_max = 10, 10, 20, 20
                 >>> x_min, y_min, x_max, y_max = 0, 0, 20, 20
                 >>> print('self = {!r}'.format(self))
                 >>> scaled = warp_within_bounds(self, x_min, y_min, x_max, y_max)
@@ -854,7 +905,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     # The dataset has been prepared, now we just render it and we have
     # a nice video dataset.
     renderkw = {
-        'dpath': None,
+        'dpath': dpath,
     }
     if isinstance(render, dict):
         renderkw.update(render)
@@ -862,7 +913,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         if not render:
             renderkw = None
     if renderkw is not None:
-        render_toy_dataset(dset, rng=rng, renderkw=renderkw)
+        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw)
     if autobuild:
         dset._build_index()
     return dset
@@ -922,12 +973,14 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     hashid = dset._build_hashid()[0:24]
 
     if dpath is None:
-        dpath = ub.ensure_app_cache_dir('kwcoco', 'toy_dset')
+        dset_name = 'rendered_{}'.format(hashid)
+        bundle_dpath = ub.ensure_app_cache_dir('kwcoco', 'rendered', dset_name)
+        dset.fpath = join(bundle_dpath, 'data.kwcoco.json')
+        bundle_dpath = dset.bundle_dpath
     else:
-        ub.ensuredir(dpath)
+        bundle_dpath = dpath
 
-    root_dpath = ub.ensuredir((dpath, 'render_{}'.format(hashid)))
-    img_dpath = ub.ensuredir((root_dpath, 'images'))
+    img_dpath = ub.ensuredir((bundle_dpath, '_assets/images'))
 
     for gid in dset.imgs.keys():
         # Render data inside the image
@@ -945,7 +998,8 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
         if auxiliaries is not None:
             for auxdict in auxiliaries:
                 aux_dpath = ub.ensuredir(
-                    (root_dpath, 'aux_' + auxdict['channels']))
+                    (bundle_dpath, '_assets',
+                     'aux', 'aux_' + auxdict['channels']))
                 aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
                 ub.ensuredir(aux_dpath)
                 auxdata = (auxdict.pop('imdata') * 255).astype(np.uint8)
@@ -956,8 +1010,8 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
                 except Exception:
                     kwimage.imwrite(aux_fpath, auxdata, space=None)
             img['auxiliary'] = auxiliaries
-
         kwimage.imwrite(img_fpath, imdata)
+
     dset._build_index()
     return dset
 

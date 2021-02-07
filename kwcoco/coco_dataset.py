@@ -184,11 +184,7 @@ References:
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 import warnings
-from os.path import dirname
-from os.path import splitext
-from os.path import basename
-from os.path import join
-from os.path import exists
+from os.path import dirname, splitext, basename, join, exists, isdir
 from collections import OrderedDict, defaultdict
 import json
 import numpy as np
@@ -555,7 +551,7 @@ class Images(ObjectList1D):
 
     @property
     def gpath(self):
-        root = self._dset.img_root
+        root = self._dset.bundle_dpath
         return [join(root, gname) for gname in self.gname]
 
     @property
@@ -1026,7 +1022,7 @@ class MixinCocoAccessors(object):
             gpath = self.get_auxiliary_fpath(gid_or_img, channels)
         else:
             img = self._resolve_to_img(gid_or_img)
-            gpath = join(self.img_root, img['file_name'])
+            gpath = join(self.bundle_dpath, img['file_name'])
         return gpath
 
     def _get_img_auxiliary(self, gid_or_img, channels):
@@ -1062,7 +1058,7 @@ class MixinCocoAccessors(object):
             >>> self.get_auxiliary_fpath(1, 'disparity')
         """
         aux = self._get_img_auxiliary(gid_or_img, channels)
-        fpath = join(self.img_root, aux['file_name'])
+        fpath = join(self.bundle_dpath, aux['file_name'])
         return fpath
 
     # old misspellings for backwards compat
@@ -1510,7 +1506,9 @@ class MixinCocoExtras(object):
 
         Example:
             >>> print(CocoDataset.demo('photos'))
-            >>> print(CocoDataset.demo('shapes', verbose=0))
+            >>> print(CocoDataset.demo('shapes', verbose=1))
+            >>> print(CocoDataset.demo('vidshapes', verbose=1))
+
             >>> print(CocoDataset.demo('shapes256', verbose=0))
             >>> print(CocoDataset.demo('shapes8', verbose=0))
 
@@ -1548,6 +1546,12 @@ class MixinCocoExtras(object):
             >>> assert self1.fpath == self2.fpath
             >>> assert self1.dataset == self2.dataset
             >>> assert self1.dataset is not self2.dataset
+
+        Ignore:
+            import xdev
+            key = 'shapes'
+            globals().update(xdev.get_func_kwargs(kwcoco.CocoDataset.demo))
+            kw = {}
         """
         import parse
         from kwcoco.demo import toydata
@@ -1558,8 +1562,10 @@ class MixinCocoExtras(object):
                 kw['n_imgs'] = int(res.named['num_imgs'])
             if 'rng' not in kw and 'n_imgs' in kw:
                 kw['rng'] = kw['n_imgs']
-            dataset = toydata.demodata_toy_dset(**kw)
-            self = cls(dataset, tag=key)
+            self = toydata.demodata_toy_dset(**kw)
+            self.tag = key
+            # .dataset
+            # self = cls(dataset, tag=key)
         elif key.startswith('vidshapes'):
             res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
             vidkw = {
@@ -1589,35 +1595,71 @@ class MixinCocoExtras(object):
 
             tag = key + '_' + cfgstr
 
-            dpath = vidkw.get('dpath', None)
-            if dpath is None:
+            dpath = vidkw.pop('dpath', None)
+            bundle_dpath = vidkw.get('bundle_dpath', None)
+            if dpath is not None:
+                bundle_dpath = dpath
+
+            if bundle_dpath is None:
                 # Even if the cache is off, we still will need this because it
                 # will write rendered data to disk. Perhaps we can make this
                 # optional in the future.
-                dpath = vidkw['dpath'] = ub.ensure_app_cache_dir('kwcoco', 'toy_dset', tag)
-            fpath = join(dpath, tag + '.kwcoco.json')
-            stamp = ub.CacheStamp(key, dpath=dpath, cfgstr=cfgstr,
+                basedir = ub.ensure_app_cache_dir('kwcoco', 'demo_visahapes')
+                bundle_dpath = vidkw['bundle_dpath'] = join(basedir, tag)
+
+            cache_dpath = join(bundle_dpath, '_cache')
+            fpath = join(bundle_dpath, 'data.kwcoco.json')
+
+            stamp = ub.CacheStamp('vidshape_stamp_v7', dpath=cache_dpath, cfgstr=cfgstr,
                                   enabled=use_cache, product=[fpath],
                                   verbose=100,
                                   # meta=vidkw  # requires ubelt>=0.9.3
                                   )
+            print('stamp = {!r}'.format(stamp))
             if stamp.expired():
+                vidkw['dpath'] = bundle_dpath
+                vidkw.pop('bundle_dpath')
                 self = toydata.random_video_dset(**vidkw)
-                self.reroot(dpath)
+                print('self.fpath = {!r}'.format(self.fpath))
+                print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
+                self.reroot(bundle_dpath)
                 self.fpath = fpath
                 if fpath is not None:
                     self.dump(fpath, newlines=True)
                     stamp.renew()
             else:
-                self = cls(fpath)
+                self = cls(data=fpath, bundle_dpath=bundle_dpath)
 
-            # self = cls(dataset, tag=key)
         elif key == 'photos':
             dataset = demo_coco_data()
             self = cls(dataset, tag=key)
         else:
             raise KeyError(key)
         return self
+
+    def _tree(self):
+        """
+        developer helper
+
+        Ignore:
+            self = kwcoco.CocoDataset.demo('photos')
+            print('self = {!r}'.format(self))
+            self._tree()
+
+            self = kwcoco.CocoDataset.demo('shapes1')
+            print('self = {!r}'.format(self))
+            self._tree()
+
+            self = kwcoco.CocoDataset.demo('vidshapes2')
+            print('self = {!r}'.format(self))
+            self._tree()
+        """
+        print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
+        print('self.fpath = {!r}'.format(self.fpath))
+        print('self.tag = {!r}'.format(self.tag))
+        if not self.bundle_dpath:
+            raise Exception('We dont have a bundle')
+        _ = ub.cmd('tree {}'.format(self.bundle_dpath), verbose=2)  # NOQA
 
     @classmethod
     def random(cls, rng=None):
@@ -1713,7 +1755,7 @@ class MixinCocoExtras(object):
         if hash_pixels:
             if not hashid_parts['images'].get('pixels', None):
                 gids = sorted(self.imgs.keys())
-                gpaths = [join(self.img_root, gname)
+                gpaths = [join(self.bundle_dpath, gname)
                           for gname in self.images(gids).lookup('file_name')]
                 gpath_sha512s = [
                     ub.hash_file(gpath, hasher='sha512')
@@ -1852,7 +1894,7 @@ class MixinCocoExtras(object):
             pool = util_futures.JobPool('thread', max_workers=workers)
             for img in ub.ProgIter(self.dataset['images'], verbose=verbose,
                                    desc='submit image size jobs'):
-                gpath = join(self.img_root, img['file_name'])
+                gpath = join(self.bundle_dpath, img['file_name'])
                 if 'width' not in img or 'height' not in img:
                     job = pool.submit(kwimage.load_image_shape, gpath)
                     job.img = img
@@ -1879,7 +1921,7 @@ class MixinCocoExtras(object):
         """
         def _gen_missing_imgs():
             for img in self.iter_images():
-                gpath = join(self.img_root, img['file_name'])
+                gpath = join(self.bundle_dpath, img['file_name'])
                 if not exists(gpath):
                     yield img
 
@@ -1896,7 +1938,7 @@ class MixinCocoExtras(object):
         for img in ub.ProgIter(gids, desc='ensure image data'):
             if 'url' in img:
                 if _has_download_permission():
-                    gpath = join(self.img_root, img['file_name'])
+                    gpath = join(self.bundle_dpath, img['file_name'])
                     ub.ensuredir(dirname(gpath))
                     ub.grabdata(img['url'], gpath)
                 else:
@@ -1919,13 +1961,13 @@ class MixinCocoExtras(object):
         for index in ub.ProgIter(range(len(self.dataset['images'])),
                                  verbose=verbose):
             img = self.dataset['images'][index]
-            gpath = join(self.img_root, img['file_name'])
+            gpath = join(self.bundle_dpath, img['file_name'])
             if not exists(gpath):
                 bad_paths.append((index, gpath))
 
             if check_aux:
                 for aux in img.get('aux', []):
-                    gpath = join(self.img_root, aux['file_name'])
+                    gpath = join(self.bundle_dpath, aux['file_name'])
                     if not exists(gpath):
                         bad_paths.append((index, gpath))
         return bad_paths
@@ -1941,7 +1983,7 @@ class MixinCocoExtras(object):
         for index in ub.ProgIter(range(len(self.dataset['images'])),
                                  verbose=verbose, desc='check corrupted images'):
             img = self.dataset['images'][index]
-            gpath = join(self.img_root, img['file_name'])
+            gpath = join(self.bundle_dpath, img['file_name'])
             if not exists(gpath):
                 bad_paths.append((index, gpath))
             # TODO: parallelize
@@ -2218,7 +2260,7 @@ class MixinCocoExtras(object):
 
         Args:
             new_root (str, default=None):
-                New image root. If unspecified the current ``self.img_root`` is
+                New image root. If unspecified the current ``self.bundle_dpath`` is
                 used. If old_prefix and new_prefix are unspecified, they will
                 attempt to be determined based on the current root (which
                 assumes the file paths exist at that root) and this new root.
@@ -2273,9 +2315,9 @@ class MixinCocoExtras(object):
             >>> # * given absolute paths on current machine
             >>> cases['abs_curr'] = kwcoco.CocoDataset.from_image_paths([join(host, gname)])
             >>> # * given "remote" rooted relative paths on current machine
-            >>> cases['rel_remoterooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], img_root=remote)
+            >>> cases['rel_remoterooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], bundle_dpath=remote)
             >>> # * given "host" rooted relative paths on current machine
-            >>> cases['rel_hostrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], img_root=host)
+            >>> cases['rel_hostrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], bundle_dpath=host)
             >>> # * given unrooted relative paths on current machine
             >>> cases['rel_unrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname])
             >>> # * given absolute paths on another machine
@@ -2292,7 +2334,7 @@ class MixinCocoExtras(object):
             >>>     print('----')
             >>>     print('case key = {!r}'.format(key))
             >>>     print('ORIG = {!r}'.format(dset.imgs[1]['file_name']))
-            >>>     print('dset.img_root = {!r}'.format(dset.img_root))
+            >>>     print('dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
             >>>     print('missing_gids = {!r}'.format(dset.missing_images()))
             >>>     print('cwd = {!r}'.format(os.getcwd()))
             >>>     print('host = {!r}'.format(host))
@@ -2328,18 +2370,18 @@ class MixinCocoExtras(object):
             >>>     print('rel_fpath = {!r}'.format(rel_fpath))
             >>> dset = self = kwcoco.CocoDataset.demo()
             >>> # Change base relative directory
-            >>> img_root = ub.expandpath('~')
+            >>> bundle_dpath = ub.expandpath('~')
             >>> print('ORIG self.imgs = {!r}'.format(self.imgs))
-            >>> print('ORIG dset.img_root = {!r}'.format(dset.img_root))
-            >>> print('NEW img_root       = {!r}'.format(img_root))
-            >>> self.reroot(img_root)
+            >>> print('ORIG dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
+            >>> print('NEW bundle_dpath       = {!r}'.format(bundle_dpath))
+            >>> self.reroot(bundle_dpath)
             >>> report(self, 'self')
             >>> print('NEW self.imgs = {!r}'.format(self.imgs))
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
             >>> # Use absolute paths
             >>> self.reroot(absolute=True)
-            >>> assert self.imgs[1]['file_name'].startswith(img_root)
+            >>> assert self.imgs[1]['file_name'].startswith(bundle_dpath)
 
             >>> # Switch back to relative paths
             >>> self.reroot()
@@ -2349,10 +2391,10 @@ class MixinCocoExtras(object):
             >>> # demo with auxiliary data
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
-            >>> img_root = ub.expandpath('~')
+            >>> bundle_dpath = ub.expandpath('~')
             >>> print(self.imgs[1]['file_name'])
             >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
-            >>> self.reroot(new_root=img_root)
+            >>> self.reroot(new_root=bundle_dpath)
             >>> print(self.imgs[1]['file_name'])
             >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
@@ -2361,9 +2403,9 @@ class MixinCocoExtras(object):
         from os.path import exists, relpath
 
         new_img_root = new_root
-        cur_img_root = self.img_root
+        cur_img_root = self.bundle_dpath
         if new_img_root is None:
-            new_img_root = self.img_root
+            new_img_root = self.bundle_dpath
 
         if smart:
             raise NotImplementedError('we are not smart yet (probably a good thing)')
@@ -2471,17 +2513,35 @@ class MixinCocoExtras(object):
             self.index.file_name_to_img = {
                 img['file_name']: img for img in self.index.imgs.values()}
 
-        self.img_root = new_img_root
+        self.bundle_dpath = new_img_root
         return self
 
     @property
     def data_root(self):
-        """ In the future we may deprecate img_root for data_root """
-        return self.img_root
+        """ In the future we will deprecate data_root for bundle_dpath """
+        return self.bundle_dpath
 
     @data_root.setter
     def data_root(self, value):
-        self.img_root = value
+        self.bundle_dpath = value
+
+    @property
+    def img_root(self):
+        """ In the future we will deprecate img_root for bundle_dpath """
+        return self.bundle_dpath
+
+    @img_root.setter
+    def img_root(self, value):
+        self.bundle_dpath = value
+
+    @property
+    def data_fpath(self):
+        """ data_fpath is an alias of fpath """
+        return self.fpath
+
+    @data_fpath.setter
+    def data_fpath(self, value):
+        self.fpath = value
 
     def find_representative_images(self, gids=None):
         r"""
@@ -4542,7 +4602,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         tag (str):
             A tag indicating the name of the dataset.
 
-        img_root (PathLike | None) :
+        bundle_dpath (PathLike | None) :
             If known, this is the root path that all image file names are
             relative to. This can also be manually overwritten by the user.
 
@@ -4566,7 +4626,8 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         >>> plt.show()
     """
 
-    def __init__(self, data=None, tag=None, img_root=None, autobuild=True):
+    def __init__(self, data=None, tag=None, bundle_dpath=None, img_root=None,
+                 autobuild=True):
         """
         Args:
 
@@ -4583,15 +4644,22 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                 If unspecfied and ``data`` is a filepath this becomes the
                 basename.
 
-            img_root (str | None):
+            bundle_dpath (str | None):
                 the root of the dataset that images / external data will be
-                assumed to be relative to. (in the future this name might
-                change to data_root). If unspecfied, we attempt to determine it
-                using information in ``data``. If ``data`` is a filepath, we
-                use the dirname of that path. If ``data`` is a dictionary, we
-                look for the "img_root" key. If unspecfied and we fail to
-                introspect then, we fallback to the current working directory.
+                assumed to be relative to. If unspecfied, we attempt to
+                determine it using information in ``data``. If ``data`` is a
+                filepath, we use the dirname of that path. If ``data`` is a
+                dictionary, we look for the "img_root" key. If unspecfied and
+                we fail to introspect then, we fallback to the current working
+                directory.
+
+            img_root (str | None):
+                deprecated alias for bundle_dpath
         """
+        self._fpath = None
+
+        if img_root is not None:
+            bundle_dpath = img_root
         if data is None:
             # TODO: rely on subset of SPEC keys
             data = {
@@ -4604,30 +4672,79 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             }
 
         fpath = None
-
         if isinstance(data, dict):
             # Assumption: If data is a dict and are not explicitly given
-            # img_root, then we assume it is relative to the cwd.
-            assumed_root = '.'
+            # bundle_dpath, then we assume it is relative to the cwd.
+            assumed_root = './untitled_kwcoco_bundle'
         elif isinstance(data, six.string_types):
-            fpath = data
-            key = basename(fpath)
-            data = json.load(open(fpath, 'r'))
-
-            # If data is a path it gives us the absolute location of the root
-            assumed_root = dirname(fpath)
-            if tag is None:
-                tag = key
+            path = data
+            if isdir(path):
+                # data was a pointer to hopefully a kwcoco bundle
+                if bundle_dpath is None:
+                    bundle_dpath = path
+                else:
+                    if bundle_dpath != path:
+                        raise Exception('ambiguous')
+            else:
+                # data was a pointer to hopefully a kwcoco filepath
+                fpath = data
+                if bundle_dpath is None:
+                    bundle_dpath = dirname(fpath)
         else:
             raise TypeError(
                 'data must be a dict or path to json file, '
                 'but got: {!r}'.format(type(data)))
 
-        if img_root is None:
+        if fpath is None and bundle_dpath is not None:
+            import glob
+            candidates = [
+                'data',
+                'data.json',
+                'data.kwcoco.json',
+                '*.kwcoco.json',
+                '*.mscoco.json',
+            ]
+            # Check for standard bundle manifest names
+            manifest_candidate_iter = iter(ub.oset(ub.flatten([
+                glob.glob(join(bundle_dpath, p))
+                for p in candidates])))
+            try:
+                fpath = ub.peek(manifest_candidate_iter)
+            except StopIteration:
+                fpath = join(bundle_dpath, 'data.kwcoco.json')
+                # raise Exception('No manifest in Dataset Bundle')
+            else:
+                remain = list(manifest_candidate_iter)
+                if len(remain) > 0:
+                    raise Exception('Ambiguous Dataset Bundle')
+            key = basename(bundle_dpath)
+
+        if fpath is not None:
+            fname = basename(fpath)
+            if fname == 'data.kwcoco.json':
+                if bundle_dpath is not None:
+                    bundle_dpath = dirname(fpath)
+                key = basename(bundle_dpath)
+            else:
+                key = fname
+
+        if bundle_dpath is not None:
+            assumed_root = bundle_dpath
+
+        if isinstance(data, six.string_types):
+            # assumed_root = dirname(fpath)
+            with open(fpath, 'r') as file:
+                data = json.load(file)
+
+            # If data is a path it gives us the absolute location of the root
+            if tag is None:
+                tag = key
+
+        if bundle_dpath is None:
             if 'img_root' in data:
                 # allow image root to be specified in the dataset
                 # we refer to this as a json data "body root".
-                body_root = data['img_root']
+                body_root = data.get('img_root', '')
                 if body_root is None:
                     body_root = ''
                 elif isinstance(body_root, six.string_types):
@@ -4640,40 +4757,86 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
                     else:
                         raise TypeError('body_root = {!r}'.format(body_root))
                 try:
-                    img_root = join(assumed_root, body_root)
+                    bundle_dpath = join(assumed_root, body_root)
                 except Exception:
                     print('body_root = {!r}'.format(body_root))
                     print('assumed_root = {!r}'.format(assumed_root))
                     raise
             else:
-                img_root = assumed_root
+                bundle_dpath = assumed_root
+
+        bundle_dpath = ub.expandpath(bundle_dpath)
+
+        if fpath is None:
+            fpath = join(bundle_dpath, 'data.kwcoco.json')
 
         self.index = CocoIndex()
 
         self.hashid = None
         self.hashid_parts = None
-        self.fpath = fpath
 
         self.tag = tag
         self.dataset = data
-        self.img_root = ub.expandpath(img_root)
+
+        self.data_fpath = fpath
+        self.bundle_dpath = bundle_dpath
+
+        self.cache_dpath = None
+        self.assets_dpath = None
 
         # Keep track of an unused id we may use
         self._next_ids = _NextId(self)
 
+        self._infer_dirs()
+
         if autobuild:
             self._build_index()
 
+    @property
+    def fpath(self):
+        """ In the future we will deprecate img_root for bundle_dpath """
+        return self._fpath
+
+    @fpath.setter
+    def fpath(self, value):
+        self._fpath = value
+        self._infer_dirs()
+
+    def _infer_dirs(self):
+        """
+        Example:
+            self = dset
+        """
+        data_fpath = self.fpath
+        if data_fpath is not None:
+            bundle_dpath = dirname(data_fpath)
+            assets_dpath = join(bundle_dpath, '_assets')
+            cache_dpath = join(bundle_dpath, '_cache')
+            # OPINION: Do we want conditions?
+            # data_fname = basename(data_fpath)
+            # bundle_conditions = {
+            #     # 'name': data_fname == 'data.kwcoco.json',
+            #     # 'ext': data_fname.endswith('.kwcoco.json'),
+            #     # 'has_assets': exists(assets_dpath),
+            # }
+            # is_bundle = all(bundle_conditions.values())
+            # if is_bundle:
+            self.bundle_dpath = bundle_dpath
+            self.assets_dpath = assets_dpath
+            self.cache_dpath = cache_dpath
+
     @classmethod
-    def from_data(CocoDataset, data, img_root=None):
+    def from_data(CocoDataset, data, bundle_dpath=None, img_root=None):
         """
         Constructor from a json dictionary
         """
-        coco_dset = CocoDataset(data, img_root=img_root)
+        coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
+                                img_root=img_root)
         return coco_dset
 
     @classmethod
-    def from_image_paths(CocoDataset, gpaths, img_root=None):
+    def from_image_paths(CocoDataset, gpaths, bundle_dpath=None,
+                         img_root=None):
         """
         Constructor from a list of images paths.
 
@@ -4686,7 +4849,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> coco_dset = CocoDataset.from_image_paths(['a.png', 'b.png'])
             >>> assert coco_dset.n_images == 2
         """
-        coco_dset = CocoDataset(img_root=img_root)
+        coco_dset = CocoDataset(bundle_dpath=bundle_dpath, img_root=img_root)
         for gpath in gpaths:
             coco_dset.add_image(gpath)
         return coco_dset
@@ -5310,7 +5473,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         # handle soft data roots
         from os.path import normpath
-        soft_dset_roots = [dset.img_root for dset in others]
+        soft_dset_roots = [dset.bundle_dpath for dset in others]
         soft_dset_roots = [normpath(r) if r is not None else None for r in soft_dset_roots]
         if ub.allsame(soft_dset_roots):
             soft_img_root = ub.peek(soft_dset_roots)
@@ -5326,7 +5489,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             relative_dsets = [('', d.dataset) for d in others]
         else:
             common_root = None
-            relative_dsets = [(d.img_root, d.dataset) for d in others]
+            relative_dsets = [(d.bundle_dpath, d.dataset) for d in others]
 
         merged = _coco_union(relative_dsets, common_root)
 
@@ -5336,7 +5499,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         new_dset = cls(merged, **kwargs)
 
         if common_root is None and soft_img_root is not None:
-            new_dset.img_root = soft_img_root
+            new_dset.bundle_dpath = soft_img_root
         return new_dset
 
     def subset(self, gids, copy=False, autobuild=True):
@@ -5393,7 +5556,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             from copy import deepcopy
             new_dataset = deepcopy(new_dataset)
 
-        sub_dset = CocoDataset(new_dataset, img_root=self.img_root,
+        sub_dset = CocoDataset(new_dataset, bundle_dpath=self.bundle_dpath,
                                autobuild=autobuild)
         return sub_dset
 

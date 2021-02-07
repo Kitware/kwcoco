@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.11 - Unreleased
 
+### Added
+* Introduced the concept of a bundled dataset
+
 
 ## Version 0.1.10 - Released 2021-02-05
 
