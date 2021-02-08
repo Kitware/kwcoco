@@ -3942,11 +3942,11 @@ class MixinCocoAddRemove(object):
         Example:
             >>> from kwcoco.coco_dataset import *
             >>> self = CocoDataset.demo('vidshapes8')
-            >>> assert len(self.dataset['videos']) == 1
+            >>> assert len(self.dataset['videos']) == 8
             >>> vidids_or_videos = [self.dataset['videos'][0]['id']]
             >>> self.remove_videos(vidids_or_videos)  # xdoc: +IGNORE_WANT
             {'annotations': 4, 'images': 2, 'videos': 1}
-            >>> assert len(self.dataset['videos']) == 0
+            >>> assert len(self.dataset['videos']) == 7
             >>> self._check_index()
         """
         remove_info = {'annotations': None, 'images': None, 'videos': None}
