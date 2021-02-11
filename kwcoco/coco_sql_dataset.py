@@ -939,7 +939,7 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         DBSession = sessionmaker(bind=self.engine)
         self.session = DBSession()
 
-        self.session.execute('PRAGMA cache_size -{}'.format(128 * 1000))
+        self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
 
         self._build_index()
 
