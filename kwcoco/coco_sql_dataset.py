@@ -938,6 +938,9 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
             CocoBase.metadata.create_all(self.engine)
         DBSession = sessionmaker(bind=self.engine)
         self.session = DBSession()
+
+        self.session.execute('PRAGMA cache_size -{}'.format(128 * 1000))
+
         self._build_index()
 
     def delete(self):
