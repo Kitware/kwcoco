@@ -909,8 +909,15 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         self.session = None
         self.engine = None
         # Make unpickled objects readonly
-        self.index = CocoSqlIndex()
         self.connect(readonly=True)
+
+    def disconnect(self):
+        """
+        Drop references to any SQL or cache objects
+        """
+        self.session = None
+        self.engine = None
+        self.index = None
 
     def connect(self, readonly=False):
         """
@@ -941,7 +948,8 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
 
         self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
 
-        self._build_index()
+        self.index = CocoSqlIndex()
+        self.index.build(self)
 
     def delete(self):
         fpath = self.uri.split('///file:')[-1]
@@ -988,9 +996,6 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
                 row = cls(**item_)
                 session.add(row)
         session.commit()
-
-    def _build_index(self):
-        self.index.build(self)
 
     @property
     def dataset(self):
