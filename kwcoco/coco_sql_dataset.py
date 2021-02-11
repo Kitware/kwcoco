@@ -1092,6 +1092,30 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
                 raise NotImplementedError('cannot use default')
         return attr_list
 
+    def _all_rows_column_lookup(self, tablename, keys):
+        """
+        Convinience method to look up all rows from a table and only a few
+        columns.
+
+        Example:
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> self, dset = demo(10)
+            >>> tablename = 'annotations'
+            >>> keys = ['id', 'category_id']
+            >>> rows = self._all_rows_column_lookup(tablename, keys)
+        """
+        colnames_list = ['{}.{}'.format(tablename, key) for key in keys]
+        colnames = ', '.join(colnames_list)
+        stmt = ub.paragraph(
+            '''
+            SELECT
+                {colnames}
+            FROM {tablename} ORDER BY {tablename}.id
+            ''').format(colnames=colnames, tablename=tablename)
+        result = self.session.execute(stmt)
+        rows = result.fetchall()
+        return rows
+
     def tabular_targets(self):
         """
         Convinience method to create an in-memory summary of basic annotation
