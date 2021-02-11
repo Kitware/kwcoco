@@ -225,7 +225,7 @@ def _new_proxy_cache():
     # return None
     try:
         from ndsampler.utils import util_lru
-        return util_lru.LRUDict.new(max_size=100, impl='auto')
+        return util_lru.LRUDict.new(max_size=1000, impl='auto')
     except Exception:
         return {}
 
@@ -1029,6 +1029,68 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         import pandas as pd
         table_df = pd.read_sql_table(table_name, con=self.engine)
         return table_df
+
+    def _column_lookup(self, tablename, key, rowids, default=ub.NoParam,
+                       keepid=False):
+        """
+        Convinience method to lookup only a single column of information
+
+        Example:
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> self, dset = demo(10)
+            >>> tablename = 'annotations'
+            >>> key = 'category_id'
+            >>> rowids = list(self.anns.keys())[::3]
+            >>> cids1 = self._column_lookup(tablename, key, rowids)
+            >>> cids2 = self.annots(rowids).get(key)
+            >>> cids3 = dset.annots(rowids).get(key)
+            >>> assert cids3 == cids2 == cids1
+
+        Ignore:
+            import timerit
+            ti = timerit.Timerit(10, bestof=3, verbose=2)
+
+            for timer in ti.reset('time'):
+                with timer:
+                    self._column_lookup(tablename, key, rowids)
+
+            for timer in ti.reset('time'):
+                self.anns._cache.clear()
+                with timer:
+                    annots = self.annots(rowids)
+                    annots.get(key)
+
+            for timer in ti.reset('time'):
+                self.anns._cache.clear()
+                with timer:
+                    anns = [self.anns[aid] for aid in rowids]
+                    cids = [ann[key] for ann in anns]
+        """
+        stmt = ub.paragraph(
+            '''
+            SELECT
+                {tablename}.{key}
+            FROM {tablename}
+            WHERE {tablename}.id = :rowid
+            ''').format(tablename=tablename, key=key)
+
+        values = [
+            # self.anns[aid][key]
+            # if aid in self.anns._cache else
+            self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
+            for rowid in rowids
+        ]
+        if keepid:
+            if default is ub.NoParam:
+                attr_list = ub.dzip(rowids, values)
+            else:
+                raise NotImplementedError('cannot use default')
+        else:
+            if default is ub.NoParam:
+                attr_list = values
+            else:
+                raise NotImplementedError('cannot use default')
+        return attr_list
 
     def tabular_targets(self):
         """
