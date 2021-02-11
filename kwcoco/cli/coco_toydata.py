@@ -12,19 +12,25 @@ class CocoToyDataCLI(object):
         default = {
             'key': scfg.Value('shapes8', help='special demodata code', position=1),
 
-            'dst': scfg.Value(None, help='output path. Uses special cache dir if unspecified'),
+            'dst': scfg.Value(None, help=ub.paragraph(
+                '''
+                Output path for the final kwcoco json file.
+                Note, that even when given, a data.kwcoco.json file
+                will also be generated in a bundle_dpath.
+                ''')),
 
             'bundle_dpath': scfg.Value(None, help=ub.paragraph(
                 '''
-                If specified, overwrites the `dst` parameter
-                and creates a bundled dataset in the specified location.
+                Creates a bundled dataset in the specified location.
+                If unspecified, a bundle name is generated based on the
+                toydata config.
                 ''')),
 
             'use_cache': scfg.Value(True)
         }
         epilog = """
         Example Usage:
-            kwcoco toydata --key=shapes8 --dst=toydata.mscoco.json
+            kwcoco toydata --key=shapes8 --dst=toydata.kwcoco.json
 
             kwcoco toydata --key=shapes8 --bundle_dpath=my_test_bundle_v1
             kwcoco toydata --key=shapes8 --bundle_dpath=my_test_bundle_v1
@@ -59,10 +65,9 @@ class CocoToyDataCLI(object):
             if config['dst'] is not None:
                 fpath = config['dst']
                 from os.path import dirname
-                bundle_dpath = dirname(fpath)
-                print('bundle_dpath = {!r}'.format(bundle_dpath))
+                dpath = dirname(fpath)
                 dset = kwcoco.CocoDataset.demo(config['key'],
-                                               bundle_dpath=bundle_dpath,
+                                               dpath=dpath,
                                                use_cache=config['use_cache'])
                 dset.fpath = fpath
             else:
@@ -70,10 +75,10 @@ class CocoToyDataCLI(object):
                                                use_cache=config['use_cache'])
             # dset.reroot(absolute=True)
 
-        print('dset.fpath = {!r}'.format(dset.fpath))
-        print('Writing to dset.fpath = {!r}'.format(dset.fpath))
-
-        dset.dump(dset.fpath, newlines=True)
+        if config['dst'] is not None:
+            print('dset.fpath = {!r}'.format(dset.fpath))
+            print('Writing to dset.fpath = {!r}'.format(dset.fpath))
+            dset.dump(dset.fpath, newlines=True)
 
 _CLI = CocoToyDataCLI
 
