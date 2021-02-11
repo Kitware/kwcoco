@@ -13,6 +13,7 @@ def main(cmdline=True, **kw):
     from kwcoco.cli import coco_show
     from kwcoco.cli import coco_toydata
     from kwcoco.cli import coco_eval
+    from kwcoco.cli import coco_conform
     from kwcoco.cli import coco_modify_categories
     from kwcoco.cli import coco_reroot
 
@@ -24,6 +25,7 @@ def main(cmdline=True, **kw):
         coco_show,
         coco_reroot,
         coco_toydata,
+        coco_conform,
         coco_eval,
         coco_modify_categories,
     ]
