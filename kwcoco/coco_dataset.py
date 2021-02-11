@@ -369,11 +369,11 @@ class ObjectList1D(ub.NiceRepr):
             >>> self.get('id')
             >>> self.get(key='foo', default=None, keepid=True)
         """
-        if hasattr(self._dset, '_column_lookup'):
-            # Hack for SQL speed
-            return self._dset._column_lookup(
-                tablename=self._key, key=key, rowids=self._ids)
-
+        # if hasattr(self._dset, '_column_lookup'):
+        #     # Hack for SQL speed
+        #     # Agg, this doesn't work because some columns need json decoding
+        #     return self._dset._column_lookup(
+        #         tablename=self._key, key=key, rowids=self._ids)
         _lut = self._id_to_obj
         if keepid:
             if default is ub.NoParam:

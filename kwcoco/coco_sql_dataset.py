@@ -1066,6 +1066,7 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
                     anns = [self.anns[aid] for aid in rowids]
                     cids = [ann[key] for ann in anns]
         """
+        # FIXME: Make this work for columns that need json decoding
         stmt = ub.paragraph(
             '''
             SELECT
