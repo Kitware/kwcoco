@@ -343,3 +343,74 @@ class IndexableWalker(Generator):
                 else:
                     if isinstance(value, self.indexable_cls):
                         stack.append((value, path))
+
+
+def indexable_allclose(dct1, dct2, return_info=False):
+    """
+    Walks through two nested data structures and ensures that everything is
+    roughly the same.
+
+    Args:
+        dct1: a nested indexable item
+        dct2: a nested indexable item
+
+    Example:
+        >>> from kwcoco.util.util_json import indexable_allclose
+        >>>
+        >>> dct1 = {
+        >>>     'foo': [1.222222, 1.333],
+        >>>     'bar': 1,
+        >>>     'baz': [],
+        >>> }
+        >>> dct2 = {
+        >>>     'foo': [1.22222, 1.333],
+        >>>     'bar': 1,
+        >>>     'baz': [],
+        >>> }
+        >>> assert indexable_allclose(dct1, dct2)
+    """
+    walker1 = IndexableWalker(dct1)
+    walker2 = IndexableWalker(dct2)
+    flat_items1 = [
+        (path, value) for path, value in walker1
+        if not isinstance(value, walker1.indexable_cls) or len(value) == 0]
+    flat_items2 = [
+        (path, value) for path, value in walker2
+        if not isinstance(value, walker1.indexable_cls) or len(value) == 0]
+
+    flat_items1 = sorted(flat_items1)
+    flat_items2 = sorted(flat_items2)
+
+    if len(flat_items1) != len(flat_items2):
+        info = {
+            'faillist': ['length mismatch']
+        }
+        final_flag = False
+    else:
+        passlist = []
+        faillist = []
+
+        for t1, t2 in zip(flat_items1, flat_items2):
+            p1, v1 = t1
+            p2, v2 = t2
+            assert p1 == p2
+
+            flag = (v1 == v2)
+            if not flag:
+                if isinstance(v1, float) and isinstance(v2, float) and np.isclose(v1, v2):
+                    flag = True
+            if flag:
+                passlist.append(p1)
+            else:
+                faillist.append((p1, v1, v2))
+
+        final_flag = len(faillist) == 0
+        info = {
+            'passlist': passlist,
+            'faillist': faillist,
+        }
+
+    if return_info:
+        return final_flag, info
+    else:
+        return final_flag

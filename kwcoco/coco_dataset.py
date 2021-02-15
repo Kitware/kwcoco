@@ -1470,15 +1470,59 @@ class MixinCocoExtras(object):
 
     @classmethod
     def coerce(cls, key, **kw):
+        """
+        Attempt to transform the input into the intended CocoDataset.
+
+        Args:
+            key : this can either be an instance of a CocoDataset, a
+               string URI pointing to an on-disk dataset, or a special
+               key for creating demodata.
+
+            **kw: passed to whatever constructor is chosen (if any)
+
+        Example:
+            >>> # test coerce for various input methods
+            >>> import kwcoco
+            >>> from kwcoco.coco_sql_dataset import assert_dsets_allclose
+            >>> dct_dset = kwcoco.CocoDataset.coerce('special:shapes8')
+            >>> copy1 = kwcoco.CocoDataset.coerce(dct_dset)
+            >>> copy2 = kwcoco.CocoDataset.coerce(dct_dset.fpath)
+            >>> assert assert_dsets_allclose(dct_dset, copy1)
+            >>> assert assert_dsets_allclose(dct_dset, copy2)
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> sql_dset = dct_dset.view_sql()
+            >>> copy3 = kwcoco.CocoDataset.coerce(sql_dset)
+            >>> copy4 = kwcoco.CocoDataset.coerce(sql_dset.fpath)
+            >>> assert assert_dsets_allclose(dct_dset, sql_dset)
+            >>> assert assert_dsets_allclose(dct_dset, copy3)
+            >>> assert assert_dsets_allclose(dct_dset, copy4)
+        """
         if isinstance(key, cls):
-            return key
-        elif key.startswith('special:'):
-            demokey = key.split(':')[1]
-            self = cls.demo(key=demokey, **kw)
-        elif key.endswith('.json') or '.json.' in key:
-            self = cls(key, **kw)
+            self = key
+        if isinstance(key, str):
+            import uritools
+            dset_fpath = ub.expandpath(key)
+            # Parse the the "file" URI scheme
+            # https://tools.ietf.org/html/rfc8089
+            result = uritools.urisplit(dset_fpath)
+            if result.scheme == 'sqlite':
+                from kwcoco.coco_sql_dataset import CocoSqlDatabase
+                self = CocoSqlDatabase(dset_fpath).connect()
+            elif result.path.endswith('.json') or '.json' in result.path:
+                import kwcoco
+                self = kwcoco.CocoDataset(dset_fpath, **kw)
+            elif result.scheme == 'special':
+                self = cls.demo(key=key, **kw)
+            else:
+                self = cls.demo(key=key, **kw)
+        elif type(key).__name__ == 'CocoSqlDatabase':
+            self = key
+        elif type(key).__name__ == 'CocoDataset':
+            self = key
+        elif type(key).__name__ == 'CocoSampler':
+            self = key.dset
         else:
-            self = cls.demo(key=key, **kw)
+            raise TypeError(type(key))
         return self
 
     @classmethod
@@ -1562,6 +1606,9 @@ class MixinCocoExtras(object):
         """
         import parse
         from kwcoco.demo import toydata
+
+        if key.startswith('special:'):
+            key = key.split(':')[1]
 
         if key.startswith('shapes'):
             res = parse.parse('{prefix}{num_imgs:d}', key)
@@ -5583,6 +5630,20 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         sub_dset = CocoDataset(new_dataset, bundle_dpath=self.bundle_dpath,
                                autobuild=autobuild)
         return sub_dset
+
+    def view_sql(self):
+        """
+        Create a cached SQL interface to this dataset suitable for large scale
+        multiprocessing use cases.
+
+        Note:
+            This view cache is experimental and currently depends on the
+            timestamp of the file pointed to by ``self.fpath``. In other words
+            dont use this on in-memory datasets.
+        """
+        from kwcoco.coco_sql_dataset import ensure_sql_coco_view
+        sql_dset = ensure_sql_coco_view(self)
+        return sql_dset
 
 
 def _delitems(items, remove_idxs, thresh=750):
