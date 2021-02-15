@@ -2968,9 +2968,9 @@ class MixinCocoStats(object):
         """
         if gids is None:
             gids = sorted(self.imgs.keys())
-            gid_to_aids = self.gid_to_aids
+            gid_to_aids = self.index.gid_to_aids
         else:
-            gid_to_aids = ub.dict_subset(self.gid_to_aids, gids)
+            gid_to_aids = ub.dict_subset(self.index.gid_to_aids, gids)
 
         all_cids = set(self.cid_to_aids.keys())
 
