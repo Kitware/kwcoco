@@ -356,7 +356,6 @@ def indexable_allclose(dct1, dct2, return_info=False):
 
     Example:
         >>> from kwcoco.util.util_json import indexable_allclose
-        >>>
         >>> dct1 = {
         >>>     'foo': [1.222222, 1.333],
         >>>     'bar': 1,

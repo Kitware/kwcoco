@@ -75,6 +75,7 @@ import ubelt as ub
 from os.path import exists
 
 from kwcoco.util.dict_like import DictLike  # NOQA
+from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco.coco_dataset import (  # NOQA
     MixinCocoJSONAccessors, MixinCocoAccessors, MixinCocoAttrs,
     MixinCocoStats, MixinCocoDraw
@@ -821,9 +822,9 @@ class CocoSqlIndex(object):
         }
 
 
-class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
-                      MixinCocoAttrs, MixinCocoStats, MixinCocoDraw,
-                      ub.NiceRepr):
+class CocoSqlDatabase(AbstractCocoDataset, MixinCocoJSONAccessors,
+                      MixinCocoAccessors, MixinCocoAttrs, MixinCocoStats,
+                      MixinCocoDraw, ub.NiceRepr):
     """
     Provides an API nearly identical to :class:`kwcoco.CocoDatabase`, but uses
     an SQL backend data store. This makes it robust to copy-on-write memory

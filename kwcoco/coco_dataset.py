@@ -194,6 +194,8 @@ import itertools as it
 from six.moves import cStringIO as StringIO
 import copy
 
+from kwcoco.abstract_coco_dataset import AbstractCocoDataset
+
 # Does having __all__ prevent readthedocs from building mixins?
 # __all__ = [
 #     'CocoDataset',
@@ -4613,10 +4615,10 @@ class MixinCocoIndex(object):
         return self.index.name_to_cat
 
 
-class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
+class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                   MixinCocoAttrs, MixinCocoDraw, MixinCocoJSONAccessors,
                   MixinCocoAccessors, MixinCocoExtras, MixinCocoIndex,
-                  MixinCocoDepricate):
+                  MixinCocoDepricate, ub.NiceRepr):
     """
     Notes:
         A keypoint annotation
@@ -5666,7 +5668,12 @@ def _delitems(items, remove_idxs, thresh=750):
 
 def demo_coco_data():
     """
-    Simple data for testing
+    Simple data for testing.
+
+    This contains several non-standard fields, which help ensure robustness of
+    functions tested with this data. For more compliant demodata see the
+    ``kwcoco.demodata`` submodule
+
 
     Ignore:
         # code for getting a segmentation polygon
@@ -5742,9 +5749,6 @@ def demo_coco_data():
             },
         ],
         'images': [
-            # {'id': 1, 'file_name': gname1},
-            # {'id': 2, 'file_name': gname2},
-            # {'id': 3, 'file_name': gname3},
             {'id': 1, 'file_name': gname1, 'url': url1},
             {'id': 2, 'file_name': gname2, 'url': url2},
             {'id': 3, 'file_name': gname3, 'url': url3},
