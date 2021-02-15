@@ -853,7 +853,7 @@ class MixinCocoDepricate(object):
         warnings.warn('DEPRECATED: this method should not be used',
                       DeprecationWarning)
         for gid, img in self.imgs.items():
-            aids = self.gid_to_aids.get(gid, [])
+            aids = self.index.gid_to_aids.get(gid, [])
             # If there is at least one annotation, always mark as has_annots
             if len(aids) > 0:
                 assert img.get('has_annots', ub.NoParam) in [ub.NoParam, True], (
@@ -936,7 +936,7 @@ class MixinCocoDepricate(object):
                       DeprecationWarning)
         to_remove = []
         for gid in self.imgs.keys():
-            aids = self.gid_to_aids.get(gid, [])
+            aids = self.index.gid_to_aids.get(gid, [])
             if not aids:
                 to_remove.append(self.imgs[gid])
         print('Removing {} empty images'.format(len(to_remove)))
@@ -2777,7 +2777,7 @@ class MixinCocoStats(object):
         """
         catname_to_nannots = ub.map_keys(
             lambda x: None if x is None else self.cats[x]['name'],
-            ub.map_vals(len, self.cid_to_aids))
+            ub.map_vals(len, self.index.cid_to_aids))
         catname_to_nannots = ub.odict(sorted(catname_to_nannots.items(),
                                              key=lambda kv: (kv[1], kv[0])))
         return catname_to_nannots
@@ -2792,7 +2792,7 @@ class MixinCocoStats(object):
             >>> print(ub.repr2(hist))
         """
         catname_to_nannot_types = {}
-        for cid, aids in self.cid_to_aids.items():
+        for cid, aids in self.index.cid_to_aids.items():
             name = self.cats[cid]['name']
             hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))
             catname_to_nannot_types[name] = ub.map_keys(
@@ -2844,9 +2844,9 @@ class MixinCocoStats(object):
             n_yids = list(ub.map_vals(len, xid_to_yids).values())
             return kwarray.stats_dict(n_yids, n_extreme=True)
         return ub.odict([
-            ('annots_per_img', mapping_stats(self.gid_to_aids)),
-            # ('cats_per_img', mapping_stats(self.cid_to_gids)),
-            ('annots_per_cat', mapping_stats(self.cid_to_aids)),
+            ('annots_per_img', mapping_stats(self.index.gid_to_aids)),
+            # ('cats_per_img', mapping_stats(self.index.cid_to_gids)),
+            ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),
         ])
 
     def boxsize_stats(self, anchors=None, perclass=True, gids=None, aids=None,
@@ -2972,7 +2972,7 @@ class MixinCocoStats(object):
         else:
             gid_to_aids = ub.dict_subset(self.index.gid_to_aids, gids)
 
-        all_cids = set(self.cid_to_aids.keys())
+        all_cids = set(self.index.cid_to_aids.keys())
 
         # Select representative images to draw such that each category
         # appears at least once.
@@ -3237,7 +3237,7 @@ class MixinCocoDraw(object):
             highlight_aids.update(aids)
 
         img = self.imgs[gid]
-        aids = self.gid_to_aids.get(img['id'], [])
+        aids = self.index.gid_to_aids.get(img['id'], [])
 
         # Collect annotation overlays
         colored_segments = defaultdict(list)
@@ -3885,8 +3885,8 @@ class MixinCocoAddRemove(object):
             else:
                 remove_cids = list(map(self._resolve_to_cid, cat_identifiers))
             # First remove any annotation that belongs to those categories
-            if self.cid_to_aids:
-                remove_aids = list(it.chain(*[self.cid_to_aids[cid]
+            if self.index.cid_to_aids:
+                remove_aids = list(it.chain(*[self.index.cid_to_aids[cid]
                                               for cid in remove_cids]))
             else:
                 remove_aids = [ann['id'] for ann in self.dataset['annotations']
@@ -3954,8 +3954,8 @@ class MixinCocoAddRemove(object):
             if safe:
                 remove_gids = sorted(set(remove_gids))
             # First remove any annotation that belongs to those images
-            if self.gid_to_aids:
-                remove_aids = list(it.chain(*[self.gid_to_aids[gid]
+            if self.index.gid_to_aids:
+                remove_aids = list(it.chain(*[self.index.gid_to_aids[gid]
                                               for gid in remove_gids]))
             else:
                 remove_aids = [ann['id'] for ann in self.dataset['annotations']
@@ -4137,10 +4137,10 @@ class MixinCocoAddRemove(object):
         if self.index:
             if 'category_id' in ann:
                 old_cid = ann['category_id']
-                self.cid_to_aids[old_cid].remove(aid)
+                self.index.cid_to_aids[old_cid].remove(aid)
         ann['category_id'] = new_cid
         if self.index:
-            self.cid_to_aids[new_cid].add(aid)
+            self.index.cid_to_aids[new_cid].add(aid)
         self._invalidate_hashid(['annotations'])
 
 
@@ -5591,7 +5591,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> self = CocoDataset.demo()
             >>> gids = [1, 3]
             >>> sub_dset = self.subset(gids)
-            >>> assert len(self.gid_to_aids) == 3
+            >>> assert len(self.index.gid_to_aids) == 3
             >>> assert len(sub_dset.gid_to_aids) == 2
 
         Example:
@@ -5620,7 +5620,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         gids = sorted(set(gids))
         sub_aids = sorted([aid for gid in gids
-                           for aid in self.gid_to_aids.get(gid, [])])
+                           for aid in self.index.gid_to_aids.get(gid, [])])
         new_dataset['annotations'] = list(ub.take(self.anns, sub_aids))
         new_dataset['images'] = list(ub.take(self.imgs, gids))
         new_dataset['img_root'] = self.dataset.get('img_root', None)
