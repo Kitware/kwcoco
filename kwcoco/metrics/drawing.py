@@ -46,7 +46,7 @@ def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
             fp_count = info['fp_count']
             fpr = info['fpr']
 
-        nsupport = int(info['nsupport'])
+        nsupport = float(info['nsupport'])
         if 'realpos_total' in info:
             z = info['realpos_total']
             if abs(z - int(z)) < 1e-8:
@@ -132,7 +132,7 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
             # I thought AP=nan in this case, but I missed something
             precision, recall = [0], [0]
 
-        nsupport = int(info['nsupport'])
+        nsupport = float(info['nsupport'])
         if 'realpos_total' in info:
             z = info['realpos_total']
             if abs(z - int(z)) < 1e-8:
@@ -252,7 +252,7 @@ def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnu
             best_measure = measure[max_idx]
             best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
 
-        nsupport = int(info['nsupport'])
+        nsupport = float(info['nsupport'])
         if 'realpos_total' in info:
             z = info['realpos_total']
             if abs(z - int(z)) < 1e-8:
@@ -479,7 +479,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
             best_measure = np.nan
         best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
 
-        nsupport = int(info['nsupport'])
+        nsupport = float(info['nsupport'])
         if 'realpos_total' in info:
             z = info['realpos_total']
             if abs(z - int(z)) < 1e-8:
