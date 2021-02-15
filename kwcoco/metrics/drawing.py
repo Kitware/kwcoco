@@ -65,6 +65,20 @@ def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
     return ax
 
 
+def inty_display(val, eps=1e-8, ndigits=2):
+    """
+    Make a number as inty as possible
+    """
+    try:
+        val_int = int(val)
+        if abs(val - val_int) > eps:
+            raise ValueError('not close to an int')
+        final = '{}'.format(val_int)
+    except (ValueError, TypeError):
+        final = '{}'.format(round(val, ndigits))
+    return final
+
+
 def _realpos_label_suffix(info):
     """
     Creates a label suffix that indicates the number of real positive cases
@@ -94,18 +108,6 @@ def _realpos_label_suffix(info):
     nsupport = float('nan') if nsupport is None else float(nsupport)
 
     rpt = info.get('realpos_total', None)
-
-    def inty_display(val):
-        eps = 1e-8
-        try:
-            val_int = int(val)
-            if abs(val - val_int) > eps:
-                raise ValueError('not close to an int')
-            final = '{}'.format(val_int)
-        except (ValueError, TypeError):
-            final = '{}'.format(round(val, 2))
-        return final
-
     nsupport_dsp = inty_display(nsupport)
     if rpt is None:
         return nsupport_dsp
@@ -363,11 +365,13 @@ def draw_roc(info, prefix='', fnum=1, **kw):
         sns.lineplot(data=data, x=xlabel, y=ylabel, markers='', ax=ax)
         ax.set_title(title)
     else:
+        realpos_total_disp = inty_display(realpos_total)
+
         ax = kwplot.multi_plot(
             list(fp_rate), list(tp_rate), marker='',
             # xlabel='FA count (false positive count)',
             xlabel='fpr (count={})'.format(falsepos_total),
-            ylabel='tpr (count={})'.format(int(realpos_total)),
+            ylabel='tpr (count={})'.format(realpos_total_disp),
             title=title,
             ylim=(0, 1), ypad=1e-2,
             xlim=(0, 1), xpad=1e-2,
