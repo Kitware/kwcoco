@@ -186,6 +186,9 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
         mAP = np.nanmean(aps)
 
     if 0:
+        import seaborn as sns
+        import pandas as pd
+        # sns.set()
         # TODO: deprecate multi_plot for seaborn?
         data_groups = {
             key: {'recall': r, 'precision': p}
@@ -195,15 +198,11 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
 
         longform = []
         for key, subdata in data_groups.items():
-            import pandas as pd
             subdata = pd.DataFrame.from_dict(subdata)
             subdata['label'] = key
             longform.append(subdata)
         data = pd.concat(longform)
 
-        import seaborn as sns
-        import pandas as pd
-        # sns.set()
         fig = kwplot.figure(fnum=fnum)
         ax = fig.gca()
         longform = []
@@ -494,12 +493,16 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         measure = info[key][finite_flags]
 
         if len(measure):
-            max_idx = np.nanargmax(measure)
-            offset = (~finite_flags[:max_idx]).sum()
-            max_idx += offset
-            best_thresh = thresh[max_idx]
-            best_measure = measure[max_idx]
-            best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+            try:
+                max_idx = np.nanargmax(measure)
+                offset = (~finite_flags[:max_idx]).sum()
+                max_idx += offset
+                best_thresh = thresh[max_idx]
+                best_measure = measure[max_idx]
+                best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+            except ValueError:
+                best_thresh = np.nan
+                best_measure = np.nan
         else:
             best_thresh = np.nan
             best_measure = np.nan
