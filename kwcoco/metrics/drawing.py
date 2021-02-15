@@ -389,7 +389,7 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
         # I thought AP=nan in this case, but I missed something
         precision, recall = [0], [0]
 
-    nsupport = int(info['nsupport'])
+    nsupport = float(info['nsupport'])
     if 'realpos_total' in info:
         z = info['realpos_total']
         if abs(z - int(z)) < 1e-8:

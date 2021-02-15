@@ -830,6 +830,11 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoJSONAccessors,
     an SQL backend data store. This makes it robust to copy-on-write memory
     issues that arise when forking, as discussed in [1]_.
 
+    Notes:
+        By default constructing an instance of the CocoSqlDatabase does not
+        create a connection to the databse. Use the :func:`connect` method to
+        open a connection.
+
     References:
         .. [1] https://github.com/pytorch/pytorch/issues/13246
 
@@ -924,6 +929,8 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoJSONAccessors,
 
     def connect(self, readonly=False):
         """
+        Connects this instance to the underlying database.
+
         References:
             # details on read only mode, some of these didnt seem to work
             https://github.com/sqlalchemy/sqlalchemy/blob/master/lib/sqlalchemy/dialects/sqlite/pysqlite.py#L71
