@@ -85,7 +85,7 @@ class CocoRerootCLI:
                 --check=True --dst rebased.json
         """
         import kwcoco
-        from os.path import dirname
+        from os.path import dirname, abspath
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
@@ -96,7 +96,7 @@ class CocoRerootCLI:
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
-        new_root = dirname(config['dst'])
+        new_root = abspath(dirname(config['dst']))
 
         dset.reroot(
             new_root=new_root,
