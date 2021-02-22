@@ -75,6 +75,7 @@ import ubelt as ub
 from os.path import exists
 
 from kwcoco.util.dict_like import DictLike  # NOQA
+from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco.coco_dataset import (  # NOQA
     MixinCocoJSONAccessors, MixinCocoAccessors, MixinCocoAttrs,
     MixinCocoStats, MixinCocoDraw
@@ -225,7 +226,7 @@ def _new_proxy_cache():
     # return None
     try:
         from ndsampler.utils import util_lru
-        return util_lru.LRUDict.new(max_size=100, impl='auto')
+        return util_lru.LRUDict.new(max_size=1000, impl='auto')
     except Exception:
         return {}
 
@@ -372,6 +373,8 @@ class SqlDictProxy(DictLike):
         >>> import pytest
         >>> sql_dset, dct_dset = demo(num=10)
         >>> proxy = sql_dset.index.name_to_cat
+
+        >>> proxy = sql_dset.index.file_name_to_img
 
         >>> keys = list(proxy.keys())
         >>> values = list(proxy.values())
@@ -819,13 +822,18 @@ class CocoSqlIndex(object):
         }
 
 
-class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
-                      MixinCocoAttrs, MixinCocoStats, MixinCocoDraw,
-                      ub.NiceRepr):
+class CocoSqlDatabase(AbstractCocoDataset, MixinCocoJSONAccessors,
+                      MixinCocoAccessors, MixinCocoAttrs, MixinCocoStats,
+                      MixinCocoDraw, ub.NiceRepr):
     """
     Provides an API nearly identical to :class:`kwcoco.CocoDatabase`, but uses
     an SQL backend data store. This makes it robust to copy-on-write memory
     issues that arise when forking, as discussed in [1]_.
+
+    Notes:
+        By default constructing an instance of the CocoSqlDatabase does not
+        create a connection to the databse. Use the :func:`connect` method to
+        open a connection.
 
     References:
         .. [1] https://github.com/pytorch/pytorch/issues/13246
@@ -909,11 +917,20 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         self.session = None
         self.engine = None
         # Make unpickled objects readonly
-        self.index = CocoSqlIndex()
         self.connect(readonly=True)
+
+    def disconnect(self):
+        """
+        Drop references to any SQL or cache objects
+        """
+        self.session = None
+        self.engine = None
+        self.index = None
 
     def connect(self, readonly=False):
         """
+        Connects this instance to the underlying database.
+
         References:
             # details on read only mode, some of these didnt seem to work
             https://github.com/sqlalchemy/sqlalchemy/blob/master/lib/sqlalchemy/dialects/sqlite/pysqlite.py#L71
@@ -938,7 +955,16 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
             CocoBase.metadata.create_all(self.engine)
         DBSession = sessionmaker(bind=self.engine)
         self.session = DBSession()
-        self._build_index()
+
+        self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
+
+        self.index = CocoSqlIndex()
+        self.index.build(self)
+        return self
+
+    @property
+    def fpath(self):
+        return self.uri
 
     def delete(self):
         fpath = self.uri.split('///file:')[-1]
@@ -986,9 +1012,6 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
                 session.add(row)
         session.commit()
 
-    def _build_index(self):
-        self.index.build(self)
-
     @property
     def dataset(self):
         return self.index.dataset
@@ -1029,6 +1052,93 @@ class CocoSqlDatabase(MixinCocoJSONAccessors, MixinCocoAccessors,
         import pandas as pd
         table_df = pd.read_sql_table(table_name, con=self.engine)
         return table_df
+
+    def _column_lookup(self, tablename, key, rowids, default=ub.NoParam,
+                       keepid=False):
+        """
+        Convinience method to lookup only a single column of information
+
+        Example:
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> self, dset = demo(10)
+            >>> tablename = 'annotations'
+            >>> key = 'category_id'
+            >>> rowids = list(self.anns.keys())[::3]
+            >>> cids1 = self._column_lookup(tablename, key, rowids)
+            >>> cids2 = self.annots(rowids).get(key)
+            >>> cids3 = dset.annots(rowids).get(key)
+            >>> assert cids3 == cids2 == cids1
+
+        Ignore:
+            import timerit
+            ti = timerit.Timerit(10, bestof=3, verbose=2)
+
+            for timer in ti.reset('time'):
+                with timer:
+                    self._column_lookup(tablename, key, rowids)
+
+            for timer in ti.reset('time'):
+                self.anns._cache.clear()
+                with timer:
+                    annots = self.annots(rowids)
+                    annots.get(key)
+
+            for timer in ti.reset('time'):
+                self.anns._cache.clear()
+                with timer:
+                    anns = [self.anns[aid] for aid in rowids]
+                    cids = [ann[key] for ann in anns]
+        """
+        # FIXME: Make this work for columns that need json decoding
+        stmt = ub.paragraph(
+            '''
+            SELECT
+                {tablename}.{key}
+            FROM {tablename}
+            WHERE {tablename}.id = :rowid
+            ''').format(tablename=tablename, key=key)
+
+        values = [
+            # self.anns[aid][key]
+            # if aid in self.anns._cache else
+            self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
+            for rowid in rowids
+        ]
+        if keepid:
+            if default is ub.NoParam:
+                attr_list = ub.dzip(rowids, values)
+            else:
+                raise NotImplementedError('cannot use default')
+        else:
+            if default is ub.NoParam:
+                attr_list = values
+            else:
+                raise NotImplementedError('cannot use default')
+        return attr_list
+
+    def _all_rows_column_lookup(self, tablename, keys):
+        """
+        Convinience method to look up all rows from a table and only a few
+        columns.
+
+        Example:
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> self, dset = demo(10)
+            >>> tablename = 'annotations'
+            >>> keys = ['id', 'category_id']
+            >>> rows = self._all_rows_column_lookup(tablename, keys)
+        """
+        colnames_list = ['{}.{}'.format(tablename, key) for key in keys]
+        colnames = ', '.join(colnames_list)
+        stmt = ub.paragraph(
+            '''
+            SELECT
+                {colnames}
+            FROM {tablename} ORDER BY {tablename}.id
+            ''').format(colnames=colnames, tablename=tablename)
+        result = self.session.execute(stmt)
+        rows = result.fetchall()
+        return rows
 
     def tabular_targets(self):
         """
@@ -1146,78 +1256,8 @@ def demo(num=10):
     return self, dset
 
 
-def indexable_allclose(dct1, dct2, return_info=False):
-    """
-    Walks through two nested data structures and ensures that everything is
-    roughly the same.
-
-    Args:
-        dct1: a nested indexable item
-        dct2: a nested indexable item
-
-    Example:
-        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
-        >>> dct1 = {
-        >>>     'foo': [1.222222, 1.333],
-        >>>     'bar': 1,
-        >>>     'baz': [],
-        >>> }
-        >>> dct2 = {
-        >>>     'foo': [1.22222, 1.333],
-        >>>     'bar': 1,
-        >>>     'baz': [],
-        >>> }
-        >>> assert indexable_allclose(dct1, dct2)
-    """
-    from kwcoco.util.util_json import IndexableWalker
-    walker1 = IndexableWalker(dct1)
-    walker2 = IndexableWalker(dct2)
-    flat_items1 = [
-        (path, value) for path, value in walker1
-        if not isinstance(value, walker1.indexable_cls) or len(value) == 0]
-    flat_items2 = [
-        (path, value) for path, value in walker2
-        if not isinstance(value, walker1.indexable_cls) or len(value) == 0]
-
-    flat_items1 = sorted(flat_items1)
-    flat_items2 = sorted(flat_items2)
-
-    if len(flat_items1) != len(flat_items2):
-        info = {
-            'faillist': ['length mismatch']
-        }
-        final_flag = False
-    else:
-        passlist = []
-        faillist = []
-
-        for t1, t2 in zip(flat_items1, flat_items2):
-            p1, v1 = t1
-            p2, v2 = t2
-            assert p1 == p2
-
-            flag = (v1 == v2)
-            if not flag:
-                if isinstance(v1, float) and isinstance(v2, float) and np.isclose(v1, v2):
-                    flag = True
-            if flag:
-                passlist.append(p1)
-            else:
-                faillist.append((p1, v1, v2))
-
-        final_flag = len(faillist) == 0
-        info = {
-            'passlist': passlist,
-            'faillist': faillist,
-        }
-
-    if return_info:
-        return final_flag, info
-    else:
-        return final_flag
-
-
-def assert_dsets_allclose(dset1, dset2, tag1='sql', tag2='dct'):
+def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
+    from kwcoco.util.util_json import indexable_allclose
     # Test that the duck types are working
     compare = {}
     compare['gid_to_aids'] = {
@@ -1271,6 +1311,7 @@ def assert_dsets_allclose(dset1, dset2, tag1='sql', tag2='dct'):
             assert indexable_allclose(common2, common1)
             assert all(v is None for v in diff2.values())
             assert all(v is None for v in diff1.values())
+    return True
 
 
 def _benchmark_dset_readtime(dset, tag='?'):

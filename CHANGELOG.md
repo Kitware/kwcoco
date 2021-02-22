@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Introduced the concept of a bundled dataset
+* Added `kwcoco conform` script to standardize / make coco files compliant with `pycocotools`. 
+* Added `--image_attrs=True` to `kwcoco stats`.
+* Added `AbstractCocoDataset` base class for `CocoDataset` and `CocoSqlDataset`.
+* Added `examples` subdirectory for answers to FAQ
 
 
 ## Version 0.1.10 - Released 2021-02-05

@@ -414,8 +414,16 @@ class CocoEvaluator(object):
                 extra: any extra information we gathered via coercion
 
         Example:
+            >>> from kwcoco.coco_evaluator import *  # NOQA
             >>> import kwcoco
             >>> coco_dset = kwcoco.CocoDataset.demo('shapes8')
+            >>> gid_to_det, extras = CocoEvaluator._coerce_dets(coco_dset)
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> from kwcoco.coco_evaluator import *  # NOQA
+            >>> import kwcoco
+            >>> coco_dset = kwcoco.CocoDataset.demo('shapes8').view_sql()
             >>> gid_to_det, extras = CocoEvaluator._coerce_dets(coco_dset)
         """
         # coerce the input into dictionary of detection objects.
@@ -438,7 +446,7 @@ class CocoEvaluator(object):
                     raise NotImplementedError
             else:
                 gid_to_det = {}
-        elif isinstance(dataset, kwcoco.CocoDataset):
+        elif isinstance(dataset, kwcoco.AbstractCocoDataset):
             extra['coco_dset'] = coco_dset = dataset
             gid_to_det = {}
             gids = sorted(coco_dset.imgs.keys())

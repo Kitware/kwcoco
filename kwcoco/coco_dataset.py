@@ -194,6 +194,8 @@ import itertools as it
 from six.moves import cStringIO as StringIO
 import copy
 
+from kwcoco.abstract_coco_dataset import AbstractCocoDataset
+
 # Does having __all__ prevent readthedocs from building mixins?
 # __all__ = [
 #     'CocoDataset',
@@ -369,6 +371,11 @@ class ObjectList1D(ub.NiceRepr):
             >>> self.get('id')
             >>> self.get(key='foo', default=None, keepid=True)
         """
+        # if hasattr(self._dset, '_column_lookup'):
+        #     # Hack for SQL speed
+        #     # Agg, this doesn't work because some columns need json decoding
+        #     return self._dset._column_lookup(
+        #         tablename=self._key, key=key, rowids=self._ids)
         _lut = self._id_to_obj
         if keepid:
             if default is ub.NoParam:
@@ -846,7 +853,7 @@ class MixinCocoDepricate(object):
         warnings.warn('DEPRECATED: this method should not be used',
                       DeprecationWarning)
         for gid, img in self.imgs.items():
-            aids = self.gid_to_aids.get(gid, [])
+            aids = self.index.gid_to_aids.get(gid, [])
             # If there is at least one annotation, always mark as has_annots
             if len(aids) > 0:
                 assert img.get('has_annots', ub.NoParam) in [ub.NoParam, True], (
@@ -929,7 +936,7 @@ class MixinCocoDepricate(object):
                       DeprecationWarning)
         to_remove = []
         for gid in self.imgs.keys():
-            aids = self.gid_to_aids.get(gid, [])
+            aids = self.index.gid_to_aids.get(gid, [])
             if not aids:
                 to_remove.append(self.imgs[gid])
         print('Removing {} empty images'.format(len(to_remove)))
@@ -1465,15 +1472,59 @@ class MixinCocoExtras(object):
 
     @classmethod
     def coerce(cls, key, **kw):
+        """
+        Attempt to transform the input into the intended CocoDataset.
+
+        Args:
+            key : this can either be an instance of a CocoDataset, a
+               string URI pointing to an on-disk dataset, or a special
+               key for creating demodata.
+
+            **kw: passed to whatever constructor is chosen (if any)
+
+        Example:
+            >>> # test coerce for various input methods
+            >>> import kwcoco
+            >>> from kwcoco.coco_sql_dataset import assert_dsets_allclose
+            >>> dct_dset = kwcoco.CocoDataset.coerce('special:shapes8')
+            >>> copy1 = kwcoco.CocoDataset.coerce(dct_dset)
+            >>> copy2 = kwcoco.CocoDataset.coerce(dct_dset.fpath)
+            >>> assert assert_dsets_allclose(dct_dset, copy1)
+            >>> assert assert_dsets_allclose(dct_dset, copy2)
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> sql_dset = dct_dset.view_sql()
+            >>> copy3 = kwcoco.CocoDataset.coerce(sql_dset)
+            >>> copy4 = kwcoco.CocoDataset.coerce(sql_dset.fpath)
+            >>> assert assert_dsets_allclose(dct_dset, sql_dset)
+            >>> assert assert_dsets_allclose(dct_dset, copy3)
+            >>> assert assert_dsets_allclose(dct_dset, copy4)
+        """
         if isinstance(key, cls):
-            return key
-        elif key.startswith('special:'):
-            demokey = key.split(':')[1]
-            self = cls.demo(key=demokey, **kw)
-        elif key.endswith('.json') or '.json.' in key:
-            self = cls(key, **kw)
+            self = key
+        if isinstance(key, str):
+            import uritools
+            dset_fpath = ub.expandpath(key)
+            # Parse the the "file" URI scheme
+            # https://tools.ietf.org/html/rfc8089
+            result = uritools.urisplit(dset_fpath)
+            if result.scheme == 'sqlite':
+                from kwcoco.coco_sql_dataset import CocoSqlDatabase
+                self = CocoSqlDatabase(dset_fpath).connect()
+            elif result.path.endswith('.json') or '.json' in result.path:
+                import kwcoco
+                self = kwcoco.CocoDataset(dset_fpath, **kw)
+            elif result.scheme == 'special':
+                self = cls.demo(key=key, **kw)
+            else:
+                self = cls.demo(key=key, **kw)
+        elif type(key).__name__ == 'CocoSqlDatabase':
+            self = key
+        elif type(key).__name__ == 'CocoDataset':
+            self = key
+        elif type(key).__name__ == 'CocoSampler':
+            self = key.dset
         else:
-            self = cls.demo(key=key, **kw)
+            raise TypeError(type(key))
         return self
 
     @classmethod
@@ -1557,6 +1608,9 @@ class MixinCocoExtras(object):
         """
         import parse
         from kwcoco.demo import toydata
+
+        if key.startswith('special:'):
+            key = key.split(':')[1]
 
         if key.startswith('shapes'):
             res = parse.parse('{prefix}{num_imgs:d}', key)
@@ -2559,97 +2613,6 @@ class MixinCocoExtras(object):
     def data_fpath(self, value):
         self.fpath = value
 
-    def find_representative_images(self, gids=None):
-        r"""
-        Find images that have a wide array of categories. Attempt to find the
-        fewest images that cover all categories using images that contain both
-        a large and small number of annotations.
-
-        Args:
-            gids (None | List): Subset of image ids to consider when finding
-                representative images. Uses all images if unspecified.
-
-        Returns:
-            List: list of image ids determined to be representative
-
-        Example:
-            >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
-            >>> gids = self.find_representative_images()
-            >>> print('gids = {!r}'.format(gids))
-            >>> gids = self.find_representative_images([3])
-            >>> print('gids = {!r}'.format(gids))
-
-            >>> self = kwcoco.CocoDataset.demo('shapes8')
-            >>> gids = self.find_representative_images()
-            >>> print('gids = {!r}'.format(gids))
-            >>> valid = {7, 1}
-            >>> gids = self.find_representative_images(valid)
-            >>> assert valid.issuperset(gids)
-            >>> print('gids = {!r}'.format(gids))
-        """
-        if gids is None:
-            gids = sorted(self.imgs.keys())
-            gid_to_aids = self.gid_to_aids
-        else:
-            gid_to_aids = ub.dict_subset(self.gid_to_aids, gids)
-
-        all_cids = set(self.cid_to_aids.keys())
-
-        # Select representative images to draw such that each category
-        # appears at least once.
-        gid_to_cidfreq = ub.map_vals(
-            lambda aids: ub.dict_hist([self.anns[aid]['category_id']
-                                       for aid in aids]),
-            gid_to_aids)
-
-        gid_to_nannots = ub.map_vals(len, gid_to_aids)
-
-        gid_to_cids = {
-            gid: list(cidfreq.keys())
-            for gid, cidfreq in gid_to_cidfreq.items()
-        }
-
-        for gid, nannots in gid_to_nannots.items():
-            if nannots == 0:
-                # Add a dummy category to note images without any annotations
-                gid_to_cids[gid].append(-1)
-                all_cids.add(-1)
-
-        all_cids = list(all_cids)
-
-        # Solve setcover with different weight schemes to get a better
-        # representative sample.
-
-        candidate_sets = gid_to_cids.copy()
-
-        selected = {}
-
-        large_image_weights = gid_to_nannots
-        small_image_weights = ub.map_vals(lambda x: 1 / (x + 1), gid_to_nannots)
-
-        import kwarray
-        cover1 = kwarray.setcover(candidate_sets, items=all_cids)
-        selected.update(cover1)
-        candidate_sets = ub.dict_diff(candidate_sets, cover1)
-
-        cover2 = kwarray.setcover(
-                candidate_sets,
-                items=all_cids,
-                set_weights=large_image_weights)
-        selected.update(cover2)
-        candidate_sets = ub.dict_diff(candidate_sets, cover2)
-
-        cover3 = kwarray.setcover(
-                candidate_sets,
-                items=all_cids,
-                set_weights=small_image_weights)
-        selected.update(cover3)
-        candidate_sets = ub.dict_diff(candidate_sets, cover3)
-
-        selected_gids = sorted(selected.keys())
-        return selected_gids
-
 
 class MixinCocoAttrs(object):
     """
@@ -2814,7 +2777,7 @@ class MixinCocoStats(object):
         """
         catname_to_nannots = ub.map_keys(
             lambda x: None if x is None else self.cats[x]['name'],
-            ub.map_vals(len, self.cid_to_aids))
+            ub.map_vals(len, self.index.cid_to_aids))
         catname_to_nannots = ub.odict(sorted(catname_to_nannots.items(),
                                              key=lambda kv: (kv[1], kv[0])))
         return catname_to_nannots
@@ -2829,7 +2792,7 @@ class MixinCocoStats(object):
             >>> print(ub.repr2(hist))
         """
         catname_to_nannot_types = {}
-        for cid, aids in self.cid_to_aids.items():
+        for cid, aids in self.index.cid_to_aids.items():
             name = self.cats[cid]['name']
             hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))
             catname_to_nannot_types[name] = ub.map_keys(
@@ -2881,9 +2844,9 @@ class MixinCocoStats(object):
             n_yids = list(ub.map_vals(len, xid_to_yids).values())
             return kwarray.stats_dict(n_yids, n_extreme=True)
         return ub.odict([
-            ('annots_per_img', mapping_stats(self.gid_to_aids)),
-            # ('cats_per_img', mapping_stats(self.cid_to_gids)),
-            ('annots_per_cat', mapping_stats(self.cid_to_aids)),
+            ('annots_per_img', mapping_stats(self.index.gid_to_aids)),
+            # ('cats_per_img', mapping_stats(self.index.cid_to_gids)),
+            ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),
         ])
 
     def boxsize_stats(self, anchors=None, perclass=True, gids=None, aids=None,
@@ -2973,6 +2936,97 @@ class MixinCocoStats(object):
         all_info = _boxes_info(all_sizes)
         infos['all'] = all_info
         return infos
+
+    def find_representative_images(self, gids=None):
+        r"""
+        Find images that have a wide array of categories. Attempt to find the
+        fewest images that cover all categories using images that contain both
+        a large and small number of annotations.
+
+        Args:
+            gids (None | List): Subset of image ids to consider when finding
+                representative images. Uses all images if unspecified.
+
+        Returns:
+            List: list of image ids determined to be representative
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> gids = self.find_representative_images()
+            >>> print('gids = {!r}'.format(gids))
+            >>> gids = self.find_representative_images([3])
+            >>> print('gids = {!r}'.format(gids))
+
+            >>> self = kwcoco.CocoDataset.demo('shapes8')
+            >>> gids = self.find_representative_images()
+            >>> print('gids = {!r}'.format(gids))
+            >>> valid = {7, 1}
+            >>> gids = self.find_representative_images(valid)
+            >>> assert valid.issuperset(gids)
+            >>> print('gids = {!r}'.format(gids))
+        """
+        if gids is None:
+            gids = sorted(self.imgs.keys())
+            gid_to_aids = self.index.gid_to_aids
+        else:
+            gid_to_aids = ub.dict_subset(self.index.gid_to_aids, gids)
+
+        all_cids = set(self.index.cid_to_aids.keys())
+
+        # Select representative images to draw such that each category
+        # appears at least once.
+        gid_to_cidfreq = ub.map_vals(
+            lambda aids: ub.dict_hist([self.anns[aid]['category_id']
+                                       for aid in aids]),
+            gid_to_aids)
+
+        gid_to_nannots = ub.map_vals(len, gid_to_aids)
+
+        gid_to_cids = {
+            gid: list(cidfreq.keys())
+            for gid, cidfreq in gid_to_cidfreq.items()
+        }
+
+        for gid, nannots in gid_to_nannots.items():
+            if nannots == 0:
+                # Add a dummy category to note images without any annotations
+                gid_to_cids[gid].append(-1)
+                all_cids.add(-1)
+
+        all_cids = list(all_cids)
+
+        # Solve setcover with different weight schemes to get a better
+        # representative sample.
+
+        candidate_sets = gid_to_cids.copy()
+
+        selected = {}
+
+        large_image_weights = gid_to_nannots
+        small_image_weights = ub.map_vals(lambda x: 1 / (x + 1), gid_to_nannots)
+
+        import kwarray
+        cover1 = kwarray.setcover(candidate_sets, items=all_cids)
+        selected.update(cover1)
+        candidate_sets = ub.dict_diff(candidate_sets, cover1)
+
+        cover2 = kwarray.setcover(
+                candidate_sets,
+                items=all_cids,
+                set_weights=large_image_weights)
+        selected.update(cover2)
+        candidate_sets = ub.dict_diff(candidate_sets, cover2)
+
+        cover3 = kwarray.setcover(
+                candidate_sets,
+                items=all_cids,
+                set_weights=small_image_weights)
+        selected.update(cover3)
+        candidate_sets = ub.dict_diff(candidate_sets, cover3)
+
+        selected_gids = sorted(selected.keys())
+        return selected_gids
 
 
 class _NextId(object):
@@ -3183,7 +3237,7 @@ class MixinCocoDraw(object):
             highlight_aids.update(aids)
 
         img = self.imgs[gid]
-        aids = self.gid_to_aids.get(img['id'], [])
+        aids = self.index.gid_to_aids.get(img['id'], [])
 
         # Collect annotation overlays
         colored_segments = defaultdict(list)
@@ -3831,8 +3885,8 @@ class MixinCocoAddRemove(object):
             else:
                 remove_cids = list(map(self._resolve_to_cid, cat_identifiers))
             # First remove any annotation that belongs to those categories
-            if self.cid_to_aids:
-                remove_aids = list(it.chain(*[self.cid_to_aids[cid]
+            if self.index.cid_to_aids:
+                remove_aids = list(it.chain(*[self.index.cid_to_aids[cid]
                                               for cid in remove_cids]))
             else:
                 remove_aids = [ann['id'] for ann in self.dataset['annotations']
@@ -3900,8 +3954,8 @@ class MixinCocoAddRemove(object):
             if safe:
                 remove_gids = sorted(set(remove_gids))
             # First remove any annotation that belongs to those images
-            if self.gid_to_aids:
-                remove_aids = list(it.chain(*[self.gid_to_aids[gid]
+            if self.index.gid_to_aids:
+                remove_aids = list(it.chain(*[self.index.gid_to_aids[gid]
                                               for gid in remove_gids]))
             else:
                 remove_aids = [ann['id'] for ann in self.dataset['annotations']
@@ -4083,10 +4137,10 @@ class MixinCocoAddRemove(object):
         if self.index:
             if 'category_id' in ann:
                 old_cid = ann['category_id']
-                self.cid_to_aids[old_cid].remove(aid)
+                self.index.cid_to_aids[old_cid].remove(aid)
         ann['category_id'] = new_cid
         if self.index:
-            self.cid_to_aids[new_cid].add(aid)
+            self.index.cid_to_aids[new_cid].add(aid)
         self._invalidate_hashid(['annotations'])
 
 
@@ -4561,10 +4615,10 @@ class MixinCocoIndex(object):
         return self.index.name_to_cat
 
 
-class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
+class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                   MixinCocoAttrs, MixinCocoDraw, MixinCocoJSONAccessors,
                   MixinCocoAccessors, MixinCocoExtras, MixinCocoIndex,
-                  MixinCocoDepricate):
+                  MixinCocoDepricate, ub.NiceRepr):
     """
     Notes:
         A keypoint annotation
@@ -5537,7 +5591,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
             >>> self = CocoDataset.demo()
             >>> gids = [1, 3]
             >>> sub_dset = self.subset(gids)
-            >>> assert len(self.gid_to_aids) == 3
+            >>> assert len(self.index.gid_to_aids) == 3
             >>> assert len(sub_dset.gid_to_aids) == 2
 
         Example:
@@ -5566,7 +5620,7 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
 
         gids = sorted(set(gids))
         sub_aids = sorted([aid for gid in gids
-                           for aid in self.gid_to_aids.get(gid, [])])
+                           for aid in self.index.gid_to_aids.get(gid, [])])
         new_dataset['annotations'] = list(ub.take(self.anns, sub_aids))
         new_dataset['images'] = list(ub.take(self.imgs, gids))
         new_dataset['img_root'] = self.dataset.get('img_root', None)
@@ -5578,6 +5632,20 @@ class CocoDataset(ub.NiceRepr, MixinCocoAddRemove, MixinCocoStats,
         sub_dset = CocoDataset(new_dataset, bundle_dpath=self.bundle_dpath,
                                autobuild=autobuild)
         return sub_dset
+
+    def view_sql(self):
+        """
+        Create a cached SQL interface to this dataset suitable for large scale
+        multiprocessing use cases.
+
+        Note:
+            This view cache is experimental and currently depends on the
+            timestamp of the file pointed to by ``self.fpath``. In other words
+            dont use this on in-memory datasets.
+        """
+        from kwcoco.coco_sql_dataset import ensure_sql_coco_view
+        sql_dset = ensure_sql_coco_view(self)
+        return sql_dset
 
 
 def _delitems(items, remove_idxs, thresh=750):
@@ -5600,7 +5668,12 @@ def _delitems(items, remove_idxs, thresh=750):
 
 def demo_coco_data():
     """
-    Simple data for testing
+    Simple data for testing.
+
+    This contains several non-standard fields, which help ensure robustness of
+    functions tested with this data. For more compliant demodata see the
+    ``kwcoco.demodata`` submodule
+
 
     Ignore:
         # code for getting a segmentation polygon
@@ -5676,9 +5749,6 @@ def demo_coco_data():
             },
         ],
         'images': [
-            # {'id': 1, 'file_name': gname1},
-            # {'id': 2, 'file_name': gname2},
-            # {'id': 3, 'file_name': gname3},
             {'id': 1, 'file_name': gname1, 'url': url1},
             {'id': 2, 'file_name': gname2, 'url': url2},
             {'id': 3, 'file_name': gname3, 'url': url3},
