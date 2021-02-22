@@ -199,7 +199,7 @@ ANNOTATION = OBJECT(OrderedDict((
     ('score', NUMBER),
     ('weight', NUMBER),
 
-    ('iscrowd', STRING),  # legacy
+    ('iscrowd', INTEGER),  # legacy
     ('caption', STRING),
 )),
     required=['id', 'image_id']

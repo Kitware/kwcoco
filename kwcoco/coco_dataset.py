@@ -2074,7 +2074,7 @@ class MixinCocoExtras(object):
         img_enum = enumerate(self.dataset['images'])
         for index, img in ub.ProgIter(img_enum,
                                       total=len(self.dataset['images']),
-                                      desc='check missing images',
+                                      desc='check corrupted images',
                                       verbose=verbose):
             gid = img.get('id', None)
             gpath = join(self.bundle_dpath, img['file_name'])

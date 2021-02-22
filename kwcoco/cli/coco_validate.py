@@ -23,6 +23,7 @@ class CocoValidateCLI:
                 Code indicating strategy to attempt to fix the dataset.
                 If None, do nothing.
                 If remove, removes missing / corrupted images.
+                Other strategies may be added in the future.
 
                 This is a hueristic and does not always work. dst must be
                 specified. And only one src dataset can be given.
