@@ -54,6 +54,15 @@ class CocoStatsCLI:
             dset = kwcoco.CocoDataset.coerce(fpath)
             datasets.append(dset)
 
+        # hack dataset tags
+        dset_tags = [dset.tag for dset in datasets]
+        if len(set(dset_tags)) < len(dset_tags):
+            from os.path import commonprefix
+            dset_fpaths = [dset.fpath for dset in datasets]
+            toremove = commonprefix(dset_fpaths)
+            for dset in datasets:
+                dset.tag = dset.fpath.replace(toremove, '')
+
         try:
             from kwcoco.category_tree import _print_forest
             for dset in datasets:
