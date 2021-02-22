@@ -17,6 +17,23 @@ class CocoValidateCLI:
 
             'missing': scfg.Value(True, help='If True check if all assets (e.g. images) exist'),
             'corrupted': scfg.Value(False, help='If True check the assets can be read'),
+
+            'fix': scfg.Value(None, help=ub.paragraph(
+                '''
+                Code indicating strategy to attempt to fix the dataset.
+                If None, do nothing.
+                If remove, removes missing / corrupted images.
+
+                This is a hueristic and does not always work. dst must be
+                specified. And only one src dataset can be given.
+                ''')),
+
+            'dst': scfg.Value(None, help=ub.paragraph(
+                '''
+                Location to write a "fixed" coco file if a fix strategy is
+                given.
+                '''))
+
         }
         epilog = """
         Example Usage:
@@ -47,6 +64,10 @@ class CocoValidateCLI:
         else:
             fpaths = config['src']
 
+        fix_strat = set()
+        if config['fix'] is not None:
+            fix_strat = {c.lower() for c in config['fix'].split('+')}
+
         datasets = []
         for fpath in ub.ProgIter(fpaths, desc='reading datasets', verbose=1):
             print('reading fpath = {!r}'.format(fpath))
@@ -64,6 +85,11 @@ class CocoValidateCLI:
                 missing = dset.missing_images(check_aux=True, verbose=1)
                 if missing:
                     print('missing = {}'.format(ub.repr2(missing, nl=1)))
+
+                if 'remove' in fix_strat:
+                    bad_gids = [t[0] for t in missing]
+                    dset.remove_images(bad_gids)
+                else:
                     raise Exception('missing assets')
                 # print('Check assets exist: dset = {!r}'.format(dset))
                 # all_gids = list(dset.imgs.keys())
@@ -77,7 +103,18 @@ class CocoValidateCLI:
                 bad_gpaths = dset.corrupted_images(check_aux=True, verbose=1)
                 if bad_gpaths:
                     print('bad_gpaths = {}'.format(ub.repr2(bad_gpaths, nl=1)))
-                    raise Exception('missing assets')
+
+                if 'remove' in fix_strat:
+                    bad_gids = [t[0] for t in bad_gpaths]
+                    dset.remove_images(bad_gids)
+                else:
+                    raise Exception('corrupted assets')
+
+        if config['dst']:
+            if len(datasets) != 1:
+                raise Exception('can only specify 1 dataset in fix mode')
+            dset = datasets[0]
+            dset.dump(config['dst'], newlines=True)
 
 
 _CLI = CocoValidateCLI
