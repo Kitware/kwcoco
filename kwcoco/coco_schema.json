@@ -241,7 +241,12 @@
                     },
                     "score": {"type": "number"},
                     "weight": {"type": "number"},
-                    "iscrowd": {"type": "integer"},
+                    "iscrowd": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "boolean"}
+                        ]
+                    },
                     "caption": {"type": "string"}
                 },
                 "required": ["id", "image_id"]
