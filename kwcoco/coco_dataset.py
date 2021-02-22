@@ -2038,21 +2038,24 @@ class MixinCocoExtras(object):
             verbose (int): verbosity level
 
         Returns:
-            List[Tuple[int, str]]: bad indexes and paths
+            List[Tuple[int, str, int]]: bad indexes and paths and ids
         """
         bad_paths = []
-        for index in ub.ProgIter(range(len(self.dataset['images'])),
-                                 desc='check missing images', verbose=verbose):
-            img = self.dataset['images'][index]
+        img_enum = enumerate(self.dataset['images'])
+        for index, img in ub.ProgIter(img_enum,
+                                      total=len(self.dataset['images']),
+                                      desc='check missing images',
+                                      verbose=verbose):
+            gid = img.get('id', None)
             gpath = join(self.bundle_dpath, img['file_name'])
             if not exists(gpath):
-                bad_paths.append((index, gpath))
+                bad_paths.append((index, gpath, gid))
 
             if check_aux:
                 for aux in img.get('aux', []):
                     gpath = join(self.bundle_dpath, aux['file_name'])
                     if not exists(gpath):
-                        bad_paths.append((index, gpath))
+                        bad_paths.append((index, gpath, gid))
         return bad_paths
 
     def corrupted_images(self, check_aux=False, verbose=0):
@@ -2065,34 +2068,37 @@ class MixinCocoExtras(object):
             verbose (int): verbosity level
 
         Returns:
-            List[Tuple[int, str]]: bad indexes and paths
+            List[Tuple[int, str, int]]: bad indexes and paths and ids
         """
         bad_paths = []
-        for index in ub.ProgIter(range(len(self.dataset['images'])),
-                                 verbose=verbose, desc='check corrupted images'):
-            img = self.dataset['images'][index]
+        img_enum = enumerate(self.dataset['images'])
+        for index, img in ub.ProgIter(img_enum,
+                                      total=len(self.dataset['images']),
+                                      desc='check missing images',
+                                      verbose=verbose):
+            gid = img.get('id', None)
             gpath = join(self.bundle_dpath, img['file_name'])
             if not exists(gpath):
-                bad_paths.append((index, gpath))
+                bad_paths.append((index, gpath, gid))
             # TODO: parallelize
             try:
                 import kwimage
                 # kwimage.imread(gpath)
                 kwimage.load_image_shape(gpath)
             except Exception:
-                bad_paths.append((index, gpath))
+                bad_paths.append((index, gpath, gid))
 
             if check_aux:
                 for aux in img.get('aux', []):
                     gpath = join(self.bundle_dpath, aux['file_name'])
                     if not exists(gpath):
-                        bad_paths.append((index, gpath))
+                        bad_paths.append((index, gpath, gid))
                     try:
                         import kwimage
                         kwimage.load_image_shape(gpath)
                         # kwimage.imread(gpath)
                     except Exception:
-                        bad_paths.append((index, gpath))
+                        bad_paths.append((index, gpath, gid))
 
         return bad_paths
 
