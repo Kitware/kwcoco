@@ -87,7 +87,7 @@ class CocoValidateCLI:
                     print('missing = {}'.format(ub.repr2(missing, nl=1)))
 
                 if 'remove' in fix_strat:
-                    bad_gids = [t[0] for t in missing]
+                    bad_gids = [t[2] for t in missing]
                     status = dset.remove_images(bad_gids, verbose=1)
                     print('status = {}'.format(ub.repr2(status, nl=1)))
                 else:
@@ -106,7 +106,7 @@ class CocoValidateCLI:
                     print('bad_gpaths = {}'.format(ub.repr2(bad_gpaths, nl=1)))
 
                 if 'remove' in fix_strat:
-                    bad_gids = [t[0] for t in bad_gpaths]
+                    bad_gids = [t[2] for t in bad_gpaths]
                     status = dset.remove_images(bad_gids, verbose=1)
                     print('status = {}'.format(ub.repr2(status, nl=1)))
                 else:
