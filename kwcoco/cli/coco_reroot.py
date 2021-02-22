@@ -98,6 +98,9 @@ class CocoRerootCLI:
 
         new_root = abspath(dirname(config['dst']))
 
+        if config['absolute']:
+            new_root = abspath(new_root)
+
         dset.reroot(
             new_root=new_root,
             new_prefix=config['new_prefix'],
