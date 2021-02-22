@@ -2077,7 +2077,8 @@ class MixinCocoExtras(object):
             # TODO: parallelize
             try:
                 import kwimage
-                kwimage.imread(gpath)
+                # kwimage.imread(gpath)
+                kwimage.load_image_shape(gpath)
             except Exception:
                 bad_paths.append((index, gpath))
 
@@ -2088,7 +2089,8 @@ class MixinCocoExtras(object):
                         bad_paths.append((index, gpath))
                     try:
                         import kwimage
-                        kwimage.imread(gpath)
+                        kwimage.load_image_shape(gpath)
+                        # kwimage.imread(gpath)
                     except Exception:
                         bad_paths.append((index, gpath))
 
