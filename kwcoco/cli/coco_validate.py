@@ -88,7 +88,8 @@ class CocoValidateCLI:
 
                 if 'remove' in fix_strat:
                     bad_gids = [t[0] for t in missing]
-                    dset.remove_images(bad_gids)
+                    status = dset.remove_images(bad_gids, verbose=1)
+                    print('status = {}'.format(ub.repr2(status, nl=1)))
                 else:
                     raise Exception('missing assets')
                 # print('Check assets exist: dset = {!r}'.format(dset))
@@ -106,7 +107,8 @@ class CocoValidateCLI:
 
                 if 'remove' in fix_strat:
                     bad_gids = [t[0] for t in bad_gpaths]
-                    dset.remove_images(bad_gids)
+                    status = dset.remove_images(bad_gids, verbose=1)
+                    print('status = {}'.format(ub.repr2(status, nl=1)))
                 else:
                     raise Exception('corrupted assets')
 
