@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import ubelt as ub
+import scriptconfig as scfg
+
+
+class CocoValidateCLI:
+    name = 'validate'
+
+    class CLIConfig(scfg.Config):
+        """
+        Compute summary statistics about a COCO dataset
+        """
+        default = {
+            'src': scfg.Value(['special:shapes8'], nargs='+', help='path to datasets', position=1),
+            'schema': scfg.Value(True, help='If True check the json schema'),
+
+            'missing': scfg.Value(True, help='If True check if all assets (e.g. images) exist'),
+            'corrupted': scfg.Value(False, help='If True check the assets can be read'),
+        }
+        epilog = """
+        Example Usage:
+            kwcoco toydata --dst foo.json --key=special:shapes8
+            kwcoco validate --src=foo.json --corrupted=True
+        """
+
+    @classmethod
+    def main(cls, cmdline=True, **kw):
+        """
+        Example:
+            >>> kw = {'src': 'special:shapes8'}
+            >>> cmdline = False
+            >>> cls = CocoStatsCLI
+            >>> cls.main(cmdline, **kw)
+        """
+        import kwcoco
+        from kwcoco.coco_schema import COCO_SCHEMA
+
+        config = cls.CLIConfig(kw, cmdline=cmdline)
+        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+
+        if config['src'] is None:
+            raise Exception('must specify source: {}'.format(config['src']))
+
+        if isinstance(config['src'], str):
+            fpaths = [config['src']]
+        else:
+            fpaths = config['src']
+
+        datasets = []
+        for fpath in ub.ProgIter(fpaths, desc='reading datasets', verbose=1):
+            print('reading fpath = {!r}'.format(fpath))
+            dset = kwcoco.CocoDataset.coerce(fpath)
+            datasets.append(dset)
+
+        if config['schema']:
+            for dset in datasets:
+                print('Check schema: dset = {!r}'.format(dset))
+                result = COCO_SCHEMA.validate(dset.dataset)
+                print('result = {!r}'.format(result))
+
+        if config['missing']:
+            for dset in datasets:
+                missing = dset.missing_images(check_aux=True, verbose=1)
+                if missing:
+                    print('missing = {}'.format(ub.repr2(missing, nl=1)))
+                    raise Exception('missing assets')
+                # print('Check assets exist: dset = {!r}'.format(dset))
+                # all_gids = list(dset.imgs.keys())
+                # for gid in all_gids:
+                #     fpath = dset.get_image_fpath(gid)
+                #     if not exists(fpath):
+                #         raise Exception('fpath = {} does not exist'.format(fpath))
+
+        if config['corrupted']:
+            for dset in datasets:
+                bad_gpaths = dset.corrupted_images(check_aux=True, verbose=1)
+                if bad_gpaths:
+                    print('bad_gpaths = {}'.format(ub.repr2(bad_gpaths, nl=1)))
+                    raise Exception('missing assets')
+
+
+_CLI = CocoValidateCLI
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python -m kwcoco.cli.coco_stats --src=special:shapes8
+    """
+    _CLI.main()

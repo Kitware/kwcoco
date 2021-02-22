@@ -951,37 +951,39 @@ class MixinCocoJSONAccessors(object):
 
     The modivation is that we want to define an API that we can conform to
     with either json or sql backends.
+
+    DEPRECATED: Handled with better duck typing. Don't use.
     """
 
-    def iter_images(self):
-        if self.index.imgs is not None:
-            return self.index.imgs.values()
-        else:
-            return iter(self.dataset['images'])
+    # def iter_images(self):
+    #     if self.index.imgs is not None:
+    #         return self.index.imgs.values()
+    #     else:
+    #         return iter(self.dataset['images'])
 
-    def iter_categories(self):
-        if self.index.imgs is not None:
-            return self.index.cats.values()
-        else:
-            return iter(self.dataset['categories'])
+    # def iter_categories(self):
+    #     if self.index.imgs is not None:
+    #         return self.index.cats.values()
+    #     else:
+    #         return iter(self.dataset['categories'])
 
-    def iter_annotations(self):
-        if self.index.imgs is not None:
-            return self.index.anns.values()
-        else:
-            return iter(self.dataset['annotations'])
+    # def iter_annotations(self):
+    #     if self.index.imgs is not None:
+    #         return self.index.anns.values()
+    #     else:
+    #         return iter(self.dataset['annotations'])
 
-    def iter_videos(self):
-        if self.index.imgs is not None:
-            return self.index.videos.values()
-        else:
-            return iter(self.dataset['videos'])
+    # def iter_videos(self):
+    #     if self.index.imgs is not None:
+    #         return self.index.videos.values()
+    #     else:
+    #         return iter(self.dataset['videos'])
 
-    def iter_keypoint_categories(self):
-        if self.index.kpcats is not None:
-            return self.index.kpcats.values()
-        else:
-            return iter(self.dataset['keypoint_categories'])
+    # def iter_keypoint_categories(self):
+    #     if self.index.kpcats is not None:
+    #         return self.index.kpcats.values()
+    #     else:
+    #         return iter(self.dataset['keypoint_categories'])
 
 
 class MixinCocoAccessors(object):
@@ -1188,7 +1190,7 @@ class MixinCocoAccessors(object):
             if self.imgs is not None:
                 resolved_img = self.imgs[gid_or_img]
             else:
-                for img in self.iter_images():
+                for img in self.dataset['images']:
                     if img['id'] == gid_or_img:
                         resolved_img = img
                         break
@@ -1369,7 +1371,7 @@ class MixinCocoAccessors(object):
         # TODO: should supercategories that don't exist as nodes be added here?
         import networkx as nx
         graph = nx.DiGraph()
-        for cat in self.iter_categories():
+        for cat in self.dataset['categories']:
             graph.add_node(cat['name'], **cat)
             if cat.get('supercategory', None) is not None:
                 u = cat['supercategory']
@@ -1409,7 +1411,10 @@ class MixinCocoAccessors(object):
         """
         from kwcoco.category_tree import CategoryTree
         try:
-            kpcats = self.iter_keypoint_categories()
+            if self.index.kpcats is not None:
+                kpcats = self.index.kpcats.values()
+            else:
+                kpcats = iter(self.dataset['keypoint_categories'])
         except KeyError:
             catnames = self._keypoint_category_names()
             classes = CategoryTree.coerce(catnames)
@@ -1442,7 +1447,7 @@ class MixinCocoAccessors(object):
             return [c['name'] for c in self.dataset['keypoint_categories']]
         else:
             names = []
-            cats = sorted(self.iter_categories(), key=lambda c: c['id'])
+            cats = sorted(self.dataset['categories'], key=lambda c: c['id'])
             for cat in cats:
                 if 'keypoints' in cat:
                     names.extend(cat['keypoints'])
@@ -1516,7 +1521,14 @@ class MixinCocoExtras(object):
             elif result.scheme == 'special':
                 self = cls.demo(key=key, **kw)
             else:
-                self = cls.demo(key=key, **kw)
+                # This case can be env-dependant in the unlikely case where you
+                # have a file with the same name as a demo key. But hey, you
+                # are using the coerce function, be more explicit if you want
+                # predictable behavior.
+                if exists(dset_fpath):
+                    self = kwcoco.CocoDataset(dset_fpath, **kw)
+                else:
+                    self = cls.demo(key=key, **kw)
         elif type(key).__name__ == 'CocoSqlDatabase':
             self = key
         elif type(key).__name__ == 'CocoDataset':
@@ -1990,7 +2002,7 @@ class MixinCocoExtras(object):
             gids (List): subset of images to download
         """
         def _gen_missing_imgs():
-            for img in self.iter_images():
+            for img in self.dataset['images']:
                 gpath = join(self.bundle_dpath, img['file_name'])
                 if not exists(gpath):
                     yield img
@@ -2021,15 +2033,16 @@ class MixinCocoExtras(object):
         Check for images that don't exist
 
         Args:
-            check_aux (bool, default=Fasle):
+            check_aux (bool, default=False):
                 if specified also checks auxiliary images
+            verbose (int): verbosity level
 
         Returns:
             List[Tuple[int, str]]: bad indexes and paths
         """
         bad_paths = []
         for index in ub.ProgIter(range(len(self.dataset['images'])),
-                                 verbose=verbose):
+                                 desc='check missing images', verbose=verbose):
             img = self.dataset['images'][index]
             gpath = join(self.bundle_dpath, img['file_name'])
             if not exists(gpath):
@@ -2042,9 +2055,14 @@ class MixinCocoExtras(object):
                         bad_paths.append((index, gpath))
         return bad_paths
 
-    def corrupted_images(self, verbose=0):
+    def corrupted_images(self, check_aux=False, verbose=0):
         """
         Check for images that don't exist or can't be opened
+
+        Args:
+            check_aux (bool, default=False):
+                if specified also checks auxiliary images
+            verbose (int): verbosity level
 
         Returns:
             List[Tuple[int, str]]: bad indexes and paths
@@ -2062,6 +2080,18 @@ class MixinCocoExtras(object):
                 kwimage.imread(gpath)
             except Exception:
                 bad_paths.append((index, gpath))
+
+            if check_aux:
+                for aux in img.get('aux', []):
+                    gpath = join(self.bundle_dpath, aux['file_name'])
+                    if not exists(gpath):
+                        bad_paths.append((index, gpath))
+                    try:
+                        import kwimage
+                        kwimage.imread(gpath)
+                    except Exception:
+                        bad_paths.append((index, gpath))
+
         return bad_paths
 
     def rename_categories(self, mapper, strict=False, preserve=False,

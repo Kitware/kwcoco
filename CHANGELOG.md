@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Added `--image_attrs=True` to `kwcoco stats`.
 * Added `AbstractCocoDataset` base class for `CocoDataset` and `CocoSqlDataset`.
 * Added `examples` subdirectory for answers to FAQ
+* Added `kwcoco validate` script to check that json and assets exist.
 
 
 ## Version 0.1.10 - Released 2021-02-05
