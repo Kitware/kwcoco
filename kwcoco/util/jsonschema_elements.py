@@ -4,7 +4,7 @@ Functional interface into defining jsonschema structures.
 See mixin classes for details.
 
 Example:
-    >>> from kwcoco.jsonschema_elements import *  # NOQA
+    >>> from kwcoco.util.jsonschema_elements import *  # NOQA
     >>> elem = SchemaElements()
     >>> for base in SchemaElements.__bases__:
     >>>     print('\n\n====\nbase = {!r}'.format(base))
@@ -175,7 +175,7 @@ class QuantifierElements(object):
     https://json-schema.org/understanding-json-schema/reference/combining.html#allof
 
     Example:
-        >>> from kwcoco.jsonschema_elements import *  # NOQA
+        >>> from kwcoco.util.jsonschema_elements import *  # NOQA
         >>> elem.ANYOF(elem.STRING, elem.NUMBER).validate()
         >>> elem.ONEOF(elem.STRING, elem.NUMBER).validate()
         >>> elem.NOT(elem.NULL).validate()
@@ -204,7 +204,7 @@ class ContainerElements:
     Types that contain other types
 
     Example:
-        >>> from kwcoco.jsonschema_elements import *  # NOQA
+        >>> from kwcoco.util.jsonschema_elements import *  # NOQA
         >>> print(elem.ARRAY().validate())
         >>> print(elem.OBJECT().validate())
         >>> print(elem.OBJECT().validate())
@@ -218,7 +218,7 @@ class ContainerElements:
         https://json-schema.org/understanding-json-schema/reference/array.html
 
         Example:
-            >>> from kwcoco.jsonschema_elements import *  # NOQA
+            >>> from kwcoco.util.jsonschema_elements import *  # NOQA
             >>> ARRAY(numItems=3)
             >>> schema = ARRAY(minItems=3)
             >>> schema.validate()
@@ -316,10 +316,10 @@ class SchemaElements(
         - [ ] Generics: title, description, default, examples
 
     CommandLine:
-        xdoctest -m /home/joncrall/code/kwcoco/kwcoco/jsonschema_elements.py SchemaElements
+        xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/jsonschema_elements.py SchemaElements
 
     Example:
-        >>> from kwcoco.jsonschema_elements import *  # NOQA
+        >>> from kwcoco.util.jsonschema_elements import *  # NOQA
         >>> elem = SchemaElements()
         >>> elem.ARRAY(elem.ANY())
         >>> schema = OBJECT({
@@ -353,7 +353,7 @@ class SchemaElements(
 
 if 0:
     """
-    from kwcoco.jsonschema_elements import *  # NOQA
+    from kwcoco.util.jsonschema_elements import *  # NOQA
 
     elem = SchemaElements()
     attrs = [key for key in dir(SchemaElements) if not key.startswith('_')]
@@ -382,7 +382,7 @@ STRING = elem.STRING
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/jsonschema_elements.py all
+        python ~/code/kwcoco/kwcoco/util/jsonschema_elements.py all
     """
     import xdoctest
     xdoctest.doctest_module(__file__)

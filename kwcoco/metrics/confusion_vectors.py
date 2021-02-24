@@ -390,36 +390,39 @@ class ConfusionVectors(ub.NiceRepr):
             catname_to_binvecs.cx_to_binvecs['class_1'].data.pandas()
 
         Notes:
-            Consider we want to measure how well we can classify beagles.
 
-            Given a multiclass confusion vector, we need to carefully select a
-            subset. We ignore any truth that is coarser than our current label.
-            We also ignore any background predictions on irrelevant classes
+            .. code:
 
-            y_true     | y_pred     | score
-            -------------------------------
-            dog        | dog          <- ignore coarser truths
-            dog        | cat          <- ignore coarser truths
-            dog        | beagle       <- ignore coarser truths
-            cat        | dog
-            cat        | cat
-            cat        | background   <- ignore failures to predict unrelated classes
-            cat        | maine-coon
-            beagle     | beagle
-            beagle     | dog
-            beagle     | background
-            beagle     | cat
-            Snoopy     | beagle
-            Snoopy     | cat
-            maine-coon | background    <- ignore failures to predict unrelated classes
-            maine-coon | beagle
-            maine-coon | cat
+                Consider we want to measure how well we can classify beagles.
 
-            Anything not marked as ignore is counted. We count anything marked
-            as beagle or a finer grained class (e.g.  Snoopy) as a positive
-            case. All other cases are negative. The scores come from the
-            predicted probability of beagle, which must be remembered outside
-            the dataframe.
+                Given a multiclass confusion vector, we need to carefully select a
+                subset. We ignore any truth that is coarser than our current label.
+                We also ignore any background predictions on irrelevant classes
+
+                y_true     | y_pred     | score
+                -------------------------------
+                dog        | dog          <- ignore coarser truths
+                dog        | cat          <- ignore coarser truths
+                dog        | beagle       <- ignore coarser truths
+                cat        | dog
+                cat        | cat
+                cat        | background   <- ignore failures to predict unrelated classes
+                cat        | maine-coon
+                beagle     | beagle
+                beagle     | dog
+                beagle     | background
+                beagle     | cat
+                Snoopy     | beagle
+                Snoopy     | cat
+                maine-coon | background    <- ignore failures to predict unrelated classes
+                maine-coon | beagle
+                maine-coon | cat
+
+                Anything not marked as ignore is counted. We count anything marked
+                as beagle or a finer grained class (e.g.  Snoopy) as a positive
+                case. All other cases are negative. The scores come from the
+                predicted probability of beagle, which must be remembered outside
+                the dataframe.
         """
         import kwarray
 

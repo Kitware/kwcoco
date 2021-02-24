@@ -10,19 +10,13 @@
 Welcome to kwcoco's documentation!
 ==================================
 
+
 .. The __init__ files contains the top-level documentation overview
 .. automodule:: kwcoco.__init__
    :show-inheritance:
 
 
 .. toctree::
+   :titlesonly:
 
-   kwcoco
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   /autoapi/kwcoco/index

@@ -24,7 +24,7 @@ Example:
     >>>     raise
 """
 
-from kwcoco.jsonschema_elements import SchemaElements
+from kwcoco.util.jsonschema_elements import SchemaElements
 from collections import OrderedDict
 import ubelt as ub
 

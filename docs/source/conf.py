@@ -4,6 +4,7 @@ Notes:
     http://docs.readthedocs.io/en/latest/getting_started.html
 
     pip install sphinx sphinx-autobuild sphinx_rtd_theme sphinxcontrib-napoleon
+    pip install sphinx-autoapi
 
     cd ~/code/kwcoco
     mkdir docs
@@ -73,13 +74,15 @@ def parse_version(fpath):
 # -- Project information -----------------------------------------------------
 
 project = 'kwcoco'
+modname = project
 copyright = '2020, Kitware Inc'
 author = 'Jon Crall'
 
 modpath = join(dirname(dirname(dirname(__file__))), 'kwcoco', '__init__.py')
 # The full version, including alpha/beta/rc tags
 release = parse_version(modpath)
-version = '.'.join(release.split('.')[0:2])
+# version = '.'.join(release.split('.')[0:2])
+version = release
 
 
 # -- General configuration ---------------------------------------------------
@@ -104,6 +107,29 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
+
+# TODO: figure out how to use autoapi
+USE_AUTOAPI = True
+if USE_AUTOAPI:
+    # redirects = {
+    #     "index": "autoapi/kwcoco/index.html",
+    # }
+
+    autoapi_modules = {
+        modname: {
+            'override': False,
+            'output': 'auto'
+        }
+    }
+
+    autoapi_dirs = [f'../../{modname}']
+    # autoapi_keep_files = True
+
+    extensions.extend([
+        'autoapi.extension',
+        # 'sphinx.ext.inheritance_diagram',
+        # 'autoapi.sphinx',
+    ])
 
 # -- Options for HTML output -------------------------------------------------
 
