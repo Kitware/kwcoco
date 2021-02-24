@@ -1,3 +1,36 @@
+# -*- coding: utf-8 -*-
+"""
+Notes:
+    http://docs.readthedocs.io/en/latest/getting_started.html
+
+    pip install sphinx sphinx-autobuild sphinx_rtd_theme sphinxcontrib-napoleon
+
+    cd ~/code/kwcoco
+    mkdir docs
+    cd docs
+
+    sphinx-quickstart
+
+    # need to edit the conf.py
+
+    cd ~/code/kwcoco/docs
+    make html
+    sphinx-apidoc -f -o ~/code/kwcoco/docs/source ~/code/kwcoco/kwcoco --separate
+    make html
+
+
+    Also:
+        To turn on PR checks
+
+        https://docs.readthedocs.io/en/stable/guides/autobuild-docs-for-pull-requests.html
+
+        https://readthedocs.org/dashboard/kwcoco/advanced/
+
+        ensure your github account is connected to readthedocs
+        https://readthedocs.org/accounts/social/connections/
+
+"""
+
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -10,16 +43,42 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os
-import sys
-sys.path.insert(0, os.path.abspath('../..'))
+import sphinx_rtd_theme
+from os.path import exists
+from os.path import dirname
+from os.path import join
+
+
+def parse_version(fpath):
+    """
+    Statically parse the version number from a python file
+    """
+    import ast
+    if not exists(fpath):
+        raise ValueError('fpath={!r} does not exist'.format(fpath))
+    with open(fpath, 'r') as file_:
+        sourcecode = file_.read()
+    pt = ast.parse(sourcecode)
+    class VersionVisitor(ast.NodeVisitor):
+        def visit_Assign(self, node):
+            for target in node.targets:
+                if getattr(target, 'id', None) == '__version__':
+                    self.version = node.value.s
+    visitor = VersionVisitor()
+    visitor.visit(pt)
+    return visitor.version
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'kwcoco'
-copyright = '2020, joncrall'
+copyright = '2020, kitware'
 author = 'joncrall'
+
+modpath = join(dirname(dirname(dirname(__file__))), 'kwcoco', '__init__.py')
+# The full version, including alpha/beta/rc tags
+release = parse_version(modpath)
+version = '.'.join(release.split('.')[0:2])
 
 
 # -- General configuration ---------------------------------------------------
@@ -58,6 +117,9 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+source_suffix = ['.rst', '.md']
+
+pygments_style = 'sphinx'
 
 
 # -- Extension configuration -------------------------------------------------

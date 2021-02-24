@@ -7,8 +7,10 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   kwcoco.util.dict_like
    kwcoco.util.util_futures
    kwcoco.util.util_json
+   kwcoco.util.util_monkey
    kwcoco.util.util_sklearn
    kwcoco.util.util_slice
 

@@ -18,13 +18,16 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   kwcoco.abstract_coco_dataset
    kwcoco.category_tree
    kwcoco.coco_dataset
    kwcoco.coco_evaluator
+   kwcoco.coco_schema
+   kwcoco.coco_sql_dataset
    kwcoco.compat_dataset
+   kwcoco.jsonschema_elements
    kwcoco.kpf
    kwcoco.kw18
-   kwcoco.spec
    kwcoco.toydata
    kwcoco.toypatterns
 

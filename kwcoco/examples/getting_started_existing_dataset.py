@@ -1,0 +1,74 @@
+
+def getting_started_existing_dataset():
+    """
+    If you want to start using the Python API. Just open IPython and try:
+    """
+
+    import kwcoco
+    dset = kwcoco.CocoDataset('<DATASET_NAME>/data.kwcoco.json')
+
+    """
+    You can access category, image, and annotation infomation using the index:
+    """
+    cat = dset.index.cats[1]
+    print('The First Category = {!r}'.format(cat))
+
+    img = dset.index.imgs[1]
+    print('The First Image = {!r}'.format(img))
+
+    ann = dset.index.anns[1]
+    print('The First Annotation = {!r}'.format(ann))
+
+
+def the_core_dataset_backend():
+
+    import kwcoco
+    dset = kwcoco.CocoDataset.demo('shapes2')
+
+    # Make data slightly tider for display
+    for ann in dset.dataset['annotations']:
+        ann.pop('segmentation', None)
+        ann.pop('keypoints', None)
+        ann.pop('area', None)
+
+    for cat in dset.dataset['categories']:
+        cat.pop('keypoints', None)
+
+    for img in dset.dataset['images']:
+        img.pop('channels', None)
+
+    dset.reroot(dirname(dset.fpath), absolute=False)
+    import kwarray
+    dset.remove_annotations(kwarray.shuffle(list(dset.anns.keys()))[10:])
+
+    print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
+
+
+def demo_vectorize_interface():
+
+    """
+
+    >>> import kwcoco
+    >>> dset = kwcoco.CocoDataset.demo('vidshapes2')
+    >>> #
+    >>> aids = [1, 2, 3, 4]
+    >>> annots = dset.annots(aids)
+    >>> print('annots = {!r}'.format(annots))
+    annots = <Annots(num=4) at 0x7fd8aff78d00>
+
+    >>> annots.lookup('bbox')
+    [[223.7, -136.6, 333.7, 319.1],
+     [232.3, -130.0, 327.8, 310.1],
+     [347.6, 127.3, 36.8, 117.9],
+     [343.5, 119.1, 38.6, 124.2]]
+
+    >>> gids = annots.lookup('image_id')
+    >>> print('gids = {!r}'.format(gids))
+    gids = [1, 2, 1, 2]
+
+    >>> images = dset.images(gids)
+    >>> list(zip(images.lookup('width'), images.lookup('height')))
+    [(600, 600), (600, 600), (600, 600), (600, 600)]
+
+
+    """
