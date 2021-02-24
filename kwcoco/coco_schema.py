@@ -226,14 +226,15 @@ COCO_SCHEMA = OBJECT(
 )
 
 
-if __debug__:
+if ub.argflag('--debug'):
     COCO_SCHEMA.validate()
 
 
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/coco_schema.py > ~/code/kwcoco/kwcoco/coco_schema.json
+        python ~/code/kwcoco/kwcoco/coco_schema.py
+        > ~/code/kwcoco/kwcoco/coco_schema.json
     """
     # import json
     print(ub.repr2(COCO_SCHEMA, nl=-1, trailsep=False, sort=False).replace("'", '"'))

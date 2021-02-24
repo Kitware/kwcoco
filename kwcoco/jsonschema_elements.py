@@ -19,6 +19,12 @@ import ubelt as ub
 
 class Element(dict):
     """
+    A dictionary used to define an element of a JSON Schema.
+
+    The exact keys/values for the element will depend on the type of element
+    being described. The :class:`SchemaElements` defines exactly what these are
+    for the core elements. (e.g. OBJECT, INTEGER, NULL, ARRAY, ANYOF)
+
     Example:
         >>> from kwcoco.coco_schema import *  # NOQA
         >>> self = Element(base={'type': 'demo'}, options={'opt1', 'opt2'})
@@ -29,7 +35,35 @@ class Element(dict):
         >>> print('new3 = {}'.format(ub.repr2(new(title='myvar'), nl=1)))
         >>> print('new4 = {}'.format(ub.repr2(new(title='myvar')(examples=['']), nl=1)))
         >>> print('new5 = {}'.format(ub.repr2(new(badattr=True), nl=1)))
+        self = {
+            'type': 'demo',
+        }
+        new = {
+            'opt1': 3,
+            'type': 'demo',
+        }
+        new2 = {
+            'opt1': 3,
+            'type': 'demo',
+        }
+        new3 = {
+            'opt1': 3,
+            'title': 'myvar',
+            'type': 'demo',
+        }
+        new4 = {
+            'examples': [''],
+            'opt1': 3,
+            'title': 'myvar',
+            'type': 'demo',
+        }
+        new5 = {
+            'opt1': 3,
+            'type': 'demo',
+        }
     """
+
+    # These are generic attributes that any type of schema element might have
     __generics__ = {
         'title': NotImplemented,
         'description': NotImplemented,
@@ -38,6 +72,15 @@ class Element(dict):
     }
 
     def __init__(self, base, options={}, _magic=None):
+        """
+        Args:
+            base (dict): the keys / values this schema must contain
+            options (options): the keys / values this schema may contain
+            _magic (callable): called when creating an instance of this schema
+                element. Allows convinience attributes to be converted to the
+                formal jsonschema specs. TODO: _magic is a terrible name rename
+                it.
+        """
         self._base = base
 
         if isinstance(options, (set, list, tuple)):
@@ -56,6 +99,13 @@ class Element(dict):
         return new
 
     def validate(self, instance=ub.NoParam):
+        """
+        If ``instance`` is given, validates that that dictionary conforms to
+        this schema. Otherwise validates that this is a valid schema element.
+
+        Args:
+            instance (dict): a dictionary to validate
+        """
         import jsonschema
         from jsonschema.validators import validator_for
         if instance is ub.NoParam:
@@ -158,6 +208,9 @@ class ContainerElements:
         >>> print(elem.ARRAY().validate())
         >>> print(elem.OBJECT().validate())
         >>> print(elem.OBJECT().validate())
+        {'type': 'array', 'items': {}}
+        {'type': 'object', 'properties': {}}
+        {'type': 'object', 'properties': {}}
     """
 
     def ARRAY(self, TYPE={}, **kw):
@@ -169,6 +222,7 @@ class ContainerElements:
             >>> ARRAY(numItems=3)
             >>> schema = ARRAY(minItems=3)
             >>> schema.validate()
+            {'type': 'array', 'items': {}, 'minItems': 3}
         """
         def _magic(kw):
             numItems = kw.pop('numItems', None)
@@ -215,6 +269,21 @@ class ContainerElements:
             >>> schema.validate()
             >>> print('schema = {}'.format(ub.repr2(schema, nl=-1)))
             >>> jsonschema.validate({'key1': {'arr': []}}, schema)
+            schema = {
+                'properties': {
+                    'key1': {
+                        'properties': {
+                            'arr': {'items': {}, 'type': 'array'}
+                        },
+                        'type': 'object'
+                    },
+                    'key2': {}
+                },
+                'required': ['key1'],
+                'title': 'a title',
+                'type': 'object'
+            }
+
         """
         self = Element(
                 base={'type': 'object', 'properties': PROPERTIES},
@@ -261,8 +330,15 @@ class SchemaElements(
         >>>         'subprob2': NUMBER,
         >>>     }))
         >>> })
-        >>> print('schema = {}'.format(ub.repr2(schema, nl=-1)))
         >>> print('schema = {}'.format(ub.repr2(schema, nl=2)))
+        schema = {
+            'properties': {
+                'prop1': {'items': {'type': 'integer'}, 'minItems': 3, 'type': 'array'},
+                'prop2': {'items': {'type': 'string'}, 'maxItems': 2, 'minItems': 2, 'type': 'array'},
+                'prop3': {'items': {'properties': {'subprob1': {'type': 'number'}, 'subprob2': {'type': 'number'}}, 'type': 'object'}, 'type': 'array'},
+            },
+            'type': 'object',
+        }
 
         >>> TYPE = elem.OBJECT({
         >>>     'p1': ANY,
