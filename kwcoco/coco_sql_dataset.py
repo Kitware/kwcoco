@@ -1122,6 +1122,7 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoJSONAccessors,
         columns.
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
             >>> self, dset = demo(10)
             >>> tablename = 'annotations'
