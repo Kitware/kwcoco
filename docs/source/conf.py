@@ -31,6 +31,13 @@ Notes:
         ensure your github account is connected to readthedocs
         https://readthedocs.org/accounts/social/connections/
 
+
+        # Add RTD as a GitLab Hook
+
+        https://docs.readthedocs.io/en/stable/webhooks.html
+
+        https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/integrations
+
 """
 
 # Configuration file for the Sphinx documentation builder.

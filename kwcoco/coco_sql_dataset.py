@@ -1059,6 +1059,7 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoJSONAccessors,
         Convinience method to lookup only a single column of information
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
             >>> self, dset = demo(10)
             >>> tablename = 'annotations'
