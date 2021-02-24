@@ -446,7 +446,5 @@ a coco file using process similar to the following code:
 .. |GitlabCIPipeline| image:: https://gitlab.kitware.com/computer-vision/kwcoco/badges/master/pipeline.svg
    :target: https://gitlab.kitware.com/computer-vision/kwcoco/-/jobs
 
-.. |GitlabCICoverage| image:: https://gitlab.kitware.com/computer-vision/kwcoco/badges/master/coverage.svg?job=coverage
+.. |GitlabCICoverage| image:: https://gitlab.kitware.com/computer-vision/kwcoco/badges/master/coverage.svg
     :target: https://gitlab.kitware.com/computer-vision/kwcoco/commits/master
-
-
