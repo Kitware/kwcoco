@@ -25,6 +25,7 @@ Notes:
         https://docs.readthedocs.io/en/stable/guides/autobuild-docs-for-pull-requests.html
 
         https://readthedocs.org/dashboard/kwcoco/advanced/
+            * Click "Build pull requests for this project", then click save
 
         ensure your github account is connected to readthedocs
         https://readthedocs.org/accounts/social/connections/
@@ -72,8 +73,8 @@ def parse_version(fpath):
 # -- Project information -----------------------------------------------------
 
 project = 'kwcoco'
-copyright = '2020, kitware'
-author = 'joncrall'
+copyright = '2020, Kitware Inc'
+author = 'Jon Crall'
 
 modpath = join(dirname(dirname(dirname(__file__))), 'kwcoco', '__init__.py')
 # The full version, including alpha/beta/rc tags
