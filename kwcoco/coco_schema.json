@@ -29,8 +29,8 @@
                     "keypoints": {"description": "deprecated"},
                     "skeleton": {"description": "deprecated"}
                 },
-                "title": "CATEGORY",
-                "required": ["id", "name"]
+                "required": ["id", "name"],
+                "title": "CATEGORY"
             }
         },
         "keypoint_categories": {
@@ -53,8 +53,8 @@
                         ]
                     }
                 },
-                "title": "KEYPOINT_CATEGORY",
-                "required": ["id", "name"]
+                "required": ["id", "name"],
+                "title": "KEYPOINT_CATEGORY"
             }
         },
         "videos": {
@@ -66,8 +66,8 @@
                     "name": {"type": "string"},
                     "caption": {"type": "string"}
                 },
-                "title": "VIDEO",
-                "required": ["id", "name"]
+                "required": ["id", "name"],
+                "title": "VIDEO"
             }
         },
         "images": {
@@ -110,10 +110,10 @@
                     "bbox": {
                         "type": "array",
                         "items": {"type": "number"},
-                        "maxItems": 4,
-                        "minItems": 4,
                         "title": "bbox",
-                        "description": "[top-left x, top-left-y, width, height] in pixels"
+                        "description": "[top-left x, top-left-y, width, height] in pixels",
+                        "minItems": 4,
+                        "maxItems": 4
                     },
                     "category_id": {"type": "integer"},
                     "track_id": {
@@ -135,8 +135,8 @@
                                                 "items": {
                                                     "type": "array",
                                                     "items": {"type": "number"},
-                                                    "maxItems": 2,
-                                                    "minItems": 2
+                                                    "minItems": 2,
+                                                    "maxItems": 2
                                                 },
                                                 "description": "counter-clockwise xy exterior points"
                                             },
@@ -147,8 +147,8 @@
                                                     "items": {
                                                         "type": "array",
                                                         "items": {"type": "number"},
-                                                        "maxItems": 2,
-                                                        "minItems": 2
+                                                        "minItems": 2,
+                                                        "maxItems": 2
                                                     },
                                                     "description": "clockwise xy hole"
                                                 }
@@ -167,8 +167,8 @@
                                                     "items": {
                                                         "type": "array",
                                                         "items": {"type": "number"},
-                                                        "maxItems": 2,
-                                                        "minItems": 2
+                                                        "minItems": 2,
+                                                        "maxItems": 2
                                                     },
                                                     "description": "counter-clockwise xy exterior points"
                                                 },
@@ -179,8 +179,8 @@
                                                         "items": {
                                                             "type": "array",
                                                             "items": {"type": "number"},
-                                                            "maxItems": 2,
-                                                            "minItems": 2
+                                                            "minItems": 2,
+                                                            "maxItems": 2
                                                         },
                                                         "description": "clockwise xy hole"
                                                     }
@@ -195,8 +195,8 @@
                                         "items": {
                                             "type": "array",
                                             "items": {"type": "number"},
-                                            "maxItems": 2,
-                                            "minItems": 2
+                                            "minItems": 2,
+                                            "maxItems": 2
                                         },
                                         "title": "ORIG_COCO_POLYGON",
                                         "description": "[x1,y1,v1,...,xk,yk,vk]"
@@ -221,9 +221,9 @@
                                         "xy": {
                                             "type": "array",
                                             "items": {"type": "number"},
-                                            "maxItems": 2,
+                                            "description": "<x1, y1> in pixels",
                                             "minItems": 2,
-                                            "description": "<x1, y1> in pixels"
+                                            "maxItems": 2
                                         },
                                         "visible": {"type": "integer", "description": "choice(0, 1, 2)"},
                                         "keypoint_category_id": {"type": "integer"},
@@ -241,7 +241,12 @@
                     },
                     "score": {"type": "number"},
                     "weight": {"type": "number"},
-                    "iscrowd": {"type": "string"},
+                    "iscrowd": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "boolean"}
+                        ]
+                    },
                     "caption": {"type": "string"}
                 },
                 "required": ["id", "image_id"]

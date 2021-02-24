@@ -46,15 +46,8 @@ def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
             fp_count = info['fp_count']
             fpr = info['fpr']
 
-        nsupport = int(info['nsupport'])
-        if 'realpos_total' in info:
-            z = info['realpos_total']
-            if abs(z - int(z)) < 1e-8:
-                label = 'auc={:0.2f}: {} ({:d}/{:d})'.format(auc, catname, int(info['realpos_total']), round(nsupport, 2))
-            else:
-                label = 'auc={:0.2f}: {} ({:.2f}/{:d})'.format(auc, catname, round(info['realpos_total'], 2), round(nsupport, 2))
-        else:
-            label = 'auc={:0.2f}: {} ({:d})'.format(auc, catname, round(nsupport, 2))
+        label_suffix = _realpos_label_suffix(info)
+        label = 'auc={:0.2f}: {} ({})'.format(auc, catname, label_suffix)
 
         if fp_axis == 'count':
             xydata[label] = (fp_count, tpr)
@@ -70,6 +63,57 @@ def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
         color='distinct', linestyle='cycle', marker='cycle', **kw
     )
     return ax
+
+
+def inty_display(val, eps=1e-8, ndigits=2):
+    """
+    Make a number as inty as possible
+    """
+    try:
+        val_int = int(val)
+        if abs(val - val_int) > eps:
+            raise ValueError('not close to an int')
+        final = '{}'.format(val_int)
+    except (ValueError, TypeError):
+        final = '{}'.format(round(val, ndigits))
+    return final
+
+
+def _realpos_label_suffix(info):
+    """
+    Creates a label suffix that indicates the number of real positive cases
+    versus the total amount of cases considered for an evaluation curve.
+
+    Args:
+        info (Dict): with keys, nsuppert, realpos_total
+
+    Example:
+        >>> info = {'nsupport': 10, 'realpos_total': 10}
+        >>> _realpos_label_suffix(info)
+        10/10
+        >>> info = {'nsupport': 10.0, 'realpos_total': 10.0}
+        >>> _realpos_label_suffix(info)
+        10/10
+        >>> info = {'nsupport': 10.3333, 'realpos_total': 10.22222}
+        >>> _realpos_label_suffix(info)
+        10.22/10.33
+        >>> info = {'nsupport': 10.000000001, 'realpos_total': None}
+        >>> _realpos_label_suffix(info)
+        10
+        >>> info = {'nsupport': 10.009}
+        >>> _realpos_label_suffix(info)
+        10.01
+    """
+    nsupport = info['nsupport']
+    nsupport = float('nan') if nsupport is None else float(nsupport)
+
+    rpt = info.get('realpos_total', None)
+    nsupport_dsp = inty_display(nsupport)
+    if rpt is None:
+        return nsupport_dsp
+    else:
+        rpt_dsp = inty_display(rpt)
+        return '{}/{}'.format(rpt_dsp, nsupport_dsp)
 
 
 def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
@@ -132,15 +176,9 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
             # I thought AP=nan in this case, but I missed something
             precision, recall = [0], [0]
 
-        nsupport = int(info['nsupport'])
-        if 'realpos_total' in info:
-            z = info['realpos_total']
-            if abs(z - int(z)) < 1e-8:
-                label = 'ap={:0.2f}: {} ({:d}/{:d})'.format(ap, catname, int(info['realpos_total']), round(nsupport, 2))
-            else:
-                label = 'ap={:0.2f}: {} ({:.2f}/{:d})'.format(ap, catname, round(info['realpos_total'], 2), round(nsupport, 2))
-        else:
-            label = 'ap={:0.2f}: {} ({:d})'.format(ap, catname, round(nsupport, 2))
+        label_suffix = _realpos_label_suffix(info)
+        label = 'ap={:0.2f}: {} ({})'.format(ap, catname, label_suffix)
+
         xydata[label] = (recall, precision)
 
     with warnings.catch_warnings():
@@ -148,6 +186,9 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
         mAP = np.nanmean(aps)
 
     if 0:
+        import seaborn as sns
+        import pandas as pd
+        # sns.set()
         # TODO: deprecate multi_plot for seaborn?
         data_groups = {
             key: {'recall': r, 'precision': p}
@@ -157,15 +198,11 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
 
         longform = []
         for key, subdata in data_groups.items():
-            import pandas as pd
             subdata = pd.DataFrame.from_dict(subdata)
             subdata['label'] = key
             longform.append(subdata)
         data = pd.concat(longform)
 
-        import seaborn as sns
-        import pandas as pd
-        # sns.set()
         fig = kwplot.figure(fnum=fnum)
         ax = fig.gca()
         longform = []
@@ -252,15 +289,8 @@ def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnu
             best_measure = measure[max_idx]
             best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
 
-        nsupport = int(info['nsupport'])
-        if 'realpos_total' in info:
-            z = info['realpos_total']
-            if abs(z - int(z)) < 1e-8:
-                label = '{}: {} ({:d}/{:d})'.format(best_label, catname, int(info['realpos_total']), round(nsupport, 2))
-            else:
-                label = '{}: {} ({:.2f}/{:d})'.format(best_label, catname, round(info['realpos_total'], 2), round(nsupport, 2))
-        else:
-            label = '{}: {} ({:d})'.format(best_label, catname, round(nsupport, 2))
+        label_suffix = _realpos_label_suffix(info)
+        label = '{}: {} ({})'.format(best_label, catname, label_suffix)
         xydata[label] = (thresholds, measure)
 
     with warnings.catch_warnings():
@@ -334,11 +364,13 @@ def draw_roc(info, prefix='', fnum=1, **kw):
         sns.lineplot(data=data, x=xlabel, y=ylabel, markers='', ax=ax)
         ax.set_title(title)
     else:
+        realpos_total_disp = inty_display(realpos_total)
+
         ax = kwplot.multi_plot(
             list(fp_rate), list(tp_rate), marker='',
             # xlabel='FA count (false positive count)',
             xlabel='fpr (count={})'.format(falsepos_total),
-            ylabel='tpr (count={})'.format(int(realpos_total)),
+            ylabel='tpr (count={})'.format(realpos_total_disp),
             title=title,
             ylim=(0, 1), ypad=1e-2,
             xlim=(0, 1), xpad=1e-2,
@@ -389,15 +421,8 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
         # I thought AP=nan in this case, but I missed something
         precision, recall = [0], [0]
 
-    nsupport = int(info['nsupport'])
-    if 'realpos_total' in info:
-        z = info['realpos_total']
-        if abs(z - int(z)) < 1e-8:
-            label = 'ap={:0.2f}: ({:d}/{:d})'.format(ap, int(info['realpos_total']), round(nsupport, 2))
-        else:
-            label = 'ap={:0.2f}: ({:.2f}/{:d})'.format(ap, round(info['realpos_total'], 2), round(nsupport, 2))
-    else:
-        label = 'ap={:0.2f}: ({:d})'.format(ap, nsupport)
+    label_suffix = _realpos_label_suffix(info)
+    label = 'ap={:0.2f}: ({})'.format(ap, label_suffix)
 
     ax = kwplot.multi_plot(
         xdata=recall, ydata=precision, fnum=fnum, label=label,
@@ -468,26 +493,24 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         measure = info[key][finite_flags]
 
         if len(measure):
-            max_idx = np.nanargmax(measure)
-            offset = (~finite_flags[:max_idx]).sum()
-            max_idx += offset
-            best_thresh = thresh[max_idx]
-            best_measure = measure[max_idx]
-            best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+            try:
+                max_idx = np.nanargmax(measure)
+                offset = (~finite_flags[:max_idx]).sum()
+                max_idx += offset
+                best_thresh = thresh[max_idx]
+                best_measure = measure[max_idx]
+                best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+            except ValueError:
+                best_thresh = np.nan
+                best_measure = np.nan
         else:
             best_thresh = np.nan
             best_measure = np.nan
         best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
 
-        nsupport = int(info['nsupport'])
-        if 'realpos_total' in info:
-            z = info['realpos_total']
-            if abs(z - int(z)) < 1e-8:
-                label = '{}: ({:d}/{:d})'.format(best_label, int(info['realpos_total']), round(nsupport, 2))
-            else:
-                label = '{}: ({:.2f}/{:d})'.format(best_label, round(info['realpos_total'], 2), round(nsupport, 2))
-        else:
-            label = '{}: ({:d})'.format(best_label, nsupport)
+        label_suffix = _realpos_label_suffix(info)
+        label = '{}: ({})'.format(best_label, label_suffix)
+
         xydata[label] = (thresh, measure)
         colors[label] = color
         idx_to_best_pt[idx] = (best_thresh, best_measure)
@@ -509,8 +532,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
 
 if __name__ == '__main__':
     """
-
-        python ~/code/kwcoco/kwcoco/metrics/drawing.py
+    xdoctest ~/code/kwcoco/kwcoco/metrics/drawing.py
     """
     import xdoctest
     xdoctest.doctest_module(__file__)

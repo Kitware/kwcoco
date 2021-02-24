@@ -414,8 +414,16 @@ class CocoEvaluator(object):
                 extra: any extra information we gathered via coercion
 
         Example:
+            >>> from kwcoco.coco_evaluator import *  # NOQA
             >>> import kwcoco
             >>> coco_dset = kwcoco.CocoDataset.demo('shapes8')
+            >>> gid_to_det, extras = CocoEvaluator._coerce_dets(coco_dset)
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> from kwcoco.coco_evaluator import *  # NOQA
+            >>> import kwcoco
+            >>> coco_dset = kwcoco.CocoDataset.demo('shapes8').view_sql()
             >>> gid_to_det, extras = CocoEvaluator._coerce_dets(coco_dset)
         """
         # coerce the input into dictionary of detection objects.
@@ -438,7 +446,7 @@ class CocoEvaluator(object):
                     raise NotImplementedError
             else:
                 gid_to_det = {}
-        elif isinstance(dataset, kwcoco.CocoDataset):
+        elif isinstance(dataset, kwcoco.AbstractCocoDataset):
             extra['coco_dset'] = coco_dset = dataset
             gid_to_det = {}
             gids = sorted(coco_dset.imgs.keys())
@@ -1169,6 +1177,9 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
 
 
 class CocoEvalCLIConfig(scfg.Config):
+    """
+    Evaluate detection metrics using a predicted and truth coco file.
+    """
     default = ub.dict_union(CocoEvalConfig.default, {
         # These should go into the CLI args, not the class config args
         'expt_title': scfg.Value('', type=str, help='title for plots'),

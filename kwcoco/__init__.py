@@ -10,15 +10,21 @@ The :class:`kwcoco.CocoDataset` class is capable of dynamic addition and removal
 of categories, images, and annotations. Has better support for keypoints and
 segmentation formats than the original COCO format. Despite being written in
 Python, this data structure is reasonably efficient.
-
 """
-__version__ = '0.1.10'
 
-__submodules__ = ['coco_dataset']
+__dev__ = """
+mkinit ~/code/kwcoco/kwcoco/__init__.py
+"""
+
+__version__ = '0.1.11'
+
+__submodules__ = ['coco_dataset', 'abstract_coco_dataset']
 
 from kwcoco import coco_dataset
 
+from kwcoco.abstract_coco_dataset import (AbstractCocoDataset,)
 from kwcoco.category_tree import (CategoryTree,)
 from kwcoco.coco_dataset import (CocoDataset,)
 
-__all__ = ['CocoDataset', 'CategoryTree', 'coco_dataset']
+__all__ = ['AbstractCocoDataset', 'CocoDataset', 'CategoryTree',
+           'coco_dataset']

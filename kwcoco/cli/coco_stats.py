@@ -17,7 +17,9 @@ class CocoStatsCLI:
             'extended': scfg.Value(True, help='show extended stats'),
             'catfreq': scfg.Value(True, help='show category frequency stats'),
             'boxes': scfg.Value(False, help='show bounding box stats'),
-            'annot_attrs': scfg.Value(False, help='show annot attribute information'),
+
+            'annot_attrs': scfg.Value(False, help='show annotation attribute information'),
+            'image_attrs': scfg.Value(False, help='show image attribute information'),
 
             'embed': scfg.Value(False, help='embed into interactive shell'),
         }
@@ -53,6 +55,15 @@ class CocoStatsCLI:
             print('reading fpath = {!r}'.format(fpath))
             dset = kwcoco.CocoDataset.coerce(fpath)
             datasets.append(dset)
+
+        # hack dataset tags
+        dset_tags = [dset.tag for dset in datasets]
+        if len(set(dset_tags)) < len(dset_tags):
+            from os.path import commonprefix
+            dset_fpaths = [dset.fpath for dset in datasets]
+            toremove = commonprefix(dset_fpaths)
+            for dset in datasets:
+                dset.tag = dset.fpath.replace(toremove, '')
 
         try:
             from kwcoco.category_tree import _print_forest
@@ -91,17 +102,26 @@ class CocoStatsCLI:
             df = pd.DataFrame.from_dict(tag_to_freq)
             print(df.to_string(float_format=lambda x: '%0.3f' % x))
 
+        if config['image_attrs']:
+            print('Image Attrs')
+            for dset in datasets:
+                print('dset.tag = {!r}'.format(dset.tag))
+                attrs = ub.ddict(lambda: 0)
+                for ann in dset.imgs.values():
+                    for key, value in ann.items():
+                        if value:
+                            attrs[key] += 1
+                print('image_attrs = {}'.format(ub.repr2(attrs, nl=1)))
+
         if config['annot_attrs']:
             print('Annot Attrs')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
-
                 attrs = ub.ddict(lambda: 0)
                 for ann in dset.anns.values():
                     for key, value in ann.items():
                         if value:
                             attrs[key] += 1
-
                 print('annot_attrs = {}'.format(ub.repr2(attrs, nl=1)))
 
         if config['boxes']:
