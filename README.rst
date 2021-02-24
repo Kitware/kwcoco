@@ -201,6 +201,8 @@ An implementation and extension of the original MS-COCO API [1]_.
 
 Dataset Spec:
 
+An informal description of the spec is written here:
+
 .. code:: 
 
     category = {
@@ -306,18 +308,18 @@ Dataset Spec:
         We also have a new top-level dictionary to specify all the possible
         keypoint categories.
 
-    Auxillary Channels:
+    Auxiliary Channels:
         For multimodal or multispectral images it is possible to specify
-        auxillary channels in an image dictionary as follows:
+        auxiliary channels in an image dictionary as follows:
 
         {
             'id': int, 'file_name': str
             'channels': <spec>,  # a spec code that indicates the layout of these channels.
-            'auxillary': [  # information about auxillary channels
+            'auxiliary': [  # information about auxiliary channels
                 {
                     'file_name':
                     'channels': <spec>
-                }, ... # can have many auxillary channels with unique specs
+                }, ... # can have many auxiliary channels with unique specs
             ]
         }
 
@@ -347,6 +349,9 @@ Dataset Spec:
             "track_id": <int | str | uuid>  # optional, indicates association between annotations across frames
         }
 
+
+For a formal description of the spec see the  `kwcoco/coco_schema.json <kwcoco/coco_schema.json>`_.
+        
 
 Converting your data to COCO
 ----------------------------
