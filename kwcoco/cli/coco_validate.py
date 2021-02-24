@@ -9,7 +9,8 @@ class CocoValidateCLI:
 
     class CLIConfig(scfg.Config):
         """
-        Compute summary statistics about a COCO dataset
+        Validate that a coco file conforms to the json schema, that assets
+        exist, and potentially fix corrupted assets by removing them.
         """
         default = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to datasets', position=1),
@@ -48,7 +49,7 @@ class CocoValidateCLI:
         Example:
             >>> kw = {'src': 'special:shapes8'}
             >>> cmdline = False
-            >>> cls = CocoStatsCLI
+            >>> cls = CocoValidateCLI
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco

@@ -1177,6 +1177,9 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
 
 
 class CocoEvalCLIConfig(scfg.Config):
+    """
+    Evaluate detection metrics using a predicted and truth coco file.
+    """
     default = ub.dict_union(CocoEvalConfig.default, {
         # These should go into the CLI args, not the class config args
         'expt_title': scfg.Value('', type=str, help='title for plots'),

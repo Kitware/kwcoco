@@ -9,7 +9,8 @@ class CocoShowCLI:
 
     class CLIConfig(scfg.Config):
         """
-        Visualize a COCO image using matplotlib, optionally writing it to disk
+        Visualize a COCO image using matplotlib or opencv, optionally writing
+        it to disk
         """
         epilog = """
         Example Usage:
