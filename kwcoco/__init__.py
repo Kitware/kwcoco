@@ -16,7 +16,7 @@ __dev__ = """
 mkinit ~/code/kwcoco/kwcoco/__init__.py
 """
 
-__version__ = '0.1.12'
+__version__ = '0.1.13'
 
 __submodules__ = ['coco_dataset', 'abstract_coco_dataset']
 
