@@ -2044,7 +2044,7 @@ class MixinCocoExtras(object):
         img_enum = enumerate(self.dataset['images'])
         for index, img in ub.ProgIter(img_enum,
                                       total=len(self.dataset['images']),
-                                      desc='check missing images',
+                                      desc='check for missing images',
                                       verbose=verbose):
             gid = img.get('id', None)
             gpath = join(self.bundle_dpath, img['file_name'])
@@ -2074,7 +2074,7 @@ class MixinCocoExtras(object):
         img_enum = enumerate(self.dataset['images'])
         for index, img in ub.ProgIter(img_enum,
                                       total=len(self.dataset['images']),
-                                      desc='check corrupted images',
+                                      desc='check for corrupted images',
                                       verbose=verbose):
             gid = img.get('id', None)
             gpath = join(self.bundle_dpath, img['file_name'])
@@ -2731,6 +2731,13 @@ class MixinCocoAttrs(object):
     def videos(self, vidids=None):
         """
         Return vectorized video objects
+
+        TODO:
+            - [ ] This conflicts with what should be the property that
+                should redirect to ``index.videos``, we should resolve this
+                somehow. E.g. all other main members of the index (anns, imgs,
+                cats) have a toplevel dataset property, we don't have one for
+                videos because the name we would pick conflicts with this.
 
         Example:
             >>> self = CocoDataset.demo('vidshapes2')
@@ -5633,6 +5640,14 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert len(sub_dset.gid_to_aids) == 2
 
         Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> gids = [1, 2]
+            >>> sub_dset = self.subset(gids, copy=True)
+            >>> assert len(sub_dset.index.videos) == 1
+            >>> assert len(self.index.videos) == 2
+
+        Example:
             >>> self = CocoDataset.demo()
             >>> sub1 = self.subset([1])
             >>> sub2 = self.subset([2])
@@ -5649,18 +5664,24 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dataset['info'] = self.dataset.get('info', [])
         new_dataset['licenses'] = self.dataset.get('licenses', [])
 
+        chosen_gids = sorted(set(gids))
+
+        chosen_imgs = list(ub.take(self.imgs, chosen_gids))
+        new_dataset['images'] = chosen_imgs
+
         if 'keypoint_categories' in self.dataset:
             new_dataset['keypoint_categories'] = self.dataset['keypoint_categories']
 
         if 'videos' in self.dataset:
             # TODO: Take only videos with image support?
-            new_dataset['videos'] = self.dataset['videos']
+            vidids = sorted(set(img.get('video_id', None)
+                                for img in chosen_imgs) - {None})
+            chosen_vids = list(ub.take(self.index.videos, vidids))
+            new_dataset['videos'] = chosen_vids
 
-        gids = sorted(set(gids))
-        sub_aids = sorted([aid for gid in gids
+        sub_aids = sorted([aid for gid in chosen_gids
                            for aid in self.index.gid_to_aids.get(gid, [])])
-        new_dataset['annotations'] = list(ub.take(self.anns, sub_aids))
-        new_dataset['images'] = list(ub.take(self.imgs, gids))
+        new_dataset['annotations'] = list(ub.take(self.index.anns, sub_aids))
         new_dataset['img_root'] = self.dataset.get('img_root', None)
 
         if copy:
