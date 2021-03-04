@@ -18,6 +18,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Added `examples` subdirectory for answers to FAQ
 * Added `kwcoco validate` script to check that json and assets exist.
 
+### Changed
+* `CocoDataset.subset` will now only return the videos that are supported by
+  the chosen images.
 
 ## Version 0.1.10 - Released 2021-02-05
 
