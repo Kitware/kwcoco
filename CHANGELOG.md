@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.13 - Unreleased
 
+### Fixed
+* Fixed the default bundle root to be the cwd instead of
+  `untitled_kwcoco_bundle`.
 
 ## Version 0.1.12 - Released 2021-03-04
 

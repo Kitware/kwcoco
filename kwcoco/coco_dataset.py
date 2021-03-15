@@ -4790,7 +4790,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if isinstance(data, dict):
             # Assumption: If data is a dict and are not explicitly given
             # bundle_dpath, then we assume it is relative to the cwd.
-            assumed_root = './untitled_kwcoco_bundle'
+            assumed_root = '.'
         elif isinstance(data, six.string_types):
             path = data
             if isdir(path):
