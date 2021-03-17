@@ -5,14 +5,11 @@ import scriptconfig as scfg
 
 
 class CocoSubsetCLI(object):
-    """
-    Take a subset of this dataset and write it to a new file
-    """
     name = 'subset'
 
     class CLIConfig(scfg.Config):
         """
-        Split a single COCO dataset into two sub-datasets.
+        Take a subset of this dataset and write it to a new file
         """
         default = {
             'src': scfg.Value(None, help='input dataset path', position=1),
