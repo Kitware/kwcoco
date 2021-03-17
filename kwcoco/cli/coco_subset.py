@@ -42,7 +42,7 @@ class CocoSubsetCLI(object):
         """
         Example:
             >>> kw = {'src': 'special:shapes8',
-            >>>       'dst1': 'train.json', 'dst2': 'test.json'}
+            >>>       'dst': 'subset.json', 'include_categories': 'superstar'}
             >>> cmdline = False
             >>> cls = CocoSubsetCLI
             >>> cls.main(cmdline, **kw)
