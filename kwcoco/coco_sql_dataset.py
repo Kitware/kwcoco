@@ -181,10 +181,20 @@ class Annotation(CocoBase):
 
 # Global book keeping (It would be nice to find a way to avoid this)
 CocoBase.TBLNAME_TO_CLASS = {}
-for classname, cls in CocoBase._decl_class_registry.items():
-    if not classname.startswith('_'):
-        tblname = cls.__tablename__
-        CocoBase.TBLNAME_TO_CLASS[tblname] = cls
+# sqlalchemy v 1.3.23 is the last to have _decl_class_registry
+# v1.4 does not have it
+if hasattr(CocoBase, '_decl_class_registry'):
+    for classname, cls in CocoBase._decl_class_registry.items():
+        if not classname.startswith('_'):
+            tblname = cls.__tablename__
+            CocoBase.TBLNAME_TO_CLASS[tblname] = cls
+else:
+    for mapper in CocoBase.registry.mappers:
+        cls = mapper.class_
+        classname = cls.__name__
+        if not classname.startswith('_'):
+            tblname = cls.__tablename__
+            CocoBase.TBLNAME_TO_CLASS[tblname] = cls
 
 
 def orm_to_dict(obj):
