@@ -8,7 +8,7 @@ class CocoSubsetCLI(object):
     """
     Take a subset of this dataset and write it to a new file
     """
-    name = 'split'
+    name = 'subset'
 
     class CLIConfig(scfg.Config):
         """
@@ -31,6 +31,7 @@ class CocoSubsetCLI(object):
             # image file name matches
             # annotations with segmentations / keypoints?
             # iamges/annotations that contain a special attribute?
+            # images with a maximum / minimum number of annotations?
 
             # 'rng': scfg.Value(None, help='random seed'),
         }
