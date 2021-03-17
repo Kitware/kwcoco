@@ -4787,10 +4787,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             }
 
         fpath = None
+        inferred_date_type = None
         if isinstance(data, dict):
             # Assumption: If data is a dict and are not explicitly given
             # bundle_dpath, then we assume it is relative to the cwd.
             assumed_root = '.'
+            inferred_date_type = 'json-dict'
         elif isinstance(data, six.string_types):
             path = data
             if isdir(path):
@@ -4800,17 +4802,22 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 else:
                     if bundle_dpath != path:
                         raise Exception('ambiguous')
+                inferred_date_type = 'bundle-path'
             else:
                 # data was a pointer to hopefully a kwcoco filepath
+                # TODO: do some validation of that here
                 fpath = data
                 if bundle_dpath is None:
                     bundle_dpath = dirname(fpath)
+                inferred_date_type = 'file-path'
         else:
             raise TypeError(
                 'data must be a dict or path to json file, '
                 'but got: {!r}'.format(type(data)))
 
-        if fpath is None and bundle_dpath is not None:
+        if fpath is None and bundle_dpath is not None and inferred_date_type == 'bundle-path':
+            # This should probably be reserved for a coercion method
+            # If we are givena bundle path, assume a standard name convention
             if fname is None:
                 import glob
                 candidates = [
