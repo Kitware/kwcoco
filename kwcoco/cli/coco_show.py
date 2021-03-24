@@ -97,6 +97,18 @@ class CocoShowCLI:
             else:
                 ax = dset.show_image(gid=gid, aid=aid, **show_kw)
             if out_fpath is None:
+
+                if 1:
+                    try:
+                        import xdev
+                    except Exception:
+                        pass
+                    else:
+                        gids = [gid] + list(set(dset.imgs.keys()) - {gid})
+                        for gid in xdev.InteractiveIter(gids):
+                            ax = dset.show_image(gid=gid, aid=aid, **show_kw)
+                            xdev.InteractiveIter.draw()
+                            plt.show(block=False)
                 plt.show()
             else:
                 ax.figure.savefig(out_fpath)

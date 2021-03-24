@@ -477,6 +477,9 @@ class ObjectGroups(ub.NiceRepr):
     def _lookup(self, key):
         return self._lookup(key)
 
+    def __getitem__(self, index):
+        return self._groups[index]
+
     def lookup(self, key, default=ub.NoParam):
         return [group.lookup(key, default) for group in self._groups]
 
@@ -2844,9 +2847,102 @@ class MixinCocoStats(object):
                 lambda k: k[0] if len(k) == 1 else k, hist)
         return catname_to_nannot_types
 
+    def validate(self, **config):
+        # raise NotImplementedError('TODO, port functionality from coco_validate')
+        dset = self
+
+        verbose = config.get('verbose', 1)
+
+        if config.get('schema', True):
+            if verbose:
+                print('Validate schema')
+            from kwcoco.coco_schema import COCO_SCHEMA
+            result = COCO_SCHEMA.validate(dset.dataset)
+            if verbose:
+                if result:
+                    print('result = {!r}'.format(result))
+            # if not result:
+            #     raise Exception('bad schema')
+
+        if config.get('missing', True):
+            missing = dset.missing_images(check_aux=True, verbose=verbose)
+            if missing:
+                if verbose:
+                    print('missing = {!r}'.format(missing))
+                raise Exception('missing = {}'.format(ub.repr2(missing, nl=1)))
+
+        if config.get('corrupted', False):
+            bad_gpaths = dset.corrupted_images(check_aux=True, verbose=verbose)
+            if bad_gpaths:
+                if verbose:
+                    print('bad_gpaths = {!r}'.format(bad_gpaths))
+                raise Exception('bad_gpaths = {}'.format(ub.repr2(bad_gpaths, nl=1)))
+
+    def stats(self, **kwargs):
+        """
+        This function corresponds to :module:`kwcoco.cli.coco_stats`.
+
+        KWargs:
+            basic(bool, default=True): return basic stats'
+            extended(bool, default=True): return extended stats'
+            catfreq(bool, default=True): return category frequency stats'
+            boxes(bool, default=False): return bounding box stats'
+
+            annot_attrs(bool, default=True): return annotation attribute information'
+            image_attrs(bool, default=True): return image attribute information'
+
+        Returns:
+            dic: info
+        """
+        config = kwargs
+        dset = self
+        info = {}
+        if config.get('basic', True):
+            info['basic'] = dset.basic_stats()
+
+        if config.get('extended', True):
+            info['extended'] = dset.extended_stats()
+
+        if config.get('catfreq', True):
+            info['catfreq'] = dset.category_annotation_frequency()
+
+        def varied(obj_lut):
+            attrs = ub.ddict(lambda: 0)
+            unique = ub.ddict(set)
+            for obj in obj_lut.values():
+                for key, value in obj.items():
+                    if value:
+                        attrs[key] += 1
+                        try:
+                            unique[key].add(value)
+                        except TypeError:
+                            unique[key].add(ub.hash_data(value, hasher='sha1'))
+
+            varied_attrs = {
+                key: {'num_unique': len(unique[key]), 'num_total': num}
+                for key, num in attrs.items()
+            }
+            return varied_attrs
+
+        if config.get('image_attrs', True):
+            image_attrs = varied(dset.imgs)
+            info['image_attrs'] = image_attrs
+
+        if config.get('annot_attrs', True):
+            annot_attrs = varied(dset.anns)
+            info['annot_attrs'] = annot_attrs
+
+        if config.get('boxes', False):
+            dset['boxes'] = dset.boxsize_stats()
+        return info
+
     def basic_stats(self):
         """
         Reports number of images, annotations, and categories.
+
+        SeeAlso:
+            :func:`basic_stats`
+            :func:`extended_stats`
 
         Example:
             >>> import kwcoco
@@ -2879,6 +2975,10 @@ class MixinCocoStats(object):
     def extended_stats(self):
         """
         Reports number of images, annotations, and categories.
+
+        SeeAlso:
+            :func:`basic_stats`
+            :func:`extended_stats`
 
         Example:
             >>> self = CocoDataset.demo()
@@ -3588,6 +3688,11 @@ class MixinCocoAddRemove(object):
             id (None or int): ADVANCED. Force using this image id.
             **kw : stores arbitrary key/value pairs in this new image
 
+        SeeAlso:
+            :func:`add_image`
+            :func:`add_images`
+            :func:`ensure_image`
+
         Example:
             >>> self = CocoDataset.demo()
             >>> import kwimage
@@ -3619,6 +3724,10 @@ class MixinCocoAddRemove(object):
             bbox (list or kwimage.Boxes): bounding box in xywh format
             id (None or int): ADVANCED. Force using this annotation id.
             **kw : stores arbitrary key/value pairs in this new image
+
+        SeeAlso:
+            :func:`add_annotation`
+            :func:`add_annotations`
 
         Example:
             >>> self = CocoDataset.demo()
@@ -3670,6 +3779,10 @@ class MixinCocoAddRemove(object):
             id (int, optional): use this category id, if it was not taken
             **kw : stores arbitrary key/value pairs in this new image
 
+        SeeAlso:
+            :func:`add_category`
+            :func:`ensure_category`
+
         Example:
             >>> self = CocoDataset.demo()
             >>> prev_n_cats = self.n_cats
@@ -3706,8 +3819,9 @@ class MixinCocoAddRemove(object):
 
     def ensure_image(self, file_name, id=None, **kw):
         """
-        Like add_image, but returns the existing image id if it already
-        exists instead of failing. In this case all metadata is ignored.
+        Like :func:`add_image`,, but returns the existing image id if it
+        already exists instead of failing. In this case all metadata is
+        ignored.
 
         Args:
             file_name (str): relative or absolute path to image
@@ -3716,6 +3830,11 @@ class MixinCocoAddRemove(object):
 
         Returns:
             int: the existing or new image id
+
+        SeeAlso:
+            :func:`add_image`
+            :func:`add_images`
+            :func:`ensure_image`
         """
         try:
             id = self.add_image(file_name=file_name, id=id, **kw)
@@ -3726,11 +3845,16 @@ class MixinCocoAddRemove(object):
 
     def ensure_category(self, name, supercategory=None, id=None, **kw):
         """
-        Like add_category, but returns the existing category id if it already
-        exists instead of failing. In this case all metadata is ignored.
+        Like :func:`add_category`, but returns the existing category id if it
+        already exists instead of failing. In this case all metadata is
+        ignored.
 
         Returns:
             int: the existing or new category id
+
+        SeeAlso:
+            :func:`add_category`
+            :func:`ensure_category`
         """
         try:
             id = self.add_category(name=name, supercategory=supercategory,
@@ -3742,10 +3866,18 @@ class MixinCocoAddRemove(object):
 
     def add_annotations(self, anns):
         """
-        Faster less-safe multi-item alternative
+        Faster less-safe multi-item alternative to add_annotation.
+
+        We assume the annotations are well formatted in kwcoco compliant
+        dictionaries, including the "id" field. No validation checks are
+        made when calling this function.
 
         Args:
             anns (List[Dict]): list of annotation dictionaries
+
+        SeeAlso:
+            :func:`add_annotation`
+            :func:`add_annotations`
 
         Example:
             >>> self = CocoDataset.demo()
@@ -3763,6 +3895,10 @@ class MixinCocoAddRemove(object):
         """
         Faster less-safe multi-item alternative
 
+        We assume the images are well formatted in kwcoco compliant
+        dictionaries, including the "id" field. No validation checks are
+        made when calling this function.
+
         Note:
             THIS FUNCTION WAS DESIGNED FOR SPEED, AS SUCH IT DOES NOT CHECK IF
             THE IMAGE-IDs or FILE_NAMES ARE DUPLICATED AND WILL BLINDLY ADD
@@ -3771,6 +3907,11 @@ class MixinCocoAddRemove(object):
 
         Args:
             imgs (List[Dict]): list of image dictionaries
+
+        SeeAlso:
+            :func:`add_image`
+            :func:`add_images`
+            :func:`ensure_image`
 
         Example:
             >>> imgs = CocoDataset.demo().dataset['images']

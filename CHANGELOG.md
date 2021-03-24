@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Add `kwcoco.Subset` create a subset of a coco file based on filter criteria
+* Experimental interactive mode to kwcoco show
+* Start to merge cli and class functionality.
 
 ### Fixed
 * Fixed the default bundle root to be the cwd instead of
