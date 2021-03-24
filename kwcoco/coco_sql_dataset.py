@@ -111,7 +111,7 @@ class Category(CocoBase):
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
 
-    foreign = Column(JSON, default=dict())
+    extra = Column(JSON, default=dict())
 
 
 class KeypointCategory(CocoBase):
@@ -122,7 +122,7 @@ class KeypointCategory(CocoBase):
     supercategory = Column(String(256), doc='coarser category name')
     reflection_id = Column(Integer, doc='if augmentation reflects the image, change keypoint id to this')
 
-    foreign = Column(JSON, default=dict())
+    extra = Column(JSON, default=dict())
 
 
 class Video(CocoBase):
@@ -131,7 +131,7 @@ class Video(CocoBase):
     name = Column(String(256), nullable=False, index=True, unique=True)
     caption = Column(String(256), nullable=True)
 
-    foreign = Column(JSON, default=dict())
+    extra = Column(JSON, default=dict())
 
 
 class Image(CocoBase):
@@ -149,7 +149,7 @@ class Image(CocoBase):
     channels = Column(JSON)
     auxiliary = Column(JSON)
 
-    foreign = Column(JSON, default=dict())
+    extra = Column(JSON, default=dict())
 
 
 class Annotation(CocoBase):
@@ -176,7 +176,7 @@ class Annotation(CocoBase):
     iscrowd = Column(Integer)
     caption = Column(JSON)
 
-    foreign = Column(JSON, default=dict())
+    extra = Column(JSON, default=dict())
 
 
 # Global book keeping (It would be nice to find a way to avoid this)
@@ -1009,8 +1009,8 @@ class CocoSqlDatabase(AbstractCocoDataset,
             cls = CocoBase.TBLNAME_TO_CLASS[key]
             for item in dset.dataset.get(key, []):
                 item_ = ub.dict_isect(item, colnames)
-                # Everything else is a foreign key
-                item_['foreign'] = ub.dict_diff(item, item_)
+                # Everything else is a extra i.e. additional property
+                item_['extra'] = ub.dict_diff(item, item_)
                 if key == 'annotations':
                     # Need custom code to translate list-based properties
                     x, y, w, h = item_.get('bbox', [None, None, None, None])
@@ -1223,7 +1223,7 @@ def ensure_sql_coco_view(dset, db_fpath=None):
         timestamps to determine if it needs to write the dataset.
     """
     if db_fpath is None:
-        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v003.sqlite')
+        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v004.sqlite')
 
     db_uri = 'sqlite:///file:' + db_fpath
     # dpath = dirname(dset.fpath)
@@ -1314,8 +1314,8 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
         for key in keys:
             item1 = ub.dict_diff(lut1[key], special_cols)
             item2 = ub.dict_diff(lut2[key], special_cols)
-            item1.update(item1.pop('foreign', {}))
-            item2.update(item2.pop('foreign', {}))
+            item1.update(item1.pop('extra', {}))
+            item2.update(item2.pop('extra', {}))
             common1 = ub.dict_isect(item2, item1)
             common2 = ub.dict_isect(item1, item2)
             diff1 = ub.dict_diff(item1, common2)

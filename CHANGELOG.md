@@ -12,10 +12,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   exists, but now we can do `id` + `name` + `auxiliary` without a default
   `file_name`, which allows us to better handle multispectral images.
 
-* The `name` is the new primary text key for images. If this is unspecified
-  then it defaults to the value of `file_name` for backwards compatibility.
-  As such, the Index's `file_name_to_image` will be deprecated for
-  `name_to_image`.
+* The `name` is a new primary text key for images. 
+
+* In the SQL view of the database, non-schema properties are now stored in
+  "extra" instead of "foreign". (I confused "foreign keys" for "additionalProperties")
 
 ### Added
 * Add `name` property to the `image`.
