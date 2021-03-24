@@ -77,7 +77,7 @@ from os.path import exists
 from kwcoco.util.dict_like import DictLike  # NOQA
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco.coco_dataset import (  # NOQA
-    MixinCocoJSONAccessors, MixinCocoAccessors, MixinCocoAttrs,
+    MixinCocoAccessors, MixinCocoAttrs,
     MixinCocoStats, MixinCocoDraw
 )
 
@@ -832,7 +832,7 @@ class CocoSqlIndex(object):
         }
 
 
-class CocoSqlDatabase(AbstractCocoDataset, MixinCocoJSONAccessors,
+class CocoSqlDatabase(AbstractCocoDataset,
                       MixinCocoAccessors, MixinCocoAttrs, MixinCocoStats,
                       MixinCocoDraw, ub.NiceRepr):
     """
