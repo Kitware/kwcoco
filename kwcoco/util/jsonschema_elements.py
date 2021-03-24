@@ -78,8 +78,8 @@ class Element(dict):
             options (options): the keys / values this schema may contain
             _magic (callable): called when creating an instance of this schema
                 element. Allows convinience attributes to be converted to the
-                formal jsonschema specs. TODO: _magic is a terrible name rename
-                it.
+                formal jsonschema specs. TODO: _magic is a terrible name, we
+                need to rename it with something descriptive.
         """
         self._base = base
 
@@ -294,6 +294,7 @@ class ContainerElements:
                     'minProperties': 0,
                     'maxProperties': float('inf'),
                     'dependencies': {},
+                    'oneOf': {},  # hack to allow for multiple required
                     }
                 )
         return self(**kw)

@@ -7,7 +7,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.1.13 - Unreleased
 
+### Changed
+* The image schema now has two modalities. The normal `id` + `file_name`  still
+  exists, but now we can do `id` + `name` + `auxiliary` without a default
+  `file_name`, which allows us to better handle multispectral images.
+
+* The `name` is the new primary text key for images. If this is unspecified
+  then it defaults to the value of `file_name` for backwards compatibility.
+  As such, the Index's `file_name_to_image` will be deprecated for
+  `name_to_image`.
+
 ### Added
+* Add `name` property to the `image`.
+* Add `kwcoco.Subset` create a subset of a coco file based on filter criteria
 * Add `kwcoco.Subset` create a subset of a coco file based on filter criteria
 * Experimental interactive mode to kwcoco show
 * Start to merge cli and class functionality.
