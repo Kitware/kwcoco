@@ -174,14 +174,14 @@ IMAGE = OBJECT(OrderedDict((
         is unspecified, then a name and auxiliary file paths must be specified.
         This should only be unspecified for multispectral observations that
         dont have a clear default file.
-        '''))),
+        ''')) | NULL),
 
     ('name', STRING(description=ub.paragraph(
         '''
         Unique name for the image.
         If unspecified the file_name should be used as the default value
         for the name property.
-        '''))),
+        ''')) | NULL),
 
     ('width', INTEGER),
     ('height', INTEGER),
@@ -206,7 +206,7 @@ IMAGE = OBJECT(OrderedDict((
     )),
 )), title='IMAGE',
     # required=['id', 'file_name']
-    oneOf=[
+    anyOf=[
         {'required': ['id', 'file_name']},
         {'required': ['id', 'name', 'auxiliary']},
     ],

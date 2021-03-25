@@ -28,6 +28,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Fixed the default bundle root to be the cwd instead of
   `untitled_kwcoco_bundle`.
 
+* `CocoDataset.union` will now correctly insert prefixes into file names such
+  that they are relative to the common bundle directory.
+
 ## Version 0.1.12 - Released 2021-03-04
 
 

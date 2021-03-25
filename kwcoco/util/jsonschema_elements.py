@@ -115,6 +115,30 @@ class Element(dict):
         else:
             return jsonschema.validate(instance, schema=self)
 
+    def __or__(self, other):
+        """
+        Syntax for making an anyOf relationship
+
+        Example:
+            >>> from kwcoco.util.jsonschema_elements import *  # NOQA
+            >>> obj1 = OBJECT(dict(opt1=NUMBER()))
+            >>> obj2 = OBJECT(dict(opt2=STRING()))
+            >>> obj3 = OBJECT(dict(opt3=ANY()))
+            >>> any_v1 = obj1 | obj2
+            >>> any_v2 = ANYOF(obj1, obj2)
+            >>> assert any_v1 == any_v2
+            >>> any_v3 = any_v1 | obj3
+            >>> any_v4 = ANYOF(obj1, obj2, obj3)
+            >>> assert any_v3 == any_v4
+        """
+        unpacked = []
+        for item in [self, other]:
+            if list(item.keys()) == ['anyOf']:
+                unpacked.extend(item['anyOf'])
+            else:
+                unpacked.append(item)
+        return ANYOF(*unpacked)
+
 
 class ScalarElements(object):
     """
@@ -295,6 +319,7 @@ class ContainerElements:
                     'maxProperties': float('inf'),
                     'dependencies': {},
                     'oneOf': {},  # hack to allow for multiple required
+                    'anyOf': {},  # hack to allow for multiple required
                     }
                 )
         return self(**kw)

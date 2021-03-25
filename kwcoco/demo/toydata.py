@@ -528,12 +528,14 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         # Hack, our default multispectral data is inspired by sentinal 2
         def temp_scale_matrix_json(sx):
             # TODO: standard for transformation serialization?
-            return {'type': 'affine', 'matrix': [[sx, 0, 0], [0, sx, 0], [0, 0, 1]]}
-        s2_res = [60, 10, 10, 10, 20, 20, 20, 10, 20, 60, 60, 20, 20]
-        s2_bands = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8a',
-                    'B9', 'B10', 'B11', 'B12']
+            return {'type': 'affine', 'matrix': [
+                [sx, 0, 0], [0, sx, 0], [0, 0, 1]]}
+        s2_res = [60, 10, 20, 60, 20]
+        s2_bands = ['B1', 'B8', 'B8a', 'B10', 'B11']
         aux = [
-            {'channels': b, 'transform': temp_scale_matrix_json(r / 60.), 'dtype': 'uint16'}
+            {'channels': b,
+             'transform': temp_scale_matrix_json(r / 60.),
+             'dtype': 'uint16'}
             for b, r in zip(s2_bands, s2_res)
         ]
 

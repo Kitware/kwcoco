@@ -2625,7 +2625,7 @@ class MixinCocoExtras(object):
             # Overwrite old values
             for gid, new in gid_to_new.items():
                 img = self.imgs[gid]
-                img['file_name'] = new['file_name']
+                img['file_name'] = new.get('file_name', None)
                 if 'auxiliary' in new:
                     for aux_fname, aux in zip(new['auxiliary'], img['auxiliary']):
                         aux['file_name'] = aux_fname
@@ -2902,6 +2902,18 @@ class MixinCocoStats(object):
                     print('result = {!r}'.format(result))
             # if not result:
             #     raise Exception('bad schema')
+
+        if config.get('unique', True):
+            seen = set()
+            for img in dset.dataset.get('images', []):
+                name = img.get('name', None)
+                if name is not None:
+                    if name in seen:
+                        if verbose:
+                            print('duplicate image name = {!r}'.format(name))
+                        raise Exception('duplicate image name = {!r}'.format(name))
+                    else:
+                        seen.add(name)
 
         if config.get('missing', True):
             missing = dset.missing_images(check_aux=True, verbose=verbose)
@@ -3310,6 +3322,39 @@ class _ID_Remapper(object):
         next_id = self._nextid
         self._nextid += 1
         return next_id
+
+
+class UniqueNameRemapper(object):
+    """
+    helper to ensure names will be unique by appending suffixes
+
+    Example:
+        >>> from kwcoco.coco_dataset import *  # NOQA
+        >>> self = UniqueNameRemapper()
+        >>> assert self.remap('foo') == 'foo'
+        >>> assert self.remap('foo') == 'foo_v001'
+        >>> assert self.remap('foo') == 'foo_v002'
+        >>> assert self.remap('foo_v001') == 'foo_v003'
+    """
+    def __init__(self):
+        import re
+        self._seen = set()
+        self.suffix_pat = re.compile(r'(.*)_v(\d+)')
+
+    def remap(self, name):
+        suffix_pat = self.suffix_pat
+        match = suffix_pat.match(name)
+        if match:
+            prefix, _num = match.groups()
+            num = int(_num)
+        else:
+            prefix = name
+            num = 0
+        while name in self._seen:
+            num += 1
+            name = '{}_v{:03d}'.format(prefix, num)
+        self._seen.add(name)
+        return name
 
 
 class MixinCocoDraw(object):
@@ -5614,6 +5659,13 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             cls = self.__class__
             others = (self,) + others
 
+        # TODO: add an option such that the union will fail if the names
+        # are not already disjoint. Alternatively, it could be the case
+        # that a union between images with the same name really does
+        # mean that they are the same image.
+        unique_img_names = UniqueNameRemapper()
+        unique_video_names = UniqueNameRemapper()
+
         def _coco_union(relative_dsets, common_root):
             """ union of dictionary based data structure """
             # TODO: rely on subset of SPEC keys
@@ -5734,9 +5786,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         new_id = old_video['id']
                     else:
                         new_id = len(merged['videos']) + 1
+                    new_vidname = unique_video_names.remap(old_video['name'])
                     new_video = _dict([
                         ('id', new_id),
-                        ('name', join(subdir, old_video['name'])),
+                        ('name', new_vidname),
                     ])
                     # copy over other metadata
                     update_ifnotin(new_video, old_video)
@@ -5749,10 +5802,26 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         new_id = old_img['id']
                     else:
                         new_id = len(merged['images']) + 1
+                    old_gname = old_img['file_name']
+                    new_gname = None if old_gname is None else (
+                        join(subdir, old_gname)
+                    )
                     new_img = _dict([
                         ('id', new_id),
-                        ('file_name', join(subdir, old_img['file_name'])),
+                        ('file_name', new_gname),
                     ])
+                    old_name = old_img.get('name', None)
+                    if old_name is not None:
+                        new_name = unique_video_names.remap(old_name)
+                        new_img['name'] = new_name
+                    if 'auxiliary' in old_img:
+                        new_auxiliary = []
+                        for old_aux in old_img['auxiliary']:
+                            new_aux = old_aux.copy()
+                            new_aux['file_name'] = join(subdir, old_aux['file_name'])
+                            new_auxiliary.append(new_aux)
+                        new_img['auxiliary'] = new_auxiliary
+
                     video_img_id = video_id_map.get(old_img.get('video_id'), None)
                     if video_img_id is not None:
                         new_img['video_id'] = video_img_id
@@ -5801,22 +5870,23 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
                 # Mark that we are not allowed to use the same track-ids again
                 track_id_map.block_seen()
-
             return merged
 
-        # handle soft data roots
+        # Handle soft data roots
         from os.path import normpath
         soft_dset_roots = [dset.bundle_dpath for dset in others]
-        soft_dset_roots = [normpath(r) if r is not None else None for r in soft_dset_roots]
+        soft_dset_roots = [normpath(r) if r is not None else None
+                           for r in soft_dset_roots]
         if ub.allsame(soft_dset_roots):
             soft_img_root = ub.peek(soft_dset_roots)
         else:
             soft_img_root = None
 
-        # Handle hard coded data roots
+        # Handle hard coded data roots (This should not be common)
         from os.path import normpath
         hard_dset_roots = [dset.dataset.get('img_root', None) for dset in others]
-        hard_dset_roots = [normpath(r) if r is not None else None for r in hard_dset_roots]
+        hard_dset_roots = [normpath(r) if r is not None else None
+                           for r in hard_dset_roots]
         if ub.allsame(hard_dset_roots):
             common_root = ub.peek(hard_dset_roots)
             relative_dsets = [('', d.dataset) for d in others]
@@ -5824,15 +5894,60 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             common_root = None
             relative_dsets = [(d.bundle_dpath, d.dataset) for d in others]
 
-        merged = _coco_union(relative_dsets, common_root)
+        FIX_PATH_BEHAVIOR = 1
+        if FIX_PATH_BEHAVIOR:
+            # New behavior
+            def longest_common_prefix(items, sep='/'):
+                """
+                Example:
+                    >>> items = [
+                    >>>     '/foo/bar/always/the/same/set1/img1.png',
+                    >>>     '/foo/bar/always/the/same/set1/img2.png',
+                    >>>     '/foo/bar/always/the/same/set2/img1.png',
+                    >>>     '/foo/bar/always/the/same/set2/img2.png',
+                    >>>     '/foo/baz/file1.txt',
+                    >>> ]
+                    >>> sep = '/'
+                    >>> longest_common_prefix(items, sep=sep)
+                    >>> longest_common_prefix(items[:-1], sep=sep)
+                """
+                # I would use a trie, but I don't know if pygtrie can do this efficiently
+                # (not that this is efficient)
+                from collections import defaultdict
+                freq = defaultdict(lambda: 0)
+                for item in items:
+                    path = tuple(item.split(sep))
+                    for i in range(len(path)):
+                        prefix = path[:i + 1]
+                        freq[prefix] += 1
+                # Find the longest common prefix
+                value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
+                longest_prefix = sep.join(value)
+                return longest_prefix
 
-        if common_root is not None:
-            merged['img_root'] = common_root
+            import os
+            from os.path import relpath
+            common_root = longest_common_prefix(soft_dset_roots,
+                                                sep=os.path.sep)
+            relative_dsets = [(relpath(d.bundle_dpath, common_root),
+                               d.dataset) for d in others]
 
-        new_dset = cls(merged, **kwargs)
+            merged = _coco_union(relative_dsets, common_root)
 
-        if common_root is None and soft_img_root is not None:
-            new_dset.bundle_dpath = soft_img_root
+            kwargs['bundle_dpath'] = common_root
+            new_dset = cls(merged, **kwargs)
+
+        else:
+            merged = _coco_union(relative_dsets, common_root)
+
+            if common_root is not None:
+                merged['img_root'] = common_root
+
+            new_dset = cls(merged, **kwargs)
+
+            if common_root is None and soft_img_root is not None:
+                new_dset.bundle_dpath = soft_img_root
+
         return new_dset
 
     def subset(self, gids, copy=False, autobuild=True):

@@ -76,8 +76,18 @@
                 "type": "object",
                 "properties": {
                     "id": {"type": "integer"},
-                    "file_name": {"type": "string", "description": "A relative or absolute path to the main image file. If this file_name is unspecified, then a name and auxiliary file paths must be specified. This should only be unspecified for multispectral observations that dont have a clear default file."},
-                    "name": {"type": "string", "description": "Unique name for the image. If unspecified the file_name should be used as the default value for the name property."},
+                    "file_name": {
+                        "anyOf": [
+                            {"type": "string", "description": "A relative or absolute path to the main image file. If this file_name is unspecified, then a name and auxiliary file paths must be specified. This should only be unspecified for multispectral observations that dont have a clear default file."},
+                            {"type": "null"}
+                        ]
+                    },
+                    "name": {
+                        "anyOf": [
+                            {"type": "string", "description": "Unique name for the image. If unspecified the file_name should be used as the default value for the name property."},
+                            {"type": "null"}
+                        ]
+                    },
                     "width": {"type": "integer"},
                     "height": {"type": "integer"},
                     "video_id": {"type": "integer"},
@@ -94,14 +104,15 @@
                                 "width": {"type": "integer"},
                                 "height": {"type": "integer"}
                             },
-                            "title": "aux"
+                            "title": "aux",
+                            "required": ["file_name"]
                         }
                     }
                 },
                 "title": "IMAGE",
-                "oneOf": [
+                "anyOf": [
                     {
-                        "required": ["id", "image_id"]
+                        "required": ["id", "file_name"]
                     },
                     {
                         "required": ["id", "name", "auxiliary"]

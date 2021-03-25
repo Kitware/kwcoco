@@ -201,7 +201,7 @@ class CategoryPatterns(object):
             >>> self = CategoryPatterns.coerce(['superstar'])
             >>> chip = None
             >>> dims = (64, 64)
-            >>> info = self.render_category('superstar', chip, newstyle=True, dims=dims)
+            >>> info = self.render_category('superstar', chip, newstyle=True, dims=dims, size=dims)
             >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
         """
         data, mask, kpts = self._from_elem(cname, chip, size=size)
@@ -299,6 +299,7 @@ class CategoryPatterns(object):
         """
         Example:
             >>> # hack to allow chip to be None
+            >>> chip = None
             >>> size = (32, 32)
             >>> cname = 'superstar'
             >>> self = CategoryPatterns.coerce()
