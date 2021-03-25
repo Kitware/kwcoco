@@ -76,12 +76,11 @@ KWCoco has been designed to work with these tasks in these image modalities.
 * Combinations of the above.
 
 
-
 ## Pseudo Spec
 
 The following describes psuedo-code for the high level spec (some of which may
-not be have full support in the Python API). A formal json-schema can be found
-in the kwcoco module.
+not be have full support in the Python API). A formal json-schema is defined in
+:module:`kwcoco.coco_schema.py`.
 
 ```
 # All object categories are defined here.
@@ -141,10 +140,10 @@ annotation = {
 }
 
 
-# A dataset bundles a manifest of all aformentioned data into one file.
+# A dataset bundles a manifest of all aformentioned data into one structure.
 dataset = {
-    # these are object level categories
     'categories': [category, ...],
+    'videos': [video, ...]
     'images': [image, ...]
     'annotations': [annotation, ...]
     'licenses': [],

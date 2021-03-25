@@ -4,9 +4,9 @@ An implementation and extension of the original MS-COCO API [1]_.
 
 Extends the format to also include line annotations.
 
-Dataset Spec:
-
-    * Note: a formal spec has been defined in :module:`kwcoco.coco_schema.py`.
+The following describes psuedo-code for the high level spec (some of which may
+not be have full support in the Python API). A formal json-schema is defined in
+:module:`kwcoco.coco_schema.py`.
 
 .. code::
 
@@ -66,10 +66,10 @@ Dataset Spec:
         'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
     }
 
-    # A dataset bundles a manifest of all aformentioned data into one file.
+    # A dataset bundles a manifest of all aformentioned data into one structure.
     dataset = {
-        # these are object level categories
         'categories': [category, ...],
+        'videos': [video, ...]
         'images': [image, ...]
         'annotations': [annotation, ...]
         'licenses': [],
