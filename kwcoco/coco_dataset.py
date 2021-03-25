@@ -10,44 +10,68 @@ Dataset Spec:
 
 .. code::
 
+    # All object categories are defined here.
     category = {
         'id': int,
-        'name': str,
-        'supercategory': Optional[str],
-        'keypoints': Optional(List[str]),
-        'skeleton': Optional(List[Tuple[Int, Int]]),
+        'name': str,  # unique name of the category
+        'supercategory': str,   # parent category name
     }
 
+    # Videos are used to manage collections of sequences of images.
+    video = {
+        "id": int,
+        "name": str,  # a unique name for this video.
+    }
+
+    # Specifies how to find sensor data of a particular scene at a particular
+    # time. This is usually paths to rgb images, but auxiliary information
+    # can be used to specify multiple bands / etc...
     image = {
         'id': int,
-        'file_name': str
+
+        'name': str,  # a unique name
+        'file_name': str,  # relative path to the primary image data
+
+        'auxiliary': [  # information about any auxiliary channels / bands
+            {
+                'file_name': str,  # relative path to associated file
+                'channels': <spec>,  # a string encoding
+            },
+        ]
+
+        'video_id': str  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
+        'timestamp': int  # timestamp (ideally in flicks), used to identify the timestamp of the frame. Only applicable video inputs.
+        'frame_index': int  # ordinal frame index which can be used if timestamp is unknown.
     }
 
+    # Ground truth is specified as annotations, each belongs to a spatial
+    # region in an image. This must reference a subregion of the image in pixel
+    # coordinates. Additional non-schma properties can be specified to track
+    # location in other coordinate systems. Annotations can be linked over time
+    # by specifying track-ids.
+    annotation = {
+        'id': int,
+        'image_id': int,
+        'category_id': int,
+
+        "track_id": <int | str | uuid>  # indicates association between annotations across frames
+
+        'bbox': [tl_x, tl_y, w, h],  # xywh format)
+        "score" : float,
+        "prob" : List[float],
+        "weight" : float,
+
+        "caption": str,  # a text caption for this annotation
+        "keypoints" : <Keypoints | List[int] > # an accepted keypoint format
+        'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
+    }
+
+    # A dataset bundles a manifest of all aformentioned data into one file.
     dataset = {
         # these are object level categories
-        'categories': [category],
-        'images': [image]
-            ...
-        ],
-        'annotations': [
-            {
-                'id': Int,
-                'image_id': Int,
-                'category_id': Int,
-                'track_id': Optional[Int],
-
-                'bbox': [tl_x, tl_y, w, h],  # optional (xywh format)
-                "score" : float,  # optional
-                "prob" : List[float],  # optional
-                "weight" : float,  # optional
-
-                "caption": str,  # an optional text caption for this annotation
-                "iscrowd" : <0 or 1>,  # denotes if the annotation covers a single object (0) or multiple objects (1)
-                "keypoints" : [x1,y1,v1,...,xk,yk,vk], # or new dict-based format
-                'segmentation': <RunLengthEncoding | Polygon>,  # formats are defined bellow
-            },
-            ...
-        ],
+        'categories': [category, ...],
+        'images': [image, ...]
+        'annotations': [annotation, ...]
         'licenses': [],
         'info': [],
     }
@@ -64,6 +88,8 @@ Dataset Spec:
         We also allow a non-standard dictionary encoding of polygons
             {'exterior': [(x1, y1)...],
              'interiors': [[(x1, y1), ...], ...]}
+
+        TODO: Support WTK
 
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
@@ -112,6 +138,8 @@ Dataset Spec:
 
         We also have a new top-level dictionary to specify all the possible
         keypoint categories.
+
+        TODO: Support WTK
 
     Auxiliary Channels:
         For multimodal or multispectral images it is possible to specify
@@ -169,13 +197,13 @@ TODO:
       on demand. This will give us faster access to categories / images,
       whereas we will always have to wait for annotations etc...
 
-    - [ ] Should img_root be changed to data root?
+    - [X] Should img_root be changed to bundle_dpath?
 
     - [ ] Read video data, return numpy arrays (requires API for images)
 
     - [ ] Spec for video URI, and convert to frames @ framerate function.
 
-    - [ ] remove videos
+    - [X] remove videos
 
 
 References:
