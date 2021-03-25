@@ -32,10 +32,16 @@ not be have full support in the Python API). A formal json-schema is defined in
         'name': str,  # a unique name
         'file_name': str,  # relative path to the primary image data
 
+        'width': int,   # pixel width of main image
+        'height': int,  # pixel height of main image
+
         'auxiliary': [  # information about any auxiliary channels / bands
             {
-                'file_name': str,  # relative path to associated file
-                'channels': <spec>,  # a string encoding
+                'file_name': str,     # relative path to associated file
+                'channels': <spec>,   # a string encoding
+                'width':     <int>    # pixel width of auxillary image
+                'height':    <int>    # pixel height of auxillary image
+                'transform': <todo>,  # tranform from main image space to auxiliary image space. (identity if unspecified)
             },
         ]
 
@@ -1602,6 +1608,19 @@ class MixinCocoExtras(object):
             >>> dset = kwcoco.CocoDataset.demo('vidshapes5-aux', num_frames=1,
             >>>                                verbose=0, rng=None)
 
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes1-multispectral', num_frames=5,
+            >>>                                verbose=0, rng=None)
+            >>> # This is the first use-case of image names
+            >>> assert len(dset.index.file_name_to_img) == 0, (
+            >>>     'the multispectral demo case has no "base" image')
+            >>> assert len(dset.index.name_to_img) == len(dset.imgs) == 5
+            >>> dset.remove_images([1])
+            >>> assert len(dset.index.name_to_img) == len(dset.imgs) == 4
+            >>> dset.remove_videos([1])
+            >>> assert len(dset.index.name_to_img) == len(dset.imgs) == 0
+
         Ignore:
             >>> # Test the cache
             >>> key = 'vidshapes8-aux'
@@ -1652,6 +1671,7 @@ class MixinCocoExtras(object):
                 'anchors': None,
                 'gsize': (600, 600),
                 'aux': None,
+                'multispectral': None,
             }
             suff_parts = None
             if res:
@@ -1664,6 +1684,9 @@ class MixinCocoExtras(object):
 
             if 'aux' in suff_parts:
                 vidkw['aux'] = True
+
+            if 'multispectral' in suff_parts:
+                vidkw['multispectral'] = True
 
             vidkw.update(kw)
             use_cache = vidkw.pop('use_cache', True)
@@ -1687,15 +1710,15 @@ class MixinCocoExtras(object):
                 # Even if the cache is off, we still will need this because it
                 # will write rendered data to disk. Perhaps we can make this
                 # optional in the future.
-                dpath = ub.ensure_app_cache_dir('kwcoco', 'demo_visahapes')
+                dpath = ub.ensure_app_cache_dir('kwcoco', 'demo_vidshapes')
                 bundle_dpath = vidkw['bundle_dpath'] = join(dpath, tag)
 
             cache_dpath = join(bundle_dpath, '_cache')
             fpath = join(bundle_dpath, 'data.kwcoco.json')
 
-            stamp = ub.CacheStamp('vidshape_stamp_v13', dpath=cache_dpath, cfgstr=cfgstr,
-                                  enabled=use_cache, product=[fpath],
-                                  verbose=100,
+            stamp = ub.CacheStamp('vidshape_stamp_v13', dpath=cache_dpath,
+                                  cfgstr=cfgstr, enabled=use_cache,
+                                  product=[fpath], verbose=100,
                                   # meta=vidkw  # requires ubelt>=0.9.3
                                   )
             print('stamp = {!r}'.format(stamp))
@@ -5277,7 +5300,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """
         def _json_dumps(data, indent=None):
             fp = StringIO()
-            json.dump(data, fp, indent=indent, ensure_ascii=False)
+            try:
+                json.dump(data, fp, indent=indent, ensure_ascii=False)
+            except Exception as ex:
+                print('Failed to dump ex = {!r}'.format(ex))
+                self._check_json_serializable()
+                raise
             fp.seek(0)
             text = fp.read()
             return text
@@ -5365,7 +5393,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             if newlines:
                 file.write(self.dumps(indent=indent, newlines=newlines))
             else:
-                json.dump(self.dataset, file, indent=indent, ensure_ascii=False)
+                try:
+                    json.dump(self.dataset, file, indent=indent, ensure_ascii=False)
+                except Exception as ex:
+                    print('Failed to dump ex = {!r}'.format(ex))
+                    self._check_json_serializable()
+                    raise
 
     def _check_json_serializable(self, verbose=1):
         """

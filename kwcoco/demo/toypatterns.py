@@ -162,7 +162,7 @@ class CategoryPatterns(object):
                 return default
 
     def random_category(self, chip, xy_offset=None, dims=None,
-                        newstyle=True):
+                        newstyle=True, size=None):
         """
         Ignore:
             import xdev
@@ -176,25 +176,35 @@ class CategoryPatterns(object):
         """
         cname = self.rng.choice(self.obj_catnames)
         info = self.render_category(
-                cname, chip, xy_offset=xy_offset, dims=dims, newstyle=newstyle)
+                cname, chip, xy_offset=xy_offset, dims=dims, newstyle=newstyle,
+                size=size)
         return info
 
     def render_category(self, cname, chip, xy_offset=None, dims=None,
-                        newstyle=True):
+                        newstyle=True, size=None):
         """
         Ignore:
             import xdev
             globals().update(xdev.get_func_kwargs(self.random_category))
 
         Example:
+            >>> from kwcoco.demo.toypatterns import *  # NOQA
             >>> self = CategoryPatterns.coerce(['superstar'])
             >>> chip = np.random.rand(64, 64)
             >>> info = self.render_category('superstar', chip, newstyle=True)
             >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
             >>> info = self.render_category('superstar', chip, newstyle=False)
             >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
+
+        Example:
+            >>> from kwcoco.demo.toypatterns import *  # NOQA
+            >>> self = CategoryPatterns.coerce(['superstar'])
+            >>> chip = None
+            >>> dims = (64, 64)
+            >>> info = self.render_category('superstar', chip, newstyle=True, dims=dims)
+            >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
         """
-        data, mask, kpts = self._from_elem(cname, chip)
+        data, mask, kpts = self._from_elem(cname, chip, size=size)
         info = self._package_info(cname, data, mask, kpts, xy_offset, dims,
                                   newstyle=newstyle)
         return info
@@ -285,13 +295,26 @@ class CategoryPatterns(object):
         }
         return info
 
-    def _from_elem(self, cname, chip):
+    def _from_elem(self, cname, chip, size=None):
+        """
+        Example:
+            >>> # hack to allow chip to be None
+            >>> size = (32, 32)
+            >>> cname = 'superstar'
+            >>> self = CategoryPatterns.coerce()
+            >>> self._from_elem(cname, chip, size)
+        """
         elem_func = self._category_to_elemfunc[cname]
-        x = max(chip.shape[0:2])
+
+        if chip is None:
+            assert size is not None
+            x = max(size)
+        else:
+            size = tuple(map(int, chip.shape[0:2][::-1]))
+            x = max(chip.shape[0:2])
+
         # x = int(2 ** np.floor(np.log2(x)))
         elem, kpts_yx = elem_func(x)
-
-        size = tuple(map(int, chip.shape[0:2][::-1]))
 
         if kpts_yx is not None:
             kp_catnames = list(kpts_yx.keys())
@@ -310,12 +333,16 @@ class CategoryPatterns(object):
         template = cv2.resize(elem, size).astype(np.float32)
         fg_intensity = np.float32(self.fg_intensity)
         fg_scale = np.float32(self.fg_scale)
-        fgdata = kwarray.standard_normal(chip.shape, std=fg_scale,
-                                         mean=fg_intensity, rng=self.rng,
-                                         dtype=np.float32)
-        fgdata = np.clip(fgdata , 0, 1, out=fgdata)
-        fga = kwimage.ensure_alpha_channel(fgdata, alpha=template)
-        data = kwimage.overlay_alpha_images(fga, chip, keepalpha=False)
+
+        if chip is not None:
+            fgdata = kwarray.standard_normal(chip.shape, std=fg_scale,
+                                             mean=fg_intensity, rng=self.rng,
+                                             dtype=np.float32)
+            fgdata = np.clip(fgdata , 0, 1, out=fgdata)
+            fga = kwimage.ensure_alpha_channel(fgdata, alpha=template)
+            data = kwimage.overlay_alpha_images(fga, chip, keepalpha=False)
+        else:
+            data = None
         mask = (template > 0.05).astype(np.uint8)
         return data, mask, kpts
 

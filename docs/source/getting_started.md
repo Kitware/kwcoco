@@ -105,10 +105,16 @@ image = {
     'name': str,  # a unique name
     'file_name': str,  # relative path to the primary image data
 
+    'width': int,   # pixel width of main image
+    'height': int,  # pixel height of main image
+
     'auxiliary': [  # information about any auxiliary channels / bands
         {
-            'file_name': str,  # relative path to associated file
-            'channels': <spec>,  # a string encoding
+            'file_name': str,     # relative path to associated file
+            'channels': <spec>,   # a string encoding
+            'width':     <int>    # pixel width of auxillary image
+            'height':    <int>    # pixel height of auxillary image
+            'transform': <todo>,  # tranform from main image space to auxiliary image space. (identity if unspecified)
         },
     ]
 
@@ -152,6 +158,113 @@ dataset = {
 ```
 
 
+## The Python API
+
+### Creating a dataset
+
+The Python API can be used to load an existing dataset or initialize an empty
+dataset. In both cases the dataset can be modified by adding/removing/editing
+categories, videos, images, and annotations.
+
+
+You can load an existing dataset as such:
+
+```python
+import kwcoco
+dset = kwcoco.CocoDataset('path/to/data.kwcoco.json')
+```
+
+You can initialize an empty dataset as such:
+
+```python
+import kwcoco
+dset = kwcoco.CocoDataset()
+```
+
+In both cases you can add and remove data items. When you add an item, it
+returns the internal integer primary id used to refer to that item.
+
+```python
+cid = dset.add_category(name='cat')
+
+gid = dset.add_image(file_name='/path/to/limecat.jpg')
+
+aid = dset.add_annotation(image_id=gid, category_id=cid, bbox=[0, 0, 100, 100])
+```
+
+
+The `CocoDataset` class has an instance variable `dset.dataset` which is the
+loaded JSON data structure. This dataset can be interacted with directly.
+
+```python
+# Loop over all categories, images, and annotations
+
+for img in dset.dataset['categories']:
+    print(img)
+
+for img in dset.dataset['images']:
+    print(img)
+
+for img in dset.dataset['annotations']:
+    print(img)
+```
+
+This the above example, this will result in:
+
+```
+OrderedDict([('id', 1), ('name', 'cat')])
+OrderedDict([('id', 1), ('file_name', '/path/to/limecat.jpg')])
+OrderedDict([('id', 1), ('image_id', 1), ('category_id', 1), ('bbox', [0, 0, 100, 100])])
+```
+
+In the above example, you can display the underlying `dataset` structure as
+such
+```python
+print(dset.dumps(indent='    ', newlines=True))
+```
+
+This results in
+
+```
+{
+"info": [],
+"licenses": [],
+"categories": [
+    {"id": 1, "name": "cat"}
+],
+"videos": [],
+"images": [
+    {"id": 1, "file_name": "/path/to/limecat.jpg"}
+],
+"annotations": [
+    {"id": 1, "image_id": 1, "category_id": 1, "bbox": [0, 0, 100, 100]}
+]
+}
+```
+
+In addition to accessing `dset.dataset` directly, the `CocoDataset` object
+maintains an `index` which allows the user to quickly lookup objects by primary
+or secondary keys. A list of available indexes are:
+
+```python
+dset.index.anns    # a mapping from annotation-ids to annotation dictionaries
+dset.index.imgs    # a mapping from image-ids to image dictionaries
+dset.index.videos  # a mapping from video-ids to video dictionaries
+dset.index.cats    # a mapping from category-ids to category dictionaries
+
+dset.index.gid_to_aids    # a mapping from an image id to annotation ids contained in the image
+dset.index.cid_to_aids    # a mapping from an annotation id to annotation ids with that category
+dset.index.vidid_to_gids  # a mapping from an video id to image ids contained in the video
+
+dset.index.name_to_video  # a mapping from a video name to the video dictionary
+dset.index.name_to_cat    # a mapping from a category name to the category dictionary
+dset.index.name_to_img    # a mapping from an image name to the image dictionary
+dset.index.file_name_to_img  # a mapping from an image file name to the image dictionary
+```
+
+These indexes are dynamically updated when items are added or removed.
+
+
 ## Technical Dept
 
 Based on design decisions made in the original MS-COCO and KW-COCO, there are a
@@ -172,7 +285,16 @@ few weird things
 
 * The "prob" field needs to be better defined 
 
+* A "video" is just a temporal sequence of frames. 
+
 
 ## Code Examples. 
 
 See the README and the doctests.
+
+
+## TODO / Notes:
+
+- [X] For multispectral images, what happens when the images are no the same
+  resolution? - Each auxiliary image now holds a "transform" from the base 
+  image resolution to the auxiliary image resolution.
