@@ -285,7 +285,7 @@ few weird things
 
 * The "prob" field needs to be better defined 
 
-* A "video" is just a temporal sequence of frames. 
+* The name "video" might be confusing. Its just a temporally ordered group of images.
 
 
 ## Code Examples. 
