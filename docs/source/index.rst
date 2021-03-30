@@ -11,6 +11,9 @@ Welcome to kwcoco's documentation!
 ==================================
 
 
+If you are new, please see our :doc:`getting started document <getting_started.md>`. 
+
+
 .. The __init__ files contains the top-level documentation overview
 .. automodule:: kwcoco.__init__
    :show-inheritance:

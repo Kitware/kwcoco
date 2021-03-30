@@ -76,7 +76,18 @@
                 "type": "object",
                 "properties": {
                     "id": {"type": "integer"},
-                    "file_name": {"type": "string"},
+                    "file_name": {
+                        "anyOf": [
+                            {"type": "string", "description": "A relative or absolute path to the main image file. If this file_name is unspecified, then a name and auxiliary file paths must be specified. This should only be unspecified for multispectral observations that dont have a clear default file."},
+                            {"type": "null"}
+                        ]
+                    },
+                    "name": {
+                        "anyOf": [
+                            {"type": "string", "description": "Unique name for the image. If unspecified the file_name should be used as the default value for the name property."},
+                            {"type": "null"}
+                        ]
+                    },
                     "width": {"type": "integer"},
                     "height": {"type": "integer"},
                     "video_id": {"type": "integer"},
@@ -93,11 +104,20 @@
                                 "width": {"type": "integer"},
                                 "height": {"type": "integer"}
                             },
-                            "title": "aux"
+                            "title": "aux",
+                            "required": ["file_name"]
                         }
                     }
                 },
-                "required": ["id", "file_name"]
+                "title": "IMAGE",
+                "anyOf": [
+                    {
+                        "required": ["id", "file_name"]
+                    },
+                    {
+                        "required": ["id", "name", "auxiliary"]
+                    }
+                ]
             }
         },
         "annotations": {
@@ -194,9 +214,7 @@
                                         "type": "array",
                                         "items": {
                                             "type": "array",
-                                            "items": {"type": "number"},
-                                            "minItems": 2,
-                                            "maxItems": 2
+                                            "items": {"type": "number"}
                                         },
                                         "title": "ORIG_COCO_POLYGON",
                                         "description": "[x1,y1,v1,...,xk,yk,vk]"
@@ -211,7 +229,8 @@
                             {
                                 "type": "array",
                                 "items": {"type": "integer"},
-                                "description": "old format (x1,y1,v1,...,xk,yk,vk)"
+                                "description": "old format (x1,y1,v1,...,xk,yk,vk)",
+                                "title": "MSCOCO_KEYPOINTS"
                             },
                             {
                                 "type": "array",
@@ -237,10 +256,10 @@
                     "prob": {
                         "type": "array",
                         "items": {"type": "number"},
-                        "description": "This needs to be in the same order as categories. probability order currently needs to be known a-priori, typically in "order" of the classes, but its hard to always keep that consistent."
+                        "description": "This needs to be in the same order as categories. probability order currently needs to be known a-priori, typically in *order* of the classes, but its hard to always keep that consistent."
                     },
-                    "score": {"type": "number"},
-                    "weight": {"type": "number"},
+                    "score": {"type": "number", "description": "Typically assigned to predicted annotations"},
+                    "weight": {"type": "number", "description": "Typically given to truth annotations to indicate quality."},
                     "iscrowd": {
                         "anyOf": [
                             {"type": "integer"},
@@ -249,7 +268,8 @@
                     },
                     "caption": {"type": "string"}
                 },
-                "required": ["id", "image_id"]
+                "required": ["id", "image_id"],
+                "title": "ANNOTATION"
             }
         }
     },
