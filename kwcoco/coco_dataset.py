@@ -5954,31 +5954,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 track_id_map.block_seen()
             return merged
 
-        # Handle soft data roots
-        from os.path import normpath
-        soft_dset_roots = [dset.bundle_dpath for dset in others]
-        soft_dset_roots = [normpath(r) if r is not None else None
-                           for r in soft_dset_roots]
-        if ub.allsame(soft_dset_roots):
-            soft_img_root = ub.peek(soft_dset_roots)
-        else:
-            soft_img_root = None
-
-        # Handle hard coded data roots (This should not be common)
-        from os.path import normpath
-        hard_dset_roots = [dset.dataset.get('img_root', None) for dset in others]
-        hard_dset_roots = [normpath(r) if r is not None else None
-                           for r in hard_dset_roots]
-        if ub.allsame(hard_dset_roots):
-            common_root = ub.peek(hard_dset_roots)
-            relative_dsets = [('', d.dataset) for d in others]
-        else:
-            common_root = None
-            relative_dsets = [(d.bundle_dpath, d.dataset) for d in others]
-
         FIX_PATH_BEHAVIOR = 1
         if FIX_PATH_BEHAVIOR:
-            # New behavior
+            # New behavior is simplified and I believe it is correct
             def longest_common_prefix(items, sep='/'):
                 """
                 Example:
@@ -6009,8 +5987,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             import os
             from os.path import relpath
-            common_root = longest_common_prefix(soft_dset_roots,
-                                                sep=os.path.sep)
+            from os.path import normpath
+            dset_roots = [dset.bundle_dpath for dset in others]
+            dset_roots = [normpath(r) if r is not None else None
+                          for r in dset_roots]
+            items = [join('.', p) for p in dset_roots]
+            common_root = longest_common_prefix(items, sep=os.path.sep)
             relative_dsets = [(relpath(d.bundle_dpath, common_root),
                                d.dataset) for d in others]
 
@@ -6020,6 +6002,30 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             new_dset = cls(merged, **kwargs)
 
         else:
+            # OLD BEHAVIOR IS PROBABLY WRONG
+
+            # Handle soft data roots
+            from os.path import normpath
+            soft_dset_roots = [dset.bundle_dpath for dset in others]
+            soft_dset_roots = [normpath(r) if r is not None else None
+                               for r in soft_dset_roots]
+            if ub.allsame(soft_dset_roots):
+                soft_img_root = ub.peek(soft_dset_roots)
+            else:
+                soft_img_root = None
+
+            # Handle hard coded data roots (This should not be common)
+            from os.path import normpath
+            hard_dset_roots = [dset.dataset.get('img_root', None) for dset in others]
+            hard_dset_roots = [normpath(r) if r is not None else None
+                               for r in hard_dset_roots]
+            if ub.allsame(hard_dset_roots):
+                common_root = ub.peek(hard_dset_roots)
+                relative_dsets = [('', d.dataset) for d in others]
+            else:
+                common_root = None
+                relative_dsets = [(d.bundle_dpath, d.dataset) for d in others]
+
             merged = _coco_union(relative_dsets, common_root)
 
             if common_root is not None:
