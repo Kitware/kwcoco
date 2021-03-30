@@ -2928,7 +2928,7 @@ class MixinCocoStats(object):
             'warnings': [],
         }
         verbose = config.get('verbose', 1)
-        fastfail = config.get('fastfail', 1)
+        fastfail = config.get('fastfail', 0)
 
         def _error(msg):
             if verbose:
