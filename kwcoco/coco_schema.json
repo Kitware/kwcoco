@@ -214,9 +214,7 @@
                                         "type": "array",
                                         "items": {
                                             "type": "array",
-                                            "items": {"type": "number"},
-                                            "minItems": 2,
-                                            "maxItems": 2
+                                            "items": {"type": "number"}
                                         },
                                         "title": "ORIG_COCO_POLYGON",
                                         "description": "[x1,y1,v1,...,xk,yk,vk]"

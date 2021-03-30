@@ -2887,47 +2887,127 @@ class MixinCocoStats(object):
         return catname_to_nannot_types
 
     def validate(self, **config):
+        """
+        Performs checks on this coco dataset.
+
+        Corresponds to the ``kwcoco validate`` CLI tool.
+
+        KWArgs:
+            **config :
+                schema (default=True): validates the json-schema
+                unique (default=True): validates unique secondary keys
+                missing (default=True): validates registered files exist
+                corrupted (default=False): validates data in registered files
+                verbose (default=1): verbosity flag
+                fastfail (default=False): if True raise errors immediately
+
+        Returns:
+            dict: result containing keys:
+                status (bool): False if any errors occurred
+                errors (List[str]): list of all error messages
+                missing (List): List of any missing images
+                corrupted (List): List of any corrupted images
+
+        SeeAlso:
+            :method:`_check_integrity` - performs internal checks
+
+        Example:
+            >>> from kwcoco.coco_dataset import *
+            >>> self = CocoDataset.demo()
+            >>> import pytest
+            >>> with pytest.warns(UserWarning):
+            >>>     result = self.validate()
+            >>> assert not result['errors']
+            >>> assert result['warnings']
+        """
         # raise NotImplementedError('TODO, port functionality from coco_validate')
         dset = self
 
+        result = {
+            'errors': [],
+            'warnings': [],
+        }
         verbose = config.get('verbose', 1)
+        fastfail = config.get('fastfail', 1)
+
+        def _error(msg):
+            if verbose:
+                print(msg)
+            if fastfail:
+                raise Exception(msg)
+            result['errors'].append(msg)
+
+        def _warn(msg):
+            if verbose:
+                print(msg)
+            warnings.warn(msg, UserWarning)
+            result['warnings'].append(msg)
 
         if config.get('schema', True):
-            if verbose:
-                print('Validate schema')
+            import jsonschema
             from kwcoco.coco_schema import COCO_SCHEMA
-            result = COCO_SCHEMA.validate(dset.dataset)
             if verbose:
-                if result:
-                    print('result = {!r}'.format(result))
-            # if not result:
-            #     raise Exception('bad schema')
+                print('Validate json-schema')
+            try:
+                COCO_SCHEMA.validate(dset.dataset)
+            except jsonschema.exceptions.ValidationError as ex:
+                msg = 'Failed to validate schema {!r}'.format(ex)
+                _error(msg)
 
         if config.get('unique', True):
-            seen = set()
-            for img in dset.dataset.get('images', []):
-                name = img.get('name', None)
-                if name is not None:
-                    if name in seen:
-                        if verbose:
-                            print('duplicate image name = {!r}'.format(name))
-                        raise Exception('duplicate image name = {!r}'.format(name))
+            def _check_unique(dset, table_key, col_key, required=True):
+                if verbose:
+                    print('Check {!r} has unique {!r}'.format(
+                        table_key, col_key))
+                items = dset.dataset.get(table_key, [])
+                seen = set()
+                num_unset = 0
+                for obj in items:
+                    value = obj.get(col_key, None)
+                    if value is None:
+                        num_unset += 1
                     else:
-                        seen.add(name)
+                        if value in seen:
+                            msg = 'Duplicate {} {} = {!r}'.format(
+                                table_key, col_key, value)
+                            _error(msg)
+                        else:
+                            seen.add(value)
+                if num_unset > 0:
+                    msg = ub.paragraph(
+                        '''
+                        Table {!r} is missing {} / {} values for column {!r}
+                        '''
+                    ).format(table_key, num_unset, len(items), col_key)
+                    if required:
+                        _error(msg)
+                    else:
+                        _warn(msg)
+
+            _check_unique(dset, table_key='categories', col_key='name')
+            _check_unique(dset, table_key='videos', col_key='name')
+            _check_unique(dset, table_key='images', col_key='name',
+                          required=False)
+
+            _check_unique(dset, table_key='images', col_key='id')
+            _check_unique(dset, table_key='videos', col_key='id')
+            _check_unique(dset, table_key='annotations', col_key='id')
+            _check_unique(dset, table_key='categories', col_key='id')
 
         if config.get('missing', True):
             missing = dset.missing_images(check_aux=True, verbose=verbose)
             if missing:
-                if verbose:
-                    print('missing = {!r}'.format(missing))
-                raise Exception('missing = {}'.format(ub.repr2(missing, nl=1)))
+                msg = 'There are {} missing images'.format(len(missing))
+                _error(msg)
+                result['missing'] = missing
 
         if config.get('corrupted', False):
-            bad_gpaths = dset.corrupted_images(check_aux=True, verbose=verbose)
-            if bad_gpaths:
-                if verbose:
-                    print('bad_gpaths = {!r}'.format(bad_gpaths))
-                raise Exception('bad_gpaths = {}'.format(ub.repr2(bad_gpaths, nl=1)))
+            corrupted = dset.corrupted_images(check_aux=True, verbose=verbose)
+            if corrupted:
+                msg = 'There are {} corrupted images'.format(len(corrupted))
+                _error(msg)
+                result['corrupted'] = corrupted
+        return result
 
     def stats(self, **kwargs):
         """
@@ -2943,7 +3023,7 @@ class MixinCocoStats(object):
             image_attrs(bool, default=True): return image attribute information'
 
         Returns:
-            dic: info
+            dict: info
         """
         config = kwargs
         dset = self
@@ -5471,7 +5551,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """ perform all checks """
         self._check_index()
         self._check_pointers()
-        assert len(self.missing_images()) == 0
+        self._check_json_serializable()
+        self.validate()
+        # assert len(self.missing_images()) == 0
 
     def _check_index(self):
         """
@@ -5812,7 +5894,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     ])
                     old_name = old_img.get('name', None)
                     if old_name is not None:
-                        new_name = unique_video_names.remap(old_name)
+                        new_name = unique_img_names.remap(old_name)
                         new_img['name'] = new_name
                     if 'auxiliary' in old_img:
                         new_auxiliary = []

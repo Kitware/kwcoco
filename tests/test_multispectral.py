@@ -30,6 +30,7 @@ def test_multispectral_union_absolute():
 
     others = [dset1, dset2]
     combo = kwcoco.CocoDataset.union(*others)
+    combo.validate()
 
     stats1 = dset1.basic_stats()
     stats2 = dset2.basic_stats()
@@ -56,6 +57,7 @@ def test_multispectral_union_relative():
 
     others = [dset1, dset2]
     combo = kwcoco.CocoDataset.union(*others)
+    combo.validate()
 
     stats1 = dset1.basic_stats()
     stats2 = dset2.basic_stats()

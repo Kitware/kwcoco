@@ -104,7 +104,7 @@ KEYPOINTS = ANYOF(ORIG_COCO_KEYPOINTS, KWCOCO_KEYPOINTS)
 
 
 ORIG_COCO_POLYGON = ARRAY(
-    TYPE=ARRAY(NUMBER, numItems=2),
+    TYPE=ARRAY(NUMBER),
     title='ORIG_COCO_POLYGON',
     description='[x1,y1,v1,...,xk,yk,vk]',
 )
