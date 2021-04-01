@@ -17,6 +17,7 @@ def main(cmdline=True, **kw):
     from kwcoco.cli import coco_modify_categories
     from kwcoco.cli import coco_reroot
     from kwcoco.cli import coco_validate
+    from kwcoco.cli import coco_subset
 
     # Create a list of all submodules with CLI interfaces
     cli_modules = [
@@ -30,6 +31,7 @@ def main(cmdline=True, **kw):
         coco_eval,
         coco_modify_categories,
         coco_validate,
+        coco_subset,
     ]
 
     # Create a subparser that uses the first positional argument to run one of

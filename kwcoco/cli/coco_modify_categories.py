@@ -26,7 +26,7 @@ class CocoModifyCatsCLI:
         """
         default = {
             'src': scfg.Value(None, help=(
-                'Path to the coco dataset')),
+                'Path to the coco dataset'), position=1),
 
             'dst': scfg.Value(None, help=(
                 'Save the rebased dataset to a new file')),

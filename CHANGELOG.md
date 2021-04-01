@@ -5,7 +5,33 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.12 - Unreleased
+## Version 0.1.13 - Unreleased
+
+### Changed
+* The image schema now has two modalities. The normal `id` + `file_name`  still
+  exists, but now we can do `id` + `name` + `auxiliary` without a default
+  `file_name`, which allows us to better handle multispectral images.
+
+* The `name` is a new primary text key for images. 
+
+* In the SQL view of the database, non-schema properties are now stored in
+  "extra" instead of "foreign". (I confused "foreign keys" for "additionalProperties")
+
+### Added
+* Add `name` property to the `image`.
+* Add `kwcoco.Subset` create a subset of a coco file based on filter criteria
+* Add `kwcoco.Subset` create a subset of a coco file based on filter criteria
+* Experimental interactive mode to kwcoco show
+* Start to merge cli and class functionality.
+
+### Fixed
+* Fixed the default bundle root to be the cwd instead of
+  `untitled_kwcoco_bundle`.
+
+* `CocoDataset.union` will now correctly insert prefixes into file names such
+  that they are relative to the common bundle directory.
+
+## Version 0.1.12 - Released 2021-03-04
 
 
 ## Version 0.1.11 - Released 2021-02-24

@@ -12,7 +12,7 @@ class CocoSplitCLI(object):
         Split a single COCO dataset into two sub-datasets.
         """
         default = {
-            'src': scfg.Value(None, help='input dataset to split'),
+            'src': scfg.Value(None, help='input dataset to split', position=1),
             'dst1': scfg.Value('split1.mscoco.json', help='output path1'),
             'dst2': scfg.Value('split2.mscoco.json', help='output path2'),
             'factor': scfg.Value(3, help='ratio of items put in dset1 vs dset2'),

@@ -22,6 +22,21 @@ Example:
     >>>     schema_ex = ex
     >>>     print('schema_ex.instance = {}'.format(ub.repr2(schema_ex.instance, nl=-1)))
     >>>     raise
+
+    >>> # Test the multispectral image defintino
+    >>> import copy
+    >>> dataset = dset.copy().dataset
+    >>> img = dataset['images'][0]
+    >>> img.pop('file_name')
+    >>> import pytest
+    >>> with pytest.raises(jsonschema.ValidationError):
+    >>>     COCO_SCHEMA.validate(dataset)
+    >>> import pytest
+    >>> img['auxiliary'] = [{'file_name': 'foobar'}]
+    >>> with pytest.raises(jsonschema.ValidationError):
+    >>>     COCO_SCHEMA.validate(dataset)
+    >>> img['name'] = 'aux-only images must have a name'
+    >>> COCO_SCHEMA.validate(dataset)
 """
 
 from kwcoco.util.jsonschema_elements import SchemaElements
@@ -83,13 +98,13 @@ KWCOCO_POLYGON = OBJECT(
 
 
 ORIG_COCO_KEYPOINTS = ARRAY(
-    INTEGER, description='old format (x1,y1,v1,...,xk,yk,vk)')
+    INTEGER, description='old format (x1,y1,v1,...,xk,yk,vk)', title='MSCOCO_KEYPOINTS')
 KWCOCO_KEYPOINTS = ARRAY(KWCOCO_KEYPOINT)
 KEYPOINTS = ANYOF(ORIG_COCO_KEYPOINTS, KWCOCO_KEYPOINTS)
 
 
 ORIG_COCO_POLYGON = ARRAY(
-    TYPE=ARRAY(NUMBER, numItems=2),
+    TYPE=ARRAY(NUMBER),
     title='ORIG_COCO_POLYGON',
     description='[x1,y1,v1,...,xk,yk,vk]',
 )
@@ -153,7 +168,20 @@ CHANNELS = STRING(title='CHANNEL_SPEC', description='experimental. todo: refine'
 
 IMAGE = OBJECT(OrderedDict((
     ('id', INTEGER),
-    ('file_name', PATH),
+    ('file_name', PATH(description=ub.paragraph(
+        '''
+        A relative or absolute path to the main image file. If this file_name
+        is unspecified, then a name and auxiliary file paths must be specified.
+        This should only be unspecified for multispectral observations that
+        dont have a clear default file.
+        ''')) | NULL),
+
+    ('name', STRING(description=ub.paragraph(
+        '''
+        Unique name for the image.
+        If unspecified the file_name should be used as the default value
+        for the name property.
+        ''')) | NULL),
 
     ('width', INTEGER),
     ('height', INTEGER),
@@ -174,9 +202,15 @@ IMAGE = OBJECT(OrderedDict((
             'channels': CHANNELS,
             'width': INTEGER,
             'height': INTEGER,
-        }, title='aux')
+        }, title='aux', required=['file_name'])
     )),
-)), required=['id', 'file_name'])
+)), title='IMAGE',
+    # required=['id', 'file_name']
+    anyOf=[
+        {'required': ['id', 'file_name']},
+        {'required': ['id', 'name', 'auxiliary']},
+    ],
+)
 
 ANNOTATION = OBJECT(OrderedDict((
     ('id', INTEGER),
@@ -190,19 +224,22 @@ ANNOTATION = OBJECT(OrderedDict((
     ('segmentation', SEGMENTATION),
     ('keypoints', KEYPOINTS),
 
-    ('prob', ARRAY(NUMBER, description=(
-        'This needs to be in the same order as categories. '
-        'probability order currently needs to be known a-priori, '
-        'typically in "order" of the classes, but its hard to always '
-        'keep that consistent.'))),
+    ('prob', ARRAY(NUMBER, description=ub.paragraph(
+        '''
+        This needs to be in the same order as categories.
+        probability order currently needs to be known a-priori,
+        typically in *order* of the classes, but its hard to always
+        keep that consistent.
+        '''))),
 
-    ('score', NUMBER),
-    ('weight', NUMBER),
+    ('score', NUMBER(description='Typically assigned to predicted annotations')),
+    ('weight', NUMBER(description='Typically given to truth annotations to indicate quality.')),
 
     ('iscrowd', ANYOF(INTEGER, BOOLEAN)),  # legacy
     ('caption', STRING),
 )),
-    required=['id', 'image_id']
+    required=['id', 'image_id'],
+    title='ANNOTATION',
 )
 
 
@@ -234,7 +271,8 @@ if __name__ == '__main__':
     """
     CommandLine:
         python ~/code/kwcoco/kwcoco/coco_schema.py
-        > ~/code/kwcoco/kwcoco/coco_schema.json
+        python ~/code/kwcoco/kwcoco/coco_schema.py > ~/code/kwcoco/kwcoco/coco_schema.json
+        jq .properties.images ~/code/kwcoco/kwcoco/coco_schema.json
     """
     # import json
     print(ub.repr2(COCO_SCHEMA, nl=-1, trailsep=False, sort=False).replace("'", '"'))

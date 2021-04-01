@@ -78,8 +78,8 @@ class Element(dict):
             options (options): the keys / values this schema may contain
             _magic (callable): called when creating an instance of this schema
                 element. Allows convinience attributes to be converted to the
-                formal jsonschema specs. TODO: _magic is a terrible name rename
-                it.
+                formal jsonschema specs. TODO: _magic is a terrible name, we
+                need to rename it with something descriptive.
         """
         self._base = base
 
@@ -114,6 +114,30 @@ class Element(dict):
             return self
         else:
             return jsonschema.validate(instance, schema=self)
+
+    def __or__(self, other):
+        """
+        Syntax for making an anyOf relationship
+
+        Example:
+            >>> from kwcoco.util.jsonschema_elements import *  # NOQA
+            >>> obj1 = OBJECT(dict(opt1=NUMBER()))
+            >>> obj2 = OBJECT(dict(opt2=STRING()))
+            >>> obj3 = OBJECT(dict(opt3=ANY()))
+            >>> any_v1 = obj1 | obj2
+            >>> any_v2 = ANYOF(obj1, obj2)
+            >>> assert any_v1 == any_v2
+            >>> any_v3 = any_v1 | obj3
+            >>> any_v4 = ANYOF(obj1, obj2, obj3)
+            >>> assert any_v3 == any_v4
+        """
+        unpacked = []
+        for item in [self, other]:
+            if list(item.keys()) == ['anyOf']:
+                unpacked.extend(item['anyOf'])
+            else:
+                unpacked.append(item)
+        return ANYOF(*unpacked)
 
 
 class ScalarElements(object):
@@ -294,6 +318,8 @@ class ContainerElements:
                     'minProperties': 0,
                     'maxProperties': float('inf'),
                     'dependencies': {},
+                    'oneOf': {},  # hack to allow for multiple required
+                    'anyOf': {},  # hack to allow for multiple required
                     }
                 )
         return self(**kw)
