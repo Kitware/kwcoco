@@ -1013,7 +1013,7 @@ class CocoSingleResult(ub.NiceRepr):
         # serialized / cached metrics on disk.
         print('drawing evaluation metrics')
         import kwplot
-        import matplotlib as mpl
+        import matplotlib as mpl  # NOQA
         # TODO: kwcoco matplotlib backend context
         ctx = kwplot.BackendContext(backend='agg')
         ctx.__enter__()
@@ -1026,7 +1026,7 @@ class CocoSingleResult(ub.NiceRepr):
 
         figsize = (9, 7)
 
-        def writefig(fig: mpl.pyplot.Figure, dpath: str, fname: str):
+        def writefig(fig, dpath: str, fname: str):
             fig_fpath = join(metrics_dpath, fname)
             print('write fig_fpath = {!r}'.format(fig_fpath))
             fig.set_size_inches(figsize)

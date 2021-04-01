@@ -101,7 +101,7 @@ class CocoValidateCLI:
 
             errors = result['errors']
             if errors:
-                print('result = {}'.format(ub.repr2(result, nl=1)))
+                print('result = {}'.format(ub.repr2(result, nl=-1)))
                 raise Exception('\n'.join(errors))
 
 
