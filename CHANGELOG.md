@@ -5,7 +5,12 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.14 - Unreleased
+## Version 0.2.0 - Unreleased
+
+
+### Removed
+
+* Several deprecated APIs
 
 
 ## Version 0.1.13 - Released 2021-04-01
