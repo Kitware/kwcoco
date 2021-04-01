@@ -39,7 +39,7 @@ class CocoConformCLI:
                 8, help='number of background workers for bigger checks'),
 
             'dst': scfg.Value(None, help=(
-                'Save the rebased dataset to a new file')),
+                'Save the modified dataset to a new file')),
         }
 
     @classmethod

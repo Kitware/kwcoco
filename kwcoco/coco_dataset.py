@@ -39,8 +39,8 @@ not be have full support in the Python API). A formal json-schema is defined in
             {
                 'file_name': str,     # relative path to associated file
                 'channels': <spec>,   # a string encoding
-                'width':     <int>    # pixel width of auxillary image
-                'height':    <int>    # pixel height of auxillary image
+                'width':     <int>    # pixel width of auxiliary image
+                'height':    <int>    # pixel height of auxiliary image
                 'transform': <todo>,  # tranform from main image space to auxiliary image space. (identity if unspecified)
             },
         ]
@@ -834,163 +834,6 @@ class MixinCocoDepricate(object):
     These functions are marked for deprication and may be removed at any time
     """
 
-    def lookup_imgs(self, filename=None):
-        """
-        Linear search for an images with specific attributes
-
-        # DEPRICATE
-
-        Ignore:
-            filename = '201503.20150525.101841191.573975.png'
-            list(self.lookup_imgs(filename))
-            gid = 64940
-            img = self.imgs[gid]
-            img['file_name'] = filename
-        """
-        import warnings
-        warnings.warn('DEPRECATED: this method name may be recycled and '
-                      'do something different in a later version. '
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        for img in self.imgs.values():
-            if filename is not None:
-                fpath = img['file_name']
-                fname = basename(fpath)
-                fname_noext = splitext(fname)[0]
-                if filename in [fpath, fname, fname_noext]:
-                    print('img = {!r}'.format(img))
-                    yield img
-
-    def lookup_anns(self, has=None):
-        """
-        Linear search for an annotations with specific attributes
-
-        # DEPRICATE
-
-        Ignore:
-            list(self.lookup_anns(has='radius'))
-            gid = 112888
-            img = self.imgs[gid]
-            img['file_name'] = filename
-        """
-        import warnings
-        warnings.warn('DEPRECATED: this method name may be recycled and '
-                      'do something different in a later version. ',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        for ann in self.anns.values():
-            if has is not None:
-                if hasattr(ann, has):
-                    print('ann = {!r}'.format(ann))
-                    yield ann
-
-    def _mark_annotated_images(self):
-        """
-        Mark any image that explicitly has annotations.
-
-        # DEPRICATE
-        """
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        for gid, img in self.imgs.items():
-            aids = self.index.gid_to_aids.get(gid, [])
-            # If there is at least one annotation, always mark as has_annots
-            if len(aids) > 0:
-                assert img.get('has_annots', ub.NoParam) in [ub.NoParam, True], (
-                    'image with annots was explictly labeled as non-True!')
-                img['has_annots'] = True
-            else:
-                # Otherwise set has_annots to null if it has not been
-                # explicitly labeled
-                if 'has_annots' not in img:
-                    img['has_annots'] = None
-
-    def _find_bad_annotations(self):
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for ann in self.dataset['annotations']:
-            if ann['image_id'] is None or ann['category_id'] is None:
-                to_remove.append(ann)
-            else:
-                if ann['image_id'] not in self.imgs:
-                    to_remove.append(ann)
-                if ann['category_id'] not in self.cats:
-                    to_remove.append(ann)
-        return to_remove
-
-    def _remove_keypoint_annotations(self, rebuild=True):
-        """
-        Remove annotations with keypoints only
-
-        Example:
-            >>> self = CocoDataset.demo()
-            >>> self._remove_keypoint_annotations()
-        """
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used'
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for ann in self.dataset['annotations']:
-            roi_shape = ann.get('roi_shape', None)
-            if roi_shape is None:
-                if 'keypoints' in ann and ann.get('bbox', None) is None:
-                    to_remove.append(ann)
-            elif roi_shape == 'keypoints':
-                to_remove.append(ann)
-        print('Removing {} keypoint annotations'.format(len(to_remove)))
-        self.remove_annotations(to_remove)
-        if rebuild:
-            self._build_index()
-
-    def _remove_bad_annotations(self, rebuild=True):
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for ann in self.dataset['annotations']:
-            if ann['image_id'] is None or ann['category_id'] is None:
-                to_remove.append(ann)
-        print('Removing {} bad annotations'.format(len(to_remove)))
-        self.remove_annotations(to_remove)
-        if rebuild:
-            self._build_index()
-
-    def _remove_radius_annotations(self, rebuild=False):
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for ann in self.dataset['annotations']:
-            if 'radius' in ann:
-                to_remove.append(ann)
-        print('Removing {} radius annotations'.format(len(to_remove)))
-        self.remove_annotations(to_remove)
-        if rebuild:
-            self._build_index()
-
-    def _remove_empty_images(self):
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for gid in self.imgs.keys():
-            aids = self.index.gid_to_aids.get(gid, [])
-            if not aids:
-                to_remove.append(self.imgs[gid])
-        print('Removing {} empty images'.format(len(to_remove)))
-        for img in to_remove:
-            self.dataset['images'].remove(img)
-        self._build_index()
-
 
 class MixinCocoAccessors(object):
     """
@@ -1013,14 +856,6 @@ class MixinCocoAccessors(object):
         gpath = self.get_image_fpath(gid_or_img, channels=channels)
         np_img = kwimage.imread(gpath)
         return np_img
-
-    def load_image_fpath(self, gid_or_img):
-        import warnings
-        warnings.warn(
-            'get_image_fpath is deprecated use get_image_fpath instead. '
-            'This method will be removed in version 0.2.0',
-            DeprecationWarning)
-        return self.get_image_fpath(gid_or_img)
 
     def get_image_fpath(self, gid_or_img, channels=None):
         """
@@ -1047,8 +882,6 @@ class MixinCocoAccessors(object):
         found = None
         if 'auxiliary' in img:
             auxlist = img['auxiliary']
-        elif 'auxillary' in img:
-            auxlist = img['auxillary']
         else:
             raise KeyError('no auxilary data')
         for aux in auxlist:
@@ -1076,11 +909,6 @@ class MixinCocoAccessors(object):
         aux = self._get_img_auxiliary(gid_or_img, channels)
         fpath = join(self.bundle_dpath, aux['file_name'])
         return fpath
-
-    # old misspellings for backwards compat
-    # Deprecated: these will be removed in 0.2.0
-    _get_img_auxillary = _get_img_auxiliary
-    get_auxillary_fpath = get_auxiliary_fpath
 
     def load_annot_sample(self, aid_or_ann, image=None, pad=None):
         """
@@ -2380,14 +2208,6 @@ class MixinCocoExtras(object):
         pycoco.createIndex()
         return pycoco
 
-    def rebase(self, *args, **kw):
-        """ Deprecated use reroot instead """
-        import warnings
-        warnings.warn(
-            'Deprecated rebase renamed to reroot. Use reroot instead',
-            DeprecationWarning)
-        return self.reroot(*args, **kw)
-
     def reroot(self, new_root=None,
                old_prefix=None,
                new_prefix=None,
@@ -2610,14 +2430,6 @@ class MixinCocoExtras(object):
                         new['auxiliary'] = aux_fname = []
                         for aux in img.get('auxiliary', []):
                             aux_fname.append(_reroot_path(aux['file_name']))
-                    elif 'auxillary' in img:
-                        warnings.warn('incorrect spelling of auxiliary will be '
-                                      'unsupported in the future. '
-                                      'This will be removed in 0.2.0',
-                                      DeprecationWarning)
-                        new['auxillary'] = aux_fname = []
-                        for aux in img.get('auxillary', []):
-                            aux_fname.append(_reroot_path(aux['file_name']))
                     gid_to_new[gid] = new
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
@@ -2629,13 +2441,6 @@ class MixinCocoExtras(object):
                 if 'auxiliary' in new:
                     for aux_fname, aux in zip(new['auxiliary'], img['auxiliary']):
                         aux['file_name'] = aux_fname
-                elif 'auxillary' in new:
-                    warnings.warn('incorrect spelling of auxiliary will be '
-                                  'unsupported in the future. '
-                                  'This will be removed in 0.2.0',
-                                   DeprecationWarning)
-                    for aux_fname, aux in zip(new['auxillary'], img['auxillary']):
-                        aux['file_name'] = aux_fname
         else:
             for img in self.imgs.values():
                 try:
@@ -2643,12 +2448,6 @@ class MixinCocoExtras(object):
                     if gname is not None:
                         img['file_name'] = _reroot_path(gname)
                     for aux in img.get('auxiliary', []):
-                        aux['file_name'] = _reroot_path(aux['file_name'])
-                    for aux in img.get('auxillary', []):
-                        warnings.warn('incorrect spelling of auxiliary will be '
-                                      'unsupported in the future. '
-                                      'This will be removed in 0.2.0',
-                                       DeprecationWarning)
                         aux['file_name'] = _reroot_path(aux['file_name'])
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
@@ -3469,7 +3268,7 @@ class MixinCocoDraw(object):
         import kwimage
         # Load the raw image pixels
         canvas = self.load_image(gid, channels=channels)
-        # TODO: account for auxilliary transforms if the exist
+        # TODO: account for auxiliary transforms if the exist
 
         # Get annotation IDs from this image
         aids = self.index.gid_to_aids[gid]

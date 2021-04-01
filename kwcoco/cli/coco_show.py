@@ -38,7 +38,7 @@ class CocoShowCLI:
                 None, type=str, help=ub.paragraph(
                     '''
                     By default uses the default channels (usually this is rgb),
-                    otherwise specify the name of an auxillary channels
+                    otherwise specify the name of an auxiliary channels
                     ''')
             ),
 
@@ -50,7 +50,7 @@ class CocoShowCLI:
     def main(cls, cmdline=True, **kw):
         """
         TODO:
-            - [ ] Visualize auxillary data
+            - [ ] Visualize auxiliary data
 
         Example:
             >>> # xdoctest: +SKIP

@@ -112,8 +112,8 @@ image = {
         {
             'file_name': str,     # relative path to associated file
             'channels': <spec>,   # a string encoding
-            'width':     <int>    # pixel width of auxillary image
-            'height':    <int>    # pixel height of auxillary image
+            'width':     <int>    # pixel width of auxiliary image
+            'height':    <int>    # pixel height of auxiliary image
             'transform': <todo>,  # tranform from main image space to auxiliary image space. (identity if unspecified)
         },
     ]

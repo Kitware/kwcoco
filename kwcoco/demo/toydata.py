@@ -53,7 +53,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
             If specified, dpath is ignored. If unspecified, a bundle
             will be written inside `dpath`.
 
-        aux (bool): if True generates dummy auxillary channels
+        aux (bool): if True generates dummy auxiliary channels
 
         verbose (int, default=3): verbosity mode
 
@@ -310,7 +310,7 @@ def random_video_dset(
 
         verbose (int, default=3): verbosity mode
 
-        aux (bool): if True generates dummy auxillary channels
+        aux (bool): if True generates dummy auxiliary channels
 
         multispectral (bool): similar to aux, but does not have the concept of
             a "main" image.
