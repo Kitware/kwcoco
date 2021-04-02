@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Removed
 
 * Several deprecated APIs
+* `kwcoco.toydata` and `kwcoco.toypatterns`, use `kwcoco.demo.toydata` and `kwcoco.demo.toypatterns` instead.
 
 
 ## Version 0.1.13 - Released 2021-04-01

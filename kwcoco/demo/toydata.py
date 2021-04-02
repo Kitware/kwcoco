@@ -16,7 +16,7 @@ import kwimage
 import skimage
 from os.path import basename
 import skimage.morphology  # NOQA
-from kwcoco.toypatterns import CategoryPatterns
+from kwcoco.demo.toypatterns import CategoryPatterns
 
 
 try:

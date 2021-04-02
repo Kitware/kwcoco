@@ -220,7 +220,7 @@ References:
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 import warnings
-from os.path import dirname, splitext, basename, join, exists, isdir
+from os.path import dirname, basename, join, exists, isdir
 from collections import OrderedDict, defaultdict
 import json
 import numpy as np
