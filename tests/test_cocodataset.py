@@ -22,7 +22,12 @@ def test_category_rename_merge_policy():
     dset = orig_dset.copy()
     dset.rename_categories(mapping, merge_policy='update')
     print(ub.repr2(dset.cats, nl=1))
-    assert dset.name_to_cat['b'] == {'id': 2, 'name': 'b', 'b': 2, 'a': 1, 'c': 3}
+    got = dset.name_to_cat['b']
+    want = {'id': 2, 'name': 'b', 'b': 2, 'a': 1, 'c': 3}
+    print('got = {}'.format(ub.repr2(got, nl=1)))
+    print('want = {}'.format(ub.repr2(want, nl=1)))
+    # assert got == want
+    assert sorted(got.items()) == sorted(want.items())
 
     dset = orig_dset.copy()
     dset.rename_categories(mapping, merge_policy='ignore')
