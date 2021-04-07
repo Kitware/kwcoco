@@ -2078,7 +2078,8 @@ class MixinCocoExtras(object):
                     elif merge_policy == 'update':
                         # When there are multiple sources then union all
                         # original source attributes.
-                        # Note: this update order is arbitrary and may be funky
+                        # Note: the order of srcs is arbitrary so we sort
+                        # to make the update order consistent
                         for src in sorted(srcs):
                             new_cat.update(orig_cats[src])
                     elif merge_policy == 'ignore':
@@ -2096,8 +2097,11 @@ class MixinCocoExtras(object):
                     new_cats[dst] = new_cat
 
                 # Apply category deltas
+
+                # Remove category names that were renamed
                 self.remove_categories(rm_cnames, keep_annots=True)
 
+                # Update any existing categories that were merged
                 for cname in sorted(update_cnames):
                     if merge_policy == 'ignore':
                         new_cats[cname] = dict(orig_cats[cname])
@@ -2112,7 +2116,8 @@ class MixinCocoExtras(object):
                         raise KeyError('Unknown merge_policy={}'.format(
                             merge_policy))
 
-                for cname in add_cnames:
+                # Add new category names that were created
+                for cname in sorted(add_cnames):
                     self.add_category(**new_cats[cname])
 
                 # Apply the annotation deltas
@@ -2127,6 +2132,7 @@ class MixinCocoExtras(object):
                     rebuild = True
 
         else:
+            # TODO DEPRECATE AND REMOVE
             raise NotImplementedError('DO NOT USE simple=False ANYMORE')
             new_cats = []
             old_cats = self.dataset['categories']

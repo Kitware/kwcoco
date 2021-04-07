@@ -12,6 +12,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * Fixed numpy warning by using `int` instead of `np.int`.
 
+* Issue in rename categories with non-deterministic behavior
+
 ### Removed
 
 * Several deprecated APIs
