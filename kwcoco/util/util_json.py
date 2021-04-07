@@ -23,7 +23,7 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
         >>> data['foo'] = ub.ddict(lambda: int)
         >>> data['bar'] = np.array([1, 2, 3])
         >>> data['foo']['a'] = 1
-        >>> data['foo']['b'] = (1, np.array([1, 2, 3]), {3: np.int(3), 4: np.float16(1.0)})
+        >>> data['foo']['b'] = (1, np.array([1, 2, 3]), {3: np.int32(3), 4: np.float16(1.0)})
         >>> dict_ = data
         >>> print(ub.repr2(data, nl=-1))
         >>> assert list(find_json_unserializable(data))

@@ -797,7 +797,7 @@ class Annots(ObjectList1D):
             >>> from kwcoco.coco_dataset import *  # NOQA
             >>> self = CocoDataset.demo().annots([1, 2, 11])
             >>> print('self.boxes = {!r}'.format(self.boxes))
-            >>> boxes = kwimage.Boxes.random(3).scale(512).astype(np.int)
+            >>> boxes = kwimage.Boxes.random(3).scale(512).astype(int)
             >>> self.boxes = boxes
             >>> print('self.boxes = {!r}'.format(self.boxes))
         """

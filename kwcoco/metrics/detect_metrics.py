@@ -289,7 +289,7 @@ class DetectionMetrics(ub.NiceRepr):
                         else:
                             raise KeyError(track_probs)
                     else:
-                        pxs = np.array(y['pxs'], dtype=np.int)
+                        pxs = np.array(y['pxs'], dtype=int)
 
                         # For unassigned truths, we need to create dummy probs
                         # where a background class has probability 1.

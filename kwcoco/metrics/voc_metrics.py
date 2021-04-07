@@ -165,7 +165,7 @@ def _pr_curves(y, method='voc2012'):
         # which gives nice easy to reproduce results.
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='invalid .* true_divide')
-            is_correct = (y['true'] == y['pred']).astype(np.int)
+            is_correct = (y['true'] == y['pred']).astype(int)
             ap = sklearn.metrics.average_precision_score(
                 y_true=is_correct, y_score=y['score'],
                 sample_weight=y['weight'],

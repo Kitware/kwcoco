@@ -699,8 +699,8 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         if WITH_KPTS_SSEG:
             kpts = []
             ssegs = []
-            ddims = boxes.data[:, 2:4].astype(np.int)[:, ::-1]
-            offsets = boxes.data[:, 0:2].astype(np.int)
+            ddims = boxes.data[:, 2:4].astype(int)[:, ::-1]
+            offsets = boxes.data[:, 0:2].astype(int)
             cnames = [classes[cidx] for cidx in dets.class_idxs]
             for dims, xy_offset, cname in zip(ddims, offsets, cnames):
                 info = catpats._todo_refactor_geometric_info(cname, xy_offset, dims)
@@ -918,7 +918,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         boxes = boxes[1:]
 
     boxes = boxes.scale(.8).translate(.1 * min(gsize))
-    boxes.data = boxes.data.astype(np.int)
+    boxes.data = boxes.data.astype(int)
 
     # Hack away zero width objects
     boxes = boxes.to_xywh(copy=False)
@@ -1222,7 +1222,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
 
     def render_foreground(imdata, chan_to_auxinfo):
         boxes = annots.boxes
-        tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(np.int)
+        tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(int)
 
         # Render coco-style annotation dictionaries
         for ann, tlbr in zip(annots.objs, tlbr_boxes):

@@ -8,6 +8,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.0 - Unreleased
 
 
+### Fixed
+
+* Fixed numpy warning by using `int` instead of `np.int`.
+
 ### Removed
 
 * Several deprecated APIs

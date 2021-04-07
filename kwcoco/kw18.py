@@ -109,7 +109,7 @@ class KW18(kwarray.DataFrameArray):
         num_need = np.sum(missing)
         new_track_ids = np.arange(next_track_id, next_track_id + num_need)
         track_ids[missing] = new_track_ids
-        track_ids = track_ids.astype(np.int)
+        track_ids = track_ids.astype(int)
 
         scores = np.array([ann.get('score', -1) for ann in anns])
         image_ids = np.array([ann['image_id'] for ann in anns])
