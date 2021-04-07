@@ -24,6 +24,7 @@ def test_category_rename_merge_policy():
         'c': 'b',
     }
 
+    print('-- test 1 --')
     dset = orig_dset.copy()
     dset.rename_categories(mapping, merge_policy='update')
     print(ub.repr2(dset.cats, nl=1))
@@ -37,6 +38,7 @@ def test_category_rename_merge_policy():
     assert flag
     # assert sorted(got.items()) == sorted(want.items())
 
+    print('-- test 2 --')
     dset = orig_dset.copy()
     dset.rename_categories(mapping, merge_policy='ignore')
     print(ub.repr2(dset.cats, nl=1))
@@ -47,6 +49,7 @@ def test_category_rename_merge_policy():
     assert flag
 
     # Test multiple cats map on to one new cat
+    print('-- test 3 --')
     mapping = {
         'a': 'e',
         'c': 'e',
@@ -66,6 +69,7 @@ def test_category_rename_merge_policy():
     print('info = {}'.format(ub.repr2(info, nl=1)))
     assert flag
 
+    print('-- test 4 --')
     dset = orig_dset.copy()
     dset.rename_categories(mapping, merge_policy='update')
     print(ub.repr2(dset.cats, nl=1))

@@ -2016,8 +2016,6 @@ class MixinCocoExtras(object):
         old_cats = self.dataset['categories']
 
         if simple:
-            # orig_mapper = mapper
-
             # Ignore identity mappings
             mapper = {k: v for k, v in mapper.items() if k != v}
 
@@ -2129,6 +2127,7 @@ class MixinCocoExtras(object):
                     rebuild = True
 
         else:
+            raise NotImplementedError('DO NOT USE simple=False ANYMORE')
             new_cats = []
             old_cats = self.dataset['categories']
             new_name_to_cat = {}
