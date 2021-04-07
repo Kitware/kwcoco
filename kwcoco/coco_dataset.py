@@ -1962,8 +1962,7 @@ class MixinCocoExtras(object):
 
         return bad_paths
 
-    def rename_categories(self, mapper, strict=False, preserve=False,
-                          rebuild=True, simple=True, merge_policy='ignore'):
+    def rename_categories(self, mapper, rebuild=True, merge_policy='ignore'):
         """
         Create a coarser categorization
 
@@ -1981,15 +1980,6 @@ class MixinCocoExtras(object):
         Args:
             mapper (dict or Function): maps old names to new names.
 
-            strict (bool): DEPRICATED IGNORE.
-                if True, fails if mapper doesnt map all classes
-
-            preserve (bool): DEPRICATED IGNORE.
-                if True, preserve old categories as supercatgories. Broken.
-
-            simple (bool, default=True): defaults to the new way of doing this.
-                The old way is depricated.
-
             merge_policy (str):
                 How to handle multiple categories that map to the same name.
                 Can be update or ignore.
@@ -1999,7 +1989,7 @@ class MixinCocoExtras(object):
             >>> self.rename_categories({'astronomer': 'person',
             >>>                         'astronaut': 'person',
             >>>                         'mouth': 'person',
-            >>>                         'helmet': 'hat'}, preserve=0)
+            >>>                         'helmet': 'hat'})
             >>> assert 'hat' in self.name_to_cat
             >>> assert 'helmet' not in self.name_to_cat
             >>> # Test merge case
@@ -2015,185 +2005,121 @@ class MixinCocoExtras(object):
         """
         old_cats = self.dataset['categories']
 
-        if simple:
-            # Ignore identity mappings
-            mapper = {k: v for k, v in mapper.items() if k != v}
+        # Ignore identity mappings
+        mapper = {k: v for k, v in mapper.items() if k != v}
 
-            # Perform checks to determine what bookkeeping needs to be done
-            orig_cnames = {cat['name'] for cat in old_cats}
-            src_cnames = set(mapper.keys())
-            dst_cnames = set(mapper.values())
+        # Perform checks to determine what bookkeeping needs to be done
+        orig_cnames = {cat['name'] for cat in old_cats}
+        src_cnames = set(mapper.keys())
+        dst_cnames = set(mapper.values())
 
-            bad_cnames = src_cnames - orig_cnames
-            if bad_cnames:
-                raise ValueError(
-                    'The following categories to not exist: {}'.format(bad_cnames))
+        bad_cnames = src_cnames - orig_cnames
+        if bad_cnames:
+            raise ValueError(
+                'The following categories to not exist: {}'.format(bad_cnames))
 
-            has_orig_merges = dst_cnames.intersection(orig_cnames)
-            has_src_merges = dst_cnames.intersection(src_cnames)
-            has_dup_dst = set(ub.find_duplicates(mapper.values()).keys())
+        has_orig_merges = dst_cnames.intersection(orig_cnames)
+        has_src_merges = dst_cnames.intersection(src_cnames)
+        has_dup_dst = set(ub.find_duplicates(mapper.values()).keys())
 
-            has_merges = has_orig_merges or has_src_merges or has_dup_dst
+        has_merges = has_orig_merges or has_src_merges or has_dup_dst
 
-            if not has_merges:
-                # In the simple case we are just changing the labels, so
-                # nothing special needs to happen.
-                for key, value in mapper.items():
-                    for cat in self.dataset['categories']:
-                        if cat['name'] == key:
-                            cat['name'] = value
-            else:
-                # Remember the original categories
-                orig_cats = {cat['name']: cat for cat in old_cats}
-
-                # Remember all annotations of the original categories
-                src_cids = [self.index.name_to_cat[c]['id']
-                            for c in src_cnames]
-                src_cname_to_aids = {c: self.index.cid_to_aids[cid]
-                                     for c, cid in zip(src_cnames, src_cids)}
-
-                # Track which srcs each dst is constructed from
-                dst_to_srcs = ub.invert_dict(mapper, unique_vals=False)
-
-                # Mark unreferenced cats for removal
-                rm_cnames = src_cnames - dst_cnames
-
-                # Mark unseen cats for addition
-                add_cnames = dst_cnames - orig_cnames
-
-                # Mark renamed cats for update
-                update_cnames = dst_cnames - add_cnames
-
-                # Populate new category information
-                new_cats = {}
-                for dst in sorted(dst_cnames):
-                    # Combine information between existing categories that are
-                    # being collapsed into a single category.
-                    srcs = dst_to_srcs[dst]
-                    new_cat = {}
-                    if len(srcs) <= 1:
-                        # in the case of 1 source, then there is no merger
-                        for src in srcs:
-                            new_cat.update(orig_cats[src])
-                    elif merge_policy == 'update':
-                        # When there are multiple sources then union all
-                        # original source attributes.
-                        # Note: the order of srcs is arbitrary so we sort
-                        # to make the update order consistent
-                        for src in sorted(srcs):
-                            new_cat.update(orig_cats[src])
-                    elif merge_policy == 'ignore':
-                        # When there are multiple sources then ignore all
-                        # original source attributes.
-                        pass
-                    else:
-                        # There may be better merge policies that should be
-                        # implemented
-                        raise KeyError('Unknown merge_policy={}'.format(
-                            merge_policy))
-
-                    new_cat['name'] = dst
-                    new_cat.pop('id', None)
-                    new_cats[dst] = new_cat
-
-                # Apply category deltas
-
-                # Remove category names that were renamed
-                self.remove_categories(rm_cnames, keep_annots=True)
-
-                # Update any existing categories that were merged
-                for cname in sorted(update_cnames):
-                    if merge_policy == 'ignore':
-                        new_cats[cname] = dict(orig_cats[cname])
-                    elif merge_policy == 'update':
-                        new_cat = new_cats[cname]
-                        orig_cat = orig_cats[cname]
-                        # Only update name and non-existing information
-                        # TODO: check for conflicts?
-                        new_info = ub.dict_diff(new_cat, orig_cat)
-                        orig_cat.update(new_info)
-                    else:
-                        raise KeyError('Unknown merge_policy={}'.format(
-                            merge_policy))
-
-                # Add new category names that were created
-                for cname in sorted(add_cnames):
-                    self.add_category(**new_cats[cname])
-
-                # Apply the annotation deltas
-                for src, aids in src_cname_to_aids.items():
-                    cat = self.name_to_cat[mapper[src]]
-                    cid = cat['id']
-                    for aid in aids:
-                        self.anns[aid]['category_id'] = cid
-
-                # force rebuild if any annotations we changed
-                if src_cname_to_aids:
-                    rebuild = True
-
+        if not has_merges:
+            # In the simple case we are just changing the labels, so
+            # nothing special needs to happen.
+            for key, value in mapper.items():
+                for cat in self.dataset['categories']:
+                    if cat['name'] == key:
+                        cat['name'] = value
         else:
-            # TODO DEPRECATE AND REMOVE
-            raise NotImplementedError('DO NOT USE simple=False ANYMORE')
-            new_cats = []
-            old_cats = self.dataset['categories']
-            new_name_to_cat = {}
-            old_to_new_id = {}
+            # Remember the original categories
+            orig_cats = {cat['name']: cat for cat in old_cats}
 
-            if not callable(mapper):
-                mapper = mapper.__getitem__
+            # Remember all annotations of the original categories
+            src_cids = [self.index.name_to_cat[c]['id']
+                        for c in src_cnames]
+            src_cname_to_aids = {c: self.index.cid_to_aids[cid]
+                                 for c, cid in zip(src_cnames, src_cids)}
 
-            for old_cat in old_cats:
-                try:
-                    new_name = mapper(old_cat['name'])
-                except KeyError:
-                    if strict:
-                        raise
-                    new_name = old_cat['name']
+            # Track which srcs each dst is constructed from
+            dst_to_srcs = ub.invert_dict(mapper, unique_vals=False)
 
-                old_cat['supercategory'] = new_name
+            # Mark unreferenced cats for removal
+            rm_cnames = src_cnames - dst_cnames
 
-                if new_name in new_name_to_cat:
-                    # Multiple old categories are mapped to this new one
-                    new_cat = new_name_to_cat[new_name]
+            # Mark unseen cats for addition
+            add_cnames = dst_cnames - orig_cnames
+
+            # Mark renamed cats for update
+            update_cnames = dst_cnames - add_cnames
+
+            # Populate new category information
+            new_cats = {}
+            for dst in sorted(dst_cnames):
+                # Combine information between existing categories that are
+                # being collapsed into a single category.
+                srcs = dst_to_srcs[dst]
+                new_cat = {}
+                if len(srcs) <= 1:
+                    # in the case of 1 source, then there is no merger
+                    for src in srcs:
+                        new_cat.update(orig_cats[src])
+                elif merge_policy == 'update':
+                    # When there are multiple sources then union all
+                    # original source attributes.
+                    # Note: the order of srcs is arbitrary so we sort
+                    # to make the update order consistent
+                    for src in sorted(srcs):
+                        new_cat.update(orig_cats[src])
+                elif merge_policy == 'ignore':
+                    # When there are multiple sources then ignore all
+                    # original source attributes.
+                    pass
                 else:
-                    if old_cat['name'] == new_name:
-                        # new name is an existing category
-                        new_cat = old_cat.copy()
-                        new_cat['id'] = len(new_cats) + 1
-                    else:
-                        # new name is a entirely new category
-                        new_cat = _dict([
-                            ('id', len(new_cats) + 1),
-                            ('name', new_name),
-                        ])
-                    new_name_to_cat[new_name] = new_cat
-                    new_cats.append(new_cat)
+                    # There may be better merge policies that should be
+                    # implemented
+                    raise KeyError('Unknown merge_policy={}'.format(
+                        merge_policy))
 
-                old_to_new_id[old_cat['id']] = new_cat['id']
+                new_cat['name'] = dst
+                new_cat.pop('id', None)
+                new_cats[dst] = new_cat
 
-            if preserve:
-                raise NotImplementedError
-                # for old_cat in old_cats:
-                #     # Ensure all old cats are preserved
-                #     if old_cat['name'] not in new_name_to_cat:
-                #         new_cat = old_cat.copy()
-                #         new_cat['id'] = len(new_cats) + 1
-                #         new_name_to_cat[new_name] = new_cat
-                #         new_cats.append(new_cat)
-                #         old_to_new_id[old_cat['id']] = new_cat['id']
+            # Apply category deltas
 
-            # self.dataset['fine_categories'] = old_cats
-            self.dataset['categories'] = new_cats
+            # Remove category names that were renamed
+            self.remove_categories(rm_cnames, keep_annots=True)
 
-            # Fix annotations of modified categories
-            # (todo: if the index is built, we can use that to only modify
-            #  a potentially smaller subset of annotations)
-            for ann in self.dataset['annotations']:
-                old_id = ann['category_id']
-                new_id = old_to_new_id[old_id]
+            # Update any existing categories that were merged
+            for cname in sorted(update_cnames):
+                if merge_policy == 'ignore':
+                    new_cats[cname] = dict(orig_cats[cname])
+                elif merge_policy == 'update':
+                    new_cat = new_cats[cname]
+                    orig_cat = orig_cats[cname]
+                    # Only update name and non-existing information
+                    # TODO: check for conflicts?
+                    new_info = ub.dict_diff(new_cat, orig_cat)
+                    orig_cat.update(new_info)
+                else:
+                    raise KeyError('Unknown merge_policy={}'.format(
+                        merge_policy))
 
-                if old_id != new_id:
-                    ann['category_id'] = new_id
+            # Add new category names that were created
+            for cname in sorted(add_cnames):
+                self.add_category(**new_cats[cname])
+
+            # Apply the annotation deltas
+            for src, aids in src_cname_to_aids.items():
+                cat = self.name_to_cat[mapper[src]]
+                cid = cat['id']
+                for aid in aids:
+                    self.anns[aid]['category_id'] = cid
+
+            # force rebuild if any annotations we changed
+            if src_cname_to_aids:
+                rebuild = True
+
         if rebuild:
             self._build_index()
         else:
