@@ -1105,7 +1105,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
                 auxdict['file_name'] = aux_fpath
                 auxdata = auxdict.pop('imdata', None)
                 try:
-                    from osgeo import import gdal  # NOQA
+                    from osgeo import gdal  # NOQA
                     kwimage.imwrite(aux_fpath, auxdata, backend='gdal', space=None)
                 except Exception:
                     kwimage.imwrite(aux_fpath, auxdata, space=None)
