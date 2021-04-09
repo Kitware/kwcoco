@@ -1964,28 +1964,20 @@ class MixinCocoExtras(object):
 
     def rename_categories(self, mapper, rebuild=True, merge_policy='ignore'):
         """
-        Create a coarser categorization
-
-        Note: this function has been unstable in the past, and has not yet been
-        properly stabalized. Either avoid or use with care.
-        Ensuring ``simple=True`` should result in newer saner behavior that will
-        likely be backwards compatible.
-
-        TODO:
-            - [X] Simple case where we relabel names with no conflicts
-            - [ ] Case where annotation labels need to change to be coarser
-                    - dev note: see internal libraries for work on this
-            - [ ] Other cases
+        Rename categories with a potentially coarser categorization.
 
         Args:
             mapper (dict or Function): maps old names to new names.
+                If multiple names are mapped to the same category, those
+                categories will be merged.
 
             merge_policy (str):
                 How to handle multiple categories that map to the same name.
                 Can be update or ignore.
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> self.rename_categories({'astronomer': 'person',
             >>>                         'astronaut': 'person',
             >>>                         'mouth': 'person',
@@ -1993,7 +1985,7 @@ class MixinCocoExtras(object):
             >>> assert 'hat' in self.name_to_cat
             >>> assert 'helmet' not in self.name_to_cat
             >>> # Test merge case
-            >>> self = CocoDataset.demo()
+            >>> self = kwcoco.CocoDataset.demo()
             >>> mapper = {
             >>>     'helmet': 'rocket',
             >>>     'astronomer': 'rocket',

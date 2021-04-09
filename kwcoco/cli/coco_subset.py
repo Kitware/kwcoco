@@ -21,6 +21,12 @@ class CocoSubsetCLI(object):
                     images containing these categories will be included.
                     ''')),  # TODO: pattern matching?
 
+            'gids': scfg.Value(
+                None, help=ub.paragraph(
+                    '''
+                    if specified, only take these image ids
+                    ''')),
+
             # TODO: Add more filter criteria
             #
             # image size
@@ -59,6 +65,14 @@ class CocoSubsetCLI(object):
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
         valid_gids = set(dset.imgs.keys())
+
+        if config['gids'] is not None:
+            if isinstance(config['gids'], str):
+                valid_gids &= set(map(int, config['gids'].split(',')))
+            elif ub.iterable(config['gids']):
+                valid_gids &= set(map(int, config['gids']))
+            else:
+                raise KeyError(config['gids'])
 
         if config['include_categories'] is not None:
             catnames = config['include_categories'].split(',')
