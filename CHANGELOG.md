@@ -9,15 +9,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Fixed
-
 * Fixed numpy warning by using `int` instead of `np.int`.
-
 * Issue in rename categories with non-deterministic behavior
+* Reference gdal from the `osgeo` package
 
 ### Removed
-
 * Several deprecated APIs
 * `kwcoco.toydata` and `kwcoco.toypatterns`, use `kwcoco.demo.toydata` and `kwcoco.demo.toypatterns` instead.
+
+
+### Changed
+* `kwcoco coco_subset` can now take a list of image-ids explicitly.
 
 
 ## Version 0.1.13 - Released 2021-04-01
@@ -45,6 +47,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * `CocoDataset.union` will now correctly insert prefixes into file names such
   that they are relative to the common bundle directory.
+
+* Bug in `rename_categories`
 
 ## Version 0.1.12 - Released 2021-03-04
 
