@@ -1507,6 +1507,35 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
         >>> plt = kwplot.autoplt()
         >>> kwplot.multi_plot(xdata=path[:, 0], ydata=path[:, 1], fnum=1, doclf=1, xlim=(0, 1), ylim=(0, 1))
         >>> kwplot.show_if_requested()
+
+    Example:
+        >>> # xdoctest: +REQUIRES(--3d)
+        >>> import kwarray
+        >>> import kwplot
+        >>> plt = kwplot.autoplt()
+        >>> #
+        >>> num= num_frames = 100
+        >>> rng = kwarray.ensure_rng(0)
+        >>> #
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> paths = []
+        >>> paths.append(random_path(num, degree=3, dimension=3, mode='bezier'))
+        >>> paths.append(random_path(num, degree=2, dimension=3, mode='bezier'))
+        >>> paths.append(random_path(num, degree=4, dimension=3, mode='bezier'))
+        >>> #
+        >>> from mpl_toolkits.mplot3d import Axes3D  # NOQA
+        >>> ax = plt.gca(projection='3d')
+        >>> ax.cla()
+        >>> #
+        >>> for path in paths:
+        >>>     time = np.arange(len(path))
+        >>>     ax.plot(time, path.T[0] * 1, path.T[1] * 1, 'o-')
+        >>> ax.set_xlim(0, num_frames)
+        >>> ax.set_ylim(-.01, 1.01)
+        >>> ax.set_zlim(-.01, 1.01)
+        >>> ax.set_xlabel('x')
+        >>> ax.set_ylabel('y')
+        >>> ax.set_zlabel('z')
     """
     import bezier
     rng = kwarray.ensure_rng(rng)

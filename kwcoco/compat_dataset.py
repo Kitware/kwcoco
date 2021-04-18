@@ -372,9 +372,14 @@ class COCO(CocoDataset):
         data = ann['segmentation']
         dims = None
         sseg = _coerce_coco_segmentation(data, dims)
-        mask = sseg.to_mask()
+        try:
+            mask = sseg.to_mask()
+        except Exception:
+            img = self.imgs[ann['image_id']]
+            dims = (img['height'], img['width'])
+            mask = sseg.to_mask(dims=dims)
         # mask.to_fortran_mask()
-        m = mask.to_c_mask()  # forget which one is right
+        m = mask.to_c_mask().data  # forget which one is right
         # rle = self.annToRLE(ann)
         # m = maskUtils.decode(rle)
         return m
