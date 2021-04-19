@@ -19,8 +19,8 @@ not be have full support in the Python API). A formal json-schema is defined in
 
     # Videos are used to manage collections of sequences of images.
     video = {
-        "id": int,
-        "name": str,  # a unique name for this video.
+        'id': int,
+        'name': str,  # a unique name for this video.
     }
 
     # Specifies how to find sensor data of a particular scene at a particular
@@ -60,15 +60,15 @@ not be have full support in the Python API). A formal json-schema is defined in
         'image_id': int,
         'category_id': int,
 
-        "track_id": <int | str | uuid>  # indicates association between annotations across frames
+        'track_id': <int | str | uuid>  # indicates association between annotations across frames
 
         'bbox': [tl_x, tl_y, w, h],  # xywh format)
-        "score" : float,
-        "prob" : List[float],
-        "weight" : float,
+        'score' : float,
+        'prob' : List[float],
+        'weight' : float,
 
-        "caption": str,  # a text caption for this annotation
-        "keypoints" : <Keypoints | List[int] > # an accepted keypoint format
+        'caption': str,  # a text caption for this annotation
+        'keypoints' : <Keypoints | List[int] > # an accepted keypoint format
         'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
     }
 
@@ -167,8 +167,8 @@ not be have full support in the Python API). A formal json-schema is defined in
     Video Sequences:
         For video sequences, we add the following video level index:
 
-        "videos": [
-            { "id": <int>, "name": <video_name:str> },
+        'videos': [
+            { 'id': <int>, 'name': <video_name:str> },
         ]
 
         Note that the videos might be given as encoded mp4/avi/etc.. files (in
@@ -187,7 +187,7 @@ not be have full support in the Python API). A formal json-schema is defined in
         And annotations are augmented as follows:
 
         {
-            "track_id": <int | str | uuid>  # optional, indicates association between annotations across frames
+            'track_id': <int | str | uuid>  # optional, indicates association between annotations across frames
         }
 
 
