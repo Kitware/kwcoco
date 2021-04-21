@@ -534,14 +534,14 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         s2_bands = ['B1', 'B8', 'B8a', 'B10', 'B11']
         aux = [
             {'channels': b,
-             'transform': temp_scale_matrix_json(r / 60.),
+             'base_to_aux': temp_scale_matrix_json(r / 60.),
              'dtype': 'uint16'}
             for b, r in zip(s2_bands, s2_res)
         ]
 
         main_window = kwimage.Boxes([[0, 0, gsize[0], gsize[1]]], 'xywh')
         for chaninfo in aux:
-            mat = np.array(chaninfo['transform']['matrix'])
+            mat = np.array(chaninfo['base_to_aux']['matrix'])
             aux_window = main_window.warp(mat).quantize()
             chaninfo['width'] = int(aux_window.width.ravel()[0])
             chaninfo['height'] = int(aux_window.height.ravel()[0])
@@ -575,7 +575,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
                         'channels': chaninfo,
                         'width': gsize[0],
                         'height': gsize[1],
-                        'transform': None,
+                        'base_to_aux': None,
                     }
                 # Add placeholder for auxiliary image data
                 auxitem = {
@@ -1268,9 +1268,9 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
                             val = rng.uniform(0.2, 1.0)
                             # transform annotation into aux space if it is
                             # different
-                            transform = auxinfo.get('transform', None)
-                            if transform is not None:
-                                mat = np.array(transform['matrix'])
+                            base_to_aux = auxinfo.get('base_to_aux', None)
+                            if base_to_aux is not None:
+                                mat = np.array(base_to_aux['matrix'])
                                 seg_ = seg.warp(mat)
                                 auxinfo['imdata'] = seg_.fill(auxinfo['imdata'], value=val)
                             else:

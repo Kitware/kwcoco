@@ -32,10 +32,10 @@ An informal spec is as follows:
         'id': int,
 
         'name': str,  # an encouraged but optional unique name
-        'file_name': str,  # relative path to the primary image data
+        'file_name': str,  # relative path to the "base" image data
 
-        'width': int,   # pixel width of main image
-        'height': int,  # pixel height of main image
+        'width': int,   # pixel width of "base" image
+        'height': int,  # pixel height of "base" image
 
         'channels': <ChannelSpec>,   # a string encoding of the channels in the main image
 
@@ -45,7 +45,7 @@ An informal spec is as follows:
                 'channels': <ChannelSpec>,   # a string encoding
                 'width':     <int>    # pixel width of auxiliary image
                 'height':    <int>    # pixel height of auxiliary image
-                'transform': <TransformSpec>,  # tranform from main image space to auxiliary image space. (identity if unspecified)
+                'base_to_aux': <TransformSpec>,  # tranform from "base" image space to auxiliary image space. (identity if unspecified)
             }, ...
         ]
 
@@ -176,9 +176,9 @@ An informal spec is as follows:
 
         {
             'id': int,
-            'file_name': str,    # path to the primary image (may be None)
+            'file_name': str,    # path to the "base" image (may be None)
             'name': str,         # a unique name for the image (must be given if file_name is None)
-            'channels': <spec>,  # a spec code that indicates the layout of the primary image channels.
+            'channels': <spec>,  # a spec code that indicates the layout of the "base" image channels.
             'auxiliary': [  # information about auxiliary channels
                 {
                     'file_name': str,
