@@ -8,6 +8,8 @@ The following describes psuedo-code for the high level spec (some of which may
 not be have full support in the Python API). A formal json-schema is defined in
 :module:`kwcoco.coco_schema.py`.
 
+An informal spec is as follows:
+
 .. code::
 
     # All object categories are defined here.
@@ -29,26 +31,47 @@ not be have full support in the Python API). A formal json-schema is defined in
     image = {
         'id': int,
 
-        'name': str,  # a unique name
+        'name': str,  # an encouraged but optional unique name
         'file_name': str,  # relative path to the primary image data
 
         'width': int,   # pixel width of main image
         'height': int,  # pixel height of main image
 
+        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image
+
         'auxiliary': [  # information about any auxiliary channels / bands
             {
                 'file_name': str,     # relative path to associated file
-                'channels': <spec>,   # a string encoding
+                'channels': <ChannelSpec>,   # a string encoding
                 'width':     <int>    # pixel width of auxiliary image
                 'height':    <int>    # pixel height of auxiliary image
-                'transform': <todo>,  # tranform from main image space to auxiliary image space. (identity if unspecified)
-            },
+                'transform': <TransformSpec>,  # tranform from main image space to auxiliary image space. (identity if unspecified)
+            }, ...
         ]
 
         'video_id': str  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
-        'timestamp': int  # timestamp (ideally in flicks), used to identify the timestamp of the frame. Only applicable video inputs.
+        'timestamp': str | int  # a iso-string timestamp or an integer in flicks.
         'frame_index': int  # ordinal frame index which can be used if timestamp is unknown.
     }
+
+    TransformSpec:
+        Currently there is only one spec that works with anything:
+            {'type': 'affine': 'matrix': <a-3x3 matrix>},
+
+        In the future we may do something like this:
+            {'type': 'scale', 'factor': <float|Tuple[float, float]>},
+            {'type': 'translate', 'offset': <float|Tuple[float, float]>},
+            {'type': 'rotate', 'radians_ccw': <float>},
+
+    ChannelSpec:
+        This is a string that describes the channel composition of an image.
+        For the purposes of kwcoco, separate different channel names with a
+        pipe ('|'). If the spec is not specified, methods may fall back on
+        grayscale or rgb processing. There are special string. For instance
+        'rgb' will expand into 'r|g|b'. In other applications you can "late
+        fuse" inputs by separating them with a "," and "early fuse" by
+        separating with a "|". Early fusion returns a solid array/tensor, late
+        fusion returns separated arrays/tensors.
 
     # Ground truth is specified as annotations, each belongs to a spatial
     # region in an image. This must reference a subregion of the image in pixel
@@ -208,6 +231,8 @@ TODO:
     - [ ] Read video data, return numpy arrays (requires API for images)
 
     - [ ] Spec for video URI, and convert to frames @ framerate function.
+
+    - [ ] Document channel spec (move from netharn to here)
 
     - [X] remove videos
 
