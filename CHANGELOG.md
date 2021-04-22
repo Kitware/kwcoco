@@ -12,6 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Fixed numpy warning by using `int` instead of `np.int`.
 * Issue in rename categories with non-deterministic behavior
 * Reference gdal from the `osgeo` package
+* Fixed "name" attribute in sqlview.
 
 ### Removed
 * Several deprecated APIs
@@ -20,6 +21,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 * `kwcoco coco_subset` can now take a list of image-ids explicitly.
+* Separate the vectorized ORM-like objects out of `coco_dataset` and into their own `coco_objects` module.
 
 
 ## Version 0.1.13 - Released 2021-04-01
