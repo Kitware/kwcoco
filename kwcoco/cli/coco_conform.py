@@ -35,6 +35,9 @@ class CocoConformCLI:
                 ensure information needed for pycocotools
                 ''')),
 
+            'legacy': scfg.Value(False, help='if True tries to convert to the '
+                                 'original ms-coco format'),
+
             'workers': scfg.Value(
                 8, help='number of background workers for bigger checks'),
 
@@ -66,26 +69,6 @@ class CocoConformCLI:
 
         config_ = ub.dict_diff(config, {'src', 'dst'})
         dset.conform(**config_)
-
-        # if config['ensure_imgsize']:
-        #     dset._ensure_imgsize(workers=config['workers'])
-
-        # if config['pycocotools_info']:
-        #     for ann in ub.ProgIter(dset.dataset['annotations'], desc='update anns'):
-        #         if 'iscrowd' not in ann:
-        #             ann['iscrowd'] = False
-
-        #         if 'ignore' not in ann:
-        #             ann['ignore'] = ann.get('weight', 1.0) < .5
-
-        #         if 'area' not in ann:
-        #             # Use segmentation if available
-        #             if 'segmentation' in ann:
-        #                 poly = kwimage.Polygon.from_coco(ann['segmentation'][0])
-        #                 ann['area'] = float(poly.to_shapely().area)
-        #             else:
-        #                 x, y, w, h = ann['bbox']
-        #                 ann['area'] = w * h
 
         dset.fpath = config['dst']
         print('dump dset.fpath = {!r}'.format(dset.fpath))

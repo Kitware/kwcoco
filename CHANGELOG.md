@@ -67,6 +67,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Added `AbstractCocoDataset` base class for `CocoDataset` and `CocoSqlDataset`.
 * Added `examples` subdirectory for answers to FAQ
 * Added `kwcoco validate` script to check that json and assets exist.
+* Added `conform` method to the main coco dataset
 
 ### Changed
 * `CocoDataset.subset` will now only return the videos that are supported by

@@ -2088,9 +2088,9 @@ class MixinCocoStats(object):
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
             >>> dset.imgs[1].pop('width')
-            >>> dset.conform()
+            >>> dset.conform(legacy=True)
             >>> assert 'width' in dset.imgs[1]
-            >>> assert 'area' in dset.anns
+            >>> assert 'area' in dset.anns[1]
         """
 
         if config.get('ensure_imgsize', True):
@@ -2119,7 +2119,6 @@ class MixinCocoStats(object):
                 kpcats = self.keypoint_categories()
             except Exception:
                 kpcats = None
-                pass
             for ann in ub.ProgIter(self.dataset['annotations'], desc='update orig coco anns'):
                 # Use segmentation if available
                 if 'segmentation' in ann:
@@ -5216,7 +5215,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             """
             # I would use a trie, but I don't know if pygtrie can do this efficiently
             # (not that this is efficient)
-            from collections import defaultdict
             freq = defaultdict(lambda: 0)
             for item in items:
                 path = tuple(item.split(sep))
@@ -5307,7 +5305,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dataset['img_root'] = self.dataset.get('img_root', None)
 
         if copy:
-            new_dataset = copy.deepcopy(new_dataset)
+            from copy import deepcopy
+            new_dataset = deepcopy(new_dataset)
 
         sub_dset = CocoDataset(new_dataset, bundle_dpath=self.bundle_dpath,
                                autobuild=autobuild)
