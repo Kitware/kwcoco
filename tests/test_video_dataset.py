@@ -4,6 +4,9 @@ def test_frames_are_in_order():
     import ubelt as ub
     import random
 
+    def is_sorted(x):
+        return x == sorted(x)
+
     total_frames = 30
     total_videos = 4
     max_frames_per_video = 20
@@ -34,17 +37,21 @@ def test_frames_are_in_order():
         dset.add_image(video_id=vidid, frame_index=frame_index, name=name)
 
     # Test that our image ids are always ordered by frame ids
-    for vidid, gids in dset.index.vidid_to_gids.items():
-        # Note: this check might be invalid if the params or seed is changed
-        assert sorted(gids) != gids, (
-            'the probability we randomly have ordered image ids is low, '
-            'and 0 when we seed the rng'
-        )
+    vidid_to_gids = dset.index.vidid_to_gids
+    gids_were_in_order = []
+    for vidid, gids in vidid_to_gids.items():
+        gids_were_in_order.append(is_sorted(gids))
         frame_idxs = [dset.imgs[gid]['frame_index'] for gid in gids]
 
         # Note: this check is always valid
-        assert sorted(frame_idxs) == frame_idxs, (
+        assert is_sorted(frame_idxs), (
             'images in vidid_to_gids must be sorted by frame_index')
+
+    # Note: this check has a chance of failing for other params / seeds
+    assert not all(gids_were_in_order), (
+        'the probability we randomly have ordered image ids is low, '
+        'and 0 when we seed the rng'
+    )
 
     try:
         import sqlalchemy  # NOQA
@@ -54,15 +61,18 @@ def test_frames_are_in_order():
         # Test that the sql view works too
         sql_dset = dset.view_sql(memory=True)
 
-        sql_vidid_to_gids = dict(sql_dset.index.vidid_to_gids)
-        for vidid, gids in sql_vidid_to_gids.items():
-            # Note: this check might be invalid if the params or seed is changed
-            assert sorted(gids) != gids, (
-                'the probability we randomly have ordered image ids is low, '
-                'and 0 when we seed the rng'
-            )
+        vidid_to_gids = dict(sql_dset.index.vidid_to_gids)
+        gids_were_in_order = []
+        for vidid, gids in vidid_to_gids.items():
+            gids_were_in_order.append(is_sorted(gids))
             frame_idxs = [dset.imgs[gid]['frame_index'] for gid in gids]
 
             # Note: this check is always valid
-            assert sorted(frame_idxs) == frame_idxs, (
+            assert is_sorted(frame_idxs), (
                 'images in vidid_to_gids must be sorted by frame_index')
+
+        # Note: this check has a chance of failing for other params / seeds
+        assert not all(gids_were_in_order), (
+            'the probability we randomly have ordered image ids is low, '
+            'and 0 when we seed the rng'
+        )

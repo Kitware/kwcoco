@@ -1069,7 +1069,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         elif uri.startswith('sqlite:///file:'):
             uri = uri + '?uri=true'
         self.engine = create_engine(uri)
-        if len(self.engine.table_names()) == 0:
+        # table_names = self.engine.table_names()
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()
+        if len(table_names) == 0:
             # Opened an empty database, need to create the tables
             # Create all tables in the engine.
             # This is equivalent to "Create Table" statements in raw SQL.
@@ -1116,7 +1118,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         from sqlalchemy import inspect
         session = self.session
         inspector = inspect(self.engine)
-        for key in self.engine.table_names():
+        # table_names = self.engine.table_names()
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()
+        for key in table_names:
             colinfo = inspector.get_columns(key)
             colnames = {c['name'] for c in colinfo}
             # TODO: is there a better way to grab this information?
@@ -1565,7 +1569,9 @@ def devcheck():
     print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
 
     # Read the sql tables into pandas
-    for key in self.engine.table_names():
+    # table_names = self.engine.table_names()  # deprecated
+    table_names = sqlalchemy.inspect(self.engine).get_table_names()
+    for key in table_names:
         print('\n----')
         print('key = {!r}'.format(key))
         table_df = self.raw_table(key)
