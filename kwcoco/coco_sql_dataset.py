@@ -180,6 +180,9 @@ class Annotation(CocoBase):
 
     extra = Column(JSON, default=dict())
 
+# As long as the flavor of sql conforms to our raw sql commands set
+# this to 0, which uses the faster raw variant.
+ALCHEMY_MODE_DEFAULT = 0
 
 # Global book keeping (It would be nice to find a way to avoid this)
 CocoBase.TBLNAME_TO_CLASS = {}
@@ -251,7 +254,7 @@ class SqlListProxy(ub.NiceRepr):
         proxy.cls = cls
         proxy.session = session
         proxy._colnames = None
-        proxy.ALCHEMY_MODE = 0
+        proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
 
     def __len__(proxy):
         query = proxy.session.query(proxy.cls)
@@ -341,6 +344,8 @@ class SqlDictProxy(DictLike):
         session (Session): the sqlalchemy session
         cls (Type): the declarative sqlalchemy table class
         keyattr : the indexed column to use as the keys
+        ignore_null (bool): if True, ignores any keys set to NULL, otherwise
+            NULL keys are allowed.
 
     Example:
         >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -382,58 +387,55 @@ class SqlDictProxy(DictLike):
     Example:
         >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
-        >>> import pytest
-        >>> sql_dset, dct_dset = demo(num=10)
-        >>> proxy = sql_dset.index.name_to_cat
+        >>> import kwcoco
+        >>> # Test the variant of the SqlDictProxy where we ignore None keys
+        >>> # This is the case for name_to_img and file_name_to_img
+        >>> dct_dset = kwcoco.CocoDataset.demo('shapes1')
+        >>> dct_dset.add_image(name='no_file_image1')
+        >>> dct_dset.add_image(name='no_file_image2')
+        >>> dct_dset.add_image(name='no_file_image3')
+        >>> sql_dset = dct_dset.view_sql(memory=True)
+        >>> assert len(dct_dset.index.imgs) == 4
+        >>> assert len(dct_dset.index.file_name_to_img) == 1
+        >>> assert len(dct_dset.index.name_to_img) == 3
+        >>> assert len(sql_dset.index.imgs) == 4
+        >>> assert len(sql_dset.index.file_name_to_img) == 1
+        >>> assert len(sql_dset.index.name_to_img) == 3
 
         >>> proxy = sql_dset.index.file_name_to_img
+        >>> assert len(list(proxy.keys())) == 1
+        >>> assert len(list(proxy.values())) == 1
 
-        >>> keys = list(proxy.keys())
-        >>> values = list(proxy.values())
-        >>> items = list(proxy.items())
-        >>> item_keys = [t[0] for t in items]
-        >>> item_vals = [t[1] for t in items]
-        >>> lut_vals = [proxy[key] for key in keys]
-        >>> assert item_vals == lut_vals == values
-        >>> assert item_keys == keys
-        >>> assert len(proxy) == len(keys)
+        >>> proxy = sql_dset.index.name_to_img
+        >>> assert len(list(proxy.keys())) == 3
+        >>> assert len(list(proxy.values())) == 3
 
-        >>> goodkey1 = keys[1]
-        >>> badkey1 = -100000000000
-        >>> badkey2 = 'foobarbazbiz'
-        >>> badkey3 = object()
-        >>> assert goodkey1 in proxy
-        >>> assert badkey1 not in proxy
-        >>> assert badkey2 not in proxy
-        >>> assert badkey3 not in proxy
-        >>> with pytest.raises(KeyError):
-        >>>     proxy[badkey1]
-        >>> with pytest.raises(KeyError):
-        >>>     proxy[badkey2]
-        >>> with pytest.raises(KeyError):
-        >>>     proxy[badkey3]
-
-        >>> # xdoctest: +SKIP
-        >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
-        >>> ti = _benchmark_dict_proxy_ops(proxy)
-        >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
+        >>> proxy = sql_dset.index.imgs
+        >>> assert len(list(proxy.keys())) == 4
+        >>> assert len(list(proxy.values())) == 4
     """
-    def __init__(proxy, session, cls, keyattr=None):
+    def __init__(proxy, session, cls, keyattr=None, ignore_null=False):
         proxy.cls = cls
         proxy.session = session
         proxy.keyattr = keyattr
         proxy._colnames = None
         proxy._casters = None
+        proxy.ignore_null = ignore_null
 
         # It seems like writing the raw sql ourselves is fater than
         # using the ORM in most cases.
-        proxy.ALCHEMY_MODE = 0
+        proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
 
-        # ONLY DO THIS IN READONLInterfaceError:Y MODE
+        # ONLY USE IN READONLY MODE
         proxy._cache = _new_proxy_cache()
 
     def __len__(proxy):
-        query = proxy.session.query(proxy.cls)
+        if proxy.keyattr is None:
+            query = proxy.session.query(proxy.cls)
+        else:
+            query = proxy.session.query(proxy.keyattr)
+            if proxy.ignore_null:
+                query = query.filter(proxy.keyattr != None)  # NOQA
         return query.count()
 
     def __nice__(proxy):
@@ -446,6 +448,8 @@ class SqlDictProxy(DictLike):
         if proxy._cache is not None:
             if key in proxy._cache:
                 return True
+        if proxy.ignore_null and key is None:
+            return False
         keyattr = proxy.keyattr
         if keyattr is None:
             keyattr = proxy.cls.id
@@ -463,6 +467,8 @@ class SqlDictProxy(DictLike):
         if proxy._cache is not None:
             if key in proxy._cache:
                 return proxy._cache[key]
+        if proxy.ignore_null and key is None:
+            raise KeyError(key)
         try:
             session = proxy.session
             cls = proxy.cls
@@ -498,26 +504,34 @@ class SqlDictProxy(DictLike):
             else:
                 query = proxy.session.query(proxy.keyattr).order_by(proxy.cls.id)
 
+            if proxy.ignore_null:
+                query = query.filter(proxy.keyattr != None)  # NOQA
+
             for item in _orm_yielder(query):
                 key = item[0]
                 yield key
         else:
             # Using raw SQL seems much faster
-            if proxy.keyattr is None:
-                result = proxy.session.execute(
-                    'SELECT id FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+            keyattr = 'id' if proxy.keyattr is None else proxy.keyattr.key
+            if proxy.ignore_null:
+                expr = 'SELECT {} FROM {} WHERE {} IS NOT NULL ORDER BY id'.format(
+                    keyattr, proxy.cls.__tablename__, keyattr)
             else:
-                # raise NotImplementedError
-                result = proxy.session.execute(
-                    'SELECT {} FROM {} ORDER BY id'.format(
-                        proxy.keyattr.key, proxy.cls.__tablename__))
-
+                expr = 'SELECT {} FROM {} ORDER BY id'.format(
+                    keyattr, proxy.cls.__tablename__)
+            result = proxy.session.execute(expr)
             for item in _raw_yielder(result):
                 yield item[0]
 
     def itervalues(proxy):
         if proxy.ALCHEMY_MODE:
-            query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
+            query = proxy.session.query(proxy.cls)
+            if proxy.ignore_null:
+                # I think this is only needed in the autoreload session
+                # otherwise it might be possible to jsut use proxy.keyattr
+                cls_keyattr = getattr(proxy.cls, proxy.keyattr.key)
+                query = query.filter(cls_keyattr != None)  # NOQA
+            query = query.order_by(proxy.cls.id)
             for obj in _orm_yielder(query):
                 item = orm_to_dict(obj)
                 yield item
@@ -548,8 +562,14 @@ class SqlDictProxy(DictLike):
             casters = proxy._casters
 
             # Using raw SQL seems much faster
-            result = proxy.session.execute(
-                'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+            if proxy.ignore_null:
+                keyattr = 'id' if proxy.keyattr is None else proxy.keyattr.key
+                expr = 'SELECT {} FROM {} WHERE {} IS NOT NULL ORDER BY id'.format(
+                    keyattr, proxy.cls.__tablename__, keyattr)
+            else:
+                expr = (
+                    'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+            result = proxy.session.execute(expr)
 
             for row in _raw_yielder(result):
                 cast_row = [f(x) for f, x in zip(proxy._casters, row)]
@@ -610,7 +630,9 @@ class SqlIdGroupDictProxy(DictLike):
         >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
         >>> import kwcoco
-        >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes3')
+        >>> # Test the group sorted variant of this by using vidid_to_gids
+        >>> # where the "gids" must be sorted by the image frame indexes
+        >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes1')
         >>> dct_dset.add_image(name='frame-index-order-demo1', frame_index=-30, video_id=1)
         >>> dct_dset.add_image(name='frame-index-order-demo2', frame_index=10, video_id=1)
         >>> dct_dset.add_image(name='frame-index-order-demo3', frame_index=3, video_id=1)
@@ -729,22 +751,16 @@ class SqlIdGroupDictProxy(DictLike):
             all_keys = deque(proxy.keys())
 
             if proxy.ALCHEMY_MODE:
-                parent_keyattr = proxy.parent_keyattr
                 keyattr = proxy.keyattr
                 valattr = proxy.valattr
                 session = proxy.session
-
-                parent_table = parent_keyattr.class_.__table__
                 table = keyattr.class_.__table__
-
                 query = session.query(keyattr, valattr).order_by(
                     keyattr, proxy.group_order_attr)
                 result = session.execute(query)
                 yielder = _raw_yielder(result)
             else:
-                parent_table = proxy.parent_keyattr.class_.__tablename__
                 table = proxy.keyattr.class_.__tablename__
-                parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
                 keycol = table + '.' + proxy.keyattr.name
                 valcol = table + '.' + proxy.valattr.name
                 groupcol = table + '.' + proxy.group_order_attr.name
@@ -838,37 +854,12 @@ class SqlIdGroupDictProxy(DictLike):
                     yield tup
 
     def itervalues(proxy):
-        # Hack:
+        # Not sure if there if iterating over just the valuse can be more
+        # efficient than iterating over the items and discarding the values.
         for key, val in proxy.items():
             yield val
         # _set = set if proxy.group_order_attr is None else ub.oset
         # if proxy.ALCHEMY_MODE:
-        #     # Hack:
-        #     for key, val in proxy.items():
-        #         yield val
-        #     # parent_keyattr = proxy.parent_keyattr
-        #     # keyattr = proxy.keyattr
-        #     # valattr = proxy.valattr
-        #     # session = proxy.session
-
-        #     # parent_table = parent_keyattr.class_.__table__
-        #     # table = proxy.keyattr.class_.__tablename__
-
-        #     # # TODO: This might have to be different for PostgreSQL
-        #     # grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
-        #     # query = (
-        #     #     session.query(grouped_vals)
-        #     #     .outerjoin(table, parent_keyattr == keyattr)
-        #     #     .group_by(parent_keyattr)
-        #     #     .order_by(parent_keyattr)
-        #     # )
-        #     # for row in _orm_yielder(query):
-        #     #     group = row[0]
-        #     #     if group[0] is None:
-        #     #         group = set()
-        #     #     else:
-        #     #         group = set(group)
-        #     #     yield group
         # else:
         #     parent_table = proxy.parent_keyattr.class_.__tablename__
         #     table = proxy.keyattr.class_.__tablename__
@@ -923,10 +914,11 @@ class CocoSqlIndex(object):
         index.videos = SqlDictProxy(session, Video)
         index.name_to_cat = SqlDictProxy(session, Category, Category.name)
 
-        # TODO: handle case where these values are None, such that they are not
-        # handled in the index.
-        index.name_to_img = SqlDictProxy(session, Image, Image.name)
-        index.file_name_to_img = SqlDictProxy(session, Image, Image.file_name)
+        # These indexes are allowed to have null keys
+        index.name_to_img = SqlDictProxy(session, Image, Image.name,
+                                         ignore_null=True)
+        index.file_name_to_img = SqlDictProxy(session, Image, Image.file_name,
+                                              ignore_null=True)
 
         index.gid_to_aids = SqlIdGroupDictProxy(
             session, Annotation.id, Annotation.image_id, Image.id)
