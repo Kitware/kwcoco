@@ -375,7 +375,7 @@ def star(a, dtype=np.uint8):
             [c, b],
             [0, c],
         ])
-        pts = vertices.astype(np.int)[:, None, :]
+        pts = vertices.astype(int)[:, None, :]
         mask = np.zeros_like(selem_square)
         mask = cv2.fillConvexPoly(mask, pts, color=1)
         selem_rotated = mask

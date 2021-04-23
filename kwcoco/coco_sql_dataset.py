@@ -77,7 +77,7 @@ from os.path import exists
 from kwcoco.util.dict_like import DictLike  # NOQA
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco.coco_dataset import (  # NOQA
-    MixinCocoAccessors, MixinCocoAttrs,
+    MixinCocoAccessors, MixinCocoObjects,
     MixinCocoStats, MixinCocoDraw
 )
 
@@ -137,7 +137,9 @@ class Video(CocoBase):
 class Image(CocoBase):
     __tablename__ = 'images'
     id = Column(Integer, primary_key=True, doc='unique internal id')
-    file_name = Column(String(512), nullable=False, index=True, unique=True)
+
+    name = Column(String(512), nullable=True, index=True, unique=True)
+    file_name = Column(String(512), nullable=True, index=True, unique=True)
 
     width = Column(Integer)
     height = Column(Integer)
@@ -786,7 +788,7 @@ class SqlIdGroupDictProxy(DictLike):
 
 class CocoSqlIndex(object):
     """
-    Simulates the dictionary provided by CocoIndex
+    Simulates the dictionary provided by :class:`kwcoco.coco_dataset.CocoIndex`
     """
     def __init__(index):
         index.anns = None
@@ -794,6 +796,9 @@ class CocoSqlIndex(object):
         index.videos = None
         index.cats = None
         index.file_name_to_img = None
+
+        index.name_to_cat = None
+        index.name_to_img = None
 
         index.dataset = None
         index._id_lookup = None
@@ -806,6 +811,10 @@ class CocoSqlIndex(object):
         index.kpcats = SqlDictProxy(session, KeypointCategory)
         index.videos = SqlDictProxy(session, Video)
         index.name_to_cat = SqlDictProxy(session, Category, Category.name)
+
+        # TODO: handle case where these values are None, such that they are not
+        # handled in the index.
+        index.name_to_img = SqlDictProxy(session, Image, Image.name)
         index.file_name_to_img = SqlDictProxy(session, Image, Image.file_name)
 
         index.gid_to_aids = SqlIdGroupDictProxy(
@@ -833,7 +842,7 @@ class CocoSqlIndex(object):
 
 
 class CocoSqlDatabase(AbstractCocoDataset,
-                      MixinCocoAccessors, MixinCocoAttrs, MixinCocoStats,
+                      MixinCocoAccessors, MixinCocoObjects, MixinCocoStats,
                       MixinCocoDraw, ub.NiceRepr):
     """
     Provides an API nearly identical to :class:`kwcoco.CocoDatabase`, but uses
@@ -987,6 +996,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> from kwcoco.coco_sql_dataset import _benchmark_dset_readtime  # NOQA
             >>> import kwcoco
             >>> from kwcoco.coco_sql_dataset import *
             >>> dset2 = dset = kwcoco.CocoDataset.demo()
@@ -1214,7 +1224,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         self.fpath = value
 
 
-def ensure_sql_coco_view(dset, db_fpath=None):
+def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
     """
     Create a cached on-disk SQL view of an on-disk COCO dataset.
 
@@ -1223,7 +1233,7 @@ def ensure_sql_coco_view(dset, db_fpath=None):
         timestamps to determine if it needs to write the dataset.
     """
     if db_fpath is None:
-        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v004.sqlite')
+        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v005.sqlite')
 
     db_uri = 'sqlite:///file:' + db_fpath
     # dpath = dirname(dset.fpath)
@@ -1233,7 +1243,7 @@ def ensure_sql_coco_view(dset, db_fpath=None):
 
     import os
     needs_rewrite = True
-    if exists(db_fpath):
+    if not force_rewrite and exists(db_fpath) :
         needs_rewrite = (
             os.stat(dset.fpath).st_mtime >
             os.stat(db_fpath).st_mtime

@@ -8,6 +8,8 @@ The following describes psuedo-code for the high level spec (some of which may
 not be have full support in the Python API). A formal json-schema is defined in
 :module:`kwcoco.coco_schema.py`.
 
+An informal spec is as follows:
+
 .. code::
 
     # All object categories are defined here.
@@ -19,8 +21,8 @@ not be have full support in the Python API). A formal json-schema is defined in
 
     # Videos are used to manage collections of sequences of images.
     video = {
-        "id": int,
-        "name": str,  # a unique name for this video.
+        'id': int,
+        'name': str,  # a unique name for this video.
     }
 
     # Specifies how to find sensor data of a particular scene at a particular
@@ -29,26 +31,47 @@ not be have full support in the Python API). A formal json-schema is defined in
     image = {
         'id': int,
 
-        'name': str,  # a unique name
-        'file_name': str,  # relative path to the primary image data
+        'name': str,  # an encouraged but optional unique name
+        'file_name': str,  # relative path to the "base" image data
 
-        'width': int,   # pixel width of main image
-        'height': int,  # pixel height of main image
+        'width': int,   # pixel width of "base" image
+        'height': int,  # pixel height of "base" image
+
+        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image
 
         'auxiliary': [  # information about any auxiliary channels / bands
             {
                 'file_name': str,     # relative path to associated file
-                'channels': <spec>,   # a string encoding
-                'width':     <int>    # pixel width of auxillary image
-                'height':    <int>    # pixel height of auxillary image
-                'transform': <todo>,  # tranform from main image space to auxiliary image space. (identity if unspecified)
-            },
+                'channels': <ChannelSpec>,   # a string encoding
+                'width':     <int>    # pixel width of auxiliary image
+                'height':    <int>    # pixel height of auxiliary image
+                'base_to_aux': <TransformSpec>,  # tranform from "base" image space to auxiliary image space. (identity if unspecified)
+            }, ...
         ]
 
         'video_id': str  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
-        'timestamp': int  # timestamp (ideally in flicks), used to identify the timestamp of the frame. Only applicable video inputs.
+        'timestamp': str | int  # a iso-string timestamp or an integer in flicks.
         'frame_index': int  # ordinal frame index which can be used if timestamp is unknown.
     }
+
+    TransformSpec:
+        Currently there is only one spec that works with anything:
+            {'type': 'affine': 'matrix': <a-3x3 matrix>},
+
+        In the future we may do something like this:
+            {'type': 'scale', 'factor': <float|Tuple[float, float]>},
+            {'type': 'translate', 'offset': <float|Tuple[float, float]>},
+            {'type': 'rotate', 'radians_ccw': <float>},
+
+    ChannelSpec:
+        This is a string that describes the channel composition of an image.
+        For the purposes of kwcoco, separate different channel names with a
+        pipe ('|'). If the spec is not specified, methods may fall back on
+        grayscale or rgb processing. There are special string. For instance
+        'rgb' will expand into 'r|g|b'. In other applications you can "late
+        fuse" inputs by separating them with a "," and "early fuse" by
+        separating with a "|". Early fusion returns a solid array/tensor, late
+        fusion returns separated arrays/tensors.
 
     # Ground truth is specified as annotations, each belongs to a spatial
     # region in an image. This must reference a subregion of the image in pixel
@@ -60,15 +83,15 @@ not be have full support in the Python API). A formal json-schema is defined in
         'image_id': int,
         'category_id': int,
 
-        "track_id": <int | str | uuid>  # indicates association between annotations across frames
+        'track_id': <int | str | uuid>  # indicates association between annotations across frames
 
         'bbox': [tl_x, tl_y, w, h],  # xywh format)
-        "score" : float,
-        "prob" : List[float],
-        "weight" : float,
+        'score' : float,
+        'prob' : List[float],
+        'weight' : float,
 
-        "caption": str,  # a text caption for this annotation
-        "keypoints" : <Keypoints | List[int] > # an accepted keypoint format
+        'caption': str,  # a text caption for this annotation
+        'keypoints' : <Keypoints | List[int] > # an accepted keypoint format
         'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
     }
 
@@ -153,9 +176,9 @@ not be have full support in the Python API). A formal json-schema is defined in
 
         {
             'id': int,
-            'file_name': str,    # path to the primary image (may be None)
+            'file_name': str,    # path to the "base" image (may be None)
             'name': str,         # a unique name for the image (must be given if file_name is None)
-            'channels': <spec>,  # a spec code that indicates the layout of the primary image channels.
+            'channels': <spec>,  # a spec code that indicates the layout of the "base" image channels.
             'auxiliary': [  # information about auxiliary channels
                 {
                     'file_name': str,
@@ -167,8 +190,8 @@ not be have full support in the Python API). A formal json-schema is defined in
     Video Sequences:
         For video sequences, we add the following video level index:
 
-        "videos": [
-            { "id": <int>, "name": <video_name:str> },
+        'videos': [
+            { 'id': <int>, 'name': <video_name:str> },
         ]
 
         Note that the videos might be given as encoded mp4/avi/etc.. files (in
@@ -187,7 +210,7 @@ not be have full support in the Python API). A formal json-schema is defined in
         And annotations are augmented as follows:
 
         {
-            "track_id": <int | str | uuid>  # optional, indicates association between annotations across frames
+            'track_id': <int | str | uuid>  # optional, indicates association between annotations across frames
         }
 
 
@@ -209,6 +232,8 @@ TODO:
 
     - [ ] Spec for video URI, and convert to frames @ framerate function.
 
+    - [ ] Document channel spec (move from netharn to here)
+
     - [X] remove videos
 
 
@@ -219,17 +244,21 @@ References:
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
-import warnings
-from os.path import dirname, splitext, basename, join, exists, isdir
-from collections import OrderedDict, defaultdict
+import copy
+import itertools as it
 import json
 import numpy as np
-import ubelt as ub
+import os
 import six
-import itertools as it
+import ubelt as ub
+import warnings
+from collections import OrderedDict, defaultdict
+from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
+                     commonprefix)
 from six.moves import cStringIO as StringIO
-import copy
 
+# Vectorized ORM-Like containers
+from kwcoco.coco_objects import Categories, Videos, Images, Annots
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 
 # Does having __all__ prevent readthedocs from building mixins?
@@ -255,741 +284,10 @@ SPEC_KEYS = [
 INT_TYPES = (int, np.integer)
 
 
-def _annot_type(ann):
-    """
-    Returns what type of annotation ``ann`` is.
-    """
-    return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
-
-
-class ObjectList1D(ub.NiceRepr):
-    """
-    Vectorized access to lists of dictionary objects
-
-    Lightweight reference to a set of object (e.g. annotations, images) that
-    allows for convenient property access.
-
-    Args:
-        ids (List[int]): list of ids
-        dset (CocoDataset): parent dataset
-        key (str): main object name (e.g. 'images', 'annotations')
-
-    Types:
-        ObjT = Ann | Img | Cat  # can be one of these types
-        ObjectList1D gives us access to a List[ObjT]
-
-    Example:
-        >>> import kwcoco
-        >>> dset = kwcoco.CocoDataset.demo()
-        >>> # Both annots and images are object lists
-        >>> self = dset.annots()
-        >>> self = dset.images()
-        >>> # can call with a list of ids or not, for everything
-        >>> self = dset.annots([1, 2, 11])
-        >>> self = dset.images([1, 2, 3])
-        >>> self.lookup('id')
-        >>> self.lookup(['id'])
-    """
-
-    def __init__(self, ids, dset, key):
-        self._key = key
-        self._ids = ids
-        self._dset = dset
-
-    def __nice__(self):
-        return 'num={!r}'.format(len(self))
-
-    def __iter__(self):
-        return iter(self._ids)
-
-    def __len__(self):
-        return len(self._ids)
-
-    @property
-    def _id_to_obj(self):
-        return self._dset.index._id_lookup[self._key]
-
-    @property
-    def objs(self):
-        """
-        Returns:
-            List: all object dictionaries
-        """
-        return list(ub.take(self._id_to_obj, self._ids))
-
-    def take(self, idxs):
-        """
-        Take a subset by index
-
-        Example:
-            >>> self = CocoDataset.demo().annots()
-            >>> assert len(self.take([0, 2, 3])) == 3
-        """
-        subids = list(ub.take(self._ids, idxs))
-        newself = self.__class__(subids, self._dset)
-        return newself
-
-    def compress(self, flags):
-        """
-        Take a subset by flags
-
-        Example:
-            >>> self = CocoDataset.demo().images()
-            >>> assert len(self.compress([True, False, True])) == 2
-        """
-        subids = list(ub.compress(self._ids, flags))
-        newself = self.__class__(subids, self._dset)
-        return newself
-
-    def peek(self):
-        """
-        Return the first object dictionary
-        """
-        return ub.peek(self._id_to_obj.values())
-
-    def lookup(self, key, default=ub.NoParam, keepid=False):
-        """
-        Lookup a list of object attributes
-
-        Args:
-            key (str | Iterable): name of the property you want to lookup
-                can also be a list of names, in which case we return a dict
-
-            default : if specified, uses this value if it doesn't exist
-                in an ObjT.
-
-            keepid: if True, return a mapping from ids to the property
-
-        Returns:
-            List[ObjT]: a list of whatever type the object is
-            Dict[str, ObjT]
-
-        Example:
-            >>> import kwcoco
-            >>> dset = kwcoco.CocoDataset.demo()
-            >>> self = dset.annots()
-            >>> self.lookup('id')
-            >>> key = ['id']
-            >>> default = None
-            >>> self.lookup(key=['id', 'image_id'])
-            >>> self.lookup(key=['id', 'image_id'])
-            >>> self.lookup(key='foo', default=None, keepid=True)
-            >>> self.lookup(key=['foo'], default=None, keepid=True)
-            >>> self.lookup(key=['id', 'image_id'], keepid=True)
-        """
-        # Note: while the old _lookup code was slightly faster than this, the
-        # difference is extremely negligable (179us vs 178us).
-        if ub.iterable(key):
-            return {k: self.lookup(k, default, keepid) for k in key}
-        else:
-            return self.get(key, default=default, keepid=keepid)
-
-    def get(self, key, default=ub.NoParam, keepid=False):
-        """
-        Lookup a list of object attributes
-
-        Args:
-            key (str): name of the property you want to lookup
-
-            default : if specified, uses this value if it doesn't exist
-                in an ObjT.
-
-            keepid: if True, return a mapping from ids to the property
-
-        Returns:
-            List[ObjT]: a list of whatever type the object is
-            Dict[str, ObjT]
-
-        Example:
-            >>> import kwcoco
-            >>> dset = kwcoco.CocoDataset.demo()
-            >>> self = dset.annots()
-            >>> self.get('id')
-            >>> self.get(key='foo', default=None, keepid=True)
-        """
-        # if hasattr(self._dset, '_column_lookup'):
-        #     # Hack for SQL speed
-        #     # Agg, this doesn't work because some columns need json decoding
-        #     return self._dset._column_lookup(
-        #         tablename=self._key, key=key, rowids=self._ids)
-        _lut = self._id_to_obj
-        if keepid:
-            if default is ub.NoParam:
-                attr_list = {_id: _lut[_id][key] for _id in self._ids}
-            else:
-                attr_list = {_id: _lut[_id].get(key, default) for _id in self._ids}
-        else:
-            if default is ub.NoParam:
-                attr_list = [_lut[_id][key] for _id in self._ids]
-            else:
-                attr_list = [_lut[_id].get(key, default) for _id in self._ids]
-        return attr_list
-
-    def set(self, key, values):
-        """
-        Assign a value to each annotation
-
-        Args:
-            key (str): the annotation property to modify
-            values (Iterable | scalar): an iterable of values to set for each
-                annot in the dataset. If the item is not iterable, it is
-                assigned to all objects.
-
-        Example:
-            >>> dset = CocoDataset.demo()
-            >>> self = dset.annots()
-            >>> self.set('my-key1', 'my-scalar-value')
-            >>> self.set('my-key2', np.random.rand(len(self)))
-            >>> print('dset.imgs = {}'.format(ub.repr2(dset.imgs, nl=1)))
-            >>> self.get('my-key2')
-        """
-        if not ub.iterable(values):
-            values = [values] * len(self)
-        elif not isinstance(values, list):
-            values = list(values)
-        assert len(self) == len(values)
-        self._set(key, values)
-
-    def _set(self, key, values):
-        """ faster less safe version of set """
-        objs = ub.take(self._id_to_obj, self._ids)
-        for obj, value in zip(objs, values):
-            obj[key] = value
-
-    def _lookup(self, key, default=ub.NoParam):
-        """
-        Benchmark:
-            >>> import kwcoco
-            >>> dset = kwcoco.CocoDataset.demo('shapes256')
-            >>> self = annots = dset.annots()
-
-            >>> import timerit
-            >>> ti = timerit.Timerit(100, bestof=10, verbose=2)
-
-            for timer in ti.reset('lookup'):
-                with timer:
-                    self.lookup('image_id')
-
-            for timer in ti.reset('_lookup'):
-                with timer:
-                    self._lookup('image_id')
-
-            for timer in ti.reset('image_id'):
-                with timer:
-                    self.image_id
-
-            for timer in ti.reset('raw1'):
-                with timer:
-                    key = 'image_id'
-                    [self._dset.anns[_id][key] for _id in self._ids]
-
-            for timer in ti.reset('raw2'):
-                with timer:
-                    anns = self._dset.anns
-                    key = 'image_id'
-                    [anns[_id][key] for _id in self._ids]
-
-            for timer in ti.reset('lut-gen'):
-                with timer:
-                    _lut = self._obj_lut
-                    objs = (_lut[_id] for _id in self._ids)
-                    [obj[key] for obj in objs]
-
-            for timer in ti.reset('lut-gen-single'):
-                with timer:
-                    _lut = self._obj_lut
-                    [_lut[_id][key] for _id in self._ids]
-        """
-        return self.lookup(key, default=default)
-
-
-class ObjectGroups(ub.NiceRepr):
-    """
-    An object for holding a groups of :class:`ObjectList1D` objects
-    """
-    def __init__(self, groups, dset):
-        self._groups = groups
-
-    def _lookup(self, key):
-        return self._lookup(key)
-
-    def __getitem__(self, index):
-        return self._groups[index]
-
-    def lookup(self, key, default=ub.NoParam):
-        return [group.lookup(key, default) for group in self._groups]
-
-    def __nice__(self):
-        # import timerit
-        # mu = timerit.core._trychar('μ', 'm')
-        # sigma = timerit.core._trychar('σ', 's')
-        mu = 'm'
-        sigma = 's'
-        len_list = list(map(len, self._groups))
-        num = len(self._groups)
-        mean = np.mean(len_list)
-        std = np.std(len_list)
-        nice = 'n={!r}, {}={:.1f}, {}={:.1f}'.format(
-            num, mu, mean, sigma, std)
-        return nice
-
-
-class Categories(ObjectList1D):
-    """
-    Vectorized access to category attributes
-
-    Example:
-        >>> from kwcoco.coco_dataset import Categories  # NOQA
-        >>> import kwcoco
-        >>> dset = kwcoco.CocoDataset.demo()
-        >>> ids = list(dset.cats.keys())
-        >>> self = Categories(ids, dset)
-        >>> print('self.name = {!r}'.format(self.name))
-        >>> print('self.supercategory = {!r}'.format(self.supercategory))
-    """
-    def __init__(self, ids, dset):
-        super().__init__(ids, dset, 'categories')
-
-    @property
-    def cids(self):
-        return self.lookup('id')
-
-    @property
-    def name(self):
-        return self.lookup('name')
-
-    @property
-    def supercategory(self):
-        return self.lookup('supercategory', None)
-
-
-class Videos(ObjectList1D):
-    """
-    Vectorized access to video attributes
-
-    Example:
-        >>> from kwcoco.coco_dataset import Videos  # NOQA
-        >>> import kwcoco
-        >>> dset = kwcoco.CocoDataset.demo('vidshapes5')
-        >>> ids = list(dset.index.videos.keys())
-        >>> self = Videos(ids, dset)
-        >>> print('self = {!r}'.format(self))
-    """
-    def __init__(self, ids, dset):
-        super().__init__(ids, dset, 'videos')
-
-
-class Images(ObjectList1D):
-    """
-    Vectorized access to image attributes
-    """
-
-    def __init__(self, ids, dset):
-        super().__init__(ids, dset, 'images')
-
-    @property
-    def gids(self):
-        return self._ids
-
-    @property
-    def gname(self):
-        return self.lookup('file_name')
-
-    @property
-    def gpath(self):
-        root = self._dset.bundle_dpath
-        return [join(root, gname) for gname in self.gname]
-
-    @property
-    def width(self):
-        return self.lookup('width')
-
-    @property
-    def height(self):
-        return self.lookup('height')
-
-    @property
-    def size(self):
-        """
-        Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo().images()
-            >>> self._dset._ensure_imgsize()
-            >>> print(self.size)
-            [(512, 512), (300, 250), (256, 256)]
-        """
-        return list(zip(self.lookup('width'), self.lookup('height')))
-
-    @property
-    def area(self):
-        """
-        Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo().images()
-            >>> self._dset._ensure_imgsize()
-            >>> print(self.area)
-            [262144, 75000, 65536]
-        """
-        return [w * h for w, h in zip(self.lookup('width'), self.lookup('height'))]
-
-    @property
-    def n_annots(self):
-        """
-        Example:
-            >>> self = CocoDataset.demo().images()
-            >>> print(ub.repr2(self.n_annots, nl=0))
-            [9, 2, 0]
-        """
-        return list(map(len, ub.take(self._dset.gid_to_aids, self._ids)))
-
-    @property
-    def aids(self):
-        """
-        Example:
-            >>> self = CocoDataset.demo().images()
-            >>> print(ub.repr2(list(map(list, self.aids)), nl=0))
-            [[1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 11], []]
-        """
-        return list(ub.take(self._dset.gid_to_aids, self._ids))
-
-    @property
-    def annots(self):
-        """
-        Example:
-            >>> self = CocoDataset.demo().images()
-            >>> print(self.annots)
-            <AnnotGroups(n=3, m=3.7, s=3.9)>
-        """
-        return AnnotGroups([self._dset.annots(aids) for aids in self.aids],
-                           self._dset)
-
-
-class Annots(ObjectList1D):
-    """
-    Vectorized access to annotation attributes
-    """
-
-    def __init__(self, ids, dset):
-        super().__init__(ids, dset, 'annotations')
-
-    @property
-    def aids(self):
-        """ The annotation ids of this column of annotations """
-        return self._ids
-
-    @property
-    def images(self):
-        """
-        Get the column of images
-
-        Returns:
-            Images
-        """
-        return self._dset.images(self.gids)
-
-    @property
-    def image_id(self):
-        return self.lookup('image_id')
-
-    @property
-    def category_id(self):
-        return self.lookup('category_id')
-
-    @property
-    def gids(self):
-        """
-        Get the column of image-ids
-
-        Returns:
-            List[int]: list of image ids
-        """
-        return self.lookup('image_id')
-
-    @property
-    def cids(self):
-        """
-        Get the column of category-ids
-
-        Returns:
-            List[int]
-        """
-        return self.lookup('category_id')
-
-    @property
-    def cnames(self):
-        """
-        Get the column of category names
-
-        Returns:
-            List[int]
-        """
-        return [cat['name'] for cat in ub.take(self._dset.cats, self.cids)]
-
-    @cnames.setter
-    def cnames(self, cnames):
-        """
-        Args:
-            cnames (List[str]):
-
-        Example:
-            >>> from kwcoco.coco_dataset import *  # NOQA
-            >>> self = CocoDataset.demo().annots([1, 2, 11])
-            >>> print('self.cnames = {!r}'.format(self.cnames))
-            >>> print('self.cids = {!r}'.format(self.cids))
-            >>> cnames = ['boo', 'bar', 'rocket']
-            >>> list(map(self._dset.ensure_category, set(cnames)))
-            >>> self.cnames = cnames
-            >>> print('self.cnames = {!r}'.format(self.cnames))
-            >>> print('self.cids = {!r}'.format(self.cids))
-        """
-        cats = map(self._dset._alias_to_cat, cnames)
-        cids = (cat['id'] for cat in cats)
-        self.set('category_id', cids)
-
-    @property
-    def detections(self):
-        """
-        Get the kwimage-style detection objects
-
-        Returns:
-            kwimage.Detections
-
-        Example:
-            >>> # xdoctest: +REQUIRES(module:kwimage)
-            >>> from kwcoco.coco_dataset import *  # NOQA
-            >>> self = CocoDataset.demo('shapes32').annots([1, 2, 11])
-            >>> dets = self.detections
-            >>> print('dets.data = {!r}'.format(dets.data))
-            >>> print('dets.meta = {!r}'.format(dets.meta))
-        """
-        import kwimage
-        anns = [self._id_to_obj[aid] for aid in self.aids]
-        dets = kwimage.Detections.from_coco_annots(anns, dset=self._dset)
-        # dets.data['aids'] = np.array(self.aids)
-        return dets
-
-    @property
-    def boxes(self):
-        """
-        Get the column of kwimage-style bounding boxes
-
-        Example:
-            >>> self = CocoDataset.demo().annots([1, 2, 11])
-            >>> print(self.boxes)
-            <Boxes(xywh,
-                array([[ 10,  10, 360, 490],
-                       [350,   5, 130, 290],
-                       [124,  96,  45,  18]]))>
-        """
-        import kwimage
-        xywh = self.lookup('bbox')
-        boxes = kwimage.Boxes(xywh, 'xywh')
-        return boxes
-
-    @boxes.setter
-    def boxes(self, boxes):
-        """
-        Args:
-            boxes (kwimage.Boxes):
-
-        Example:
-            >>> import kwimage
-            >>> from kwcoco.coco_dataset import *  # NOQA
-            >>> self = CocoDataset.demo().annots([1, 2, 11])
-            >>> print('self.boxes = {!r}'.format(self.boxes))
-            >>> boxes = kwimage.Boxes.random(3).scale(512).astype(np.int)
-            >>> self.boxes = boxes
-            >>> print('self.boxes = {!r}'.format(self.boxes))
-        """
-        anns = ub.take(self._dset.anns, self.aids)
-        xywh = boxes.to_xywh().data.tolist()
-        for ann, xywh in zip(anns, xywh):
-            ann['bbox'] = xywh
-
-    @property
-    def xywh(self):
-        """
-        Returns raw boxes
-
-        Example:
-            >>> self = CocoDataset.demo().annots([1, 2, 11])
-            >>> print(self.xywh)
-        """
-        xywh = self.lookup('bbox')
-        return xywh
-
-
-class AnnotGroups(ObjectGroups):
-    @property
-    def cids(self):
-        return self.lookup('category_id')
-
-
-class ImageGroups(ObjectGroups):
-    pass
-
-
 class MixinCocoDepricate(object):
     """
     These functions are marked for deprication and may be removed at any time
     """
-
-    def lookup_imgs(self, filename=None):
-        """
-        Linear search for an images with specific attributes
-
-        # DEPRICATE
-
-        Ignore:
-            filename = '201503.20150525.101841191.573975.png'
-            list(self.lookup_imgs(filename))
-            gid = 64940
-            img = self.imgs[gid]
-            img['file_name'] = filename
-        """
-        import warnings
-        warnings.warn('DEPRECATED: this method name may be recycled and '
-                      'do something different in a later version. '
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        for img in self.imgs.values():
-            if filename is not None:
-                fpath = img['file_name']
-                fname = basename(fpath)
-                fname_noext = splitext(fname)[0]
-                if filename in [fpath, fname, fname_noext]:
-                    print('img = {!r}'.format(img))
-                    yield img
-
-    def lookup_anns(self, has=None):
-        """
-        Linear search for an annotations with specific attributes
-
-        # DEPRICATE
-
-        Ignore:
-            list(self.lookup_anns(has='radius'))
-            gid = 112888
-            img = self.imgs[gid]
-            img['file_name'] = filename
-        """
-        import warnings
-        warnings.warn('DEPRECATED: this method name may be recycled and '
-                      'do something different in a later version. ',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        for ann in self.anns.values():
-            if has is not None:
-                if hasattr(ann, has):
-                    print('ann = {!r}'.format(ann))
-                    yield ann
-
-    def _mark_annotated_images(self):
-        """
-        Mark any image that explicitly has annotations.
-
-        # DEPRICATE
-        """
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        for gid, img in self.imgs.items():
-            aids = self.index.gid_to_aids.get(gid, [])
-            # If there is at least one annotation, always mark as has_annots
-            if len(aids) > 0:
-                assert img.get('has_annots', ub.NoParam) in [ub.NoParam, True], (
-                    'image with annots was explictly labeled as non-True!')
-                img['has_annots'] = True
-            else:
-                # Otherwise set has_annots to null if it has not been
-                # explicitly labeled
-                if 'has_annots' not in img:
-                    img['has_annots'] = None
-
-    def _find_bad_annotations(self):
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for ann in self.dataset['annotations']:
-            if ann['image_id'] is None or ann['category_id'] is None:
-                to_remove.append(ann)
-            else:
-                if ann['image_id'] not in self.imgs:
-                    to_remove.append(ann)
-                if ann['category_id'] not in self.cats:
-                    to_remove.append(ann)
-        return to_remove
-
-    def _remove_keypoint_annotations(self, rebuild=True):
-        """
-        Remove annotations with keypoints only
-
-        Example:
-            >>> self = CocoDataset.demo()
-            >>> self._remove_keypoint_annotations()
-        """
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used'
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for ann in self.dataset['annotations']:
-            roi_shape = ann.get('roi_shape', None)
-            if roi_shape is None:
-                if 'keypoints' in ann and ann.get('bbox', None) is None:
-                    to_remove.append(ann)
-            elif roi_shape == 'keypoints':
-                to_remove.append(ann)
-        print('Removing {} keypoint annotations'.format(len(to_remove)))
-        self.remove_annotations(to_remove)
-        if rebuild:
-            self._build_index()
-
-    def _remove_bad_annotations(self, rebuild=True):
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for ann in self.dataset['annotations']:
-            if ann['image_id'] is None or ann['category_id'] is None:
-                to_remove.append(ann)
-        print('Removing {} bad annotations'.format(len(to_remove)))
-        self.remove_annotations(to_remove)
-        if rebuild:
-            self._build_index()
-
-    def _remove_radius_annotations(self, rebuild=False):
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for ann in self.dataset['annotations']:
-            if 'radius' in ann:
-                to_remove.append(ann)
-        print('Removing {} radius annotations'.format(len(to_remove)))
-        self.remove_annotations(to_remove)
-        if rebuild:
-            self._build_index()
-
-    def _remove_empty_images(self):
-        import warnings
-        warnings.warn('DEPRECATED: this method should not be used',
-                      'This method will be removed in version 0.2.0',
-                      DeprecationWarning)
-        to_remove = []
-        for gid in self.imgs.keys():
-            aids = self.index.gid_to_aids.get(gid, [])
-            if not aids:
-                to_remove.append(self.imgs[gid])
-        print('Removing {} empty images'.format(len(to_remove)))
-        for img in to_remove:
-            self.dataset['images'].remove(img)
-        self._build_index()
 
 
 class MixinCocoAccessors(object):
@@ -1013,14 +311,6 @@ class MixinCocoAccessors(object):
         gpath = self.get_image_fpath(gid_or_img, channels=channels)
         np_img = kwimage.imread(gpath)
         return np_img
-
-    def load_image_fpath(self, gid_or_img):
-        import warnings
-        warnings.warn(
-            'get_image_fpath is deprecated use get_image_fpath instead. '
-            'This method will be removed in version 0.2.0',
-            DeprecationWarning)
-        return self.get_image_fpath(gid_or_img)
 
     def get_image_fpath(self, gid_or_img, channels=None):
         """
@@ -1047,8 +337,6 @@ class MixinCocoAccessors(object):
         found = None
         if 'auxiliary' in img:
             auxlist = img['auxiliary']
-        elif 'auxillary' in img:
-            auxlist = img['auxillary']
         else:
             raise KeyError('no auxilary data')
         for aux in auxlist:
@@ -1076,11 +364,6 @@ class MixinCocoAccessors(object):
         aux = self._get_img_auxiliary(gid_or_img, channels)
         fpath = join(self.bundle_dpath, aux['file_name'])
         return fpath
-
-    # old misspellings for backwards compat
-    # Deprecated: these will be removed in 0.2.0
-    _get_img_auxillary = _get_img_auxiliary
-    get_auxillary_fpath = get_auxiliary_fpath
 
     def load_annot_sample(self, aid_or_ann, image=None, pad=None):
         """
@@ -2134,48 +1417,30 @@ class MixinCocoExtras(object):
 
         return bad_paths
 
-    def rename_categories(self, mapper, strict=False, preserve=False,
-                          rebuild=True, simple=True, merge_policy='ignore'):
+    def rename_categories(self, mapper, rebuild=True, merge_policy='ignore'):
         """
-        Create a coarser categorization
-
-        Note: this function has been unstable in the past, and has not yet been
-        properly stabalized. Either avoid or use with care.
-        Ensuring ``simple=True`` should result in newer saner behavior that will
-        likely be backwards compatible.
-
-        TODO:
-            - [X] Simple case where we relabel names with no conflicts
-            - [ ] Case where annotation labels need to change to be coarser
-                    - dev note: see internal libraries for work on this
-            - [ ] Other cases
+        Rename categories with a potentially coarser categorization.
 
         Args:
             mapper (dict or Function): maps old names to new names.
-
-            strict (bool): DEPRICATED IGNORE.
-                if True, fails if mapper doesnt map all classes
-
-            preserve (bool): DEPRICATED IGNORE.
-                if True, preserve old categories as supercatgories. Broken.
-
-            simple (bool, default=True): defaults to the new way of doing this.
-                The old way is depricated.
+                If multiple names are mapped to the same category, those
+                categories will be merged.
 
             merge_policy (str):
                 How to handle multiple categories that map to the same name.
                 Can be update or ignore.
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> self.rename_categories({'astronomer': 'person',
             >>>                         'astronaut': 'person',
             >>>                         'mouth': 'person',
-            >>>                         'helmet': 'hat'}, preserve=0)
+            >>>                         'helmet': 'hat'})
             >>> assert 'hat' in self.name_to_cat
             >>> assert 'helmet' not in self.name_to_cat
             >>> # Test merge case
-            >>> self = CocoDataset.demo()
+            >>> self = kwcoco.CocoDataset.demo()
             >>> mapper = {
             >>>     'helmet': 'rocket',
             >>>     'astronomer': 'rocket',
@@ -2187,180 +1452,121 @@ class MixinCocoExtras(object):
         """
         old_cats = self.dataset['categories']
 
-        if simple:
-            # orig_mapper = mapper
+        # Ignore identity mappings
+        mapper = {k: v for k, v in mapper.items() if k != v}
 
-            # Ignore identity mappings
-            mapper = {k: v for k, v in mapper.items() if k != v}
+        # Perform checks to determine what bookkeeping needs to be done
+        orig_cnames = {cat['name'] for cat in old_cats}
+        src_cnames = set(mapper.keys())
+        dst_cnames = set(mapper.values())
 
-            # Perform checks to determine what bookkeeping needs to be done
-            orig_cnames = {cat['name'] for cat in old_cats}
-            src_cnames = set(mapper.keys())
-            dst_cnames = set(mapper.values())
+        bad_cnames = src_cnames - orig_cnames
+        if bad_cnames:
+            raise ValueError(
+                'The following categories to not exist: {}'.format(bad_cnames))
 
-            bad_cnames = src_cnames - orig_cnames
-            if bad_cnames:
-                raise ValueError(
-                    'The following categories to not exist: {}'.format(bad_cnames))
+        has_orig_merges = dst_cnames.intersection(orig_cnames)
+        has_src_merges = dst_cnames.intersection(src_cnames)
+        has_dup_dst = set(ub.find_duplicates(mapper.values()).keys())
 
-            has_orig_merges = dst_cnames.intersection(orig_cnames)
-            has_src_merges = dst_cnames.intersection(src_cnames)
-            has_dup_dst = set(ub.find_duplicates(mapper.values()).keys())
+        has_merges = has_orig_merges or has_src_merges or has_dup_dst
 
-            has_merges = has_orig_merges or has_src_merges or has_dup_dst
-
-            if not has_merges:
-                # In the simple case we are just changing the labels, so
-                # nothing special needs to happen.
-                for key, value in mapper.items():
-                    for cat in self.dataset['categories']:
-                        if cat['name'] == key:
-                            cat['name'] = value
-            else:
-                # Remember the original categories
-                orig_cats = {cat['name']: cat for cat in old_cats}
-
-                # Remember all annotations of the original categories
-                src_cids = [self.index.name_to_cat[c]['id']
-                            for c in src_cnames]
-                src_cname_to_aids = {c: self.index.cid_to_aids[cid]
-                                     for c, cid in zip(src_cnames, src_cids)}
-
-                # Track which srcs each dst is constructed from
-                dst_to_srcs = ub.invert_dict(mapper, unique_vals=False)
-
-                # Mark unreferenced cats for removal
-                rm_cnames = src_cnames - dst_cnames
-
-                # Mark unseen cats for addition
-                add_cnames = dst_cnames - orig_cnames
-
-                # Mark renamed cats for update
-                update_cnames = dst_cnames - add_cnames
-
-                # Populate new category information
-                new_cats = {}
-                for dst in sorted(dst_cnames):
-                    # Combine information between existing categories that are
-                    # being collapsed into a single category.
-                    srcs = dst_to_srcs[dst]
-                    new_cat = {}
-                    if len(srcs) <= 1:
-                        # in the case of 1 source, then there is no merger
-                        for src in srcs:
-                            new_cat.update(orig_cats[src])
-                    elif merge_policy == 'update':
-                        # When there are multiple sources then union all
-                        # original source attributes.
-                        # Note: this update order is arbitrary and may be funky
-                        for src in sorted(srcs):
-                            new_cat.update(orig_cats[src])
-                    elif merge_policy == 'ignore':
-                        # When there are multiple sources then ignore all
-                        # original source attributes.
-                        pass
-                    else:
-                        # There may be better merge policies that should be
-                        # implemented
-                        raise KeyError('Unknown merge_policy={}'.format(
-                            merge_policy))
-
-                    new_cat['name'] = dst
-                    new_cat.pop('id', None)
-                    new_cats[dst] = new_cat
-
-                # Apply category deltas
-                self.remove_categories(rm_cnames, keep_annots=True)
-
-                for cname in sorted(update_cnames):
-                    if merge_policy == 'ignore':
-                        new_cats[cname] = dict(orig_cats[cname])
-                    elif merge_policy == 'update':
-                        new_cat = new_cats[cname]
-                        orig_cat = orig_cats[cname]
-                        # Only update name and non-existing information
-                        # TODO: check for conflicts?
-                        new_info = ub.dict_diff(new_cat, orig_cat)
-                        orig_cat.update(new_info)
-                    else:
-                        raise KeyError('Unknown merge_policy={}'.format(
-                            merge_policy))
-
-                for cname in add_cnames:
-                    self.add_category(**new_cats[cname])
-
-                # Apply the annotation deltas
-                for src, aids in src_cname_to_aids.items():
-                    cat = self.name_to_cat[mapper[src]]
-                    cid = cat['id']
-                    for aid in aids:
-                        self.anns[aid]['category_id'] = cid
-
-                # force rebuild if any annotations we changed
-                if src_cname_to_aids:
-                    rebuild = True
-
+        if not has_merges:
+            # In the simple case we are just changing the labels, so
+            # nothing special needs to happen.
+            for key, value in mapper.items():
+                for cat in self.dataset['categories']:
+                    if cat['name'] == key:
+                        cat['name'] = value
         else:
-            new_cats = []
-            old_cats = self.dataset['categories']
-            new_name_to_cat = {}
-            old_to_new_id = {}
+            # Remember the original categories
+            orig_cats = {cat['name']: cat for cat in old_cats}
 
-            if not callable(mapper):
-                mapper = mapper.__getitem__
+            # Remember all annotations of the original categories
+            src_cids = [self.index.name_to_cat[c]['id']
+                        for c in src_cnames]
+            src_cname_to_aids = {c: self.index.cid_to_aids[cid]
+                                 for c, cid in zip(src_cnames, src_cids)}
 
-            for old_cat in old_cats:
-                try:
-                    new_name = mapper(old_cat['name'])
-                except KeyError:
-                    if strict:
-                        raise
-                    new_name = old_cat['name']
+            # Track which srcs each dst is constructed from
+            dst_to_srcs = ub.invert_dict(mapper, unique_vals=False)
 
-                old_cat['supercategory'] = new_name
+            # Mark unreferenced cats for removal
+            rm_cnames = src_cnames - dst_cnames
 
-                if new_name in new_name_to_cat:
-                    # Multiple old categories are mapped to this new one
-                    new_cat = new_name_to_cat[new_name]
+            # Mark unseen cats for addition
+            add_cnames = dst_cnames - orig_cnames
+
+            # Mark renamed cats for update
+            update_cnames = dst_cnames - add_cnames
+
+            # Populate new category information
+            new_cats = {}
+            for dst in sorted(dst_cnames):
+                # Combine information between existing categories that are
+                # being collapsed into a single category.
+                srcs = dst_to_srcs[dst]
+                new_cat = {}
+                if len(srcs) <= 1:
+                    # in the case of 1 source, then there is no merger
+                    for src in srcs:
+                        new_cat.update(orig_cats[src])
+                elif merge_policy == 'update':
+                    # When there are multiple sources then union all
+                    # original source attributes.
+                    # Note: the order of srcs is arbitrary so we sort
+                    # to make the update order consistent
+                    for src in sorted(srcs):
+                        new_cat.update(orig_cats[src])
+                elif merge_policy == 'ignore':
+                    # When there are multiple sources then ignore all
+                    # original source attributes.
+                    pass
                 else:
-                    if old_cat['name'] == new_name:
-                        # new name is an existing category
-                        new_cat = old_cat.copy()
-                        new_cat['id'] = len(new_cats) + 1
-                    else:
-                        # new name is a entirely new category
-                        new_cat = _dict([
-                            ('id', len(new_cats) + 1),
-                            ('name', new_name),
-                        ])
-                    new_name_to_cat[new_name] = new_cat
-                    new_cats.append(new_cat)
+                    # There may be better merge policies that should be
+                    # implemented
+                    raise KeyError('Unknown merge_policy={}'.format(
+                        merge_policy))
 
-                old_to_new_id[old_cat['id']] = new_cat['id']
+                new_cat['name'] = dst
+                new_cat.pop('id', None)
+                new_cats[dst] = new_cat
 
-            if preserve:
-                raise NotImplementedError
-                # for old_cat in old_cats:
-                #     # Ensure all old cats are preserved
-                #     if old_cat['name'] not in new_name_to_cat:
-                #         new_cat = old_cat.copy()
-                #         new_cat['id'] = len(new_cats) + 1
-                #         new_name_to_cat[new_name] = new_cat
-                #         new_cats.append(new_cat)
-                #         old_to_new_id[old_cat['id']] = new_cat['id']
+            # Apply category deltas
 
-            # self.dataset['fine_categories'] = old_cats
-            self.dataset['categories'] = new_cats
+            # Remove category names that were renamed
+            self.remove_categories(rm_cnames, keep_annots=True)
 
-            # Fix annotations of modified categories
-            # (todo: if the index is built, we can use that to only modify
-            #  a potentially smaller subset of annotations)
-            for ann in self.dataset['annotations']:
-                old_id = ann['category_id']
-                new_id = old_to_new_id[old_id]
+            # Update any existing categories that were merged
+            for cname in sorted(update_cnames):
+                if merge_policy == 'ignore':
+                    new_cats[cname] = dict(orig_cats[cname])
+                elif merge_policy == 'update':
+                    new_cat = new_cats[cname]
+                    orig_cat = orig_cats[cname]
+                    # Only update name and non-existing information
+                    # TODO: check for conflicts?
+                    new_info = ub.dict_diff(new_cat, orig_cat)
+                    orig_cat.update(new_info)
+                else:
+                    raise KeyError('Unknown merge_policy={}'.format(
+                        merge_policy))
 
-                if old_id != new_id:
-                    ann['category_id'] = new_id
+            # Add new category names that were created
+            for cname in sorted(add_cnames):
+                self.add_category(**new_cats[cname])
+
+            # Apply the annotation deltas
+            for src, aids in src_cname_to_aids.items():
+                cat = self.name_to_cat[mapper[src]]
+                cid = cat['id']
+                for aid in aids:
+                    self.anns[aid]['category_id'] = cid
+
+            # force rebuild if any annotations we changed
+            if src_cname_to_aids:
+                rebuild = True
+
         if rebuild:
             self._build_index()
         else:
@@ -2379,14 +1585,6 @@ class MixinCocoExtras(object):
         pycoco.dataset = self.dataset
         pycoco.createIndex()
         return pycoco
-
-    def rebase(self, *args, **kw):
-        """ Deprecated use reroot instead """
-        import warnings
-        warnings.warn(
-            'Deprecated rebase renamed to reroot. Use reroot instead',
-            DeprecationWarning)
-        return self.reroot(*args, **kw)
 
     def reroot(self, new_root=None,
                old_prefix=None,
@@ -2441,7 +1639,6 @@ class MixinCocoExtras(object):
             >>> # want to here. Might need to discuss this.
             >>> from kwcoco.coco_dataset import *  # NOQA
             >>> import kwcoco
-            >>> import os
             >>> gname = 'images/foo.png'
             >>> remote = '/remote/path'
             >>> host = ub.ensure_app_cache_dir('kwcoco/tests/reroot')
@@ -2540,8 +1737,6 @@ class MixinCocoExtras(object):
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
             >>> assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
         """
-        from os.path import exists, relpath
-
         new_img_root = new_root
         cur_img_root = self.bundle_dpath
         if new_img_root is None:
@@ -2610,14 +1805,6 @@ class MixinCocoExtras(object):
                         new['auxiliary'] = aux_fname = []
                         for aux in img.get('auxiliary', []):
                             aux_fname.append(_reroot_path(aux['file_name']))
-                    elif 'auxillary' in img:
-                        warnings.warn('incorrect spelling of auxiliary will be '
-                                      'unsupported in the future. '
-                                      'This will be removed in 0.2.0',
-                                      DeprecationWarning)
-                        new['auxillary'] = aux_fname = []
-                        for aux in img.get('auxillary', []):
-                            aux_fname.append(_reroot_path(aux['file_name']))
                     gid_to_new[gid] = new
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
@@ -2629,13 +1816,6 @@ class MixinCocoExtras(object):
                 if 'auxiliary' in new:
                     for aux_fname, aux in zip(new['auxiliary'], img['auxiliary']):
                         aux['file_name'] = aux_fname
-                elif 'auxillary' in new:
-                    warnings.warn('incorrect spelling of auxiliary will be '
-                                  'unsupported in the future. '
-                                  'This will be removed in 0.2.0',
-                                   DeprecationWarning)
-                    for aux_fname, aux in zip(new['auxillary'], img['auxillary']):
-                        aux['file_name'] = aux_fname
         else:
             for img in self.imgs.values():
                 try:
@@ -2643,12 +1823,6 @@ class MixinCocoExtras(object):
                     if gname is not None:
                         img['file_name'] = _reroot_path(gname)
                     for aux in img.get('auxiliary', []):
-                        aux['file_name'] = _reroot_path(aux['file_name'])
-                    for aux in img.get('auxillary', []):
-                        warnings.warn('incorrect spelling of auxiliary will be '
-                                      'unsupported in the future. '
-                                      'This will be removed in 0.2.0',
-                                       DeprecationWarning)
                         aux['file_name'] = _reroot_path(aux['file_name'])
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
@@ -2694,9 +1868,11 @@ class MixinCocoExtras(object):
         self.fpath = value
 
 
-class MixinCocoAttrs(object):
+class MixinCocoObjects(object):
     """
-    Expose methods to construct object lists / groups
+    Expose methods to construct object lists / groups.
+
+    This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
     def annots(self, aids=None, gid=None):
@@ -2879,12 +2055,86 @@ class MixinCocoStats(object):
             >>> print(ub.repr2(hist))
         """
         catname_to_nannot_types = {}
+
+        def _annot_type(ann):
+            """
+            Returns what type of annotation ``ann`` is.
+            """
+            return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
+
         for cid, aids in self.index.cid_to_aids.items():
             name = self.cats[cid]['name']
             hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))
             catname_to_nannot_types[name] = ub.map_keys(
                 lambda k: k[0] if len(k) == 1 else k, hist)
         return catname_to_nannot_types
+
+    def conform(self, **config):
+        """
+        Make the COCO file conform a stricter spec, infers attibutes where
+        possible.
+
+        Corresponds to the ``kwcoco conform`` CLI tool.
+
+        KWArgs:
+            **config :
+                pycocotools_info (default=True): returns info required by pycocotools
+                ensure_imgsize (default=True): ensure image size is populated
+                legacy (default=True): if true tries to convert data
+                    structures to items compatible with the original
+                    pycocotools spec
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('shapes8')
+            >>> dset.imgs[1].pop('width')
+            >>> dset.conform(legacy=True)
+            >>> assert 'width' in dset.imgs[1]
+            >>> assert 'area' in dset.anns[1]
+        """
+
+        if config.get('ensure_imgsize', True):
+            self._ensure_imgsize(workers=config.get('workers', 8))
+
+        if config.get('pycocotools_info', True):
+            for ann in ub.ProgIter(self.dataset['annotations'], desc='update anns'):
+                if 'iscrowd' not in ann:
+                    ann['iscrowd'] = False
+
+                if 'ignore' not in ann:
+                    ann['ignore'] = ann.get('weight', 1.0) < .5
+
+                if 'area' not in ann:
+                    # Use segmentation if available
+                    if 'segmentation' in ann:
+                        import kwimage
+                        poly = kwimage.Polygon.from_coco(ann['segmentation'][0])
+                        ann['area'] = float(poly.to_shapely().area)
+                    else:
+                        x, y, w, h = ann['bbox']
+                        ann['area'] = w * h
+
+        if config.get('legacy', True):
+            try:
+                kpcats = self.keypoint_categories()
+            except Exception:
+                kpcats = None
+            for ann in ub.ProgIter(self.dataset['annotations'], desc='update orig coco anns'):
+                # Use segmentation if available
+                if 'segmentation' in ann:
+                    # TODO: any original style coco dict is ok, we dont
+                    # always need it to be a poly if it is RLE
+                    import kwimage
+                    poly = kwimage.Polygon.from_coco(ann['segmentation'][0])
+                    # Hack, looks like kwimage does not wrap the original
+                    # coco polygon with a list, but pycocotools needs that
+                    ann['segmentation'] = [poly.to_coco(style='orig')]
+                if 'keypoints' in ann:
+                    import kwimage
+                    # TODO: these have to be in some defined order for
+                    # each category, currently it is arbitrary
+                    pts = kwimage.Points.from_coco(ann['keypoints'], classes=kpcats)
+                    ann['keypoints'] = pts.to_coco(style='orig')
 
     def validate(self, **config):
         """
@@ -3242,6 +2492,7 @@ class MixinCocoStats(object):
             >>> assert valid.issuperset(gids)
             >>> print('gids = {!r}'.format(gids))
         """
+        import kwarray
         if gids is None:
             gids = sorted(self.imgs.keys())
             gid_to_aids = self.index.gid_to_aids
@@ -3282,7 +2533,6 @@ class MixinCocoStats(object):
         large_image_weights = gid_to_nannots
         small_image_weights = ub.map_vals(lambda x: 1 / (x + 1), gid_to_nannots)
 
-        import kwarray
         cover1 = kwarray.setcover(candidate_sets, items=all_cids)
         selected.update(cover1)
         candidate_sets = ub.dict_diff(candidate_sets, cover1)
@@ -3469,7 +2719,7 @@ class MixinCocoDraw(object):
         import kwimage
         # Load the raw image pixels
         canvas = self.load_image(gid, channels=channels)
-        # TODO: account for auxilliary transforms if the exist
+        # TODO: account for auxiliary transforms if the exist
 
         # Get annotation IDs from this image
         aids = self.index.gid_to_aids[gid]
@@ -3523,7 +2773,6 @@ class MixinCocoDraw(object):
         """
         import matplotlib as mpl
         from matplotlib import pyplot as plt
-        # from PIL import Image
         import kwimage
         import kwplot
 
@@ -4119,9 +3368,6 @@ class MixinCocoAddRemove(object):
         self.index._remove_all_annotations()
         self._invalidate_hashid(['annotations'])
 
-    remove_all_images = clear_images
-    remove_all_annotations = clear_annotations
-
     def remove_annotation(self, aid_or_ann):
         """
         Remove a single annotation from the dataset
@@ -4219,7 +3465,6 @@ class MixinCocoAddRemove(object):
         """
         remove_info = {'annotations': None, 'categories': None}
         if cat_identifiers:
-
             if verbose > 1:
                 print('Removing annots of removed categories')
 
@@ -4296,7 +3541,6 @@ class MixinCocoAddRemove(object):
         """
         remove_info = {'annotations': None, 'images': None}
         if gids_or_imgs:
-
             if verbose > 1:
                 print('Removing images')
 
@@ -4355,7 +3599,6 @@ class MixinCocoAddRemove(object):
         """
         remove_info = {'annotations': None, 'images': None, 'videos': None}
         if vidids_or_videos:
-
             if verbose > 1:
                 print('Removing videos')
 
@@ -4530,7 +3773,6 @@ class CocoIndex(object):
         index.file_name_to_img = None
         index._CHECKS = True
 
-        # index.name_to_video = None # TODO
         # index.kpcid_to_aids = None  # TODO
 
     def __bool__(index):
@@ -4562,15 +3804,15 @@ class CocoIndex(object):
 
     def _add_video(index, vidid, video):
         if index.videos is not None:
-            # name = video['name']
-            # if index._CHECKS:
-            #     if name in index.name_to_video:
-            #         raise ValueError(
-            #             'video with name={} already exists'.format(name))
+            name = video['name']
+            if index._CHECKS:
+                if name in index.name_to_video:
+                    raise ValueError(
+                        'video with name={} already exists'.format(name))
             index.videos[vidid] = video
             if vidid not in index.vidid_to_gids:
                 index.vidid_to_gids[vidid] = index._set()
-            # index.name_to_video[name] = video
+            index.name_to_video[name] = video
 
     def _add_image(index, gid, img):
         """
@@ -4776,8 +4018,6 @@ class CocoIndex(object):
                 item = lut.pop(item_id)
                 del index.vidid_to_gids[item_id]
                 if index.name_to_video is not None:
-                    raise NotImplementedError(
-                        'need to ensure name_to_video is maintained correctly')
                     del index.name_to_video[item['name']]
             if verbose > 2:
                 print('Updated video index')
@@ -4957,6 +4197,10 @@ class CocoIndex(object):
             img['name']: img for img in index.imgs.values()
             if img.get('name', None) is not None
         }
+        index.name_to_video = {
+            video['name']: video for video in index.videos.values()
+            if video.get('name', None) is not None
+        }
 
 
 class MixinCocoIndex(object):
@@ -4993,7 +4237,7 @@ class MixinCocoIndex(object):
 
 
 class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
-                  MixinCocoAttrs, MixinCocoDraw,
+                  MixinCocoObjects, MixinCocoDraw,
                   MixinCocoAccessors, MixinCocoExtras, MixinCocoIndex,
                   MixinCocoDepricate, ub.NiceRepr):
     """
@@ -5277,7 +4521,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             #     # 'has_assets': exists(assets_dpath),
             # }
             # is_bundle = all(bundle_conditions.values())
-            # if is_bundle:
             self.bundle_dpath = bundle_dpath
             self.assets_dpath = assets_dpath
             self.cache_dpath = cache_dpath
@@ -5349,14 +4592,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if union:
             try:
                 if verbose:
-                    # TODO: it would be nice if we had a way to combine results on
-                    # the fly, so we can work while the remaining io jobs are
-                    # loading
+                    # TODO: it would be nice if we had a way to combine results
+                    # on the fly, so we can work while the remaining io jobs
+                    # are loading
                     print('combining results')
                 coco_dset = CocoDataset.union(*results)
             except Exception as ex:
                 if union == 'try':
-                    warnings.warn('Failed to union coco results: {!r}'.format(ex))
+                    warnings.warn(
+                        'Failed to union coco results: {!r}'.format(ex))
                     return results
                 else:
                     raise
@@ -5482,8 +4726,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 Where to write the data.  Can either be a path to a file or an
                 open file pointer / stream.
 
-            newlines (bool) : if True, each annotation, image, category gets
-                its own line.
+            newlines (bool):
+                if True, each annotation, image, category gets its own line.
 
         Example:
             >>> import tempfile
@@ -5954,88 +5198,46 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 track_id_map.block_seen()
             return merged
 
-        FIX_PATH_BEHAVIOR = 1
-        if FIX_PATH_BEHAVIOR:
-            # New behavior is simplified and I believe it is correct
-            def longest_common_prefix(items, sep='/'):
-                """
-                Example:
-                    >>> items = [
-                    >>>     '/foo/bar/always/the/same/set1/img1.png',
-                    >>>     '/foo/bar/always/the/same/set1/img2.png',
-                    >>>     '/foo/bar/always/the/same/set2/img1.png',
-                    >>>     '/foo/bar/always/the/same/set2/img2.png',
-                    >>>     '/foo/baz/file1.txt',
-                    >>> ]
-                    >>> sep = '/'
-                    >>> longest_common_prefix(items, sep=sep)
-                    >>> longest_common_prefix(items[:-1], sep=sep)
-                """
-                # I would use a trie, but I don't know if pygtrie can do this efficiently
-                # (not that this is efficient)
-                from collections import defaultdict
-                freq = defaultdict(lambda: 0)
-                for item in items:
-                    path = tuple(item.split(sep))
-                    for i in range(len(path)):
-                        prefix = path[:i + 1]
-                        freq[prefix] += 1
-                # Find the longest common prefix
-                value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
-                longest_prefix = sep.join(value)
-                return longest_prefix
+        # New behavior is simplified and I believe it is correct
+        def longest_common_prefix(items, sep='/'):
+            """
+            Example:
+                >>> items = [
+                >>>     '/foo/bar/always/the/same/set1/img1.png',
+                >>>     '/foo/bar/always/the/same/set1/img2.png',
+                >>>     '/foo/bar/always/the/same/set2/img1.png',
+                >>>     '/foo/bar/always/the/same/set2/img2.png',
+                >>>     '/foo/baz/file1.txt',
+                >>> ]
+                >>> sep = '/'
+                >>> longest_common_prefix(items, sep=sep)
+                >>> longest_common_prefix(items[:-1], sep=sep)
+            """
+            # I would use a trie, but I don't know if pygtrie can do this efficiently
+            # (not that this is efficient)
+            freq = defaultdict(lambda: 0)
+            for item in items:
+                path = tuple(item.split(sep))
+                for i in range(len(path)):
+                    prefix = path[:i + 1]
+                    freq[prefix] += 1
+            # Find the longest common prefix
+            value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
+            longest_prefix = sep.join(value)
+            return longest_prefix
 
-            import os
-            from os.path import relpath
-            from os.path import normpath
-            dset_roots = [dset.bundle_dpath for dset in others]
-            dset_roots = [normpath(r) if r is not None else None
-                          for r in dset_roots]
-            items = [join('.', p) for p in dset_roots]
-            common_root = longest_common_prefix(items, sep=os.path.sep)
-            relative_dsets = [(relpath(d.bundle_dpath, common_root),
-                               d.dataset) for d in others]
+        dset_roots = [dset.bundle_dpath for dset in others]
+        dset_roots = [normpath(r) if r is not None else None
+                      for r in dset_roots]
+        items = [join('.', p) for p in dset_roots]
+        common_root = longest_common_prefix(items, sep=os.path.sep)
+        relative_dsets = [(relpath(d.bundle_dpath, common_root),
+                           d.dataset) for d in others]
 
-            merged = _coco_union(relative_dsets, common_root)
+        merged = _coco_union(relative_dsets, common_root)
 
-            kwargs['bundle_dpath'] = common_root
-            new_dset = cls(merged, **kwargs)
-
-        else:
-            # OLD BEHAVIOR IS PROBABLY WRONG
-
-            # Handle soft data roots
-            from os.path import normpath
-            soft_dset_roots = [dset.bundle_dpath for dset in others]
-            soft_dset_roots = [normpath(r) if r is not None else None
-                               for r in soft_dset_roots]
-            if ub.allsame(soft_dset_roots):
-                soft_img_root = ub.peek(soft_dset_roots)
-            else:
-                soft_img_root = None
-
-            # Handle hard coded data roots (This should not be common)
-            from os.path import normpath
-            hard_dset_roots = [dset.dataset.get('img_root', None) for dset in others]
-            hard_dset_roots = [normpath(r) if r is not None else None
-                               for r in hard_dset_roots]
-            if ub.allsame(hard_dset_roots):
-                common_root = ub.peek(hard_dset_roots)
-                relative_dsets = [('', d.dataset) for d in others]
-            else:
-                common_root = None
-                relative_dsets = [(d.bundle_dpath, d.dataset) for d in others]
-
-            merged = _coco_union(relative_dsets, common_root)
-
-            if common_root is not None:
-                merged['img_root'] = common_root
-
-            new_dset = cls(merged, **kwargs)
-
-            if common_root is None and soft_img_root is not None:
-                new_dset.bundle_dpath = soft_img_root
-
+        kwargs['bundle_dpath'] = common_root
+        new_dset = cls(merged, **kwargs)
         return new_dset
 
     def subset(self, gids, copy=False, autobuild=True):
@@ -6110,7 +5312,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                autobuild=autobuild)
         return sub_dset
 
-    def view_sql(self):
+    def view_sql(self, force_rewrite=False):
         """
         Create a cached SQL interface to this dataset suitable for large scale
         multiprocessing use cases.
@@ -6121,7 +5323,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             dont use this on in-memory datasets.
         """
         from kwcoco.coco_sql_dataset import ensure_sql_coco_view
-        sql_dset = ensure_sql_coco_view(self)
+        sql_dset = ensure_sql_coco_view(self, force_rewrite=force_rewrite)
         return sql_dset
 
 
@@ -6151,13 +5353,6 @@ def demo_coco_data():
     functions tested with this data. For more compliant demodata see the
     ``kwcoco.demodata`` submodule
 
-
-    Ignore:
-        # code for getting a segmentation polygon
-        kwimage.grab_test_image_fpath('astro')
-        labelme /home/joncrall/.cache/kwimage/demodata/astro.png
-        cat /home/joncrall/.cache/kwimage/demodata/astro.json
-
     Example:
         >>> # xdoctest: +REQUIRES(--show)
         >>> from kwcoco.coco_dataset import demo_coco_data, CocoDataset
@@ -6170,7 +5365,6 @@ def demo_coco_data():
     """
     import kwimage
     from kwimage.im_demodata import _TEST_IMAGES
-    from os.path import commonprefix, relpath
 
     test_imgs_keys = ['astro', 'carl', 'stars']
     urls = {k: _TEST_IMAGES[k]['url'] for k in test_imgs_keys}
@@ -6179,11 +5373,6 @@ def demo_coco_data():
 
     gpath1, gpath2, gpath3 = ub.take(gpaths, test_imgs_keys)
     url1, url2, url3 = ub.take(urls, test_imgs_keys)
-    # gpath2 = kwimage.grab_test_image_fpath('carl')
-    # gpath3 = kwimage.grab_test_image_fpath('stars')
-    # gpath1 = ub.grabdata('https://i.imgur.com/KXhKM72.png')
-    # gpath2 = ub.grabdata('https://i.imgur.com/flTHWFD.png')
-    # gpath3 = ub.grabdata('https://i.imgur.com/kCi7C1r.png')
 
     # Make file names relative for consistent testing purpose
     gname1 = relpath(gpath1, img_root)

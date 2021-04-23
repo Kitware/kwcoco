@@ -38,11 +38,11 @@ def confusion_matrix(y_true, y_pred, n_labels=None, labels=None,
             confusion_matrix(y_true, y_pred, 2, sample_weight=sample_weight)
 
         for timer in ub.Timerit(n, bestof=10, label='np-time'):
-            sample_weight = np.ones(len(y_true), dtype=np.int)
+            sample_weight = np.ones(len(y_true), dtype=int)
             confusion_matrix(y_true, y_pred, 2, sample_weight=sample_weight)
     """
     if sample_weight is None:
-        sample_weight = np.ones(len(y_true), dtype=np.int)
+        sample_weight = np.ones(len(y_true), dtype=int)
     if n_labels is None:
         n_labels = len(labels)
     CM = coo_matrix((sample_weight, (y_true, y_pred)),

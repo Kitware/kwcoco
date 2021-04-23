@@ -35,11 +35,14 @@ class CocoConformCLI:
                 ensure information needed for pycocotools
                 ''')),
 
+            'legacy': scfg.Value(False, help='if True tries to convert to the '
+                                 'original ms-coco format'),
+
             'workers': scfg.Value(
                 8, help='number of background workers for bigger checks'),
 
             'dst': scfg.Value(None, help=(
-                'Save the rebased dataset to a new file')),
+                'Save the modified dataset to a new file')),
         }
 
     @classmethod
@@ -53,7 +56,6 @@ class CocoConformCLI:
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        import kwimage
 
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
@@ -65,25 +67,8 @@ class CocoConformCLI:
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
-        if config['ensure_imgsize']:
-            dset._ensure_imgsize(workers=config['workers'])
-
-        if config['pycocotools_info']:
-            for ann in ub.ProgIter(dset.dataset['annotations'], desc='update anns'):
-                if 'iscrowd' not in ann:
-                    ann['iscrowd'] = False
-
-                if 'ignore' not in ann:
-                    ann['ignore'] = ann.get('weight', 1.0) < .5
-
-                if 'area' not in ann:
-                    # Use segmentation if available
-                    if 'segmentation' in ann:
-                        poly = kwimage.Polygon.from_coco(ann['segmentation'][0])
-                        ann['area'] = float(poly.to_shapely().area)
-                    else:
-                        x, y, w, h = ann['bbox']
-                        ann['area'] = w * h
+        config_ = ub.dict_diff(config, {'src', 'dst'})
+        dset.conform(**config_)
 
         dset.fpath = config['dst']
         print('dump dset.fpath = {!r}'.format(dset.fpath))

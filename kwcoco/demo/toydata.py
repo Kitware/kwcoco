@@ -16,7 +16,7 @@ import kwimage
 import skimage
 from os.path import basename
 import skimage.morphology  # NOQA
-from kwcoco.toypatterns import CategoryPatterns
+from kwcoco.demo.toypatterns import CategoryPatterns
 
 
 try:
@@ -53,7 +53,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
             If specified, dpath is ignored. If unspecified, a bundle
             will be written inside `dpath`.
 
-        aux (bool): if True generates dummy auxillary channels
+        aux (bool): if True generates dummy auxiliary channels
 
         verbose (int, default=3): verbosity mode
 
@@ -206,7 +206,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                 kpname_to_id[kpcat['name']] = kpcat['id']
 
         try:
-            import gdal  # NOQA
+            from osgeo import gdal  # NOQA
         except Exception:
             imwrite_kwargs = {}
         else:
@@ -310,7 +310,7 @@ def random_video_dset(
 
         verbose (int, default=3): verbosity mode
 
-        aux (bool): if True generates dummy auxillary channels
+        aux (bool): if True generates dummy auxiliary channels
 
         multispectral (bool): similar to aux, but does not have the concept of
             a "main" image.
@@ -534,14 +534,14 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         s2_bands = ['B1', 'B8', 'B8a', 'B10', 'B11']
         aux = [
             {'channels': b,
-             'transform': temp_scale_matrix_json(r / 60.),
+             'base_to_aux': temp_scale_matrix_json(r / 60.),
              'dtype': 'uint16'}
             for b, r in zip(s2_bands, s2_res)
         ]
 
         main_window = kwimage.Boxes([[0, 0, gsize[0], gsize[1]]], 'xywh')
         for chaninfo in aux:
-            mat = np.array(chaninfo['transform']['matrix'])
+            mat = np.array(chaninfo['base_to_aux']['matrix'])
             aux_window = main_window.warp(mat).quantize()
             chaninfo['width'] = int(aux_window.width.ravel()[0])
             chaninfo['height'] = int(aux_window.height.ravel()[0])
@@ -575,7 +575,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
                         'channels': chaninfo,
                         'width': gsize[0],
                         'height': gsize[1],
-                        'transform': None,
+                        'base_to_aux': None,
                     }
                 # Add placeholder for auxiliary image data
                 auxitem = {
@@ -699,8 +699,8 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         if WITH_KPTS_SSEG:
             kpts = []
             ssegs = []
-            ddims = boxes.data[:, 2:4].astype(np.int)[:, ::-1]
-            offsets = boxes.data[:, 0:2].astype(np.int)
+            ddims = boxes.data[:, 2:4].astype(int)[:, ::-1]
+            offsets = boxes.data[:, 0:2].astype(int)
             cnames = [classes[cidx] for cidx in dets.class_idxs]
             for dims, xy_offset, cname in zip(ddims, offsets, cnames):
                 info = catpats._todo_refactor_geometric_info(cname, xy_offset, dims)
@@ -918,7 +918,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         boxes = boxes[1:]
 
     boxes = boxes.scale(.8).translate(.1 * min(gsize))
-    boxes.data = boxes.data.astype(np.int)
+    boxes.data = boxes.data.astype(int)
 
     # Hack away zero width objects
     boxes = boxes.to_xywh(copy=False)
@@ -1105,7 +1105,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
                 auxdict['file_name'] = aux_fpath
                 auxdata = auxdict.pop('imdata', None)
                 try:
-                    import gdal  # NOQA
+                    from osgeo import gdal  # NOQA
                     kwimage.imwrite(aux_fpath, auxdata, backend='gdal', space=None)
                 except Exception:
                     kwimage.imwrite(aux_fpath, auxdata, space=None)
@@ -1222,7 +1222,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
 
     def render_foreground(imdata, chan_to_auxinfo):
         boxes = annots.boxes
-        tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(np.int)
+        tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(int)
 
         # Render coco-style annotation dictionaries
         for ann, tlbr in zip(annots.objs, tlbr_boxes):
@@ -1268,9 +1268,9 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
                             val = rng.uniform(0.2, 1.0)
                             # transform annotation into aux space if it is
                             # different
-                            transform = auxinfo.get('transform', None)
-                            if transform is not None:
-                                mat = np.array(transform['matrix'])
+                            base_to_aux = auxinfo.get('base_to_aux', None)
+                            if base_to_aux is not None:
+                                mat = np.array(base_to_aux['matrix'])
                                 seg_ = seg.warp(mat)
                                 auxinfo['imdata'] = seg_.fill(auxinfo['imdata'], value=val)
                             else:
@@ -1507,6 +1507,35 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
         >>> plt = kwplot.autoplt()
         >>> kwplot.multi_plot(xdata=path[:, 0], ydata=path[:, 1], fnum=1, doclf=1, xlim=(0, 1), ylim=(0, 1))
         >>> kwplot.show_if_requested()
+
+    Example:
+        >>> # xdoctest: +REQUIRES(--3d)
+        >>> import kwarray
+        >>> import kwplot
+        >>> plt = kwplot.autoplt()
+        >>> #
+        >>> num= num_frames = 100
+        >>> rng = kwarray.ensure_rng(0)
+        >>> #
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> paths = []
+        >>> paths.append(random_path(num, degree=3, dimension=3, mode='bezier'))
+        >>> paths.append(random_path(num, degree=2, dimension=3, mode='bezier'))
+        >>> paths.append(random_path(num, degree=4, dimension=3, mode='bezier'))
+        >>> #
+        >>> from mpl_toolkits.mplot3d import Axes3D  # NOQA
+        >>> ax = plt.gca(projection='3d')
+        >>> ax.cla()
+        >>> #
+        >>> for path in paths:
+        >>>     time = np.arange(len(path))
+        >>>     ax.plot(time, path.T[0] * 1, path.T[1] * 1, 'o-')
+        >>> ax.set_xlim(0, num_frames)
+        >>> ax.set_ylim(-.01, 1.01)
+        >>> ax.set_zlim(-.01, 1.01)
+        >>> ax.set_xlabel('x')
+        >>> ax.set_ylabel('y')
+        >>> ax.set_zlabel('z')
     """
     import bezier
     rng = kwarray.ensure_rng(rng)

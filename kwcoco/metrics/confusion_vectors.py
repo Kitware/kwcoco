@@ -156,7 +156,7 @@ class ConfusionVectors(ub.NiceRepr):
             >>> import kwarray
             >>> classes = ['person', 'vehicle', 'object']
             >>> rng = kwarray.ensure_rng(0)
-            >>> true = (rng.rand(10) * len(classes)).astype(np.int)
+            >>> true = (rng.rand(10) * len(classes)).astype(int)
             >>> probs = rng.rand(len(true), len(classes))
             >>> cfsn_vecs = ConfusionVectors.from_arrays(true=true, probs=probs, classes=classes)
             >>> cfsn_vecs.confusion_matrix()

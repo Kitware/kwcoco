@@ -6,8 +6,11 @@ import scriptconfig as scfg
 
 class CocoRerootCLI:
     """
+    Modify the root of a coco dataset such to either make paths relative to a
+    new root or make paths absolute.
 
-    NOT WORKING YET. NEED TO WORK THROUGH DETAILS IN A CASE-BY-CASE BASIS
+    NOTE: This does seem to work in many cases but it has not been 100% tested
+    in all cases.
 
     What happens when:
 
@@ -29,8 +32,8 @@ class CocoRerootCLI:
         epilog = """
         Example Usage:
             kwcoco reroot --help
-            kwcoco reroot --src=special:shapes8 --dst rebased.json
-            kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rebased.json
+            kwcoco reroot --src=special:shapes8 --dst rerooted.json
+            kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rerooted.json
         """
         default = {
             'src': scfg.Value(None, help=(
@@ -49,7 +52,7 @@ class CocoRerootCLI:
                 'If True, checks that all data exists')),
 
             'dst': scfg.Value(None, help=(
-                'Save the rebased dataset to a new file')),
+                'Save the re-rooted dataset to a new file')),
         }
 
     @classmethod
@@ -82,7 +85,7 @@ class CocoRerootCLI:
                 --old_prefix=/run/media/matt/Storage/TEST/training_data
             '''
                 /run/media/matt/Storage/TEST/training_data
-                --check=True --dst rebased.json
+                --check=True --dst rerooted.json
         """
         import kwcoco
         from os.path import dirname, abspath

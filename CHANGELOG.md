@@ -5,7 +5,29 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.1.13 - Unreleased
+## Version 0.2.0 - Unreleased
+
+
+### Fixed
+* Fixed numpy warning by using `int` instead of `np.int`.
+* Issue in rename categories with non-deterministic behavior
+* Reference gdal from the `osgeo` package
+* Fixed "name" attribute in sqlview.
+* Implemented the `name_to_video` index
+* annToMask and annToRLE in the `compat_dataset` now work like the original.
+
+### Removed
+* Several deprecated APIs
+* `kwcoco.toydata` and `kwcoco.toypatterns`, use `kwcoco.demo.toydata` and `kwcoco.demo.toypatterns` instead.
+* `remove_all_images` and `remove_all_annotations` (use clear variants instead)
+
+
+### Changed
+* `kwcoco coco_subset` can now take a list of image-ids explicitly.
+* Separate the vectorized ORM-like objects out of `coco_dataset` and into their own `coco_objects` module.
+
+
+## Version 0.1.13 - Released 2021-04-01
 
 ### Changed
 * The image schema now has two modalities. The normal `id` + `file_name`  still
@@ -31,6 +53,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * `CocoDataset.union` will now correctly insert prefixes into file names such
   that they are relative to the common bundle directory.
 
+* Bug in `rename_categories`
+
 ## Version 0.1.12 - Released 2021-03-04
 
 
@@ -43,6 +67,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Added `AbstractCocoDataset` base class for `CocoDataset` and `CocoSqlDataset`.
 * Added `examples` subdirectory for answers to FAQ
 * Added `kwcoco validate` script to check that json and assets exist.
+* Added `conform` method to the main coco dataset
 
 ### Changed
 * `CocoDataset.subset` will now only return the videos that are supported by

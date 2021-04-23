@@ -70,3 +70,32 @@ def test_multispectral_union_relative():
     assert stats1['n_anns'] + stats2['n_anns'] == stats3['n_anns']
     assert stats1['n_imgs'] + stats2['n_imgs'] == stats3['n_imgs']
     assert combo.bundle_dpath == dirname(dset1.bundle_dpath)
+
+
+def test_multispectral_sql():
+    try:
+        import sqlalchemy
+    except Exception:
+        import pytest
+        pytest.skip()
+
+    import numpy as np
+    import kwcoco
+    import ubelt as ub
+    dset1 = kwcoco.CocoDataset.demo('vidshapes1-multispectral')
+    dset2 = dset1.view_sql(force_rewrite=True)
+
+    dset2.basic_stats()
+
+    name = ub.peek(dset1.index.name_to_img)
+    img_dict = dset2.index.name_to_img[name]
+    assert img_dict['name'] == name
+
+    # file_name = ub.peek(dset1.index.file_name_to_img)
+    # img_dict = dset2.index.name_to_img[name]
+    # assert img_dict['name'] == name
+
+    img1 = dset1.load_image(1, channels='B1')
+    img2 = dset2.load_image(1, channels='B1')
+
+    assert np.all(img1 == img2)

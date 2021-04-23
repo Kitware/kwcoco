@@ -279,6 +279,7 @@ stages:
         - pip install pip setuptools -U
         - python -V  # Print out python version for debugging
         - pip install .[tests]  
+        - pip install opencv-python-headless
         # FIXME: we should start from a docker iamge that already has LibGL setup
         #- apt update && apt install libgl1-mesa-glx -y && rm -rf /var/lib/apt/lists/*  
 
@@ -320,6 +321,7 @@ stages:
         - pip install pip setuptools -U
         - python -V  # Print out python version for debugging
         - pip install .[all]
+        - pip install opencv-python-headless
         # FIXME: we should start from a docker iamge that already has LibGL setup
         #- apt update && apt install libgl1-mesa-glx -y && rm -rf /var/lib/apt/lists/*  
 

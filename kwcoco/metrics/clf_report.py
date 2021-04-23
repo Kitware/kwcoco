@@ -339,11 +339,11 @@ def classification_report(y_true, y_pred, target_names=None,
     _residual = (confusion_df - np.floor(confusion_df)).values
     _thresh = 1e-6
     if np.all(_residual < _thresh):
-        confusion_df = confusion_df.astype(np.int)
+        confusion_df = confusion_df.astype(int)
     confusion_df.iloc[(-1, -1)] = N
     _residual = (confusion_df - np.floor(confusion_df)).values
     if np.all(_residual < _thresh):
-        confusion_df = confusion_df.astype(np.int)
+        confusion_df = confusion_df.astype(int)
 
     if verbose:
         if ascii_only:
