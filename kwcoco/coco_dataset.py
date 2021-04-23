@@ -23,6 +23,11 @@ An informal spec is as follows:
     video = {
         'id': int,
         'name': str,  # a unique name for this video.
+
+        'width': int  # the base width of this video (all associated images must have this width)
+        'height': int  # the base height of this video (all associated images must have this height)
+
+        # In the future this may be extended to allow pointing to video files
     }
 
     # Specifies how to find sensor data of a particular scene at a particular
@@ -252,6 +257,7 @@ import os
 import six
 import ubelt as ub
 import warnings
+import sortedcontainers
 from collections import OrderedDict, defaultdict
 from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
                      commonprefix)
@@ -3056,6 +3062,9 @@ class MixinCocoAddRemove(object):
             id (None or int): ADVANCED. Force using this image id.
             **kw : stores arbitrary key/value pairs in this new video
 
+        Returns:
+            int : the video id assigned to the new video
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset()
@@ -3070,10 +3079,10 @@ class MixinCocoAddRemove(object):
             >>> print('self.index.imgs = {}'.format(ub.repr2(self.index.imgs, nl=1)))
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
 
-            >>> gid1 = self.add_image('foo1.jpg', video_id=vidid1)
-            >>> gid2 = self.add_image('foo2.jpg', video_id=vidid1)
-            >>> gid3 = self.add_image('foo3.jpg', video_id=vidid1)
-            >>> self.add_image('bar1.jpg', video_id=vidid2)
+            >>> gid1 = self.add_image('foo1.jpg', video_id=vidid1, frame_index=0)
+            >>> gid2 = self.add_image('foo2.jpg', video_id=vidid1, frame_index=1)
+            >>> gid3 = self.add_image('foo3.jpg', video_id=vidid1, frame_index=2)
+            >>> gid4 = self.add_image('bar1.jpg', video_id=vidid2, frame_index=0)
             >>> print('self.index.videos = {}'.format(ub.repr2(self.index.videos, nl=1)))
             >>> print('self.index.imgs = {}'.format(ub.repr2(self.index.imgs, nl=1)))
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
@@ -3092,14 +3101,25 @@ class MixinCocoAddRemove(object):
         # self._invalidate_hashid(['videos'])
         return id
 
-    def add_image(self, file_name, id=None, **kw):
+    def add_image(self, file_name=None, id=None, **kw):
         """
         Add an image to the dataset (dynamically updates the index)
 
         Args:
             file_name (str): relative or absolute path to image
             id (None or int): ADVANCED. Force using this image id.
+            name (str): a unique key to identify this image
+            width (int): base width of the image
+            height (int): base height of the image
+            channels (ChannelSpec): specification of base channels
+            auxiliary (List[Dict]): specification of auxiliary information
+            video_id (int): parent video, if applicable
+            frame_index (int): frame index in parent video
+            timestamp (number | str): timestamp of frame index
             **kw : stores arbitrary key/value pairs in this new image
+
+        Returns:
+            int : the image id assigned to the new image
 
         SeeAlso:
             :func:`add_image`
@@ -3137,6 +3157,9 @@ class MixinCocoAddRemove(object):
             bbox (list or kwimage.Boxes): bounding box in xywh format
             id (None or int): ADVANCED. Force using this annotation id.
             **kw : stores arbitrary key/value pairs in this new image
+
+        Returns:
+            int : the annotation id assigned to the new annotation
 
         SeeAlso:
             :func:`add_annotation`
@@ -3191,6 +3214,9 @@ class MixinCocoAddRemove(object):
             supercategory (str, optional): parent of this category
             id (int, optional): use this category id, if it was not taken
             **kw : stores arbitrary key/value pairs in this new image
+
+        Returns:
+            int : the category id assigned to the new category
 
         SeeAlso:
             :func:`add_category`
@@ -3755,6 +3781,15 @@ class CocoIndex(object):
     # _set = ub.oset  # many operations are much slower for oset
     _set = set
 
+    def _set_sorted_by_frame_index(index, gids=None):
+        """
+        Helper for ensuring that vidid_to_gids returns image ids ordered by
+        frame index.
+        """
+        def _lut_frame_index(gid):
+            return index.imgs[gid]['frame_index']
+        return sortedcontainers.SortedSet(gids, key=_lut_frame_index)
+
     def __init__(index):
         index.anns = None
         index.imgs = None
@@ -3811,7 +3846,7 @@ class CocoIndex(object):
                         'video with name={} already exists'.format(name))
             index.videos[vidid] = video
             if vidid not in index.vidid_to_gids:
-                index.vidid_to_gids[vidid] = index._set()
+                index.vidid_to_gids[vidid] = index._set_sorted_by_frame_index()
             index.name_to_video[name] = video
 
     def _add_image(index, gid, img):
@@ -3820,8 +3855,8 @@ class CocoIndex(object):
             >>> # Test adding image to video that doesnt exist
             >>> import kwcoco
             >>> self = dset = kwcoco.CocoDataset()
-            >>> dset.add_image(file_name='frame1', video_id=1)
-            >>> dset.add_image(file_name='frame2', video_id=1)
+            >>> dset.add_image(file_name='frame1', video_id=1, frame_index=0)
+            >>> dset.add_image(file_name='frame2', video_id=1, frame_index=0)
             >>> dset._check_pointers()
             >>> dset._check_index()
             >>> print('dset.index.vidid_to_gids = {!r}'.format(dset.index.vidid_to_gids))
@@ -3855,6 +3890,9 @@ class CocoIndex(object):
                 index.name_to_img[name] = img
 
             if 'video_id' in img:
+                if img.get('frame_index', None) is None:
+                    raise ValueError(
+                        'Images with video-ids must have a frame_index')
                 vidid = img['video_id']
                 try:
                     index.vidid_to_gids[vidid].add(gid)
@@ -3864,8 +3902,10 @@ class CocoIndex(object):
                     #        'non-existing video-id={}').format(gid, vidid)
                     msg = 'Adding image to non-existing video'
                     warnings.warn(msg)
-                    index.vidid_to_gids[vidid] = index._set()
-                    index.vidid_to_gids[vidid].add(gid)
+                    index.vidid_to_gids[vidid] = index._set_sorted_by_frame_index()
+                    import xdev
+                    with xdev.embed_on_exception_context:
+                        index.vidid_to_gids[vidid].add(gid)
 
     def _add_images(index, imgs):
         """
@@ -3996,7 +4036,7 @@ class CocoIndex(object):
         # dynamically update the image index
         if index.imgs is not None:
             for gid in remove_gids:
-                img = index.imgs.pop(gid)
+                img = index.imgs[gid]
                 vidid = img.get('video_id', None)
                 if vidid in index.vidid_to_gids:
                     index.vidid_to_gids[vidid].remove(gid)
@@ -4007,6 +4047,7 @@ class CocoIndex(object):
                 name = img.get('name', None)
                 if name is not None:
                     del index.name_to_img[name]
+                del index.imgs[gid]
             if verbose > 2:
                 print('Updated image index')
 
@@ -4102,8 +4143,6 @@ class CocoIndex(object):
             [g.get('video_id', None) for g in imgs.values()]
         )
         vidid_to_gids.pop(None, None)
-        # Ensure that the values are cast to the appropriate set type
-        vidid_to_gids = ub.map_vals(index._set, vidid_to_gids)
 
         if 0:
             # The following is slightly slower, but it is also many fewer lines
@@ -4114,7 +4153,7 @@ class CocoIndex(object):
             cid_to_aids.pop(None, None)
             gid_to_aids = ub.map_vals(index._set, gid_to_aids)
             cid_to_aids = ub.map_vals(index._set, cid_to_aids)
-            vidid_to_gids = ub.map_vals(index._set, vidid_to_gids)
+            vidid_to_gids = ub.map_vals(index._set_sorted_by_frame_index, vidid_to_gids)
         else:
             gid_to_aids = defaultdict(index._set)
             cid_to_aids = defaultdict(index._set)
@@ -4183,6 +4222,10 @@ class CocoIndex(object):
         # categories so we can allow for the category_id=None case
         # cid_to_aids.default_factory = None
         # vidid_to_gids.default_factory = None
+
+        # Ensure that the values are cast to the appropriate set type
+        # This needs to happen after index.imgs is populated
+        vidid_to_gids = ub.map_vals(index._set_sorted_by_frame_index, vidid_to_gids)
 
         index.gid_to_aids = gid_to_aids
         index.cid_to_aids = cid_to_aids
@@ -5312,10 +5355,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                autobuild=autobuild)
         return sub_dset
 
-    def view_sql(self, force_rewrite=False):
+    def view_sql(self, force_rewrite=False, memory=False):
         """
         Create a cached SQL interface to this dataset suitable for large scale
         multiprocessing use cases.
+
+        Args:
+            force_rewrite (bool, default=False):
+                if True, forces an update to any existing cache file on disk
+            memory (bool, default=False):
+                if True, the database is constructed in memory.
 
         Note:
             This view cache is experimental and currently depends on the
@@ -5323,7 +5372,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             dont use this on in-memory datasets.
         """
         from kwcoco.coco_sql_dataset import ensure_sql_coco_view
-        sql_dset = ensure_sql_coco_view(self, force_rewrite=force_rewrite)
+        if memory:
+            db_fpath = ':memory:'
+        else:
+            db_fpath = None
+        sql_dset = ensure_sql_coco_view(self, db_fpath=db_fpath,
+                                        force_rewrite=force_rewrite)
         return sql_dset
 
 

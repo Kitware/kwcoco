@@ -577,6 +577,9 @@ class SqlIdGroupDictProxy(DictLike):
     another table corresponding to rows where a specific column has that parent
     id.
 
+    The items in the group can be sorted by the ``group_order_attr`` if
+    specified.
+
     For example, imagine two tables: images with one column (id) and
     annotations with two columns (id, image_id). This class can help provide a
     mpaping from each `image.id` to a `Set[annotation.id]` where those
@@ -602,14 +605,40 @@ class SqlIdGroupDictProxy(DictLike):
         >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
         >>> ti = _benchmark_dict_proxy_ops(proxy)
         >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
+
+    Example:
+        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+        >>> from kwcoco.coco_sql_dataset import *  # NOQA
+        >>> import kwcoco
+        >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes3')
+        >>> dct_dset.add_image(name='frame-index-order-demo1', frame_index=-30, video_id=1)
+        >>> dct_dset.add_image(name='frame-index-order-demo2', frame_index=10, video_id=1)
+        >>> dct_dset.add_image(name='frame-index-order-demo3', frame_index=3, video_id=1)
+        >>> dct_dset.add_video(name='empty-video1')
+        >>> dct_dset.add_video(name='empty-video2')
+        >>> dct_dset.add_video(name='empty-video3')
+        >>> sql_dset = dct_dset.view_sql(memory=True)
+        >>> orig = dct_dset.index.vidid_to_gids
+        >>> proxy = sql_dset.index.vidid_to_gids
+        >>> from kwcoco.util.util_json import indexable_allclose
+        >>> assert indexable_allclose(orig, dict(proxy))
+        >>> items = list(proxy.iteritems())
+        >>> vals = list(proxy.itervalues())
+        >>> keys = list(proxy.iterkeys())
+        >>> assert len(keys) == len(vals)
+        >>> assert dict(zip(keys, vals)) == dict(items)
     """
-    def __init__(proxy, session, valattr, keyattr, parent_keyattr):
+    def __init__(proxy, session, valattr, keyattr, parent_keyattr,
+                 group_order_attr=None):
         proxy.valattr = valattr
         proxy.keyattr = keyattr
         proxy.session = session
         proxy.parent_keyattr = parent_keyattr
         proxy.ALCHEMY_MODE = 0
         proxy._cache = _new_proxy_cache()
+
+        # if specified, the items within groups are ordered by this attr
+        proxy.group_order_attr = group_order_attr
 
     def __nice__(self):
         return str(len(self))
@@ -628,16 +657,27 @@ class SqlIdGroupDictProxy(DictLike):
         valattr = proxy.valattr
         if proxy.ALCHEMY_MODE:
             query = session.query(valattr).filter(keyattr == key)
+            if proxy.group_order_attr is not None:
+                query = query.order_by(proxy.group_order_attr)
             item = [row[0] for row in query.all()]
         else:
-            sql_expr = 'SELECT {} FROM {} WHERE {}=:key'.format(
-                proxy.valattr.name,
-                proxy.keyattr.class_.__tablename__,
-                proxy.keyattr.name,
-            )
+            if proxy.group_order_attr is None:
+                sql_expr = 'SELECT {} FROM {} WHERE {}=:key'.format(
+                    proxy.valattr.name,
+                    proxy.keyattr.class_.__tablename__,
+                    proxy.keyattr.name,
+                )
+            else:
+                sql_expr = 'SELECT {} FROM {} WHERE {}=:key ORDER BY {}'.format(
+                    proxy.valattr.name,
+                    proxy.keyattr.class_.__tablename__,
+                    proxy.keyattr.name,
+                    proxy.group_order_attr.name,
+                )
             result = proxy.session.execute(sql_expr, params={'key': key})
             item = [row[0] for row in result.fetchall()]
-        item = set(item)
+        _set = set if proxy.group_order_attr is None else ub.oset
+        item = _set(item)
         if proxy._cache is not None:
             proxy._cache[key] = item
         return item
@@ -660,130 +700,201 @@ class SqlIdGroupDictProxy(DictLike):
     def keys(proxy):
         if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.parent_keyattr)
+            query = query.order_by(proxy.parent_keyattr)
             for item in _orm_yielder(query):
                 key = item[0]
                 yield key
         else:
             result = proxy.session.execute(
-                'SELECT {} FROM {}'.format(
+                'SELECT {} FROM {} ORDER BY {}'.format(
                     proxy.parent_keyattr.name,
-                    proxy.parent_keyattr.class_.__tablename__))
+                    proxy.parent_keyattr.class_.__tablename__,
+                    proxy.parent_keyattr.name
+                ))
             for item in _raw_yielder(result):
                 yield item[0]
 
     def iteritems(proxy):
-        if proxy.ALCHEMY_MODE:
-            parent_keyattr = proxy.parent_keyattr
-            keyattr = proxy.keyattr
-            valattr = proxy.valattr
-            session = proxy.session
+        _set = set if proxy.group_order_attr is None else ub.oset
+        if proxy.group_order_attr is not None:
+            print('proxy.group_order_attr = {!r}'.format(proxy.group_order_attr))
+            # ALTERNATIVE MODE, EXPERIMENTAL MODE
+            # groups based on post processing. this might be faster or more
+            # robust than the group json array? Requires a hack to yield empty
+            # groups. Should consolidate to use one method or the other.
+            from collections import deque
+            import itertools as it
 
-            parent_table = parent_keyattr.class_.__table__
-            table = keyattr.class_.__table__
+            # hack to yield, empty groups
+            all_keys = deque(proxy.keys())
 
-            grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
-            # Hack: have to cast to str because I don't know how to make
-            # the json type work
-            query = (
-                session.query(parent_keyattr, str(grouped_vals))
-                .outerjoin(table, parent_keyattr == keyattr)
-                .group_by(parent_keyattr)
-                .order_by(parent_keyattr)
-            )
+            if proxy.ALCHEMY_MODE:
+                parent_keyattr = proxy.parent_keyattr
+                keyattr = proxy.keyattr
+                valattr = proxy.valattr
+                session = proxy.session
 
-            for row in query.all():
-                key = row[0]
-                group = json.loads(row[1])
-                if group[0] is None:
-                    group = set()
-                else:
-                    group = set(group)
+                parent_table = parent_keyattr.class_.__table__
+                table = keyattr.class_.__table__
+
+                query = session.query(keyattr, valattr).order_by(
+                    keyattr, proxy.group_order_attr)
+                result = session.execute(query)
+                yielder = _raw_yielder(result)
+            else:
+                parent_table = proxy.parent_keyattr.class_.__tablename__
+                table = proxy.keyattr.class_.__tablename__
+                parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
+                keycol = table + '.' + proxy.keyattr.name
+                valcol = table + '.' + proxy.valattr.name
+                groupcol = table + '.' + proxy.group_order_attr.name
+
+                expr = (
+                    'SELECT {keycol}, {valcol} '
+                    'FROM {table} '
+                    'ORDER BY {keycol}, {group_order_attr}').format(
+                        table=table,
+                        keycol=keycol,
+                        valcol=valcol,
+                        group_order_attr=groupcol,
+                    )
+                result = proxy.session.execute(expr)
+                yielder = _raw_yielder(result)
+
+            for key, grouper in it.groupby(yielder, key=lambda x: x[0]):
+                next_key = all_keys.popleft()
+                while next_key != key:
+                    # Hack to yield empty groups
+                    next_group = _set()
+                    next_tup = (next_key, next_group)
+                    next_key = all_keys.popleft()
+                    yield next_tup
+                group = _set([g[1] for g in grouper])
+                tup = (key, group)
+                yield tup
+
+            # any remaining groups are empty
+            for key in all_keys:
+                group = _set()
                 tup = (key, group)
                 yield tup
 
         else:
-            parent_table = proxy.parent_keyattr.class_.__tablename__
-            table = proxy.keyattr.class_.__tablename__
-            parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
-            keycol = table + '.' + proxy.keyattr.name
-            valcol = table + '.' + proxy.valattr.name
-            expr = (
-                'SELECT {parent_keycol}, json_group_array({valcol}) '
-                'FROM {parent_table} '
-                'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
-                'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
-                    parent_table=parent_table,
-                    table=table,
-                    parent_keycol=parent_keycol,
-                    keycol=keycol,
-                    valcol=valcol,
+            if proxy.ALCHEMY_MODE:
+                parent_keyattr = proxy.parent_keyattr
+                keyattr = proxy.keyattr
+                valattr = proxy.valattr
+                session = proxy.session
+
+                parent_table = parent_keyattr.class_.__table__
+                table = keyattr.class_.__table__
+
+                grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
+                # Hack: have to cast to str because I don't know how to make
+                # the json type work
+                query = (
+                    session.query(parent_keyattr, str(grouped_vals))
+                    .outerjoin(table, parent_keyattr == keyattr)
+                    .group_by(parent_keyattr)
+                    .order_by(parent_keyattr)
                 )
-            print(expr)
-            result = proxy.session.execute(expr)
-            for row in result.fetchall():
-                key = row[0]
-                group = json.loads(row[1])
-                if group[0] is None:
-                    group = set()
-                else:
-                    group = set(group)
-                tup = (key, group)
-                yield tup
+
+                for row in query.all():
+                    key = row[0]
+                    group = json.loads(row[1])
+                    if group[0] is None:
+                        group = _set()
+                    else:
+                        group = _set(group)
+                    tup = (key, group)
+                    yield tup
+
+            else:
+                parent_table = proxy.parent_keyattr.class_.__tablename__
+                table = proxy.keyattr.class_.__tablename__
+                parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
+                keycol = table + '.' + proxy.keyattr.name
+                valcol = table + '.' + proxy.valattr.name
+                expr = (
+                    'SELECT {parent_keycol}, json_group_array({valcol}) '
+                    'FROM {parent_table} '
+                    'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
+                    'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
+                        parent_table=parent_table,
+                        table=table,
+                        parent_keycol=parent_keycol,
+                        keycol=keycol,
+                        valcol=valcol,
+                    )
+                result = proxy.session.execute(expr)
+                for row in result.fetchall():
+                    key = row[0]
+                    group = json.loads(row[1])
+                    if group[0] is None:
+                        group = _set()
+                    else:
+                        group = _set(group)
+                    tup = (key, group)
+                    yield tup
 
     def itervalues(proxy):
-        if proxy.ALCHEMY_MODE:
-            # Hack:
-            for key, val in proxy.items():
-                yield val
-            # parent_keyattr = proxy.parent_keyattr
-            # keyattr = proxy.keyattr
-            # valattr = proxy.valattr
-            # session = proxy.session
+        # Hack:
+        for key, val in proxy.items():
+            yield val
+        # _set = set if proxy.group_order_attr is None else ub.oset
+        # if proxy.ALCHEMY_MODE:
+        #     # Hack:
+        #     for key, val in proxy.items():
+        #         yield val
+        #     # parent_keyattr = proxy.parent_keyattr
+        #     # keyattr = proxy.keyattr
+        #     # valattr = proxy.valattr
+        #     # session = proxy.session
 
-            # parent_table = parent_keyattr.class_.__table__
-            # table = proxy.keyattr.class_.__tablename__
+        #     # parent_table = parent_keyattr.class_.__table__
+        #     # table = proxy.keyattr.class_.__tablename__
 
-            # # TODO: This might have to be different for PostgreSQL
-            # grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
-            # query = (
-            #     session.query(grouped_vals)
-            #     .outerjoin(table, parent_keyattr == keyattr)
-            #     .group_by(parent_keyattr)
-            #     .order_by(parent_keyattr)
-            # )
-            # for row in _orm_yielder(query):
-            #     group = row[0]
-            #     if group[0] is None:
-            #         group = set()
-            #     else:
-            #         group = set(group)
-            #     yield group
-        else:
-            parent_table = proxy.parent_keyattr.class_.__tablename__
-            table = proxy.keyattr.class_.__tablename__
-            parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
-            keycol = table + '.' + proxy.keyattr.name
-            valcol = table + '.' + proxy.valattr.name
-            expr = (
-                'SELECT {parent_keycol}, json_group_array({valcol}) '
-                'FROM {parent_table} '
-                'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
-                'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
-                    parent_table=parent_table,
-                    table=table,
-                    parent_keycol=parent_keycol,
-                    keycol=keycol,
-                    valcol=valcol,
-                )
-            # print(expr)
-            result = proxy.session.execute(expr)
-            for row in result.fetchall():
-                group = json.loads(row[1])
-                if group[0] is None:
-                    group = set()
-                else:
-                    group = set(group)
-                yield group
+        #     # # TODO: This might have to be different for PostgreSQL
+        #     # grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
+        #     # query = (
+        #     #     session.query(grouped_vals)
+        #     #     .outerjoin(table, parent_keyattr == keyattr)
+        #     #     .group_by(parent_keyattr)
+        #     #     .order_by(parent_keyattr)
+        #     # )
+        #     # for row in _orm_yielder(query):
+        #     #     group = row[0]
+        #     #     if group[0] is None:
+        #     #         group = set()
+        #     #     else:
+        #     #         group = set(group)
+        #     #     yield group
+        # else:
+        #     parent_table = proxy.parent_keyattr.class_.__tablename__
+        #     table = proxy.keyattr.class_.__tablename__
+        #     parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
+        #     keycol = table + '.' + proxy.keyattr.name
+        #     valcol = table + '.' + proxy.valattr.name
+        #     expr = (
+        #         'SELECT {parent_keycol}, json_group_array({valcol}) '
+        #         'FROM {parent_table} '
+        #         'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
+        #         'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
+        #             parent_table=parent_table,
+        #             table=table,
+        #             parent_keycol=parent_keycol,
+        #             keycol=keycol,
+        #             valcol=valcol,
+        #         )
+        #     # print(expr)
+        #     result = proxy.session.execute(expr)
+        #     for row in result.fetchall():
+        #         group = json.loads(row[1])
+        #         if group[0] is None:
+        #             group = _set()
+        #         else:
+        #             group = _set(group)
+        #         yield group
 
 
 class CocoSqlIndex(object):
@@ -822,7 +933,8 @@ class CocoSqlIndex(object):
         index.cid_to_aids = SqlIdGroupDictProxy(
             session, Annotation.id, Annotation.category_id, Category.id)
         index.vidid_to_gids = SqlIdGroupDictProxy(
-            session, Image.id, Image.video_id, Video.id)
+            session, Image.id, Image.video_id, Video.id,
+            group_order_attr=Image.frame_index)
 
         # Make a list like view for algorithms
         index.dataset = {
@@ -1235,10 +1347,11 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
     if db_fpath is None:
         db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v005.sqlite')
 
-    db_uri = 'sqlite:///file:' + db_fpath
-    # dpath = dirname(dset.fpath)
+    if db_fpath == ':memory:':
+        db_uri = 'sqlite:///:memory:'
+    else:
+        db_uri = 'sqlite:///file:' + db_fpath
 
-    print('dset.img_root = {!r}'.format(dset.img_root))
     self = CocoSqlDatabase(db_uri, img_root=dset.img_root, tag=dset.tag)
 
     import os
@@ -1499,9 +1612,9 @@ def devcheck():
 
     with timerit.Timer('query with in'):
         query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)
-        items1 = query.all()
+        items1 = query.all()  # NOQA
 
     with timerit.Timer('naive'):
-        items2 = [proxy[gid] for gid in chosen_gids]
+        items2 = [proxy[gid] for gid in chosen_gids]  # NOQA
 
     print(query.statement)
