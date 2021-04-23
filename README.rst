@@ -205,44 +205,95 @@ An informal description of the spec is written here:
 
 .. code:: 
 
+    # All object categories are defined here.
     category = {
         'id': int,
-        'name': str,
-        'supercategory': Optional[str],
-        'keypoints': Optional(List[str]),
-        'skeleton': Optional(List[Tuple[Int, Int]]),
+        'name': str,  # unique name of the category
+        'supercategory': str,   # parent category name
     }
 
+    # Videos are used to manage collections of sequences of images.
+    video = {
+        'id': int,
+        'name': str,  # a unique name for this video.
+    }
+
+    # Specifies how to find sensor data of a particular scene at a particular
+    # time. This is usually paths to rgb images, but auxiliary information
+    # can be used to specify multiple bands / etc...
     image = {
         'id': int,
-        'file_name': str
+
+        'name': str,  # an encouraged but optional unique name
+        'file_name': str,  # relative path to the "base" image data
+
+        'width': int,   # pixel width of "base" image
+        'height': int,  # pixel height of "base" image
+
+        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image
+
+        'auxiliary': [  # information about any auxiliary channels / bands
+            {
+                'file_name': str,     # relative path to associated file
+                'channels': <ChannelSpec>,   # a string encoding
+                'width':     <int>    # pixel width of auxiliary image
+                'height':    <int>    # pixel height of auxiliary image
+                'base_to_aux': <TransformSpec>,  # tranform from "base" image space to auxiliary image space. (identity if unspecified)
+            }, ...
+        ]
+
+        'video_id': str  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
+        'timestamp': str | int  # a iso-string timestamp or an integer in flicks.
+        'frame_index': int  # ordinal frame index which can be used if timestamp is unknown.
     }
 
+    TransformSpec:
+        Currently there is only one spec that works with anything:
+            {'type': 'affine': 'matrix': <a-3x3 matrix>},
+
+        In the future we may do something like this:
+            {'type': 'scale', 'factor': <float|Tuple[float, float]>},
+            {'type': 'translate', 'offset': <float|Tuple[float, float]>},
+            {'type': 'rotate', 'radians_ccw': <float>},
+
+    ChannelSpec:
+        This is a string that describes the channel composition of an image.
+        For the purposes of kwcoco, separate different channel names with a
+        pipe ('|'). If the spec is not specified, methods may fall back on
+        grayscale or rgb processing. There are special string. For instance
+        'rgb' will expand into 'r|g|b'. In other applications you can "late
+        fuse" inputs by separating them with a "," and "early fuse" by
+        separating with a "|". Early fusion returns a solid array/tensor, late
+        fusion returns separated arrays/tensors.
+
+    # Ground truth is specified as annotations, each belongs to a spatial
+    # region in an image. This must reference a subregion of the image in pixel
+    # coordinates. Additional non-schma properties can be specified to track
+    # location in other coordinate systems. Annotations can be linked over time
+    # by specifying track-ids.
+    annotation = {
+        'id': int,
+        'image_id': int,
+        'category_id': int,
+
+        'track_id': <int | str | uuid>  # indicates association between annotations across frames
+
+        'bbox': [tl_x, tl_y, w, h],  # xywh format)
+        'score' : float,
+        'prob' : List[float],
+        'weight' : float,
+
+        'caption': str,  # a text caption for this annotation
+        'keypoints' : <Keypoints | List[int] > # an accepted keypoint format
+        'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
+    }
+
+    # A dataset bundles a manifest of all aformentioned data into one structure.
     dataset = {
-        # these are object level categories
-        'categories': [category],
-        'images': [image]
-            ...
-        ],
-        'annotations': [
-            {
-                'id': Int,
-                'image_id': Int,
-                'category_id': Int,
-                'track_id': Optional[Int],
-
-                'bbox': [tl_x, tl_y, w, h],  # optional (xywh format)
-                "score" : float,  # optional
-                "prob" : List[float],  # optional
-                "weight" : float,  # optional
-
-                "caption": str,  # an optional text caption for this annotation
-                "iscrowd" : <0 or 1>,  # denotes if the annotation covers a single object (0) or multiple objects (1)
-                "keypoints" : [x1,y1,v1,...,xk,yk,vk], # or new dict-based format
-                'segmentation': <RunLengthEncoding | Polygon>,  # formats are defined bellow
-            },
-            ...
-        ],
+        'categories': [category, ...],
+        'videos': [video, ...]
+        'images': [image, ...]
+        'annotations': [annotation, ...]
         'licenses': [],
         'info': [],
     }
@@ -259,6 +310,8 @@ An informal description of the spec is written here:
         We also allow a non-standard dictionary encoding of polygons
             {'exterior': [(x1, y1)...],
              'interiors': [[(x1, y1), ...], ...]}
+
+        TODO: Support WTK
 
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
@@ -308,16 +361,20 @@ An informal description of the spec is written here:
         We also have a new top-level dictionary to specify all the possible
         keypoint categories.
 
+        TODO: Support WTK
+
     Auxiliary Channels:
         For multimodal or multispectral images it is possible to specify
         auxiliary channels in an image dictionary as follows:
 
         {
-            'id': int, 'file_name': str
-            'channels': <spec>,  # a spec code that indicates the layout of these channels.
+            'id': int,
+            'file_name': str,    # path to the "base" image (may be None)
+            'name': str,         # a unique name for the image (must be given if file_name is None)
+            'channels': <spec>,  # a spec code that indicates the layout of the "base" image channels.
             'auxiliary': [  # information about auxiliary channels
                 {
-                    'file_name':
+                    'file_name': str,
                     'channels': <spec>
                 }, ... # can have many auxiliary channels with unique specs
             ]
@@ -326,8 +383,8 @@ An informal description of the spec is written here:
     Video Sequences:
         For video sequences, we add the following video level index:
 
-        "videos": [
-            { "id": <int>, "name": <video_name:str> },
+        'videos': [
+            { 'id': <int>, 'name': <video_name:str> },
         ]
 
         Note that the videos might be given as encoded mp4/avi/etc.. files (in
@@ -346,7 +403,7 @@ An informal description of the spec is written here:
         And annotations are augmented as follows:
 
         {
-            "track_id": <int | str | uuid>  # optional, indicates association between annotations across frames
+            'track_id': <int | str | uuid>  # optional, indicates association between annotations across frames
         }
 
 
