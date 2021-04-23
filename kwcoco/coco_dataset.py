@@ -244,21 +244,22 @@ References:
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
-import warnings
-from os.path import dirname, basename, join, exists, isdir
-from collections import OrderedDict, defaultdict
+import copy
+import itertools as it
 import json
 import numpy as np
-import ubelt as ub
+import os
 import six
-import itertools as it
+import ubelt as ub
+import warnings
+from collections import OrderedDict, defaultdict
+from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
+                     commonprefix)
 from six.moves import cStringIO as StringIO
-import copy
-
-from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 
 # Vectorized ORM-Like containers
 from kwcoco.coco_objects import Categories, Videos, Images, Annots
+from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 
 # Does having __all__ prevent readthedocs from building mixins?
 # __all__ = [
@@ -1638,7 +1639,6 @@ class MixinCocoExtras(object):
             >>> # want to here. Might need to discuss this.
             >>> from kwcoco.coco_dataset import *  # NOQA
             >>> import kwcoco
-            >>> import os
             >>> gname = 'images/foo.png'
             >>> remote = '/remote/path'
             >>> host = ub.ensure_app_cache_dir('kwcoco/tests/reroot')
@@ -1737,8 +1737,6 @@ class MixinCocoExtras(object):
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
             >>> assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
         """
-        from os.path import exists, relpath
-
         new_img_root = new_root
         cur_img_root = self.bundle_dpath
         if new_img_root is None:
@@ -2070,6 +2068,74 @@ class MixinCocoStats(object):
             catname_to_nannot_types[name] = ub.map_keys(
                 lambda k: k[0] if len(k) == 1 else k, hist)
         return catname_to_nannot_types
+
+    def conform(self, **config):
+        """
+        Make the COCO file conform a stricter spec, infers attibutes where
+        possible.
+
+        Corresponds to the ``kwcoco conform`` CLI tool.
+
+        KWArgs:
+            **config :
+                pycocotools_info (default=True): returns info required by pycocotools
+                ensure_imgsize (default=True): ensure image size is populated
+                legacy (default=True): if true tries to convert data
+                    structures to items compatible with the original
+                    pycocotools spec
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('shapes8')
+            >>> dset.imgs[1].pop('width')
+            >>> dset.conform()
+            >>> assert 'width' in dset.imgs[1]
+            >>> assert 'area' in dset.anns
+        """
+
+        if config.get('ensure_imgsize', True):
+            self._ensure_imgsize(workers=config.get('workers', 8))
+
+        if config.get('pycocotools_info', True):
+            for ann in ub.ProgIter(self.dataset['annotations'], desc='update anns'):
+                if 'iscrowd' not in ann:
+                    ann['iscrowd'] = False
+
+                if 'ignore' not in ann:
+                    ann['ignore'] = ann.get('weight', 1.0) < .5
+
+                if 'area' not in ann:
+                    # Use segmentation if available
+                    if 'segmentation' in ann:
+                        import kwimage
+                        poly = kwimage.Polygon.from_coco(ann['segmentation'][0])
+                        ann['area'] = float(poly.to_shapely().area)
+                    else:
+                        x, y, w, h = ann['bbox']
+                        ann['area'] = w * h
+
+        if config.get('legacy', True):
+            try:
+                kpcats = self.keypoint_categories()
+            except Exception:
+                kpcats = None
+                pass
+            for ann in ub.ProgIter(self.dataset['annotations'], desc='update orig coco anns'):
+                # Use segmentation if available
+                if 'segmentation' in ann:
+                    # TODO: any original style coco dict is ok, we dont
+                    # always need it to be a poly if it is RLE
+                    import kwimage
+                    poly = kwimage.Polygon.from_coco(ann['segmentation'][0])
+                    # Hack, looks like kwimage does not wrap the original
+                    # coco polygon with a list, but pycocotools needs that
+                    ann['segmentation'] = [poly.to_coco(style='orig')]
+                if 'keypoints' in ann:
+                    import kwimage
+                    # TODO: these have to be in some defined order for
+                    # each category, currently it is arbitrary
+                    pts = kwimage.Points.from_coco(ann['keypoints'], classes=kpcats)
+                    ann['keypoints'] = pts.to_coco(style='orig')
 
     def validate(self, **config):
         """
@@ -2427,6 +2493,7 @@ class MixinCocoStats(object):
             >>> assert valid.issuperset(gids)
             >>> print('gids = {!r}'.format(gids))
         """
+        import kwarray
         if gids is None:
             gids = sorted(self.imgs.keys())
             gid_to_aids = self.index.gid_to_aids
@@ -2467,7 +2534,6 @@ class MixinCocoStats(object):
         large_image_weights = gid_to_nannots
         small_image_weights = ub.map_vals(lambda x: 1 / (x + 1), gid_to_nannots)
 
-        import kwarray
         cover1 = kwarray.setcover(candidate_sets, items=all_cids)
         selected.update(cover1)
         candidate_sets = ub.dict_diff(candidate_sets, cover1)
@@ -2708,7 +2774,6 @@ class MixinCocoDraw(object):
         """
         import matplotlib as mpl
         from matplotlib import pyplot as plt
-        # from PIL import Image
         import kwimage
         import kwplot
 
@@ -3304,9 +3369,6 @@ class MixinCocoAddRemove(object):
         self.index._remove_all_annotations()
         self._invalidate_hashid(['annotations'])
 
-    remove_all_images = clear_images
-    remove_all_annotations = clear_annotations
-
     def remove_annotation(self, aid_or_ann):
         """
         Remove a single annotation from the dataset
@@ -3404,7 +3466,6 @@ class MixinCocoAddRemove(object):
         """
         remove_info = {'annotations': None, 'categories': None}
         if cat_identifiers:
-
             if verbose > 1:
                 print('Removing annots of removed categories')
 
@@ -3481,7 +3542,6 @@ class MixinCocoAddRemove(object):
         """
         remove_info = {'annotations': None, 'images': None}
         if gids_or_imgs:
-
             if verbose > 1:
                 print('Removing images')
 
@@ -3540,7 +3600,6 @@ class MixinCocoAddRemove(object):
         """
         remove_info = {'annotations': None, 'images': None, 'videos': None}
         if vidids_or_videos:
-
             if verbose > 1:
                 print('Removing videos')
 
@@ -3715,7 +3774,6 @@ class CocoIndex(object):
         index.file_name_to_img = None
         index._CHECKS = True
 
-        # index.name_to_video = None # TODO
         # index.kpcid_to_aids = None  # TODO
 
     def __bool__(index):
@@ -3747,15 +3805,15 @@ class CocoIndex(object):
 
     def _add_video(index, vidid, video):
         if index.videos is not None:
-            # name = video['name']
-            # if index._CHECKS:
-            #     if name in index.name_to_video:
-            #         raise ValueError(
-            #             'video with name={} already exists'.format(name))
+            name = video['name']
+            if index._CHECKS:
+                if name in index.name_to_video:
+                    raise ValueError(
+                        'video with name={} already exists'.format(name))
             index.videos[vidid] = video
             if vidid not in index.vidid_to_gids:
                 index.vidid_to_gids[vidid] = index._set()
-            # index.name_to_video[name] = video
+            index.name_to_video[name] = video
 
     def _add_image(index, gid, img):
         """
@@ -3961,8 +4019,6 @@ class CocoIndex(object):
                 item = lut.pop(item_id)
                 del index.vidid_to_gids[item_id]
                 if index.name_to_video is not None:
-                    raise NotImplementedError(
-                        'need to ensure name_to_video is maintained correctly')
                     del index.name_to_video[item['name']]
             if verbose > 2:
                 print('Updated video index')
@@ -4141,6 +4197,10 @@ class CocoIndex(object):
         index.name_to_img = {
             img['name']: img for img in index.imgs.values()
             if img.get('name', None) is not None
+        }
+        index.name_to_video = {
+            video['name']: video for video in index.videos.values()
+            if video.get('name', None) is not None
         }
 
 
@@ -4462,7 +4522,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             #     # 'has_assets': exists(assets_dpath),
             # }
             # is_bundle = all(bundle_conditions.values())
-            # if is_bundle:
             self.bundle_dpath = bundle_dpath
             self.assets_dpath = assets_dpath
             self.cache_dpath = cache_dpath
@@ -4534,14 +4593,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if union:
             try:
                 if verbose:
-                    # TODO: it would be nice if we had a way to combine results on
-                    # the fly, so we can work while the remaining io jobs are
-                    # loading
+                    # TODO: it would be nice if we had a way to combine results
+                    # on the fly, so we can work while the remaining io jobs
+                    # are loading
                     print('combining results')
                 coco_dset = CocoDataset.union(*results)
             except Exception as ex:
                 if union == 'try':
-                    warnings.warn('Failed to union coco results: {!r}'.format(ex))
+                    warnings.warn(
+                        'Failed to union coco results: {!r}'.format(ex))
                     return results
                 else:
                     raise
@@ -4667,8 +4727,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 Where to write the data.  Can either be a path to a file or an
                 open file pointer / stream.
 
-            newlines (bool) : if True, each annotation, image, category gets
-                its own line.
+            newlines (bool):
+                if True, each annotation, image, category gets its own line.
 
         Example:
             >>> import tempfile
@@ -5139,88 +5199,47 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 track_id_map.block_seen()
             return merged
 
-        FIX_PATH_BEHAVIOR = 1
-        if FIX_PATH_BEHAVIOR:
-            # New behavior is simplified and I believe it is correct
-            def longest_common_prefix(items, sep='/'):
-                """
-                Example:
-                    >>> items = [
-                    >>>     '/foo/bar/always/the/same/set1/img1.png',
-                    >>>     '/foo/bar/always/the/same/set1/img2.png',
-                    >>>     '/foo/bar/always/the/same/set2/img1.png',
-                    >>>     '/foo/bar/always/the/same/set2/img2.png',
-                    >>>     '/foo/baz/file1.txt',
-                    >>> ]
-                    >>> sep = '/'
-                    >>> longest_common_prefix(items, sep=sep)
-                    >>> longest_common_prefix(items[:-1], sep=sep)
-                """
-                # I would use a trie, but I don't know if pygtrie can do this efficiently
-                # (not that this is efficient)
-                from collections import defaultdict
-                freq = defaultdict(lambda: 0)
-                for item in items:
-                    path = tuple(item.split(sep))
-                    for i in range(len(path)):
-                        prefix = path[:i + 1]
-                        freq[prefix] += 1
-                # Find the longest common prefix
-                value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
-                longest_prefix = sep.join(value)
-                return longest_prefix
+        # New behavior is simplified and I believe it is correct
+        def longest_common_prefix(items, sep='/'):
+            """
+            Example:
+                >>> items = [
+                >>>     '/foo/bar/always/the/same/set1/img1.png',
+                >>>     '/foo/bar/always/the/same/set1/img2.png',
+                >>>     '/foo/bar/always/the/same/set2/img1.png',
+                >>>     '/foo/bar/always/the/same/set2/img2.png',
+                >>>     '/foo/baz/file1.txt',
+                >>> ]
+                >>> sep = '/'
+                >>> longest_common_prefix(items, sep=sep)
+                >>> longest_common_prefix(items[:-1], sep=sep)
+            """
+            # I would use a trie, but I don't know if pygtrie can do this efficiently
+            # (not that this is efficient)
+            from collections import defaultdict
+            freq = defaultdict(lambda: 0)
+            for item in items:
+                path = tuple(item.split(sep))
+                for i in range(len(path)):
+                    prefix = path[:i + 1]
+                    freq[prefix] += 1
+            # Find the longest common prefix
+            value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
+            longest_prefix = sep.join(value)
+            return longest_prefix
 
-            import os
-            from os.path import relpath
-            from os.path import normpath
-            dset_roots = [dset.bundle_dpath for dset in others]
-            dset_roots = [normpath(r) if r is not None else None
-                          for r in dset_roots]
-            items = [join('.', p) for p in dset_roots]
-            common_root = longest_common_prefix(items, sep=os.path.sep)
-            relative_dsets = [(relpath(d.bundle_dpath, common_root),
-                               d.dataset) for d in others]
+        dset_roots = [dset.bundle_dpath for dset in others]
+        dset_roots = [normpath(r) if r is not None else None
+                      for r in dset_roots]
+        items = [join('.', p) for p in dset_roots]
+        common_root = longest_common_prefix(items, sep=os.path.sep)
+        relative_dsets = [(relpath(d.bundle_dpath, common_root),
+                           d.dataset) for d in others]
 
-            merged = _coco_union(relative_dsets, common_root)
+        merged = _coco_union(relative_dsets, common_root)
 
-            kwargs['bundle_dpath'] = common_root
-            new_dset = cls(merged, **kwargs)
-
-        else:
-            # OLD BEHAVIOR IS PROBABLY WRONG
-
-            # Handle soft data roots
-            from os.path import normpath
-            soft_dset_roots = [dset.bundle_dpath for dset in others]
-            soft_dset_roots = [normpath(r) if r is not None else None
-                               for r in soft_dset_roots]
-            if ub.allsame(soft_dset_roots):
-                soft_img_root = ub.peek(soft_dset_roots)
-            else:
-                soft_img_root = None
-
-            # Handle hard coded data roots (This should not be common)
-            from os.path import normpath
-            hard_dset_roots = [dset.dataset.get('img_root', None) for dset in others]
-            hard_dset_roots = [normpath(r) if r is not None else None
-                               for r in hard_dset_roots]
-            if ub.allsame(hard_dset_roots):
-                common_root = ub.peek(hard_dset_roots)
-                relative_dsets = [('', d.dataset) for d in others]
-            else:
-                common_root = None
-                relative_dsets = [(d.bundle_dpath, d.dataset) for d in others]
-
-            merged = _coco_union(relative_dsets, common_root)
-
-            if common_root is not None:
-                merged['img_root'] = common_root
-
-            new_dset = cls(merged, **kwargs)
-
-            if common_root is None and soft_img_root is not None:
-                new_dset.bundle_dpath = soft_img_root
-
+        kwargs['bundle_dpath'] = common_root
+        new_dset = cls(merged, **kwargs)
         return new_dset
 
     def subset(self, gids, copy=False, autobuild=True):
@@ -5288,8 +5307,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dataset['img_root'] = self.dataset.get('img_root', None)
 
         if copy:
-            from copy import deepcopy
-            new_dataset = deepcopy(new_dataset)
+            new_dataset = copy.deepcopy(new_dataset)
 
         sub_dset = CocoDataset(new_dataset, bundle_dpath=self.bundle_dpath,
                                autobuild=autobuild)
@@ -5336,13 +5354,6 @@ def demo_coco_data():
     functions tested with this data. For more compliant demodata see the
     ``kwcoco.demodata`` submodule
 
-
-    Ignore:
-        # code for getting a segmentation polygon
-        kwimage.grab_test_image_fpath('astro')
-        labelme /home/joncrall/.cache/kwimage/demodata/astro.png
-        cat /home/joncrall/.cache/kwimage/demodata/astro.json
-
     Example:
         >>> # xdoctest: +REQUIRES(--show)
         >>> from kwcoco.coco_dataset import demo_coco_data, CocoDataset
@@ -5355,7 +5366,6 @@ def demo_coco_data():
     """
     import kwimage
     from kwimage.im_demodata import _TEST_IMAGES
-    from os.path import commonprefix, relpath
 
     test_imgs_keys = ['astro', 'carl', 'stars']
     urls = {k: _TEST_IMAGES[k]['url'] for k in test_imgs_keys}
@@ -5364,11 +5374,6 @@ def demo_coco_data():
 
     gpath1, gpath2, gpath3 = ub.take(gpaths, test_imgs_keys)
     url1, url2, url3 = ub.take(urls, test_imgs_keys)
-    # gpath2 = kwimage.grab_test_image_fpath('carl')
-    # gpath3 = kwimage.grab_test_image_fpath('stars')
-    # gpath1 = ub.grabdata('https://i.imgur.com/KXhKM72.png')
-    # gpath2 = ub.grabdata('https://i.imgur.com/flTHWFD.png')
-    # gpath3 = ub.grabdata('https://i.imgur.com/kCi7C1r.png')
 
     # Make file names relative for consistent testing purpose
     gname1 = relpath(gpath1, img_root)

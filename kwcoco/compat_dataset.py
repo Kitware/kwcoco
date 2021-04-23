@@ -338,8 +338,11 @@ class COCO(CocoDataset):
             >>> from kwcoco.compat_dataset import *  # NOQA
             >>> import kwcoco
             >>> self = COCO(kwcoco.CocoDataset.demo('shapes8').dataset)
-            >>> ann = {'id': 1}
-            >>> self.annToRLE(ann)
+            >>> rle = self.annToRLE(self.anns[1])
+            >>> assert len(rle['counts']) > 2
+            >>> # xdoctest: +REQUIRES(module:pycocotools)
+            >>> self.conform(legacy=True)
+            >>> orig = self._aspycoco().annToRLE(self.anns[1])
         """
         from kwimage.structs.segmentation import _coerce_coco_segmentation
         aid = ann['id']
@@ -349,22 +352,34 @@ class COCO(CocoDataset):
         data = ann['segmentation']
         dims = (h, w)
         sseg = _coerce_coco_segmentation(data, dims)
-        rle = sseg.to_mask(dims=dims).to_bytes_rle().data['counts']
+        rle = sseg.to_mask(dims=dims).to_bytes_rle().data
         return rle
 
     def annToMask(self, ann):
         """
-        Convert annotation which can be polygons, uncompressed RLE, or RLE to binary mask.
+        Convert annotation which can be polygons, uncompressed RLE, or RLE to
+        binary mask.
+
         :return: binary mask (numpy 2D array)
 
-        # TODO: fixme
+        Notes:
+            The mask is returned as a fortran (F-style) array with the same
+            dimensions as the parent image.
 
         Ignore:
             >>> from kwcoco.compat_dataset import *  # NOQA
             >>> import kwcoco
             >>> self = COCO(kwcoco.CocoDataset.demo('shapes8').dataset)
-            >>> ann = {'id': 1}
-            >>> self.annToMask(ann)
+            >>> mask = self.annToMask(self.anns[1])
+            >>> # xdoctest: +REQUIRES(module:pycocotools)
+            >>> self.conform(legacy=True)
+            >>> orig = self._aspycoco().annToMask(self.anns[1])
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> diff = kwimage.normalize((compat_mask - orig_mask).astype(np.float32))
+            >>> kwplot.imshow(diff)
+            >>> kwplot.show_if_requested()
         """
         from kwimage.structs.segmentation import _coerce_coco_segmentation
         aid = ann['id']
@@ -378,8 +393,5 @@ class COCO(CocoDataset):
             img = self.imgs[ann['image_id']]
             dims = (img['height'], img['width'])
             mask = sseg.to_mask(dims=dims)
-        # mask.to_fortran_mask()
-        m = mask.to_c_mask().data  # forget which one is right
-        # rle = self.annToRLE(ann)
-        # m = maskUtils.decode(rle)
+        m = mask.to_fortran_mask().data
         return m

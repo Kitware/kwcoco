@@ -13,10 +13,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Issue in rename categories with non-deterministic behavior
 * Reference gdal from the `osgeo` package
 * Fixed "name" attribute in sqlview.
+* Implemented the `name_to_video` index
+* annToMask and annToRLE in the `compat_dataset` now work like the original.
 
 ### Removed
 * Several deprecated APIs
 * `kwcoco.toydata` and `kwcoco.toypatterns`, use `kwcoco.demo.toydata` and `kwcoco.demo.toypatterns` instead.
+* `remove_all_images` and `remove_all_annotations` (use clear variants instead)
 
 
 ### Changed
