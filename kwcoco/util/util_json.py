@@ -4,7 +4,6 @@ import ubelt as ub  # NOQA
 import json
 from collections.abc import Generator
 from collections import OrderedDict
-# from collections import deque
 
 
 def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
@@ -59,7 +58,7 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
         elif isinstance(value, (np.floating)):
             new_value = float(value)
             walker[prefix] = new_value
-        elif isinstance(value, (np.complex)):
+        elif isinstance(value, (np.complexfloating)):
             new_value = complex(value)
             walker[prefix] = new_value
         elif hasattr(value, '__json__'):

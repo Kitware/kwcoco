@@ -3903,9 +3903,7 @@ class CocoIndex(object):
                     msg = 'Adding image to non-existing video'
                     warnings.warn(msg)
                     index.vidid_to_gids[vidid] = index._set_sorted_by_frame_index()
-                    import xdev
-                    with xdev.embed_on_exception_context:
-                        index.vidid_to_gids[vidid].add(gid)
+                    index.vidid_to_gids[vidid].add(gid)
 
     def _add_images(index, imgs):
         """
