@@ -85,9 +85,9 @@ VERSION=$(python -c "import setup; print(setup.VERSION)")
 MB_PYTHON_TAG=${MB_PYTHON_TAG:py3-none-any}
 
 # The default should change depending on the application
-#DEFAULT_MODE_LIST=("sdist" "universal" "bdist")
-DEFAULT_MODE_LIST=("sdist" "native" "universal")
-#DEFAULT_MODE_LIST=("sdist" "bdist")
+# Dont use universal unless Python2 is supported
+#DEFAULT_MODE_LIST=("sdist" "native" "universal" "bdist")
+DEFAULT_MODE_LIST=("sdist" "native")
 
 check_variable DEPLOY_REMOTE
 check_variable VERSION || exit 1
@@ -196,6 +196,8 @@ if [ "$DO_BUILD" == "True" ]; then
             WHEEL_PATH=$(ls dist/$NAME-$VERSION*.whl)
             #WHEEL_PATHS+=($WHEEL_PATH)
         elif [[ "$_MODE" == "universal" ]]; then
+            # Notes:
+            # https://packaging.python.org/guides/distributing-packages-using-setuptools/#pure-python-wheels
             python setup.py bdist_wheel --universal || { echo 'failed to build universal wheel' ; exit 1; }
             UNIVERSAL_TAG="py3-none-any"
             WHEEL_PATH=$(ls dist/$NAME-$VERSION-$UNIVERSAL_TAG*.whl)

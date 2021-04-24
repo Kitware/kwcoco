@@ -312,6 +312,9 @@ class MixinCocoAccessors(object):
 
         Returns:
             np.ndarray : the image
+
+        TODO:
+            - [ ] allow specification of multiple channels
         """
         import kwimage
         gpath = self.get_image_fpath(gid_or_img, channels=channels)
@@ -2102,6 +2105,19 @@ class MixinCocoStats(object):
         if config.get('ensure_imgsize', True):
             self._ensure_imgsize(workers=config.get('workers', 8))
 
+            for vidid, gids in self.index.vidid_to_gids.items():
+                if len(gids):
+                    # Each image in a video should be the same size (unless we
+                    # implement some transform from image to video space)
+                    # populate each video with the consistent width/height
+                    video = self.index.videos[vidid]
+                    vid_frames = self.images(gids)
+                    width_cand = vid_frames.lookup('width')
+                    height_cand = vid_frames.lookup('height')
+                    if ub.allsame(height_cand) and ub.allsame(width_cand):
+                        video['width'] = width_cand[0]
+                        video['height'] = height_cand[0]
+
         if config.get('pycocotools_info', True):
             for ann in ub.ProgIter(self.dataset['annotations'], desc='update anns'):
                 if 'iscrowd' not in ann:
@@ -2120,7 +2136,7 @@ class MixinCocoStats(object):
                         x, y, w, h = ann['bbox']
                         ann['area'] = w * h
 
-        if config.get('legacy', True):
+        if config.get('legacy', False):
             try:
                 kpcats = self.keypoint_categories()
             except Exception:
@@ -2131,7 +2147,7 @@ class MixinCocoStats(object):
                     # TODO: any original style coco dict is ok, we dont
                     # always need it to be a poly if it is RLE
                     import kwimage
-                    poly = kwimage.Polygon.from_coco(ann['segmentation'][0])
+                    poly = kwimage.Polygon.from_coco(ann['segmentation'])
                     # Hack, looks like kwimage does not wrap the original
                     # coco polygon with a list, but pycocotools needs that
                     ann['segmentation'] = [poly.to_coco(style='orig')]
