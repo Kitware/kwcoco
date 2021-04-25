@@ -519,7 +519,12 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     track_ids = list(range(tid_start, num_tracks + tid_start))
 
     dset = kwcoco.CocoDataset(autobuild=False)
-    dset.add_video(name='toy_video_{}'.format(video_id), id=video_id)
+    dset.add_video(
+        name='toy_video_{}'.format(video_id),
+        width=gsize[0],
+        height=gsize[1],
+        id=video_id,
+    )
 
     if multispectral and aux:
         raise ValueError('cant have multispectral and aux')
