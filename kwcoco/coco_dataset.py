@@ -1008,7 +1008,7 @@ class MixinCocoExtras(object):
             cache_dpath = join(bundle_dpath, '_cache')
             fpath = join(bundle_dpath, 'data.kwcoco.json')
 
-            stamp = ub.CacheStamp('vidshape_stamp_v13', dpath=cache_dpath,
+            stamp = ub.CacheStamp('vidshape_stamp_v14', dpath=cache_dpath,
                                   cfgstr=cfgstr, enabled=use_cache,
                                   product=[fpath], verbose=100,
                                   # meta=vidkw  # requires ubelt>=0.9.3
