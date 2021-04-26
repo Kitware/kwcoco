@@ -131,6 +131,9 @@ class Video(CocoBase):
     name = Column(String(256), nullable=False, index=True, unique=True)
     caption = Column(String(256), nullable=True)
 
+    width = Column(Integer)
+    height = Column(Integer)
+
     extra = Column(JSON, default=dict())
 
 
@@ -1341,7 +1344,7 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
         timestamps to determine if it needs to write the dataset.
     """
     if db_fpath is None:
-        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v005.sqlite')
+        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v006.sqlite')
 
     if db_fpath == ':memory:':
         db_uri = 'sqlite:///:memory:'
