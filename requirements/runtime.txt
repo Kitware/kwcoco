@@ -1,7 +1,7 @@
 ubelt >= 0.8.2
 parse >= 1.12.0
 scriptconfig >= 0.5.8
-kwarray >= 0.4.0
+kwarray >= 0.5.16
 kwimage >= 0.6.6
 six >= 1.11.0
 numpy >= 1.9.0

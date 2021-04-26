@@ -394,8 +394,7 @@ class MixinCocoAccessors(object):
             >>> kwplot.imshow(sample['im'])
             >>> kwplot.show_if_requested()
         """
-        # from kwcoco.util.util_slice import padded_slice
-        import kwimage
+        import kwarray
         ann = self._resolve_to_ann(aid_or_ann)
         if image is None:
             image = self.load_image(ann['image_id'])
@@ -405,8 +404,7 @@ class MixinCocoAccessors(object):
             slice(int(y), int(np.ceil(y + h))),
             slice(int(x), int(np.ceil(x + w))),
         )
-        # data_sliced, transform = padded_slice(image, in_slice, pad_slice=pad)
-        data_sliced, transform = kwimage.padded_slice(image, in_slice, pad=pad,
+        data_sliced, transform = kwarray.padded_slice(image, in_slice, pad=pad,
                                                       return_info=True)
 
         sample = {
@@ -2130,7 +2128,7 @@ class MixinCocoStats(object):
                     # Use segmentation if available
                     if 'segmentation' in ann:
                         import kwimage
-                        poly = kwimage.Polygon.from_coco(ann['segmentation'][0])
+                        poly = kwimage.MultiPolygon.from_coco(ann['segmentation'])
                         ann['area'] = float(poly.to_shapely().area)
                     else:
                         x, y, w, h = ann['bbox']
@@ -2147,10 +2145,10 @@ class MixinCocoStats(object):
                     # TODO: any original style coco dict is ok, we dont
                     # always need it to be a poly if it is RLE
                     import kwimage
-                    poly = kwimage.Polygon.from_coco(ann['segmentation'])
+                    poly = kwimage.MultiPolygon.from_coco(ann['segmentation'])
                     # Hack, looks like kwimage does not wrap the original
                     # coco polygon with a list, but pycocotools needs that
-                    ann['segmentation'] = [poly.to_coco(style='orig')]
+                    ann['segmentation'] = poly.to_coco(style='orig')
                 if 'keypoints' in ann:
                     import kwimage
                     # TODO: these have to be in some defined order for

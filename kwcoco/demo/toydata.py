@@ -1235,7 +1235,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
             tl_x, tl_y, br_x, br_y = tlbr
 
             # TODO: Use pad-infinite-slices to fix a bug here
-            # kwimage.padded_slice()
+            # kwarray.padded_slice()
 
             chip_index = tuple([slice(tl_y, br_y), slice(tl_x, br_x)])
             if imdata is not None:
