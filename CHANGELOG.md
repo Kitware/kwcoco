@@ -5,7 +5,20 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.0 - Unreleased
+## Version 0.2.1 - Unreleased
+
+
+### Changed
+
+* The `dset.index.vidid_to_gids` is now guaranteed to always return image ids ordered by their frame index.
+* `dset.view_sql` now has a `memory` kwarg that will force the database to live in memory.
+* The SQLite backend now agrees with the dict backend and does not map None to values for image names and file names.
+
+### Removed
+* `kwcoco.utils.util_slice` use `kwarray.util_slice` instead.
+
+
+## Version 0.2.0 - Released 2021-04-22
 
 
 ### Fixed

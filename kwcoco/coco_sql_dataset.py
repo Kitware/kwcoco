@@ -131,6 +131,9 @@ class Video(CocoBase):
     name = Column(String(256), nullable=False, index=True, unique=True)
     caption = Column(String(256), nullable=True)
 
+    width = Column(Integer)
+    height = Column(Integer)
+
     extra = Column(JSON, default=dict())
 
 
@@ -180,6 +183,9 @@ class Annotation(CocoBase):
 
     extra = Column(JSON, default=dict())
 
+# As long as the flavor of sql conforms to our raw sql commands set
+# this to 0, which uses the faster raw variant.
+ALCHEMY_MODE_DEFAULT = 0
 
 # Global book keeping (It would be nice to find a way to avoid this)
 CocoBase.TBLNAME_TO_CLASS = {}
@@ -251,7 +257,7 @@ class SqlListProxy(ub.NiceRepr):
         proxy.cls = cls
         proxy.session = session
         proxy._colnames = None
-        proxy.ALCHEMY_MODE = 0
+        proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
 
     def __len__(proxy):
         query = proxy.session.query(proxy.cls)
@@ -341,6 +347,8 @@ class SqlDictProxy(DictLike):
         session (Session): the sqlalchemy session
         cls (Type): the declarative sqlalchemy table class
         keyattr : the indexed column to use as the keys
+        ignore_null (bool): if True, ignores any keys set to NULL, otherwise
+            NULL keys are allowed.
 
     Example:
         >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -382,58 +390,55 @@ class SqlDictProxy(DictLike):
     Example:
         >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
-        >>> import pytest
-        >>> sql_dset, dct_dset = demo(num=10)
-        >>> proxy = sql_dset.index.name_to_cat
+        >>> import kwcoco
+        >>> # Test the variant of the SqlDictProxy where we ignore None keys
+        >>> # This is the case for name_to_img and file_name_to_img
+        >>> dct_dset = kwcoco.CocoDataset.demo('shapes1')
+        >>> dct_dset.add_image(name='no_file_image1')
+        >>> dct_dset.add_image(name='no_file_image2')
+        >>> dct_dset.add_image(name='no_file_image3')
+        >>> sql_dset = dct_dset.view_sql(memory=True)
+        >>> assert len(dct_dset.index.imgs) == 4
+        >>> assert len(dct_dset.index.file_name_to_img) == 1
+        >>> assert len(dct_dset.index.name_to_img) == 3
+        >>> assert len(sql_dset.index.imgs) == 4
+        >>> assert len(sql_dset.index.file_name_to_img) == 1
+        >>> assert len(sql_dset.index.name_to_img) == 3
 
         >>> proxy = sql_dset.index.file_name_to_img
+        >>> assert len(list(proxy.keys())) == 1
+        >>> assert len(list(proxy.values())) == 1
 
-        >>> keys = list(proxy.keys())
-        >>> values = list(proxy.values())
-        >>> items = list(proxy.items())
-        >>> item_keys = [t[0] for t in items]
-        >>> item_vals = [t[1] for t in items]
-        >>> lut_vals = [proxy[key] for key in keys]
-        >>> assert item_vals == lut_vals == values
-        >>> assert item_keys == keys
-        >>> assert len(proxy) == len(keys)
+        >>> proxy = sql_dset.index.name_to_img
+        >>> assert len(list(proxy.keys())) == 3
+        >>> assert len(list(proxy.values())) == 3
 
-        >>> goodkey1 = keys[1]
-        >>> badkey1 = -100000000000
-        >>> badkey2 = 'foobarbazbiz'
-        >>> badkey3 = object()
-        >>> assert goodkey1 in proxy
-        >>> assert badkey1 not in proxy
-        >>> assert badkey2 not in proxy
-        >>> assert badkey3 not in proxy
-        >>> with pytest.raises(KeyError):
-        >>>     proxy[badkey1]
-        >>> with pytest.raises(KeyError):
-        >>>     proxy[badkey2]
-        >>> with pytest.raises(KeyError):
-        >>>     proxy[badkey3]
-
-        >>> # xdoctest: +SKIP
-        >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
-        >>> ti = _benchmark_dict_proxy_ops(proxy)
-        >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
+        >>> proxy = sql_dset.index.imgs
+        >>> assert len(list(proxy.keys())) == 4
+        >>> assert len(list(proxy.values())) == 4
     """
-    def __init__(proxy, session, cls, keyattr=None):
+    def __init__(proxy, session, cls, keyattr=None, ignore_null=False):
         proxy.cls = cls
         proxy.session = session
         proxy.keyattr = keyattr
         proxy._colnames = None
         proxy._casters = None
+        proxy.ignore_null = ignore_null
 
         # It seems like writing the raw sql ourselves is fater than
         # using the ORM in most cases.
-        proxy.ALCHEMY_MODE = 0
+        proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
 
-        # ONLY DO THIS IN READONLInterfaceError:Y MODE
+        # ONLY USE IN READONLY MODE
         proxy._cache = _new_proxy_cache()
 
     def __len__(proxy):
-        query = proxy.session.query(proxy.cls)
+        if proxy.keyattr is None:
+            query = proxy.session.query(proxy.cls)
+        else:
+            query = proxy.session.query(proxy.keyattr)
+            if proxy.ignore_null:
+                query = query.filter(proxy.keyattr != None)  # NOQA
         return query.count()
 
     def __nice__(proxy):
@@ -446,6 +451,8 @@ class SqlDictProxy(DictLike):
         if proxy._cache is not None:
             if key in proxy._cache:
                 return True
+        if proxy.ignore_null and key is None:
+            return False
         keyattr = proxy.keyattr
         if keyattr is None:
             keyattr = proxy.cls.id
@@ -463,6 +470,8 @@ class SqlDictProxy(DictLike):
         if proxy._cache is not None:
             if key in proxy._cache:
                 return proxy._cache[key]
+        if proxy.ignore_null and key is None:
+            raise KeyError(key)
         try:
             session = proxy.session
             cls = proxy.cls
@@ -498,26 +507,34 @@ class SqlDictProxy(DictLike):
             else:
                 query = proxy.session.query(proxy.keyattr).order_by(proxy.cls.id)
 
+            if proxy.ignore_null:
+                query = query.filter(proxy.keyattr != None)  # NOQA
+
             for item in _orm_yielder(query):
                 key = item[0]
                 yield key
         else:
             # Using raw SQL seems much faster
-            if proxy.keyattr is None:
-                result = proxy.session.execute(
-                    'SELECT id FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+            keyattr = 'id' if proxy.keyattr is None else proxy.keyattr.key
+            if proxy.ignore_null:
+                expr = 'SELECT {} FROM {} WHERE {} IS NOT NULL ORDER BY id'.format(
+                    keyattr, proxy.cls.__tablename__, keyattr)
             else:
-                # raise NotImplementedError
-                result = proxy.session.execute(
-                    'SELECT {} FROM {} ORDER BY id'.format(
-                        proxy.keyattr.key, proxy.cls.__tablename__))
-
+                expr = 'SELECT {} FROM {} ORDER BY id'.format(
+                    keyattr, proxy.cls.__tablename__)
+            result = proxy.session.execute(expr)
             for item in _raw_yielder(result):
                 yield item[0]
 
     def itervalues(proxy):
         if proxy.ALCHEMY_MODE:
-            query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
+            query = proxy.session.query(proxy.cls)
+            if proxy.ignore_null:
+                # I think this is only needed in the autoreload session
+                # otherwise it might be possible to jsut use proxy.keyattr
+                cls_keyattr = getattr(proxy.cls, proxy.keyattr.key)
+                query = query.filter(cls_keyattr != None)  # NOQA
+            query = query.order_by(proxy.cls.id)
             for obj in _orm_yielder(query):
                 item = orm_to_dict(obj)
                 yield item
@@ -548,8 +565,14 @@ class SqlDictProxy(DictLike):
             casters = proxy._casters
 
             # Using raw SQL seems much faster
-            result = proxy.session.execute(
-                'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+            if proxy.ignore_null:
+                keyattr = 'id' if proxy.keyattr is None else proxy.keyattr.key
+                expr = 'SELECT {} FROM {} WHERE {} IS NOT NULL ORDER BY id'.format(
+                    keyattr, proxy.cls.__tablename__, keyattr)
+            else:
+                expr = (
+                    'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+            result = proxy.session.execute(expr)
 
             for row in _raw_yielder(result):
                 cast_row = [f(x) for f, x in zip(proxy._casters, row)]
@@ -577,6 +600,9 @@ class SqlIdGroupDictProxy(DictLike):
     another table corresponding to rows where a specific column has that parent
     id.
 
+    The items in the group can be sorted by the ``group_order_attr`` if
+    specified.
+
     For example, imagine two tables: images with one column (id) and
     annotations with two columns (id, image_id). This class can help provide a
     mpaping from each `image.id` to a `Set[annotation.id]` where those
@@ -602,14 +628,42 @@ class SqlIdGroupDictProxy(DictLike):
         >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
         >>> ti = _benchmark_dict_proxy_ops(proxy)
         >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
+
+    Example:
+        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+        >>> from kwcoco.coco_sql_dataset import *  # NOQA
+        >>> import kwcoco
+        >>> # Test the group sorted variant of this by using vidid_to_gids
+        >>> # where the "gids" must be sorted by the image frame indexes
+        >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes1')
+        >>> dct_dset.add_image(name='frame-index-order-demo1', frame_index=-30, video_id=1)
+        >>> dct_dset.add_image(name='frame-index-order-demo2', frame_index=10, video_id=1)
+        >>> dct_dset.add_image(name='frame-index-order-demo3', frame_index=3, video_id=1)
+        >>> dct_dset.add_video(name='empty-video1')
+        >>> dct_dset.add_video(name='empty-video2')
+        >>> dct_dset.add_video(name='empty-video3')
+        >>> sql_dset = dct_dset.view_sql(memory=True)
+        >>> orig = dct_dset.index.vidid_to_gids
+        >>> proxy = sql_dset.index.vidid_to_gids
+        >>> from kwcoco.util.util_json import indexable_allclose
+        >>> assert indexable_allclose(orig, dict(proxy))
+        >>> items = list(proxy.iteritems())
+        >>> vals = list(proxy.itervalues())
+        >>> keys = list(proxy.iterkeys())
+        >>> assert len(keys) == len(vals)
+        >>> assert dict(zip(keys, vals)) == dict(items)
     """
-    def __init__(proxy, session, valattr, keyattr, parent_keyattr):
+    def __init__(proxy, session, valattr, keyattr, parent_keyattr,
+                 group_order_attr=None):
         proxy.valattr = valattr
         proxy.keyattr = keyattr
         proxy.session = session
         proxy.parent_keyattr = parent_keyattr
         proxy.ALCHEMY_MODE = 0
         proxy._cache = _new_proxy_cache()
+
+        # if specified, the items within groups are ordered by this attr
+        proxy.group_order_attr = group_order_attr
 
     def __nice__(self):
         return str(len(self))
@@ -628,16 +682,27 @@ class SqlIdGroupDictProxy(DictLike):
         valattr = proxy.valattr
         if proxy.ALCHEMY_MODE:
             query = session.query(valattr).filter(keyattr == key)
+            if proxy.group_order_attr is not None:
+                query = query.order_by(proxy.group_order_attr)
             item = [row[0] for row in query.all()]
         else:
-            sql_expr = 'SELECT {} FROM {} WHERE {}=:key'.format(
-                proxy.valattr.name,
-                proxy.keyattr.class_.__tablename__,
-                proxy.keyattr.name,
-            )
+            if proxy.group_order_attr is None:
+                sql_expr = 'SELECT {} FROM {} WHERE {}=:key'.format(
+                    proxy.valattr.name,
+                    proxy.keyattr.class_.__tablename__,
+                    proxy.keyattr.name,
+                )
+            else:
+                sql_expr = 'SELECT {} FROM {} WHERE {}=:key ORDER BY {}'.format(
+                    proxy.valattr.name,
+                    proxy.keyattr.class_.__tablename__,
+                    proxy.keyattr.name,
+                    proxy.group_order_attr.name,
+                )
             result = proxy.session.execute(sql_expr, params={'key': key})
             item = [row[0] for row in result.fetchall()]
-        item = set(item)
+        _set = set if proxy.group_order_attr is None else ub.oset
+        item = _set(item)
         if proxy._cache is not None:
             proxy._cache[key] = item
         return item
@@ -660,130 +725,170 @@ class SqlIdGroupDictProxy(DictLike):
     def keys(proxy):
         if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.parent_keyattr)
+            query = query.order_by(proxy.parent_keyattr)
             for item in _orm_yielder(query):
                 key = item[0]
                 yield key
         else:
             result = proxy.session.execute(
-                'SELECT {} FROM {}'.format(
+                'SELECT {} FROM {} ORDER BY {}'.format(
                     proxy.parent_keyattr.name,
-                    proxy.parent_keyattr.class_.__tablename__))
+                    proxy.parent_keyattr.class_.__tablename__,
+                    proxy.parent_keyattr.name
+                ))
             for item in _raw_yielder(result):
                 yield item[0]
 
     def iteritems(proxy):
-        if proxy.ALCHEMY_MODE:
-            parent_keyattr = proxy.parent_keyattr
-            keyattr = proxy.keyattr
-            valattr = proxy.valattr
-            session = proxy.session
+        _set = set if proxy.group_order_attr is None else ub.oset
+        if proxy.group_order_attr is not None:
+            print('proxy.group_order_attr = {!r}'.format(proxy.group_order_attr))
+            # ALTERNATIVE MODE, EXPERIMENTAL MODE
+            # groups based on post processing. this might be faster or more
+            # robust than the group json array? Requires a hack to yield empty
+            # groups. Should consolidate to use one method or the other.
+            from collections import deque
+            import itertools as it
 
-            parent_table = parent_keyattr.class_.__table__
-            table = keyattr.class_.__table__
+            # hack to yield, empty groups
+            all_keys = deque(proxy.keys())
 
-            grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
-            # Hack: have to cast to str because I don't know how to make
-            # the json type work
-            query = (
-                session.query(parent_keyattr, str(grouped_vals))
-                .outerjoin(table, parent_keyattr == keyattr)
-                .group_by(parent_keyattr)
-                .order_by(parent_keyattr)
-            )
+            if proxy.ALCHEMY_MODE:
+                keyattr = proxy.keyattr
+                valattr = proxy.valattr
+                session = proxy.session
+                table = keyattr.class_.__table__
+                query = session.query(keyattr, valattr).order_by(
+                    keyattr, proxy.group_order_attr)
+                result = session.execute(query)
+                yielder = _raw_yielder(result)
+            else:
+                table = proxy.keyattr.class_.__tablename__
+                keycol = table + '.' + proxy.keyattr.name
+                valcol = table + '.' + proxy.valattr.name
+                groupcol = table + '.' + proxy.group_order_attr.name
 
-            for row in query.all():
-                key = row[0]
-                group = json.loads(row[1])
-                if group[0] is None:
-                    group = set()
-                else:
-                    group = set(group)
+                expr = (
+                    'SELECT {keycol}, {valcol} '
+                    'FROM {table} '
+                    'ORDER BY {keycol}, {group_order_attr}').format(
+                        table=table,
+                        keycol=keycol,
+                        valcol=valcol,
+                        group_order_attr=groupcol,
+                    )
+                result = proxy.session.execute(expr)
+                yielder = _raw_yielder(result)
+
+            for key, grouper in it.groupby(yielder, key=lambda x: x[0]):
+                next_key = all_keys.popleft()
+                while next_key != key:
+                    # Hack to yield empty groups
+                    next_group = _set()
+                    next_tup = (next_key, next_group)
+                    next_key = all_keys.popleft()
+                    yield next_tup
+                group = _set([g[1] for g in grouper])
+                tup = (key, group)
+                yield tup
+
+            # any remaining groups are empty
+            for key in all_keys:
+                group = _set()
                 tup = (key, group)
                 yield tup
 
         else:
-            parent_table = proxy.parent_keyattr.class_.__tablename__
-            table = proxy.keyattr.class_.__tablename__
-            parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
-            keycol = table + '.' + proxy.keyattr.name
-            valcol = table + '.' + proxy.valattr.name
-            expr = (
-                'SELECT {parent_keycol}, json_group_array({valcol}) '
-                'FROM {parent_table} '
-                'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
-                'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
-                    parent_table=parent_table,
-                    table=table,
-                    parent_keycol=parent_keycol,
-                    keycol=keycol,
-                    valcol=valcol,
+            if proxy.ALCHEMY_MODE:
+                parent_keyattr = proxy.parent_keyattr
+                keyattr = proxy.keyattr
+                valattr = proxy.valattr
+                session = proxy.session
+
+                parent_table = parent_keyattr.class_.__table__
+                table = keyattr.class_.__table__
+
+                grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
+                # Hack: have to cast to str because I don't know how to make
+                # the json type work
+                query = (
+                    session.query(parent_keyattr, str(grouped_vals))
+                    .outerjoin(table, parent_keyattr == keyattr)
+                    .group_by(parent_keyattr)
+                    .order_by(parent_keyattr)
                 )
-            print(expr)
-            result = proxy.session.execute(expr)
-            for row in result.fetchall():
-                key = row[0]
-                group = json.loads(row[1])
-                if group[0] is None:
-                    group = set()
-                else:
-                    group = set(group)
-                tup = (key, group)
-                yield tup
+
+                for row in query.all():
+                    key = row[0]
+                    group = json.loads(row[1])
+                    if group[0] is None:
+                        group = _set()
+                    else:
+                        group = _set(group)
+                    tup = (key, group)
+                    yield tup
+
+            else:
+                parent_table = proxy.parent_keyattr.class_.__tablename__
+                table = proxy.keyattr.class_.__tablename__
+                parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
+                keycol = table + '.' + proxy.keyattr.name
+                valcol = table + '.' + proxy.valattr.name
+                expr = (
+                    'SELECT {parent_keycol}, json_group_array({valcol}) '
+                    'FROM {parent_table} '
+                    'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
+                    'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
+                        parent_table=parent_table,
+                        table=table,
+                        parent_keycol=parent_keycol,
+                        keycol=keycol,
+                        valcol=valcol,
+                    )
+                result = proxy.session.execute(expr)
+                for row in result.fetchall():
+                    key = row[0]
+                    group = json.loads(row[1])
+                    if group[0] is None:
+                        group = _set()
+                    else:
+                        group = _set(group)
+                    tup = (key, group)
+                    yield tup
 
     def itervalues(proxy):
-        if proxy.ALCHEMY_MODE:
-            # Hack:
-            for key, val in proxy.items():
-                yield val
-            # parent_keyattr = proxy.parent_keyattr
-            # keyattr = proxy.keyattr
-            # valattr = proxy.valattr
-            # session = proxy.session
-
-            # parent_table = parent_keyattr.class_.__table__
-            # table = proxy.keyattr.class_.__tablename__
-
-            # # TODO: This might have to be different for PostgreSQL
-            # grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
-            # query = (
-            #     session.query(grouped_vals)
-            #     .outerjoin(table, parent_keyattr == keyattr)
-            #     .group_by(parent_keyattr)
-            #     .order_by(parent_keyattr)
-            # )
-            # for row in _orm_yielder(query):
-            #     group = row[0]
-            #     if group[0] is None:
-            #         group = set()
-            #     else:
-            #         group = set(group)
-            #     yield group
-        else:
-            parent_table = proxy.parent_keyattr.class_.__tablename__
-            table = proxy.keyattr.class_.__tablename__
-            parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
-            keycol = table + '.' + proxy.keyattr.name
-            valcol = table + '.' + proxy.valattr.name
-            expr = (
-                'SELECT {parent_keycol}, json_group_array({valcol}) '
-                'FROM {parent_table} '
-                'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
-                'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
-                    parent_table=parent_table,
-                    table=table,
-                    parent_keycol=parent_keycol,
-                    keycol=keycol,
-                    valcol=valcol,
-                )
-            # print(expr)
-            result = proxy.session.execute(expr)
-            for row in result.fetchall():
-                group = json.loads(row[1])
-                if group[0] is None:
-                    group = set()
-                else:
-                    group = set(group)
-                yield group
+        # Not sure if there if iterating over just the valuse can be more
+        # efficient than iterating over the items and discarding the values.
+        for key, val in proxy.items():
+            yield val
+        # _set = set if proxy.group_order_attr is None else ub.oset
+        # if proxy.ALCHEMY_MODE:
+        # else:
+        #     parent_table = proxy.parent_keyattr.class_.__tablename__
+        #     table = proxy.keyattr.class_.__tablename__
+        #     parent_keycol = parent_table + '.' + proxy.parent_keyattr.name
+        #     keycol = table + '.' + proxy.keyattr.name
+        #     valcol = table + '.' + proxy.valattr.name
+        #     expr = (
+        #         'SELECT {parent_keycol}, json_group_array({valcol}) '
+        #         'FROM {parent_table} '
+        #         'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
+        #         'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
+        #             parent_table=parent_table,
+        #             table=table,
+        #             parent_keycol=parent_keycol,
+        #             keycol=keycol,
+        #             valcol=valcol,
+        #         )
+        #     # print(expr)
+        #     result = proxy.session.execute(expr)
+        #     for row in result.fetchall():
+        #         group = json.loads(row[1])
+        #         if group[0] is None:
+        #             group = _set()
+        #         else:
+        #             group = _set(group)
+        #         yield group
 
 
 class CocoSqlIndex(object):
@@ -812,17 +917,19 @@ class CocoSqlIndex(object):
         index.videos = SqlDictProxy(session, Video)
         index.name_to_cat = SqlDictProxy(session, Category, Category.name)
 
-        # TODO: handle case where these values are None, such that they are not
-        # handled in the index.
-        index.name_to_img = SqlDictProxy(session, Image, Image.name)
-        index.file_name_to_img = SqlDictProxy(session, Image, Image.file_name)
+        # These indexes are allowed to have null keys
+        index.name_to_img = SqlDictProxy(session, Image, Image.name,
+                                         ignore_null=True)
+        index.file_name_to_img = SqlDictProxy(session, Image, Image.file_name,
+                                              ignore_null=True)
 
         index.gid_to_aids = SqlIdGroupDictProxy(
             session, Annotation.id, Annotation.image_id, Image.id)
         index.cid_to_aids = SqlIdGroupDictProxy(
             session, Annotation.id, Annotation.category_id, Category.id)
         index.vidid_to_gids = SqlIdGroupDictProxy(
-            session, Image.id, Image.video_id, Video.id)
+            session, Image.id, Image.video_id, Video.id,
+            group_order_attr=Image.frame_index)
 
         # Make a list like view for algorithms
         index.dataset = {
@@ -965,7 +1072,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         elif uri.startswith('sqlite:///file:'):
             uri = uri + '?uri=true'
         self.engine = create_engine(uri)
-        if len(self.engine.table_names()) == 0:
+        # table_names = self.engine.table_names()
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()
+        if len(table_names) == 0:
             # Opened an empty database, need to create the tables
             # Create all tables in the engine.
             # This is equivalent to "Create Table" statements in raw SQL.
@@ -1012,7 +1121,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         from sqlalchemy import inspect
         session = self.session
         inspector = inspect(self.engine)
-        for key in self.engine.table_names():
+        # table_names = self.engine.table_names()
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()
+        for key in table_names:
             colinfo = inspector.get_columns(key)
             colnames = {c['name'] for c in colinfo}
             # TODO: is there a better way to grab this information?
@@ -1233,12 +1344,13 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
         timestamps to determine if it needs to write the dataset.
     """
     if db_fpath is None:
-        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v005.sqlite')
+        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v006.sqlite')
 
-    db_uri = 'sqlite:///file:' + db_fpath
-    # dpath = dirname(dset.fpath)
+    if db_fpath == ':memory:':
+        db_uri = 'sqlite:///:memory:'
+    else:
+        db_uri = 'sqlite:///file:' + db_fpath
 
-    print('dset.img_root = {!r}'.format(dset.img_root))
     self = CocoSqlDatabase(db_uri, img_root=dset.img_root, tag=dset.tag)
 
     import os
@@ -1460,7 +1572,9 @@ def devcheck():
     print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
 
     # Read the sql tables into pandas
-    for key in self.engine.table_names():
+    # table_names = self.engine.table_names()  # deprecated
+    table_names = sqlalchemy.inspect(self.engine).get_table_names()
+    for key in table_names:
         print('\n----')
         print('key = {!r}'.format(key))
         table_df = self.raw_table(key)
@@ -1499,9 +1613,9 @@ def devcheck():
 
     with timerit.Timer('query with in'):
         query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)
-        items1 = query.all()
+        items1 = query.all()  # NOQA
 
     with timerit.Timer('naive'):
-        items2 = [proxy[gid] for gid in chosen_gids]
+        items2 = [proxy[gid] for gid in chosen_gids]  # NOQA
 
     print(query.statement)
