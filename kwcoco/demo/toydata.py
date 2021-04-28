@@ -25,6 +25,11 @@ except Exception:
     profile = ub.identity
 
 
+# Updated when toydata is modified.
+# Internal cachers use this to invalidate old caches
+TOYDATA_VERSION = 15
+
+
 @profile
 def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
                       newstyle=True,
@@ -165,7 +170,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     cache_dpath = ub.ensuredir(cache_dpath)
 
     stamp = ub.CacheStamp(
-        'toy_dset_stamp_v14',
+        'toy_dset_stamp_v{:03d}'.format(TOYDATA_VERSION),
         dpath=cache_dpath, depends=depends, verbose=verbose, enabled=0)
 
     n_have = len(list(glob.glob(join(img_dpath, '*.png'))))
@@ -535,18 +540,19 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
             # TODO: standard for transformation serialization?
             return {'type': 'affine', 'matrix': [
                 [sx, 0, 0], [0, sx, 0], [0, 0, 1]]}
+        # kwimage.Scale((sx, sy)).__json__() ???
         s2_res = [60, 10, 20, 60, 20]
         s2_bands = ['B1', 'B8', 'B8a', 'B10', 'B11']
         aux = [
             {'channels': b,
-             'base_to_aux': temp_scale_matrix_json(r / 60.),
+             'warp_aux_to_img': temp_scale_matrix_json(60. / r),
              'dtype': 'uint16'}
             for b, r in zip(s2_bands, s2_res)
         ]
 
         main_window = kwimage.Boxes([[0, 0, gsize[0], gsize[1]]], 'xywh')
         for chaninfo in aux:
-            mat = np.array(chaninfo['base_to_aux']['matrix'])
+            mat = np.linalg.inv(np.array(chaninfo['warp_aux_to_img']['matrix']))
             aux_window = main_window.warp(mat).quantize()
             chaninfo['width'] = int(aux_window.width.ravel()[0])
             chaninfo['height'] = int(aux_window.height.ravel()[0])
@@ -580,7 +586,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
                         'channels': chaninfo,
                         'width': gsize[0],
                         'height': gsize[1],
-                        'base_to_aux': None,
+                        'warp_aux_to_img': None,
                     }
                 # Add placeholder for auxiliary image data
                 auxitem = {
@@ -1273,9 +1279,9 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
                             val = rng.uniform(0.2, 1.0)
                             # transform annotation into aux space if it is
                             # different
-                            base_to_aux = auxinfo.get('base_to_aux', None)
-                            if base_to_aux is not None:
-                                mat = np.array(base_to_aux['matrix'])
+                            warp_aux_to_img = auxinfo.get('warp_aux_to_img', None)
+                            if warp_aux_to_img is not None:
+                                mat = np.linalg.inv(np.array(warp_aux_to_img['matrix']))
                                 seg_ = seg.warp(mat)
                                 auxinfo['imdata'] = seg_.fill(auxinfo['imdata'], value=val)
                             else:

@@ -50,13 +50,14 @@ An informal spec is as follows:
                 'channels': <ChannelSpec>,   # a string encoding
                 'width':     <int>    # pixel width of auxiliary image
                 'height':    <int>    # pixel height of auxiliary image
-                'base_to_aux': <TransformSpec>,  # tranform from "base" image space to auxiliary image space. (identity if unspecified)
+                'warp_aux_to_img': <TransformSpec>,  # tranform from "base" image space to auxiliary image space. (identity if unspecified)
             }, ...
         ]
 
         'video_id': str  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
         'timestamp': str | int  # a iso-string timestamp or an integer in flicks.
         'frame_index': int  # ordinal frame index which can be used if timestamp is unknown.
+        'warp_img_to_vid': <TransformSpec>  # a transform image space to video space (identity if unspecified), can be used for sensor alignment or video stabilization
     }
 
     TransformSpec:
@@ -1006,11 +1007,13 @@ class MixinCocoExtras(object):
             cache_dpath = join(bundle_dpath, '_cache')
             fpath = join(bundle_dpath, 'data.kwcoco.json')
 
-            stamp = ub.CacheStamp('vidshape_stamp_v14', dpath=cache_dpath,
-                                  cfgstr=cfgstr, enabled=use_cache,
-                                  product=[fpath], verbose=100,
-                                  # meta=vidkw  # requires ubelt>=0.9.3
-                                  )
+            stamp = ub.CacheStamp(
+                'vidshape_stamp_v{:03d}'.format(toydata.TOYDATA_VERSION),
+                dpath=cache_dpath,
+                cfgstr=cfgstr, enabled=use_cache,
+                product=[fpath], verbose=100,
+                meta=vidkw
+            )
             print('stamp = {!r}'.format(stamp))
             if stamp.expired():
                 vidkw['dpath'] = bundle_dpath
