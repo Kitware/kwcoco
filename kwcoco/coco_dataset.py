@@ -2418,7 +2418,8 @@ class MixinCocoStats(object):
             statskw (dict): kwargs for :func:`kwarray.stats_dict`
 
         Returns:
-            Dict[str, Dict[str, Dict | ndarray]
+            Dict[str, Dict[str, Dict | ndarray]:
+                Stats are returned in width-height format.
 
         Example:
             >>> import kwcoco

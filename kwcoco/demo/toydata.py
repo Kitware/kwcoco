@@ -27,7 +27,7 @@ except Exception:
 
 # Updated when toydata is modified.
 # Internal cachers use this to invalidate old caches
-TOYDATA_VERSION = 15
+TOYDATA_VERSION = 16
 
 
 @profile
@@ -563,6 +563,10 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
             'file_name': '<todo-generate-{}-{}>'.format(video_id, frame_idx),
             'width': gsize[0],
             'height': gsize[1],
+            'warp_img_to_vid': {
+                'type': 'affine',
+                'matrix': [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            },
             'frame_index': frame_idx,
             'video_id': video_id,
         }
