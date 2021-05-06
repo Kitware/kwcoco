@@ -18,6 +18,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Removed `base_to_aux` transform in favor of inverse `warp_aux_to_img`
 
 
+### Fixes
+* Fixed error in kwcoco conform documentation 
+* The conform operation now warns if the segmentation cannot be converted to a polygon
+
+
 ## Version 0.2.1 - Released 2021-04-26
 
 

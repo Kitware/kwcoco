@@ -2130,9 +2130,19 @@ class MixinCocoStats(object):
                 if 'area' not in ann:
                     # Use segmentation if available
                     if 'segmentation' in ann:
-                        import kwimage
-                        poly = kwimage.MultiPolygon.from_coco(ann['segmentation'])
-                        ann['area'] = float(poly.to_shapely().area)
+                        try:
+                            import kwimage
+                            poly = kwimage.MultiPolygon.from_coco(ann['segmentation'])
+                            ann['area'] = float(poly.to_shapely().area)
+                        except Exception:
+                            import warnings
+                            warnings.warn(ub.paragraph(
+                                '''
+                                Unable to coerce segmentation to a polygon.
+                                This may be indicative of a bug in
+                                `kwimage.MultiPolygon.coerce` or a misformatted
+                                segmentation
+                                '''))
                     else:
                         x, y, w, h = ann['bbox']
                         ann['area'] = w * h
