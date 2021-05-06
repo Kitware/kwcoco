@@ -5,16 +5,13 @@ import scriptconfig as scfg
 
 
 class CocoConformCLI:
-    """
-    Make the COCO file conform to the spec.
-
-    Populates inferable information such as image size, annotation area, etc.
-    """
     name = 'conform'
 
     class CLIConfig(scfg.Config):
         """
-        Reroot image paths onto a new image root.
+        Make the COCO file conform to the spec.
+
+        Populates inferable information such as image size, annotation area, etc.
         """
         epilog = """
         Example Usage:

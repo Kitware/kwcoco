@@ -286,6 +286,24 @@ dset.index.file_name_to_img  # a mapping from an image file name to the image di
 These indexes are dynamically updated when items are added or removed.
 
 
+### Using kwcoco to write a torch dataset
+
+
+The easiest way to write a torch dataset with kwcoco is to combine it with
+`ndsampler <https://gitlab.kitware.com/computer-vision/ndsampler>`
+
+Examples of kwcoco + ndsampler being to write torch datasets to train deep
+networks can be found in `netharn's
+<https://gitlab.kitware.com/computer-vision/netharn>`_ examples for:
+
+`detection <https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/examples/object_detection.py>`_
+
+`classification <https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/examples/classification.py>`_
+
+`segmentation <https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/examples/segmentation.py>`_
+
+
+
 ## Technical Dept
 
 Based on design decisions made in the original MS-COCO and KW-COCO, there are a
