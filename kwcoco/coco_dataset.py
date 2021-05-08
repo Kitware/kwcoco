@@ -1017,7 +1017,7 @@ class MixinCocoExtras(object):
             print('stamp = {!r}'.format(stamp))
             if stamp.expired():
                 vidkw['dpath'] = bundle_dpath
-                vidkw.pop('bundle_dpath')
+                vidkw.pop('bundle_dpath', None)
                 self = toydata.random_video_dset(**vidkw)
                 print('self.fpath = {!r}'.format(self.fpath))
                 print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
