@@ -364,6 +364,8 @@ class ChannelSpec(ub.NiceRepr):
             _ = xdev.profile_now(self.encode)(item, mode=1)
         """
         import kwarray
+        if len(item) == 0:
+            raise ValueError('Cannot encode empty item')
         _impl = kwarray.ArrayAPI.coerce(ub.peek(item.values()))
 
         parsed = self.parse()
