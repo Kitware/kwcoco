@@ -288,17 +288,16 @@ class ChannelSpec(ub.NiceRepr):
             >>> ChannelSpec.coerce('rgb')._demo_item(dims, rng=0)
             >>> ChannelSpec.coerce('gray')._demo_item(dims, rng=0)
         """
-        import torch
         import kwarray
         rng = kwarray.ensure_rng(rng)
         item_shapes = self._item_shapes(dims)
         item = {
-            key: torch.from_numpy(rng.rand(*shape))
+            key: rng.rand(*shape)
             for key, shape in item_shapes.items()
         }
         return item
 
-    def encode(self, item, axis=0, impl=1):
+    def encode(self, item, axis=0, mode=1):
         """
         Given a dictionary containing preloaded components of the network
         inputs, build a concatenated (fused) network representations of each
@@ -315,13 +314,14 @@ class ChannelSpec(ub.NiceRepr):
                 mapping between input stream and its early fused tensor input.
 
         Example:
-            >>> import torch
+            >>> from kwcoco.channel_spec import *  # NOQA
+            >>> import numpy as np
             >>> dims = (4, 4)
             >>> item = {
-            >>>     'rgb': torch.rand(3, *dims),
-            >>>     'disparity': torch.rand(1, *dims),
-            >>>     'flowx': torch.rand(1, *dims),
-            >>>     'flowy': torch.rand(1, *dims),
+            >>>     'rgb': np.random.rand(3, *dims),
+            >>>     'disparity': np.random.rand(1, *dims),
+            >>>     'flowx': np.random.rand(1, *dims),
+            >>>     'flowy': np.random.rand(1, *dims),
             >>> }
             >>> # Complex Case
             >>> self = ChannelSpec('rgb,disparity,rgb|disparity|flowx|flowy,flowx|flowy')
@@ -336,12 +336,12 @@ class ChannelSpec(ub.NiceRepr):
 
         Example:
             >>> # Case where we have to break up early fused data
-            >>> import torch
+            >>> import numpy as np
             >>> dims = (40, 40)
             >>> item = {
-            >>>     'rgb|disparity': torch.rand(4, *dims),
-            >>>     'flowx': torch.rand(1, *dims),
-            >>>     'flowy': torch.rand(1, *dims),
+            >>>     'rgb|disparity': np.random.rand(4, *dims),
+            >>>     'flowx': np.random.rand(1, *dims),
+            >>>     'flowy': np.random.rand(1, *dims),
             >>> }
             >>> # Complex Case
             >>> self = ChannelSpec('rgb,disparity,rgb|disparity,rgb|disparity|flowx|flowy,flowx|flowy,flowx,disparity')
@@ -353,17 +353,19 @@ class ChannelSpec(ub.NiceRepr):
             >>> #self = ChannelSpec('rgb|disparity,flowx|flowy')
             >>> import timerit
             >>> ti = timerit.Timerit(100, bestof=10, verbose=2)
-            >>> for timer in ti.reset('impl=simple'):
+            >>> for timer in ti.reset('mode=simple'):
             >>>     with timer:
-            >>>         inputs = self.encode(item, impl=0)
-            >>> for timer in ti.reset('impl=minimize-concat'):
+            >>>         inputs = self.encode(item, mode=0)
+            >>> for timer in ti.reset('mode=minimize-concat'):
             >>>     with timer:
-            >>>         inputs = self.encode(item, impl=1)
+            >>>         inputs = self.encode(item, mode=1)
 
             import xdev
-            _ = xdev.profile_now(self.encode)(item, impl=1)
+            _ = xdev.profile_now(self.encode)(item, mode=1)
         """
-        import torch
+        import kwarray
+        _impl = kwarray.ArrayAPI.coerce(ub.peek(item.values()))
+
         parsed = self.parse()
         # unique = self.unique()
 
@@ -371,7 +373,7 @@ class ChannelSpec(ub.NiceRepr):
         # channels item can be directly translated to the result inputs. We
         # probably don't need to do the full decoding each and every time.
 
-        if impl == 1:
+        if mode == 1:
             # Slightly more complex implementation that attempts to minimize
             # concat operations.
             item_keys = tuple(sorted(item.keys()))
@@ -384,8 +386,8 @@ class ChannelSpec(ub.NiceRepr):
                 if len(parts) == 1:
                     fused[key] = parts[0]
                 else:
-                    fused[key] = torch.cat(parts, dim=axis)
-        elif impl == 0:
+                    fused[key] = _impl.cat(parts, axis=axis)
+        elif mode == 0:
             # Simple implementation that always does the full break down of
             # item components.
             components = {}
@@ -398,9 +400,9 @@ class ChannelSpec(ub.NiceRepr):
 
             fused = {}
             for key, parts in parsed.items():
-                fused[key] = torch.cat([components[k] for k in parts], dim=axis)
+                fused[key] = _impl.cat([components[k] for k in parts], axis=axis)
         else:
-            raise KeyError(impl)
+            raise KeyError(mode)
 
         return fused
 
@@ -410,20 +412,37 @@ class ChannelSpec(ub.NiceRepr):
 
         Args:
             inputs (Dict[str, Tensor]): dictionary of components
+            axis (int, default=1): channel dimension
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:netharn)
-            >>> import torch
+            >>> from kwcoco.channel_spec import *  # NOQA
+            >>> import numpy as np
             >>> dims = (4, 4)
-            >>> components = {
-            >>>     'rgb': torch.rand(3, *dims),
-            >>>     'ir': torch.rand(1, *dims),
+            >>> item_components = {
+            >>>     'rgb': np.random.rand(3, *dims),
+            >>>     'ir': np.random.rand(1, *dims),
             >>> }
             >>> self = ChannelSpec('rgb|ir')
-            >>> inputs = self.encode(components)
+            >>> item_encoded = self.encode(item_components)
+            >>> batch = {k: np.concatenate([v[None, :], v[None, :]], axis=0)
+            ...          for k, v in item_encoded.items()}
+            >>> components = self.decode(batch)
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:netharn, module:torch)
+            >>> import torch
+            >>> import numpy as np
+            >>> dims = (4, 4)
+            >>> components = {
+            >>>     'rgb': np.random.rand(3, *dims),
+            >>>     'ir': np.random.rand(1, *dims),
+            >>> }
+            >>> components = ub.map_vals(torch.from_numpy, components)
+            >>> self = ChannelSpec('rgb|ir')
+            >>> encoded = self.encode(components)
             >>> from netharn.data import data_containers
             >>> item = {k: data_containers.ItemContainer(v, stack=True)
-            >>>         for k, v in inputs.items()}
+            >>>         for k, v in encoded.items()}
             >>> batch = data_containers.container_collate([item, item])
             >>> components = self.decode(batch)
         """
@@ -435,7 +454,7 @@ class ChannelSpec(ub.NiceRepr):
                 size = self._size_lut.get(part, 1)
                 idx2 = idx1 + size
                 fused = inputs[key]
-                index = ([slice(None)] * axis + [slice(idx1, idx2)])
+                index = tuple([slice(None)] * axis + [slice(idx1, idx2)])
                 component = fused[index]
                 components[part] = component
                 idx1 = idx2
@@ -446,7 +465,6 @@ class ChannelSpec(ub.NiceRepr):
         Look up component indices within fused streams
 
         Example:
-            >>> import torch
             >>> dims = (4, 4)
             >>> inputs = ['flowx', 'flowy', 'disparity']
             >>> self = ChannelSpec('disparity,flowx|flowy')
@@ -460,7 +478,7 @@ class ChannelSpec(ub.NiceRepr):
             for part in parts:
                 size = self._size_lut.get(part, 1)
                 idx2 = idx1 + size
-                index = ([slice(None)] * axis + [slice(idx1, idx2)])
+                index = tuple([slice(None)] * axis + [slice(idx1, idx2)])
                 idx1 = idx2
                 component_indices[part] = (key, index)
         return component_indices
@@ -511,10 +529,12 @@ def _cached_single_fused_mapping(item_keys, parsed_items, axis=0):
                 last = accum[-1][1]
                 new_sl = list(first)
                 new_sl[-1] = slice(first[-1].start, last[-1].stop, last[-1].step)
+                new_sl = tuple(new_sl)
                 new_idx_list.append((item_key, new_sl))
             else:
                 new_idx_list.append(accum[0])
-        new_fused_indices[key] = new_idx_list
+        val = new_idx_list
+        new_fused_indices[key] = val
     return new_fused_indices
 
 
@@ -639,11 +659,3 @@ def oset_delitem(self, index):
                     self.map[k] = v - num_after
         else:
             self.discard(to_remove)
-
-if __name__ == '__main__':
-    """
-    CommandLine:
-        python ~/code/kwcoco/kwcoco/channel_spec.py all
-    """
-    import xdoctest
-    xdoctest.doctest_module(__file__)
