@@ -16,7 +16,10 @@ class CocoStatsCLI:
             'basic': scfg.Value(True, help='show basic stats'),
             'extended': scfg.Value(True, help='show extended stats'),
             'catfreq': scfg.Value(True, help='show category frequency stats'),
-            'boxes': scfg.Value(False, help='show bounding box stats'),
+            'boxes': scfg.Value(False, help=ub.paragraph(
+                '''
+                show bounding box stats in width-height format.
+                ''')),
 
             'annot_attrs': scfg.Value(False, help='show annotation attribute information'),
             'image_attrs': scfg.Value(False, help='show image attribute information'),

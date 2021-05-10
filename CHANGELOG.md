@@ -5,7 +5,26 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.1 - Unreleased
+## Version 0.2.2 - Unreleased
+
+
+### Added
+
+* Added `channel_spec.py` as a helper and documentation
+* Auxiliary images now have `warp_aux_to_img` property
+* Base images now have `warp_img_to_vid` property
+
+### Changed
+
+* Removed `base_to_aux` transform in favor of inverse `warp_aux_to_img`
+
+
+### Fixes
+* Fixed error in kwcoco conform documentation 
+* The conform operation now warns if the segmentation cannot be converted to a polygon
+
+
+## Version 0.2.1 - Released 2021-04-26
 
 
 ### Changed

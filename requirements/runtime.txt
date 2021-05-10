@@ -1,4 +1,4 @@
-ubelt >= 0.8.2
+ubelt >= 0.9.3
 parse >= 1.12.0
 scriptconfig >= 0.5.8
 kwarray >= 0.5.16

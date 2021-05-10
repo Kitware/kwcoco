@@ -73,7 +73,7 @@ class CocoToyDataCLI(object):
             else:
                 dset = kwcoco.CocoDataset.demo(config['key'],
                                                use_cache=config['use_cache'])
-            # dset.reroot(absolute=True)
+            dset.reroot(absolute=True)
 
         if config['dst'] is not None:
             print('dset.fpath = {!r}'.format(dset.fpath))
