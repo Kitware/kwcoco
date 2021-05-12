@@ -886,9 +886,9 @@ class MixinCocoExtras(object):
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
-            >>> pnums = kwplot.PlotNums(nSubplots=len(dset.imgs))
+            >>> pnums = kwplot.PlotNums(nSubplots=len(dset.index.imgs))
             >>> fnum = 1
-            >>> for gx, gid in enumerate(dset.imgs.keys()):
+            >>> for gx, gid in enumerate(dset.index.imgs.keys()):
             >>>     canvas = dset.draw_image(gid=gid)
             >>>     kwplot.imshow(canvas, pnum=pnums[gx], fnum=fnum)
             >>>     #dset.show_image(gid=gid, pnum=pnums[gx])
@@ -906,11 +906,11 @@ class MixinCocoExtras(object):
             >>> # This is the first use-case of image names
             >>> assert len(dset.index.file_name_to_img) == 0, (
             >>>     'the multispectral demo case has no "base" image')
-            >>> assert len(dset.index.name_to_img) == len(dset.imgs) == 5
+            >>> assert len(dset.index.name_to_img) == len(dset.index.imgs) == 5
             >>> dset.remove_images([1])
-            >>> assert len(dset.index.name_to_img) == len(dset.imgs) == 4
+            >>> assert len(dset.index.name_to_img) == len(dset.index.imgs) == 4
             >>> dset.remove_videos([1])
-            >>> assert len(dset.index.name_to_img) == len(dset.imgs) == 0
+            >>> assert len(dset.index.name_to_img) == len(dset.index.imgs) == 0
 
         Ignore:
             >>> # Test the cache
@@ -1671,7 +1671,7 @@ class MixinCocoExtras(object):
             >>> cases['abs_remote'] = kwcoco.CocoDataset.from_image_paths([join(remote, gname)])
             >>> def report(dset, name):
             >>>     gid = 1
-            >>>     rel_fpath = dset.imgs[gid]['file_name']
+            >>>     rel_fpath = dset.index.imgs[gid]['file_name']
             >>>     abs_fpath = dset.get_image_fpath(gid)
             >>>     color = 'green' if exists(abs_fpath) else 'red'
             >>>     print('   * strategy_name = {!r}'.format(name))
@@ -1680,7 +1680,7 @@ class MixinCocoExtras(object):
             >>> for key, dset in cases.items():
             >>>     print('----')
             >>>     print('case key = {!r}'.format(key))
-            >>>     print('ORIG = {!r}'.format(dset.imgs[1]['file_name']))
+            >>>     print('ORIG = {!r}'.format(dset.index.imgs[1]['file_name']))
             >>>     print('dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
             >>>     print('missing_gids = {!r}'.format(dset.missing_images()))
             >>>     print('cwd = {!r}'.format(os.getcwd()))
@@ -1710,7 +1710,7 @@ class MixinCocoExtras(object):
             >>> def report(dset, name):
             >>>     gid = 1
             >>>     abs_fpath = dset.get_image_fpath(gid)
-            >>>     rel_fpath = dset.imgs[gid]['file_name']
+            >>>     rel_fpath = dset.index.imgs[gid]['file_name']
             >>>     color = 'green' if exists(abs_fpath) else 'red'
             >>>     print('strategy_name = {!r}'.format(name))
             >>>     print(ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
@@ -2097,10 +2097,10 @@ class MixinCocoStats(object):
         Example:
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
-            >>> dset.imgs[1].pop('width')
+            >>> dset.index.imgs[1].pop('width')
             >>> dset.conform(legacy=True)
-            >>> assert 'width' in dset.imgs[1]
-            >>> assert 'area' in dset.anns[1]
+            >>> assert 'width' in dset.index.imgs[1]
+            >>> assert 'area' in dset.index.anns[1]
         """
 
         if config.get('ensure_imgsize', True):
@@ -2339,15 +2339,19 @@ class MixinCocoStats(object):
             return varied_attrs
 
         if config.get('image_attrs', True):
-            image_attrs = varied(dset.imgs)
+            image_attrs = varied(dset.index.imgs)
             info['image_attrs'] = image_attrs
 
         if config.get('annot_attrs', True):
-            annot_attrs = varied(dset.anns)
+            annot_attrs = varied(dset.index.anns)
             info['annot_attrs'] = annot_attrs
 
+        if config.get('video_attrs', True):
+            annot_attrs = varied(dset.index.videos)
+            info['video_attrs'] = annot_attrs
+
         if config.get('boxes', False):
-            dset['boxes'] = dset.boxsize_stats()
+            info['boxes'] = dset.boxsize_stats()
         return info
 
     def basic_stats(self):
@@ -2404,8 +2408,9 @@ class MixinCocoStats(object):
             return kwarray.stats_dict(n_yids, n_extreme=True)
         return ub.odict([
             ('annots_per_img', mapping_stats(self.index.gid_to_aids)),
-            # ('cats_per_img', mapping_stats(self.index.cid_to_gids)),
+            ('cats_per_img', mapping_stats(self.index.cid_to_gids)),
             ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),
+            ('imgs_per_video', mapping_stats(self.index.vidid_to_gids)),
         ])
 
     def boxsize_stats(self, anchors=None, perclass=True, gids=None, aids=None,
@@ -5030,8 +5035,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> dset3 = kwcoco.CocoDataset.demo('vidshapes3')
             >>> others = (dset1, dset2, dset3)
             >>> for dset in others:
-            >>>     [a.pop('segmentation') for a in dset.anns.values()]
-            >>>     [a.pop('keypoints') for a in dset.anns.values()]
+            >>>     [a.pop('segmentation') for a in dset.index.anns.values()]
+            >>>     [a.pop('keypoints') for a in dset.index.anns.values()]
             >>> cls = self = kwcoco.CocoDataset
             >>> merged = cls.union(*others, disjoint_tracks=1)
             >>> print('dset1.anns = {}'.format(ub.repr2(dset1.anns, nl=1)))

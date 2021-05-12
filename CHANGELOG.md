@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.3 - Unreleased
 
+### Changed
+* Made bezier dependency optional
+* stats now returns video stats
+
 
 ## Version 0.2.2 - Released 2021-05-10
 
