@@ -1,7 +1,7 @@
 kwplot >= 0.4.0
 seaborn >= 0.9.0
 sqlalchemy >= 1.3.22
-bezier >= 2021.2.12;python_version >= '3.7' 
+bezier >= 2021.2.12 ; python_version >= '3.7' 
 bezier >= 0.8.0, <= 0.11.0; python_version < '3.7.0' 
-bezier >= 0.8.0, <= 0.11.0; python_version < '3.7.0' and python_version >= '3.6.0
-bezier <= 0.8.0;python_version < '3.6'
+bezier >= 0.8.0, <= 0.11.0; python_version < '3.7.0' and python_version >= '3.6.0'
+bezier <= 0.8.0 ; python_version < '3.6'
