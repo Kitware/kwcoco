@@ -1499,12 +1499,13 @@ def random_multi_object_path(num_objects, num_frames, rng=None):
 
 def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
     """
-    Create a random path using a bezier curve.
+    Create a random path using a somem ethod curve.
 
     Args:
         num (int): number of points in the path
         degree (int, default=1): degree of curvieness of the path
         dimension (int, default=2): number of spatial dimensions
+        mode (str): can be boid, walk, or bezier
         rng (RandomState, default=None): seed
 
     References:
@@ -1525,6 +1526,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
 
     Example:
         >>> # xdoctest: +REQUIRES(--3d)
+        >>> # xdoctest: +REQUIRES(module:bezier)
         >>> import kwarray
         >>> import kwplot
         >>> plt = kwplot.autoplt()
@@ -1552,7 +1554,6 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
         >>> ax.set_ylabel('y')
         >>> ax.set_zlabel('z')
     """
-    import bezier
     rng = kwarray.ensure_rng(rng)
 
     if mode == 'boid':
@@ -1586,6 +1587,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
         path = np.array(positions) % 1
 
     elif mode == 'bezier':
+        import bezier
         # Create random bezier control points
         nodes_f = rng.rand(degree + 1, dimension).T  # F-contiguous
         curve = bezier.Curve(nodes_f, degree=degree)
