@@ -2406,9 +2406,18 @@ class MixinCocoStats(object):
             import kwarray
             n_yids = list(ub.map_vals(len, xid_to_yids).values())
             return kwarray.stats_dict(n_yids, n_extreme=True)
+        gid_to_cidfreq = ub.map_vals(
+            lambda aids: ub.dict_hist([self.anns[aid]['category_id']
+                                       for aid in aids]),
+            self.index.gid_to_aids)
+        gid_to_cids = {
+            gid: list(cidfreq.keys())
+            for gid, cidfreq in gid_to_cidfreq.items()
+        }
         return ub.odict([
             ('annots_per_img', mapping_stats(self.index.gid_to_aids)),
-            ('cats_per_img', mapping_stats(self.index.cid_to_gids)),
+            ('imgs_per_cat', mapping_stats(self.index.cid_to_gids)),
+            ('cats_per_img', mapping_stats(gid_to_cids)),
             ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),
             ('imgs_per_video', mapping_stats(self.index.vidid_to_gids)),
         ])
