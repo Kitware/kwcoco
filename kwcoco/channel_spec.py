@@ -15,6 +15,12 @@ The ChannelSpec has these simple rules:
 
 For single arrays, the spec is always an early fused spec.
 
+TODO:
+    - [X] : normalize representations? e.g: rgb = r|g|b? - OPTIONAL
+    - [X] : rename to BandsSpec or SensorSpec? - REJECTED
+    - [ ] : allow bands to be coerced, i.e. rgb -> gray, or gray->rgb
+
+
 """
 import ubelt as ub
 import six
@@ -33,10 +39,6 @@ class ChannelSpec(ub.NiceRepr):
         The comma (',') character separates different inputs streams/branches
         for a multi-stream/branch network which will be lated fused. Order does
         not matter
-
-    TODO:
-        - [X] : normalize representations? e.g: rgb = r|g|b? - OPTIONAL
-        - [X] : rename to BandsSpec or SensorSpec? - REJECTED
 
     Example:
         >>> # Integer spec
@@ -102,19 +104,22 @@ class ChannelSpec(ub.NiceRepr):
 
     """
 
-    _known = {
+    _alias_lut = {
         'rgb': 'r|g|b',
         'rgba': 'r|g|b|a',
         'dxdy': 'dx|dy',
         'fxfy': 'fx|fy',
     }
 
-    _size_lut = {k: v.count('|') + 1 for k, v in _known.items()}
+    _size_lut = {k: v.count('|') + 1 for k, v in _alias_lut.items()}
 
-    def __init__(self, spec):
+    def __init__(self, spec, parsed=None):
         # TODO: allow integer specs
         self.spec = spec
-        self._info = {}
+        self._info = {
+            'spec': spec,
+            'parsed': parsed,
+        }
 
     def __nice__(self):
         return self.spec
@@ -134,13 +139,10 @@ class ChannelSpec(ub.NiceRepr):
 
     @property
     def info(self):
-        self._info = {
-            'spec': self.spec,
-            'parsed': self.parse(),
+        return ub.dict_union(self._info, {
             'unique': self.unique(),
             'normed': self.normalize(),
-        }
-        return self._info
+        })
 
     @classmethod
     def coerce(cls, data):
@@ -163,26 +165,51 @@ class ChannelSpec(ub.NiceRepr):
         """
         Build internal representation
         """
-        # commas break inputs into multiple streams
-        stream_specs = self.spec.split(',')
-        parsed = {ss: ss.split('|') for ss in stream_specs}
-        return parsed
+        if self._info.get('parsed', None) is None:
+            # commas break inputs into multiple streams
+            stream_specs = self.spec.split(',')
+            parsed = {ss: ss.split('|') for ss in stream_specs}
+            self._info['parsed'] = parsed
+        return self._info['parsed']
 
     def normalize(self):
-        spec = self.spec
-        stream_specs = spec.split(',')
-        parsed = {ss: ss for ss in stream_specs}
-        for k1 in parsed.keys():
-            for k, v in self._known.items():
-                parsed[k1] = parsed[k1].replace(k, v)
-        parsed = {k: v.split('|') for k, v in parsed.items()}
-        return parsed
+        """
+        Replace aliases with explicit single-band-per-code specs
+
+        Example:
+            >>> self = ChannelSpec('b1|b2|b3|rgb')
+            >>> self.normalize()
+            >>> list(self.keys())
+        """
+        new_parsed = {}
+        for k1, v1 in self.parse().items():
+            norm_vals = list(
+                ub.flatten(self._alias_lut.get(v, v).split('|') for v in v1))
+            norm_key = '|'.join(norm_vals)
+            new_parsed[norm_key] = norm_vals
+        new_spec = ','.join(list(new_parsed.keys()))
+        normed = ChannelSpec(new_spec, parsed=new_parsed)
+        return normed
+        # spec = self.spec
+        # stream_specs = spec.split(',')
+        # parsed = {ss: ss for ss in stream_specs}
+        # for k1 in parsed.keys():
+        #     for alias, alias_spec in self._alias_lut.items():
+        #         parsed[k1] = parsed[k1].replace(alias, alias_spec)
+        # parsed = {k: v.split('|') for k, v in parsed.items()}
+        # return parsed
 
     def keys(self):
         spec = self.spec
         stream_specs = spec.split(',')
         for spec in stream_specs:
             yield spec
+
+    def values(self):
+        return self.parse().values()
+
+    def items(self):
+        return self.parse().items()
 
     def streams(self):
         """
@@ -207,12 +234,12 @@ class ChannelSpec(ub.NiceRepr):
         self_norm = self.normalize()
 
         new_streams = []
-        for key, parts in self_norm.items():
+        for parts in self_norm.values():
             new_parts = ub.oset(parts) - ub.oset(other_norm)
             # shrink the representation of a complex r|g|b to an alias if
             # possible.
             # TODO: make this more efficient
-            for alias, alias_spec in self._known.items():
+            for alias, alias_spec in self._alias_lut.items():
                 alias_parts = ub.oset(alias_spec.split('|'))
                 index = subsequence_index(new_parts, alias_parts)
                 if index is not None:
@@ -261,7 +288,6 @@ class ChannelSpec(ub.NiceRepr):
         """
         item_shapes = {}
         parsed = self.parse()
-        # normed = self.normalize()
         fused_keys = list(self.keys())
         for fused_key in fused_keys:
             components = parsed[fused_key]
