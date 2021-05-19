@@ -371,7 +371,7 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
         once = False
 
         # Add images
-        dset.remove_all_annotations()
+        dset.remove_annotations(list(dset.index.anns.keys()))
         for gid, img in ub.ProgIter(dset.imgs.items(), desc='parse label masks'):
             mask_fpath = join(dset_root, img['segmentation'])
 
