@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * Fixed `cats_per_img` in kwcoco stats.
+* Fixed `grab_camvid`.
+* Fixed legacy `img_root` key not being respected.
 
 
 ## Version 0.2.3 - Released 2021-05-13

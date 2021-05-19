@@ -4524,30 +4524,32 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             if tag is None:
                 tag = key
 
-        if bundle_dpath is None:
-            if 'img_root' in data:
-                # allow image root to be specified in the dataset
-                # we refer to this as a json data "body root".
-                body_root = data.get('img_root', '')
-                if body_root is None:
-                    body_root = ''
-                elif isinstance(body_root, six.string_types):
-                    _tmp = ub.expandpath(body_root)
-                    if exists(_tmp):
-                        body_root = _tmp
-                else:
-                    if isinstance(body_root, list) and body_root == []:
-                        body_root = ''
-                    else:
-                        raise TypeError('body_root = {!r}'.format(body_root))
-                try:
-                    bundle_dpath = join(assumed_root, body_root)
-                except Exception:
-                    print('body_root = {!r}'.format(body_root))
-                    print('assumed_root = {!r}'.format(assumed_root))
-                    raise
+        # Backwards compat hack, allow the coco file to specify the
+        # bundle_dpath
+        if isinstance(data, dict) and 'img_root' in data:
+            # allow image root to be specified in the dataset
+            # we refer to this as a json data "body root".
+            body_root = data.get('img_root', '')
+            if body_root is None:
+                body_root = ''
+            elif isinstance(body_root, six.string_types):
+                _tmp = ub.expandpath(body_root)
+                if exists(_tmp):
+                    body_root = _tmp
             else:
-                bundle_dpath = assumed_root
+                if isinstance(body_root, list) and body_root == []:
+                    body_root = ''
+                else:
+                    raise TypeError('body_root = {!r}'.format(body_root))
+            try:
+                bundle_dpath = join(assumed_root, body_root)
+            except Exception:
+                print('body_root = {!r}'.format(body_root))
+                print('assumed_root = {!r}'.format(assumed_root))
+                raise
+
+        if bundle_dpath is None:
+            bundle_dpath = assumed_root
 
         bundle_dpath = ub.expandpath(bundle_dpath)
 
