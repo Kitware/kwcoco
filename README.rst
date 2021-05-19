@@ -5,6 +5,16 @@ The Kitware COCO Module
 
 |GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |Downloads| |ReadTheDocs|
 
++------------------+---------------------------------------------
+| Read the docs    | https://kwcoco.readthedocs.io              |
++------------------+---------------------------------------------
+| Gitlab (main)    | https://gitlab.kitware.com/utils/kwcoco    |
++------------------+---------------------------------------------
+| Github (mirror)  | https://github.com/Kitware/kwcoco          |
++------------------+---------------------------------------------
+| Pypi             | https://pypi.org/project/kwcoco            |
++------------------+---------------------------------------------
+
 The main webpage for this project is: https://gitlab.kitware.com/computer-vision/kwcoco
 
 The Kitware COCO module defines a variant of the Microsoft COCO format,
