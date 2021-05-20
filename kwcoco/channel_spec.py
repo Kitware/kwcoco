@@ -218,6 +218,14 @@ class ChannelSpec(ub.NiceRepr):
         streams = [self.__class__(spec) for spec in self.keys()]
         return streams
 
+    def code_list(self):
+        parsed = self.parse()
+        if len(parsed) > 1:
+            raise Exception(
+                'Can only work on single-streams. '
+                'TODO make class for single streams')
+        return ub.peek(parsed.values())
+
     def difference(self, other):
         """
         Set difference

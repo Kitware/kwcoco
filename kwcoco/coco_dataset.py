@@ -309,9 +309,17 @@ class MixinCocoAccessors(object):
         Example:
             >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo('vidshapes3-multispectral', num_frames=5)
-            >>> gid = gid_or_img = 1
-            >>> channels = None
+            >>> gid = 1
+            >>> #
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> final = self.delayed_load(gid)
+            >>> print('final = {!r}'.format(final))
+            >>> print('final.finalize() = {!r}'.format(final.finalize()))
+            >>> #
+            >>> self = kwcoco.CocoDataset.demo('shapes8')
+            >>> final = self.delayed_load(gid)
+            >>> print('final = {!r}'.format(final))
+            >>> print('final.finalize() = {!r}'.format(final.finalize()))
         """
         from ndsampler.delayed import DelayedLoad, DelayedChannelConcat
         from kwimage.transform import Affine
@@ -376,7 +384,6 @@ class MixinCocoAccessors(object):
         gpath = self.get_image_fpath(gid_or_img, channels=channels)
         np_img = kwimage.imread(gpath)
         return np_img
-
 
     def get_image_fpath(self, gid_or_img, channels=None):
         """

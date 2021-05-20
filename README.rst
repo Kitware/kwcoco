@@ -39,6 +39,15 @@ class for drop-in replacement with existing tools that use `pycocoutils`.
 
 There is some support for `kw18` files in the `kwcoco.kw18` module.
 
+Installation
+------------
+
+The `kwcoco <https://pypi.org/project/kwcoco/>`_.  package can be installed via pip:
+
+.. code-block:: bash
+
+    pip install kwcoco
+
 
 The kwcoco CLI
 --------------
