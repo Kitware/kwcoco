@@ -315,11 +315,17 @@ class MixinCocoAccessors(object):
             >>> final = self.delayed_load(gid)
             >>> print('final = {!r}'.format(final))
             >>> print('final.finalize() = {!r}'.format(final.finalize()))
+            >>> print('final.finalize() = {!r}'.format(final.finalize(as_xarray=True)))
             >>> #
             >>> self = kwcoco.CocoDataset.demo('shapes8')
             >>> final = self.delayed_load(gid)
             >>> print('final = {!r}'.format(final))
             >>> print('final.finalize() = {!r}'.format(final.finalize()))
+            >>> print('final.finalize() = {!r}'.format(final.finalize(as_xarray=True)))
+
+            >>> crop = final.delayed_crop((slice(0, 3), slice(0, 3)))
+            >>> crop.finalize()
+            >>> crop.finalize(as_xarray=True)
         """
         from ndsampler.delayed import DelayedLoad, DelayedChannelConcat
         from kwimage.transform import Affine
