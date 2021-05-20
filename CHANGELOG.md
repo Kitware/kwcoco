@@ -5,7 +5,19 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.3 - Unreleased
+## Version 0.2.4 - Unreleased
+
+### Added
+
+* Experimental `delayed_load` method for an image
+
+### Fixed
+* Fixed `cats_per_img` in kwcoco stats.
+* Fixed `grab_camvid`.
+* Fixed legacy `img_root` key not being respected.
+
+
+## Version 0.2.3 - Released 2021-05-13
 
 ### Changed
 * Made bezier dependency optional

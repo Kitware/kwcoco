@@ -5,6 +5,16 @@ The Kitware COCO Module
 
 |GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |Downloads| |ReadTheDocs|
 
++------------------+---------------------------------------------
+| Read the docs    | https://kwcoco.readthedocs.io              |
++------------------+---------------------------------------------
+| Gitlab (main)    | https://gitlab.kitware.com/utils/kwcoco    |
++------------------+---------------------------------------------
+| Github (mirror)  | https://github.com/Kitware/kwcoco          |
++------------------+---------------------------------------------
+| Pypi             | https://pypi.org/project/kwcoco            |
++------------------+---------------------------------------------
+
 The main webpage for this project is: https://gitlab.kitware.com/computer-vision/kwcoco
 
 The Kitware COCO module defines a variant of the Microsoft COCO format,
@@ -28,6 +38,15 @@ The original `pycocoutils` API is exposed via the `kwcoco.compat_dataset.COCO`
 class for drop-in replacement with existing tools that use `pycocoutils`. 
 
 There is some support for `kw18` files in the `kwcoco.kw18` module.
+
+Installation
+------------
+
+The `kwcoco <https://pypi.org/project/kwcoco/>`_.  package can be installed via pip:
+
+.. code-block:: bash
+
+    pip install kwcoco
 
 
 The kwcoco CLI

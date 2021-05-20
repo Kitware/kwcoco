@@ -23,6 +23,7 @@ class CocoStatsCLI:
 
             'annot_attrs': scfg.Value(False, help='show annotation attribute information'),
             'image_attrs': scfg.Value(False, help='show image attribute information'),
+            'video_attrs': scfg.Value(False, help='show video attribute information'),
 
             'embed': scfg.Value(False, help='embed into interactive shell'),
         }
@@ -92,8 +93,12 @@ class CocoStatsCLI:
             for dset in datasets:
                 tag_to_ext_stats[dset.tag] = dset.extended_stats()
 
-            for key in ['annots_per_img', 'annots_per_cat']:
-                print('{!r}'.format(key))
+            # allkeys = ['annots_per_img', 'annots_per_cat']
+            allkeys = sorted(set(ub.flatten(s.keys() for s in tag_to_ext_stats.values())))
+            # print('allkeys = {!r}'.format(allkeys))
+
+            for key in allkeys:
+                print('\n--{!r}'.format(key))
                 df = pd.DataFrame.from_dict(
                     {k: v[key] for k, v in tag_to_ext_stats.items()})
                 print(df.to_string(float_format=lambda x: '%0.3f' % x))
@@ -104,6 +109,17 @@ class CocoStatsCLI:
                 tag_to_freq[dset.tag] = dset.category_annotation_frequency()
             df = pd.DataFrame.from_dict(tag_to_freq)
             print(df.to_string(float_format=lambda x: '%0.3f' % x))
+
+        if config['video_attrs']:
+            print('Video Attrs')
+            for dset in datasets:
+                print('dset.tag = {!r}'.format(dset.tag))
+                attrs = ub.ddict(lambda: 0)
+                for ann in dset.imgs.values():
+                    for key, value in ann.items():
+                        if value:
+                            attrs[key] += 1
+                print('video_attrs = {}'.format(ub.repr2(attrs, nl=1)))
 
         if config['image_attrs']:
             print('Image Attrs')

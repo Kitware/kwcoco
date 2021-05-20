@@ -302,6 +302,75 @@ class MixinCocoAccessors(object):
     TODO: better name
     """
 
+    def delayed_load(self, gid):
+        """
+        Experimental method
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> import kwcoco
+            >>> gid = 1
+            >>> #
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> final = self.delayed_load(gid)
+            >>> print('final = {!r}'.format(final))
+            >>> print('final.finalize() = {!r}'.format(final.finalize()))
+            >>> print('final.finalize() = {!r}'.format(final.finalize(as_xarray=True)))
+            >>> #
+            >>> self = kwcoco.CocoDataset.demo('shapes8')
+            >>> final = self.delayed_load(gid)
+            >>> print('final = {!r}'.format(final))
+            >>> print('final.finalize() = {!r}'.format(final.finalize()))
+            >>> print('final.finalize() = {!r}'.format(final.finalize(as_xarray=True)))
+
+            >>> crop = final.delayed_crop((slice(0, 3), slice(0, 3)))
+            >>> crop.finalize()
+            >>> crop.finalize(as_xarray=True)
+        """
+        from ndsampler.delayed import DelayedLoad, DelayedChannelConcat
+        from kwimage.transform import Affine
+        from kwcoco.channel_spec import ChannelSpec
+        bundle_dpath = self.bundle_dpath
+
+        def _delay_load_imglike(obj):
+            info = {}
+            fname = obj.get('file_name', None)
+            info['channels'] = channels = ChannelSpec(obj.get('channels', None))
+            width = obj.get('width', None)
+            height = obj.get('height', None)
+            if height is not None and width is not None:
+                info['dsize'] = dsize = (width, height)
+            else:
+                info['dsize'] = None
+            if fname is not None:
+                info['fpath'] = fpath = join(bundle_dpath, fname)
+                info['chan'] = DelayedLoad(fpath, channels=channels, dsize=dsize)
+            return info
+
+        img = self.index.imgs[gid]
+        img_info = _delay_load_imglike(img)
+        img_info['to_vid'] = Affine.coerce(img.get('warp_img_to_vid', None))
+
+        chan_list = []
+
+        if img_info.get('chan', None) is not None:
+            chan_list.append(img_info.get('chan', None))
+
+        for aux in img.get('auxiliary', []):
+            aux_info = _delay_load_imglike(aux)
+            aux_to_img = Affine.coerce(aux.get('aux_to_img', None))
+            self = chan = aux_info['chan']
+            chan = chan.delayed_warp(
+                aux_to_img, dsize=img_info['dsize'])
+            chan_list.append(chan)
+
+        for chan in chan_list:
+            print('chan.num_bands = {!r}'.format(chan.num_bands))
+
+        delayed_full = DelayedChannelConcat(chan_list)
+        final = delayed_full
+        return final
+
     def load_image(self, gid_or_img, channels=None):
         """
         Reads an image from disk and
@@ -2406,9 +2475,18 @@ class MixinCocoStats(object):
             import kwarray
             n_yids = list(ub.map_vals(len, xid_to_yids).values())
             return kwarray.stats_dict(n_yids, n_extreme=True)
+        gid_to_cidfreq = ub.map_vals(
+            lambda aids: ub.dict_hist([self.anns[aid]['category_id']
+                                       for aid in aids]),
+            self.index.gid_to_aids)
+        gid_to_cids = {
+            gid: list(cidfreq.keys())
+            for gid, cidfreq in gid_to_cidfreq.items()
+        }
         return ub.odict([
             ('annots_per_img', mapping_stats(self.index.gid_to_aids)),
-            ('cats_per_img', mapping_stats(self.index.cid_to_gids)),
+            ('imgs_per_cat', mapping_stats(self.index.cid_to_gids)),
+            ('cats_per_img', mapping_stats(gid_to_cids)),
             ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),
             ('imgs_per_video', mapping_stats(self.index.vidid_to_gids)),
         ])
@@ -4515,30 +4593,32 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             if tag is None:
                 tag = key
 
-        if bundle_dpath is None:
-            if 'img_root' in data:
-                # allow image root to be specified in the dataset
-                # we refer to this as a json data "body root".
-                body_root = data.get('img_root', '')
-                if body_root is None:
-                    body_root = ''
-                elif isinstance(body_root, six.string_types):
-                    _tmp = ub.expandpath(body_root)
-                    if exists(_tmp):
-                        body_root = _tmp
-                else:
-                    if isinstance(body_root, list) and body_root == []:
-                        body_root = ''
-                    else:
-                        raise TypeError('body_root = {!r}'.format(body_root))
-                try:
-                    bundle_dpath = join(assumed_root, body_root)
-                except Exception:
-                    print('body_root = {!r}'.format(body_root))
-                    print('assumed_root = {!r}'.format(assumed_root))
-                    raise
+        # Backwards compat hack, allow the coco file to specify the
+        # bundle_dpath
+        if isinstance(data, dict) and 'img_root' in data:
+            # allow image root to be specified in the dataset
+            # we refer to this as a json data "body root".
+            body_root = data.get('img_root', '')
+            if body_root is None:
+                body_root = ''
+            elif isinstance(body_root, six.string_types):
+                _tmp = ub.expandpath(body_root)
+                if exists(_tmp):
+                    body_root = _tmp
             else:
-                bundle_dpath = assumed_root
+                if isinstance(body_root, list) and body_root == []:
+                    body_root = ''
+                else:
+                    raise TypeError('body_root = {!r}'.format(body_root))
+            try:
+                bundle_dpath = join(assumed_root, body_root)
+            except Exception:
+                print('body_root = {!r}'.format(body_root))
+                print('assumed_root = {!r}'.format(assumed_root))
+                raise
+
+        if bundle_dpath is None:
+            bundle_dpath = assumed_root
 
         bundle_dpath = ub.expandpath(bundle_dpath)
 
