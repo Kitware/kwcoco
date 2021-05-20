@@ -302,6 +302,61 @@ class MixinCocoAccessors(object):
     TODO: better name
     """
 
+    def delayed_load(self, gid):
+        """
+        Experimental method
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:ndsampler)
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes3-multispectral', num_frames=5)
+            >>> gid = gid_or_img = 1
+            >>> channels = None
+        """
+        from ndsampler.delayed import DelayedLoad, DelayedChannelConcat
+        from kwimage.transform import Affine
+        from kwcoco.channel_spec import ChannelSpec
+        bundle_dpath = self.bundle_dpath
+
+        def _delay_load_imglike(obj):
+            info = {}
+            fname = obj.get('file_name', None)
+            info['channels'] = channels = ChannelSpec(obj.get('channels', None))
+            width = obj.get('width', None)
+            height = obj.get('height', None)
+            if height is not None and width is not None:
+                info['dsize'] = dsize = (width, height)
+            else:
+                info['dsize'] = None
+            if fname is not None:
+                info['fpath'] = fpath = join(bundle_dpath, fname)
+                info['chan'] = DelayedLoad(fpath, channels=channels, dsize=dsize)
+            return info
+
+        img = self.index.imgs[gid]
+        img_info = _delay_load_imglike(img)
+        img_info['to_vid'] = Affine.coerce(img.get('warp_img_to_vid', None))
+
+        chan_list = []
+
+        if img_info.get('chan', None) is not None:
+            chan_list.append(img_info.get('chan', None))
+
+        for aux in img.get('auxiliary', []):
+            aux_info = _delay_load_imglike(aux)
+            aux_to_img = Affine.coerce(aux.get('aux_to_img', None))
+            self = chan = aux_info['chan']
+            chan = chan.delayed_warp(
+                aux_to_img, dsize=img_info['dsize'])
+            chan_list.append(chan)
+
+        for chan in chan_list:
+            print('chan.num_bands = {!r}'.format(chan.num_bands))
+
+        delayed_full = DelayedChannelConcat(chan_list)
+        final = delayed_full
+        return final
+
     def load_image(self, gid_or_img, channels=None):
         """
         Reads an image from disk and
@@ -321,6 +376,7 @@ class MixinCocoAccessors(object):
         gpath = self.get_image_fpath(gid_or_img, channels=channels)
         np_img = kwimage.imread(gpath)
         return np_img
+
 
     def get_image_fpath(self, gid_or_img, channels=None):
         """
