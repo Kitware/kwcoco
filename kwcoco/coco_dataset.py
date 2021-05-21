@@ -358,14 +358,11 @@ class MixinCocoAccessors(object):
 
         for aux in img.get('auxiliary', []):
             aux_info = _delay_load_imglike(aux)
-            aux_to_img = Affine.coerce(aux.get('aux_to_img', None))
+            aux_to_img = Affine.coerce(aux.get('warp_aux_to_img', None))
             self = chan = aux_info['chan']
             chan = chan.delayed_warp(
                 aux_to_img, dsize=img_info['dsize'])
             chan_list.append(chan)
-
-        for chan in chan_list:
-            print('chan.num_bands = {!r}'.format(chan.num_bands))
 
         delayed_full = DelayedChannelConcat(chan_list)
         final = delayed_full
@@ -2500,6 +2497,8 @@ class MixinCocoStats(object):
 
         Args:
             anchors (int): if specified also computes box anchors
+                via
+                KMeans clustering
             perclass (bool): if True also computes stats for each category
             gids (List[int], default=None):
                 if specified only compute stats for these image ids.
@@ -3258,16 +3257,83 @@ class MixinCocoAddRemove(object):
         self._invalidate_hashid()
         return id
 
+    # def add_auxiliary(self, gid, fpath, warp_aux_to_img, channels=None):
+    #     """
+    #     Adds an auxiliary file to an image.
+    #     """
+    #     from kwimage.transform import Affine
+    #     import kwimage
+    #     from os.path import relpath, join
+    #     # See the auxiliary image spec
+    #     chandata = np.random.rand(300, 300)
+
+    #     # Need to ensure this is correct for your method
+    #     warp_aux_to_img = Affine.random().__json__()
+
+    #     # Add custom channel names with pipes
+    #     channels = 'my_fancy_channel_code'
+
+    #     # Write your data somewhere in the coco bundle path
+    #     dpath = ub.ensuredir((self.bundle_dpath, 'my_aux_channels'))
+    #     fpath = join(dpath, 'my_aux_for_{}.tif'.format(gid))
+    #     fname = relpath(fpath, self.bundle_dpath)
+
+    #     kwimage.imwrite(fpath, chandata)
+
+    #     aux = {
+    #         'file_name': fname,
+    #         'width': chandata.shape[1],
+    #         'height': chandata.shape[0],
+    #         'warp_aux_to_img': warp_aux_to_img,
+    #         'channels': channels,
+    #     }
+
+    #     # lookup the image you want to add to
+    #     img = self.index.imgs[gid]
+    #     # Ensure there is an auxiliary image list
+    #     auxiliary = img.setdefault('auxiliary', [])
+    #     # Add the auxiliary information to the image
+    #     auxiliary.append(aux)
+    #     self._invalidate_hashid()
+
     def add_annotation(self, image_id, category_id=None, bbox=None, id=None, **kw):
         """
         Add an annotation to the dataset (dynamically updates the index)
 
         Args:
-            image_id (int): image_id to add to
-            category_id (int): category_id to add to
-            bbox (list or kwimage.Boxes): bounding box in xywh format
-            id (None or int): ADVANCED. Force using this annotation id.
-            **kw : stores arbitrary key/value pairs in this new image
+            image_id (int): image_id the annoatation is added to.
+
+            category_id (int | None): category_id for the new annotaiton
+
+            bbox (list | kwimage.Boxes): bounding box in xywh format
+
+            id (None | int): Force using this annotation id. Typically you
+                should NOT specify this. A new unused id will be chosen and
+                returned.
+
+            **kw : stores arbitrary key/value pairs in this new image,
+                Common respected key/values include but are not limited to the
+                following:
+
+                track_id (int | str): some value used to associate annotations
+                    that belong to the same "track".
+
+                score' : float
+
+                prob' : List[float]
+
+                weight (float): a weight, usually used to indicate if a ground
+                    truth annotation is difficult / important. This generalizes
+                    standard "is_hard" or "ignore" attributes in other formats.
+
+                caption (str): a text caption for this annotation
+
+                keypoints (KeypointsLike): keypoints in some accepted
+                    format, see :method:`kwimage.Keypoints.to_coco`..
+
+                segmentation (MaskLike | MultiPolygonLike): keypoints in some
+                    accepted format, see :method:`kwimage.Mask.to_coco` and
+                    :method:`kwimage.MultiPolygon.to_coco`.
 
         Returns:
             int : the annotation id assigned to the new annotation
@@ -3283,6 +3349,19 @@ class MixinCocoAddRemove(object):
             >>> bbox = [10, 10, 20, 20]
             >>> aid = self.add_annotation(image_id, cid, bbox)
             >>> assert self.anns[aid]['bbox'] == bbox
+
+        Example:
+            >>> import kwimage
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> new_det = kwimage.Detections.random(1, segmentations=True, keypoints=True)
+            >>> # kwimage datastructures have methods to convert to coco recognized formats
+            >>> new_ann_data = list(new_annot_data.to_coco(style='new'))[0]
+            >>> image_id = 1
+            >>> aid = self.add_annotation(image_id, **new_ann_data)
+            >>> # Lookup the annotation we just added
+            >>> ann = self.index.anns[aid]
+            >>> print('ann = {}'.format(ub.repr2(ann, nl=-2)))
 
         Example:
             >>> # Attempt to annot without a category or bbox
