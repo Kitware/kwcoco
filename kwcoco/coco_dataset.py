@@ -3356,7 +3356,7 @@ class MixinCocoAddRemove(object):
             >>> self = kwcoco.CocoDataset.demo()
             >>> new_det = kwimage.Detections.random(1, segmentations=True, keypoints=True)
             >>> # kwimage datastructures have methods to convert to coco recognized formats
-            >>> new_ann_data = list(new_annot_data.to_coco(style='new'))[0]
+            >>> new_ann_data = list(new_det.to_coco(style='new'))[0]
             >>> image_id = 1
             >>> aid = self.add_annotation(image_id, **new_ann_data)
             >>> # Lookup the annotation we just added
