@@ -335,7 +335,10 @@ class MixinCocoAccessors(object):
         def _delay_load_imglike(obj):
             info = {}
             fname = obj.get('file_name', None)
-            info['channels'] = channels = ChannelSpec(obj.get('channels', None))
+            channels = obj.get('channels', None)
+            if channels is not None:
+                channels = ChannelSpec(channels)
+            info['channels'] = channels
             width = obj.get('width', None)
             height = obj.get('height', None)
             if height is not None and width is not None:
@@ -363,8 +366,10 @@ class MixinCocoAccessors(object):
             chan = chan.delayed_warp(
                 aux_to_img, dsize=img_info['dsize'])
             chan_list.append(chan)
-
-        delayed_full = DelayedChannelConcat(chan_list)
+        if len(chan_list) == 1:
+            delayed_full = chan_list[0]
+        else:
+            delayed_full = DelayedChannelConcat(chan_list)
         final = delayed_full
         return final
 
