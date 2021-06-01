@@ -2274,7 +2274,6 @@ class MixinCocoStats(object):
             >>> assert not result['errors']
             >>> assert result['warnings']
         """
-        # raise NotImplementedError('TODO, port functionality from coco_validate')
         dset = self
 
         result = {
@@ -5118,18 +5117,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
     def _build_index(self):
         self.index.build(self)
 
-    def union(self, *others, disjoint_tracks=True, **kwargs):
+    def union(*others, disjoint_tracks=True, **kwargs):
         """
         Merges multiple :class:`CocoDataset` items into one. Names and
         associations are retained, but ids may be different.
 
         Args:
-            self : note that :func:`union` can be called as an instance method
-                or a class method.  If it is a class method, then this is the
-                class type, otherwise the instance will also be unioned with
-                ``others``.
-
-            *others : a series of CocoDatasets that we will merge
+            *others : a series of CocoDatasets that we will merge.
+                Note, if called as an instance method, the "self" instance
+                will be the first item in the "others" list. But if called
+                like a classmethod, "others" will be empty by default.
 
             disjoint_tracks (bool, default=True):
                 if True, we will assume track-ids are disjoint and if two
@@ -5208,20 +5205,28 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> print('dset3.anns = {}'.format(ub.repr2(dset3.anns, nl=1)))
             >>> print('merged.anns = {}'.format(ub.repr2(merged.anns, nl=1)))
 
+        Example:
+            >>> import kwcoco
+            >>> # Test empty union
+            >>> empty_union = kwcoco.CocoDataset.union()
+            >>> assert len(empty_union.index.imgs) == 0
+
         TODO:
             - [ ] are supercategories broken?
             - [ ] reuse image ids where possible
             - [ ] reuse annotation / category ids where possible
+            - [X] handle case where no inputs are given
             - [x] disambiguate track-ids
             - [x] disambiguate video-ids
         """
-        if self.__class__ is type:
-            # Method called as classmethod
-            cls = self
+        # Dev Notes:
+        # See ~/misc/tests/python/test_multiarg_classmethod.py
+        # for tests for how to correctly implement this method such that it can
+        # behave as a method or a classmethod
+        if len(others) > 0:
+            cls = type(others[0])
         else:
-            # Method called as instancemethod
-            cls = self.__class__
-            others = (self,) + others
+            cls = CocoDataset
 
         # TODO: add an option such that the union will fail if the names
         # are not already disjoint. Alternatively, it could be the case
@@ -5460,8 +5465,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     prefix = path[:i + 1]
                     freq[prefix] += 1
             # Find the longest common prefix
-            value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
-            longest_prefix = sep.join(value)
+            if len(freq) == 0:
+                longest_prefix = ''
+            else:
+                value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
+                longest_prefix = sep.join(value)
             return longest_prefix
 
         dset_roots = [dset.bundle_dpath for dset in others]
