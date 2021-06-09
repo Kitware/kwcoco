@@ -163,15 +163,6 @@ class CocoEvalConfig(scfg.Config):
                     if '-' in p:
                         p = p.split('-')
                         minmax = tuple(map(float, p))
-                    # else:
-                    #     if p == 'small':
-                    #         p = [0 ** 2, 32 ** 2],
-                    #     if p == 'medium':
-                    #         p = [32 ** 2, 96 ** 2],
-                    #     if p == 'large':
-                    #         p = [96 ** 2, 1e5 ** 2],
-                    #     if p == 'all':
-                    #         p = [0, float('inf')],
                 parsed.append(minmax)
             self['area_range'] = parsed
 
@@ -225,6 +216,10 @@ class CocoEvaluator(object):
         and image ids.
         """
         # TODO: coerce into a cocodataset form if possible
+        # TODO: Optionally:
+        # * validate the input coco files,
+        # * ensure that the score attribute on the predictions exists.
+        # * ensure there is more than one category.
         coco_eval.log('init truth dset')
 
         # FIXME: What is the image names line up correctly, but the image ids
@@ -428,9 +423,6 @@ class CocoEvaluator(object):
         """
         # coerce the input into dictionary of detection objects.
         import kwcoco
-        # if 0:
-        #     # hack
-        #     isinstance = kwimage.structs._generic._isinstance2
 
         # We only need the box locations, but if we can coerce extra
         # information we will maintain that as well.
@@ -532,6 +524,7 @@ class CocoEvaluator(object):
         Ignore:
             dmet = coco_eval._build_dmet()
         """
+        from kwcoco.metrics import DetectionMetrics
         coco_eval._ensure_init()
         classes = coco_eval.classes
 
@@ -553,7 +546,6 @@ class CocoEvaluator(object):
                 pred_names += cnames
             ub.dict_hist(pred_names)
 
-        from kwcoco.metrics import DetectionMetrics
         dmet = DetectionMetrics(classes=classes)
         for gid in ub.ProgIter(coco_eval.gids):
             pred_dets = gid_to_pred[gid]
@@ -615,6 +607,7 @@ class CocoEvaluator(object):
             >>>     import xdev
             >>>     xdev.view_directory(dpath)
         """
+        import platform
         coco_eval.log('evaluating')
         # print('coco_eval.config = {}'.format(ub.repr2(dict(coco_eval.config), nl=3)))
 
@@ -670,7 +663,6 @@ class CocoEvaluator(object):
         if not isinstance(base_meta['pred_dataset'], str):
             base_meta['pred_dataset'] = '<not-a-file-ref>'
         # Add machine-specific metadata
-        import platform
         base_meta['hostname'] = platform.node()
         base_meta['timestamp'] = ub.timestamp()
 
@@ -801,7 +793,6 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
                     pred_area = np.array(pred_annots.lookup('area'))
                 except Exception:
                     if use_area_attr != 'try':
-                        import warnings
                         warnings.warn('Predictions do not have area attributes')
                     pred_area = dmet.gid_to_pred_dets[gid].boxes.area
             else:
@@ -881,9 +872,6 @@ class CocoResults(ub.NiceRepr, DictProxy):
             result.dump_figures(dpath, expt_title=title)
 
     def __json__(results):
-        """
-        print(ub.repr2(results.__json__(), nl=-1))
-        """
         from kwcoco.util.util_json import ensure_json_serializable
         state = {
             k: (ensure_json_serializable(v)
@@ -977,9 +965,6 @@ class CocoSingleResult(ub.NiceRepr):
         return self
 
     def __json__(result):
-        """
-        print(ub.repr2(result.__json__(), nl=-1))
-        """
         state = {
             'nocls_measures': result.nocls_measures.__json__(),
             'ovr_measures': result.ovr_measures.__json__(),
@@ -1216,32 +1201,11 @@ def main(cmdline=True, **kw):
 
     results = coco_eval.evaluate()
 
-    # if coco_eval.config['force_pycocoutils']:
-    #     print('forced pycocotools, no other analysis will be done')
-    #     return
-
     ub.ensuredir(cli_config['out_dpath'])
 
-    if 1:
-        metrics_fpath = join(cli_config['out_dpath'], 'metrics.json')
-        print('dumping metrics_fpath = {!r}'.format(metrics_fpath))
-        results.dump(metrics_fpath, indent='    ')
-    else:
-        with open(join(cli_config['out_dpath'], 'meta.json'), 'w') as file:
-            state = results.meta
-            json.dump(state, file, indent='    ')
-
-        with open(join(cli_config['out_dpath'], 'measures.json'), 'w') as file:
-            state = results.measures.__json__()
-            json.dump(state, file, indent='    ')
-
-        with open(join(cli_config['out_dpath'], 'ovr_measures.json'), 'w') as file:
-            state = results.ovr_measures.__json__()
-            json.dump(state, file, indent='    ')
-
-        with open(join(cli_config['out_dpath'], 'cfsn_vecs.json'), 'w') as file:
-            state = results.cfsn_vecs.__json__()
-            json.dump(state, file, indent='    ')
+    metrics_fpath = join(cli_config['out_dpath'], 'metrics.json')
+    print('dumping metrics_fpath = {!r}'.format(metrics_fpath))
+    results.dump(metrics_fpath, indent='    ')
 
     if cli_config['draw']:
         results.dump_figures(
@@ -1259,7 +1223,6 @@ def main(cmdline=True, **kw):
     if truth_dset is not None and getattr(results, 'cfsn_vecs', None):
         print('Attempting to draw examples')
         gid_to_stats = {}
-        import kwarray
         gids, groupxs = kwarray.group_indices(results.cfsn_vecs.data['gid'])
         for gid, groupx in zip(gids, groupxs):
             true_vec = results.cfsn_vecs.data['true'][groupx]
@@ -1282,8 +1245,7 @@ def main(cmdline=True, **kw):
 
         rng = kwarray.ensure_rng(None)
         random_gids = rng.choice(gids, size=5).tolist()
-        # import random
-        # random_gids = random.choices(gids, k=5)
+
         found_gids = truth_dset.find_representative_images(gids)
         draw_gids = list(ub.unique(found_gids + stat_gids + random_gids))
 

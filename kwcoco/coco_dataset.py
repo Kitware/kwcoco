@@ -335,7 +335,10 @@ class MixinCocoAccessors(object):
         def _delay_load_imglike(obj):
             info = {}
             fname = obj.get('file_name', None)
-            info['channels'] = channels = ChannelSpec(obj.get('channels', None))
+            channels = obj.get('channels', None)
+            if channels is not None:
+                channels = ChannelSpec(channels)
+            info['channels'] = channels
             width = obj.get('width', None)
             height = obj.get('height', None)
             if height is not None and width is not None:
@@ -358,16 +361,15 @@ class MixinCocoAccessors(object):
 
         for aux in img.get('auxiliary', []):
             aux_info = _delay_load_imglike(aux)
-            aux_to_img = Affine.coerce(aux.get('aux_to_img', None))
+            aux_to_img = Affine.coerce(aux.get('warp_aux_to_img', None))
             self = chan = aux_info['chan']
             chan = chan.delayed_warp(
                 aux_to_img, dsize=img_info['dsize'])
             chan_list.append(chan)
-
-        for chan in chan_list:
-            print('chan.num_bands = {!r}'.format(chan.num_bands))
-
-        delayed_full = DelayedChannelConcat(chan_list)
+        if len(chan_list) == 1:
+            delayed_full = chan_list[0]
+        else:
+            delayed_full = DelayedChannelConcat(chan_list)
         final = delayed_full
         return final
 
@@ -2272,7 +2274,6 @@ class MixinCocoStats(object):
             >>> assert not result['errors']
             >>> assert result['warnings']
         """
-        # raise NotImplementedError('TODO, port functionality from coco_validate')
         dset = self
 
         result = {
@@ -2500,6 +2501,8 @@ class MixinCocoStats(object):
 
         Args:
             anchors (int): if specified also computes box anchors
+                via
+                KMeans clustering
             perclass (bool): if True also computes stats for each category
             gids (List[int], default=None):
                 if specified only compute stats for these image ids.
@@ -3258,16 +3261,83 @@ class MixinCocoAddRemove(object):
         self._invalidate_hashid()
         return id
 
+    # def add_auxiliary(self, gid, fpath, warp_aux_to_img, channels=None):
+    #     """
+    #     Adds an auxiliary file to an image.
+    #     """
+    #     from kwimage.transform import Affine
+    #     import kwimage
+    #     from os.path import relpath, join
+    #     # See the auxiliary image spec
+    #     chandata = np.random.rand(300, 300)
+
+    #     # Need to ensure this is correct for your method
+    #     warp_aux_to_img = Affine.random().__json__()
+
+    #     # Add custom channel names with pipes
+    #     channels = 'my_fancy_channel_code'
+
+    #     # Write your data somewhere in the coco bundle path
+    #     dpath = ub.ensuredir((self.bundle_dpath, 'my_aux_channels'))
+    #     fpath = join(dpath, 'my_aux_for_{}.tif'.format(gid))
+    #     fname = relpath(fpath, self.bundle_dpath)
+
+    #     kwimage.imwrite(fpath, chandata)
+
+    #     aux = {
+    #         'file_name': fname,
+    #         'width': chandata.shape[1],
+    #         'height': chandata.shape[0],
+    #         'warp_aux_to_img': warp_aux_to_img,
+    #         'channels': channels,
+    #     }
+
+    #     # lookup the image you want to add to
+    #     img = self.index.imgs[gid]
+    #     # Ensure there is an auxiliary image list
+    #     auxiliary = img.setdefault('auxiliary', [])
+    #     # Add the auxiliary information to the image
+    #     auxiliary.append(aux)
+    #     self._invalidate_hashid()
+
     def add_annotation(self, image_id, category_id=None, bbox=None, id=None, **kw):
         """
         Add an annotation to the dataset (dynamically updates the index)
 
         Args:
-            image_id (int): image_id to add to
-            category_id (int): category_id to add to
-            bbox (list or kwimage.Boxes): bounding box in xywh format
-            id (None or int): ADVANCED. Force using this annotation id.
-            **kw : stores arbitrary key/value pairs in this new image
+            image_id (int): image_id the annoatation is added to.
+
+            category_id (int | None): category_id for the new annotaiton
+
+            bbox (list | kwimage.Boxes): bounding box in xywh format
+
+            id (None | int): Force using this annotation id. Typically you
+                should NOT specify this. A new unused id will be chosen and
+                returned.
+
+            **kw : stores arbitrary key/value pairs in this new image,
+                Common respected key/values include but are not limited to the
+                following:
+
+                track_id (int | str): some value used to associate annotations
+                    that belong to the same "track".
+
+                score' : float
+
+                prob' : List[float]
+
+                weight (float): a weight, usually used to indicate if a ground
+                    truth annotation is difficult / important. This generalizes
+                    standard "is_hard" or "ignore" attributes in other formats.
+
+                caption (str): a text caption for this annotation
+
+                keypoints (KeypointsLike): keypoints in some accepted
+                    format, see :method:`kwimage.Keypoints.to_coco`..
+
+                segmentation (MaskLike | MultiPolygonLike): keypoints in some
+                    accepted format, see :method:`kwimage.Mask.to_coco` and
+                    :method:`kwimage.MultiPolygon.to_coco`.
 
         Returns:
             int : the annotation id assigned to the new annotation
@@ -3283,6 +3353,19 @@ class MixinCocoAddRemove(object):
             >>> bbox = [10, 10, 20, 20]
             >>> aid = self.add_annotation(image_id, cid, bbox)
             >>> assert self.anns[aid]['bbox'] == bbox
+
+        Example:
+            >>> import kwimage
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> new_det = kwimage.Detections.random(1, segmentations=True, keypoints=True)
+            >>> # kwimage datastructures have methods to convert to coco recognized formats
+            >>> new_ann_data = list(new_det.to_coco(style='new'))[0]
+            >>> image_id = 1
+            >>> aid = self.add_annotation(image_id, **new_ann_data)
+            >>> # Lookup the annotation we just added
+            >>> ann = self.index.anns[aid]
+            >>> print('ann = {}'.format(ub.repr2(ann, nl=-2)))
 
         Example:
             >>> # Attempt to annot without a category or bbox
@@ -5034,18 +5117,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
     def _build_index(self):
         self.index.build(self)
 
-    def union(self, *others, disjoint_tracks=True, **kwargs):
+    def union(*others, disjoint_tracks=True, **kwargs):
         """
         Merges multiple :class:`CocoDataset` items into one. Names and
         associations are retained, but ids may be different.
 
         Args:
-            self : note that :func:`union` can be called as an instance method
-                or a class method.  If it is a class method, then this is the
-                class type, otherwise the instance will also be unioned with
-                ``others``.
-
-            *others : a series of CocoDatasets that we will merge
+            *others : a series of CocoDatasets that we will merge.
+                Note, if called as an instance method, the "self" instance
+                will be the first item in the "others" list. But if called
+                like a classmethod, "others" will be empty by default.
 
             disjoint_tracks (bool, default=True):
                 if True, we will assume track-ids are disjoint and if two
@@ -5124,20 +5205,28 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> print('dset3.anns = {}'.format(ub.repr2(dset3.anns, nl=1)))
             >>> print('merged.anns = {}'.format(ub.repr2(merged.anns, nl=1)))
 
+        Example:
+            >>> import kwcoco
+            >>> # Test empty union
+            >>> empty_union = kwcoco.CocoDataset.union()
+            >>> assert len(empty_union.index.imgs) == 0
+
         TODO:
             - [ ] are supercategories broken?
             - [ ] reuse image ids where possible
             - [ ] reuse annotation / category ids where possible
+            - [X] handle case where no inputs are given
             - [x] disambiguate track-ids
             - [x] disambiguate video-ids
         """
-        if self.__class__ is type:
-            # Method called as classmethod
-            cls = self
+        # Dev Notes:
+        # See ~/misc/tests/python/test_multiarg_classmethod.py
+        # for tests for how to correctly implement this method such that it can
+        # behave as a method or a classmethod
+        if len(others) > 0:
+            cls = type(others[0])
         else:
-            # Method called as instancemethod
-            cls = self.__class__
-            others = (self,) + others
+            cls = CocoDataset
 
         # TODO: add an option such that the union will fail if the names
         # are not already disjoint. Alternatively, it could be the case
@@ -5376,8 +5465,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     prefix = path[:i + 1]
                     freq[prefix] += 1
             # Find the longest common prefix
-            value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
-            longest_prefix = sep.join(value)
+            if len(freq) == 0:
+                longest_prefix = ''
+            else:
+                value, freq = max(freq.items(), key=lambda kv: (kv[1], len(kv[0])))
+                longest_prefix = sep.join(value)
             return longest_prefix
 
         dset_roots = [dset.bundle_dpath for dset in others]
