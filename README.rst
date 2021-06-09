@@ -5,15 +5,15 @@ The Kitware COCO Module
 
 |GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |Downloads| |ReadTheDocs|
 
-+------------------+--------------------------------------------+
-| Read the docs    | https://kwcoco.readthedocs.io              |
-+------------------+--------------------------------------------+
-| Gitlab (main)    | https://gitlab.kitware.com/utils/kwcoco    |
-+------------------+--------------------------------------------+
-| Github (mirror)  | https://github.com/Kitware/kwcoco          |
-+------------------+--------------------------------------------+
-| Pypi             | https://pypi.org/project/kwcoco            |
-+------------------+--------------------------------------------+
++------------------+------------------------------------------------------+
+| Read the docs    | https://kwcoco.readthedocs.io                        |
++------------------+------------------------------------------------------+
+| Gitlab (main)    | https://gitlab.kitware.com/computer-vision/kwcoco    |
++------------------+------------------------------------------------------+
+| Github (mirror)  | https://github.com/Kitware/kwcoco                    |
++------------------+------------------------------------------------------+
+| Pypi             | https://pypi.org/project/kwcoco                      |
++------------------+------------------------------------------------------+
 
 The main webpage for this project is: https://gitlab.kitware.com/computer-vision/kwcoco
 
@@ -74,12 +74,14 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
         conform             Make the COCO file conform to the spec. Populates inferable information such as image size, annotation area, etc.
         eval                Evaluate detection metrics using a predicted and truth coco file.
         modify_categories   Rename or remove categories
-        validate            Validate that a coco file conforms to the json schema, that assets exist, and potentially fix corrupted assets by removing them.
+        validate            Validate that a coco file conforms to the json schema, that assets exist, and potentially fix corrupted assets by removing
+                            them.
         subset              Take a subset of this dataset and write it to a new file
 
     optional arguments:
       -h, --help            show this help message and exit
       --version             show version number and exit (default: False)
+
 
 
 This should help you inspect (via stats and show), combine (via union), and
@@ -91,10 +93,10 @@ Toy Data
 --------
 
 Don't have a dataset with you, but you still want to test out your algorithms?
-Try the kwcoco shapes demo dataset, and generate an arbitrarilly large dataset.
+Try the kwcoco shapes demo dataset, and generate an arbitrarily large dataset.
 
 The toydata submodule renders simple objects on a noisy background ---
-optionally with auxillary channels --- and provides bounding boxes,
+optionally with auxiliary channels --- and provides bounding boxes,
 segmentations, and keypoint annotations. The following example illustrates a
 generated toy image with and without overlaid annotations. 
 
@@ -210,8 +212,8 @@ The JSON Spec
 A COCO file is a json file that follows a particular spec. It is used for
 storing computer vision datasets: namely images, categories, and annotations.
 Images have an id and a file name, which holds a relative or absolute path to
-the image data. Images can also have auxillary files (e.g. for depth masks,
-infared, or motion). A category has an id, a name, and an optional
+the image data. Images can also have auxiliary files (e.g. for depth masks,
+infrared, or motion). A category has an id, a name, and an optional
 supercategory.  Annotations always have an id, an image-id, and a bounding box.
 Usually they also contain a category-id. Sometimes they contain keypoints,
 segmentations. The dataset can also store videos, in which case images should
