@@ -2304,7 +2304,7 @@ class MixinCocoStats(object):
             try:
                 COCO_SCHEMA.validate(dset.dataset)
             except jsonschema.exceptions.ValidationError as ex:
-                msg = 'Failed to validate schema {!r}'.format(ex)
+                msg = 'Failed to validate schema: {}'.format(str(ex))
                 _error(msg)
 
         if config.get('unique', True):

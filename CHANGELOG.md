@@ -7,9 +7,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.6 - Unreleased
 
+### Fixed
+* Channels in a base image can now be None. 
+* `validate` now prints which field caused the issue
 
 ## Version 0.2.5 - Released 2021-06-09
 
+### Changes
+* Updated README
+* Code cleanup
+* More docs
+
+### Fixes
+* Fixed error with empty union
+* Fixed error in `delayed_load`
 
 ## Version 0.2.4 - Released 2021-05-20
 
