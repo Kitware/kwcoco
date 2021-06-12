@@ -1,4 +1,5 @@
 import sys
+import ubelt as ub
 
 
 def main(cmdline=True, **kw):
@@ -7,32 +8,28 @@ def main(cmdline=True, **kw):
     cmdline = False
     """
     import argparse
-    from kwcoco.cli import coco_stats
-    from kwcoco.cli import coco_union
-    from kwcoco.cli import coco_split
-    from kwcoco.cli import coco_show
-    from kwcoco.cli import coco_toydata
-    from kwcoco.cli import coco_eval
-    from kwcoco.cli import coco_conform
-    from kwcoco.cli import coco_modify_categories
-    from kwcoco.cli import coco_reroot
-    from kwcoco.cli import coco_validate
-    from kwcoco.cli import coco_subset
+
+    modnames = [
+        'coco_stats',
+        'coco_union',
+        'coco_split',
+        'coco_show',
+        'coco_toydata',
+        'coco_eval',
+        'coco_conform',
+        'coco_modify_categories',
+        'coco_reroot',
+        'coco_validate',
+        'coco_subset',
+        'coco_grab',
+    ]
+    module_lut = {}
+    for name in modnames:
+        mod = ub.import_module_from_name('kwcoco.cli.{}'.format(name))
+        module_lut[name] = mod
 
     # Create a list of all submodules with CLI interfaces
-    cli_modules = [
-        coco_stats,
-        coco_union,
-        coco_split,
-        coco_show,
-        coco_reroot,
-        coco_toydata,
-        coco_conform,
-        coco_eval,
-        coco_modify_categories,
-        coco_validate,
-        coco_subset,
-    ]
+    cli_modules = list(module_lut.values())
 
     # Create a subparser that uses the first positional argument to run one of
     # the previous CLI interfaces.
@@ -63,7 +60,7 @@ def main(cmdline=True, **kw):
             parserkw = dict(
                 description=subconfig.__class__.__doc__
             )
-        parserkw['help'] = parserkw['description']
+        parserkw['help'] = parserkw['description'].split('\n')[0]
         subparser = subparsers.add_parser(cli_cls.name, **parserkw)
         subparser = subconfig.argparse(subparser)
         subparser.set_defaults(main=cli_cls.main)

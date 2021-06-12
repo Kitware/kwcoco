@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.6 - Unreleased
 
+### Added
+* `kwcoco grab` CLI for downloading and converting standard datasets
+
 ### Fixed
 * Channels in a base image can now be None. 
 * `validate` now prints which field caused the issue

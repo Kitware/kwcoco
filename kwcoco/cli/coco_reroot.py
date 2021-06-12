@@ -5,31 +5,21 @@ import scriptconfig as scfg
 
 
 class CocoRerootCLI:
-    """
-    Modify the root of a coco dataset such to either make paths relative to a
-    new root or make paths absolute.
-
-    NOTE: This does seem to work in many cases but it has not been 100% tested
-    in all cases.
-
-    What happens when:
-
-        * Existing file paths are absolute, but are not correct.
-
-        * Existing file paths are absolute, and correct.
-
-        * Existing file paths are relative, but the original directory is
-          unknown, but the new image root correctly places them.
-
-        * todo: enumerate the rest
-    """
     name = 'reroot'
 
     class CLIConfig(scfg.Config):
         """
         Reroot image paths onto a new image root.
+
+        Modify the root of a coco dataset such to either make paths relative to a
+        new root or make paths absolute.
+
+        TODO:
+            - [ ] Evaluate that all tests cases work
         """
+
         epilog = """
+
         Example Usage:
             kwcoco reroot --help
             kwcoco reroot --src=special:shapes8 --dst rerooted.json
