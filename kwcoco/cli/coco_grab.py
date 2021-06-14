@@ -1,3 +1,4 @@
+import ubelt as ub
 import scriptconfig as scfg
 
 
@@ -11,38 +12,38 @@ class CocoGrabCLI:
         Grab standard datasets.
 
         Example:
-            kwcoco grab --cifar10=True --cifar100=True --camvid=True
-
-        TODO:
-            - [ ] Make the cli arg setup less wonky
+            kwcoco grab cifar10 camvid
         """
 
         default = {
-            # 'names': scfg.Value([], help='list of dataset names, cifar10, cifar100, or camvid'),
-            'cifar10': scfg.Value(False, help='set to True to grab this dataset'),
-            'cifar100': scfg.Value(False, help='set to True to grab this dataset'),
-            # 'voc': scfg.Value(False, help='set to True to grab this dataset'),
-            'camvid': scfg.Value(False, help='set to True to grab this dataset'),
+            'names': scfg.Value([], nargs='+', position=1, help=ub.paragraph(
+                '''
+                Dataset names to grab. Valid values are cifar10, cifar100,
+                and camvid.
+                '''
+            ))
         }
 
     @classmethod
     def main(cls, cmdline=True, **kw):
-        import ubelt as ub
         from kwcoco.data import grab_cifar
         from kwcoco.data import grab_camvid
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
         ensured = []
-        if config['camvid']:
+        names = config['names']
+        print('names = {!r}'.format(names))
+
+        if 'camvid' in names:
             dset = grab_camvid.grab_coco_camvid()
             ensured.append(dset)
 
-        if config['cifar10']:
+        if 'cifar10' in names:
             dset = grab_cifar.convert_cifar10()
             ensured.append(dset)
 
-        if config['cifar100']:
+        if 'cifar100' in names:
             dset = grab_cifar.convert_cifar100()
             ensured.append(dset)
 

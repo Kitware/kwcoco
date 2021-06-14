@@ -5,6 +5,22 @@ from os.path import dirname
 from os.path import relpath
 
 
+def __torrent_voc():
+    """
+    Requires:
+        pip install deluge
+        pip install python-libtorrent-bin
+
+    References:
+        https://academictorrents.com/details/f6ddac36ac7ae2ef79dc72a26a065b803c9c7230
+
+    TODO:
+        - [ ] Is there a pythonic way to download a torrent programatically?
+    """
+    # info = ub.cmd('deluge-console --help', verbose=3)
+    pass
+
+
 def convert_voc_to_coco(dpath=None):
     # TODO: convert segmentation information
 
@@ -189,6 +205,9 @@ def _read_split_paths(devkit_dpath, split, year):
 def ensure_voc_data(dpath=None, force=False, years=[2007, 2012]):
     """
     Download the Pascal VOC data if it does not already exist.
+
+    NOTE:
+        - [ ] These URLS seem to be dead
 
     Example:
         >>> # xdoctest: +REQUIRES(--download)
