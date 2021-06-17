@@ -3300,7 +3300,8 @@ class MixinCocoAddRemove(object):
     #     auxiliary.append(aux)
     #     self._invalidate_hashid()
 
-    def add_annotation(self, image_id, category_id=None, bbox=None, id=None, **kw):
+    def add_annotation(self, image_id, category_id=None, bbox=None,
+                       segmentation=None, keypoints=None, id=None, **kw):
         """
         Add an annotation to the dataset (dynamically updates the index)
 
@@ -3310,6 +3311,13 @@ class MixinCocoAddRemove(object):
             category_id (int | None): category_id for the new annotaiton
 
             bbox (list | kwimage.Boxes): bounding box in xywh format
+
+            segmentation (MaskLike | MultiPolygonLike): keypoints in some
+                accepted format, see :method:`kwimage.Mask.to_coco` and
+                :method:`kwimage.MultiPolygon.to_coco`.
+
+            keypoints (KeypointsLike): keypoints in some accepted
+                format, see :method:`kwimage.Keypoints.to_coco`..
 
             id (None | int): Force using this annotation id. Typically you
                 should NOT specify this. A new unused id will be chosen and
@@ -3331,13 +3339,6 @@ class MixinCocoAddRemove(object):
                     standard "is_hard" or "ignore" attributes in other formats.
 
                 caption (str): a text caption for this annotation
-
-                keypoints (KeypointsLike): keypoints in some accepted
-                    format, see :method:`kwimage.Keypoints.to_coco`..
-
-                segmentation (MaskLike | MultiPolygonLike): keypoints in some
-                    accepted format, see :method:`kwimage.Mask.to_coco` and
-                    :method:`kwimage.MultiPolygon.to_coco`.
 
         Returns:
             int : the annotation id assigned to the new annotation
@@ -3368,13 +3369,40 @@ class MixinCocoAddRemove(object):
             >>> print('ann = {}'.format(ub.repr2(ann, nl=-2)))
 
         Example:
-            >>> # Attempt to annot without a category or bbox
+            >>> # Attempt to add annot without a category or bbox
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> image_id = 1
             >>> aid = self.add_annotation(image_id)
             >>> assert None in self.index.cid_to_aids
+
+        Example:
+            >>> # Attempt to add annot using various styles of kwimage structures
+            >>> import kwcoco
+            >>> import kwimage
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> image_id = 1
+            >>> #--
+            >>> kw = {}
+            >>> kw['segmentation'] = kwimage.Polygon.random()
+            >>> kw['keypoints'] = kwimage.Points.random()
+            >>> aid = self.add_annotation(image_id, **kw)
+            >>> ann = self.index.anns[aid]
+            >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
+            >>> #--
+            >>> kw = {}
+            >>> kw['segmentation'] = kwimage.Mask.random()
+            >>> aid = self.add_annotation(image_id, **kw)
+            >>> ann = self.index.anns[aid]
+            >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
+            >>> #--
+            >>> kw = {}
+            >>> kw['segmentation'] = kwimage.Mask.random().to_bytes_rle()
+            >>> aid = self.add_annotation(image_id, **kw)
+            >>> ann = self.index.anns[aid]
+            >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
         """
+        import kwimage
         if id is None:
             id = self._next_ids.get('annotations')
         elif self.anns and id in self.anns:
@@ -3386,13 +3414,20 @@ class MixinCocoAddRemove(object):
         ann['category_id'] = None if category_id is None else int(category_id)
         if bbox is not None:
             try:
-                import kwimage
                 if isinstance(bbox, kwimage.Boxes):
                     bbox = bbox.to_xywh().data.tolist()
             except ImportError:
                 pass
             ann['bbox'] = bbox
-        # assert not set(kw).intersection(set(ann))
+
+        if segmentation is not None:
+            if hasattr(segmentation, 'to_coco'):
+                ann['segmentation'] = segmentation.to_coco(style='new')
+
+        if keypoints is not None:
+            if hasattr(keypoints, 'to_coco'):
+                ann['keypoints'] = keypoints.to_coco(style='new')
+
         ann.update(**kw)
         self.dataset['annotations'].append(ann)
         self.index._add_annotation(id, image_id, category_id, ann)

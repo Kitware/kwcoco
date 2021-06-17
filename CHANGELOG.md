@@ -10,6 +10,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * `kwcoco grab` CLI for downloading and converting standard datasets
 
+### Changed
+* `kwcoco.add_annotation` can now accept and automatically convert kwimage data
+  structures for segmentation and keypoints.
+
 ### Fixed
 * Channels in a base image can now be None. 
 * `validate` now prints which field caused the issue
