@@ -1,10 +1,21 @@
 """
 This example demonstrates how to use kwcoco to write a very simple torch
-dataset. This assumes the dataset will be single-image RGB inputs.
+dataset. This assumes the dataset will be single-image RGB inputs.  This file
+is intended to talk the reader through what we are doing and why.
 
 This example aims for clairity over being concise. There are APIs exposed by
 kwcoco (and its sister module ndsampler) that can perform the same tasks more
 efficiently and with fewer lines of code.
+
+If you run the doctest, it will produce a visualization that shows the images
+with boxes drawn on it, running it multiple times will let you see the
+augmentations. This can be done with the following command:
+
+
+    xdoctest -m kwcoco.examples.simple_kwcoco_torch_dataset KWCocoSimpleTorchDataset --show
+
+
+Or just copy the doctest into IPython and run it.
 """
 import torch
 import kwcoco
@@ -134,12 +145,11 @@ class KWCocoSimpleTorchDataset(torch.utils.data.Dataset):
         # Process the data and the annotations
 
         # Use if you want to ensure grayscale images are interpreted as rgb
-        imdata = raw_img
+        imdata = kwimage.atleast_3channels(raw_img)
         dets = raw_dets
 
-        # TODO: Do whatever sort of augmentation you want here.
-        # Remember, whenever we transform the image, we also need to transform
-        # the annotations.
+        # Do whatever sort of augmentation you want here.  Remember, whenever
+        # we transform the image, we also need to transform the annotations.
         if self.augment:
             # Build up an Affine augmentation
 
@@ -147,17 +157,22 @@ class KWCocoSimpleTorchDataset(torch.utils.data.Dataset):
             if self.rng.rand() < 0.5:
                 # horizontal flip with 0.5 probability
                 h, w = imdata.shape[0:2]
-                aug_transform = kwimage.Affine.affine(
-                    scale=(-1, 1), about=(w / 2, h / 2)) @ aug_transform
+                flip_transform = kwimage.Affine.affine(
+                    scale=(-1, 1),
+                    about=(w / 2, h / 2)
+                )
+                aug_transform = flip_transform @ aug_transform
 
             if self.rng.rand() < 0.8:
                 # small translation / scale perterbation with 80% probability
-                aug_transform = kwimage.Affine.random(
+                random_transform = kwimage.Affine.random(
                     # scale= not implemented as a distribution yet
                     # offset= not implemented as a distribution yet
                     shear=0,
                     theta=0,
-                    rng=self.rng) @ aug_transform
+                    rng=self.rng
+                )
+                aug_transform = random_transform @ aug_transform
 
             # Augment the image and the dets
             imdata = kwimage.warp_affine(imdata, aug_transform)
