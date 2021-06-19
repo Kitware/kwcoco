@@ -88,6 +88,12 @@ def main(cmdline=True, **kw):
             parser._subparsers._actions
             pass
 
+    EASTER = 1
+    if EASTER:
+        if len(sys.argv) == 2 and sys.argv[1] == 'boid':
+            from kwcoco.demo.boids import _yeah_boid
+            _yeah_boid()
+
     ns = parser.parse_known_args()[0]
     # print('ns = {!r}'.format(ns))
 
