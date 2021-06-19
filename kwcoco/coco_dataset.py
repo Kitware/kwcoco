@@ -5184,6 +5184,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         Returns:
             CocoDataset: a new merged coco dataset
 
+        CommandLine:
+            xdoctest -m kwcoco.coco_dataset CocoDataset.union
+
         Example:
             >>> # Test union works with different keypoint categories
             >>> dset1 = CocoDataset.demo('shapes1')
@@ -5243,7 +5246,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> others = (dset1, dset2, dset3)
             >>> for dset in others:
             >>>     [a.pop('segmentation', None) for a in dset.index.anns.values()]
-            >>>     [a.pop('keypoints') for a in dset.index.anns.values()]
+            >>>     [a.pop('keypoints', None) for a in dset.index.anns.values()]
             >>> cls = self = kwcoco.CocoDataset
             >>> merged = cls.union(*others, disjoint_tracks=1)
             >>> print('dset1.anns = {}'.format(ub.repr2(dset1.anns, nl=1)))
