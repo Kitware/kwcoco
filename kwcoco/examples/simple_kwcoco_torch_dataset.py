@@ -206,7 +206,7 @@ class KWCocoSimpleTorchDataset(DatasetBase):
 
         cxywh = torch.from_numpy(dets.data['boxes'].to_cxywh().data)
         class_idxs = torch.from_numpy(dets.data['class_idxs'])
-        rgb_chw = torch.from_numpy(imdata.transpose(2, 0, 1)).float() / 255.
+        rgb_chw = torch.from_numpy(imdata.transpose(2, 0, 1)).float() / 255.  # Magic dataset-level normalization
 
         # It is best practices that a data loader returns a dictionary
         # so it is easy to add / remove data input and label information.
