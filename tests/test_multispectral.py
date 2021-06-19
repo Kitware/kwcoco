@@ -74,7 +74,7 @@ def test_multispectral_union_relative():
 
 def test_multispectral_sql():
     try:
-        import sqlalchemy
+        import sqlalchemy  # NOQA
     except Exception:
         import pytest
         pytest.skip()

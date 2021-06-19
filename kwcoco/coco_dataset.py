@@ -3300,8 +3300,9 @@ class MixinCocoAddRemove(object):
     #     auxiliary.append(aux)
     #     self._invalidate_hashid()
 
-    def add_annotation(self, image_id, category_id=None, bbox=None,
-                       segmentation=None, keypoints=None, id=None, **kw):
+    def add_annotation(self, image_id, category_id=None, bbox=ub.NoParam,
+                       segmentation=ub.NoParam, keypoints=ub.NoParam, id=None,
+                       **kw):
         """
         Add an annotation to the dataset (dynamically updates the index)
 
@@ -3348,7 +3349,8 @@ class MixinCocoAddRemove(object):
             :func:`add_annotations`
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> image_id = 1
             >>> cid = 1
             >>> bbox = [10, 10, 20, 20]
@@ -3402,7 +3404,11 @@ class MixinCocoAddRemove(object):
             >>> ann = self.index.anns[aid]
             >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
         """
-        import kwimage
+        try:
+            import kwimage
+        except ImportError:
+            kwimage = None
+
         if id is None:
             id = self._next_ids.get('annotations')
         elif self.anns and id in self.anns:
@@ -3412,21 +3418,26 @@ class MixinCocoAddRemove(object):
         ann['id'] = int(id)
         ann['image_id'] = int(image_id)
         ann['category_id'] = None if category_id is None else int(category_id)
-        if bbox is not None:
+
+        if kwimage is not None and hasattr(bbox, 'to_coco'):
+            # to_coco works different for boxes atm, might update in future
             try:
-                if isinstance(bbox, kwimage.Boxes):
-                    bbox = bbox.to_xywh().data.tolist()
-            except ImportError:
-                pass
+                ann['bbox'] = ub.peek(bbox.to_coco(style='new'))
+            except Exception:
+                ann['bbox'] = bbox.to_xywh().data.tolist()
+        elif bbox is not ub.NoParam:
             ann['bbox'] = bbox
 
-        if segmentation is not None:
-            if hasattr(segmentation, 'to_coco'):
-                ann['segmentation'] = segmentation.to_coco(style='new')
+        elif kwimage is not None and hasattr(keypoints, 'to_coco'):
+            ub.peek(kwimage.Boxes.random(1).to_coco())
+            ann['keypoints'] = keypoints.to_coco(style='new')
+        elif keypoints is not ub.NoParam:
+            ann['keypoints'] = keypoints
 
-        if keypoints is not None:
-            if hasattr(keypoints, 'to_coco'):
-                ann['keypoints'] = keypoints.to_coco(style='new')
+        elif kwimage is not None and hasattr(segmentation, 'to_coco'):
+            ann['segmentation'] = segmentation.to_coco(style='new')
+        elif segmentation is not ub.NoParam:
+            ann['segmentation'] = segmentation
 
         ann.update(**kw)
         self.dataset['annotations'].append(ann)
@@ -5231,7 +5242,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> dset3 = kwcoco.CocoDataset.demo('vidshapes3')
             >>> others = (dset1, dset2, dset3)
             >>> for dset in others:
-            >>>     [a.pop('segmentation') for a in dset.index.anns.values()]
+            >>>     [a.pop('segmentation', None) for a in dset.index.anns.values()]
             >>>     [a.pop('keypoints') for a in dset.index.anns.values()]
             >>> cls = self = kwcoco.CocoDataset
             >>> merged = cls.union(*others, disjoint_tracks=1)
