@@ -17,14 +17,20 @@ augmentations. This can be done with the following command:
 
 Or just copy the doctest into IPython and run it.
 """
-import torch
+try:
+    import torch
+    DatasetBase = torch.utils.data.Dataset
+except Exception:
+    torch = None
+    DatasetBase = object
+
 import kwcoco
 import kwimage
 import kwarray
 import ubelt as ub
 
 
-class KWCocoSimpleTorchDataset(torch.utils.data.Dataset):
+class KWCocoSimpleTorchDataset(DatasetBase):
     """
     A simple torch dataloader where each image is considered a single item.
 
