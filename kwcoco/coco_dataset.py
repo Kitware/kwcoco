@@ -238,7 +238,7 @@ TODO:
 
     - [ ] Spec for video URI, and convert to frames @ framerate function.
 
-    - [ ] Document channel spec (move from netharn to here)
+    - [ ] Document channel spec
 
     - [X] remove videos
 
@@ -302,9 +302,19 @@ class MixinCocoAccessors(object):
     TODO: better name
     """
 
-    def delayed_load(self, gid):
+    def delayed_load(self, gid, channels=None, space='image'):
         """
         Experimental method
+
+        Args:
+            gid (int): image id to load
+
+            channels (FusedChannelSpec): specific channels to load.
+                if unspecified, all channels are loaded.
+
+            space (str):
+                can either be "image" for loading in image space, or
+                "video" for loading in video space.
 
         Example:
             >>> # xdoctest: +REQUIRES(module:ndsampler)
@@ -4392,6 +4402,7 @@ class CocoIndex(object):
             gid_to_aids = ub.map_vals(index._set, gid_to_aids)
             cid_to_aids = ub.map_vals(index._set, cid_to_aids)
             vidid_to_gids = ub.map_vals(index._set_sorted_by_frame_index, vidid_to_gids)
+            # trackid_to_aids = TODO
         else:
             gid_to_aids = defaultdict(index._set)
             cid_to_aids = defaultdict(index._set)

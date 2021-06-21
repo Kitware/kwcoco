@@ -3,9 +3,9 @@ The ChannelSpec has these simple rules:
 
     * each 1D channel is a alphanumeric string.
 
-    * The pipe ('|') separates aligned early fused stremas
+    * The pipe ('|') separates aligned early fused stremas (non-communative)
 
-    * The comma (',') separates late-fused streams, (happens after pipe operations)
+    * The comma (',') separates late-fused streams, (happens after pipe operations, and is communative)
 
     * Certain common sets of early fused channels have codenames, for example:
 
@@ -27,10 +27,136 @@ import six
 import functools
 
 
+class FusedChannelSpec(ub.NiceRepr):
+    """
+    A specific type of channel spec with only one early fused stream.
+
+    The channels in this stream are non-communative
+
+    Notes:
+        This class name and API is in flux and subject to change.
+
+    TODO:
+        A special code indicating a name and some number of bands that that
+        names contains, this would primarilly be used for large numbers of
+        channels produced by a network. Like:
+
+            resnet_d35d060_L5:512
+
+            or
+
+            resnet_d35d060_L5[:512]
+
+        might refer to a very specific (hashed) set of resnet parameters
+        with 512 bands
+
+        maybe we can do something slicly like:
+
+            resnet_d35d060_L5[A:B]
+            resnet_d35d060_L5:A:B
+
+        Do we want to "just store the code" and allow for parsing later?
+
+        Or do we want to ensure the serialization is parsed before we
+        construct the data structure?
+    """
+
+    _alias_lut = {
+        'rgb': 'r|g|b',
+        'rgba': 'r|g|b|a',
+        'dxdy': 'dx|dy',
+        'fxfy': 'fx|fy',
+    }
+
+    def __init__(self, parsed):
+        if __debug__ and not isinstance(parsed, list):
+            raise TypeError(ub.paragraph(
+                '''
+                FusedChannelSpec must be given a parsed list of strings, each
+                specifying a separate channel, to specify an encoded version of
+                the spec, use the coerce method
+                '''))
+        self.parsed = parsed
+
+    @ub.memoize_property
+    def spec(self):
+        return '|'.join(self.parsed)
+
+    @ub.memoize
+    def unique(self):
+        return set(self.parsed)
+
+    @classmethod
+    def parse(cls, spec):
+        self = cls(spec.split('|'))
+        return self
+
+    @classmethod
+    def coerce(cls, data):
+        """
+        Example:
+            >>> FusedChannelSpec.coerce(['a', 'b', 'c'])
+            >>> FusedChannelSpec.coerce('a|b|c')
+            >>> FusedChannelSpec.coerce(3)
+            >>> FusedChannelSpec.coerce(FusedChannelSpec(['a']))
+        """
+        if isinstance(data, list):
+            self = cls(data)
+        elif isinstance(data, str):
+            self = cls.parse(data)
+        elif isinstance(data, int):
+            # we know the number of channels, but not their names
+            self = cls(['u{}'.format(i) for i in range(data)])
+        elif isinstance(data, cls):
+            self = data
+        else:
+            raise TypeError('unknown type {}'.format(type(data)))
+        return self
+
+    def __nice__(self):
+        return self.spec
+
+    def __json__(self):
+        return self.spec
+
+    def normalize(self):
+        """
+        Replace aliases with explicit single-band-per-code specs
+
+        Example:
+            >>> self = FusedChannelSpec.coerce('b1|b2|b3|rgb')
+            >>> normed = self.normalize()
+            >>> print('normed = {}'.format(ub.repr2(normed, nl=1)))
+        """
+        norm_parsed = list(ub.flatten(
+            self._alias_lut.get(v, v).split('|')
+            for v in self.parsed))
+        normed = FusedChannelSpec(norm_parsed)
+        return normed
+
+    def __contains__(self, key):
+        """
+        Example:
+            >>> Spec = FusedChannelSpec.coerce
+            >>> 'disparity' in Spec('rgb|disparity|flowx|flowy')
+            True
+            >>> 'gray' in Spec('rgb|disparity|flowx|flowy')
+            False
+        """
+        return key in self.unique()
+
+    # def can_coerce(self, other):
+    #     # return if we can coerce this band repr to another, like
+    #     # gray to rgb or rgb to gray
+
+
 class ChannelSpec(ub.NiceRepr):
     """
     Parse and extract information about network input channel specs for
     early or late fusion networks.
+
+    Notes:
+        This class name and API is in flux and subject to change.
 
     Notes:
         The pipe ('|') character represents an early-fused input stream, and
@@ -279,6 +405,9 @@ class ChannelSpec(ub.NiceRepr):
         """
         Returns the unique channels that will need to be given or loaded
         """
+        import warnings
+        warnings.warn(
+            'FIXME: These kwargs are broken, but does anything use it?')
         if normalize:
             return set(ub.flatten(self.parse().values()))
         else:
