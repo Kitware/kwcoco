@@ -10,6 +10,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * `kwcoco grab` CLI for downloading and converting standard datasets
 
+* `CocoDataset.delayed_load` now has a limited ability to specify a list of
+  channels to load, and if it is returned in image or video space.
+
 ### Changed
 * `kwcoco.add_annotation` can now accept and automatically convert kwimage data
   structures for segmentation and keypoints.
