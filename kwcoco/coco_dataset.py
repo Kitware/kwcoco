@@ -316,39 +316,70 @@ class MixinCocoAccessors(object):
                 can either be "image" for loading in image space, or
                 "video" for loading in video space.
 
+        TODO:
+            - [ ] Currently can only take all or none of the channels from each
+                base-image / auxiliary dict. For instance if the main image is
+                r|g|b you can't just select g|b at the moment.
+
+            - [ ] The order of the channels in the delayed load should
+                match the requested channel order.
+
+            - [ ] TODO: add nans to bands that don't exist or throw an error
+
         Example:
-            >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import kwcoco
             >>> gid = 1
             >>> #
             >>> self = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-            >>> final = self.delayed_load(gid)
-            >>> print('final = {!r}'.format(final))
-            >>> print('final.finalize() = {!r}'.format(final.finalize()))
-            >>> print('final.finalize() = {!r}'.format(final.finalize(as_xarray=True)))
+            >>> delayed = self.delayed_load(gid)
+            >>> print('delayed = {!r}'.format(delayed))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
             >>> #
             >>> self = kwcoco.CocoDataset.demo('shapes8')
-            >>> final = self.delayed_load(gid)
-            >>> print('final = {!r}'.format(final))
-            >>> print('final.finalize() = {!r}'.format(final.finalize()))
-            >>> print('final.finalize() = {!r}'.format(final.finalize(as_xarray=True)))
+            >>> delayed = self.delayed_load(gid)
+            >>> print('delayed = {!r}'.format(delayed))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
 
-            >>> crop = final.delayed_crop((slice(0, 3), slice(0, 3)))
+            >>> crop = delayed.delayed_crop((slice(0, 3), slice(0, 3)))
             >>> crop.finalize()
             >>> crop.finalize(as_xarray=True)
+
+            >>> # TODO: should only select the "red" channel
+            >>> self = kwcoco.CocoDataset.demo('shapes8')
+            >>> delayed = self.delayed_load(gid, channels='r')
+
+            >>> import kwcoco
+            >>> gid = 1
+            >>> #
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> delayed = self.delayed_load(gid, channels='B1|B2', space='image')
+            >>> print('delayed = {!r}'.format(delayed))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
+            >>> delayed = self.delayed_load(gid, channels='B1|B2|B11', space='image')
+            >>> print('delayed = {!r}'.format(delayed))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
+            >>> delayed = self.delayed_load(gid, channels='B8|B1', space='video')
+            >>> print('delayed = {!r}'.format(delayed))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
         """
-        from ndsampler.delayed import DelayedLoad, DelayedChannelConcat
+        from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedChannelConcat
         from kwimage.transform import Affine
-        from kwcoco.channel_spec import ChannelSpec
+        from kwcoco.channel_spec import FusedChannelSpec
         bundle_dpath = self.bundle_dpath
+
+        requested = channels
+        if requested is not None:
+            requested = FusedChannelSpec.coerce(requested)
 
         def _delay_load_imglike(obj):
             info = {}
             fname = obj.get('file_name', None)
-            channels = obj.get('channels', None)
-            if channels is not None:
-                channels = ChannelSpec(channels)
-            info['channels'] = channels
+            channels_ = obj.get('channels', None)
+            if channels_ is not None:
+                channels_ = FusedChannelSpec.coerce(channels_).normalize()
+            info['channels'] = channels_
             width = obj.get('width', None)
             height = obj.get('height', None)
             if height is not None and width is not None:
@@ -357,31 +388,58 @@ class MixinCocoAccessors(object):
                 info['dsize'] = None
             if fname is not None:
                 info['fpath'] = fpath = join(bundle_dpath, fname)
-                info['chan'] = DelayedLoad(fpath, channels=channels, dsize=dsize)
+                info['chan'] = DelayedLoad(fpath, channels=channels_, dsize=dsize)
             return info
 
         img = self.index.imgs[gid]
-        img_info = _delay_load_imglike(img)
-        img_info['to_vid'] = Affine.coerce(img.get('warp_img_to_vid', None))
+        # obj = img
+        info = img_info = _delay_load_imglike(img)
 
         chan_list = []
-
-        if img_info.get('chan', None) is not None:
-            chan_list.append(img_info.get('chan', None))
+        if info.get('chan', None) is not None:
+            include_flag = requested is None
+            if not include_flag:
+                if requested.intersection(info['channels']):
+                    include_flag = True
+            if include_flag:
+                chan_list.append(info.get('chan', None))
 
         for aux in img.get('auxiliary', []):
-            aux_info = _delay_load_imglike(aux)
+            info = _delay_load_imglike(aux)
             aux_to_img = Affine.coerce(aux.get('warp_aux_to_img', None))
-            self = chan = aux_info['chan']
-            chan = chan.delayed_warp(
-                aux_to_img, dsize=img_info['dsize'])
-            chan_list.append(chan)
-        if len(chan_list) == 1:
-            delayed_full = chan_list[0]
+            chan = info['chan']
+
+            include_flag = requested is None
+            if not include_flag:
+                if requested.intersection(info['channels']):
+                    include_flag = True
+            if include_flag:
+                chan = chan.delayed_warp(
+                    aux_to_img, dsize=img_info['dsize'])
+                chan_list.append(chan)
+
+        if len(chan_list) == 0:
+            raise ValueError('no data')
+        elif len(chan_list) == 1:
+            delayed = chan_list[0]
         else:
-            delayed_full = DelayedChannelConcat(chan_list)
-        final = delayed_full
-        return final
+            delayed = DelayedChannelConcat(chan_list)
+
+        if space == 'image':
+            # Image space is the default
+            pass
+        elif space == 'video':
+            vidid = img['video_id']
+            video = self.index.videos[vidid]
+            width = video.get('width', img.get('width', None))
+            height = video.get('height', img.get('height', None))
+            video_dsize = (width, height)
+            img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
+            delayed = delayed.delayed_warp(img_to_vid, dsize=video_dsize)
+        else:
+            raise KeyError('space = {}'.format(space))
+
+        return delayed
 
     def load_image(self, gid_or_img, channels=None):
         """

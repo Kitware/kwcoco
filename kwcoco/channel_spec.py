@@ -68,15 +68,16 @@ class FusedChannelSpec(ub.NiceRepr):
         'fxfy': 'fx|fy',
     }
 
+    _size_lut = {k: v.count('|') + 1 for k, v in _alias_lut.items()}
+
     def __init__(self, parsed):
-        if __debug__ and not isinstance(parsed, list):
-            raise TypeError(ub.paragraph(
-                '''
-                FusedChannelSpec must be given a parsed list of strings, each
-                specifying a separate channel, to specify an encoded version of
-                the spec, use the coerce method
-                '''))
         self.parsed = parsed
+
+    def __len__(self):
+        return len(self.parsed)
+
+    # def __len__(self):
+    #     return len(self.parsed)
 
     @ub.memoize_property
     def spec(self):
@@ -137,10 +138,10 @@ class FusedChannelSpec(ub.NiceRepr):
     def __contains__(self, key):
         """
         Example:
-            >>> Spec = FusedChannelSpec.coerce
-            >>> 'disparity' in Spec('rgb|disparity|flowx|flowy')
+            >>> FCS = FusedChannelSpec.coerce
+            >>> 'disparity' in FCS('rgb|disparity|flowx|flowy')
             True
-            >>> 'gray' in Spec('rgb|disparity|flowx|flowy')
+            >>> 'gray' in FCS('rgb|disparity|flowx|flowy')
             False
         """
         return key in self.unique()
@@ -148,6 +149,70 @@ class FusedChannelSpec(ub.NiceRepr):
     # def can_coerce(self, other):
     #     # return if we can coerce this band repr to another, like
     #     # gray to rgb or rgb to gray
+
+    def code_list(self):
+        """
+        Return the expanded code list
+        """
+        return self.parsed
+
+    def difference(self, other):
+        """
+        Set difference
+
+        Example:
+            >>> FCS = FusedChannelSpec.coerce
+            >>> self = FCS('rgb|disparity|flowx|flowy')
+            >>> other = FCS('r|b')
+            >>> self.difference(other)
+            >>> other = FCS('flowx')
+            >>> self.difference(other)
+        """
+        other_norm = ub.oset(other.normalize().parsed)
+        self_norm = ub.oset(self.normalize().parsed)
+        new_parsed = list(self_norm - other_norm)
+        new = self.__class__(new_parsed)
+        return new
+
+    def intersection(self, other):
+        """
+        Example:
+            >>> FCS = FusedChannelSpec.coerce
+            >>> self = FCS('rgb|disparity|flowx|flowy')
+            >>> other = FCS('r|b|XX')
+            >>> self.intersection(other)
+        """
+        other_norm = ub.oset(other.normalize().parsed)
+        self_norm = ub.oset(self.normalize().parsed)
+        new_parsed = list(self_norm & other_norm)
+        new = self.__class__(new_parsed)
+        return new
+
+    def component_indices(self, axis=2):
+        """
+        Look up component indices within this stream
+
+        Example:
+            >>> FCS = FusedChannelSpec.coerce
+            >>> self = FCS('disparity|rgb|flowx|flowy')
+            >>> component_indices = self.component_indices()
+            >>> print('component_indices = {}'.format(ub.repr2(component_indices, nl=1)))
+            component_indices = {
+                'disparity': (slice(...), slice(...), slice(0, 1, None)),
+                'flowx': (slice(...), slice(...), slice(4, 5, None)),
+                'flowy': (slice(...), slice(...), slice(5, 6, None)),
+                'rgb': (slice(...), slice(...), slice(1, 4, None)),
+            }
+        """
+        component_indices = dict()
+        idx1 = 0
+        for part in self.parsed:
+            size = self._size_lut.get(part, 1)
+            idx2 = idx1 + size
+            index = tuple([slice(None)] * axis + [slice(idx1, idx2)])
+            idx1 = idx2
+            component_indices[part] = index
+        return component_indices
 
 
 class ChannelSpec(ub.NiceRepr):
@@ -634,7 +699,13 @@ class ChannelSpec(ub.NiceRepr):
             >>> inputs = ['flowx', 'flowy', 'disparity']
             >>> self = ChannelSpec('disparity,flowx|flowy')
             >>> component_indices = self.component_indices()
-            >>> print('component_indices = {!r}'.format(component_indices))
+            >>> print('component_indices = {}'.format(ub.repr2(component_indices, nl=1)))
+            component_indices = {
+                'disparity': ('disparity', (slice(None, None, None), slice(None, None, None), slice(0, 1, None))),
+                'flowx': ('flowx|flowy', (slice(None, None, None), slice(None, None, None), slice(0, 1, None))),
+                'flowy': ('flowx|flowy', (slice(None, None, None), slice(None, None, None), slice(1, 2, None))),
+            }
+
         """
         parsed = self.parse()
         component_indices = dict()
