@@ -61,13 +61,17 @@ An informal spec is as follows:
     }
 
     TransformSpec:
-        Currently there is only one spec that works with anything:
+        The spec can be anything coercable to a kwimage.Affine object.
+        This can be an explicit affine transform matrix like:
             {'type': 'affine': 'matrix': <a-3x3 matrix>},
 
-        In the future we may do something like this:
-            {'type': 'scale', 'factor': <float|Tuple[float, float]>},
-            {'type': 'translate', 'offset': <float|Tuple[float, float]>},
-            {'type': 'rotate', 'radians_ccw': <float>},
+        But it can also be a concise dict containing one or more of these keys
+            {
+                'scale': <float|Tuple[float, float]>,
+                'offset': <float|Tuple[float, float]>,
+                'skew': <float>,
+                'theta': <float>,  # radians counter-clock-wise
+            }
 
     ChannelSpec:
         This is a string that describes the channel composition of an image.
@@ -89,7 +93,7 @@ An informal spec is as follows:
         'image_id': int,
         'category_id': int,
 
-        'track_id': <int | str | uuid>  # indicates association between annotations across frames
+        'track_id': <int | str | uuid>  # indicates association between annotations across images
 
         'bbox': [tl_x, tl_y, w, h],  # xywh format)
         'score' : float,
