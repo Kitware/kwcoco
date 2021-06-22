@@ -3507,9 +3507,11 @@ class MixinCocoAddRemove(object):
         elif segmentation is not ub.NoParam:
             ann['segmentation'] = segmentation
 
+        track_id = ann.get('track_id', None)
+
         ann.update(**kw)
         self.dataset['annotations'].append(ann)
-        self.index._add_annotation(id, image_id, category_id, ann)
+        self.index._add_annotation(id, image_id, category_id, track_id, ann)
         self._invalidate_hashid(['annotations'])
         return id
 
@@ -4110,6 +4112,7 @@ class CocoIndex(object):
         index.cid_to_aids = None
         index.vidid_to_gids = None
         index.name_to_video = None
+        index.trackid_to_aids = None
 
         index.name_to_cat = None
         index.name_to_img = None
@@ -4271,23 +4274,26 @@ class CocoIndex(object):
                 for vidid, gids in vidid_to_gids.items():
                     index.vidid_to_gids[vidid].update(gids)
 
-    def _add_annotation(index, aid, gid, cid, ann):
+    def _add_annotation(index, aid, gid, cid, tid, ann):
         if index.anns is not None:
             index.anns[aid] = ann
             # Note: it should be ok to have None's here
             index.gid_to_aids[gid].add(aid)
             index.cid_to_aids[cid].add(aid)
+            index.trackid_to_aids[tid].add(aid)
 
     def _add_annotations(index, anns):
         if index.anns is not None:
             aids = [ann['id'] for ann in anns]
             gids = [ann['image_id'] for ann in anns]
             cids = [ann['category_id'] for ann in anns]
+            tids = [ann.get('track_id', None) for ann in anns]
             new_anns = dict(zip(aids, anns))
             index.anns.update(new_anns)
-            for gid, cid, aid in zip(gids, cids, aids):
+            for gid, cid, tid, aid in zip(gids, cids, tids, aids):
                 index.gid_to_aids[gid].add(aid)
                 index.cid_to_aids[cid].add(aid)
+                index.trackid_to_aids[tid].add(aid)
 
     def _add_category(index, cid, name, cat):
         if index.cats is not None:
@@ -4302,6 +4308,8 @@ class CocoIndex(object):
             for _ in index.gid_to_aids.values():
                 _.clear()
             for _ in index.cid_to_aids.values():
+                _.clear()
+            for _ in index.trackid_to_aids.values():
                 _.clear()
 
     def _remove_all_images(index):
@@ -4324,9 +4332,11 @@ class CocoIndex(object):
             for aid in remove_aids:
                 ann = index.anns.pop(aid)
                 gid = ann['image_id']
-                cid = ann['category_id']
+                cid = ann.get('category_id', None)
+                track_id = ann.get('track_id', None)
                 index.cid_to_aids[cid].remove(aid)
                 index.gid_to_aids[gid].remove(aid)
+                index.trackid_to_aids[track_id].remove(aid)
 
     def _remove_categories(index, remove_cids, verbose=0):
         # dynamically update the category index
@@ -4382,6 +4392,7 @@ class CocoIndex(object):
         index.name_to_cat = None
         index.file_name_to_img = None
         index.name_to_video = None
+        index.trackid_to_aids = None
         # index.kpcid_to_aids = None  # TODO
 
     def build(index, parent):
@@ -4456,14 +4467,16 @@ class CocoIndex(object):
             aids = [d['id'] for d in anns.values()]
             gid_to_aids = ub.group_items(aids, (d['image_id'] for d in anns.values()))
             cid_to_aids = ub.group_items(aids, (d.get('category_id', None) for d in anns.values()))
+            trackid_to_aids = ub.group_items(aids, (d.get('track_id', None) for d in anns.values()))
             cid_to_aids.pop(None, None)
             gid_to_aids = ub.map_vals(index._set, gid_to_aids)
             cid_to_aids = ub.map_vals(index._set, cid_to_aids)
+            trackid_to_aids = ub.map_vals(index._set, trackid_to_aids)
             vidid_to_gids = ub.map_vals(index._set_sorted_by_frame_index, vidid_to_gids)
-            # trackid_to_aids = TODO
         else:
             gid_to_aids = defaultdict(index._set)
             cid_to_aids = defaultdict(index._set)
+            trackid_to_aids = defaultdict(index._set)
             for ann in anns.values():
                 try:
                     aid = ann['id']
@@ -4495,6 +4508,9 @@ class CocoIndex(object):
                     if cid not in cats and cid is not None:
                         warnings.warn('Annotation {} in {} references '
                                       'unknown category_id'.format(ann, parent))
+
+                tid = ann.get('track_id', None)
+                trackid_to_aids[tid].add(aid)
 
         # Fix one-to-zero cases
         for cid in cats.keys():
@@ -4537,6 +4553,7 @@ class CocoIndex(object):
         index.gid_to_aids = gid_to_aids
         index.cid_to_aids = cid_to_aids
         index.vidid_to_gids = vidid_to_gids
+        index.trackid_to_aids = trackid_to_aids
 
         index.name_to_cat = {cat['name']: cat for cat in index.cats.values()}
         index.file_name_to_img = {
@@ -5178,6 +5195,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         checks['name_to_cat'] = self.index.name_to_cat == new.index.name_to_cat
         checks['name_to_img'] = self.index.name_to_img == new.index.name_to_img
         checks['file_name_to_img'] = self.index.file_name_to_img == new.index.file_name_to_img
+        checks['trackid_to_aids'] = self.index.trackid_to_aids == new.index.trackid_to_aids
         checks['vidid_to_gids'] = self.index.vidid_to_gids == new.index.vidid_to_gids
 
         failed_checks = {k: v for k, v in checks.items() if not v}
@@ -5189,9 +5207,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
     def _check_pointers(self, verbose=1):
         """
         Check that all category and image ids referenced by annotations exist
-
-        TODO:
-           - [ ] Check video_id attr in images
         """
         if not self.index:
             raise Exception('Build index before running pointer check')
@@ -5203,25 +5218,28 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             cid = ann['category_id']
             gid = ann['image_id']
 
-            if cid not in self.cats:
+            if cid not in self.index.cats:
                 if cid is not None:
                     errors.append('aid={} references bad cid={}'.format(aid, cid))
             else:
-                if self.cats[cid]['id'] != cid:
+                if self.index.cats[cid]['id'] != cid:
                     errors.append('cid={} has a bad index'.format(cid))
 
-            if gid not in self.imgs:
+            if gid not in self.index.imgs:
                 errors.append('aid={} references bad gid={}'.format(aid, gid))
             else:
-                if self.imgs[gid]['id'] != gid:
+                if self.index.imgs[gid]['id'] != gid:
                     errors.append('gid={} has a bad index'.format(gid))
 
-        if 0:
-            # WIP
-            iter_ = ub.ProgIter(self.dataset['images'], desc='check images', enabled=verbose)
-            for img in iter_:
-                img['video_id']
-                pass
+        iter_ = ub.ProgIter(self.dataset['images'], desc='check images', enabled=verbose)
+        for img in iter_:
+            gid = img['id']
+            vidid = img.get('video_id', None)
+            if vidid is not None:
+                if vidid not in self.index.videos:
+                    errors.append('gid={} references bad vidid={}'.format(aid, vidid))
+                elif self.index.videos[vidid]['id'] != vidid:
+                    errors.append('vidid={} has a bad index'.format(vidid))
 
         if errors:
             raise Exception('\n'.join(errors))
