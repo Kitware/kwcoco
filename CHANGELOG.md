@@ -8,6 +8,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.6 - Unreleased
 
 ### Added
+
+* `CocoDataset.index.trackid_to_aids` is a new index that maps a track-id to
+  all annotations assigned to that track.
+
 * `kwcoco grab` CLI for downloading and converting standard datasets
 
 * `CocoDataset.delayed_load` now has a limited ability to specify a list of

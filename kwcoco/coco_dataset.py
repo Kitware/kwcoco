@@ -5195,7 +5195,18 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         checks['name_to_cat'] = self.index.name_to_cat == new.index.name_to_cat
         checks['name_to_img'] = self.index.name_to_img == new.index.name_to_img
         checks['file_name_to_img'] = self.index.file_name_to_img == new.index.file_name_to_img
-        checks['trackid_to_aids'] = self.index.trackid_to_aids == new.index.trackid_to_aids
+
+        one_to_many1 = self.index.trackid_to_aids
+        one_to_many2 = new.index.trackid_to_aids
+
+        missing2 = ub.dict_diff(one_to_many1, one_to_many2)
+        missing1 = ub.dict_diff(one_to_many2, one_to_many1)
+        common1 = ub.dict_isect(one_to_many1, one_to_many2)
+        common2 = ub.dict_isect(one_to_many2, one_to_many1)
+        checks['trackid_to_aids'] = all([
+            all(len(v) == 0 for v in missing1.values()),
+            all(len(v) == 0 for v in missing2.values()),
+            common1 == common2])
         checks['vidid_to_gids'] = self.index.vidid_to_gids == new.index.vidid_to_gids
 
         failed_checks = {k: v for k, v in checks.items() if not v}
@@ -5237,7 +5248,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             vidid = img.get('video_id', None)
             if vidid is not None:
                 if vidid not in self.index.videos:
-                    errors.append('gid={} references bad vidid={}'.format(aid, vidid))
+                    pass
+                    # Dont make this an error because a video dictionary is not
+                    # strictly necessary for images to be linked via videos.
+                    # We could make this a warning.
+                    # errors.append('gid={} references bad vidid={}'.format(gid, vidid))
                 elif self.index.videos[vidid]['id'] != vidid:
                     errors.append('vidid={} has a bad index'.format(vidid))
 
