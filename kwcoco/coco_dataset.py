@@ -949,6 +949,7 @@ class MixinCocoExtras(object):
             >>> assert assert_dsets_allclose(dct_dset, copy3)
             >>> assert assert_dsets_allclose(dct_dset, copy4)
         """
+        import kwcoco
         if isinstance(key, cls):
             self = key
         if isinstance(key, str):
@@ -961,7 +962,6 @@ class MixinCocoExtras(object):
                 from kwcoco.coco_sql_dataset import CocoSqlDatabase
                 self = CocoSqlDatabase(dset_fpath).connect()
             elif result.path.endswith('.json') or '.json' in result.path:
-                import kwcoco
                 self = kwcoco.CocoDataset(dset_fpath, **kw)
             elif result.scheme == 'special':
                 self = cls.demo(key=key, **kw)
