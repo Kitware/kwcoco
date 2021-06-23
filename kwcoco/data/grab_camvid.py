@@ -237,7 +237,7 @@ def grab_raw_camvid():
     Grab the raw camvid data.
     """
     import zipfile
-    dpath = ub.get_app_cache_dir('kwcoco', 'camvid')
+    dpath = ub.ensure_app_cache_dir('kwcoco', 'camvid')
 
     # url = 'http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/data/LabeledApproved_full.zip'
     # url = 'https://github.com/mostafaizz/camvid/archive/master.zip'
