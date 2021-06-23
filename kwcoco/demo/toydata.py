@@ -744,7 +744,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         # Hack to fix coco formatting from Detections.to_coco
         kpt_cats = dset.keypoint_categories()
         for ann in dset.dataset['annotations']:
-            for kpt in ann['keypoints']:
+            for kpt in ann.get('keypoints', []):
                 if 'keypoint_category_id' not in kpt:
                     kp_catname = kpt.pop('keypoint_category')
                     kpt['keypoint_category_id'] = kpt_cats.node_to_id[kp_catname]

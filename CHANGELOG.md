@@ -5,8 +5,36 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.5 - Unreleased
+## Version 0.2.6 - Unreleased
 
+### Added
+
+* `CocoDataset.index.trackid_to_aids` is a new index that maps a track-id to
+  all annotations assigned to that track.
+
+* `kwcoco grab` CLI for downloading and converting standard datasets
+
+* `CocoDataset.delayed_load` now has a limited ability to specify a list of
+  channels to load, and if it is returned in image or video space.
+
+### Changed
+* `kwcoco.add_annotation` can now accept and automatically convert kwimage data
+  structures for segmentation and keypoints.
+
+### Fixed
+* Channels in a base image can now be None. 
+* `validate` now prints which field caused the issue
+
+## Version 0.2.5 - Released 2021-06-09
+
+### Changes
+* Updated README
+* Code cleanup
+* More docs
+
+### Fixes
+* Fixed error with empty union
+* Fixed error in `delayed_load`
 
 ## Version 0.2.4 - Released 2021-05-20
 

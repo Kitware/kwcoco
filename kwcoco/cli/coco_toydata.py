@@ -10,7 +10,15 @@ class CocoToyDataCLI(object):
         Create COCO toydata
         """
         default = {
-            'key': scfg.Value('shapes8', help='special demodata code', position=1),
+            'key': scfg.Value('shapes8', help=ub.paragraph(
+                '''
+                Special demodata code. Available options are:
+                photos, shapes8, vidshapes8, vidshapes8-multispectral
+
+                Note that the number (e.g. 8) at the end of the "shapes"
+                datasets can be replaced by any number to specify the number of
+                images generated in the toy dataset.
+                '''), position=1),
 
             'dst': scfg.Value(None, help=ub.paragraph(
                 '''

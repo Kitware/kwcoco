@@ -191,7 +191,7 @@ IMAGE = OBJECT(OrderedDict((
     ('timestamp', NUMBER(description='todo describe format. flicks?')),
     ('frame_index', INTEGER),
 
-    ('channels', CHANNELS),
+    ('channels', CHANNELS | NULL),
 
     # TODO: optional world localization information
     # TODO: camera information?

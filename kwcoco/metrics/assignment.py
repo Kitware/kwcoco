@@ -624,7 +624,17 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
                     bp if p is None else p
                     for bp, p in zip(box_polys, ignore_sseg.data)
                 ]
-                ignore_regions = [p.to_shapely() for p in ignore_polys]
+
+                # FIXME: to to_shapely method can break, not sure if this is
+                # the right way to fix this
+
+                ignore_regions = []
+                for p in ignore_polys:
+                    try:
+                        ignore_regions.append(p.to_shapely())
+                    except Exception:
+                        pass
+                # ignore_regions = [p.to_shapely() for p in ignore_polys]
                 ignore_region = cascaded_union(ignore_regions).buffer(0)
 
                 cand_pred = pred_boxes.take(ignore_idxs)

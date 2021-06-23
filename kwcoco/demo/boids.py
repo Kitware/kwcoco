@@ -619,5 +619,9 @@ def _pygame_render_boids():
         print('exiting')
 
 
-if __name__ == '__main__':
+def _yeah_boid():
     _pygame_render_boids()
+
+
+if __name__ == '__main__':
+    _yeah_boid()
