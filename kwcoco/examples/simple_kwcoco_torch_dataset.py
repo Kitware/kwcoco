@@ -182,7 +182,7 @@ class KWCocoSimpleTorchDataset(DatasetBase):
 
             # Augment the image and the dets
             imdata = kwimage.warp_affine(imdata, aug_transform)
-            dets = dets.warp(aug_transform)
+            dets = dets.warp(aug_transform.matrix)
 
         # Use the convention where dims/shape are ordered as height,width and
         # size/dsize are width,height.
@@ -195,7 +195,7 @@ class KWCocoSimpleTorchDataset(DatasetBase):
 
         resize_tf = kwimage.Affine.affine(offset=info['offset'],
                                           scale=info['scale'])
-        dets = dets.warp(resize_tf)
+        dets = dets.warp(resize_tf.matrix)
 
         if 0:
             # The `dets.data` and `dets.meta` dictionaries contain annot info
