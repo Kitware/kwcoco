@@ -4,7 +4,12 @@ References:
 """
 
 
-def download_domain_net():
+def grab_domain_net():
+    """
+    TODO:
+        - [ ] Allow the user to specify the download directory, generalize this
+        pattern across the data grab scripts.
+    """
     import zipfile
     import ubelt as ub
     import kwcoco
@@ -85,13 +90,21 @@ def download_domain_net():
 
     dpath = ub.ensure_app_cache_dir('kwcoco', 'domain_net')
 
-    stamp = ub.CacheStamp('domain_stamp', dpath=dpath)
+    # Assign a coco filepath to each dataset split
+    for key, info in infos.items():
+        if key.endswith(('_train', '_test')):
+            info['coco_fpath'] = os.path.join(dpath, key + '.kwcoco.json')
+
+    stamp = ub.CacheStamp('domain_stamp', dpath=dpath, depends=['v001'])
     if stamp.expired():
         errors = []
+        # TODO: Multi-file download manager with parallel jobs
+        # TODO: Don't redownload if the data was already extracted
         for key, info in infos.items():
             try:
                 zip_fpath = ub.grabdata(
-                    info['url'], dpath=dpath, hash_prefix=info.get('sha512', 'x' * 64))
+                    info['url'], dpath=dpath,
+                    hash_prefix=info.get('sha512', 'x' * 64))
                 info['fpath'] = zip_fpath
             except Exception as ex:
                 print('ex = {!r}'.format(ex))
@@ -100,6 +113,7 @@ def download_domain_net():
         if errors:
             raise Exception('download errors')
 
+        # Extact images from archive files
         for key, info in infos.items():
             if key.endswith('_images'):
                 print('extract {} images'.format(key))
@@ -107,26 +121,48 @@ def download_domain_net():
                 zfile = zipfile.ZipFile(file)
                 zfile.extractall(path=dpath)
 
-        coco_fpaths = []
+        # Construct the kwcoco manifests
         for key, info in infos.items():
             if key.endswith(('_train', '_test')):
-                coco_dset = kwcoco.CocoDataset(tag=key)
-                coco_dset.fpath = os.path.join(dpath, key + '.kwcoco.json')
+                coco_dset = kwcoco.CocoDataset()
+                coco_dset.fpath = info['coco_fpath']
 
                 with open(info['fpath'], 'r') as file:
                     lines = file.read().split('\n')
 
                 for line in ub.ProgIter(lines, desc='parse ' + key):
                     if line:
+                        print('line = {!r}'.format(line))
                         path, num = line.split(' ')
-                        h, w = kwimage.load_image_shape(os.path.join(dpath, path))[0:2]
+                        gpath = os.path.join(dpath, path)
+                        shape = kwimage.load_image_shape(gpath)
+                        h, w = shape[0:2]
                         domain, catname, image_name = path.split('/')
-                        gid = coco_dset.add_image(file_name=path, height=h, width=w, name=image_name)
+                        gid = coco_dset.add_image(file_name=path, height=h,
+                                                  width=w, name=image_name)
                         cid = int(num)
                         cid = coco_dset.ensure_category(name=catname, id=cid)
-                        aid = coco_dset.add_annotation(image_id=gid, category_id=cid, bbox=[0, 0, w, h])
+                        coco_dset.add_annotation(image_id=gid, category_id=cid,
+                                                 bbox=[0, 0, w, h])
+                        # Mark the domain in an non-standard field
+                        coco_dset.index.imgs['domain'] = domain
 
                 coco_dset.validate()
                 coco_dset.dump(coco_dset.fpath, newlines=True)
-                coco_fpaths.append(coco_dset.fpath)
         stamp.renew()
+
+    # Read and return each domain-net dataset
+    dsets = []
+    for key, info in infos.items():
+        if 'coco_fpath' in info:
+            dset = kwcoco.CocoDataset(info['coco_fpath'])
+            dsets.append(dset)
+    return dsets
+
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/kwcoco/data/grab_domainnet.py
+    """
+    grab_domain_net()

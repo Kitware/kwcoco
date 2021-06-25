@@ -19,7 +19,7 @@ class CocoGrabCLI:
             'names': scfg.Value([], nargs='+', position=1, help=ub.paragraph(
                 '''
                 Dataset names to grab. Valid values are cifar10, cifar100,
-                and camvid.
+                domainnet, and camvid.
                 '''
             ))
         }
@@ -28,6 +28,7 @@ class CocoGrabCLI:
     def main(cls, cmdline=True, **kw):
         from kwcoco.data import grab_cifar
         from kwcoco.data import grab_camvid
+        from kwcoco.data import grab_domainnet
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
@@ -46,6 +47,11 @@ class CocoGrabCLI:
         if 'cifar100' in names:
             dset = grab_cifar.convert_cifar100()
             ensured.append(dset)
+
+        if 'domainnet' in names:
+            dsets = grab_domainnet.grab_domain_net()
+            for dset in dsets:
+                ensured.append(dset)
 
         # if config['voc']:
         #     from kwcoco.data import grab_voc

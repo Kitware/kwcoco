@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.7 - Unreleased
 
+### Added
+
+* Added "domain net" to `kwcoco grab`.
+
 
 ## Version 0.2.6 - Released 2021-06-22
 
