@@ -1,41 +1,8 @@
 """
-# Helper to extract the bit of utool that we need
-
-# This is a "lightning" liberator tutorial.
-
-# Problem: I have an old codebase that has a function that I want, but I don't
-# want to bring over that entire old codebase.
-
-# Solution: Liberate the functionality you need with "liberator"
-
-# Example: I want to get the "unarchive_file" function from an old codebase so
-# I can just import the codebase (once), create a liberator object, then add
-# the function I care about to the liberator object. Liberator will do its best
-# to extract that relevant bit of code.
-
-# We can also remove dependencies on external modules using the "expand"
-# function. In this example, we "expand" out utool itself, because we dont want
-# to depend on it. The liberator object will then crawl through the code and
-# try to bring in the source for the expanded dependencies. Note, that the
-# expansion code works well, but not perfectly. It cant handle `import *` or
-# other corner cases that can break the static analysis.
-
-
-# Requires:
-#     pip install liberator)
-
-import liberator
-import utool as ut
-
-lib = liberator.Liberator()
-lib.add_dynamic(ut.unarchive_file)
-# lib.expand(['utool'])
-print(lib.current_sourcecode())
-
-
-# doesnt work
-lib.expand(['utool.util_arg'])
-
+References:
+    https://medium.com/the-downlinq/the-spacenet-7-multi-temporal-urban-development-challenge-algorithmic-baseline-4515ec9bd9fe
+    https://arxiv.org/pdf/2102.11958.pdf
+    https://spacenet.ai/sn7-challenge/
 """
 from os.path import dirname
 from os.path import exists
@@ -45,7 +12,8 @@ import ubelt as ub
 import os
 import tarfile
 import zipfile
-from os.path import relpath, dirname
+from os.path import relpath
+
 
 class Archive(object):
     """
@@ -265,72 +233,161 @@ def grab_spacenet(data_dpath):
                 archive_fpath = item['fpath']
                 unarchive_file(archive_fpath, extract_dpath, overwrite=0, verbose=2)
 
-        print('convert spacenet')
-        rooot_contents = list(extract_dpath.glob('*'))
-        print('rooot_contents = {!r}'.format(rooot_contents))
-
-        csv_fpath = extract_dpath / 'csvs/sn7_train_ground_truth_pix.csv'
-
-        contents = list(extract_dpath.glob('csvs/sn7_train_ground_truth_pix.csv'))
-
-        tile_dpaths = list(extract_dpath.glob('train/*'))
-
-        coco_dset = kwcoco.CocoDataset()
-        # FIXME: CocoDataset broke when I passed fpath in the constructor
-        coco_dset.fpath = coco_fpath
-
-        for tile_dpath in tile_dpaths:
-            tile_name = tile_dpath.name
-            # subdirs = list(tile_dpath.glob('*'))
-            vidid = coco_dset.add_video(name=tile_name)
-
-            image_gpaths = sorted(tile_dpath.glob('images/*'))
-            # sorted(tile_dpath.glob('labels/*'))
-            # sorted(tile_dpath.glob('images_masked/*'))
-            # sorted(tile_dpath.glob('labels_match/*'))
-            sorted(tile_dpath.glob('labels_match_piz/*'))
-            # sorted(tile_dpath.glob('UDM_masks/*'))
-
-            for frame_index, gpath in enumerate(image_gpaths):
-                coco_dset.add_image(
-                    file_name=str(gpath.relative_to(coco_dset.bundle_dpath)),
-                    name=str(gpath.name),
-                    video_id=vidid,
-                    frame_index=frame_index,
-                )
-
-        # Postprocess images
-        import parse
-        import datetime
-        s7_fname_fmt = parse.Parser('global_monthly_{year:d}_{month:d}_mosaic_{}')
-        for gid, img in coco_dset.index.imgs.items():
-            gname = img['name']
-            nameinfo = s7_fname_fmt.parse(gname)
-            timestamp = datetime.datetime(year=nameinfo['year'], month=nameinfo['month'], day=1)
-            img['timestamp'] = timestamp.isoformat()
-            # TODO (in postprocesing?):
-            # warp_img_to_vid=...
-            # auxiliary=...
-            # height
-            # width
-            # channels
-
-        print('coco_dset.fpath = {!r}'.format(coco_dset.fpath))
-        print('coco_dset = {!r}'.format(coco_dset))
-
-        # TODO: add annotations
-
-
-        coco_dset.dump(coco_dset.fpath, newlines=True)
+        coco_dset = convert_spacenet_to_kwcoco(extract_dpath, coco_fpath)
         stamp.renew()
 
     coco_dset = kwcoco.CocoDataset(coco_fpath)
     return coco_dset
 
 
+def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
+    """
+    Converts the raw SpaceNet7 dataset to kwcoco
 
-# def convert_spacenet_csv(data_dpath):
-#     pas
+    Notes:
+        * The "train" directory contains 60 "videos" representing a region over
+        time.
+
+        * Each "video" directory contains :
+            * images           - unmasked images
+            * images_masked    - images with masks applied
+            * labels           - geojson polys in wgs84?
+            * labels_match     - geojson polys in wgs84 with track ids?
+            * labels_match_pix - geojson polys in pixels with track ids?
+            * UDM_masks - unusable data masks (binary data corresponding with an image, may not exist)
+
+        File names appear like:
+            "global_monthly_2018_01_mosaic_L15-1538E-1163N_6154_3539_13"
+
+    Ignore:
+        dpath = pathlib.Path("/home/joncrall/data/dvc-repos/smart_watch_dvc/extern/spacenet/")
+        extract_dpath = dpath / 'extracted'
+        coco_fpath = dpath / 'spacenet7.kwcoco.json'
+    """
+    import kwcoco
+    import json
+    import kwimage
+    import parse
+    import datetime
+    print('Convert Spacenet7 to kwcoco')
+
+    coco_dset = kwcoco.CocoDataset()
+    coco_dset.fpath = coco_fpath
+
+    building_cid = coco_dset.ensure_category('building')
+    ignore_cid = coco_dset.ensure_category('ignore')
+
+    s7_fname_fmt = parse.Parser('global_monthly_{year:d}_{month:d}_mosaic_{}')
+
+    # Add images
+    tile_dpaths = list(extract_dpath.glob('train/*'))
+    for tile_dpath in ub.ProgIter(tile_dpaths, desc='add video'):
+        tile_name = tile_dpath.name
+        vidid = coco_dset.add_video(name=tile_name)
+
+        image_gpaths = sorted(tile_dpath.glob('images/*'))
+        # sorted(tile_dpath.glob('labels/*'))
+        # sorted(tile_dpath.glob('images_masked/*'))
+        # sorted(tile_dpath.glob('labels_match/*'))
+        # udm_fpaths = sorted(tile_dpath.glob('UDM_masks/*'))
+
+        for frame_index, gpath in enumerate(image_gpaths):
+            gname = str(gpath.stem)
+            nameinfo = s7_fname_fmt.parse(gname)
+            timestamp = datetime.datetime(year=nameinfo['year'], month=nameinfo['month'], day=1)
+            gid = coco_dset.add_image(
+                file_name=str(gpath.relative_to(coco_dset.bundle_dpath)),
+                name=gname,
+                video_id=vidid,
+                frame_index=frame_index,
+                timestamp=timestamp.isoformat(),
+                channels='r|g|b',
+            )
+
+    coco_dset._ensure_imgsize()
+
+    # Add annotations
+
+    def _from_geojson2(geometry):
+        import numpy as np
+        coords = geometry['coordinates']
+        exterior = np.array(coords[0])[:, 0:2]
+        interiors = [np.array(h)[:, 0:2] for h in coords[1:]]
+        poly_data = dict(exterior=kwimage.Coords(exterior),
+                         interiors=[kwimage.Coords(hole)
+                                    for hole in interiors])
+        self = kwimage.Polygon(data=poly_data)
+        return self
+
+    all_label_fpaths = sorted(extract_dpath.glob('train/*/labels_match_pix/*'))
+    for label_fpath in ub.ProgIter(all_label_fpaths, desc='add annots'):
+        # Remove trailing suffix
+        name_parts = label_fpath.stem.split('_')
+        assert name_parts[-1] == 'Buildings'
+        name = '_'.join(name_parts[:-1])
+        with open(label_fpath, 'r') as file:
+            label_data = json.load(file)
+
+        assert label_data['type'] == 'FeatureCollection'
+        for feat in label_data['features']:
+            prop = feat['properties']
+            gid = coco_dset.index.name_to_img[name]['id']
+
+            # from_geojson is slow!
+            # poly = kwimage.Polygon.from_geojson(feat['geometry'])
+            poly = _from_geojson2(feat['geometry'])
+
+            # This is a bottleneck
+            boxes = poly.bounding_box()
+            boxes = boxes.quantize()
+            xywh = boxes.to_xywh().data[0].tolist()
+
+            ann = {
+                'bbox': xywh,
+                'image_id': gid,
+                'category_id': building_cid,
+                'track_id': prop['Id'],
+                'area': prop['area'],
+                'segmentation': poly.to_coco(style='new')
+            }
+            coco_dset.add_annotation(**ann)
+
+    # import xdev
+    # xdev.profile_now(foo)()
+
+    # xdev.profile_now(poly.bounding_box)()
+    # xdev.profile_now(poly.bounding_box().quantize)()
+    # xdev.profile_now(poly.bounding_box().quantize)(inplace=True)
+    # xdev.profile_now(poly.bounding_box().quantize().to_xywh)()
+
+    # xdev.profile_now(kwimage.Polygon.from_geojson)(feat['geometry'])
+    # xdev.profile_now(_from_geojson2)(feat['geometry'])
+    # xdev.profile_now(kwimage.Polygon().__init__)(data=poly_data)
+
+    all_udm_fpaths = sorted(extract_dpath.glob('train/*/UDM_masks/*'))
+    for udm_fpath in ub.ProgIter(all_udm_fpaths, desc='add ignore masks'):
+        name_parts = udm_fpath.stem.split('_')
+        assert name_parts[-1] == 'UDM'
+        name = '_'.join(name_parts[:-1])
+
+        gid = coco_dset.index.name_to_img[name]['id']
+        c_mask = kwimage.imread(str(udm_fpath))
+        c_mask[c_mask == 255] = 1
+        mask = kwimage.Mask(c_mask, 'c_mask')
+        poly = mask.to_multi_polygon()
+        xywh = ub.peek(poly.bounding_box().quantize().to_coco())
+        ann = {
+            'bbox': xywh,
+            'image_id': gid,
+            'category_id': ignore_cid,
+            'segmentation': poly.to_coco(style='new')
+        }
+        coco_dset.add_annotation(**ann)
+
+    print('coco_dset.fpath = {!r}'.format(coco_dset.fpath))
+    print('coco_dset = {!r}'.format(coco_dset))
+    coco_dset.dump(str(coco_dset.fpath))
+    return coco_dset
 
 
 def main():
