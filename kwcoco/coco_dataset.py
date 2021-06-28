@@ -3468,12 +3468,23 @@ class MixinCocoAddRemove(object):
             >>> kw['segmentation'] = kwimage.Mask.random()
             >>> aid = self.add_annotation(image_id, **kw)
             >>> ann = self.index.anns[aid]
+            >>> assert ann.get('segmentation', None) is not None
             >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
             >>> #--
             >>> kw = {}
             >>> kw['segmentation'] = kwimage.Mask.random().to_bytes_rle()
             >>> aid = self.add_annotation(image_id, **kw)
             >>> ann = self.index.anns[aid]
+            >>> assert ann.get('segmentation', None) is not None
+            >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
+            >>> #--
+            >>> kw = {}
+            >>> kw['segmentation'] = kwimage.Polygon.random().to_coco()
+            >>> kw['keypoints'] = kwimage.Points.random().to_coco()
+            >>> aid = self.add_annotation(image_id, **kw)
+            >>> ann = self.index.anns[aid]
+            >>> assert ann.get('segmentation', None) is not None
+            >>> assert ann.get('keypoints', None) is not None
             >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
         """
         try:
@@ -3499,17 +3510,23 @@ class MixinCocoAddRemove(object):
                 ann['bbox'] = bbox.to_xywh().data.tolist()
         elif bbox is not ub.NoParam:
             ann['bbox'] = bbox
+        else:
+            assert bbox is ub.NoParam
 
-        elif kwimage is not None and hasattr(keypoints, 'to_coco'):
+        if kwimage is not None and hasattr(keypoints, 'to_coco'):
             ub.peek(kwimage.Boxes.random(1).to_coco())
             ann['keypoints'] = keypoints.to_coco(style='new')
         elif keypoints is not ub.NoParam:
             ann['keypoints'] = keypoints
+        else:
+            assert keypoints is ub.NoParam
 
-        elif kwimage is not None and hasattr(segmentation, 'to_coco'):
+        if kwimage is not None and hasattr(segmentation, 'to_coco'):
             ann['segmentation'] = segmentation.to_coco(style='new')
         elif segmentation is not ub.NoParam:
             ann['segmentation'] = segmentation
+        else:
+            assert segmentation is ub.NoParam
 
         track_id = ann.get('track_id', None)
 

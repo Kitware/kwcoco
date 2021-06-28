@@ -85,6 +85,7 @@ import numpy as np
 import kwimage
 import kwarray
 from kwimage.transform import Affine
+from kwcoco.channel_spec import FusedChannelSpec
 
 
 class DelayedOperation(ub.NiceRepr):
@@ -92,7 +93,8 @@ class DelayedOperation(ub.NiceRepr):
     Base class for nodes in a tree of delayed operations
     """
     def __nice__(self):
-        return '{}'.format(self.shape)
+        channels = self.channels
+        return '{}, {}'.format(self.shape, channels)
 
     def finalize(self):
         raise NotImplementedError
@@ -291,6 +293,100 @@ class DelayedIdentity(DelayedImageOperation):
         return final
 
 
+class DelayedNans(DelayedImageOperation):
+    """
+    Constructs nan channels as needed
+
+    Example:
+        self = DelayedNans((10, 10), FusedChannelSpec.coerce('rgb'))
+        region_slices = (slice(5, 10), slice(1, 12))
+        delayed = self.delayed_crop(region_slices)
+
+    """
+    def __init__(self, dsize=None, channels=None):
+        self.meta = {}
+        self.meta['dsize'] = dsize
+        self.meta['channels'] = channels
+
+        if channels is not None:
+            # hack
+            self.meta['channels'] = self.meta['channels'].normalize()
+            self.meta['num_bands'] = len(self.meta['channels'].unique())
+
+    @property
+    def shape(self):
+        dsize = self.dsize
+        if dsize is None:
+            w, h = None, None
+        else:
+            w, h = dsize
+        c = self.num_bands
+        return (h, w, c)
+
+    @property
+    def num_bands(self):
+        return self.meta.get('num_bands', None)
+
+    @property
+    def dsize(self):
+        dsize = self.meta.get('dsize', None)
+        return dsize
+
+    @property
+    def channels(self):
+        return self.meta.get('channels', None)
+
+    def finalize(self, **kwargs):
+        shape = self.shape
+        final = np.full(shape, fill_value=np.nan)
+
+        as_xarray = kwargs.get('as_xarray', False)
+        if as_xarray:
+            import xarray as xr
+            channels = self.channels
+            coords = {}
+            if channels is not None:
+                coords['c'] = channels.code_list()
+            final = xr.DataArray(final, dims=('y', 'x', 'c'), coords=coords)
+        return final
+
+    def delayed_crop(self, region_slices):
+        channels = self.channels
+        dsize = self.dsize
+        data_dims = dsize[::-1]
+        data_slice, extra_pad = kwarray.embed_slice(region_slices, data_dims)
+        box = kwimage.Boxes.from_slice(data_slice)
+        new_width = box.width.ravel()[0]
+        new_height = box.height.ravel()[0]
+
+        new_dsize = (new_width, new_height)
+        new = self.__class__(new_dsize, channels=channels)
+        return new
+
+    def delayed_warp(self, transform, dsize=None):
+        new = self.__class__(dsize, channels=self.channels)
+        return new
+
+    def select_channels(self, channels):
+        """
+        channels = FusedChannelSpec.coerce('b|r')
+        self = DelayedNans((10, 10), FusedChannelSpec.coerce('rgb'))
+        """
+        orig = self.channels.parsed
+        indices = []
+        for c in channels.parsed:
+            idx = orig.index(c)
+            indices.append(idx)
+
+
+class DelayedChannelSelect(DelayedImageOperation):
+    """
+    Select a subset channels or reorder them
+    """
+    def __init__(self, sub_data, channels=None):
+        pass
+
+
 class DelayedLoad(DelayedImageOperation):
     """
     Example:
@@ -306,6 +402,10 @@ class DelayedLoad(DelayedImageOperation):
         >>> print('f2_img = {!r}'.format(f2_img))
         >>> print(f2_img.finalize().shape)
         >>> print(f1_img.finalize().shape)
+
+        >>> fpath = kwimage.grab_test_image_fpath()
+        >>> channels = FusedChannelSpec.coerce('rgb')
+        >>> self = DelayedLoad(fpath, channels=channels)
     """
     __hack_dont_optimize__ = True
 
@@ -851,6 +951,14 @@ class DelayedChannelConcat(DelayedImageOperation):
             components.append(comp)
         self = DelayedChannelConcat(components)
         return self
+
+    @property
+    def channels(self):
+        sub_channs = []
+        for comp in self.components:
+            sub_channs.append(comp.channels)
+        channs = FusedChannelSpec.concat(sub_channs)
+        return channs
 
     @property
     def shape(self):

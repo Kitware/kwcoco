@@ -76,8 +76,14 @@ class FusedChannelSpec(ub.NiceRepr):
     def __len__(self):
         return len(self.parsed)
 
-    # def __len__(self):
-    #     return len(self.parsed)
+    def __getitem__(self, index):
+        return self.__class__(self.parsed[index])
+
+    @classmethod
+    def concat(cls, items):
+        combined = list(ub.flatten(item.parsed for item in items))
+        self = cls(combined)
+        return self
 
     @ub.memoize_property
     def spec(self):

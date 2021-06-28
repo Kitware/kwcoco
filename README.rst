@@ -20,9 +20,16 @@ The main webpage for this project is: https://gitlab.kitware.com/computer-vision
 The Kitware COCO module defines a variant of the Microsoft COCO format,
 originally developed for the "collected images in context" object detection
 challenge. We are backwards compatible with the original module, but we also
-have improved implementations in several places, including segmentations and
-keypoints.
+have improved implementations in several places, including segmentations,
+keypoints, annotation tracks, multi-spectral images, and videos.
 
+A kwcoco file is a "manifest" that serves as a single reference that points to
+all images, categories, and annotations in a computer vision dataset. Thus,
+when applying an algorithm to a dataset, it is sufficient to have the algorithm
+take one dataset parameter: the path to the kwcoco file.  Generally a kwcoco
+file will live in a "bundle" directory along with the data that it references,
+and paths in the kwcoco file will be relative to the location of the kwcoco
+file itself.
 
 The main data structure in this model is largely based on the implementation in
 https://github.com/cocodataset/cocoapi It uses the same efficient core indexing
