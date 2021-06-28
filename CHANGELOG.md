@@ -10,6 +10,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 
 * Added "domain net" to `kwcoco grab`.
+* Added "spacenet7" to `kwcoco grab`.
+
+
+### Fixed
+* Fixed issue in `add_annotation` where if failed to add keypoints, and segmentations.
 
 
 ## Version 0.2.6 - Released 2021-06-22

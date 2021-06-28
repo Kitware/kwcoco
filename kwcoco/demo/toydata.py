@@ -535,24 +535,18 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         raise ValueError('cant have multispectral and aux')
 
     if multispectral:
-        # Hack, our default multispectral data is inspired by sentinal 2
-        def temp_scale_matrix_json(sx):
-            # TODO: standard for transformation serialization?
-            return {'type': 'affine', 'matrix': [
-                [sx, 0, 0], [0, sx, 0], [0, 0, 1]]}
-        # kwimage.Scale((sx, sy)).__json__() ???
         s2_res = [60, 10, 20, 60, 20]
         s2_bands = ['B1', 'B8', 'B8a', 'B10', 'B11']
         aux = [
             {'channels': b,
-             'warp_aux_to_img': temp_scale_matrix_json(60. / r),
+             'warp_aux_to_img': kwimage.Affine.scale(60. / r).concise(),
              'dtype': 'uint16'}
             for b, r in zip(s2_bands, s2_res)
         ]
 
         main_window = kwimage.Boxes([[0, 0, gsize[0], gsize[1]]], 'xywh')
         for chaninfo in aux:
-            mat = np.linalg.inv(np.array(chaninfo['warp_aux_to_img']['matrix']))
+            mat = kwimage.Affine.coerce(chaninfo['warp_aux_to_img']).inv().matrix
             aux_window = main_window.warp(mat).quantize()
             chaninfo['width'] = int(aux_window.width.ravel()[0])
             chaninfo['height'] = int(aux_window.height.ravel()[0])
@@ -621,7 +615,6 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         num_frames=num_frames,
         num_objects=num_tracks, rng=rng)
 
-    tid_to_anns = {}
     for tid, path in zip(track_ids, paths):
         # degree = rng.randint(1, 5)
         # num = num_frames
@@ -737,7 +730,6 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
             ann['track_id'] = tid
             ann['image_id'] = dset.dataset['images'][frame_index]['id']
             dset.add_annotation(**ann)
-        tid_to_anns[tid] = anns
 
     HACK_FIX_COCO_KPTS_FORMAT = True
     if HACK_FIX_COCO_KPTS_FORMAT:
@@ -1200,7 +1192,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         >>> gid = 1
         >>> dset.imgs[gid]
         >>> rng = kwarray.ensure_rng(0)
-        >>> renderkw = {}
+        >>> renderkw = {'with_sseg': True}
         >>> img = render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
     """
     rng = kwarray.ensure_rng(rng)
@@ -1285,7 +1277,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
                             # different
                             warp_aux_to_img = auxinfo.get('warp_aux_to_img', None)
                             if warp_aux_to_img is not None:
-                                mat = np.linalg.inv(np.array(warp_aux_to_img['matrix']))
+                                mat = kwimage.Affine.coerce(warp_aux_to_img).matrix
                                 seg_ = seg.warp(mat)
                                 auxinfo['imdata'] = seg_.fill(auxinfo['imdata'], value=val)
                             else:
