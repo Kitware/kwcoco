@@ -19,7 +19,7 @@ class CocoGrabCLI:
             'names': scfg.Value([], nargs='+', position=1, help=ub.paragraph(
                 '''
                 Dataset names to grab. Valid values are cifar10, cifar100,
-                domainnet, and camvid.
+                domainnet, spacenet7, and camvid.
                 '''
             ))
         }
@@ -50,6 +50,12 @@ class CocoGrabCLI:
 
         if 'domainnet' in names:
             dsets = grab_domainnet.grab_domain_net()
+            for dset in dsets:
+                ensured.append(dset)
+
+        if 'spacenet7' in names:
+            from kwcoco.data import grab_spacenet
+            dsets = grab_spacenet.grab_spacenet7()
             for dset in dsets:
                 ensured.append(dset)
 

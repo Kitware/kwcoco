@@ -161,7 +161,7 @@ def unarchive_file(archive_fpath, output_dpath='.', verbose=1, overwrite=True):
     return unarchived_paths
 
 
-def grab_spacenet(data_dpath):
+def grab_spacenet7(data_dpath):
     """
     References:
         https://spacenet.ai/sn7-challenge/
@@ -229,7 +229,6 @@ def grab_spacenet(data_dpath):
         need_unarchive = 1
         if need_unarchive:
             for item in ub.ProgIter(items, desc='extract spacenet', verbose=3):
-                print('item = {}'.format(ub.repr2(item, nl=1)))
                 archive_fpath = item['fpath']
                 unarchive_file(archive_fpath, extract_dpath, overwrite=0, verbose=2)
 
@@ -237,7 +236,8 @@ def grab_spacenet(data_dpath):
         stamp.renew()
 
     coco_dset = kwcoco.CocoDataset(coco_fpath)
-    return coco_dset
+    dsets = [coco_dset]
+    return dsets
 
 
 def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
@@ -352,18 +352,6 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
             }
             coco_dset.add_annotation(**ann)
 
-    # import xdev
-    # xdev.profile_now(foo)()
-
-    # xdev.profile_now(poly.bounding_box)()
-    # xdev.profile_now(poly.bounding_box().quantize)()
-    # xdev.profile_now(poly.bounding_box().quantize)(inplace=True)
-    # xdev.profile_now(poly.bounding_box().quantize().to_xywh)()
-
-    # xdev.profile_now(kwimage.Polygon.from_geojson)(feat['geometry'])
-    # xdev.profile_now(_from_geojson2)(feat['geometry'])
-    # xdev.profile_now(kwimage.Polygon().__init__)(data=poly_data)
-
     all_udm_fpaths = sorted(extract_dpath.glob('train/*/UDM_masks/*'))
     for udm_fpath in ub.ProgIter(all_udm_fpaths, desc='add ignore masks'):
         name_parts = udm_fpath.stem.split('_')
@@ -392,7 +380,7 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
 
 def main():
     data_dpath = ub.ensure_app_cache_dir('kwcoco', 'data')
-    grab_spacenet(data_dpath)
+    grab_spacenet7(data_dpath)
 
 
 if __name__ == '__main__':
