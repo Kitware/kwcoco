@@ -21,7 +21,13 @@ class CocoGrabCLI:
                 Dataset names to grab. Valid values are cifar10, cifar100,
                 domainnet, spacenet7, and camvid.
                 '''
-            ))
+            )),
+
+            'dpath': scfg.Path(
+                ub.get_app_cache_dir('kwcoco', 'data'), help=ub.paragraph(
+                    '''
+                    Download directory
+                    '''))
         }
 
     @classmethod
@@ -35,6 +41,9 @@ class CocoGrabCLI:
         ensured = []
         names = config['names']
         print('names = {!r}'.format(names))
+
+        # TODO: standardize this interface, allow specificaiton of dpath
+        # everywhere
 
         if 'camvid' in names:
             dset = grab_camvid.grab_coco_camvid()
@@ -55,7 +64,7 @@ class CocoGrabCLI:
 
         if 'spacenet7' in names:
             from kwcoco.data import grab_spacenet
-            dsets = grab_spacenet.grab_spacenet7()
+            dsets = grab_spacenet.grab_spacenet7(config['dpath'])
             for dset in dsets:
                 ensured.append(dset)
 

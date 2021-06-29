@@ -958,7 +958,7 @@ class MixinCocoExtras(object):
             # Parse the the "file" URI scheme
             # https://tools.ietf.org/html/rfc8089
             result = uritools.urisplit(dset_fpath)
-            if result.scheme == 'sqlite':
+            if result.scheme == 'sqlite' or result.path.endswith('.sqlite'):
                 from kwcoco.coco_sql_dataset import CocoSqlDatabase
                 self = CocoSqlDatabase(dset_fpath).connect()
             elif result.path.endswith('.json') or '.json' in result.path:
@@ -2548,10 +2548,25 @@ class MixinCocoStats(object):
             import kwarray
             n_yids = list(ub.map_vals(len, xid_to_yids).values())
             return kwarray.stats_dict(n_yids, n_extreme=True)
-        gid_to_cidfreq = ub.map_vals(
-            lambda aids: ub.dict_hist([self.anns[aid]['category_id']
-                                       for aid in aids]),
-            self.index.gid_to_aids)
+
+        if hasattr(self, '_all_rows_column_lookup'):
+            # Hack for SQL speed, still slow though
+            aid_to_cid = dict(self._all_rows_column_lookup(
+                'annotations', ['id', 'category_id']))
+            gid_to_cidfreq = {}
+            for gid, aids in self.index.gid_to_aids.items():
+                gid_to_cidfreq[gid] = ub.dict_hist(
+                    ub.take(aid_to_cid, aids))
+            # for gid, aids in self.index.gid_to_aids.items():
+            #     cids = self._column_lookup(
+            #         'annotations', 'category_id', rowids=aids)
+            #     gid_to_cidfreq[gid] = ub.dict_hist(cids)
+        else:
+            # this is slow for sql.
+            gid_to_cidfreq = ub.map_vals(
+                lambda aids: ub.dict_hist([
+                    self.anns[aid]['category_id'] for aid in aids]),
+                self.index.gid_to_aids)
         gid_to_cids = {
             gid: list(cidfreq.keys())
             for gid, cidfreq in gid_to_cidfreq.items()
@@ -2898,6 +2913,10 @@ class MixinCocoDraw(object):
         Returns:
             ndarray: canvas
 
+        SeeAlso
+            :func:`draw_image`
+            :func:`show_image`
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8')
@@ -2955,6 +2974,10 @@ class MixinCocoDraw(object):
                 show_segmentation, title, show_gid, show_filename,
                 show_boxes,
 
+        SeeAlso
+            :func:`draw_image`
+            :func:`show_image`
+
         Ignore:
             # Programatically collect the kwargs for docs generation
             import xinspect
@@ -2979,6 +3002,7 @@ class MixinCocoDraw(object):
 
         show_all = kwargs.get('show_all', True)
         show_annots = kwargs.get('show_annots', True)
+        show_labels = kwargs.get('show_labels', True)
 
         highlight_aids = set()
         if aid is not None:
@@ -3058,12 +3082,14 @@ class MixinCocoDraw(object):
                         size=6, family='monospace'),
                 }
                 annot_text_parts = []
-                if kwargs.get('show_aid', show_all):
-                    annot_text_parts.append('aid={}'.format(aid))
-                if kwargs.get('show_catname', show_all):
-                    annot_text_parts.append(catname)
-                annot_text = ' '.join(annot_text_parts)
-                texts.append((x1, y1, annot_text, textkw))
+                if show_labels:
+                    if kwargs.get('show_aid', show_all):
+                        annot_text_parts.append('aid={}'.format(aid))
+                    if kwargs.get('show_catname', show_all):
+                        annot_text_parts.append(catname)
+                    if annot_text_parts:
+                        annot_text = ' '.join(annot_text_parts)
+                        texts.append((x1, y1, annot_text, textkw))
 
                 color = 'orange' if aid in highlight_aids else 'blue'
                 if 'obox' in ann:
@@ -3083,7 +3109,7 @@ class MixinCocoDraw(object):
                 if 'keypoints' in ann:
                     if xys is not None and len(xys):
                         keypoints.append(xys)
-                        if kwargs.get('show_kpname', True):
+                        if show_labels and kwargs.get('show_kpname', True):
                             if kpnames is not None:
                                 for (kp_x, kp_y), kpname in zip(xys, kpnames):
                                     texts.append((kp_x, kp_y, kpname, textkw))
@@ -3096,60 +3122,29 @@ class MixinCocoDraw(object):
                     else:
                         catcolor = None
 
-                    HAVE_KWIMAGE = True
-                    if HAVE_KWIMAGE:
-                        if catcolor is not None:
-                            catcolor = kwplot.Color(catcolor).as01()
-                        # TODO: Unify masks and polygons into a kwimage
-                        # segmentation class
-                        sseg = kwimage.Segmentation.coerce(sseg).data
-                        if isinstance(sseg, kwimage.Mask):
-                            m = sseg.to_c_mask()
-                            sseg_masks.append((m.data, catcolor))
-                        else:
-                            # TODO: interior
-                            multipoly = sseg.to_multi_polygon()
-                            for poly in multipoly.data:
-                                poly_xys = poly.data['exterior'].data
-                                polykw = {}
-                                if catcolor is not None:
-                                    polykw['color'] = catcolor
-                                poly = mpl.patches.Polygon(poly_xys, **polykw)
-                                try:
-                                    # hack
-                                    poly.area = sseg.to_shapely().area
-                                except Exception:
-                                    pass
-                                sseg_polys.append(poly)
+                    if catcolor is not None:
+                        catcolor = kwplot.Color(catcolor).as01()
+                    # TODO: Unify masks and polygons into a kwimage
+                    # segmentation class
+                    sseg = kwimage.Segmentation.coerce(sseg).data
+                    if isinstance(sseg, kwimage.Mask):
+                        m = sseg.to_c_mask()
+                        sseg_masks.append((m.data, catcolor))
                     else:
-                        # print('sseg = {!r}'.format(sseg))
-                        if isinstance(sseg, dict):
-                            # Handle COCO-RLE-segmentations; convert to raw binary masks
-                            sseg = dict(sseg)
-                            if 'shape' not in sseg and 'size' in sseg:
-                                # NOTE: size here is actually h/w unlike almost
-                                # everywhere else
-                                sseg['shape'] = sseg['size']
-                            if isinstance(sseg['counts'], (six.binary_type, six.text_type)):
-                                mask = kwimage.Mask(sseg, 'bytes_rle').to_c_mask().data
-                            else:
-                                mask = kwimage.Mask(sseg, 'array_rle').to_c_mask().data
-                            sseg_masks.append((mask, catcolor))
-                        elif isinstance(sseg, list):
-                            # Handle COCO-polygon-segmentation
-                            # If the segmentation is a list of polygons
-                            if not (len(sseg) and isinstance(sseg[0], list)):
-                                sseg = [sseg]
-                            for flat in sseg:
-                                poly_xys = np.array(flat).reshape(-1, 2)
-                                polykw = {}
-                                if catcolor is not None:
-                                    polykw['color'] = catcolor
-
-                                poly = mpl.patches.Polygon(poly_xys, **polykw)
-                                sseg_polys.append(poly)
-                        else:
-                            raise TypeError(type(sseg))
+                        # TODO: interior
+                        multipoly = sseg.to_multi_polygon()
+                        for poly in multipoly.data:
+                            poly_xys = poly.data['exterior'].data
+                            polykw = {}
+                            if catcolor is not None:
+                                polykw['color'] = catcolor
+                            poly = mpl.patches.Polygon(poly_xys, **polykw)
+                            try:
+                                # hack
+                                poly.area = sseg.to_shapely().area
+                            except Exception:
+                                pass
+                            sseg_polys.append(poly)
 
         # Show image
         np_img = self.load_image(img, channels=channels)
@@ -3204,12 +3199,11 @@ class MixinCocoDraw(object):
 
         if sseg_polys:
             # print('sseg_polys = {!r}'.format(sseg_polys))
-            if True:
-                # hack: show smaller polygons first.
-                if len(sseg_polys):
-                    areas = np.array([getattr(p, 'area', np.inf) for p in sseg_polys])
-                    sortx = np.argsort(areas)[::-1]
-                    sseg_polys = list(ub.take(sseg_polys, sortx))
+            # hack: show smaller polygons first.
+            if len(sseg_polys):
+                areas = np.array([getattr(p, 'area', np.inf) for p in sseg_polys])
+                sortx = np.argsort(areas)[::-1]
+                sseg_polys = list(ub.take(sseg_polys, sortx))
 
             poly_col = mpl.collections.PatchCollection(
                 sseg_polys, 2, alpha=0.4)

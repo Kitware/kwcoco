@@ -8,6 +8,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.8 - Unreleased
 
 
+### Added
+
+* CocoSQLDataset.coerce
+
+### Changed
+
+* Made URIs for CocoSQLDataset slightly more robust
+* kwcoco show now defaults show_labels to False
+
+
 ## Version 0.2.7 - Released 2021-06-28
 
 ### Added
