@@ -21,7 +21,8 @@ The Kitware COCO module defines a variant of the Microsoft COCO format,
 originally developed for the "collected images in context" object detection
 challenge. We are backwards compatible with the original module, but we also
 have improved implementations in several places, including segmentations,
-keypoints, annotation tracks, multi-spectral images, and videos.
+keypoints, annotation tracks, multi-spectral images, and videos (which
+represents a generic sequence of images).
 
 A kwcoco file is a "manifest" that serves as a single reference that points to
 all images, categories, and annotations in a computer vision dataset. Thus,

@@ -19,7 +19,8 @@ An informal spec is as follows:
         'supercategory': str,   # parent category name
     }
 
-    # Videos are used to manage collections of sequences of images.
+    # Videos are used to manage collections or sequences of images.
+    # Frames do not necesarilly have to be aligned or uniform time steps
     video = {
         'id': int,
         'name': str,  # a unique name for this video.
@@ -3153,9 +3154,23 @@ class MixinCocoDraw(object):
                             sseg_polys.append(poly)
 
         # Show image
-        np_img = self.load_image(img, channels=channels)
+        if img.get('file_name', None) is not None:
+            np_img = self.load_image(img, channels=channels)
+        else:
+            # hack for multispectral
+            avail_channels = [
+                aux.get('channels', None) for aux in img.get('auxiliary', [])
+            ]
+            if channels is None:
+                print('avail_channels = {!r}'.format(avail_channels))
+            print('loading image')
+            delayed = self.delayed_load(img['id'], channels=channels)
+            np_img = delayed.finalize()
+            print('loaded image')
 
         np_img = kwimage.atleast_3channels(np_img)
+
+        # TODO: percentile normalization
 
         np_img01 = None
         if np_img.dtype.kind in {'i', 'u'}:
@@ -3198,7 +3213,7 @@ class MixinCocoDraw(object):
             if kwargs.get('show_gid', True):
                 title_parts.append('gid={}'.format(gid))
             if kwargs.get('show_filename', True):
-                title_parts.append(img['file_name'])
+                title_parts.append(str(img['file_name']))
             title = ' '.join(title_parts)
         if title:
             ax.set_title(title)
