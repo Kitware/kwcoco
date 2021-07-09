@@ -269,7 +269,7 @@ from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
 from six.moves import cStringIO as StringIO
 
 # Vectorized ORM-Like containers
-from kwcoco.coco_objects import Categories, Videos, Images, Annots
+from kwcoco.coco_objects1d import Categories, Videos, Images, Annots
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 
 # Does having __all__ prevent readthedocs from building mixins?
@@ -913,6 +913,12 @@ class MixinCocoAccessors(object):
             else:
                 raise KeyError('could not find keypoint names for cid={}, cat={}, orig_cat={}'.format(cid, cat, orig_cat))
         return kpnames
+
+    def _coco_image(self, gid):
+        from kwcoco.coco_image import CocoImage
+        img = self.index.imgs[gid]
+        image = CocoImage(img, dset=self)
+        return image
 
 
 class MixinCocoExtras(object):
@@ -4601,9 +4607,10 @@ class MixinCocoIndex(object):
     def cats(self):
         return self.index.cats
 
-    @property
-    def videos(self):
-        return self.index.videos
+    # NOTE: API Issue, overloads previous method
+    # @property
+    # def videos(self):
+    #     return self.index.videos
 
     @property
     def gid_to_aids(self):

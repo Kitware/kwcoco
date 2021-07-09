@@ -329,10 +329,16 @@ class Videos(ObjectList1D):
 class Images(ObjectList1D):
     """
     Vectorized access to image attributes
+
+    SeeAlso:
+        :func:`kwcoco.CocoDataset.images`
     """
 
     def __init__(self, ids, dset):
         super().__init__(ids, dset, 'images')
+
+    def __getitem__(self, index):
+        pass
 
     @property
     def gids(self):
