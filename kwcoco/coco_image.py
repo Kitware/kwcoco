@@ -17,11 +17,11 @@ class CocoImage(ub.NiceRepr):
     Example:
         >>> import kwcoco
         >>> dset = kwcoco.CocoDataset.demo('shapes8')
-        >>> self = dset.images([1])[0]
+        >>> self = dset._coco_image(1)
 
 
         >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-        >>> self = dset.images([1])[0]
+        >>> self = dset._coco_image(1)
     """
 
     def __init__(self, img, dset=None):
@@ -49,7 +49,10 @@ class CocoImage(ub.NiceRepr):
         height = self.img.get('height', None)
         return width, height
 
-    def _iter_objs(self):
+    def _iter_asset_objs(self):
+        """
+        Iterate through base + auxiliary dicts that have file paths
+        """
         img = self.img
         has_base_image = img.get('file_name', None) is not None
         if has_base_image:
