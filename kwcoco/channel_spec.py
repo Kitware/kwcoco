@@ -126,6 +126,7 @@ class FusedChannelSpec(ub.NiceRepr):
     def __json__(self):
         return self.spec
 
+    @ub.memoize_method
     def normalize(self):
         """
         Replace aliases with explicit single-band-per-code specs
@@ -162,6 +163,22 @@ class FusedChannelSpec(ub.NiceRepr):
         """
         return self.parsed
 
+    # @ub.memoize_property
+    # def code_oset(self):
+    #     return ub.oset(self.normalize().parsed)
+
+    @ub.memoize_method
+    def as_list(self):
+        return self.normalize().parsed
+
+    @ub.memoize_method
+    def as_oset(self):
+        return ub.oset(self.normalize().parsed)
+
+    @ub.memoize_method
+    def as_set(self):
+        return set(self.normalize().parsed)
+
     def difference(self, other):
         """
         Set difference
@@ -174,8 +191,8 @@ class FusedChannelSpec(ub.NiceRepr):
             >>> other = FCS('flowx')
             >>> self.difference(other)
         """
-        other_norm = ub.oset(other.normalize().parsed)
-        self_norm = ub.oset(self.normalize().parsed)
+        other_norm = other.normalized()
+        self_norm = self.code_set
         new_parsed = list(self_norm - other_norm)
         new = self.__class__(new_parsed)
         return new

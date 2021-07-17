@@ -12,7 +12,7 @@ This is similar to GDAL's virtual raster table, but it works in memory and I
 think it is easier to chain operations.
 
 SeeAlso:
-    ../dev/symbolic_delayed.py
+    ../../dev/symbolic_delayed.py
 
 
 Concepts:
@@ -79,18 +79,34 @@ Example:
     >>> kwplot.autompl()
     >>> kwplot.imshow(final[0], pnum=(1, 2, 1), fnum=1)
     >>> kwplot.imshow(final[1], pnum=(1, 2, 2), fnum=1)
+
+Example:
+    >>> import kwcoco
+    >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+    >>> delayed = dset.delayed_load(1)
+    >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+    >>> astro = DelayedLoad.demo('astro')
+    >>> print('MSI = ' + ub.repr2(delayed.__json__(), nl=-3, sort=0))
+    >>> print('ASTRO = ' + ub.repr2(astro.__json__(), nl=2, sort=0))
+
 """
 import ubelt as ub
 import numpy as np
 import kwimage
 import kwarray
 from kwimage.transform import Affine
-from kwcoco.channel_spec import FusedChannelSpec
+from kwcoco import channel_spec
+
+try:
+    import xdev
+    profile = xdev.profile
+except Exception:
+    profile = ub.identity
 
 
-class DelayedOperation(ub.NiceRepr):
+class DelayedVisionOperation(ub.NiceRepr):
     """
-    Base class for nodes in a tree of delayed operations
+    Base class for nodes in a tree of delayed computer-vision operations
     """
     def __nice__(self):
         channels = self.channels
@@ -116,6 +132,11 @@ class DelayedOperation(ub.NiceRepr):
         for child in self.children():
             yield from child._optimize_paths(**kwargs)
 
+    def __json__(self):
+        from kwcoco.util.util_json import ensure_json_serializable
+        json_dict = ensure_json_serializable(self.nesting())
+        return json_dict
+
     def nesting(self):
         def _child_nesting(child):
             if hasattr(child, 'nesting'):
@@ -135,11 +156,11 @@ class DelayedOperation(ub.NiceRepr):
         return item
 
 
-class DelayedVideoOperation(DelayedOperation):
+class DelayedVideoOperation(DelayedVisionOperation):
     pass
 
 
-class DelayedImageOperation(DelayedOperation):
+class DelayedImageOperation(DelayedVisionOperation):
     """
     Operations that pertain only to images
     """
@@ -298,7 +319,7 @@ class DelayedNans(DelayedImageOperation):
     Constructs nan channels as needed
 
     Example:
-        self = DelayedNans((10, 10), FusedChannelSpec.coerce('rgb'))
+        self = DelayedNans((10, 10), channel_spec.FusedChannelSpec.coerce('rgb'))
         region_slices = (slice(5, 10), slice(1, 12))
         delayed = self.delayed_crop(region_slices)
 
@@ -367,34 +388,25 @@ class DelayedNans(DelayedImageOperation):
         new = self.__class__(dsize, channels=self.channels)
         return new
 
-    def select_channels(self, channels):
-        """
-        channels = FusedChannelSpec.coerce('b|r')
-        self = DelayedNans((10, 10), FusedChannelSpec.coerce('rgb'))
-        """
-        orig = self.channels.parsed
-        indices = []
-        for c in channels.parsed:
-            idx = orig.index(c)
-            indices.append(idx)
-
-
-class DelayedChannelSelect(DelayedImageOperation):
-    """
-    Select a subset channels or reorder them
-    """
-    def __init__(self, sub_data, channels=None):
-        pass
-
 
 class DelayedLoad(DelayedImageOperation):
     """
+    A load operation for a specific sub-region and sub-bands in a specified
+    image.
+
+    Notes:
+        This class contains support for fusing certain lazy operations into
+        this layer, namely cropping, scaling, and channel selection.
+
+        For now these are named ``immediates``
+
     Example:
         >>> fpath = kwimage.grab_test_image_fpath()
         >>> self = DelayedLoad(fpath)
         >>> print('self = {!r}'.format(self))
         >>> self.load_shape()
         >>> print('self = {!r}'.format(self))
+        >>> self.finalize()
 
         >>> f1_img = DelayedLoad.demo('astro', dsize=(300, 300))
         >>> f2_img = DelayedLoad.demo('carl', dsize=(256, 320))
@@ -404,28 +416,49 @@ class DelayedLoad(DelayedImageOperation):
         >>> print(f1_img.finalize().shape)
 
         >>> fpath = kwimage.grab_test_image_fpath()
-        >>> channels = FusedChannelSpec.coerce('rgb')
+        >>> channels = channel_spec.FusedChannelSpec.coerce('rgb')
         >>> self = DelayedLoad(fpath, channels=channels)
     """
     __hack_dont_optimize__ = True
 
-    def __init__(self, fpath, dsize=None, channels=None):
-        self.data = {}
+    def __init__(self, fpath, channels=None,
+                 # Extra params to allow certain operations as close to the
+                 # disk as possible.
+                 dsize=None,
+                 num_bands=None,
+                 immediate_crop=None,
+                 immediate_chan_idxs=None,
+                 immediate_dsize=None):
+        # self.data = {}
         self.meta = {}
         self.cache = {}
-        self.data['fpath'] = fpath
+
+        if immediate_dsize is not None:
+            dsize = immediate_dsize
+
+        self.meta['fpath'] = fpath
         self.meta['dsize'] = dsize
         self.meta['channels'] = channels
+
+        self._immediates = {
+            'crop': immediate_crop,
+            'dsize': immediate_dsize,
+            'chan_idxs': immediate_chan_idxs,
+        }
+
+        if num_bands is not None:
+            self.meta['num_bands'] = num_bands
 
         if channels is not None:
             # hack
             self.meta['channels'] = self.meta['channels'].normalize()
-            self.meta['num_bands'] = len(self.meta['channels'].unique())
+            if num_bands is None:
+                self.meta['num_bands'] = len(self.meta['channels'].unique())
 
     @classmethod
     def demo(DelayedLoad, key='astro', dsize=None):
         fpath = kwimage.grab_test_image_fpath(key)
-        self = DelayedLoad(fpath, dsize=dsize)
+        self = DelayedLoad(fpath, immediate_dsize=dsize)
         return self
 
     @classmethod
@@ -435,6 +468,14 @@ class DelayedLoad(DelayedImageOperation):
     def children(self):
         yield from []
 
+    def nesting(self):
+        item = {
+            'type': self.__class__.__name__,
+            'meta': self.meta,
+            '_immediates': self._immediates,
+        }
+        return item
+
     def _optimize_paths(self, **kwargs):
         # hack
         yield DelayedWarp(self, Affine(None), dsize=self.dsize)
@@ -442,11 +483,14 @@ class DelayedLoad(DelayedImageOperation):
 
     def load_shape(self):
         disk_shape = kwimage.load_image_shape(self.fpath)
-        num_bands = disk_shape[2] if len(disk_shape) == 2 else 1
-        self.meta['num_bands'] = num_bands
+        if self.meta.get('num_bands', None) is None:
+            num_bands = disk_shape[2] if len(disk_shape) == 3 else 1
+            self.meta['num_bands'] = num_bands
         if self.meta.get('dsize', None) is None:
             h, w = disk_shape[0:2]
             self.meta['dsize'] = (w, h)
+        self.meta['_raw_shape'] = disk_shape
+        return self
 
     @property
     def shape(self):
@@ -473,21 +517,36 @@ class DelayedLoad(DelayedImageOperation):
 
     @property
     def fpath(self):
-        return self.data.get('fpath', None)
+        return self.meta.get('fpath', None)
 
     def finalize(self, **kwargs):
         import kwimage
         final = self.cache.get('final', None)
         if final is None:
             if have_gdal():
-                final = LazyGDalFrameFile(self.fpath)
+                # TODO: warn if we dont have a COG.
+                pre_final = LazyGDalFrameFile(self.fpath)
             else:
+                import warnings
+                warnings.warn('DelayedLoad may not be efficient without gdal')
                 # TODO: delay even further with gdal
-                final = kwimage.imread(self.fpath)
-                final = kwarray.atleast_nd(final, 3)
-            dsize = self.meta.get('dsize', None)
+                pre_final = kwimage.imread(self.fpath)
+                pre_final = kwarray.atleast_nd(pre_final, 3)
+
+            chan_idxs = self._immediates.get('chan_idxs', None)
+            crop = self._immediates.get('crop', None)
+            if chan_idxs is None:
+                chan_slice = tuple([slice(None)])
+            else:
+                chan_slice = tuple([chan_idxs])
+            if crop is None:
+                space_slice = tuple([slice(None), slice(None)])
+            sl = space_slice + chan_slice
+
+            final = pre_final[sl]
+
+            dsize = self._immediates.get('dsize', None)
             if dsize is not None:
-                final = np.asarray(final)
                 final = kwimage.imresize(final, dsize=dsize, antialias=True)
             self.cache['final'] = final
 
@@ -500,8 +559,84 @@ class DelayedLoad(DelayedImageOperation):
             if channels is not None:
                 coords['c'] = channels.code_list()
             final = xr.DataArray(final, dims=('y', 'x', 'c'), coords=coords)
-
         return final
+
+    @profile
+    def delayed_crop(self, region_slices):
+        if self._immediates['crop']:
+            pass
+
+    @profile
+    def take_channels(self, channels):
+        """
+        This method returns a subset of the vision data with only the
+        specified bands / channels.
+
+        Args:
+            channels (List[int] | slice | channel_spec.FusedChannelSpec):
+                List of integers indexes, a slice, or a channel spec, which is
+                typically a pipe (`|`) delimited list of channel codes. See
+                kwcoco.ChannelSpec for more detials.
+
+        Returns:
+            DelayedLoad:
+                a new delayed load that only takes a subset of channels
+
+        Example:
+            >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+            >>> import kwcoco
+            >>> self = DelayedLoad.demo('astro').load_shape()
+            >>> channels = [2, 0]
+            >>> new = self.take_channels(channels)
+            >>> new3 = new.take_channels([1, 0])
+
+            >>> final1 = self.finalize()
+            >>> final2 = new.finalize()
+            >>> final3 = new3.finalize()
+            >>> assert np.all(final1[..., 2] == final2[..., 0])
+            >>> assert np.all(final1[..., 0] == final2[..., 1])
+            >>> assert final2.shape[2] == 2
+
+            >>> assert np.all(final1[..., 2] == final3[..., 1])
+            >>> assert np.all(final1[..., 0] == final3[..., 0])
+            >>> assert final3.shape[2] == 2
+        """
+        import kwarray
+        if isinstance(channels, list):
+            top_idx_mapping = channels
+        else:
+            channels = channel_spec.FusedChannelSpec.coerce(channels)
+            # Computer subindex integer mapping
+            request_codes = channels.as_list()
+            top_codes = self.channels.as_oset()
+            top_idx_mapping = [
+                top_codes.index(code)
+                for code in request_codes
+            ]
+
+        if self._immediates['chan_idxs'] is not None:
+            new_chan_ixs = list(ub.take(self._immediates['chan_idxs'],
+                                        top_idx_mapping))
+        else:
+            new_chan_ixs = top_idx_mapping
+
+        fpath = self.meta['fpath']
+        channels = self.meta['channels']
+        if channels is not None:
+            new_chan_parsed = list(ub.take(channels.parsed, top_idx_mapping))
+            channels = channel_spec.FusedChannelSpec(new_chan_parsed)
+
+        num_bands = len(new_chan_ixs)
+
+        new = self.__class__(
+            fpath=fpath,
+            num_bands=num_bands,
+            channels=channels,
+            immediate_dsize=self._immediates['dsize'],
+            immediate_crop=self._immediates['crop'],
+            immediate_chan_idxs=new_chan_ixs
+        )
+        return new
 
 
 def have_gdal():
@@ -531,7 +666,6 @@ class LazyGDalFrameFile(ub.NiceRepr):
     Example:
         >>> # xdoctest: +REQUIRES(module:osgeo)
         >>> self = LazyGDalFrameFile.demo()
-        >>> cog_fpath = self.cog_fpath
         >>> print('self = {!r}'.format(self))
         >>> self[0:3, 0:3]
         >>> self[:, :, 0]
@@ -541,17 +675,16 @@ class LazyGDalFrameFile(ub.NiceRepr):
         >>> # import kwplot
         >>> # kwplot.imshow(self[:])
     """
-    def __init__(self, cog_fpath):
-        self.cog_fpath = cog_fpath
-        self.fpath = cog_fpath
+    def __init__(self, fpath):
+        self.fpath = fpath
 
     @ub.memoize_property
     def _ds(self):
         from osgeo import gdal
         from os.path import exists
-        if not exists(self.cog_fpath):
-            raise Exception('File does not exist: {}'.format(self.cog_fpath))
-        ds = gdal.Open(self.cog_fpath, gdal.GA_ReadOnly)
+        if not exists(self.fpath):
+            raise Exception('File does not exist: {}'.format(self.fpath))
+        ds = gdal.Open(self.fpath, gdal.GA_ReadOnly)
         return ds
 
     @classmethod
@@ -595,7 +728,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
     def __nice__(self):
         from os.path import basename
-        return '.../' + basename(self.cog_fpath)
+        return '.../' + basename(self.fpath)
 
     def __getitem__(self, index):
         """
@@ -631,9 +764,12 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
         if len(trailing_part) == 1:
             channel_part = trailing_part[0]
-            rb_indices = range(*channel_part.indices(C))
+            if isinstance(channel_part, list):
+                band_indices = channel_part
+            else:
+                band_indices = range(*channel_part.indices(C))
         else:
-            rb_indices = range(C)
+            band_indices = range(C)
             assert len(trailing_part) <= 1
 
         ystart, ystop = map(int, [ypart.start, ypart.stop])
@@ -649,19 +785,19 @@ class LazyGDalFrameFile(ub.NiceRepr):
         if PREALLOC:
             # preallocate like kwimage.im_io._imread_gdal
             from kwimage.im_io import _gdal_to_numpy_dtype
-            shape = (ysize, xsize, len(rb_indices))
-            bands = [ds.GetRasterBand(1 + rb_idx)
-                     for rb_idx in rb_indices]
+            shape = (ysize, xsize, len(band_indices))
+            bands = [ds.GetRasterBand(1 + band_idx)
+                     for band_idx in band_indices]
             gdal_dtype = bands[0].DataType
             dtype = _gdal_to_numpy_dtype(gdal_dtype)
             img_part = np.empty(shape, dtype=dtype)
-            for out_idx, rb in enumerate(bands):
-                img_part[:, :, out_idx] = rb.ReadAsArray(**gdalkw)
+            for out_idx, band in enumerate(bands):
+                img_part[:, :, out_idx] = band.ReadAsArray(**gdalkw)
         else:
             channels = []
-            for rb_idx in rb_indices:
-                rb = ds.GetRasterBand(1 + rb_idx)
-                channel = rb.ReadAsArray(**gdalkw)
+            for band_idx in band_indices:
+                band = ds.GetRasterBand(1 + band_idx)
+                channel = band.ReadAsArray(**gdalkw)
                 channels.append(channel)
             img_part = np.dstack(channels)
         return img_part
@@ -723,6 +859,8 @@ def _rectify_slice_dim(part, D):
         return part
     elif isinstance(part, int):
         part = slice(part, part + 1)
+    elif isinstance(part, list):
+        part = part
     else:
         raise TypeError(part)
     return part
@@ -827,6 +965,7 @@ class DelayedFrameConcat(DelayedVideoOperation):
     def delayed_crop(self, region_slices):
         """
         Example:
+            >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> # Create raw channels in some "native" resolution for frame 1
             >>> f1_chan1 = DelayedIdentity.demo('astro', chan=(1, 0), dsize=(300, 300))
             >>> f1_chan2 = DelayedIdentity.demo('astro', chan=2, dsize=(10, 10))
@@ -957,7 +1096,7 @@ class DelayedChannelConcat(DelayedImageOperation):
         sub_channs = []
         for comp in self.components:
             sub_channs.append(comp.channels)
-        channs = FusedChannelSpec.concat(sub_channs)
+        channs = channel_spec.FusedChannelSpec.concat(sub_channs)
         return channs
 
     @property
@@ -980,6 +1119,90 @@ class DelayedChannelConcat(DelayedImageOperation):
             else:
                 final = np.concatenate(stack, axis=2)
         return final
+
+    @profile
+    def take_channels(self, channels):
+        """
+        This method returns a subset of the vision data with only the
+        specified bands / channels.
+
+        Args:
+            channels (channel_spec.FusedChannelSpec):
+                Typically a pipe (`|`) delimited list of channel codes. See
+                kwcoco.ChannelSpec for more detials.
+
+        Returns:
+            DelayedVisionOperation:
+                a delayed vision operation that only operates on the following
+                channels.
+
+        Example:
+            >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> self = delayed = dset.delayed_load(1)
+            >>> channels = 'B11|B8|B1|B10'
+            >>> new = self.take_channels(channels)
+
+            xdev.profile_now(self.take_channels)(channels)
+        """
+        # Rearange subcomponents into the specified channel representation
+        # I am not confident that this logic is the best way to do this.
+        # This may be a bottleneck
+        channels = channel_spec.FusedChannelSpec.coerce(channels)
+
+        import kwarray
+        # Computer subindex integer mapping
+        request_codes = channels.as_list()
+        top_codes = self.channels.as_oset()
+        top_idx_mapping = [
+            top_codes.index(code)
+            for code in request_codes
+        ]
+        subindexer = kwarray.FlatIndexer([
+            comp.num_bands for comp in self.components])
+
+        accum = []
+        class ContiguousSegment(object):
+            def __init__(self, comp, start):
+                self.comp = comp
+                self.start = start
+                self.stop = start + 1
+        curr = None
+        for idx in top_idx_mapping:
+            outer, inner = subindexer.unravel(idx)
+            comp = self.components[outer]
+            if curr is None:
+                curr = ContiguousSegment(comp, inner)
+            else:
+                is_contiguous = curr.comp is comp and (inner == curr.stop)
+                if is_contiguous:
+                    # extend the previous contiguous segment
+                    curr.stop = inner + 1
+                else:
+                    # accept previous segment and start a new one
+                    accum.append(curr)
+                    curr = ContiguousSegment(comp, inner)
+        # Accumulate final segment
+        if curr is not None:
+            accum.append(curr)
+
+        # Execute the delayed operation
+        new_components = []
+        for curr in accum:
+            comp = curr.comp
+            if curr.start == 0 and curr.stop == comp.num_bands:
+                # Entire component is valid, no need for sub-operation
+                new_components.append(comp)
+            else:
+                # Only part of the component is taken, need to sub-operate
+                raise NotImplementedError
+                sl = slice(curr.start, curr.stop)
+                curr.take_channels(sl)
+                new_components.append()
+
+        new = DelayedChannelConcat(new_components)
+        return new
 
 
 class DelayedWarp(DelayedImageOperation):

@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 
 * CocoSQLDataset.coerce
+* Add initial implementation of `DelayedChannelConcat.take_channels`
 
 ### Changed
 

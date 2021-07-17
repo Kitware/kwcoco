@@ -80,3 +80,7 @@ cache_dpath  = f'{bundle_dpath}/.cache'                     # For ndsampler use 
 
 
 
+# Note: 2021-07-15
+
+* Should the schema be modified such that custom user attributes are
+  **ideally** stored in an unstructured "properties" dictionary?
