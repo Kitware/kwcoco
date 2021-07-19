@@ -1,0 +1,180 @@
+▼ CocoDataset : class
+   +__init__ : function
+   +fpath : property
+
+   +from_data : classmethod
+   +from_image_paths : classmethod
+   +from_coco_paths : classmethod
+
+   +copy : function
+   +dumps : function
+   +dump : function
+
+   +union : function
+   +subset : function
+   +view_sql : function
+
+▼ MixinCocoAddRemove : class
+
+   +add_video : function
+   +add_image : function
+   +add_annotation : function
+   +add_category : function
+
+   +ensure_image : function
+   +ensure_category : function
+
+   +add_annotations : function
+   +add_images : function
+
+   +clear_images : function
+   +clear_annotations : function
+
+   +remove_annotation : function
+   +remove_annotations : function
+   +remove_categories : function
+   +remove_images : function
+   +remove_videos : function
+   +remove_annotation_keypoints : function
+   +remove_keypoint_categories : function
+
+   +set_annotation_category : function
+
+▼ MixinCocoAccessors : class
+   +delayed_load : function
+   +load_image : function
+   +get_image_fpath : function
+   +get_auxiliary_fpath : function
+   +load_annot_sample : function
+   +category_graph : function
+   +object_categories : function
+   +keypoint_categories : function
+
+▼ MixinCocoExtras : class
+   +coerce : function
+   +demo : function
+   +_tree : function
+   +random : function
+   +_build_hashid : function
+   +_invalidate_hashid : function
+   +_ensure_imgsize : function
+   +_ensure_image_data : function
+   +missing_images : function
+   +corrupted_images : function
+   +rename_categories : function
+   +_ensure_json_serializable : function
+   +_aspycoco : function
+   +reroot : function
+
+   +data_root : property
+   +img_root : property
+   +data_fpath : property
+
+▼ MixinCocoObjects : class
+   +annots : function
+   +images : function
+   +categories : function
+   +videos : function
+
+▼ MixinCocoStats : class
+   +n_annots : property
+   +n_images : property
+   +n_cats : property
+   +n_videos : property
+
+   +keypoint_annotation_frequency : function
+   +category_annotation_frequency : function
+   +category_annotation_type_frequency : function
+   +conform : function
+   +validate : function
+   +stats : function
+   +basic_stats : function
+   +extended_stats : function
+   +boxsize_stats : function
+   +find_representative_images : function
+
+▼ MixinCocoDraw : class
+   +imread : function
+   +draw_image : function
+   +show_image : function
+
+
+## Protected / Experimental Functions
+
+   -__nice__ : function
+   +_infer_dirs : function
+   +_check_json_serializable : function
+   +_check_integrity : function
+   +_check_index : function
+   +_check_pointers : function
+   +_build_index : function
+
+
+   +_get_img_auxiliary : function
+   +_resolve_to_id : function
+   +_resolve_to_cid : function
+   +_resolve_to_gid : function
+   +_resolve_to_vidid : function
+   +_resolve_to_ann : function
+   +_resolve_to_img : function
+   +_resolve_to_kpcat : function
+   +_resolve_to_cat : function
+   +_alias_to_cat : function
+   +_keypoint_category_names : function
+   +_lookup_kpnames : function
+
+
+
+#######################
+# Coco Index API
+
+▼ CocoIndex : class
+   +cid_to_gids : property
+
+    anns : dict
+    imgs : dict
+    videos = dict
+    cats : dict
+    kpcats : dict
+
+    gid_to_aids : dict
+    cid_to_aids : dict
+    vidid_to_gids : dict
+    name_to_video : dict
+    trackid_to_aids : dict
+
+    name_to_cat : dict
+    name_to_img : dict
+    file_name_to_img : dict
+
+   +clear : function
+   +build : function
+
+▼ MixinCocoIndex : class
+   +anns : property
+   +imgs : property
+   +cats : property
+   +videos : property
+   +gid_to_aids : property
+   +cid_to_aids : property
+   +name_to_cat : property
+
+
+
+Internal:
+   +_add_video : function
+   +_add_image : function
+   +_add_images : function
+   +_add_annotation : function
+   +_add_annotations : function
+   +_add_category : function
+   +_remove_all_annotations : function
+   +_remove_all_images : function
+   +_remove_annotations : function
+   +_remove_categories : function
+   +_remove_images : function
+   +_remove_videos : function
+
+   +_set_sorted_by_frame_index : function
+   +__init__ : function
+   -__bool__ : function

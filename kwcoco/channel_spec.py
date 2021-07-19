@@ -191,8 +191,8 @@ class FusedChannelSpec(ub.NiceRepr):
             >>> other = FCS('flowx')
             >>> self.difference(other)
         """
-        other_norm = other.normalized()
-        self_norm = self.code_set
+        other_norm = ub.oset(other.normalize().parsed)
+        self_norm = ub.oset(self.normalize().parsed)
         new_parsed = list(self_norm - other_norm)
         new = self.__class__(new_parsed)
         return new

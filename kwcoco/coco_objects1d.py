@@ -286,7 +286,7 @@ class Categories(ObjectList1D):
     Vectorized access to category attributes
 
     Example:
-        >>> from kwcoco.coco_objects import Categories  # NOQA
+        >>> from kwcoco.coco_objects1d import Categories  # NOQA
         >>> import kwcoco
         >>> dset = kwcoco.CocoDataset.demo()
         >>> ids = list(dset.cats.keys())
@@ -315,7 +315,7 @@ class Videos(ObjectList1D):
     Vectorized access to video attributes
 
     Example:
-        >>> from kwcoco.coco_objects import Videos  # NOQA
+        >>> from kwcoco.coco_objects1d import Videos  # NOQA
         >>> import kwcoco
         >>> dset = kwcoco.CocoDataset.demo('vidshapes5')
         >>> ids = list(dset.index.videos.keys())
