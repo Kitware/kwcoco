@@ -95,14 +95,17 @@ Example:
     >>> print('MSI = ' + ub.repr2(delayed.__json__(), nl=-3, sort=0))
     >>> print('ASTRO = ' + ub.repr2(astro.__json__(), nl=2, sort=0))
 
-    subchan = delayed.take_channels('B1|B8')
-    subcrop = subchan.delayed_crop((slice(10, 80), slice(30, 50)))
-
-    subcrop.nesting()
-    subchan.nesting()
-
-    msi_crop = delayed.delayed_crop((slice(10, 80), slice(30, 50)))
-    subdata = msi_crop.delayed_warp(kwimage.Affine.scale(3), dsize='auto').take_channels('B11|B1')
+    >>> subchan = delayed.take_channels('B1|B8')
+    >>> subcrop = subchan.delayed_crop((slice(10, 80), slice(30, 50)))
+    >>> #
+    >>> subcrop.nesting()
+    >>> subchan.nesting()
+    >>> subchan.finalize()
+    >>> subcrop.finalize()
+    >>> #
+    >>> msi_crop = delayed.delayed_crop((slice(10, 80), slice(30, 50)))
+    >>> subdata = msi_crop.delayed_warp(kwimage.Affine.scale(3), dsize='auto').take_channels('B11|B1')
+    >>> subdata.finalize()
 
 """
 import ubelt as ub
