@@ -116,6 +116,8 @@ class FusedChannelSpec(ub.NiceRepr):
             self = cls(['u{}'.format(i) for i in range(data)])
         elif isinstance(data, cls):
             self = data
+        elif isinstance(data, ChannelSpec) and len(data.parse()) == 1:
+            self = cls(ub.peek(data.parse().values()))
         else:
             raise TypeError('unknown type {}'.format(type(data)))
         return self

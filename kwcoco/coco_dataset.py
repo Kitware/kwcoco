@@ -2240,7 +2240,7 @@ class MixinCocoStats(object):
             **config :
                 pycocotools_info (default=True): returns info required by pycocotools
                 ensure_imgsize (default=True): ensure image size is populated
-                legacy (default=True): if true tries to convert data
+                legacy (default=False): if true tries to convert data
                     structures to items compatible with the original
                     pycocotools spec
 
