@@ -116,8 +116,14 @@ class FusedChannelSpec(ub.NiceRepr):
             self = cls(['u{}'.format(i) for i in range(data)])
         elif isinstance(data, cls):
             self = data
-        elif isinstance(data, ChannelSpec) and len(data.parse()) == 1:
-            self = cls(ub.peek(data.parse().values()))
+        elif isinstance(data, ChannelSpec):
+            parsed = data.parse()
+            if len(parsed) == 1:
+                self = cls(ub.peek(parsed.values()))
+            else:
+                raise ValueError(
+                    'Cannot coerce ChannelSpec to a FusedChannelSpec '
+                    'when there are multiple streams')
         else:
             raise TypeError('unknown type {}'.format(type(data)))
         return self
