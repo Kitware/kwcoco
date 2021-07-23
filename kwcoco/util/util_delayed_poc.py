@@ -151,7 +151,7 @@ class DelayedVisionOperation(ub.NiceRepr):
 
         This returns some sort of hueristically optimized leaf repr wrt warps.
         """
-        # DEBUG_PRINT('DelayedVisionOperation._optimize_paths')
+        # DEBUG_PRINT('DelayedVisionOperation._optimize_paths {}'.format(type(self)))
         for child in self.children():
             yield from child._optimize_paths(**kwargs)
 
@@ -257,6 +257,7 @@ class DelayedImageOperation(DelayedVisionOperation):
 
         for delayed_leaf in self._optimize_paths():
             # DEBUG_PRINT('delayed_leaf = {!r}'.format(delayed_leaf))
+            # DEBUG_PRINT('delayed_leaf.sub_data = {!r}'.format(delayed_leaf.sub_data))
             # Compute, sub_crop_slices, and new tf_newleaf_to_newroot
             assert isinstance(delayed_leaf, DelayedWarp)  # HACK
             tf_leaf_to_root = delayed_leaf.meta['transform']
@@ -274,7 +275,8 @@ class DelayedImageOperation(DelayedVisionOperation):
 
             delayed_leaf.sub_data
 
-            if isinstance(delayed_leaf, DelayedLoad):
+            if isinstance(delayed_leaf.sub_data, (DelayedLoad, DelayedNans)):
+                # if hasattr(delayed_leaf.sub_data, 'delayed_crop'):
                 # Hack
                 crop = delayed_leaf.sub_data.delayed_crop(leaf_crop_slices)
             else:
@@ -415,6 +417,14 @@ class DelayedNans(DelayedImageOperation):
     def channels(self):
         return self.meta.get('channels', None)
 
+    def children(self):
+        yield from []
+
+    def _optimize_paths(self, **kwargs):
+        # DEBUG_PRINT('DelayedLoad._optimize_paths')
+        # hack
+        yield DelayedWarp(self, Affine(None), dsize=self.dsize)
+
     def finalize(self, **kwargs):
         shape = self.shape
         final = np.full(shape, fill_value=np.nan)
@@ -541,7 +551,7 @@ class DelayedLoad(DelayedImageOperation):
         yield DelayedWarp(self, Affine(None), dsize=self.dsize)
         # raise AssertionError('hack so this is not called')
 
-    def load_shape(self):
+    def load_shape(self, use_channel_heuristic=False):
         disk_shape = kwimage.load_image_shape(self.fpath)
         if self.meta.get('num_bands', None) is None:
             num_bands = disk_shape[2] if len(disk_shape) == 3 else 1
@@ -549,6 +559,9 @@ class DelayedLoad(DelayedImageOperation):
         if self.meta.get('dsize', None) is None:
             h, w = disk_shape[0:2]
             self.meta['dsize'] = (w, h)
+        if self.meta.get('channels', None) is None:
+            if self.meta['num_bands'] == 3:
+                self.meta['channels'] = channel_spec.FusedChannelSpec.coerce('r|g|b')
         self.meta['_raw_shape'] = disk_shape
         return self
 
@@ -774,6 +787,7 @@ class DelayedLoad(DelayedImageOperation):
             fpath=self.meta['fpath'],
             num_bands=num_bands,
             channels=channels,
+            dsize=self.dsize,
             immediate_dsize=self._immediates['dsize'],
             immediate_crop=self._immediates['crop'],
             immediate_chan_idxs=new_chan_ixs
@@ -1294,19 +1308,56 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> channels = 'B11|B8|B1|B10'
             >>> new = self.take_channels(channels)
 
-            xdev.profile_now(self.take_channels)(channels)
+        Example:
+            >>> # Complex case
+            >>> import kwcoco
+            >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> delayed = dset.delayed_load(1)
+            >>> astro = DelayedLoad.demo('astro').load_shape(use_channel_heuristic=True)
+            >>> aligned = astro.warp(kwimage.Affine.scale(600 / 512), dsize='auto')
+            >>> self = combo = DelayedChannelConcat(delayed.components + [aligned])
+            >>> channels = 'B1|r|B8|g'
+            >>> new = self.take_channels(channels)
+            >>> new_cropped = new.crop((slice(10, 200), slice(12, 350)))
+            >>> datas = new_cropped.finalize()
+            >>> vizable = kwimage.normalize_intensity(datas, axis=2)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> stacked = kwimage.stack_images(vizable.transpose(2, 0, 1))
+            >>> kwplot.imshow(stacked)
+
+        Example:
+            >>> # Test case where requested channel does not exist
+            >>> import kwcoco
+            >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> self = dset.delayed_load(1)
+            >>> channels = 'B1|foobar|bazbiz|B8'
+            >>> new = self.take_channels(channels)
+            >>> new_cropped = new.crop((slice(10, 200), slice(12, 350)))
+            >>> fused = new_cropped.finalize()
+            >>> assert fused.shape == (190, 338, 4)
+            >>> assert np.all(np.isnan(fused[..., 1:3]))
+            >>> assert not np.any(np.isnan(fused[..., 0]))
+            >>> assert not np.any(np.isnan(fused[..., 3]))
         """
         if isinstance(channels, list):
             top_idx_mapping = channels
+            top_codes = self.channels.as_list()
+            request_codes = None
         else:
             channels = channel_spec.FusedChannelSpec.coerce(channels)
             # Computer subindex integer mapping
             request_codes = channels.as_list()
             top_codes = self.channels.as_oset()
-            top_idx_mapping = [
-                top_codes.index(code)
-                for code in request_codes
-            ]
+            top_idx_mapping = []
+            for code in request_codes:
+                try:
+                    top_idx_mapping.append(top_codes.index(code))
+                except KeyError:
+                    top_idx_mapping.append(None)
 
         # Rearange subcomponents into the specified channel representation
         # I am not confident that this logic is the best way to do this.
@@ -1320,10 +1371,20 @@ class DelayedChannelConcat(DelayedImageOperation):
                 self.comp = comp
                 self.start = start
                 self.stop = start + 1
+                self.codes = []
+
         curr = None
-        for idx in top_idx_mapping:
-            outer, inner = subindexer.unravel(idx)
-            comp = self.components[outer]
+        for request_idx, idx in enumerate(top_idx_mapping):
+            if idx is None:
+                # Requested channel does not exist in our data stack
+                comp = None
+                inner = 0
+                if curr is not None and curr.comp is None:
+                    inner = curr.stop
+            else:
+                # Requested channel exists in our data stack
+                outer, inner = subindexer.unravel(idx)
+                comp = self.components[outer]
             if curr is None:
                 curr = ContiguousSegment(comp, inner)
             else:
@@ -1335,6 +1396,11 @@ class DelayedChannelConcat(DelayedImageOperation):
                     # accept previous segment and start a new one
                     accum.append(curr)
                     curr = ContiguousSegment(comp, inner)
+
+            # Hack for nans
+            if request_codes is not None:
+                curr.codes.append(request_codes[request_idx])
+
         # Accumulate final segment
         if curr is not None:
             accum.append(curr)
@@ -1343,15 +1409,25 @@ class DelayedChannelConcat(DelayedImageOperation):
         new_components = []
         for curr in accum:
             comp = curr.comp
-            if curr.start == 0 and curr.stop == comp.num_bands:
-                # Entire component is valid, no need for sub-operation
+            if comp is None:
+                # Requested component did not exist, return nans
+                if request_codes is not None:
+                    nan_chan = channel_spec.FusedChannelSpec(curr.codes)
+                else:
+                    nan_chan = None
+                comp = DelayedNans(self.dsize, channels=nan_chan)
                 new_components.append(comp)
             else:
-                # Only part of the component is taken, need to sub-operate
-                raise NotImplementedError
-                sl = slice(curr.start, curr.stop)
-                curr.take_channels(sl)
-                new_components.append()
+                if curr.start == 0 and curr.stop == comp.num_bands:
+                    # Entire component is valid, no need for sub-operation
+                    new_components.append(comp)
+                else:
+                    # Only part of the component is taken, need to sub-operate
+                    # It would be nice if we only loaded the file once if we need
+                    # multiple parts discontiguously.
+                    sub_idxs = list(range(curr.start, curr.stop))
+                    sub_comp = comp.take_channels(sub_idxs)
+                    new_components.append(sub_comp)
 
         new = DelayedChannelConcat(new_components)
         return new
@@ -1654,7 +1730,6 @@ class DelayedWarp(DelayedImageOperation):
         return final
 
     def take_channels(self, channels):
-        print('self.sub_data = {!r}'.format(self.sub_data))
         new_subdata = self.sub_data.take_channels(channels)
         new = self.__class__(new_subdata, transform=self.meta['transform'],
                              dsize=self.meta['dsize'])
