@@ -29,7 +29,7 @@ class CocoSubsetCLI(object):
                     ''')),
 
             'select_images': scfg.Value(
-                None, help=ub.paragraph(
+                None, type=str, help=ub.paragraph(
                     '''
                     A json query (via the jq spec) that specifies which images
                     belong in the subset. Note, this is a passed as the body of
@@ -46,6 +46,8 @@ class CocoSubsetCLI(object):
                     where the value of myattr is "foo".
                     '.id < 3 and (.file_name | test(".*png"))' will select only
                     images with id less than 3 that are also pngs.
+                    .myattr | in({"val1": 1, "val4": 1}) will take images
+                    where myattr is either val1 or val4.
 
                     Requries the "jq" python library is installed.
                     ''')),
