@@ -1525,7 +1525,7 @@ class MixinCocoExtras(object):
                     bad_paths.append((index, gpath, gid))
 
             if check_aux:
-                for aux in img.get('aux', []):
+                for aux in img.get('auxiliary', []):
                     gpath = join(self.bundle_dpath, aux['file_name'])
                     if not exists(gpath):
                         bad_paths.append((index, gpath, gid))
@@ -1564,7 +1564,7 @@ class MixinCocoExtras(object):
                     bad_paths.append((index, gpath, gid))
 
             if check_aux:
-                for aux in img.get('aux', []):
+                for aux in img.get('auxiliary', []):
                     gpath = join(self.bundle_dpath, aux['file_name'])
                     if not exists(gpath):
                         bad_paths.append((index, gpath, gid))
