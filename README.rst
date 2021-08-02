@@ -21,7 +21,8 @@ The Kitware COCO module defines a variant of the Microsoft COCO format,
 originally developed for the "collected images in context" object detection
 challenge. We are backwards compatible with the original module, but we also
 have improved implementations in several places, including segmentations,
-keypoints, annotation tracks, multi-spectral images, and videos.
+keypoints, annotation tracks, multi-spectral images, and videos (which
+represents a generic sequence of images).
 
 A kwcoco file is a "manifest" that serves as a single reference that points to
 all images, categories, and annotations in a computer vision dataset. Thus,
@@ -447,7 +448,120 @@ An informal description of the spec is written here:
 
 
 For a formal description of the spec see the  `kwcoco/coco_schema.json <kwcoco/coco_schema.json>`_.
-        
+
+
+The CocoDatset API Grouped by Functinoality
+-------------------------------------------
+
+The following are grouped attribute/method names of a kwcoco.CocoDataset.
+See the in-code documentation for further details.
+
+.. code:: python
+
+    {
+        'classmethod': [
+            'coerce',
+            'demo',
+            'from_coco_paths',
+            'from_data',
+            'from_image_paths',
+            'random',
+        ],
+        'slots': [
+            'index',
+            'hashid',
+            'hashid_parts',
+            'tag',
+            'dataset',
+            'bundle_dpath',
+            'assets_dpath',
+            'cache_dpath',
+        ],
+        'property': [
+            'anns',
+            'cats',
+            'cid_to_aids',
+            'data_fpath',
+            'data_root',
+            'fpath',
+            'gid_to_aids',
+            'img_root',
+            'imgs',
+            'n_annots',
+            'n_cats',
+            'n_images',
+            'n_videos',
+            'name_to_cat',
+        ],
+        'method(via MixinCocoAddRemove)': [
+            'add_annotation',
+            'add_annotations',
+            'add_category',
+            'add_image',
+            'add_images',
+            'add_video',
+            'clear_annotations',
+            'clear_images',
+            'ensure_category',
+            'ensure_image',
+            'remove_annotation',
+            'remove_annotation_keypoints',
+            'remove_annotations',
+            'remove_categories',
+            'remove_images',
+            'remove_keypoint_categories',
+            'remove_videos',
+            'set_annotation_category',
+        ],
+        'method(via MixinCocoObjects)': [
+            'annots',
+            'categories',
+            'images',
+            'videos',
+        ],
+        'method(via MixinCocoStats)': [
+            'basic_stats',
+            'boxsize_stats',
+            'category_annotation_frequency',
+            'category_annotation_type_frequency',
+            'conform',
+            'extended_stats',
+            'find_representative_images',
+            'keypoint_annotation_frequency',
+            'stats',
+            'validate',
+        ],
+        'method(via MixinCocoAccessors)': [
+            'category_graph',
+            'delayed_load',
+            'get_auxiliary_fpath',
+            'get_image_fpath',
+            'keypoint_categories',
+            'load_annot_sample',
+            'load_image',
+            'object_categories',
+        ],
+        'method(via CocoDataset)': [
+            'copy',
+            'dump',
+            'dumps',
+            'subset',
+            'union',
+            'view_sql',
+        ],
+        'method(via MixinCocoExtras)': [
+            'corrupted_images',
+            'missing_images',
+            'rename_categories',
+            'reroot',
+        ],
+        'method(via MixinCocoDraw)': [
+            'draw_image',
+            'imread',
+            'show_image',
+        ],
+    }
+
 
 Converting your data to COCO
 ----------------------------

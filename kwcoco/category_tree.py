@@ -26,19 +26,24 @@ class CategoryTree(ub.NiceRepr):
 
         There are three basic properties that this object maintains:
 
-        name:
+        node:
             Alphanumeric string names that should be generally descriptive.
             Using spaces and special characters in these names is discouraged,
-            but can be done.
+            but can be done.  This is the COCO category "name" attribute.
+            For categories this may be denoted as (name, node, cname, catname).
 
         id:
             The integer id of a category should ideally remain consistent.
             These are often given by a dataset (e.g. a COCO dataset).
+            This is the COCO category "id" attribute. For categories this is
+            often denoted as (id, cid).
 
         index:
             Contigous zero-based indices that indexes the list of categories.
             These should be used for the fastest access in backend computation
-            tasks.
+            tasks. Typically corresponds to the ordering of the channels in the
+            final linear layer in an associated model.  For categories this is
+            often denoted as (index, cidx, idx, or cx).
 
     Attributes:
 

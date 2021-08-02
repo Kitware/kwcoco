@@ -72,7 +72,7 @@ http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 import json
 import numpy as np
 import ubelt as ub
-from os.path import exists
+from os.path import exists, dirname
 
 from kwcoco.util.dict_like import DictLike  # NOQA
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
@@ -148,7 +148,7 @@ class Image(CocoBase):
     height = Column(Integer)
 
     video_id = Column(Integer, index=True, unique=False)
-    timestamp = Column(Float)
+    timestamp = Column(Float)  # FIXME, timestamp does not have to be a float
     frame_index = Column(Integer)
 
     channels = Column(JSON)
@@ -927,6 +927,14 @@ class CocoSqlIndex(object):
             session, Annotation.id, Annotation.image_id, Image.id)
         index.cid_to_aids = SqlIdGroupDictProxy(
             session, Annotation.id, Annotation.category_id, Category.id)
+
+        index.cid_to_gids = SqlIdGroupDictProxy(
+            session, Annotation.image_id, Annotation.category_id, Category.id)
+
+        # TODO:
+        # index.trackid_to_aids = SqlIdGroupDictProxy(
+        #     session, Annotation.id, Annotation.track_id)
+
         index.vidid_to_gids = SqlIdGroupDictProxy(
             session, Image.id, Image.video_id, Video.id,
             group_order_attr=Image.frame_index)
@@ -946,6 +954,65 @@ class CocoSqlIndex(object):
             'annotations': index.anns,
             'videos': index.videos,
         }
+
+
+def _handle_sql_uri(uri):
+    """
+    Temporary function to deal with URI. Modern tools seem to use RFC 3968
+    URIs, but sqlalchemy uses RFC 1738. Attempt to gracefully handle special
+    cases. With a better understanding of the above specs, this function may be
+    able to be written more eloquently.
+
+    Ignore:
+        _handle_sql_uri(':memory:')
+        _handle_sql_uri('special:foobar')
+        _handle_sql_uri('sqlite:///:memory:')
+        _handle_sql_uri('/foo/bar')
+        _handle_sql_uri('foo/bar')
+    """
+    import uritools
+    uri_parsed = uritools.urisplit(uri)
+    normalized = None
+    local_path = None
+    parent = None
+    file_prefix = '/file:'
+
+    scheme, authority, path, query, fragment = uri_parsed
+
+    if scheme == 'special':
+        pass
+    elif scheme is None:
+        # Add in the SQLite scheme
+        scheme = 'sqlite'
+        if path == ':memory:':
+            path = '/:memory:'
+        elif not path.startswith(file_prefix):
+            path = file_prefix + path
+        if authority is None:
+            authority = ''
+    elif scheme != 'sqlite':
+        raise NotImplementedError(scheme)
+
+    if path == '/:memory:':
+        local_path = None
+    elif path.startswith(file_prefix):
+        local_path = path[len(file_prefix):]
+    else:
+        local_path = None
+
+    if local_path is not None:
+        parent = dirname(local_path)
+
+    normalized = uritools.uricompose(scheme, authority, path, query, fragment)
+
+    uri_info = {
+        'uri': uri,
+        'normalized': normalized,
+        'local_path': local_path,
+        'parsed': uri_parsed,
+        'parent': parent,
+    }
+    return uri_info
 
 
 class CocoSqlDatabase(AbstractCocoDataset,
@@ -976,6 +1043,11 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def __init__(self, uri=None, tag=None, img_root=None):
         if uri is None:
             uri = self.MEMORY_URI
+
+        # TODO: make this more robust
+        if img_root is None:
+            img_root = _handle_sql_uri(uri)['parent']
+
         self.uri = uri
         self.img_root = img_root
         self.session = None
@@ -1066,10 +1138,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
         # Create an engine that stores data at a specific uri location
-        uri = self.uri
+
+        _uri_info = _handle_sql_uri(self.uri)
+        uri = _uri_info['normalized']
         if readonly:
             uri = uri + '?mode=ro&uri=true'
-        elif uri.startswith('sqlite:///file:'):
+        else:
             uri = uri + '?uri=true'
         self.engine = create_engine(uri)
         # table_names = self.engine.table_names()
@@ -1099,7 +1173,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         if self.uri != self.MEMORY_URI and exists(fpath):
             ub.delete(fpath)
 
-    def populate_from(self, dset):
+    def populate_from(self, dset, verbose=1):
         """
         Copy the information in a :class:`CocoDataset` into this SQL database.
 
@@ -1119,16 +1193,23 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
         """
         from sqlalchemy import inspect
+        import itertools as it
+        counter = it.count()
         session = self.session
         inspector = inspect(self.engine)
         # table_names = self.engine.table_names()
         table_names = sqlalchemy.inspect(self.engine).get_table_names()
+
+        batch_size = 100000
+
         for key in table_names:
             colinfo = inspector.get_columns(key)
             colnames = {c['name'] for c in colinfo}
             # TODO: is there a better way to grab this information?
             cls = CocoBase.TBLNAME_TO_CLASS[key]
-            for item in dset.dataset.get(key, []):
+            for item in ub.ProgIter(dset.dataset.get(key, []),
+                                    desc='Populate {}'.format(key),
+                                    verbose=verbose):
                 item_ = ub.dict_isect(item, colnames)
                 # Everything else is a extra i.e. additional property
                 item_['extra'] = ub.dict_diff(item, item_)
@@ -1141,6 +1222,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
                     item_['_bbox_h'] = h
                 row = cls(**item_)
                 session.add(row)
+
+                if next(counter) % batch_size == 0:
+                    # Commit data in batches
+                    session.commit()
+        if verbose:
+            print('finish populate')
         session.commit()
 
     @property
@@ -1334,6 +1421,95 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def data_fpath(self, value):
         self.fpath = value
 
+    @classmethod
+    def coerce(self, data):
+        """
+        Create an SQL CocoDataset from the input pointer.
+
+        Example:
+            import kwcoco
+            dset = kwcoco.CocoDataset.demo('shapes8')
+            data = dset.fpath
+            self = CocoSqlDatabase.coerce(data)
+
+            from kwcoco.coco_sql_dataset import CocoSqlDatabase
+            import kwcoco
+            dset = kwcoco.CocoDataset.coerce('spacenet7.kwcoco.json')
+
+            self = CocoSqlDatabase.coerce(dset)
+
+            from kwcoco.coco_sql_dataset import CocoSqlDatabase
+            sql_dset = CocoSqlDatabase.coerce('spacenet7.kwcoco.json')
+
+            # from kwcoco.coco_sql_dataset import CocoSqlDatabase
+            import kwcoco
+            sql_dset = kwcoco.CocoDataset.coerce('_spacenet7.kwcoco.view.v006.sqlite')
+
+        """
+        import kwcoco
+        if isinstance(data, str):
+            if data.endswith('.json'):
+                dct_db_fpath = data
+                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath)
+            else:
+                raise NotImplementedError
+        elif isinstance(data, kwcoco.CocoDataset):
+            self = cached_sql_coco_view(dset=data)
+        else:
+            raise NotImplementedError
+        return self
+
+
+def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
+                         force_rewrite=False):
+    """
+    Attempts to load a cached SQL-View dataset, only loading and converting the
+    json dataset if necessary.
+    """
+    import os
+    import kwcoco
+
+    if dct_db_fpath is not None:
+        if dset is not None:
+            raise ValueError('must specify dset xor dct_db_fpath')
+        bundle_dpath = dirname(dct_db_fpath)
+        tag = None
+    elif dset is not None:
+        if dct_db_fpath is not None:
+            raise ValueError('must specify dset xor dct_db_fpath')
+        dct_db_fpath = dset.fpath
+        bundle_dpath = dset.bundle_dpath
+        tag = dset.tag
+    else:
+        raise AssertionError
+
+    if sql_db_fpath is None:
+        sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_',
+                                  ext='.view.v006.sqlite')
+
+    self = CocoSqlDatabase(sql_db_fpath, img_root=bundle_dpath, tag=tag)
+
+    needs_rewrite = True
+    if not force_rewrite and exists(sql_db_fpath):
+        needs_rewrite = (
+            os.stat(dct_db_fpath).st_mtime > os.stat(sql_db_fpath).st_mtime
+        )
+    if needs_rewrite:
+        # Write to the SQL instance
+
+        # TODO: use a CacheStamp instead
+        self.delete()
+        self.connect()
+        if dset is None:
+            print('Loading json dataset for SQL conversion')
+            dset = kwcoco.CocoDataset(dct_db_fpath)
+        # Convert a coco file to an sql database
+        print('Start SQL conversion')
+        self.populate_from(dset, verbose=1)
+    else:
+        self.connect()
+    return self
+
 
 def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
     """
@@ -1343,32 +1519,8 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
         This function is fragile. It depends on looking at file modified
         timestamps to determine if it needs to write the dataset.
     """
-    if db_fpath is None:
-        db_fpath = ub.augpath(dset.fpath, prefix='_', ext='.view.v006.sqlite')
-
-    if db_fpath == ':memory:':
-        db_uri = 'sqlite:///:memory:'
-    else:
-        db_uri = 'sqlite:///file:' + db_fpath
-
-    self = CocoSqlDatabase(db_uri, img_root=dset.img_root, tag=dset.tag)
-
-    import os
-    needs_rewrite = True
-    if not force_rewrite and exists(db_fpath) :
-        needs_rewrite = (
-            os.stat(dset.fpath).st_mtime >
-            os.stat(db_fpath).st_mtime
-        )
-    if needs_rewrite:
-        # Write to the SQL instance
-        self.delete()
-        self.connect()
-        # Convert a coco file to an sql database
-        self.populate_from(dset)
-    else:
-        self.connect()
-    return self
+    return cached_sql_coco_view(dset=dset, sql_db_fpath=db_fpath,
+                                force_rewrite=force_rewrite)
 
 
 def demo(num=10):

@@ -116,6 +116,14 @@ class FusedChannelSpec(ub.NiceRepr):
             self = cls(['u{}'.format(i) for i in range(data)])
         elif isinstance(data, cls):
             self = data
+        elif isinstance(data, ChannelSpec):
+            parsed = data.parse()
+            if len(parsed) == 1:
+                self = cls(ub.peek(parsed.values()))
+            else:
+                raise ValueError(
+                    'Cannot coerce ChannelSpec to a FusedChannelSpec '
+                    'when there are multiple streams')
         else:
             raise TypeError('unknown type {}'.format(type(data)))
         return self
@@ -126,6 +134,7 @@ class FusedChannelSpec(ub.NiceRepr):
     def __json__(self):
         return self.spec
 
+    @ub.memoize_method
     def normalize(self):
         """
         Replace aliases with explicit single-band-per-code specs
@@ -161,6 +170,22 @@ class FusedChannelSpec(ub.NiceRepr):
         Return the expanded code list
         """
         return self.parsed
+
+    # @ub.memoize_property
+    # def code_oset(self):
+    #     return ub.oset(self.normalize().parsed)
+
+    @ub.memoize_method
+    def as_list(self):
+        return self.normalize().parsed
+
+    @ub.memoize_method
+    def as_oset(self):
+        return ub.oset(self.normalize().parsed)
+
+    @ub.memoize_method
+    def as_set(self):
+        return set(self.normalize().parsed)
 
     def difference(self, other):
         """

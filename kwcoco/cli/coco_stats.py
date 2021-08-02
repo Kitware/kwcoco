@@ -56,9 +56,9 @@ class CocoStatsCLI:
 
         datasets = []
         for fpath in ub.ProgIter(fpaths, desc='reading datasets', verbose=1):
-            print('reading fpath = {!r}'.format(fpath))
             dset = kwcoco.CocoDataset.coerce(fpath)
             datasets.append(dset)
+        print('Finished reading datasets')
 
         # hack dataset tags
         dset_tags = [dset.tag for dset in datasets]

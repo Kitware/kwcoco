@@ -44,6 +44,8 @@ class CocoShowCLI:
 
             'show_annots': scfg.Value(True, help=(
                 'Overlay annotations on dispaly')),
+            'show_labels': scfg.Value(False, help=(
+                'Overlay labels on annotations')),
         }
 
     @classmethod
@@ -85,6 +87,7 @@ class CocoShowCLI:
         if config['mode'] == 'matplotlib':
             show_kw = {
                 'show_annots': config['show_annots'],
+                'show_labels': config['show_labels'],
                 'channels': config['channels'],
             }
             if config['show_annots'] == 'both':

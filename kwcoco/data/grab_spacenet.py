@@ -207,11 +207,16 @@ def grab_spacenet7(data_dpath):
             },
         ]
 
+        has_extracted = all([
+            d.exists() for d in [extract_dpath / 'csvs',
+                                 extract_dpath / 'test_public',
+                                 extract_dpath / 'train']])
+
         for item in items:
             fname = pathlib.Path(item['uri']).name
             item['fpath'] = archive_dpath / fname
 
-        need_download_archive = 1
+        need_download_archive = not has_extracted
         if need_download_archive:
             aws_exe = ub.find_exe('aws')
             if not aws_exe:
@@ -220,13 +225,13 @@ def grab_spacenet7(data_dpath):
             for item in items:
                 if not item['fpath'].exists():
                     command = '{aws_exe} s3 cp {uri} {archive_dpath}'.format(
-                        aws_exe=aws_exe, uri=items['uri'], archive_dpath=archive_dpath)
+                        aws_exe=aws_exe, uri=item['uri'], archive_dpath=archive_dpath)
                     info = ub.cmd(command, verbose=3)
                     assert info['ret'] == 0
                     got_hash = ub.hash_file(item['fpath'], hasher='sha512')
                     assert got_hash.startswith(item['sha512'])
 
-        need_unarchive = 1
+        need_unarchive = not has_extracted
         if need_unarchive:
             for item in ub.ProgIter(items, desc='extract spacenet', verbose=3):
                 archive_fpath = item['fpath']
@@ -294,13 +299,14 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
         for frame_index, gpath in enumerate(image_gpaths):
             gname = str(gpath.stem)
             nameinfo = s7_fname_fmt.parse(gname)
-            timestamp = datetime.datetime(year=nameinfo['year'], month=nameinfo['month'], day=1)
+            timestamp = datetime.datetime(
+                year=nameinfo['year'], month=nameinfo['month'], day=1)
             gid = coco_dset.add_image(
                 file_name=str(gpath.relative_to(coco_dset.bundle_dpath)),
                 name=gname,
                 video_id=vidid,
                 frame_index=frame_index,
-                timestamp=timestamp.isoformat(),
+                date_captured=timestamp.isoformat(),
                 channels='r|g|b',
             )
 
@@ -375,6 +381,12 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
     print('coco_dset.fpath = {!r}'.format(coco_dset.fpath))
     print('coco_dset = {!r}'.format(coco_dset))
     coco_dset.dump(str(coco_dset.fpath))
+
+    # We will generally want an SQL cache when working with this dataset
+    if ub.argflag('--sql-hack'):
+        from kwcoco.coco_sql_dataset import CocoSqlDatabase
+        CocoSqlDatabase.coerce(coco_dset)
+
     return coco_dset
 
 

@@ -5,7 +5,22 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.7 - Unreleased
+## Version 0.2.8 - Unreleased
+
+
+### Added
+
+* CocoSQLDataset.coerce
+* `kwcoco subset` CLI now has a `--select_images` and `--select_videos` option that takes a json query.
+* Add initial implementation of `DelayedChannelConcat.take_channels`, returns nans if the channel is not available.
+
+### Changed
+
+* Made URIs for CocoSQLDataset slightly more robust
+* kwcoco show now defaults show_labels to False
+
+
+## Version 0.2.7 - Released 2021-06-28
 
 ### Added
 
