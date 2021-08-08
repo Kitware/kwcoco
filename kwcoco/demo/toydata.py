@@ -118,10 +118,14 @@ def demodata_toy_dset(image_size=(600, 600),
     """
     import kwcoco
 
-    if 'gsize' in kwargs:
-        import warnings
-        warnings.warn('gsize is deprecated. Use image_size param instead')
-        image_size = kwargs['gsize']
+    if 'gsize' in kwargs:  # nocover
+        if 0:
+            # TODO: enable this warning
+            import warnings
+            warnings.warn('gsize is deprecated. Use image_size param instead',
+                          DeprecationWarning)
+        image_size = kwargs.pop('gsize')
+    assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
 
     if bundle_dpath is None:
         if dpath is None:
@@ -231,10 +235,9 @@ def demodata_toy_dset(image_size=(600, 600),
 
         for __ in ub.ProgIter(range(n_imgs), label='creating data'):
             # TODO: parallelize
-            img, anns = demodata_toy_img(anchors, gsize=image_size,
-                                         categories=catpats,
-                                         newstyle=newstyle, fg_scale=fg_scale,
-                                         bg_scale=bg_scale,
+            img, anns = demodata_toy_img(anchors, image_size=image_size,
+                                         categories=catpats, newstyle=newstyle,
+                                         fg_scale=fg_scale, bg_scale=bg_scale,
                                          bg_intensity=bg_intensity, rng=rng,
                                          aux=aux)
             imdata = img.pop('imdata')
@@ -302,8 +305,8 @@ def demodata_toy_dset(image_size=(600, 600),
 
 def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
-        gsize=(600, 600), verbose=3, render=False, aux=None,
-        multispectral=False, rng=None, dpath=None):
+        image_size=(600, 600), verbose=3, render=False, aux=None,
+        multispectral=False, rng=None, dpath=None, **kwargs):
     """
     Create a toy Coco Video Dataset
 
@@ -314,7 +317,8 @@ def random_video_dset(
 
         num_tracks (int) : number of tracks per video
 
-        gsize : image size
+        image_size (Tuple[int, int]):
+            The width and height of the generated images
 
         render (bool | dict):
             if truthy the toy annotations are synthetically rendered. See
@@ -331,6 +335,9 @@ def random_video_dset(
 
         multispectral (bool): similar to aux, but does not have the concept of
             a "main" image.
+
+        **kwargs : used for old backwards compatible argument names
+            gsize - alias for image_size
 
     SeeAlso:
         random_single_video_dset
@@ -364,16 +371,25 @@ def random_video_dset(
         globals().update(xdev.get_func_kwargs(random_video_dset))
         num_videos = 2
     """
+    if 'gsize' in kwargs:  # nocover
+        if 0:
+            # TODO: enable this warning
+            import warnings
+            warnings.warn('gsize is deprecated. Use image_size param instead',
+                          DeprecationWarning)
+        image_size = kwargs.pop('gsize')
+    assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
+
     rng = kwarray.ensure_rng(rng)
     subsets = []
     tid_start = 1
     gid_start = 1
     for vidid in range(1, num_videos + 1):
         dset = random_single_video_dset(
-            gsize=gsize, num_frames=num_frames, num_tracks=num_tracks,
-            tid_start=tid_start, anchors=anchors, gid_start=gid_start,
-            video_id=vidid, render=False, autobuild=False, aux=aux,
-            multispectral=multispectral, rng=rng)
+            image_size=image_size, num_frames=num_frames,
+            num_tracks=num_tracks, tid_start=tid_start, anchors=anchors,
+            gid_start=gid_start, video_id=vidid, render=False, autobuild=False,
+            aux=aux, multispectral=multispectral, rng=rng)
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
             tid_start = dset.dataset['annotations'][-1]['track_id'] + 1
@@ -412,16 +428,16 @@ def random_video_dset(
     return dset
 
 
-def random_single_video_dset(gsize=(600, 600), num_frames=5,
+def random_single_video_dset(image_size=(600, 600), num_frames=5,
                              num_tracks=3, tid_start=1, gid_start=1,
                              video_id=1, anchors=None, rng=None, render=False,
                              dpath=None, autobuild=True, verbose=3, aux=None,
-                             multispectral=False):
+                             multispectral=False, **kwargs):
     """
     Create the video scene layout of object positions.
 
     Args:
-        gsize (Tuple[int, int]): size of the images
+        image_size (Tuple[int, int]): size of the images
 
         num_frames (int): number of frames in this video
 
@@ -449,6 +465,9 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
 
         multispectral (bool): if specified simulates multispectral imagry
             This is similar to aux, but has no "main" file.
+
+        **kwargs : used for old backwards compatible argument names
+            gsize - alias for image_size
 
     TODO:
         - [ ] Need maximum allowed object overlap measure
@@ -532,14 +551,23 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     import kwcoco
     rng = kwarray.ensure_rng(rng)
 
+    if 'gsize' in kwargs:  # nocover
+        if 0:
+            # TODO: enable this warning
+            import warnings
+            warnings.warn('gsize is deprecated. Use image_size param instead',
+                          DeprecationWarning)
+        image_size = kwargs.pop('gsize')
+    assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
+
     image_ids = list(range(gid_start, num_frames + gid_start))
     track_ids = list(range(tid_start, num_tracks + tid_start))
 
     dset = kwcoco.CocoDataset(autobuild=False)
     dset.add_video(
         name='toy_video_{}'.format(video_id),
-        width=gsize[0],
-        height=gsize[1],
+        width=image_size[0],
+        height=image_size[1],
         id=video_id,
     )
 
@@ -556,7 +584,8 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
             for b, r in zip(s2_bands, s2_res)
         ]
 
-        main_window = kwimage.Boxes([[0, 0, gsize[0], gsize[1]]], 'xywh')
+        main_window = kwimage.Boxes([[0, 0, image_size[0], image_size[1]]],
+                                    'xywh')
         for chaninfo in aux:
             mat = kwimage.Affine.coerce(chaninfo['warp_aux_to_img']).inv().matrix
             aux_window = main_window.warp(mat).quantize()
@@ -567,8 +596,8 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         img = {
             'id': gid,
             'file_name': '<todo-generate-{}-{}>'.format(video_id, frame_idx),
-            'width': gsize[0],
-            'height': gsize[1],
+            'width': image_size[0],
+            'height': image_size[1],
             'warp_img_to_vid': {
                 'type': 'affine',
                 'matrix': [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -594,8 +623,8 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
                 if isinstance(chaninfo, str):
                     chaninfo = {
                         'channels': chaninfo,
-                        'width': gsize[0],
-                        'height': gsize[1],
+                        'width': image_size[0],
+                        'height': image_size[1],
                         'warp_aux_to_img': None,
                     }
                 # Add placeholder for auxiliary image data
@@ -658,8 +687,8 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         boxes.data[:, 0:2] = path
         boxes.data[:, 2:4] = box_dims.values
         # boxes = boxes.scale(0.1, about='center')
-        # boxes = boxes.scale(gsize).scale(0.5, about='center')
-        boxes = boxes.scale(gsize, about='origin')
+        # boxes = boxes.scale(image_size).scale(0.5, about='center')
+        boxes = boxes.scale(image_size, about='origin')
         boxes = boxes.scale(0.9, about='center')
 
         def warp_within_bounds(self, x_min, y_min, x_max, y_max):
@@ -704,7 +733,7 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
         # oob_pad = 20  # allow some out of bounds
         # boxes = boxes.to_tlbr()
         # TODO: need better path distributions
-        # boxes = warp_within_bounds(boxes, 0 - oob_pad, 0 - oob_pad, gsize[0] + oob_pad, gsize[1] + oob_pad)
+        # boxes = warp_within_bounds(boxes, 0 - oob_pad, 0 - oob_pad, image_size[0] + oob_pad, image_size[1] + oob_pad)
         boxes = boxes.to_xywh()
 
         boxes.data = boxes.data.round(1)
@@ -770,11 +799,11 @@ def random_single_video_dset(gsize=(600, 600), num_frames=5,
     return dset
 
 
-def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
+def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
                      n_annots=(0, 50), fg_scale=0.5, bg_scale=0.8,
                      bg_intensity=0.1, fg_intensity=0.9,
                      gray=True, centerobj=None, exact=False,
-                     newstyle=True, rng=None, aux=None):
+                     newstyle=True, rng=None, aux=None, **kwargs):
     r"""
     Generate a single image with non-overlapping toy objects of available
     categories.
@@ -814,13 +843,16 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
 
         aux: if specified builds auxiliary channels
 
+        **kwargs : used for old backwards compatible argument names.
+            gsize - alias for image_size
+
     CommandLine:
         xdoctest -m kwcoco.demo.toydata demodata_toy_img:0 --profile
         xdoctest -m kwcoco.demo.toydata demodata_toy_img:1 --show
 
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
-        >>> img, anns = demodata_toy_img(gsize=(32, 32), anchors=[[.3, .3]], rng=0)
+        >>> img, anns = demodata_toy_img(image_size=(32, 32), anchors=[[.3, .3]], rng=0)
         >>> img['imdata'] = '<ndarray shape={}>'.format(img['imdata'].shape)
         >>> print('img = {}'.format(ub.repr2(img)))
         >>> print('anns = {}'.format(ub.repr2(anns, nl=2, cbr=True)))
@@ -849,7 +881,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
 
     Example:
         >>> # xdoctest: +REQUIRES(--show)
-        >>> img, anns = demodata_toy_img(gsize=(172, 172), rng=None, aux=True)
+        >>> img, anns = demodata_toy_img(image_size=(172, 172), rng=None, aux=True)
         >>> print('anns = {}'.format(ub.repr2(anns, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
@@ -859,7 +891,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         >>> kwplot.show_if_requested()
     Example:
         >>> # xdoctest: +REQUIRES(--show)
-        >>> img, anns = demodata_toy_img(gsize=(172, 172), rng=None, aux=True)
+        >>> img, anns = demodata_toy_img(image_size=(172, 172), rng=None, aux=True)
         >>> print('anns = {}'.format(ub.repr2(anns, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
@@ -877,6 +909,15 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
     if anchors is None:
         anchors = [[.20, .20]]
     anchors = np.asarray(anchors)
+
+    if 'gsize' in kwargs:  # nocover
+        if 0:
+            # TODO: enable this warning
+            import warnings
+            warnings.warn('gsize is deprecated. Use image_size param instead',
+                          DeprecationWarning)
+        image_size = kwargs.pop('gsize')
+    assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
 
     rng = kwarray.ensure_rng(rng)
     catpats = CategoryPatterns.coerce(categories, fg_scale=fg_scale,
@@ -897,7 +938,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
     while True:
         boxes = kwimage.Boxes.random(
             num=num, scale=1.0, format='xywh', rng=rng, anchors=anchors)
-        boxes = boxes.scale(gsize)
+        boxes = boxes.scale(image_size)
         bw, bh = boxes.components[2:4]
         ar = np.maximum(bw, bh) / np.minimum(bw, bh)
         flags = ((bw > 1) & (bh > 1) & (ar < 4))
@@ -915,7 +956,7 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         if len(boxes) > 0:
             # Force the first box to be in the center
             cxywh = boxes.to_cxywh()
-            cxywh.data[0, 0:2] = np.array(gsize) / 2
+            cxywh.data[0, 0:2] = np.array(image_size) / 2
             boxes = cxywh.to_tlbr()
 
     # Make sure the first box is always kept.
@@ -936,17 +977,17 @@ def demodata_toy_img(anchors=None, gsize=(104, 104), categories=None,
         # The center of the image should be negative so remove the center box
         boxes = boxes[1:]
 
-    boxes = boxes.scale(.8).translate(.1 * min(gsize))
+    boxes = boxes.scale(.8).translate(.1 * min(image_size))
     boxes.data = boxes.data.astype(int)
 
     # Hack away zero width objects
     boxes = boxes.to_xywh(copy=False)
     boxes.data[..., 2:4] = np.maximum(boxes.data[..., 2:4], 1)
 
-    gw, gh = gsize
+    gw, gh = image_size
     dims = (gh, gw)
 
-    # This is 2x as fast for gsize=(300,300)
+    # This is 2x as fast for image_size=(300,300)
     if gray:
         gshape = (gh, gw, 1)
         imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,

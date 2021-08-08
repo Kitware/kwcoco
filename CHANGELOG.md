@@ -8,6 +8,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.9 - Unreleased
 
 
+### Changed
+
+* Changed argument name from `gsize` to `image_size` in toydata methods.
+  Backwards compatibility is preserved via kwargs for now, but `gsize` will be
+  deprecated in the future.
+
+
 ## Version 0.2.8 - Released 2021-08-02
 
 

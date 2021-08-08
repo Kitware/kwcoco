@@ -1007,7 +1007,7 @@ class MixinCocoExtras(object):
                 :func:`demodata_toy_dset` and :func:`random_video_dset`.
 
         Kwargs:
-            gsize (Tuple): size of the images
+            image_size (Tuple[int, int]): width / height size of the images
 
             dpath (str): path to the output image directory, defaults to using
                 kwcoco cache dir.
@@ -1110,7 +1110,7 @@ class MixinCocoExtras(object):
                 'num_videos': 1,
                 'num_frames': 2,
                 'anchors': None,
-                'gsize': (600, 600),
+                'image_size': (600, 600),
                 'aux': None,
                 'multispectral': None,
             }

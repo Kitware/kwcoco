@@ -1526,7 +1526,7 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
 def demo(num=10):
     import kwcoco
     dset = kwcoco.CocoDataset.demo(
-        'vidshapes', num_videos=1, num_frames=num, gsize=(64, 64))
+        'vidshapes', num_videos=1, num_frames=num, image_size=(64, 64))
     HACK = 1
     if HACK:
         gids = list(dset.imgs.keys())
