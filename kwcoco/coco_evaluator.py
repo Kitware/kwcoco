@@ -453,7 +453,12 @@ class CocoEvaluator(object):
                 cxs = np.array([None if c is None else classes.id_to_idx[c] for c in cids])
                 ssegs = [a.get('segmentation') for a in anns]
                 weights = [a.get('weight', 1) for a in anns]
+
+                # Is defaulting to NAN correct here?
                 scores = [a.get('score', np.nan) for a in anns]
+                # scores = [a.get('score', np.random.rand()) for a in anns]
+                # scores = [a.get('score', 1) for a in anns]
+                # print('scores = {!r}'.format(scores))
 
                 kw = {}
                 if all('prob' in a for a in anns):

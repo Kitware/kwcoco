@@ -31,17 +31,21 @@ TOYDATA_VERSION = 16
 
 
 @profile
-def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
+def demodata_toy_dset(image_size=(600, 600),
+                      n_imgs=5,
+                      verbose=3,
+                      rng=0,
                       newstyle=True,
                       dpath=None,
                       bundle_dpath=None,
                       aux=None,
-                      use_cache=True):
+                      use_cache=True,
+                      **kwargs):
     """
     Create a toy detection problem
 
     Args:
-        gsize (Tuple): size of the images
+        image_size (Tuple[int, int]): The width and height of the generated images
 
         n_imgs (int): number of images to generate
 
@@ -65,6 +69,9 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         use_cache (bool, default=True): if True caches the generated json in the
             `dpath`.
 
+        **kwargs : used for old backwards compatible argument names
+            gsize - alias for image_size
+
     Returns:
         kwcoco.CocoDataset :
 
@@ -84,7 +91,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     Example:
         >>> from kwcoco.demo.toydata import *
         >>> import kwcoco
-        >>> dset = demodata_toy_dset(gsize=(300, 300), aux=True, use_cache=False)
+        >>> dset = demodata_toy_dset(image_size=(300, 300), aux=True, use_cache=False)
         >>> # xdoctest: +REQUIRES(--show)
         >>> print(ub.repr2(dset.dataset, nl=2))
         >>> import kwplot
@@ -97,19 +104,24 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
         >>> from kwcoco.demo.toydata import *
         >>> import kwcoco
 
-        dset = demodata_toy_dset(gsize=(300, 300), aux=True, use_cache=False)
+        dset = demodata_toy_dset(image_size=(300, 300), aux=True, use_cache=False)
         print(dset.imgs[1])
         dset._tree()
 
-        dset = demodata_toy_dset(gsize=(300, 300), aux=True, use_cache=False,
+        dset = demodata_toy_dset(image_size=(300, 300), aux=True, use_cache=False,
             bundle_dpath='test_bundle')
         print(dset.imgs[1])
         dset._tree()
 
         dset = demodata_toy_dset(
-            gsize=(300, 300), aux=True, use_cache=False, dpath='test_cache_dpath')
+            image_size=(300, 300), aux=True, use_cache=False, dpath='test_cache_dpath')
     """
     import kwcoco
+
+    if 'gsize' in kwargs:
+        import warnings
+        warnings.warn('gsize is deprecated. Use image_size param instead')
+        image_size = kwargs['gsize']
 
     if bundle_dpath is None:
         if dpath is None:
@@ -143,7 +155,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
     # This configuration dictionary is what the cache depends on
     cfg = {
         'anchors': anchors,
-        'gsize': gsize,
+        'image_size': image_size,
         'n_imgs': n_imgs,
         'categories': catpats.categories,
         'newstyle': newstyle,
@@ -219,7 +231,7 @@ def demodata_toy_dset(gsize=(600, 600), n_imgs=5, verbose=3, rng=0,
 
         for __ in ub.ProgIter(range(n_imgs), label='creating data'):
             # TODO: parallelize
-            img, anns = demodata_toy_img(anchors, gsize=gsize,
+            img, anns = demodata_toy_img(anchors, gsize=image_size,
                                          categories=catpats,
                                          newstyle=newstyle, fg_scale=fg_scale,
                                          bg_scale=bg_scale,
@@ -1148,7 +1160,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
 
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
-        >>> gsize=(600, 600)
+        >>> image_size=(600, 600)
         >>> num_frames=5
         >>> verbose=3
         >>> rng = None
@@ -1156,7 +1168,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         >>> rng = kwarray.ensure_rng(rng)
         >>> aux = 'mx'
         >>> dset = random_single_video_dset(
-        >>>     gsize=gsize, num_frames=num_frames, verbose=verbose, aux=aux, rng=rng)
+        >>>     image_size=image_size, num_frames=num_frames, verbose=verbose, aux=aux, rng=rng)
         >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
         >>> gid = 1
         >>> renderkw = {}
@@ -1176,7 +1188,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         >>> _ = dets.draw()
 
         >>> # xdoctest: +REQUIRES(--show)
-        >>> img, anns = demodata_toy_img(gsize=(172, 172), rng=None, aux=True)
+        >>> img, anns = demodata_toy_img(image_size=(172, 172), rng=None, aux=True)
         >>> print('anns = {}'.format(ub.repr2(anns, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
@@ -1347,7 +1359,7 @@ def false_color(twochan):
 
 
 def render_background(img, rng, gray, bg_intensity, bg_scale):
-    # This is 2x as fast for gsize=(300,300)
+    # This is 2x as fast for image_size=(300,300)
     gw, gh = img['width'], img['height']
     if img.get('file_name', None) is None:
         imdata = None
