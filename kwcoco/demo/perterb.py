@@ -27,6 +27,14 @@ def perterb_coco(coco_dset, **kwargs):
         >>> }
         >>> pred_dset = perterb_coco(true_dset, **kwargs)
         >>> pred_dset._check_json_serializable()
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> gid = 1
+        >>> canvas = true_dset.delayed_load(gid).finalize()
+        >>> canvas = true_dset.annots(gid=gid).detections.draw_on(canvas, color='green')
+        >>> canvas = pred_dset.annots(gid=gid).detections.draw_on(canvas, color='blue')
+        >>> kwplot.imshow(canvas)
 
     Ignore:
         import xdev
@@ -110,12 +118,30 @@ def perterb_coco(coco_dset, **kwargs):
             # Perterb box coordinates
             ann = new_dset.anns[aid]
 
-            new_bbox = (np.array(ann['bbox']) + box_noise_RV(4)).tolist()
+            old_bbox = np.array(ann['bbox'])
+            new_bbox = (old_bbox + box_noise_RV(4)).tolist()
+
             new_x, new_y, new_w, new_h = new_bbox
             allow_neg_boxes = 0
             if not allow_neg_boxes:
                 new_w = max(new_w, 0)
                 new_h = max(new_h, 0)
+
+            old_cxywh = kwimage.Boxes([old_bbox], 'xywh').to_cxywh()
+            new_cxywh = kwimage.Boxes([new_bbox], 'xywh').to_cxywh()
+
+            old_sseg = kwimage.Segmentation.coerce(ann['segmentation'])
+
+            # Compute the transform of the box so we can modify the
+            # other attributes (TODO: we could use a random affine transform
+            # for everything)
+            offset = new_cxywh.data[0, 0:2] - old_cxywh.data[0, 0:2]
+            scale = new_cxywh.data[0, 2:4] / old_cxywh.data[0, 2:4]
+            old_to_new = kwimage.Affine.coerce(offset=offset, scale=scale)
+            new_sseg = old_sseg.warp(old_to_new)
+
+            # Overwrite the data
+            ann['segmentation'] = new_sseg.to_coco(style='new')
             ann['bbox'] = [new_x, new_y, new_w, new_h]
             ann['score'] = float(true_score_RV(1)[0])
 
@@ -150,6 +176,9 @@ def perterb_coco(coco_dset, **kwargs):
             for ann in list(false_dets.to_coco('new')):
                 ann['category_id'] = classes.node_to_id[ann.pop('category_name')]
                 ann['image_id'] = gid
+                x, y, w, h = ann['bbox']
+                sseg = kwimage.MultiPolygon.random().scale((w, h)).translate((x, y))
+                ann['segmentation'] = sseg
                 false_anns.append(ann)
 
         if null_pred:

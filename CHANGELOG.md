@@ -8,6 +8,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.9 - Unreleased
 
 
+### Added
+
+* Added `vidid` argument to `CocoDataset.images` 1D object mixin.
+* Added `trackid` argument to `CocoDataset.annots` 1D object mixin.
+
+### Fixed
+
+* `perterb_coco` now correctly perterbs segmentations
+
 ### Changed
 
 * Changed argument name from `gsize` to `image_size` in toydata methods.
