@@ -63,11 +63,15 @@ class CocoToyDataCLI(object):
         import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
 
+        demo_kwargs = {
+            'use_cache': config['use_cache'],
+        }
+
         if config['bundle_dpath'] is not None:
             bundle_dpath = config['bundle_dpath']
             dset = kwcoco.CocoDataset.demo(config['key'],
                                            bundle_dpath=bundle_dpath,
-                                           use_cache=config['use_cache'])
+                                           **demo_kwargs)
             # dset.reroot(absolute=True)
         else:
             if config['dst'] is not None:
@@ -76,11 +80,11 @@ class CocoToyDataCLI(object):
                 dpath = dirname(fpath)
                 dset = kwcoco.CocoDataset.demo(config['key'],
                                                dpath=dpath,
-                                               use_cache=config['use_cache'])
+                                               **demo_kwargs)
                 dset.fpath = fpath
             else:
                 dset = kwcoco.CocoDataset.demo(config['key'],
-                                               use_cache=config['use_cache'])
+                                               **demo_kwargs)
             dset.reroot(absolute=True)
 
         if config['dst'] is not None:
