@@ -278,8 +278,7 @@ stages:
     mkdir -p requirements-strict
     sed 's/>=/==/' requirements/runtime.txt > requirements-strict/runtime.txt
     sed 's/>=/==/' requirements/tests.txt > requirements-strict/tests.txt
-    pip install -r requirements-strict/runtime.txt
-    pip install -r requirements-strict/tests.txt
+    pip install -r requirements-strict/runtime.txt -r requirements-strict/tests.txt
 
 
 ._install_strict_full_requirements: &_install_strict_full_requirements |-
@@ -287,10 +286,7 @@ stages:
     sed 's/>=/==/' requirements/optional.txt > requirements-strict/optional.txt
     sed 's/>=/==/' requirements/runtime.txt > requirements-strict/runtime.txt
     sed 's/>=/==/' requirements/tests.txt > requirements-strict/tests.txt
-    pip install -r requirements-strict/optional.txt
-    pip install -r requirements-strict/runtime.txt
-    pip install -r requirements-strict/tests.txt
-
+    pip install -r requirements-strict/optional.txt -r requirements-strict/runtime.txt -r requirements-strict/tests.txt
 
 .common_test_template: &common_test_template
     # Tags define which runners will accept which jobs
