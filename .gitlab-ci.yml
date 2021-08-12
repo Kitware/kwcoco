@@ -261,18 +261,6 @@ stages:
             - dist/*.whl
 
 
-
-# Define anchors to be used in "before_script" parts
-._setup_virtualenv_template: &_setup_virtualenv_template |-
-    python -V  # Print out python version for debugging
-    export PYVER=$(python -c "import sys; print('{}{}'.format(*sys.version_info[0:2]))")
-    pip install virtualenv
-    virtualenv venv$PYVER
-    source venv$PYVER/bin/activate
-    pip install pip -U
-    pip install pip setuptools -U
-    python -V  # Print out python version for debugging
-
 .common_test_template: &common_test_template
     # Tags define which runners will accept which jobs
     <<: 
@@ -305,6 +293,17 @@ stages:
     #        - README.rst
     #        - CHANGELOG.md
 
+
+# Define anchors to be used in "before_script" parts
+._setup_virtualenv_template: &_setup_virtualenv_template |-
+    python -V  # Print out python version for debugging
+    export PYVER=$(python -c "import sys; print('{}{}'.format(*sys.version_info[0:2]))")
+    pip install virtualenv
+    virtualenv venv$PYVER
+    source venv$PYVER/bin/activate
+    pip install pip -U
+    pip install pip setuptools -U
+    python -V  # Print out python version for debugging
 
 ._install_strict_minimal_requirements: &_install_strict_minimal_requirements |-
     mkdir -p requirements-strict
@@ -457,16 +456,20 @@ stages:
         refs:
             - release
 
+# Aliases for the images that run the tests
+.image_python38: &image_python38
+    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.8
+.image_python37: &image_python37
+    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.7
+.image_python36: &image_python36
+    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.6
+
 
 ### JOBS ###
 # Define the actual jobs
 
-
 # ---------------
 # Python 3.8 Jobs
-
-.image_python38: &image_python38
-    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.8
 
 build/cp38-cp38-linux:
     <<: 
@@ -516,9 +519,6 @@ deploy/cp38-cp38-linux:
 # Python 3.7 Jobs
 
 
-.image_python37: &image_python37
-    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.7
-
 build/cp37-cp37-linux:
     <<: 
         - *build_template
@@ -553,9 +553,6 @@ test_minimal_strict/cp37-cp37-linux:
 # ---------------
 # Python 3.6 Jobs
 
-
-.image_python36: &image_python36
-    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.6
 
 build/cp36-cp36m-linux:
     <<: 
