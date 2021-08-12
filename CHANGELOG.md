@@ -8,6 +8,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.10 - Unreleased
 
 
+### Added
+
+* Can now specify `-frames{num}` in demo names to control number of frames in each video
+
+
+### Changed
+
+* In detection metrics, annotations now get a default score of 1.0 if not provided.
+* In detection metrics, fixed AUC to report 1.0 when detections are perfect
+
+
 ## Version 0.2.9 - Released 2021-08-12
 
 

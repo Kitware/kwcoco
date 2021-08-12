@@ -1091,20 +1091,19 @@ class MixinCocoExtras(object):
                 'aux': None,
                 'multispectral': None,
             }
-            suff_parts = None
+            suff_parts = []
             if res:
                 kw['num_videos'] = int(res.named['num_videos'])
                 if 'suffix' in res.named:
                     suff_parts = res.named['suffix'].split('-')
 
-            if suff_parts is None:
-                suff_parts = []
-
-            if 'aux' in suff_parts:
-                vidkw['aux'] = True
-
-            if 'multispectral' in suff_parts:
-                vidkw['multispectral'] = True
+            for part in suff_parts:
+                if part.startswith('frames'):
+                    vidkw['num_frames'] = int(part[6:])
+                if 'aux' == part:
+                    vidkw['aux'] = True
+                elif 'multispectral' == part:
+                    vidkw['multispectral'] = True
 
             vidkw.update(kw)
             use_cache = vidkw.pop('use_cache', True)
