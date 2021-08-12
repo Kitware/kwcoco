@@ -364,7 +364,7 @@ class COCO(CocoDataset):
         try:
             rle = sseg.to_mask(dims=dims).to_bytes_rle().data
         except NotImplementedError:
-            raise Exception((
+            raise NotImplementedError((
                 'kwimage does not seem to have required '
                 'c-extensions for bytes RLE'))
         return rle
