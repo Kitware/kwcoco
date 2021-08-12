@@ -1,8 +1,10 @@
 jsonschema >= 3.2.0
-kwarray >= 0.5.16
+kwarray >= 0.5.19
 kwimage >= 0.7.10
 networkx>=2.6.2
-numpy >= 1.19.2   # tensorflow minimum
+# numpy >= 1.19.2   # tensorflow minimum
+numpy >= 1.21.1   # tensorflow minimum
+
 pandas >= 1.1.4
 parse >= 1.12.0
 scikit-learn >= 0.24.0
@@ -10,6 +12,6 @@ scipy>=1.5.4
 scriptconfig >= 0.5.8
 six >= 1.11.0
 sortedcontainers >= 2.3.0
-ubelt >= 0.9.3
+ubelt >= 0.9.5
 uritools >= 3.0.0
 xarray >= 0.16.0
