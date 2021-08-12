@@ -2,7 +2,7 @@ jsonschema >= 3.2.0
 kwarray >= 0.5.19
 kwimage >= 0.7.10
 
-networkx >= 2.2.1            ;                              python_version >= '3.7.0'   # Python 3.7+
+networkx >= 2.2.0            ;                              python_version >= '3.7.0'   # Python 3.7+
 networkx >= 2.2.0, <= 2.5.1  ; python_version < '3.7.0' and python_version >= '3.6.0'   # Python 3.6
 networkx >= 2.2.0, <= 2.4.0  ; python_version < '3.7.0' and python_version >= '3.6.0'   # Python 3.5
 
