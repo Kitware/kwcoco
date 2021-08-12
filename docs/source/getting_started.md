@@ -330,14 +330,3 @@ few weird things
 ## Code Examples. 
 
 See the README and the doctests.
-
-
-## TODO / Notes:
-
-- [X] For multispectral images, what happens when the images are no the same
-  resolution? - Each auxiliary image now holds an attribute "base_to_aux",
-  which is a transform from the base image resolution to the auxiliary image
-  resolution.
-
-- [ ] WRT to the previous issue, we should handle VRTs as a more concise way to
-  store this data.

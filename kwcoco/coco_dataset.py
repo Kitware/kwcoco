@@ -3526,7 +3526,7 @@ class MixinCocoAddRemove(object):
             >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
             >>> #--
             >>> kw = {}
-            >>> kw['segmentation'] = kwimage.Mask.random().to_bytes_rle()
+            >>> kw['segmentation'] = kwimage.Mask.random().to_array_rle()
             >>> aid = self.add_annotation(image_id, **kw)
             >>> ann = self.index.anns[aid]
             >>> assert ann.get('segmentation', None) is not None
