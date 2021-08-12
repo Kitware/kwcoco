@@ -273,21 +273,6 @@ stages:
     pip install pip setuptools -U
     python -V  # Print out python version for debugging
 
-
-._install_strict_minimal_requirements: &_install_strict_minimal_requirements |-
-    mkdir -p requirements-strict
-    sed 's/>=/==/' requirements/runtime.txt > requirements-strict/runtime.txt
-    sed 's/>=/==/' requirements/tests.txt > requirements-strict/tests.txt
-    pip install -r requirements-strict/runtime.txt -r requirements-strict/tests.txt
-
-
-._install_strict_full_requirements: &_install_strict_full_requirements |-
-    mkdir -p requirements-strict
-    sed 's/>=/==/' requirements/optional.txt > requirements-strict/optional.txt
-    sed 's/>=/==/' requirements/runtime.txt > requirements-strict/runtime.txt
-    sed 's/>=/==/' requirements/tests.txt > requirements-strict/tests.txt
-    pip install -r requirements-strict/optional.txt -r requirements-strict/runtime.txt -r requirements-strict/tests.txt
-
 .common_test_template: &common_test_template
     # Tags define which runners will accept which jobs
     <<: 
@@ -301,11 +286,6 @@ stages:
     stage: 
         test
     
-    before_script:
-        - *_setup_virtualenv_template
-        - pip install .[tests]  
-        - pip install opencv-python-headless
-
     script: 
         - ./run_tests.py
 
@@ -324,6 +304,21 @@ stages:
     #    changes:
     #        - README.rst
     #        - CHANGELOG.md
+
+
+._install_strict_minimal_requirements: &_install_strict_minimal_requirements |-
+    mkdir -p requirements-strict
+    sed 's/>=/==/' requirements/runtime.txt > requirements-strict/runtime.txt
+    sed 's/>=/==/' requirements/tests.txt > requirements-strict/tests.txt
+    pip install -r requirements-strict/runtime.txt -r requirements-strict/tests.txt
+
+
+._install_strict_full_requirements: &_install_strict_full_requirements |-
+    mkdir -p requirements-strict
+    sed 's/>=/==/' requirements/optional.txt > requirements-strict/optional.txt
+    sed 's/>=/==/' requirements/runtime.txt > requirements-strict/runtime.txt
+    sed 's/>=/==/' requirements/tests.txt > requirements-strict/tests.txt
+    pip install -r requirements-strict/optional.txt -r requirements-strict/runtime.txt -r requirements-strict/tests.txt
 
 
 .test_minimal_strict_template: &test_minimal_strict_template
