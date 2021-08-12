@@ -482,24 +482,32 @@ test_full_loose/cp38-cp38-linux:
         - *test_full_loose_template
     image:
         *image_python38
+    needs: 
+        -  build/cp38-cp38-linux
 
 test_minimal_loose/cp38-cp38-linux:
     <<: 
         - *test_minimal_loose_template
     image:
         *image_python38
+    needs: 
+        -  build/cp38-cp38-linux
 
 test_full_strict/cp38-cp38-linux:
     <<: 
         - *test_full_strict_template
     image:
         *image_python38
+    needs: 
+        -  build/cp38-cp38-linux
 
 test_minimal_strict/cp38-cp38-linux:
     <<: 
         - *test_minimal_strict_template
     image:
         *image_python38
+    needs: 
+        -  build/cp38-cp38-linux
 
 # for universal builds we only need to gpg sign once
 gpgsign/cp38-cp38-linux:
@@ -530,24 +538,32 @@ test_full_loose/cp37-cp37-linux:
         - *test_full_loose_template
     image:
         *image_python37
+    needs: 
+        -  build/cp37-cp37-linux
 
 test_minimal_loose/cp37-cp37-linux:
     <<: 
         - *test_minimal_loose_template
     image:
         *image_python37
+    needs: 
+        -  build/cp37-cp37-linux
 
 test_full_strict/cp37-cp37-linux:
     <<: 
         - *test_full_strict_template
     image:
         *image_python37
+    needs: 
+        -  build/cp37-cp37-linux
 
 test_minimal_strict/cp37-cp37-linux:
     <<: 
         - *test_minimal_strict_template
     image:
         *image_python37
+    needs: 
+        -  build/cp37-cp37-linux
 
 
 # ---------------
@@ -565,21 +581,29 @@ test_full_loose/cp36-cp36m-linux:
         - *test_full_loose_template
     image:
         *image_python36
+    needs: 
+        -  build/cp36-cp36m-linux
 
 test_minimal_loose/cp36-cp36m-linux:
     <<: 
         - *test_minimal_loose_template
     image:
         *image_python36
+    needs: 
+        -  build/cp36-cp36m-linux
 
 test_full_strict/cp36-cp36m-linux:
     <<: 
         - *test_full_strict_template
     image:
         *image_python36
+    needs: 
+        -  build/cp36-cp36m-linux
 
 test_minimal_strict/cp36-cp36m-linux:
     <<: 
         - *test_minimal_strict_template
     image:
         *image_python36
+    needs: 
+        -  build/cp36-cp36m-linux
