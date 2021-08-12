@@ -11,7 +11,7 @@ Welcome to kwcoco's documentation!
 ==================================
 
 
-If you are new, please see our :doc:`getting started document <getting_started.md>`. 
+If you are new, please see our getting started document: :doc:`getting_started <getting_started>` 
 
 
 .. The __init__ files contains the top-level documentation overview

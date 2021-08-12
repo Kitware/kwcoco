@@ -1,13 +1,21 @@
-ubelt >= 0.9.3
-parse >= 1.12.0
-scriptconfig >= 0.5.8
-kwarray >= 0.5.16
-kwimage >= 0.6.6
-six >= 1.11.0
-numpy >= 1.9.0
-scikit-learn >= 0.24.0
-sortedcontainers >= 2.3.0
-pandas >= 1.1.4
 jsonschema >= 3.2.0
+kwarray >= 0.5.19
+kwimage >= 0.7.11
+
+networkx >= 2.2.0            ;                              python_version >= '3.7.0'   # Python 3.7+
+networkx >= 2.2.0, <= 2.5.1  ; python_version < '3.7.0' and python_version >= '3.6.0'   # Python 3.6
+networkx >= 2.2.0, <= 2.4.0  ; python_version < '3.7.0' and python_version >= '3.6.0'   # Python 3.5
+
+numpy >= 1.19.2   # tensorflow minimum
+#numpy >= 1.20.0
+
+pandas >= 1.1.4
+parse >= 1.12.0
+scikit-learn >= 0.24.0
+scipy>=1.5.4
+scriptconfig >= 0.5.8
+six >= 1.11.0
+sortedcontainers >= 2.3.0
+ubelt >= 0.9.5
 uritools >= 3.0.0
 xarray >= 0.16.0

@@ -334,12 +334,21 @@ class COCO(CocoDataset):
         Convert annotation which can be polygons, uncompressed RLE to RLE.
         :return: binary mask (numpy 2D array)
 
+        Notes:
+            * This requires the C-extensions for kwimage to be installed
+              due to the need to interface with the bytes RLE format.
+
         Example:
             >>> from kwcoco.compat_dataset import *  # NOQA
             >>> import kwcoco
             >>> self = COCO(kwcoco.CocoDataset.demo('shapes8').dataset)
-            >>> rle = self.annToRLE(self.anns[1])
-            >>> assert len(rle['counts']) > 2
+            >>> try:
+            >>>     rle = self.annToRLE(self.anns[1])
+            >>> except NotImplementedError:
+            >>>     import pytest
+            >>>     pytest.skip('missing kwimage c-extensions')
+            >>> else:
+            >>>     assert len(rle['counts']) > 2
             >>> # xdoctest: +REQUIRES(module:pycocotools)
             >>> self.conform(legacy=True)
             >>> orig = self._aspycoco().annToRLE(self.anns[1])
@@ -352,7 +361,12 @@ class COCO(CocoDataset):
         data = ann['segmentation']
         dims = (h, w)
         sseg = _coerce_coco_segmentation(data, dims)
-        rle = sseg.to_mask(dims=dims).to_bytes_rle().data
+        try:
+            rle = sseg.to_mask(dims=dims).to_bytes_rle().data
+        except NotImplementedError:
+            raise NotImplementedError((
+                'kwimage does not seem to have required '
+                'c-extensions for bytes RLE'))
         return rle
 
     def annToMask(self, ann):

@@ -3,23 +3,27 @@ import ubelt as ub
 
 dset = kwcoco.CocoDataset.demo()
 
-groups = ub.ddict(list)
-groups['classmethod'] = []
-groups['slots'] = []
-groups['property'] = []
+groups = ub.ddict(lambda: ub.ddict(list))
+groups['classmethods'] = ub.ddict(list)
+groups['slots'] = ub.ddict(list)
+groups['properties'] = ub.ddict(list)
+groups['methods'] = ub.ddict(list)
 
 for key in dset.__dict__.keys():
+    method_definer = None
     if key.startswith('_'):
         pass
     else:
-        groups['slots'].append(key)
+        groups['slots'][method_definer].append(key)
+
 for key in dir(dset):
     if key.startswith('_'):
         continue
 
-    if key in groups['slots']:
+    if key in groups['slots'][None]:
         continue
 
+    method_definer = None
     cls_val = getattr(kwcoco.CocoDataset, key, ub.NoParam)
     self_val = getattr(dset, key)
 
@@ -28,10 +32,13 @@ for key in dir(dset):
     if cls_val is ub.NoParam:
         heuristic = 'unknown'
     elif hasattr(cls_val, 'fset'):
-        heuristic = 'property'
+        heuristic = 'properties'
     elif callable(cls_val) and callable(self_val):
         if self_val.__self__ is kwcoco.CocoDataset:
-            heuristic = 'classmethod'
+            cands = [cls for cls in kwcoco.CocoDataset.__mro__ if hasattr(cls, key)]
+            method_definer = cands[-1].__name__.split('.')[-1]
+            heuristic = 'method (via {})'.format(method_definer)
+            heuristic = 'classmethods'
         elif inspect.ismethod(self_val):
             self_val.__func__
             self_val.__doc__
@@ -39,15 +46,70 @@ for key in dir(dset):
             self_val.__name__
             cands = [cls for cls in kwcoco.CocoDataset.__mro__ if hasattr(cls, key)]
             method_definer = cands[-1].__name__.split('.')[-1]
-            heuristic = 'method(via {})'.format(method_definer)
+            heuristic = 'methods'
         else:
             heuristic = 'callable'
     else:
         heuristic = None
-    groups[heuristic].append(key)
+    groups[heuristic][method_definer].append(key)
 
 print('For Reference, the following are grouped attributes/methods of a kwcoco.CocoDataset')
-print('{}'.format(ub.repr2(groups, sort=0, nl=2)))
+print('{}'.format(ub.repr2(groups, sort=0, nl=3)))
+
+# Try and make a nice RTD RST style
+
+autogen = []
+aprint = autogen.append
+
+aprint('CocoDataset API')
+aprint('###############')
+aprint('')
+aprint(ub.paragraph(
+    '''
+    The following is a logical grouping of the public kwcoco.CocoDataset API
+    attributes and methods.  See the in-code documentation for further details.
+    '''))
+
+for group, def_to_items in groups.items():
+
+    for definer, items in def_to_items.items():
+
+        aprint('')
+        subtitle = 'CocoDataset ' + group
+        if definer is not None:
+            subtitle = subtitle + ' (via {})'.format(definer)
+
+        aprint(subtitle)
+        aprint('*' * len(subtitle))
+        aprint('')
+
+        if definer is None:
+            definer = 'CocoDataset'
+
+        for item in items:
+            try:
+                doclines = []
+                for line in getattr(kwcoco.CocoDataset, item).__doc__.split('\n')[1:]:
+                    line = line.strip()
+                    if not line:
+                        break
+                    doclines.append(line)
+                docline = ' '.join(doclines)
+                if docline.startswith('Example'):
+                    docline = ''
+            except Exception:
+                docline = ''
+            if group in {'slots', 'properties'}:
+                reffer = ':attr:'
+            else:
+                reffer = ':func:'
+
+            # https://sublime-and-sphinx-guide.readthedocs.io/en/latest/references.html
+            # https://www.sphinx-doc.org/en/master/usage/restructuredtext/domains.html#cross-referencing-python-objects
+            line = f' * {reffer}`.CocoDataset.{item}<kwcoco.coco_dataset.{definer}.{item}>` - {docline}'
+            aprint(line)
+
+print('\n'.join(autogen))
 
 
 # import redbaron

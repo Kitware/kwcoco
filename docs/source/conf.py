@@ -82,7 +82,7 @@ def parse_version(fpath):
 
 project = 'kwcoco'
 modname = project
-copyright = '2020, Kitware Inc'
+copyright = '2021, Kitware Inc'
 author = 'Jon Crall'
 
 modpath = join(dirname(dirname(dirname(__file__))), 'kwcoco', '__init__.py')

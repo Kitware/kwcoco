@@ -275,8 +275,11 @@ class CategoryPatterns(object):
             kpts = kpts.translate(xy_offset, output_dims=dims)
 
         if not newstyle:
-            segmentation = segmentation.to_mask().to_bytes_rle()
-            segmentation.data['counts'] = segmentation.data['counts'].decode('utf8')
+            try:
+                segmentation = segmentation.to_mask().to_bytes_rle()
+                segmentation.data['counts'] = segmentation.data['counts'].decode('utf8')
+            except Exception:
+                segmentation = segmentation.to_mask().to_array_rle()
 
         if newstyle:
             segmentation = segmentation.to_coco('new')

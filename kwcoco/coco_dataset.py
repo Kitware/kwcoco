@@ -1007,7 +1007,7 @@ class MixinCocoExtras(object):
                 :func:`demodata_toy_dset` and :func:`random_video_dset`.
 
         Kwargs:
-            gsize (Tuple): size of the images
+            image_size (Tuple[int, int]): width / height size of the images
 
             dpath (str): path to the output image directory, defaults to using
                 kwcoco cache dir.
@@ -1110,7 +1110,7 @@ class MixinCocoExtras(object):
                 'num_videos': 1,
                 'num_frames': 2,
                 'anchors': None,
-                'gsize': (600, 600),
+                'image_size': (600, 600),
                 'aux': None,
                 'multispectral': None,
             }
@@ -2035,7 +2035,7 @@ class MixinCocoObjects(object):
     This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
-    def annots(self, aids=None, gid=None):
+    def annots(self, aids=None, gid=None, trackid=None):
         """
         Return vectorized annotation objects
 
@@ -2044,7 +2044,10 @@ class MixinCocoObjects(object):
                  all annotations are returned.
 
             gid (int): return all annotations that belong to this image id.
-                 mutually exclusive with `aids` arg.
+                 mutually exclusive with other arguments.
+
+            trackid (int): return all annotations that belong to this track.
+                 mutually exclusive with other arguments.
 
         Returns:
             Annots: vectorized annotation object
@@ -2065,13 +2068,18 @@ class MixinCocoObjects(object):
                 None,
             ]
         """
-        if aids is None and gid is not None:
+        if gid is not None:
             aids = sorted(self.index.gid_to_aids[gid])
+
+        if trackid is not None:
+            aids = self.index.trackid_to_aids[trackid]
+
         if aids is None:
             aids = sorted(self.index.anns.keys())
+
         return Annots(aids, self)
 
-    def images(self, gids=None):
+    def images(self, gids=None, vidid=None):
         """
         Return vectorized image objects
 
@@ -2079,25 +2087,48 @@ class MixinCocoObjects(object):
             gids (List[int]): image ids to reference, if unspecified
                  all images are returned.
 
+            vidid (int): returns all images that belong to this video id.
+                mutually exclusive with `gids` arg.
+
         Returns:
-            Images: vectorized images object
+            Images: vectorized image object
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> images = self.images()
             >>> print(images)
             <Images(num=3)>
+
+            >>> self = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> vidid = 1
+            >>> images = self.images(vidid=vidid)
+            >>> assert all(v == vidid for v in images.lookup('video_id'))
+            >>> print(images)
+            <Images(num=2)>
         """
+        if vidid is not None:
+            gids = self.index.vidid_to_gids[vidid]
+
         if gids is None:
             gids = sorted(self.index.imgs.keys())
+
         return Images(gids, self)
 
     def categories(self, cids=None):
         """
         Return vectorized category objects
 
+        Args:
+            cids (List[int]): category ids to reference, if unspecified
+                 all categories are returned.
+
+        Returns:
+            Categories: vectorized category object
+
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> categories = self.categories()
             >>> print(categories)
             <Categories(num=8)>
@@ -2110,6 +2141,13 @@ class MixinCocoObjects(object):
         """
         Return vectorized video objects
 
+        Args:
+            vidids (List[int]): video ids to reference, if unspecified
+                 all videos are returned.
+
+        Returns:
+            Videos: vectorized video object
+
         TODO:
             - [ ] This conflicts with what should be the property that
                 should redirect to ``index.videos``, we should resolve this
@@ -2118,7 +2156,8 @@ class MixinCocoObjects(object):
                 videos because the name we would pick conflicts with this.
 
         Example:
-            >>> self = CocoDataset.demo('vidshapes2')
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes2')
             >>> videos = self.videos()
             >>> print(videos)
             >>> videos.lookup('name')
@@ -3487,7 +3526,7 @@ class MixinCocoAddRemove(object):
             >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
             >>> #--
             >>> kw = {}
-            >>> kw['segmentation'] = kwimage.Mask.random().to_bytes_rle()
+            >>> kw['segmentation'] = kwimage.Mask.random().to_array_rle()
             >>> aid = self.add_annotation(image_id, **kw)
             >>> ann = self.index.anns[aid]
             >>> assert ann.get('segmentation', None) is not None

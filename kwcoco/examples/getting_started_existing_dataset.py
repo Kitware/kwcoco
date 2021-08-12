@@ -37,8 +37,10 @@ def the_core_dataset_backend():
     for img in dset.dataset['images']:
         img.pop('channels', None)
 
-    dset.reroot(dirname(dset.fpath), absolute=False)
+    from os.path import dirname
+    import ubelt as ub
     import kwarray
+    dset.reroot(dirname(dset.fpath), absolute=False)
     dset.remove_annotations(kwarray.shuffle(list(dset.anns.keys()))[10:])
 
     print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
@@ -53,14 +55,15 @@ def demo_vectorize_interface():
     >>> #
     >>> aids = [1, 2, 3, 4]
     >>> annots = dset.annots(aids)
+    ...
     >>> print('annots = {!r}'.format(annots))
-    annots = <Annots(num=4) at 0x7fd8aff78d00>
+    annots = <Annots(num=4) at ...>
 
     >>> annots.lookup('bbox')
-    [[223.7, -136.6, 333.7, 319.1],
-     [232.3, -130.0, 327.8, 310.1],
-     [347.6, 127.3, 36.8, 117.9],
-     [343.5, 119.1, 38.6, 124.2]]
+    [[346.5, 335.2, 33.2, 99.4],
+     [344.5, 327.7, 48.8, 111.1],
+     [548.0, 154.4, 57.2, 62.1],
+     [548.7, 151.0, 59.4, 80.5]]
 
     >>> gids = annots.lookup('image_id')
     >>> print('gids = {!r}'.format(gids))
