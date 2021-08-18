@@ -370,7 +370,7 @@ class DelayedIdentity(DelayedImageOperation):
 
     def finalize(self):
         final = self.sub_data
-        final = kwarray.atleast_nd(final, 3)
+        final = kwarray.atleast_nd(final, 3, front=False)
         return final
 
 
@@ -830,6 +830,23 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
         >>> # import kwplot
         >>> # kwplot.imshow(self[:])
+
+    Example:
+        >>> # See if we can reproduce the INTERLEAVE bug
+
+        data = np.random.rand(128, 128, 64)
+        import kwimage
+        fpath = 'foo.tiff'
+        kwimage.imwrite(fpath, data, backend='skimage')
+        recon1 = kwimage.imread(fpath)
+        recon1.shape
+
+        self = LazyGDalFrameFile(fpath)
+        self.shape
+        self[:]
+
+
+
     """
     def __init__(self, fpath):
         self.fpath = fpath
@@ -869,6 +886,23 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
     @property
     def shape(self):
+        # if 0:
+        #     ds = self.ds
+        #     INTERLEAVE = ds.GetMetadata('IMAGE_STRUCTURE').get('INTERLEAVE', '')  # handle INTERLEAVE=BAND
+        #     if INTERLEAVE == 'BAND':
+        #         pass
+        #     ds.GetMetadata('')  # handle TIFFTAG_IMAGEDESCRIPTION
+        #     from osgeo import gdal
+        #     subdataset_infos = ds.GetSubDatasets()
+        #     subdatasets = []
+        #     for subinfo in subdataset_infos:
+        #         path = subinfo[0]
+        #         sub_ds = gdal.Open(path, gdal.GA_ReadOnly)
+        #         subdatasets.append(sub_ds)
+        #     for sub in subdatasets:
+        #         sub.ReadAsArray()
+        #         print((sub.RasterXSize, sub.RasterYSize, sub.RasterCount))
+        #     sub = subdatasets[0][0]
         ds = self._ds
         width = ds.RasterXSize
         height = ds.RasterYSize
@@ -903,6 +937,12 @@ class LazyGDalFrameFile(ub.NiceRepr):
         width = ds.RasterXSize
         height = ds.RasterYSize
         C = ds.RasterCount
+
+        if 1:
+            INTERLEAVE = ds.GetMetadata('IMAGE_STRUCTURE').get('INTERLEAVE', '')
+            if INTERLEAVE == 'BAND':
+                if len(ds.GetSubDatasets()) > 0:
+                    raise NotImplementedError('Cannot handle interleaved files yet')
 
         if not ub.iterable(index):
             index = [index]
