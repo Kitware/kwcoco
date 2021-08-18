@@ -3499,7 +3499,6 @@ class MixinCocoAddRemove(object):
             assert bbox is ub.NoParam
 
         if kwimage is not None and hasattr(keypoints, 'to_coco'):
-            ub.peek(kwimage.Boxes.random(1).to_coco())
             ann['keypoints'] = keypoints.to_coco(style='new')
         elif keypoints is not ub.NoParam:
             ann['keypoints'] = keypoints
@@ -3513,9 +3512,9 @@ class MixinCocoAddRemove(object):
         else:
             assert segmentation is ub.NoParam
 
+        ann.update(**kw)
         track_id = ann.get('track_id', None)
 
-        ann.update(**kw)
         self.dataset['annotations'].append(ann)
         self.index._add_annotation(id, image_id, category_id, track_id, ann)
         self._invalidate_hashid(['annotations'])

@@ -8,8 +8,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.10 - Unreleased
 
 
-### Added
+### Fixed
+* Fixed bug when `track_id` is given to `add_annotation`
 
+### Added
 * Can now specify `-frames{num}` in demo names to control number of frames in each video
 
 
@@ -29,7 +31,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
-* `perterb_coco` now correctly perterbs segmentations
+* `perterb_coco` now correctly perturbs segmentations
 
 ### Changed
 
@@ -50,7 +52,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 
 * Made URIs for CocoSQLDataset slightly more robust
-* kwcoco show now defaults show_labels to False
+* kwcoco show now defaults `show_labels` to False
 
 
 ## Version 0.2.7 - Released 2021-06-28
