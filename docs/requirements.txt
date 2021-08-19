@@ -6,3 +6,4 @@ sphinx-autoapi
 six
 Pygments
 ubelt
+myst_parser
