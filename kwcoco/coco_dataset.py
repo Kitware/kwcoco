@@ -1769,7 +1769,7 @@ class MixinCocoExtras(object):
             smart (bool, default=False):
                 If True, we can try different reroot strategies and choose the
                 one that works. Note, always be wary when algorithms try to be
-                smart.
+                smart. NOT IMPLEMENTED. DEPRECATE or TODO?
 
         CommandLine:
             xdoctest -m kwcoco.coco_dataset MixinCocoExtras.reroot
