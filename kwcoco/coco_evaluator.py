@@ -45,6 +45,7 @@ Example:
     >>> print('results_fpath = {!r}'.format(results_fpath))
     >>> results.dump(results_fpath, indent='    ')
     >>> measures = results['area_range=all,iou_thresh=0.3'].nocls_measures
+    >>> import pandas as pd
     >>> print(pd.DataFrame(ub.dict_isect(
     >>>     measures, ['f1', 'g1', 'mcc', 'thresholds',
     >>>                'ppv', 'tpr', 'tnr', 'npv', 'fpr',
