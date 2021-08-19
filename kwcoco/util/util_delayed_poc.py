@@ -43,6 +43,7 @@ Conventions:
         time dimension to the shape. dsize is still width, height, but shape
         is now: (time, height, width, chan)
 
+
 Example:
     >>> # Example demonstrating the modivating use case
     >>> # We have multiple aligned frames for a video, but each of
@@ -107,6 +108,79 @@ Example:
     >>> subdata = msi_crop.delayed_warp(kwimage.Affine.scale(3), dsize='auto').take_channels('B11|B1')
     >>> subdata.finalize()
 
+
+Example:
+    >>> # test case where an auxiliary image does not map entirely on the image.
+    >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+    >>> import kwimage
+    >>> from os.path import join
+    >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/delayed_poc')
+    >>> chan1_fpath = join(dpath, 'chan1.tiff')
+    >>> chan2_fpath = join(dpath, 'chan2.tiff')
+    >>> chan3_fpath = join(dpath, 'chan2.tiff')
+    >>> chan1_raw = np.random.rand(128, 128, 1)
+    >>> chan2_raw = np.random.rand(64, 64, 1)
+    >>> chan3_raw = np.random.rand(256, 256, 1)
+    >>> kwimage.imwrite(chan1_fpath, chan1_raw)
+    >>> kwimage.imwrite(chan2_fpath, chan2_raw)
+    >>> kwimage.imwrite(chan3_fpath, chan3_raw)
+    >>> #
+    >>> c1 = channel_spec.FusedChannelSpec.coerce('c1')
+    >>> c2 = channel_spec.FusedChannelSpec.coerce('c2')
+    >>> c3 = channel_spec.FusedChannelSpec.coerce('c2')
+    >>> aux1 = DelayedLoad(chan1_fpath, dsize=chan1_raw.shape[0:2][::-1], channels=c1, num_bands=1)
+    >>> aux2 = DelayedLoad(chan2_fpath, dsize=chan2_raw.shape[0:2][::-1], channels=c2, num_bands=1)
+    >>> aux3 = DelayedLoad(chan3_fpath, dsize=chan3_raw.shape[0:2][::-1], channels=c3, num_bands=1)
+    >>> #
+    >>> img_dsize = (128, 128)
+    >>> transform1 = kwimage.Affine.coerce(scale=0.5)
+    >>> transform2 = kwimage.Affine.coerce(theta=0.5, shear=0.01, offset=(-20, -40))
+    >>> transform3 = kwimage.Affine.coerce(offset=(64, 0)) @ kwimage.Affine.random(rng=10)
+    >>> part1 = aux1.delayed_warp(np.eye(3), dsize=img_dsize)
+    >>> part2 = aux2.delayed_warp(transform2, dsize=img_dsize)
+    >>> part3 = aux3.delayed_warp(transform3, dsize=img_dsize)
+    >>> delayed = DelayedChannelConcat([part1, part2, part3])
+    >>> #
+    >>> delayed_crop = delayed.crop((slice(0, 10), slice(0, 10)))
+    >>> delayed_final = delayed_crop.finalize()
+    >>> # xdoctest: +REQUIRES(--show)
+    >>> import kwplot
+    >>> kwplot.autompl()
+    >>> final = delayed.finalize()
+    >>> kwplot.imshow(final, fnum=1, pnum=(1, 2, 1))
+    >>> kwplot.imshow(delayed_final, fnum=1, pnum=(1, 2, 2))
+
+
+    comp = delayed_crop.components[2]
+
+    comp.sub_data.finalize()
+
+    data = np.array([[0]]).astype(np.float32)
+    kwimage.warp_affine(data, np.eye(3), dsize=(32, 32))
+    kwimage.warp_affine(data, np.eye(3))
+
+    kwimage.warp_affine(data[0:0], np.eye(3))
+
+    transform = kwimage.Affine.coerce(scale=0.1)
+    data = np.array([[0]]).astype(np.float32)
+
+    data = np.array([[]]).astype(np.float32)
+    kwimage.warp_affine(data, transform, dsize=(0, 2), antialias=True)
+
+    data = np.array([[]]).astype(np.float32)
+    kwimage.warp_affine(data, transform, dsize=(10, 10))
+
+    data = np.array([[0]]).astype(np.float32)
+    kwimage.warp_affine(data, transform, dsize=(0, 2), antialias=True)
+
+    data = np.array([[0]]).astype(np.float32)
+    kwimage.warp_affine(data, transform, dsize=(10, 10))
+
+    cv2.warpAffine(
+        kwimage.grab_test_image(dsize=(1, 1)),
+        kwimage.Affine.coerce(scale=0.1).matrix[0:2],
+        dsize=(0, 1),
+    )
 """
 import ubelt as ub
 import numpy as np
@@ -836,7 +910,10 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
         data = np.random.rand(128, 128, 64)
         import kwimage
-        fpath = 'foo.tiff'
+        import ubelt as ub
+        from os.path import join
+        dpath = ub.ensure_app_cache_dir('kwcoco/tests/reader')
+        fpath = join(dpath, 'foo.tiff')
         kwimage.imwrite(fpath, data, backend='skimage')
         recon1 = kwimage.imread(fpath)
         recon1.shape
