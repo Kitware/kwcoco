@@ -53,6 +53,7 @@ Python, this data structure is reasonably efficient.
         >>> self.remove_categories([cid])
 
         >>> # Look at data
+        >>> import ubelt as ub
         >>> print(ub.repr2(self.basic_stats(), nl=1))
         >>> print(ub.repr2(self.extended_stats(), nl=2))
         >>> print(ub.repr2(self.boxsize_stats(), nl=3))
