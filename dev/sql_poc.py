@@ -351,8 +351,7 @@ def main():
         table_df = self.raw_table(key)
         print(table_df)
 
-    from kwcoco.util.util_futures import JobPool
-    pool = JobPool(mode='process', max_workers=2)
+    pool = ub.JobPool(mode='process', max_workers=2)
 
     job1 = pool.submit(test_sql_worker, self)
     job2 = pool.submit(test_sql_worker, self)

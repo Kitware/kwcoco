@@ -1131,8 +1131,7 @@ def _load_dets(pred_fpaths, workers=0):
     """
     # Process mode is much faster than thread.
     import kwcoco
-    from kwcoco.util import util_futures
-    jobs = util_futures.JobPool(mode='process', max_workers=workers)
+    jobs = ub.JobPool(mode='process', max_workers=workers)
     for single_pred_fpath in ub.ProgIter(pred_fpaths, desc='submit load dets jobs'):
         job = jobs.submit(_load_dets_worker, single_pred_fpath, with_coco=True)
     results = []

@@ -1415,14 +1415,12 @@ class MixinCocoExtras(object):
         if any('width' not in img or 'height' not in img
                for img in self.dataset['images']):
             import kwimage
-            from kwcoco.util import util_futures
-
             if self.tag:
                 desc = 'populate imgsize for ' + self.tag
             else:
                 desc = 'populate imgsize for untagged coco dataset'
 
-            pool = util_futures.JobPool('thread', max_workers=workers)
+            pool = ub.JobPool('thread', max_workers=workers)
             for img in ub.ProgIter(self.dataset['images'], verbose=verbose,
                                    desc='submit image size jobs'):
                 gpath = join(self.bundle_dpath, img['file_name'])
@@ -4936,8 +4934,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 list if it fails.
         """
         # Can this be done better with asyncio?
-        from kwcoco.util import util_futures
-        jobs = util_futures.JobPool(mode, max_workers=max_workers)
+        jobs = ub.JobPool(mode, max_workers=max_workers)
         for fpath in ub.ProgIter(fpaths, desc='submit load coco jobs', verbose=verbose):
             jobs.submit(CocoDataset, fpath, autobuild=False)
         results = [f.result() for f in ub.ProgIter(jobs.as_completed(),

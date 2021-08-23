@@ -249,10 +249,8 @@ class DetectionMetrics(ub.NiceRepr):
                 except ValueError:
                     pass
 
-        from kwcoco.util import util_futures
         workers = 0
-        jobs = util_futures.JobPool(mode='process', max_workers=workers)
-
+        jobs = ub.JobPool(mode='process', max_workers=workers)
         for gid in ub.ProgIter(gids, desc='submit assign jobs',
                                verbose=verbose):
             true_dets = dmet.true_detections(gid)
