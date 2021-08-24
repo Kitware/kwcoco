@@ -427,14 +427,16 @@ class MixinCocoAccessors(object):
 
         if len(chan_list) == 0:
             raise ValueError('no data')
-        elif len(chan_list) == 1:
-            delayed = chan_list[0]
         else:
             delayed = DelayedChannelConcat(chan_list)
 
         # Reorder channels in the requested order
         if requested is not None:
             delayed = delayed.take_channels(requested)
+
+        if hasattr(delayed, 'components'):
+            if len(delayed.components) == 1:
+                delayed = delayed.components[0]
 
         if space == 'image':
             # Image space is the default

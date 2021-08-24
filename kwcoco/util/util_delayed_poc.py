@@ -818,6 +818,10 @@ class DelayedLoad(DelayedImageOperation):
             DelayedLoad:
                 a new delayed load with a fused take channel operation
 
+        Note:
+            The channel subset must exist here or it will raise an error.
+            A better implementation (via pymbolic) might be able to do better
+
         Example:
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> import kwcoco
