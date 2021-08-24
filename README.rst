@@ -66,30 +66,29 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 
 .. code:: 
 
-    usage: kwcoco [-h] [--version] {stats,union,split,show,reroot,toydata,conform,eval,modify_categories,validate,subset} ...
+    usage: kwcoco [-h] [--version] {stats,union,split,show,toydata,eval,conform,modify_categories,reroot,validate,subset,grab} ...
 
     The Kitware COCO CLI
 
     positional arguments:
-      {stats,union,split,show,reroot,toydata,conform,eval,modify_categories,validate,subset}
+      {stats,union,split,show,toydata,eval,conform,modify_categories,reroot,validate,subset,grab}
                             specify a command to run
         stats               Compute summary statistics about a COCO dataset
         union               Combine multiple COCO datasets into a single merged dataset.
         split               Split a single COCO dataset into two sub-datasets.
-        show                Visualize a COCO image using matplotlib or opencv, optionally writing it to disk
-        reroot              Reroot image paths onto a new image root.
+        show                Visualize a COCO image using matplotlib or opencv, optionally writing
         toydata             Create COCO toydata
-        conform             Make the COCO file conform to the spec. Populates inferable information such as image size, annotation area, etc.
         eval                Evaluate detection metrics using a predicted and truth coco file.
+        conform             Make the COCO file conform to the spec.
         modify_categories   Rename or remove categories
-        validate            Validate that a coco file conforms to the json schema, that assets exist, and potentially fix corrupted assets by removing
-                            them.
+        reroot              Reroot image paths onto a new image root.
+        validate            Validate that a coco file conforms to the json schema, that assets
         subset              Take a subset of this dataset and write it to a new file
+        grab                Grab standard datasets.
 
     optional arguments:
       -h, --help            show this help message and exit
       --version             show version number and exit (default: False)
-
 
 
 This should help you inspect (via stats and show), combine (via union), and
