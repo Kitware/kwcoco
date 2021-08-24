@@ -47,7 +47,7 @@ class CocoRerootCLI:
 
     @classmethod
     def main(cls, cmdline=True, **kw):
-        """
+        r"""
         Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}

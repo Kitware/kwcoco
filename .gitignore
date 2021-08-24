@@ -94,3 +94,5 @@ ENV/
 profile_output.*
 _skbuild
 pip-wheel-metadata/
+
+docs/source/autoapi/

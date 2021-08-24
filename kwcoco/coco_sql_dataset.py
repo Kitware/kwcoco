@@ -50,14 +50,14 @@ There are a few questions I still have if anyone has insight:
 
     * Say I want to select a subset of K rows from a table with N entries,
       and I have a list of all of the rowids that I want. Is there any
-      way to do this better than `O(K log(N))`? I tried using a
-      `SELECT col FROM table WHERE id IN (?, ?, ?, ?, ...)` filling in
+      way to do this better than ``O(K log(N))``? I tried using a
+      ``SELECT col FROM table WHERE id IN (?, ?, ?, ?, ...)`` filling in
       enough `?` as there are rows in my subset. I'm not sure what the
       complexity of using a query like this is. I'm not sure what the `IN`
       implementation looks like. Can this be done more efficiently by
-      with a temporary table and a `JOIN`?
+      with a temporary table and a ``JOIN``?
 
-    * There really is no way to do `O(1)` row lookup in sqlite right?
+    * There really is no way to do ``O(1)`` row lookup in sqlite right?
       Is there a way in PostgreSQL or some other backend sqlalchemy
       supports?
 
@@ -172,7 +172,7 @@ class Annotation(CocoBase):
     _bbox_y = Column(Float)
     _bbox_w = Column(Float)
     _bbox_h = Column(Float)
-    weight = Column(Float)
+    # weight = Column(Float)
 
     score = Column(Float)
     weight = Column(Float)
@@ -338,7 +338,7 @@ class SqlDictProxy(DictLike):
     The key is specified by an indexed column (by default it is the `id`
     column). The values are dictionaries containing all data for that row.
 
-    Notes:
+    Note:
         With SQLite indexes are B-Trees so lookup is O(log(N)) and not O(1) as
         will regular dictionaries. Iteration should still be O(N), but
         databases have much more overhead than Python dictionaries.
@@ -1023,7 +1023,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
     an SQL backend data store. This makes it robust to copy-on-write memory
     issues that arise when forking, as discussed in [1]_.
 
-    Notes:
+    Note:
         By default constructing an instance of the CocoSqlDatabase does not
         create a connection to the databse. Use the :func:`connect` method to
         open a connection.

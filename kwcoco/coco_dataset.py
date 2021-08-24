@@ -6,7 +6,7 @@ Extends the format to also include line annotations.
 
 The following describes psuedo-code for the high level spec (some of which may
 not be have full support in the Python API). A formal json-schema is defined in
-:module:`kwcoco.coco_schema.py`.
+:mod:`kwcoco.coco_schema`.
 
 An informal spec is as follows:
 
@@ -226,8 +226,8 @@ An informal spec is as follows:
 
 
 
-Notes:
-    The main object in this file is class:`CocoDataset`, which is composed of
+Note:
+    The main object in this file is :class:`CocoDataset`, which is composed of
     several mixin classes. See the class and method documentation for more
     details.
 
@@ -366,6 +366,10 @@ class MixinCocoAccessors(object):
             >>> delayed = self.delayed_load(gid, channels='B8|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
+
+            >>> delayed = self.delayed_load(gid, channels='B8|foo|bar|B1', space='video')
+            >>> print('delayed = {!r}'.format(delayed))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
         """
         from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedChannelConcat
         from kwimage.transform import Affine
@@ -427,6 +431,9 @@ class MixinCocoAccessors(object):
             delayed = chan_list[0]
         else:
             delayed = DelayedChannelConcat(chan_list)
+
+        # Reorder channels in the requested order
+        delayed = delayed.take_channels(requested)
 
         if space == 'image':
             # Image space is the default
@@ -573,8 +580,11 @@ class MixinCocoAccessors(object):
         """
         Ensures output is an category id
 
-        Note: this does not resolve aliases (yet), for that see _alias_to_cat
-        Todo: we could maintain an alias index to make this fast
+        Note:
+            this does not resolve aliases (yet), for that see _alias_to_cat
+
+        TODO:
+            we could maintain an alias index to make this fast
         """
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
@@ -709,7 +719,7 @@ class MixinCocoAccessors(object):
         Raises:
             KeyError: if the category doesn't exist.
 
-        Notes:
+        Note:
             If the index is not built, the method will work but may be slow.
 
         Example:
@@ -749,7 +759,7 @@ class MixinCocoAccessors(object):
     def _alias_to_cat(self, alias_catname):
         """
         Lookup a coco-category via its name or an "alias" name.
-        In production code, use :method:`_resolve_to_cat` instead.
+        In production code, use :func:`_resolve_to_cat` instead.
 
         Args:
             alias_catname (str): category name or alias
@@ -802,9 +812,10 @@ class MixinCocoAccessors(object):
         Construct a networkx category hierarchy
 
         Returns:
-            network.DiGraph: graph: a directed graph where category names are
-                the nodes, supercategories define edges, and items in each
-                category dict (e.g. category id) are added as node properties.
+            networkx.DiGraph:
+                graph: a directed graph where category names are the nodes,
+                supercategories define edges, and items in each category dict
+                (e.g. category id) are added as node properties.
 
         Example:
             >>> self = CocoDataset.demo()
@@ -812,6 +823,7 @@ class MixinCocoAccessors(object):
             >>> assert 'astronaut' in graph.nodes()
             >>> assert 'keypoints' in graph.nodes['human']
 
+        Ignore:
             import graphid
             graphid.util.show_nx(graph)
         """
@@ -961,6 +973,8 @@ class MixinCocoExtras(object):
         import kwcoco
         if isinstance(key, cls):
             self = key
+        if isinstance(key, os.PathLike):
+            key = str(key)
         if isinstance(key, str):
             import uritools
             dset_fpath = ub.expandpath(key)
@@ -1775,9 +1789,6 @@ class MixinCocoExtras(object):
         TODO:
             - [ ] Incorporate maximum ordered subtree embedding?
 
-        Ignore:
-            See ~/code/kwcoco/dev/devcheck_reroot.py
-
         Example:
             >>> import kwcoco
             >>> def report(dset, name):
@@ -1819,6 +1830,9 @@ class MixinCocoExtras(object):
             >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
             >>> assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
+
+        Ignore:
+            See ~/code/kwcoco/dev/devcheck_reroot.py
         """
         new_img_root = new_root
         cur_img_root = self.bundle_dpath
@@ -2308,7 +2322,7 @@ class MixinCocoStats(object):
                 corrupted (List): List of any corrupted images
 
         SeeAlso:
-            :method:`_check_integrity` - performs internal checks
+            :func:`_check_integrity` - performs internal checks
 
         Example:
             >>> from kwcoco.coco_dataset import *
@@ -2411,7 +2425,7 @@ class MixinCocoStats(object):
         """
         Compute summary statistics to describe the dataset at a high level
 
-        This function corresponds to :module:`kwcoco.cli.coco_stats`.
+        This function corresponds to :mod:`kwcoco.cli.coco_stats`.
 
         KWargs:
             basic(bool, default=True): return basic stats'
@@ -3369,11 +3383,11 @@ class MixinCocoAddRemove(object):
             bbox (list | kwimage.Boxes): bounding box in xywh format
 
             segmentation (MaskLike | MultiPolygonLike): keypoints in some
-                accepted format, see :method:`kwimage.Mask.to_coco` and
-                :method:`kwimage.MultiPolygon.to_coco`.
+                accepted format, see :func:`kwimage.Mask.to_coco` and
+                :func:`kwimage.MultiPolygon.to_coco`.
 
             keypoints (KeypointsLike): keypoints in some accepted
-                format, see :method:`kwimage.Keypoints.to_coco`..
+                format, see :func:`kwimage.Keypoints.to_coco`.
 
             id (None | int): Force using this annotation id. Typically you
                 should NOT specify this. A new unused id will be chosen and
@@ -4591,41 +4605,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                   MixinCocoAccessors, MixinCocoExtras, MixinCocoIndex,
                   MixinCocoDepricate, ub.NiceRepr):
     """
-    Notes:
-        A keypoint annotation
-            {
-                "image_id" : int,
-                "category_id" : int,
-                "keypoints" : [x1,y1,v1,...,xk,yk,vk],
-                "score" : float,
-            }
-            Note that ``v[i]`` is a visibility flag, where v=0: not labeled,
-                v=1: labeled but not visible, and v=2: labeled and visible.
-
-        A bounding box annotation
-            {
-                "image_id" : int,
-                "category_id" : int,
-                "bbox" : [x,y,width,height],
-                "score" : float,
-            }
-
-        We also define a non-standard "line" annotation (which
-            our fixup scripts will interpret as the diameter of a circle to
-            convert into a bounding box)
-
-        A line* annotation (note this is a non-standard field)
-            {
-                "image_id" : int,
-                "category_id" : int,
-                "line" : [x1,y1,x2,y2],
-                "score" : float,
-            }
-
-        Lastly, note that our datasets will sometimes specify multiple bbox,
-        line, and/or, keypoints fields. In this case we may also specify a
-        field roi_shape, which denotes which field is the "main" annotation
-        type.
+    The main coco dataset class with a json dataset backend.
 
     Attributes:
         dataset (Dict): raw json data structure. This is the base dictionary
@@ -4659,11 +4639,69 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         python -m kwcoco.coco_dataset CocoDataset --show
 
     Example:
+        >>> from kwcoco.coco_dataset import demo_coco_data
+        >>> import kwcoco
+        >>> import ubelt as ub
+        >>> # Returns a coco json structure
         >>> dataset = demo_coco_data()
-        >>> self = CocoDataset(dataset, tag='demo')
+        >>> # Pass the coco json structure to the API
+        >>> self = kwcoco.CocoDataset(dataset, tag='demo')
+        >>> # Now you can access the data using the index and helper methods
+        >>> #
+        >>> # Start by looking up an image by it's COCO id.
+        >>> image_id = 1
+        >>> img = self.index.imgs[image_id]
+        >>> print(ub.repr2(img, nl=1))
+        {
+            'file_name': 'astro.png',
+            'id': 1,
+            'url': 'https://i.imgur.com/KXhKM72.png',
+        }
+        >>> #
+        >>> # Use the (gid_to_aids) index to lookup annotations in the iamge
+        >>> annotation_id = sorted(self.index.gid_to_aids[image_id])[0]
+        >>> ann = self.index.anns[annotation_id]
+        >>> print(ub.repr2(ub.dict_diff(, {'segmentation'}), nl=1))
+        {
+            'bbox': [10, 10, 360, 490],
+            'category_id': 1,
+            'id': 1,
+            'image_id': 1,
+            'keypoints': [247, 101, 2, 202, 100, 2],
+        }
+        >>> #
+        >>> # Use annotation category id to look up that information
+        >>> category_id = ann['category_id']
+        >>> cat = self.index.cats[category_id]
+        >>> print('cat = {}'.format(ub.repr2(cat, nl=1)))
+        cat = {
+            'id': 1,
+            'name': 'astronaut',
+            'supercategory': 'human',
+        }
+        >>> #
+        >>> # Now play with some helper functions, like extended statistics
+        >>> extended_stats = self.extended_stats()
+        >>> print('extended_stats = {}'.format(ub.repr2(extended_stats, nl=1, precision=2)))
+        extended_stats = {
+            'annots_per_img': {'mean': 3.67, 'std': 3.86, 'min': 0.00, 'max': 9.00, 'nMin': 1, 'nMax': 1, 'shape': (3,)},
+            'imgs_per_cat': {'mean': 0.88, 'std': 0.60, 'min': 0.00, 'max': 2.00, 'nMin': 2, 'nMax': 1, 'shape': (8,)},
+            'cats_per_img': {'mean': 2.33, 'std': 2.05, 'min': 0.00, 'max': 5.00, 'nMin': 1, 'nMax': 1, 'shape': (3,)},
+            'annots_per_cat': {'mean': 1.38, 'std': 1.49, 'min': 0.00, 'max': 5.00, 'nMin': 2, 'nMax': 1, 'shape': (8,)},
+            'imgs_per_video': {'empty_list': True},
+        }
+        >>> # You can "draw" a raster of the annotated image with cv2
+        >>> canvas = self.draw_image(2)
+        >>> # Or if you have matplotlib you can "show" the image with mpl objects
         >>> # xdoctest: +REQUIRES(--show)
         >>> from matplotlib import pyplot as plt
+        >>> fig = plt.figure()
+        >>> ax1 = fig.add_subplot(1, 2, 1)
         >>> self.show_image(gid=2)
+        >>> ax2 = fig.add_subplot(1, 2, 2)
+        >>> ax2.imshow(canvas)
+        >>> ax1.set_title('show with matplotlib')
+        >>> ax2.set_title('draw with cv2')
         >>> plt.show()
     """
 
@@ -4857,7 +4895,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     def _infer_dirs(self):
         """
-        Example:
+        Ignore:
             self = dset
         """
         data_fpath = self.fpath
@@ -4914,7 +4952,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         Loads multiple coco datasets and unions the result
 
-        Notes:
+        Note:
             if the union operation fails, the list of individually loaded files
             is returned instead.
 
@@ -4996,7 +5034,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             newlines (bool) :
                 if True, each annotation, image, category gets its own line
 
-        Notes:
+        Note:
             Using newlines=True is similar to:
                 print(ub.repr2(dset.dataset, nl=2, trailsep=False))
                 However, the above may not output valid json if it contains
@@ -5352,7 +5390,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             - [x] disambiguate track-ids
             - [x] disambiguate video-ids
         """
-        # Dev Notes:
+        # Dev Note:
         # See ~/misc/tests/python/test_multiarg_classmethod.py
         # for tests for how to correctly implement this method such that it can
         # behave as a method or a classmethod

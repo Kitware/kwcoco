@@ -1189,8 +1189,9 @@ class CocoEvalCLIConfig(scfg.Config):
 
 
 def main(cmdline=True, **kw):
-    """
-    TODO: should live in kwcoco.cli.coco_eval
+    r"""
+    TODO:
+        - [ ] should live in kwcoco.cli.coco_eval
 
     CommandLine:
 

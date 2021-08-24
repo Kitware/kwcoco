@@ -1,6 +1,8 @@
 """
 The ChannelSpec has these simple rules:
 
+.. code::
+
     * each 1D channel is a alphanumeric string.
 
     * The pipe ('|') separates aligned early fused stremas (non-communative)
@@ -19,8 +21,6 @@ TODO:
     - [X] : normalize representations? e.g: rgb = r|g|b? - OPTIONAL
     - [X] : rename to BandsSpec or SensorSpec? - REJECTED
     - [ ] : allow bands to be coerced, i.e. rgb -> gray, or gray->rgb
-
-
 """
 import ubelt as ub
 import six
@@ -33,7 +33,7 @@ class FusedChannelSpec(ub.NiceRepr):
 
     The channels in this stream are non-communative
 
-    Notes:
+    Note:
         This class name and API is in flux and subject to change.
 
     TODO:
@@ -251,10 +251,10 @@ class ChannelSpec(ub.NiceRepr):
     Parse and extract information about network input channel specs for
     early or late fusion networks.
 
-    Notes:
+    Note:
         This class name and API is in flux and subject to change.
 
-    Notes:
+    Note:
         The pipe ('|') character represents an early-fused input stream, and
         order matters (it is non-communative).
 
@@ -619,6 +619,7 @@ class ChannelSpec(ub.NiceRepr):
             >>>     with timer:
             >>>         inputs = self.encode(item, mode=1)
 
+        Ignore:
             import xdev
             _ = xdev.profile_now(self.encode)(item, mode=1)
         """
@@ -808,20 +809,21 @@ def _cached_single_fused_mapping(item_keys, parsed_items, axis=0):
 @functools.lru_cache(maxsize=None)
 def _cached_single_stream_idxs(key, axis=0):
     """
-    hack for speed
+    Ignore:
+        hack for speed
 
-    axis = 0
-    key = 'rgb|disparity'
+        axis = 0
+        key = 'rgb|disparity'
 
-    # xdoctest: +REQUIRES(--bench)
-    import timerit
-    ti = timerit.Timerit(100, bestof=10, verbose=2)
-    for timer in ti.reset('time'):
-        with timer:
-            _cached_single_stream_idxs(key, axis=axis)
-    for timer in ti.reset('time'):
-        with timer:
-            ChannelSpec(key).component_indices(axis=axis)
+        # xdoctest: +REQUIRES(--bench)
+        import timerit
+        ti = timerit.Timerit(100, bestof=10, verbose=2)
+        for timer in ti.reset('time'):
+            with timer:
+                _cached_single_stream_idxs(key, axis=axis)
+        for timer in ti.reset('time'):
+            with timer:
+                ChannelSpec(key).component_indices(axis=axis)
     """
     # concat operations.
     key_idxs = ChannelSpec(key).component_indices(axis=axis)
@@ -869,13 +871,14 @@ def subsequence_index(oset1, oset2):
 
 def oset_insert(self, index, obj):
     """
-    self = ub.oset()
-    oset_insert(self, 0, 'a')
-    oset_insert(self, 0, 'b')
-    oset_insert(self, 0, 'c')
-    oset_insert(self, 1, 'd')
-    oset_insert(self, 2, 'e')
-    oset_insert(self, 0, 'f')
+    Ignore:
+        self = ub.oset()
+        oset_insert(self, 0, 'a')
+        oset_insert(self, 0, 'b')
+        oset_insert(self, 0, 'c')
+        oset_insert(self, 1, 'd')
+        oset_insert(self, 2, 'e')
+        oset_insert(self, 0, 'f')
     """
     if obj not in self:
         # Bump index of every item after the insert position
@@ -893,9 +896,10 @@ def oset_delitem(self, index):
     >>> index = slice(3, 5)
     >>> oset_delitem(self, index)
 
-    self = ub.oset(['r', 'g', 'b', 'disparity'])
-    index = slice(0, 3)
-    oset_delitem(self, index)
+    Ignore:
+        self = ub.oset(['r', 'g', 'b', 'disparity'])
+        index = slice(0, 3)
+        oset_delitem(self, index)
 
     """
     if isinstance(index, slice) and index == ub.orderedset.SLICE_ALL:

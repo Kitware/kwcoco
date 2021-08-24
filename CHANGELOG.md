@@ -10,6 +10,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * Fixed bug when `track_id` is given to `add_annotation`
+* Fixed but in `delayed_load` where requested channels were returned in the
+  wrong order, or with incorrect data.
+* Bug in `delayed_load` where nans did not resize properly
 
 ### Added
 * Can now specify `-frames{num}` in demo names to control number of frames in each video

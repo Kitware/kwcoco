@@ -207,7 +207,7 @@ CocoDataset methods (via MixinCocoStats)
  * :func:`kwcoco.CocoDataset.extended_stats<kwcoco.coco_dataset.MixinCocoStats.extended_stats>` - Reports number of images, annotations, and categories.
  * :func:`kwcoco.CocoDataset.find_representative_images<kwcoco.coco_dataset.MixinCocoStats.find_representative_images>` - Find images that have a wide array of categories. Attempt to find the fewest images that cover all categories using images that contain both a large and small number of annotations.
  * :func:`kwcoco.CocoDataset.keypoint_annotation_frequency<kwcoco.coco_dataset.MixinCocoStats.keypoint_annotation_frequency>` -
- * :func:`kwcoco.CocoDataset.stats<kwcoco.coco_dataset.MixinCocoStats.stats>` - This function corresponds to :module:`kwcoco.cli.coco_stats`.
+ * :func:`kwcoco.CocoDataset.stats<kwcoco.coco_dataset.MixinCocoStats.stats>` - This function corresponds to :mod:`kwcoco.cli.coco_stats`.
  * :func:`kwcoco.CocoDataset.validate<kwcoco.coco_dataset.MixinCocoStats.validate>` - Performs checks on this coco dataset.
 
 CocoDataset methods (via MixinCocoAccessors)

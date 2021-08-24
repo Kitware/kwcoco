@@ -15,7 +15,7 @@ class ConfusionVectors(ub.NiceRepr):
     etc...
 
     Attributes:
-        data (DataFrameArray) : should at least have keys true, pred, weight
+        data (kwarray.DataFrameArray) : should at least have keys true, pred, weight
         classes (Sequence | CategoryTree): list of category names or category graph
         probs (ndarray, optional): probabilities for each class
 
@@ -304,7 +304,7 @@ class ConfusionVectors(ub.NiceRepr):
         Returns:
             BinaryConfusionVectors
 
-        Notes:
+        Note:
             The "classlessness" of this depends on the compat="all" argument
             being used when constructing confusion vectors, otherwise it
             becomes something like a macro-average because the class
@@ -389,7 +389,7 @@ class ConfusionVectors(ub.NiceRepr):
             cfsn_vecs.data.pandas()
             catname_to_binvecs.cx_to_binvecs['class_1'].data.pandas()
 
-        Notes:
+        Note:
 
             .. code:
 
@@ -800,8 +800,12 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> print('measures = {}'.format(ub.repr2(self.measures())))
             >>> print('measures = {}'.format(ub.repr2(ub.odict(self.measures()))))
 
-        Ignore:
+        References:
+            https://en.wikipedia.org/wiki/Confusion_matrix
+            https://en.wikipedia.org/wiki/Precision_and_recall
+            https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
 
+        Ignore:
             # import matplotlib.cm as cm
             # kwargs = {}
             # cmap = kwargs.get('cmap', mpl.cm.coolwarm)
@@ -813,12 +817,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
             # ax.contour(xgrid, ygrid, zdata, zdir='y', cmap=cmap)
             # ax.contour(xgrid, ygrid, zdata, zdir='z', cmap=cmap)
 
-        References:
-            https://en.wikipedia.org/wiki/Confusion_matrix
-            https://en.wikipedia.org/wiki/Precision_and_recall
-            https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
-
-        Ignore:
             self.measures().summary_plot()
             import xdev
             globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.measures._func))
@@ -1521,7 +1519,7 @@ def populate_info(info):
 
         info['auc'] = info['trunc_auc']
         """
-        Notes:
+        Note:
             Apparently, consistent scoring is really hard to get right.
 
             For detection problems scoring via

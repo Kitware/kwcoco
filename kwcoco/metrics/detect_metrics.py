@@ -200,9 +200,6 @@ class DetectionMetrics(ub.NiceRepr):
         Returns:
             ConfusionVectors | Dict[float, ConfusionVectors]
 
-        Ignore:
-            globals().update(xdev.get_func_kwargs(dmet.confusion_vectors))
-
         Example:
             >>> dmet = DetectionMetrics.demo(nimgs=30, classes=3,
             >>>                              nboxes=10, n_fp=3, box_noise=10,
@@ -213,6 +210,8 @@ class DetectionMetrics(ub.NiceRepr):
             ...     print(cfsn.binarize_ovr().measures())
             ...     print(cfsn.binarize_classless().measures())
 
+        Ignore:
+            globals().update(xdev.get_func_kwargs(dmet.confusion_vectors))
         """
         import kwarray
         _tracking_probs = bool(track_probs)
@@ -574,7 +573,7 @@ class DetectionMetrics(ub.NiceRepr):
             >>>     ovr_measures = cfsn_vecs.binarize_ovr().measures()
             >>>     print('ovr_measures = {}'.format(ub.repr2(ovr_measures, nl=1, precision=4)))
 
-        Notes:
+        Note:
             by default pycocotools computes average precision as the literal
             average of computed precisions at 101 uniformly spaced recall
             thresholds.

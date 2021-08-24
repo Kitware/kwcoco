@@ -278,7 +278,7 @@ class DelayedImageOperation(DelayedVisionOperation):
         Args:
             region_slices (Tuple[slice, slice]): y-slice and x-slice.
 
-        Notes:
+        Note:
             Returns a heuristically "simplified" tree. In the current
             implementation there are only 3 operations, cat, warp, and crop.
             All cats go at the top, all crops go at the bottom, all warps are
@@ -500,7 +500,10 @@ class DelayedNans(DelayedImageOperation):
         yield DelayedWarp(self, Affine(None), dsize=self.dsize)
 
     def finalize(self, **kwargs):
-        shape = self.shape
+        if 'dsize' in kwargs:
+            shape = tuple(kwargs['dsize'])[::-1] + (self.num_bands,)
+        else:
+            shape = self.shape
         final = np.full(shape, fill_value=np.nan)
 
         as_xarray = kwargs.get('as_xarray', False)
@@ -537,7 +540,7 @@ class DelayedLoad(DelayedImageOperation):
     A load operation for a specific sub-region and sub-bands in a specified
     image.
 
-    Notes:
+    Note:
         This class contains support for fusing certain lazy operations into
         this layer, namely cropping, scaling, and channel selection.
 
@@ -747,20 +750,22 @@ class DelayedLoad(DelayedImageOperation):
             >>> assert crop1.take_channels([1, 2]).finalize().shape == (90, 30, 2)
             >>> assert orig.finalize().shape == (512, 512, 3)
 
-        Notes:
+        Note:
 
-            This chart gives an intuition on how new absolute slice coords
-            are computed from existing absolute coords ane relative coords.
+            .. code::
 
-                  5 7    <- new
-                  3 5    <- rel
-               --------
-               01234567  <- relative coordinates
-               --------
-               2      9  <- curr
-             ----------
-             0123456789  <- absolute coordinates
-             ----------
+                This chart gives an intuition on how new absolute slice coords
+                are computed from existing absolute coords ane relative coords.
+
+                      5 7    <- new
+                      3 5    <- rel
+                   --------
+                   01234567  <- relative coordinates
+                   --------
+                   2      9  <- curr
+                 ----------
+                 0123456789  <- absolute coordinates
+                 ----------
         """
         # DEBUG_PRINT('DelayedLoad.delayed_crop')
         # Check if there is already a delayed crop operation
@@ -1142,17 +1147,19 @@ class DelayedFrameConcat(DelayedVideoOperation):
     """
     Represents multiple frames in a video
 
-    Notes:
+    Note:
 
-        Video[0]:
-            Frame[0]:
-                Chan[0]: (32) +--------------------------------+
-                Chan[1]: (16) +----------------+
-                Chan[2]: ( 8) +--------+
-            Frame[1]:
-                Chan[0]: (30) +------------------------------+
-                Chan[1]: (14) +--------------+
-                Chan[2]: ( 6) +------+
+        .. code::
+
+            Video[0]:
+                Frame[0]:
+                    Chan[0]: (32) +--------------------------------+
+                    Chan[1]: (16) +----------------+
+                    Chan[2]: ( 8) +--------+
+                Frame[1]:
+                    Chan[0]: (30) +------------------------------+
+                    Chan[1]: (14) +--------------+
+                    Chan[2]: ( 6) +------+
 
     TODO:
         - [ ] Support computing the transforms when none of the data is loaded
@@ -1554,7 +1561,7 @@ class DelayedWarp(DelayedImageOperation):
     """
     POC for chainable transforms
 
-    Notes:
+    Note:
         "sub" is used to refer to the underlying data in its native coordinates
         and resolution.
 

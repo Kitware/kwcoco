@@ -131,7 +131,7 @@ if USE_AUTOAPI:
     }
 
     autoapi_dirs = [f'../../{modname}']
-    # autoapi_keep_files = True
+    autoapi_keep_files = True
 
     extensions.extend([
         'autoapi.extension',
@@ -168,7 +168,33 @@ pygments_style = 'sphinx'
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/3/': None}
+intersphinx_mapping = {
+    # 'pytorch': ('http://pytorch.org/docs/master/', None),
+    'python': ('https://docs.python.org/3', None),
+    'click': ('https://click.palletsprojects.com/', None),
+    # 'xxhash': ('https://pypi.org/project/xxhash/', None),
+    # 'pygments': ('pygments.github.io/en/latest', None),
+
+    # Requries that the repo have objects.inv
+    # 'tqdm': ('https://tqdm.github.io', None),
+    'kwarray': ('https://kwarray.readthedocs.io/en/latest/', None),
+    'kwimage': ('https://kwimage.readthedocs.io/en/latest/', None),
+    # 'kwplot': ('https://kwplot.readthedocs.io/en/latest/', None),
+    'ndsampler': ('https://ndsampler.readthedocs.io/en/latest/', None),
+    'ubelt': ('https://ubelt.readthedocs.io/en/latest/', None),
+    'xdoctest': ('https://xdoctest.readthedocs.io/en/latest/', None),
+    'networkx': ('https://networkx.org/documentation/stable/', None),
+    'scriptconfig': ('https://scriptconfig.readthedocs.io/en/latest/', None),
+}
+
+__dev_note__ = """
+python -m sphinx.ext.intersphinx https://docs.python.org/3/objects.inv
+python -m sphinx.ext.intersphinx https://kwarray.readthedocs.io/en/latest/objects.inv
+python -m sphinx.ext.intersphinx https://kwimage.readthedocs.io/en/latest/objects.inv
+python -m sphinx.ext.intersphinx https://ubelt.readthedocs.io/en/latest/objects.inv
+python -m sphinx.ext.intersphinx https://networkx.org/documentation/stable/objects.inv
+"""
+
 
 # -- Options for todo extension ----------------------------------------------
 
@@ -187,3 +213,118 @@ html_theme_options = {
 }
 
 master_doc = 'index'
+
+from sphinx.domains.python import PythonDomain  # NOQA
+
+
+class PatchedPythonDomain(PythonDomain):
+    """
+    References:
+        https://github.com/sphinx-doc/sphinx/issues/3866
+    """
+    def resolve_xref(self, env, fromdocname, builder, typ, target, node, contnode):
+        # if target.startswith('kwcoco') or 'CategoryTree' in target:
+        if target == 'CategoryTree' or target == 'kwcoco.CategoryTree':
+            target = 'kwcoco.category_tree.CategoryTree'
+
+        # if 0:
+        #     if 'CategoryTree' in target:
+        #         import ubelt as ub
+        #         print('')
+        #         print('========')
+        #         print('Maybe fix?')
+        #         print(target)
+        #         print('contnode = {!r}'.format(contnode))
+        #         print('node = {!r}'.format(node))
+        #         print('target = {!r}'.format(target))
+        #         print('typ = {!r}'.format(typ))
+        #         print('builder = {!r}'.format(builder))
+        #         print('fromdocname = {!r}'.format(fromdocname))
+        #         print('env = {!r}'.format(env))
+        #         print('node.__dict__ = {}'.format(ub.repr2(node.__dict__, nl=1)))
+        #         print('contnode.__dict__ = {}'.format(ub.repr2(contnode.__dict__, nl=1)))
+        #         print('--')
+        #         # if 'refspecific' in node:
+        #         #     del node['refspecific']
+        return_value = super(PatchedPythonDomain, self).resolve_xref(
+            env, fromdocname, builder, typ, target, node, contnode)
+        # if 'CategoryTree' in target:
+        #     print('return_value = {!r}'.format(return_value))
+        #     if return_value is not None:
+        #         print('return_value.__dict__ = {}'.format(ub.repr2(return_value.__dict__, nl=1)))
+        #     print('========')
+        #     print('')
+        return return_value
+
+
+def setup(app):
+    app.add_domain(PatchedPythonDomain, override=True)
+
+    if 1:
+        # https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
+        from sphinx.application import Sphinx
+        from typing import Any, List
+
+        what = None
+        # Custom process to transform docstring lines
+        # Remove "Ignore" blocks
+        def process(app: Sphinx, what_: str, name: str, obj: Any, options: Any, lines: List[str]
+                    ) -> None:
+            if what and what_ not in what:
+                return
+            orig_lines = lines[:]
+
+            # text = '\n'.join(lines)
+            # if 'Example' in text and 'CommandLine' in text:
+            #     import xdev
+            #     xdev.embed()
+
+            ignore_tags = tuple(['Ignore'])
+
+            mode = None
+            # buffer = None
+            new_lines = []
+            for i, line in enumerate(orig_lines):
+
+                # See if the line triggers a mode change
+                if line.startswith(ignore_tags):
+                    mode = 'ignore'
+                elif line.startswith('CommandLine'):
+                    mode = 'cmdline'
+                elif line and not line.startswith(' '):
+                    # if the line startswith anything but a space, we are no
+                    # longer in the previous nested scope
+                    mode = None
+
+                if mode is None:
+                    new_lines.append(line)
+                elif mode == 'ignore':
+                    pass
+                elif mode == 'cmdline':
+                    if line.startswith('CommandLine'):
+                        new_lines.append('.. rubric:: CommandLine')
+                        new_lines.append('')
+                        new_lines.append('.. code-block:: bash')
+                        new_lines.append('')
+                        # new_lines.append('    # CommandLine')
+                    else:
+                        # new_lines.append(line.strip())
+                        new_lines.append(line)
+                else:
+                    raise KeyError(mode)
+
+            lines[:] = new_lines
+            # make sure there is a blank line at the end
+            if lines and lines[-1]:
+                lines.append('')
+
+        app.connect('autodoc-process-docstring', process)
+    else:
+        # https://stackoverflow.com/questions/26534184/can-sphinx-ignore-certain-tags-in-python-docstrings
+        # Register a sphinx.ext.autodoc.between listener to ignore everything
+        # between lines that contain the word IGNORE
+        # from sphinx.ext.autodoc import between
+        # app.connect('autodoc-process-docstring', between('^ *Ignore:$', exclude=True))
+        pass
+
+    return app

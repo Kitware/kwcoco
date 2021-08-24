@@ -22,7 +22,7 @@ Requirements:
      gpg2 >= 2.2.4
      OpenSSL >= 1.1.1c
 
-Notes:
+Note:
     # NEW API TO UPLOAD TO PYPI
     # https://docs.travis-ci.com/user/deployment/pypi/
     # https://packaging.python.org/tutorials/distributing-packages/
@@ -196,7 +196,7 @@ if [ "$DO_BUILD" == "True" ]; then
             WHEEL_PATH=$(ls dist/$NAME-$VERSION*.whl)
             #WHEEL_PATHS+=($WHEEL_PATH)
         elif [[ "$_MODE" == "universal" ]]; then
-            # Notes:
+            # Note:
             # https://packaging.python.org/guides/distributing-packages-using-setuptools/#pure-python-wheels
             python setup.py bdist_wheel --universal || { echo 'failed to build universal wheel' ; exit 1; }
             UNIVERSAL_TAG="py3-none-any"

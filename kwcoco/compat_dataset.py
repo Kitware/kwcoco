@@ -334,7 +334,7 @@ class COCO(CocoDataset):
         Convert annotation which can be polygons, uncompressed RLE to RLE.
         :return: binary mask (numpy 2D array)
 
-        Notes:
+        Note:
             * This requires the C-extensions for kwimage to be installed
               due to the need to interface with the bytes RLE format.
 
@@ -376,7 +376,7 @@ class COCO(CocoDataset):
 
         :return: binary mask (numpy 2D array)
 
-        Notes:
+        Note:
             The mask is returned as a fortran (F-style) array with the same
             dimensions as the parent image.
 

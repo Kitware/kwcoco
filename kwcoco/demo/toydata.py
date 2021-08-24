@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Notes:
+Generates "toydata" for demo and testing purposes.
+
+Note:
     The implementation of `demodata_toy_img` and `demodata_toy_dset` should be
     redone using the tools built for `random_video_dset`, which have more
     extensible implementations.
-
 """
 from __future__ import absolute_import, division, print_function
 from os.path import join
@@ -81,10 +82,6 @@ def demodata_toy_dset(image_size=(600, 600),
     CommandLine:
         xdoctest -m kwcoco.demo.toydata demodata_toy_dset --show
 
-    Ignore:
-        import xdev
-        globals().update(xdev.get_func_kwargs(demodata_toy_dset))
-
     TODO:
         - [ ] Non-homogeneous images sizes
 
@@ -115,6 +112,11 @@ def demodata_toy_dset(image_size=(600, 600),
 
         dset = demodata_toy_dset(
             image_size=(300, 300), aux=True, use_cache=False, dpath='test_cache_dpath')
+
+    Ignore:
+        import xdev
+        globals().update(xdev.get_func_kwargs(demodata_toy_dset))
+
     """
     import kwcoco
 
@@ -542,7 +544,6 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         import xdev
         globals().update(xdev.get_func_kwargs(random_single_video_dset))
 
-    Ignore:
         dset = random_single_video_dset(render=True, num_frames=10,
             anchors=anchors, num_tracks=10)
         dset._tree()

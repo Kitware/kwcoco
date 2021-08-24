@@ -8,7 +8,7 @@ class VOC_Metrics(ub.NiceRepr):
     API to compute object detection scores using Pascal VOC evaluation method.
 
     To use, add true and predicted detections for each image and then run the
-    `score` function.
+    :func:`VOC_Metrics.score` function.
 
     Attributes:
         recs (Dict[int, List[dict]): true boxes for each image.
@@ -237,10 +237,11 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
         bias (float): either 1.0 or 0.0.
 
     Returns:
-        Dict: info about the evaluation containing AP. Contains fp, tp, prec,
+        Dict:
+            info about the evaluation containing AP. Contains fp, tp, prec,
             rec,
 
-    Notes:
+    Note:
         Raw replication of matlab implementation of creating assignments and
         the resulting PR-curves and AP. Based on MATLAB code [1].
 

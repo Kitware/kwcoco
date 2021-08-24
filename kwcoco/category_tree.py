@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-The :mod:`category_tree`` module defines the :class:`CategoryTree` class, which
+The :mod:`category_tree` module defines the :class:`CategoryTree` class, which
 is used for maintaining flat or hierarchical category information. The kwcoco
 version of this class only contains the datastructure and does not contain any
 torch operations. See the ndsampler version for the extension with torch
@@ -22,28 +22,50 @@ class CategoryTree(ub.NiceRepr):
     Helps compute softmaxes and probabilities for tree-based categories
     where a directed edge (A, B) represents that A is a superclass of B.
 
-    Notes:
+    Ignore:
+        going to ignore this
+
+        but mayb
+
+        wont do that else
+
+
+    Ignore:
+        fofo
+
+
+    ell leo
+
+
+    Ignore:
+        byab
+
+    Note:
 
         There are three basic properties that this object maintains:
 
-        node:
-            Alphanumeric string names that should be generally descriptive.
-            Using spaces and special characters in these names is discouraged,
-            but can be done.  This is the COCO category "name" attribute.
-            For categories this may be denoted as (name, node, cname, catname).
+        .. code::
 
-        id:
-            The integer id of a category should ideally remain consistent.
-            These are often given by a dataset (e.g. a COCO dataset).
-            This is the COCO category "id" attribute. For categories this is
-            often denoted as (id, cid).
+            node:
+                Alphanumeric string names that should be generally descriptive.
+                Using spaces and special characters in these names is
+                discouraged, but can be done.  This is the COCO category "name"
+                attribute.  For categories this may be denoted as (name, node,
+                cname, catname).
 
-        index:
-            Contigous zero-based indices that indexes the list of categories.
-            These should be used for the fastest access in backend computation
-            tasks. Typically corresponds to the ordering of the channels in the
-            final linear layer in an associated model.  For categories this is
-            often denoted as (index, cidx, idx, or cx).
+            id:
+                The integer id of a category should ideally remain consistent.
+                These are often given by a dataset (e.g. a COCO dataset).  This
+                is the COCO category "id" attribute. For categories this is
+                often denoted as (id, cid).
+
+            index:
+                Contigous zero-based indices that indexes the list of
+                categories.  These should be used for the fastest access in
+                backend computation tasks. Typically corresponds to the
+                ordering of the channels in the final linear layer in an
+                associated model.  For categories this is often denoted as
+                (index, cidx, idx, or cx).
 
     Attributes:
 
@@ -56,7 +78,7 @@ class CategoryTree(ub.NiceRepr):
 
         node_to_idx (Dict[str, int]): maps category names to indexes
 
-        graph (nx.Graph): a Graph that stores any hierarchy information.
+        graph (networkx.Graph): a Graph that stores any hierarchy information.
             For standard mutually exclusive classes, this graph is edgeless.
             Nodes in this graph can maintain category attributes / properties.
 
@@ -247,8 +269,7 @@ class CategoryTree(ub.NiceRepr):
         Args:
             key (str): specify which demo dataset to use.
                 Can be 'coco' (which uses the default coco demo data).
-                Can be 'btree' which creates a binary tree and accepts kwargs
-                    'r' and 'h' for branching-factor and height.
+                Can be 'btree' which creates a binary tree and accepts kwargs 'r' and 'h' for branching-factor and height.
                 Can be 'btree2', which is the same as btree but returns strings
 
         CommandLine:
@@ -373,8 +394,7 @@ class CategoryTree(ub.NiceRepr):
         Distances
             * from parents to children are positive (descendants),
             * from children to parents are negative (ancestors),
-            * between unreachable nodes (wrt to forward and reverse graph) are
-            nan.
+            * between unreachable nodes (wrt to forward and reverse graph) are nan.
         """
         pdist = np.full((len(self), len(self)), fill_value=-np.nan,
                         dtype=np.float32)
@@ -542,6 +562,7 @@ class CategoryTree(ub.NiceRepr):
 
     def show(self):
         """
+
         Ignore:
             >>> import kwplot
             >>> kwplot.autompl()

@@ -141,10 +141,6 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         6    -1     0 0.0000  1.0000 -1.0000    0   -1
         7    -1     1 0.0000  0.9000 -1.0000    2   -1
 
-    Ignore:
-        from xinspect.dynamic_kwargs import get_func_kwargs
-        globals().update(get_func_kwargs(_assign_confusion_vectors))
-
     Example:
         >>> # xdoctest: +REQUIRES(module:pandas)
         >>> import pandas as pd
@@ -166,6 +162,10 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>>                               compat='ancestors', iou_thresh=.5)
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
+
+    Ignore:
+        from xinspect.dynamic_kwargs import get_func_kwargs
+        globals().update(get_func_kwargs(_assign_confusion_vectors))
     """
     import kwarray
     valid_compat_keys = {'ancestors', 'mutex', 'all'}
@@ -262,7 +262,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                    cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                    pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes,
                    max_dets):
-    # Notes:
+    # Note:
     # * Preallocating numpy arrays does not help
     # * It might be useful to code this critical loop up in C / Cython
     # * Could numba help? (I'm having an issue with cmath)
