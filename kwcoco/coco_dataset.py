@@ -433,7 +433,8 @@ class MixinCocoAccessors(object):
             delayed = DelayedChannelConcat(chan_list)
 
         # Reorder channels in the requested order
-        delayed = delayed.take_channels(requested)
+        if requested is not None:
+            delayed = delayed.take_channels(requested)
 
         if space == 'image':
             # Image space is the default
@@ -4661,7 +4662,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> # Use the (gid_to_aids) index to lookup annotations in the iamge
         >>> annotation_id = sorted(self.index.gid_to_aids[image_id])[0]
         >>> ann = self.index.anns[annotation_id]
-        >>> print(ub.repr2(ub.dict_diff(, {'segmentation'}), nl=1))
+        >>> print(ub.repr2(ub.dict_diff(ann, {'segmentation'}), nl=1))
         {
             'bbox': [10, 10, 360, 490],
             'category_id': 1,
