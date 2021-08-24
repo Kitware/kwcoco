@@ -43,6 +43,7 @@ Conventions:
         time dimension to the shape. dsize is still width, height, but shape
         is now: (time, height, width, chan)
 
+
 Example:
     >>> # Example demonstrating the modivating use case
     >>> # We have multiple aligned frames for a video, but each of
@@ -107,6 +108,79 @@ Example:
     >>> subdata = msi_crop.delayed_warp(kwimage.Affine.scale(3), dsize='auto').take_channels('B11|B1')
     >>> subdata.finalize()
 
+
+Example:
+    >>> # test case where an auxiliary image does not map entirely on the image.
+    >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+    >>> import kwimage
+    >>> from os.path import join
+    >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/delayed_poc')
+    >>> chan1_fpath = join(dpath, 'chan1.tiff')
+    >>> chan2_fpath = join(dpath, 'chan2.tiff')
+    >>> chan3_fpath = join(dpath, 'chan2.tiff')
+    >>> chan1_raw = np.random.rand(128, 128, 1)
+    >>> chan2_raw = np.random.rand(64, 64, 1)
+    >>> chan3_raw = np.random.rand(256, 256, 1)
+    >>> kwimage.imwrite(chan1_fpath, chan1_raw)
+    >>> kwimage.imwrite(chan2_fpath, chan2_raw)
+    >>> kwimage.imwrite(chan3_fpath, chan3_raw)
+    >>> #
+    >>> c1 = channel_spec.FusedChannelSpec.coerce('c1')
+    >>> c2 = channel_spec.FusedChannelSpec.coerce('c2')
+    >>> c3 = channel_spec.FusedChannelSpec.coerce('c2')
+    >>> aux1 = DelayedLoad(chan1_fpath, dsize=chan1_raw.shape[0:2][::-1], channels=c1, num_bands=1)
+    >>> aux2 = DelayedLoad(chan2_fpath, dsize=chan2_raw.shape[0:2][::-1], channels=c2, num_bands=1)
+    >>> aux3 = DelayedLoad(chan3_fpath, dsize=chan3_raw.shape[0:2][::-1], channels=c3, num_bands=1)
+    >>> #
+    >>> img_dsize = (128, 128)
+    >>> transform1 = kwimage.Affine.coerce(scale=0.5)
+    >>> transform2 = kwimage.Affine.coerce(theta=0.5, shear=0.01, offset=(-20, -40))
+    >>> transform3 = kwimage.Affine.coerce(offset=(64, 0)) @ kwimage.Affine.random(rng=10)
+    >>> part1 = aux1.delayed_warp(np.eye(3), dsize=img_dsize)
+    >>> part2 = aux2.delayed_warp(transform2, dsize=img_dsize)
+    >>> part3 = aux3.delayed_warp(transform3, dsize=img_dsize)
+    >>> delayed = DelayedChannelConcat([part1, part2, part3])
+    >>> #
+    >>> delayed_crop = delayed.crop((slice(0, 10), slice(0, 10)))
+    >>> delayed_final = delayed_crop.finalize()
+    >>> # xdoctest: +REQUIRES(--show)
+    >>> import kwplot
+    >>> kwplot.autompl()
+    >>> final = delayed.finalize()
+    >>> kwplot.imshow(final, fnum=1, pnum=(1, 2, 1))
+    >>> kwplot.imshow(delayed_final, fnum=1, pnum=(1, 2, 2))
+
+
+    comp = delayed_crop.components[2]
+
+    comp.sub_data.finalize()
+
+    data = np.array([[0]]).astype(np.float32)
+    kwimage.warp_affine(data, np.eye(3), dsize=(32, 32))
+    kwimage.warp_affine(data, np.eye(3))
+
+    kwimage.warp_affine(data[0:0], np.eye(3))
+
+    transform = kwimage.Affine.coerce(scale=0.1)
+    data = np.array([[0]]).astype(np.float32)
+
+    data = np.array([[]]).astype(np.float32)
+    kwimage.warp_affine(data, transform, dsize=(0, 2), antialias=True)
+
+    data = np.array([[]]).astype(np.float32)
+    kwimage.warp_affine(data, transform, dsize=(10, 10))
+
+    data = np.array([[0]]).astype(np.float32)
+    kwimage.warp_affine(data, transform, dsize=(0, 2), antialias=True)
+
+    data = np.array([[0]]).astype(np.float32)
+    kwimage.warp_affine(data, transform, dsize=(10, 10))
+
+    cv2.warpAffine(
+        kwimage.grab_test_image(dsize=(1, 1)),
+        kwimage.Affine.coerce(scale=0.1).matrix[0:2],
+        dsize=(0, 1),
+    )
 """
 import ubelt as ub
 import numpy as np
@@ -204,7 +278,7 @@ class DelayedImageOperation(DelayedVisionOperation):
         Args:
             region_slices (Tuple[slice, slice]): y-slice and x-slice.
 
-        Notes:
+        Note:
             Returns a heuristically "simplified" tree. In the current
             implementation there are only 3 operations, cat, warp, and crop.
             All cats go at the top, all crops go at the bottom, all warps are
@@ -370,7 +444,7 @@ class DelayedIdentity(DelayedImageOperation):
 
     def finalize(self):
         final = self.sub_data
-        final = kwarray.atleast_nd(final, 3)
+        final = kwarray.atleast_nd(final, 3, front=False)
         return final
 
 
@@ -426,7 +500,10 @@ class DelayedNans(DelayedImageOperation):
         yield DelayedWarp(self, Affine(None), dsize=self.dsize)
 
     def finalize(self, **kwargs):
-        shape = self.shape
+        if 'dsize' in kwargs:
+            shape = tuple(kwargs['dsize'])[::-1] + (self.num_bands,)
+        else:
+            shape = self.shape
         final = np.full(shape, fill_value=np.nan)
 
         as_xarray = kwargs.get('as_xarray', False)
@@ -463,7 +540,7 @@ class DelayedLoad(DelayedImageOperation):
     A load operation for a specific sub-region and sub-bands in a specified
     image.
 
-    Notes:
+    Note:
         This class contains support for fusing certain lazy operations into
         this layer, namely cropping, scaling, and channel selection.
 
@@ -673,20 +750,22 @@ class DelayedLoad(DelayedImageOperation):
             >>> assert crop1.take_channels([1, 2]).finalize().shape == (90, 30, 2)
             >>> assert orig.finalize().shape == (512, 512, 3)
 
-        Notes:
+        Note:
 
-            This chart gives an intuition on how new absolute slice coords
-            are computed from existing absolute coords ane relative coords.
+            .. code::
 
-                  5 7    <- new
-                  3 5    <- rel
-               --------
-               01234567  <- relative coordinates
-               --------
-               2      9  <- curr
-             ----------
-             0123456789  <- absolute coordinates
-             ----------
+                This chart gives an intuition on how new absolute slice coords
+                are computed from existing absolute coords ane relative coords.
+
+                      5 7    <- new
+                      3 5    <- rel
+                   --------
+                   01234567  <- relative coordinates
+                   --------
+                   2      9  <- curr
+                 ----------
+                 0123456789  <- absolute coordinates
+                 ----------
         """
         # DEBUG_PRINT('DelayedLoad.delayed_crop')
         # Check if there is already a delayed crop operation
@@ -738,6 +817,10 @@ class DelayedLoad(DelayedImageOperation):
         Returns:
             DelayedLoad:
                 a new delayed load with a fused take channel operation
+
+        Note:
+            The channel subset must exist here or it will raise an error.
+            A better implementation (via pymbolic) might be able to do better
 
         Example:
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
@@ -830,6 +913,26 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
         >>> # import kwplot
         >>> # kwplot.imshow(self[:])
+
+    Example:
+        >>> # See if we can reproduce the INTERLEAVE bug
+
+        data = np.random.rand(128, 128, 64)
+        import kwimage
+        import ubelt as ub
+        from os.path import join
+        dpath = ub.ensure_app_cache_dir('kwcoco/tests/reader')
+        fpath = join(dpath, 'foo.tiff')
+        kwimage.imwrite(fpath, data, backend='skimage')
+        recon1 = kwimage.imread(fpath)
+        recon1.shape
+
+        self = LazyGDalFrameFile(fpath)
+        self.shape
+        self[:]
+
+
+
     """
     def __init__(self, fpath):
         self.fpath = fpath
@@ -869,6 +972,23 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
     @property
     def shape(self):
+        # if 0:
+        #     ds = self.ds
+        #     INTERLEAVE = ds.GetMetadata('IMAGE_STRUCTURE').get('INTERLEAVE', '')  # handle INTERLEAVE=BAND
+        #     if INTERLEAVE == 'BAND':
+        #         pass
+        #     ds.GetMetadata('')  # handle TIFFTAG_IMAGEDESCRIPTION
+        #     from osgeo import gdal
+        #     subdataset_infos = ds.GetSubDatasets()
+        #     subdatasets = []
+        #     for subinfo in subdataset_infos:
+        #         path = subinfo[0]
+        #         sub_ds = gdal.Open(path, gdal.GA_ReadOnly)
+        #         subdatasets.append(sub_ds)
+        #     for sub in subdatasets:
+        #         sub.ReadAsArray()
+        #         print((sub.RasterXSize, sub.RasterYSize, sub.RasterCount))
+        #     sub = subdatasets[0][0]
         ds = self._ds
         width = ds.RasterXSize
         height = ds.RasterYSize
@@ -903,6 +1023,12 @@ class LazyGDalFrameFile(ub.NiceRepr):
         width = ds.RasterXSize
         height = ds.RasterYSize
         C = ds.RasterCount
+
+        if 1:
+            INTERLEAVE = ds.GetMetadata('IMAGE_STRUCTURE').get('INTERLEAVE', '')
+            if INTERLEAVE == 'BAND':
+                if len(ds.GetSubDatasets()) > 0:
+                    raise NotImplementedError('Cannot handle interleaved files yet')
 
         if not ub.iterable(index):
             index = [index]
@@ -1025,17 +1151,19 @@ class DelayedFrameConcat(DelayedVideoOperation):
     """
     Represents multiple frames in a video
 
-    Notes:
+    Note:
 
-        Video[0]:
-            Frame[0]:
-                Chan[0]: (32) +--------------------------------+
-                Chan[1]: (16) +----------------+
-                Chan[2]: ( 8) +--------+
-            Frame[1]:
-                Chan[0]: (30) +------------------------------+
-                Chan[1]: (14) +--------------+
-                Chan[2]: ( 6) +------+
+        .. code::
+
+            Video[0]:
+                Frame[0]:
+                    Chan[0]: (32) +--------------------------------+
+                    Chan[1]: (16) +----------------+
+                    Chan[2]: ( 8) +--------+
+                Frame[1]:
+                    Chan[0]: (30) +------------------------------+
+                    Chan[1]: (14) +--------------+
+                    Chan[2]: ( 6) +------+
 
     TODO:
         - [ ] Support computing the transforms when none of the data is loaded
@@ -1437,7 +1565,7 @@ class DelayedWarp(DelayedImageOperation):
     """
     POC for chainable transforms
 
-    Notes:
+    Note:
         "sub" is used to refer to the underlying data in its native coordinates
         and resolution.
 

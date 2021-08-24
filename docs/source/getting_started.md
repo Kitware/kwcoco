@@ -1,5 +1,8 @@
 # Getting Started With KW-COCO
 
+This document is a work in progress, and does need to be updated and
+refactored.
+
 
 ## FAQ
 
@@ -33,6 +36,17 @@ Q: Would you ever extend kwcoco to go beyond computer vision?
 A: Maybe, it would be something new though, and only use kwcoco as an
    inspiration. If extending past computer vision I would want to go back and
    rename / reorganize the spec.
+
+## Examples
+
+These python files have a few example uses cases of kwcoco
+
+* [draw_gt_and_predicted_boxes](https://github.com/Kitware/kwcoco/blob/master/kwcoco/examples/draw_gt_and_predicted_boxes.py)
+* [modification_example](https://github.com/Kitware/kwcoco/blob/master/kwcoco/examples/modification_example.py)
+* [simple_kwcoco_torch_dataset](https://github.com/Kitware/kwcoco/blob/master/kwcoco/examples/simple_kwcoco_torch_dataset.py)
+* [getting_started_existing_dataset](https://github.com/Kitware/kwcoco/blob/master/kwcoco/examples/getting_started_existing_dataset.py)
+
+
 
 ## Design Goals
 

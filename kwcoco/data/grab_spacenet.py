@@ -249,9 +249,8 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
     """
     Converts the raw SpaceNet7 dataset to kwcoco
 
-    Notes:
-        * The "train" directory contains 60 "videos" representing a region over
-        time.
+    Note:
+        * The "train" directory contains 60 "videos" representing a region over time.
 
         * Each "video" directory contains :
             * images           - unmasked images

@@ -5,7 +5,26 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.9 - Unreleased
+## Version 0.2.10 - Unreleased
+
+
+### Fixed
+* Fixed bug when `track_id` is given to `add_annotation`
+* Fixed but in `delayed_load` where requested channels were returned in the
+  wrong order, or with incorrect data.
+* Bug in `delayed_load` where nans did not resize properly
+
+### Added
+* Can now specify `-frames{num}` in demo names to control number of frames in each video
+
+
+### Changed
+
+* In detection metrics, annotations now get a default score of 1.0 if not provided.
+* In detection metrics, fixed AUC to report 1.0 when detections are perfect
+
+
+## Version 0.2.9 - Released 2021-08-12
 
 
 ### Added
@@ -15,7 +34,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
-* `perterb_coco` now correctly perterbs segmentations
+* `perterb_coco` now correctly perturbs segmentations
 
 ### Changed
 
@@ -36,7 +55,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 
 * Made URIs for CocoSQLDataset slightly more robust
-* kwcoco show now defaults show_labels to False
+* kwcoco show now defaults `show_labels` to False
 
 
 ## Version 0.2.7 - Released 2021-06-28

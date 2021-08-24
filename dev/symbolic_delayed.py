@@ -4,7 +4,7 @@ Testing:
 
     https://github.com/inducer/pymbolic/issues/45
 
-Notes:
+Note:
 
     https://github.com/inducer/pymbolic/issues/45
 

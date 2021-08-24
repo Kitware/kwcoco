@@ -15,7 +15,7 @@ class ConfusionVectors(ub.NiceRepr):
     etc...
 
     Attributes:
-        data (DataFrameArray) : should at least have keys true, pred, weight
+        data (kwarray.DataFrameArray) : should at least have keys true, pred, weight
         classes (Sequence | CategoryTree): list of category names or category graph
         probs (ndarray, optional): probabilities for each class
 
@@ -304,7 +304,7 @@ class ConfusionVectors(ub.NiceRepr):
         Returns:
             BinaryConfusionVectors
 
-        Notes:
+        Note:
             The "classlessness" of this depends on the compat="all" argument
             being used when constructing confusion vectors, otherwise it
             becomes something like a macro-average because the class
@@ -389,7 +389,7 @@ class ConfusionVectors(ub.NiceRepr):
             cfsn_vecs.data.pandas()
             catname_to_binvecs.cx_to_binvecs['class_1'].data.pandas()
 
-        Notes:
+        Note:
 
             .. code:
 
@@ -800,8 +800,12 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> print('measures = {}'.format(ub.repr2(self.measures())))
             >>> print('measures = {}'.format(ub.repr2(ub.odict(self.measures()))))
 
-        Ignore:
+        References:
+            https://en.wikipedia.org/wiki/Confusion_matrix
+            https://en.wikipedia.org/wiki/Precision_and_recall
+            https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
 
+        Ignore:
             # import matplotlib.cm as cm
             # kwargs = {}
             # cmap = kwargs.get('cmap', mpl.cm.coolwarm)
@@ -813,12 +817,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
             # ax.contour(xgrid, ygrid, zdata, zdir='y', cmap=cmap)
             # ax.contour(xgrid, ygrid, zdata, zdir='z', cmap=cmap)
 
-        References:
-            https://en.wikipedia.org/wiki/Confusion_matrix
-            https://en.wikipedia.org/wiki/Precision_and_recall
-            https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
-
-        Ignore:
             self.measures().summary_plot()
             import xdev
             globals().update(xdev.get_func_kwargs(BinaryConfusionVectors.measures._func))
@@ -1424,20 +1422,6 @@ def populate_info(info):
             if np.any(tpr_denom != info['realpos_total']):
                 warnings.warn('realpos_total is inconsistent')
 
-        # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
-        mcc_numer = (tp * tn) - (fp * fn)
-        mcc_denom = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-        mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
-        info['mcc'] = mcc_numer / mcc_denom
-
-        # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
-        info['g1'] = np.sqrt(ppv * tpr)
-
-        f1_numer = (2 * ppv * tpr)
-        f1_denom = (ppv + tpr)
-        f1_denom[f1_denom == 0] = 1
-        info['f1'] =  f1_numer / f1_denom
-
         tnr_denom = (tn + fp)
         tnr_denom[tnr_denom == 0] = 1
         tnr = tn / tnr_denom
@@ -1457,14 +1441,38 @@ def populate_info(info):
         fpr_denom = finite_fp[-1] if len(finite_fp) else 0
         if fpr_denom == 0:
             fpr_denom = 1
-        info['fpr'] = info['fp_count'] / fpr_denom
-        # info['fpr'] = info['fp_count'] / info['realneg_total']
-        # info['fpr'][np.isinf(info['fp_count'])] = 1
-
-        info['acc'] = (tp + tn) / (tp + tn + fp + fn)
+        fpr = info['fp_count'] / fpr_denom
+        info['fpr'] = fpr
 
         info['bm'] = tpr + tnr - 1  # informedness
         info['mk'] = ppv + npv - 1  # markedness
+
+        info['acc'] = (tp + tn) / (tp + tn + fp + fn)
+
+        # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
+        # mcc_numer = (tp * tn) - (fp * fn)
+        # mcc_denom = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+        # mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
+        # info['mcc'] = mcc_numer / mcc_denom
+
+        real_pos = fn + tp  # number of real positives
+        p_denom = real_pos.copy()
+        p_denom[p_denom == 0] = 1
+        fnr = fn / p_denom  # miss-rate
+        fdr  = 1 - ppv  # false discovery rate
+        fmr  = 1 - npv  # false ommision rate (for)
+
+        info['tnr'] = tnr
+        info['npv'] = npv
+        info['mcc'] = np.sqrt(ppv * tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
+
+        f1_numer = (2 * ppv * tpr)
+        f1_denom = (ppv + tpr)
+        f1_denom[f1_denom == 0] = 1
+        info['f1'] =  f1_numer / f1_denom
+
+        # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
+        info['g1'] = np.sqrt(ppv * tpr)
 
         keys = ['mcc', 'g1', 'f1', 'acc']
         finite_thresh = thresh[finite_flags]
@@ -1504,10 +1512,14 @@ def populate_info(info):
         except ValueError:
             # At least 2 points are needed to compute area under curve, but x.shape = 1
             info['trunc_auc'] = np.nan
+            if len(info['trunc_fpr']) == 1 and len(info['trunc_tpr']) == 1:
+                if info['trunc_fpr'][0] == 0 and info['trunc_tpr'][0] == 1:
+                    # Hard code AUC in the perfect detection case
+                    info['trunc_auc'] = 1.0
 
         info['auc'] = info['trunc_auc']
         """
-        Notes:
+        Note:
             Apparently, consistent scoring is really hard to get right.
 
             For detection problems scoring via

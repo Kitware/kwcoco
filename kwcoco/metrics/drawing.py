@@ -244,7 +244,7 @@ def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnu
     Args:
         cx_to_info (PerClass_Measures | Dict):
 
-    Notes:
+    Note:
         Each category is inspected independently of one another, there is no
         notion of confusion.
 

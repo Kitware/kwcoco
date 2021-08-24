@@ -164,15 +164,16 @@ class CategoryPatterns(object):
     def random_category(self, chip, xy_offset=None, dims=None,
                         newstyle=True, size=None):
         """
-        Ignore:
-            import xdev
-            globals().update(xdev.get_func_kwargs(self.random_category))
-
         Example:
             >>> from kwcoco.demo.toypatterns import *  # NOQA
             >>> self = CategoryPatterns.coerce(['superstar'])
             >>> chip = np.random.rand(64, 64)
             >>> info = self.random_category(chip)
+
+        Ignore:
+            import xdev
+            globals().update(xdev.get_func_kwargs(self.random_category))
+
         """
         cname = self.rng.choice(self.obj_catnames)
         info = self.render_category(
@@ -183,10 +184,6 @@ class CategoryPatterns(object):
     def render_category(self, cname, chip, xy_offset=None, dims=None,
                         newstyle=True, size=None):
         """
-        Ignore:
-            import xdev
-            globals().update(xdev.get_func_kwargs(self.random_category))
-
         Example:
             >>> from kwcoco.demo.toypatterns import *  # NOQA
             >>> self = CategoryPatterns.coerce(['superstar'])
@@ -203,6 +200,10 @@ class CategoryPatterns(object):
             >>> dims = (64, 64)
             >>> info = self.render_category('superstar', chip, newstyle=True, dims=dims, size=dims)
             >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
+
+        Ignore:
+            import xdev
+            globals().update(xdev.get_func_kwargs(self.random_category))
         """
         data, mask, kpts = self._from_elem(cname, chip, size=size)
         info = self._package_info(cname, data, mask, kpts, xy_offset, dims,

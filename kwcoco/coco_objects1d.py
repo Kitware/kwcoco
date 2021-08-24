@@ -205,47 +205,48 @@ class ObjectList1D(ub.NiceRepr):
 
     def _lookup(self, key, default=ub.NoParam):
         """
-        Benchmark:
+        Example:
+            >>> # xdoctest: +REQUIRES(--benchmark)
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('shapes256')
             >>> self = annots = dset.annots()
-
+            >>> #
             >>> import timerit
             >>> ti = timerit.Timerit(100, bestof=10, verbose=2)
-
-            for timer in ti.reset('lookup'):
-                with timer:
-                    self.lookup('image_id')
-
-            for timer in ti.reset('_lookup'):
-                with timer:
-                    self._lookup('image_id')
-
-            for timer in ti.reset('image_id'):
-                with timer:
-                    self.image_id
-
-            for timer in ti.reset('raw1'):
-                with timer:
-                    key = 'image_id'
-                    [self._dset.anns[_id][key] for _id in self._ids]
-
-            for timer in ti.reset('raw2'):
-                with timer:
-                    anns = self._dset.anns
-                    key = 'image_id'
-                    [anns[_id][key] for _id in self._ids]
-
-            for timer in ti.reset('lut-gen'):
-                with timer:
-                    _lut = self._obj_lut
-                    objs = (_lut[_id] for _id in self._ids)
-                    [obj[key] for obj in objs]
-
-            for timer in ti.reset('lut-gen-single'):
-                with timer:
-                    _lut = self._obj_lut
-                    [_lut[_id][key] for _id in self._ids]
+            >>> #
+            >>> for timer in ti.reset('lookup'):
+            >>>     with timer:
+            >>>         self.lookup('image_id')
+            >>> #
+            >>> for timer in ti.reset('_lookup'):
+            >>>     with timer:
+            >>>         self._lookup('image_id')
+            >>> #
+            >>> for timer in ti.reset('image_id'):
+            >>>     with timer:
+            >>>         self.image_id
+            >>> #
+            >>> for timer in ti.reset('raw1'):
+            >>>     with timer:
+            >>>         key = 'image_id'
+            >>>         [self._dset.anns[_id][key] for _id in self._ids]
+            >>> #
+            >>> for timer in ti.reset('raw2'):
+            >>>     with timer:
+            >>>         anns = self._dset.anns
+            >>>         key = 'image_id'
+            >>>         [anns[_id][key] for _id in self._ids]
+            >>> #
+            >>> for timer in ti.reset('lut-gen'):
+            >>>     with timer:
+            >>>         _lut = self._obj_lut
+            >>>         objs = (_lut[_id] for _id in self._ids)
+            >>>         [obj[key] for obj in objs]
+            >>> #
+            >>> for timer in ti.reset('lut-gen-single'):
+            >>>     with timer:
+            >>>         _lut = self._obj_lut
+            >>>         [_lut[_id][key] for _id in self._ids]
         """
         return self.lookup(key, default=default)
 
@@ -285,6 +286,9 @@ class Categories(ObjectList1D):
     """
     Vectorized access to category attributes
 
+    SeeAlso:
+        :func:`kwcoco.coco_dataset.MixinCocoObjects.categories`
+
     Example:
         >>> from kwcoco.coco_objects1d import Categories  # NOQA
         >>> import kwcoco
@@ -314,6 +318,9 @@ class Videos(ObjectList1D):
     """
     Vectorized access to video attributes
 
+    SeeAlso:
+        :func:`kwcoco.coco_dataset.MixinCocoObjects.videos`
+
     Example:
         >>> from kwcoco.coco_objects1d import Videos  # NOQA
         >>> import kwcoco
@@ -331,7 +338,7 @@ class Images(ObjectList1D):
     Vectorized access to image attributes
 
     SeeAlso:
-        :func:`kwcoco.CocoDataset.images`
+        :func:`kwcoco.coco_dataset.MixinCocoObjects.images`
     """
 
     def __init__(self, ids, dset):
@@ -423,6 +430,9 @@ class Images(ObjectList1D):
 class Annots(ObjectList1D):
     """
     Vectorized access to annotation attributes
+
+    SeeAlso:
+        :func:`kwcoco.coco_dataset.MixinCocoObjects.annots`
     """
 
     def __init__(self, ids, dset):

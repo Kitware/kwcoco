@@ -419,7 +419,6 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
         >>> multi_index = np.triu_indices(n=n, k=1)
         >>> condensed_idxs = xdev.profile_now(triu_condense_multi_index)(multi_index, [n] * 2)
 
-    Ignore:
         # Numba helps here when ub.allsame is gone
         from numba import jit
         triu_condense_multi_index2 = jit(nopython=True)(triu_condense_multi_index)

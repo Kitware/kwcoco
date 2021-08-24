@@ -53,6 +53,7 @@ Python, this data structure is reasonably efficient.
         >>> self.remove_categories([cid])
 
         >>> # Look at data
+        >>> import ubelt as ub
         >>> print(ub.repr2(self.basic_stats(), nl=1))
         >>> print(ub.repr2(self.extended_stats(), nl=2))
         >>> print(ub.repr2(self.boxsize_stats(), nl=3))
@@ -206,7 +207,7 @@ CocoDataset methods (via MixinCocoStats)
  * :func:`kwcoco.CocoDataset.extended_stats<kwcoco.coco_dataset.MixinCocoStats.extended_stats>` - Reports number of images, annotations, and categories.
  * :func:`kwcoco.CocoDataset.find_representative_images<kwcoco.coco_dataset.MixinCocoStats.find_representative_images>` - Find images that have a wide array of categories. Attempt to find the fewest images that cover all categories using images that contain both a large and small number of annotations.
  * :func:`kwcoco.CocoDataset.keypoint_annotation_frequency<kwcoco.coco_dataset.MixinCocoStats.keypoint_annotation_frequency>` -
- * :func:`kwcoco.CocoDataset.stats<kwcoco.coco_dataset.MixinCocoStats.stats>` - This function corresponds to :module:`kwcoco.cli.coco_stats`.
+ * :func:`kwcoco.CocoDataset.stats<kwcoco.coco_dataset.MixinCocoStats.stats>` - This function corresponds to :mod:`kwcoco.cli.coco_stats`.
  * :func:`kwcoco.CocoDataset.validate<kwcoco.coco_dataset.MixinCocoStats.validate>` - Performs checks on this coco dataset.
 
 CocoDataset methods (via MixinCocoAccessors)
@@ -257,7 +258,7 @@ The logic of this init is generated via:
     mkinit ~/code/kwcoco/kwcoco/__init__.py
 """
 
-__version__ = '0.2.9'
+__version__ = '0.2.10'
 
 __submodules__ = ['coco_dataset', 'abstract_coco_dataset']
 

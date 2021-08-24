@@ -11,6 +11,54 @@ TODO:
 
     - [ ] How do we note what iou_thresh and area-range were in
           the result plots?
+
+
+CommandLine:
+    xdoctest -m kwcoco.coco_evaluator __doc__:0 --vd --slow
+
+Example:
+    >>> from kwcoco.coco_evaluator import *  # NOQA
+    >>> from kwcoco.coco_evaluator import CocoEvaluator
+    >>> import kwcoco
+    >>> true_dset = kwcoco.CocoDataset.demo('shapes128')
+    >>> from kwcoco.demo.perterb import perterb_coco
+    >>> kwargs = {
+    >>>     'box_noise': 0.5,
+    >>>     'n_fp': (0, 10),
+    >>>     'n_fn': (0, 10),
+    >>>     'with_probs': True,
+    >>> }
+    >>> pred_dset = perterb_coco(true_dset, **kwargs)
+    >>> print('true_dset = {!r}'.format(true_dset))
+    >>> print('pred_dset = {!r}'.format(pred_dset))
+    >>> config = {
+    >>>     'true_dataset': true_dset,
+    >>>     'pred_dataset': pred_dset,
+    >>>     'area_range': ['all', 'small'],
+    >>>     'iou_thresh': [0.3, 0.95],
+    >>> }
+    >>> coco_eval = CocoEvaluator(config)
+    >>> results = coco_eval.evaluate()
+    >>> # Now we can draw / serialize the results as we please
+    >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
+    >>> results_fpath = join(dpath, 'metrics.json')
+    >>> print('results_fpath = {!r}'.format(results_fpath))
+    >>> results.dump(results_fpath, indent='    ')
+    >>> measures = results['area_range=all,iou_thresh=0.3'].nocls_measures
+    >>> import pandas as pd
+    >>> print(pd.DataFrame(ub.dict_isect(
+    >>>     measures, ['f1', 'g1', 'mcc', 'thresholds',
+    >>>                'ppv', 'tpr', 'tnr', 'npv', 'fpr',
+    >>>                'tp_count', 'fp_count',
+    >>>                'tn_count', 'fn_count'])).iloc[::100])
+    >>> # xdoctest: +REQUIRES(module:kwplot)
+    >>> # xdoctest: +REQUIRES(--slow)
+    >>> results.dump_figures(dpath)
+    >>> print('dpath = {!r}'.format(dpath))
+    >>> # xdoctest: +REQUIRES(--vd)
+    >>> if ub.argflag('--vd') or 1:
+    >>>     import xdev
+    >>>     xdev.view_directory(dpath)
 """
 import glob
 import numpy as np
@@ -40,8 +88,8 @@ class CocoEvalConfig(scfg.Config):
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
     default = {
-        'true_dataset': scfg.Value(None, type=str, help='coercable true detections'),
-        'pred_dataset': scfg.Value(None, type=str, help='coercable predicted detections'),
+        'true_dataset': scfg.Value(None, type=str, help='coercable true detections', position=1),
+        'pred_dataset': scfg.Value(None, type=str, help='coercable predicted detections', position=2),
 
         'ignore_classes': scfg.Value(
             None, type=list, help='classes to ignore (give them zero weight)'),
@@ -455,10 +503,10 @@ class CocoEvaluator(object):
                 weights = [a.get('weight', 1) for a in anns]
 
                 # Is defaulting to NAN correct here?
-                scores = [a.get('score', np.nan) for a in anns]
-                # scores = [a.get('score', np.random.rand()) for a in anns]
-                # scores = [a.get('score', 1) for a in anns]
-                # print('scores = {!r}'.format(scores))
+
+                default_score = 1.0
+                # default_score = np.nan
+                scores = [a.get('score', default_score) for a in anns]
 
                 kw = {}
                 if all('prob' in a for a in anns):
@@ -574,43 +622,6 @@ class CocoEvaluator(object):
         Returns:
             CocoResults: container storing (and capable of drawing /
                 serializing) results
-
-        CommandLine:
-            xdoctest -m kwcoco.coco_evaluator CocoEvaluator.evaluate --vd
-
-        Example:
-            >>> from kwcoco.coco_evaluator import *  # NOQA
-            >>> from kwcoco.coco_evaluator import CocoEvaluator
-            >>> import kwcoco
-            >>> true_dset = kwcoco.CocoDataset.demo('shapes128')
-            >>> from kwcoco.demo.perterb import perterb_coco
-            >>> kwargs = {
-            >>>     'box_noise': 0.5,
-            >>>     'n_fp': (0, 10),
-            >>>     'n_fn': (0, 10),
-            >>>     'with_probs': True,
-            >>> }
-            >>> pred_dset = perterb_coco(true_dset, **kwargs)
-            >>> print('true_dset = {!r}'.format(true_dset))
-            >>> print('pred_dset = {!r}'.format(pred_dset))
-            >>> config = {
-            >>>     'true_dataset': true_dset,
-            >>>     'pred_dataset': pred_dset,
-            >>>     'area_range': ['all', 'small'],
-            >>>     'iou_thresh': [0.3, 0.95],
-            >>> }
-            >>> coco_eval = CocoEvaluator(config)
-            >>> results = coco_eval.evaluate()
-            >>> # Now we can draw / serialize the results as we please
-            >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
-            >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
-            >>> # xdoctest: +REQUIRES(module:kwplot)
-            >>> # xdoctest: +REQUIRES(--slow)
-            >>> results.dump_figures(dpath)
-            >>> # xdoctest: +REQUIRES(--vd)
-            >>> if ub.argflag('--vd') or 1:
-            >>>     import xdev
-            >>>     xdev.view_directory(dpath)
         """
         import platform
         coco_eval.log('evaluating')
@@ -1120,8 +1131,7 @@ def _load_dets(pred_fpaths, workers=0):
     """
     # Process mode is much faster than thread.
     import kwcoco
-    from kwcoco.util import util_futures
-    jobs = util_futures.JobPool(mode='process', max_workers=workers)
+    jobs = ub.JobPool(mode='process', max_workers=workers)
     for single_pred_fpath in ub.ProgIter(pred_fpaths, desc='submit load dets jobs'):
         job = jobs.submit(_load_dets_worker, single_pred_fpath, with_coco=True)
     results = []
@@ -1179,8 +1189,9 @@ class CocoEvalCLIConfig(scfg.Config):
 
 
 def main(cmdline=True, **kw):
-    """
-    TODO: should live in kwcoco.cli.coco_eval
+    r"""
+    TODO:
+        - [ ] should live in kwcoco.cli.coco_eval
 
     CommandLine:
 

@@ -8,32 +8,34 @@ https://docs.google.com/spreadsheets/d/1DFCwoTKnDv8qfy3raM7QXtir2Fjfj9j8-z8px5Bu
 The kw18.trk files are text files, space delimited; each row is one
 frame of one track and all rows have the same number of columns. The fields are:
 
-01) track_ID         : identifies the track
-02) num_frames:     number of frames in the track
-03) frame_id        : frame number for this track sample
-04) loc_x        : X-coordinate of the track (image/ground coords)
-05) loc_y        : Y-coordinate of the track (image/ground coords)
-06) vel_x        : X-velocity of the object (image/ground coords)
-07) vel_y        : Y-velocity of the object (image/ground coords)
-08) obj_loc_x        : X-coordinate of the object (image coords)
-09) obj_loc_y        : Y-coordinate of the object (image coords)
-10) bbox_min_x    : minimum X-coordinate of bounding box (image coords)
-11) bbox_min_y    : minimum Y-coordinate of bounding box (image coords)
-12) bbox_max_x    : maximum X-coordinate of bounding box (image coords)
-13) bbox_max_y    : maximum Y-coordinate of bounding box (image coords)
-14) area        : area of object (pixels)
-15) world_loc_x    : X-coordinate of object in world
-16) world_loc_y    : Y-coordinate of object in world
-17) world_loc_z    : Z-coordiante of object in world
-18) timestamp        : timestamp of frame (frames)
-For the location and velocity of object centroids, use fields 4-7.
-Bounding box is specified using coordinates of the top-left and bottom
-right corners. Fields 15-17 may be ignored.
+.. code ::
 
-The kw19.trk and kw20.trk files, when present, add the following field(s):
-19) object class: estimated class of the object, either 1 (person), 2
-(vehicle), or 3 (other).
-20) Activity ID -- refer to activities.txt for index and list of activities.
+    01) track_ID         : identifies the track
+    02) num_frames:     number of frames in the track
+    03) frame_id        : frame number for this track sample
+    04) loc_x        : X-coordinate of the track (image/ground coords)
+    05) loc_y        : Y-coordinate of the track (image/ground coords)
+    06) vel_x        : X-velocity of the object (image/ground coords)
+    07) vel_y        : Y-velocity of the object (image/ground coords)
+    08) obj_loc_x        : X-coordinate of the object (image coords)
+    09) obj_loc_y        : Y-coordinate of the object (image coords)
+    10) bbox_min_x    : minimum X-coordinate of bounding box (image coords)
+    11) bbox_min_y    : minimum Y-coordinate of bounding box (image coords)
+    12) bbox_max_x    : maximum X-coordinate of bounding box (image coords)
+    13) bbox_max_y    : maximum Y-coordinate of bounding box (image coords)
+    14) area        : area of object (pixels)
+    15) world_loc_x    : X-coordinate of object in world
+    16) world_loc_y    : Y-coordinate of object in world
+    17) world_loc_z    : Z-coordiante of object in world
+    18) timestamp        : timestamp of frame (frames)
+    For the location and velocity of object centroids, use fields 4-7.
+    Bounding box is specified using coordinates of the top-left and bottom
+    right corners. Fields 15-17 may be ignored.
+
+    The kw19.trk and kw20.trk files, when present, add the following field(s):
+    19) object class: estimated class of the object, either 1 (person), 2
+    (vehicle), or 3 (other).
+    20) Activity ID -- refer to activities.txt for index and list of activities.
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 import kwarray
