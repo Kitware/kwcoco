@@ -187,6 +187,9 @@ class FusedChannelSpec(ub.NiceRepr):
     def as_set(self):
         return set(self.normalize().parsed)
 
+    def __set__(self):
+        return self.as_set()
+
     def difference(self, other):
         """
         Set difference
@@ -370,6 +373,11 @@ class ChannelSpec(ub.NiceRepr):
     def coerce(cls, data):
         if isinstance(data, cls):
             self = data
+            return self
+        elif isinstance(data, FusedChannelSpec):
+            spec = data.spec
+            parsed = {spec: data.parsed}
+            self = cls(spec, parsed)
             return self
         else:
             if isinstance(data, int):
