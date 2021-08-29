@@ -10,6 +10,7 @@ import ubelt as ub
 class CategoryPatterns(object):
     """
     Example:
+        >>> from kwcoco.demo.toypatterns import *  # NOQA
         >>> self = CategoryPatterns.coerce()
         >>> chip = np.zeros((100, 100, 3))
         >>> offset = (20, 10)

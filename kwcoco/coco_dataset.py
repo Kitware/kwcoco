@@ -5651,7 +5651,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                       for r in dset_roots]
         items = [join('.', p) for p in dset_roots]
         common_root = longest_common_prefix(items, sep=os.path.sep)
-        relative_dsets = [(relpath(d.bundle_dpath, common_root),
+        # common_root = normpath(common_root)
+
+        relative_dsets = [(relpath(normpath(d.bundle_dpath), common_root),
                            d.dataset) for d in others]
 
         merged = _coco_union(relative_dsets, common_root)
