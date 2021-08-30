@@ -140,13 +140,37 @@ class FusedChannelSpec(ub.NiceRepr):
         Replace aliases with explicit single-band-per-code specs
 
         Example:
+            >>> from kwcoco.channel_spec import *  # NOQA
             >>> self = FusedChannelSpec.coerce('b1|b2|b3|rgb')
             >>> normed = self.normalize()
             >>> print('normed = {}'.format(ub.repr2(normed, nl=1)))
+            >>> self = FusedChannelSpec.coerce('B:1:11')
+            >>> normed = self.normalize()
+            >>> print('normed = {}'.format(ub.repr2(normed, nl=1)))
         """
-        norm_parsed = list(ub.flatten(
-            self._alias_lut.get(v, v).split('|')
-            for v in self.parsed))
+        norm_parsed = []
+        for v in self.parsed:
+            if v in self._alias_lut:
+                norm_parsed.extend(self._alias_lut.get(v).split('|'))
+            else:
+                if ':' in v:
+                    root, *slice_args = v.split(':')
+                    if len(slice_args) == 1:
+                        start = 0
+                        stop, = map(int, slice_args)
+                        step = 1
+                    elif len(slice_args) == 2:
+                        start, stop = map(int, slice_args)
+                        step = 1
+                    else:
+                        raise NotImplementedError
+                    for idx in range(start, stop, step):
+                        norm_parsed.append('{}.{}'.format(root, idx))
+                else:
+                    norm_parsed.append(v)
+        # self._alias_lut.get(v, v).split('|')
+        # norm_parsed = list(ub.flatten(
+        #     for v in self.parsed))
         normed = FusedChannelSpec(norm_parsed)
         return normed
 
@@ -444,8 +468,12 @@ class ChannelSpec(ub.NiceRepr):
     def streams(self):
         """
         Breaks this spec up into one spec for each early-fused input stream
+
+        Example:
+            self = ChannelSpec.coerce('r|g,B1|B2,fx|fy')
+            list(map(len, self.streams()))
         """
-        streams = [self.__class__(spec) for spec in self.keys()]
+        streams = [FusedChannelSpec.coerce(spec) for spec in self.keys()]
         return streams
 
     def code_list(self):
