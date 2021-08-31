@@ -21,6 +21,11 @@ TODO:
     - [X] : normalize representations? e.g: rgb = r|g|b? - OPTIONAL
     - [X] : rename to BandsSpec or SensorSpec? - REJECTED
     - [ ] : allow bands to be coerced, i.e. rgb -> gray, or gray->rgb
+
+
+TODO:
+    - [ ]: Use FusedChannelSpec as a member of ChannelSpec
+    - [ ]: Handle special slice suffix for length calculations
 """
 import ubelt as ub
 import six

@@ -4112,6 +4112,38 @@ class CocoIndex(object):
 
         cats (Dict[int, dict]):
             mapping between category ids and the category dictionaries
+
+        kpcats (Dict[int, dict]):
+            mapping between keypoint category ids and keypoint category
+            dictionaries
+
+        gid_to_aids (Dict[int, List[int]]):
+            mapping between an image-id and annotation-ids that belong to it
+
+        cid_to_aids (Dict[int, List[int]]):
+            mapping between an category-id and annotation-ids that belong to it
+
+        cid_to_gids (Dict[int, List[int]]):
+            mapping between an category-id and image-ids that contain
+            at least one annotation with this cateogry id.
+
+        trackid_to_aids (Dict[int, List[int]]):
+            mapping between a track-id and annotation-ids that belong to it
+
+        vidid_to_gids (Dict[int, List[int]]):
+            mapping between an video-id and images-ids that belong to it
+
+        name_to_video (Dict[str, dict]):
+            mapping between a video name and the video dictionary.
+
+        name_to_cat (Dict[str, dict]):
+            mapping between a category name and the category dictionary.
+
+        name_to_img (Dict[str, dict]):
+            mapping between a image name and the image dictionary.
+
+        file_name_to_img (Dict[str, dict]):
+            mapping between a image file_name and the image dictionary.
     """
 
     # _set = ub.oset  # many operations are much slower for oset
@@ -4137,9 +4169,9 @@ class CocoIndex(object):
         index.gid_to_aids = None
         index.cid_to_aids = None
         index.vidid_to_gids = None
-        index.name_to_video = None
         index.trackid_to_aids = None
 
+        index.name_to_video = None
         index.name_to_cat = None
         index.name_to_img = None
         index.file_name_to_img = None
@@ -4617,8 +4649,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         index (CocoIndex): an efficient lookup index into the coco data
             structure. The index defines its own attributes like
-            ``anns``, ``cats``, ``imgs``, etc. See :class:`CocoIndex` for more
-            details on which attributes are available.
+            ``anns``, ``cats``, ``imgs``, ``gid_to_aids``,
+            ``file_name_to_img``, etc. See :class:`CocoIndex` for more details
+            on which attributes are available.
 
         fpath (PathLike | None):
             if known, this stores the filepath the dataset was loaded from
@@ -4632,7 +4665,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         hashid (str | None) :
             If computed, this will be a hash uniquely identifing the dataset.
-            To ensure this is computed see  :func:`_build_hashid`.
+            To ensure this is computed see
+            :func:`kwcoco.coco_dataset.MixinCocoExtras._build_hashid`.
 
     References:
         http://cocodataset.org/#format

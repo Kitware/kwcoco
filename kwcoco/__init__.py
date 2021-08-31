@@ -139,12 +139,12 @@ CocoDataset classmethods (via CocoDataset)
 CocoDataset slots
 *****************
 
- * :attr:`kwcoco.CocoDataset.index<kwcoco.coco_dataset.CocoDataset.index>` -
- * :attr:`kwcoco.CocoDataset.hashid<kwcoco.coco_dataset.CocoDataset.hashid>` -
+ * :attr:`kwcoco.CocoDataset.index<kwcoco.coco_dataset.CocoDataset.index>` - an efficient lookup index into the coco data structure. The index defines its own attributes like ``anns``, ``cats``, ``imgs``, ``gid_to_aids``, ``file_name_to_img``, etc. See :class:`CocoIndex` for more details on which attributes are available.
+ * :attr:`kwcoco.CocoDataset.hashid<kwcoco.coco_dataset.CocoDataset.hashid>` - If computed, this will be a hash uniquely identifing the dataset.  To ensure this is computed see  :func:`kwcoco.coco_dataset.MixinCocoExtras._build_hashid`.
  * :attr:`kwcoco.CocoDataset.hashid_parts<kwcoco.coco_dataset.CocoDataset.hashid_parts>` -
- * :attr:`kwcoco.CocoDataset.tag<kwcoco.coco_dataset.CocoDataset.tag>` -
- * :attr:`kwcoco.CocoDataset.dataset<kwcoco.coco_dataset.CocoDataset.dataset>` -
- * :attr:`kwcoco.CocoDataset.bundle_dpath<kwcoco.coco_dataset.CocoDataset.bundle_dpath>` -
+ * :attr:`kwcoco.CocoDataset.tag<kwcoco.coco_dataset.CocoDataset.tag>` - A tag indicating the name of the dataset.
+ * :attr:`kwcoco.CocoDataset.dataset<kwcoco.coco_dataset.CocoDataset.dataset>` - raw json data structure. This is the base dictionary that contains {'annotations': List, 'images': List, 'categories': List}
+ * :attr:`kwcoco.CocoDataset.bundle_dpath<kwcoco.coco_dataset.CocoDataset.bundle_dpath>` - If known, this is the root path that all image file names are relative to. This can also be manually overwritten by the user.
  * :attr:`kwcoco.CocoDataset.assets_dpath<kwcoco.coco_dataset.CocoDataset.assets_dpath>` -
  * :attr:`kwcoco.CocoDataset.cache_dpath<kwcoco.coco_dataset.CocoDataset.cache_dpath>` -
 
@@ -156,7 +156,7 @@ CocoDataset properties
  * :attr:`kwcoco.CocoDataset.cid_to_aids<kwcoco.coco_dataset.CocoDataset.cid_to_aids>` -
  * :attr:`kwcoco.CocoDataset.data_fpath<kwcoco.coco_dataset.CocoDataset.data_fpath>` -
  * :attr:`kwcoco.CocoDataset.data_root<kwcoco.coco_dataset.CocoDataset.data_root>` -
- * :attr:`kwcoco.CocoDataset.fpath<kwcoco.coco_dataset.CocoDataset.fpath>` -
+ * :attr:`kwcoco.CocoDataset.fpath<kwcoco.coco_dataset.CocoDataset.fpath>` - if known, this stores the filepath the dataset was loaded from
  * :attr:`kwcoco.CocoDataset.gid_to_aids<kwcoco.coco_dataset.CocoDataset.gid_to_aids>` -
  * :attr:`kwcoco.CocoDataset.img_root<kwcoco.coco_dataset.CocoDataset.img_root>` -
  * :attr:`kwcoco.CocoDataset.imgs<kwcoco.coco_dataset.CocoDataset.imgs>` -
