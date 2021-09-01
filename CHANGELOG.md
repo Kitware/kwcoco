@@ -8,6 +8,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.12 - Unreleased
 
 
+### Changed
+
+* Removed six from CocoDataset
+* Added support for pathlib
+
+
 ## Version 0.2.11 - Released 2021-08-25
 
 

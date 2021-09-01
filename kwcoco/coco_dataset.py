@@ -260,7 +260,6 @@ import itertools as it
 import json
 import numpy as np
 import os
-import six
 import ubelt as ub
 import warnings
 import sortedcontainers
@@ -268,7 +267,7 @@ import numbers
 from collections import OrderedDict, defaultdict
 from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
                      commonprefix)
-from six.moves import cStringIO as StringIO
+from io import StringIO
 
 # Vectorized ORM-Like containers
 from kwcoco.coco_objects1d import Categories, Videos, Images, Annots
@@ -591,7 +590,7 @@ class MixinCocoAccessors(object):
         """
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
+        elif isinstance(id_or_name_or_dict, str):
             resolved_id = self.index.name_to_cat[id_or_name_or_dict]['id']
         else:
             resolved_id = id_or_name_or_dict['id']
@@ -603,7 +602,7 @@ class MixinCocoAccessors(object):
         """
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
+        elif isinstance(id_or_name_or_dict, str):
             resolved_id = self.index.file_name_to_img[id_or_name_or_dict]['id']
         else:
             resolved_id = id_or_name_or_dict['id']
@@ -615,7 +614,7 @@ class MixinCocoAccessors(object):
         """
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
+        elif isinstance(id_or_name_or_dict, str):
             resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']
         else:
             resolved_id = id_or_name_or_dict['id']
@@ -692,7 +691,7 @@ class MixinCocoAccessors(object):
                     kpcat = _kpcat
             if kpcat is None:
                 raise KeyError('unable to find keypoint category')
-        elif isinstance(kp_identifier, six.string_types):
+        elif isinstance(kp_identifier, str):
             kpcat = None
             for _kpcat in self.dataset['keypoint_categories']:
                 if _kpcat['name'] == kp_identifier:
@@ -751,7 +750,7 @@ class MixinCocoAccessors(object):
                 if found is None:
                     raise KeyError(
                         'Cannot find a category with id={}'.format(cat_identifier))
-        elif isinstance(cat_identifier, six.string_types):
+        elif isinstance(cat_identifier, str):
             cat = self._alias_to_cat(cat_identifier)
         elif isinstance(cat_identifier, dict):
             cat = cat_identifier
@@ -793,7 +792,7 @@ class MixinCocoAccessors(object):
             fixed_cat = None
             for cat in self.dataset['categories']:
                 alias_list = cat.get('alias', [])
-                if isinstance(alias_list, six.string_types):
+                if isinstance(alias_list, str):
                     alias_list = [alias_list]
                 assert isinstance(alias_list, list)
                 alias_list = alias_list + [cat['name']]
@@ -1943,7 +1942,7 @@ class MixinCocoExtras(object):
 
     @data_root.setter
     def data_root(self, value):
-        self.bundle_dpath = value
+        self.bundle_dpath = value if value is None else os.fspath(value)
 
     @property
     def img_root(self):
@@ -3326,7 +3325,10 @@ class MixinCocoAddRemove(object):
 
         img = _dict()
         img['id'] = int(id)
-        img['file_name'] = file_name
+        try:
+            img['file_name'] = os.fspath(file_name)
+        except TypeError:
+            img['file_name'] = file_name
         img.update(**kw)
         self.index._add_image(id, img)
         self.dataset['images'].append(img)
@@ -4794,8 +4796,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             # bundle_dpath, then we assume it is relative to the cwd.
             assumed_root = '.'
             inferred_date_type = 'json-dict'
-        elif isinstance(data, six.string_types):
-            path = data
+        elif isinstance(data, (str, os.PathLike)):
+            path = os.fspath(data)
             if isdir(path):
                 # data was a pointer to hopefully a kwcoco bundle
                 if bundle_dpath is None:
@@ -4857,7 +4859,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if bundle_dpath is not None:
             assumed_root = bundle_dpath
 
-        if isinstance(data, six.string_types):
+        if isinstance(data, (str, os.PathLike)):
             # assumed_root = dirname(fpath)
             with open(fpath, 'r') as file:
                 data = json.load(file)
@@ -4874,7 +4876,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             body_root = data.get('img_root', '')
             if body_root is None:
                 body_root = ''
-            elif isinstance(body_root, six.string_types):
+            elif isinstance(body_root, str):
                 _tmp = ub.expandpath(body_root)
                 if exists(_tmp):
                     body_root = _tmp
@@ -4927,7 +4929,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     @fpath.setter
     def fpath(self, value):
-        self._fpath = value
+        self._fpath = value if value is None else os.fspath(value)
         self._infer_dirs()
 
     def _infer_dirs(self):
@@ -5181,7 +5183,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
         """
-        if isinstance(file, six.string_types):
+        if isinstance(file, (str, os.PathLike)):
             with open(file, 'w') as fp:
                 self.dump(fp, indent=indent, newlines=newlines)
         else:
