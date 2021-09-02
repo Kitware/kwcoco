@@ -28,28 +28,20 @@ def _create_demo_dataset():
     return dset
 
 
-def test_subset_method():
+def test_subset_api_method():
     """
     Test that the custom "user" property is not dropped
     """
     dset = _create_demo_dataset()
-
     subset_gids = list(dset.imgs.keys())[::2]
     subdset = dset.subset(subset_gids)
     print('subdset.dataset = {}'.format(ub.repr2(subdset.dataset, nl=2)))
-
     print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
     assert len(subdset.index.imgs) == 2
     assert ub.peek(subdset.index.anns.values())['user'] == 'me'
 
 
-def test_subset_method_cli_gids():
-    try:
-        import jq  # NOQA
-    except Exception:
-        import pytest
-        pytest.skip()
-
+def test_subset_cli_with_gids():
     dset = _create_demo_dataset()
     subset_gids = list(dset.imgs.keys())[::2]
 
@@ -70,7 +62,12 @@ def test_subset_method_cli_gids():
     assert ub.peek(dst_dset2.index.anns.values())['user'] == 'me'
 
 
-def test_subset_method_cli_with_jq():
+def test_subset_cli_with_jq():
+    try:
+        import jq  # NOQA
+    except Exception:
+        import pytest
+        pytest.skip()
     dset = _create_demo_dataset()
 
     dpath = ub.ensure_app_cache_dir('kwcoco/test/subset')
@@ -78,12 +75,12 @@ def test_subset_method_cli_with_jq():
     dset.dump(dset.fpath)
 
     dst_fpath1 = join(dpath, 'output.kwcoco.json')
-    config1 = {
+    config2 = {
         'src': dset.fpath,
         'dst': dst_fpath1,
         'select_images': '.id % 2 == 0'
     }
-    coco_subset.CocoSubsetCLI.main(**config1)
+    coco_subset.CocoSubsetCLI.main(**config2)
     dst_dset1 = kwcoco.CocoDataset(dst_fpath1)
 
     assert len(dst_dset1.index.imgs) == 2
