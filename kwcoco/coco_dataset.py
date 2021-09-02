@@ -2492,8 +2492,8 @@ class MixinCocoStats(object):
         Reports number of images, annotations, and categories.
 
         SeeAlso:
-            :func:`basic_stats`
-            :func:`extended_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.basic_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.extended_stats`
 
         Example:
             >>> import kwcoco
@@ -2528,8 +2528,8 @@ class MixinCocoStats(object):
         Reports number of images, annotations, and categories.
 
         SeeAlso:
-            :func:`basic_stats`
-            :func:`extended_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.basic_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.extended_stats`
 
         Example:
             >>> self = CocoDataset.demo()
