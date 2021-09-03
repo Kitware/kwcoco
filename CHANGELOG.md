@@ -8,10 +8,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.12 - Unreleased
 
 
+### Added
+* Initial implementation of shorthand channels
+
+
 ### Changed
 
 * Removed six from CocoDataset
 * Added support for pathlib
+
+
+### Fixed
+* Fixed bug in union with relative paths
 
 
 ## Version 0.2.11 - Released 2021-08-25
