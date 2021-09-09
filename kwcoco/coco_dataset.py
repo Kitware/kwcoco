@@ -287,7 +287,7 @@ SPEC_KEYS = [
     'licenses',
     'categories',
     'keypoint_categories',  # support only partially implemented
-    'videos',  # support only partially implemented
+    'videos',
     'images',
     'annotations',
 ]
@@ -1108,14 +1108,16 @@ class MixinCocoExtras(object):
                 'multispectral': None,
             }
             suff_parts = []
+            print('res = {!r}'.format(res))
             if res:
                 kw['num_videos'] = int(res.named['num_videos'])
                 if 'suffix' in res.named:
                     suff_parts = res.named['suffix'].split('-')
+            print('suff_parts = {!r}'.format(suff_parts))
 
             for part in suff_parts:
                 if part.startswith('frames'):
-                    vidkw['num_frames'] = int(part[6:])
+                    vidkw['num_frames'] = int(part.replace('frames', ''))
                 if 'aux' == part:
                     vidkw['aux'] = True
                 elif 'multispectral' == part:
@@ -4861,8 +4863,19 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         if isinstance(data, (str, os.PathLike)):
             # assumed_root = dirname(fpath)
-            with open(fpath, 'r') as file:
-                data = json.load(file)
+            if exists(fpath):
+                with open(fpath, 'r') as file:
+                    data = json.load(file)
+            else:
+                # new dataset with a file name given
+                data = {
+                    'categories': [],
+                    'videos': [],
+                    'images': [],
+                    'annotations': [],
+                    'licenses': [],
+                    'info': [],
+                }
 
             # If data is a path it gives us the absolute location of the root
             if tag is None:
