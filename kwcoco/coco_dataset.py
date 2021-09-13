@@ -4108,7 +4108,7 @@ class MixinCocoAddRemove(object):
 
 
 # Defined as a global for pickle
-# TODO: add a pickled test
+# TODO: add a pickled test, FIXME: I dont think this is safe
 def _lut_frame_index(imgs, gid):
     return imgs[gid]['frame_index']
 
@@ -4870,20 +4870,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             assumed_root = bundle_dpath
 
         if isinstance(data, (str, os.PathLike)):
-            # assumed_root = dirname(fpath)
-            if exists(fpath):
-                with open(fpath, 'r') as file:
-                    data = json.load(file)
-            else:
-                # new dataset with a file name given
-                data = {
-                    'categories': [],
-                    'videos': [],
-                    'images': [],
-                    'annotations': [],
-                    'licenses': [],
-                    'info': [],
-                }
+            if not exists(fpath):
+                raise Exception(ub.paragraph(
+                    '''
+                    Specified fpath={} does not exist. If you are trying
+                    to create a new dataset fist create a CocoDataset without
+                    any arguments, and then set the fpath attribute
+                    ''').format(fpath))
+
+            with open(fpath, 'r') as file:
+                data = json.load(file)
 
             # If data is a path it gives us the absolute location of the root
             if tag is None:
