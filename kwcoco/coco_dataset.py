@@ -4167,7 +4167,7 @@ class CocoIndex(object):
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
         """
-        return sortedcontainers.SortedSet(gids, key=partial(index, _lut_frame_index))
+        return sortedcontainers.SortedSet(gids, key=partial(_lut_frame_index, index))
 
     def __init__(index):
         index.anns = None
