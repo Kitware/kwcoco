@@ -268,6 +268,7 @@ from collections import OrderedDict, defaultdict
 from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
                      commonprefix)
 from io import StringIO
+from functools import partial
 
 # Vectorized ORM-Like containers
 from kwcoco.coco_objects1d import Categories, Videos, Images, Annots
@@ -4106,6 +4107,11 @@ class MixinCocoAddRemove(object):
         self._invalidate_hashid(['annotations'])
 
 
+# Defined as a global for pickle
+def _lut_frame_index(index, gid):
+    return index.imgs[gid]['frame_index']
+
+
 class CocoIndex(object):
     """
     Fast lookup index for the COCO dataset with dynamic modification
@@ -4161,9 +4167,7 @@ class CocoIndex(object):
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
         """
-        def _lut_frame_index(gid):
-            return index.imgs[gid]['frame_index']
-        return sortedcontainers.SortedSet(gids, key=_lut_frame_index)
+        return sortedcontainers.SortedSet(gids, key=partial(index, _lut_frame_index))
 
     def __init__(index):
         index.anns = None
