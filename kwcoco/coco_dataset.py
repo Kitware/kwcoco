@@ -4108,8 +4108,9 @@ class MixinCocoAddRemove(object):
 
 
 # Defined as a global for pickle
-def _lut_frame_index(index, gid):
-    return index.imgs[gid]['frame_index']
+# TODO: add a pickled test
+def _lut_frame_index(imgs, gid):
+    return imgs[gid]['frame_index']
 
 
 class CocoIndex(object):
@@ -4167,7 +4168,7 @@ class CocoIndex(object):
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
         """
-        return sortedcontainers.SortedSet(gids, key=partial(_lut_frame_index, index))
+        return sortedcontainers.SortedSet(gids, key=partial(_lut_frame_index, index.imgs))
 
     def __init__(index):
         index.anns = None
