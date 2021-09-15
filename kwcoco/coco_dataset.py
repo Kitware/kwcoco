@@ -4113,6 +4113,19 @@ def _lut_frame_index(imgs, gid):
     return imgs[gid]['frame_index']
 
 
+class SortedSetQuiet(sortedcontainers.SortedSet):
+    def __repr__(self):
+        """Return string representation of sorted set.
+
+        ``ss.__repr__()`` <==> ``repr(ss)``
+
+        :return: string representation
+
+        """
+        type_name = type(self).__name__
+        return '{0}({1!r})'.format(type_name, list(self))
+
+
 class CocoIndex(object):
     """
     Fast lookup index for the COCO dataset with dynamic modification
@@ -4168,7 +4181,12 @@ class CocoIndex(object):
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
         """
-        return sortedcontainers.SortedSet(gids, key=partial(_lut_frame_index, index.imgs))
+        # FIXME: likely need to do something to help this pickle nicely
+        return SortedSetQuiet(gids, key=partial(_lut_frame_index, index.imgs))
+        # This breaks in a different way
+        # def _lut_frame_index2(gid):
+        #     return index.imgs[gid]['frame_index']
+        # return sortedcontainers.SortedSet(gids, key=_lut_frame_index2)
 
     def __init__(index):
         index.anns = None

@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Initial implementation of shorthand channels
 * Parametarized `max_speed` of toydata objects
+* Add `combine_kwcoco_measures` function
 
 
 ### Changed
