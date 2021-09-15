@@ -1682,6 +1682,7 @@ def combine_kwcoco_measures(tocombine, precision=None):
         >>> measures2 = measures1  # BinaryConfusionVectors.demo(n=15).measures()
         >>> tocombine = [measures1, measures2]
         >>> new_measures = combine_kwcoco_measures(tocombine)
+        >>> new_measures.reconstruct()
         >>> print('new_measures = {!r}'.format(new_measures))
         >>> print('measures1 = {!r}'.format(measures1))
         >>> print('measures2 = {!r}'.format(measures2))
