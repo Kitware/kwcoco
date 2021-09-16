@@ -30,13 +30,92 @@ TODO:
 import ubelt as ub
 import six
 import functools
+import abc
 
 
-class FusedChannelSpec(ub.NiceRepr):
+class BaseChannelSpec(ub.NiceRepr):
+    """
+    Common code API between :class:`FusedChannelSpec` and :class:`ChannelSpec`
+
+    TODO:
+        - [ ] Keep working on this base spec and ensure the inheriting classes
+              conform to it.
+    """
+
+    @property
+    @abc.abstractmethod
+    def spec(self):
+        """
+        The string encodeing of this spec
+
+        Returns:
+            str
+        """
+        ...
+
+    @classmethod
+    @abc.abstractmethod
+    def coerce(cls, data):
+        """
+        Try and interpret the input data as some sort of spec
+
+        Args:
+            data (str | int | list | dict | BaseChannelSpec):
+                any input data that is known to represent a spec
+
+        Returns:
+            BaseChannelSpec
+        """
+        ...
+
+    @abc.abstractmethod
+    def streams(self):
+        """
+        Breakup this spec into individual early-fused components
+
+        Returns:
+            List[FusedChannelSpec]
+        """
+        ...
+
+    @abc.abstractmethod
+    def normalize(self):
+        """
+        Expand all channel codes into their normalized long-form
+
+        Returns:
+            BaseChannelSpec
+        """
+        ...
+
+    @abc.abstractmethod
+    def intersection(self):
+        ...
+
+    @abc.abstractmethod
+    def difference(self):
+        ...
+
+    def __nice__(self):
+        return self.spec
+
+    def __json__(self):
+        return self.spec
+
+    def __and__(self, other):
+        # the parent implementation of this is backwards
+        return self.intersection(other)
+
+
+class FusedChannelSpec(BaseChannelSpec):
     """
     A specific type of channel spec with only one early fused stream.
 
     The channels in this stream are non-communative
+
+    Behaves like a list of atomic-channel codes
+    (which may represent more than 1 channel), normalized codes always
+    represent exactly 1 channel.
 
     Note:
         This class name and API is in flux and subject to change.
@@ -75,14 +154,29 @@ class FusedChannelSpec(ub.NiceRepr):
 
     _size_lut = {k: v.count('|') + 1 for k, v in _alias_lut.items()}
 
-    def __init__(self, parsed):
+    def __init__(self, parsed, _is_normalized=False):
         self.parsed = parsed
+        # denote if we are already normalized or not for speed.
+        self._is_normalized = _is_normalized
 
     def __len__(self):
+        import warnings
+        warnings.warn(ub.paragraph(
+            '''
+            Length Definition for FusedChannelSpec is in flux.
+
+            It is unclear if it should be the number of atomic codes or the
+            expanded "numel", which is the number of "normalized" atomic codes.
+            '''))
         return len(self.parsed)
 
     def __getitem__(self, index):
-        return self.__class__(self.parsed[index])
+        if isinstance(index, slice):
+            return self.__class__(self.parsed[index])
+        elif ub.iterable(index):
+            return self.__class__(list(ub.take(self.parsed, index)))
+        else:
+            return self.parsed[index]
 
     @classmethod
     def concat(cls, items):
@@ -107,6 +201,7 @@ class FusedChannelSpec(ub.NiceRepr):
     def coerce(cls, data):
         """
         Example:
+            >>> from kwcoco.channel_spec import *  # NOQA
             >>> FusedChannelSpec.coerce(['a', 'b', 'c'])
             >>> FusedChannelSpec.coerce('a|b|c')
             >>> FusedChannelSpec.coerce(3)
@@ -133,26 +228,28 @@ class FusedChannelSpec(ub.NiceRepr):
             raise TypeError('unknown type {}'.format(type(data)))
         return self
 
-    def __nice__(self):
-        return self.spec
-
-    def __json__(self):
-        return self.spec
-
     @ub.memoize_method
     def normalize(self):
         """
         Replace aliases with explicit single-band-per-code specs
 
+        Returns:
+            FusedChannelSpec : normalize spec
+
         Example:
             >>> from kwcoco.channel_spec import *  # NOQA
             >>> self = FusedChannelSpec.coerce('b1|b2|b3|rgb')
             >>> normed = self.normalize()
+            >>> print('self   = {}'.format(ub.repr2(self, nl=1)))
             >>> print('normed = {}'.format(ub.repr2(normed, nl=1)))
             >>> self = FusedChannelSpec.coerce('B:1:11')
             >>> normed = self.normalize()
+            >>> print('self   = {}'.format(ub.repr2(self, nl=1)))
             >>> print('normed = {}'.format(ub.repr2(normed, nl=1)))
         """
+        if self._is_normalized:
+            return self
+
         norm_parsed = []
         for v in self.parsed:
             if v in self._alias_lut:
@@ -176,8 +273,54 @@ class FusedChannelSpec(ub.NiceRepr):
         # self._alias_lut.get(v, v).split('|')
         # norm_parsed = list(ub.flatten(
         #     for v in self.parsed))
-        normed = FusedChannelSpec(norm_parsed)
+        normed = FusedChannelSpec(norm_parsed, _is_normalized=True)
         return normed
+
+    def numel(self):
+        """
+        Total number of channels in this spec
+        """
+        if self._is_normalized:
+            return len(self.parsed)
+        else:
+            return sum(self.sizes())
+
+    def sizes(self):
+        """
+        Returns a list indicating the size of each atomic code
+
+        Returns:
+            List[int]
+
+        Example:
+            >>> from kwcoco.channel_spec import *  # NOQA
+            >>> self = FusedChannelSpec.coerce('b1|Z:3|b2|b3|rgb')
+            >>> self.sizes()
+            [1, 3, 1, 1, 3]
+        """
+        if self._is_normalized:
+            return [1] * len(self.parsed)
+        size_list = []
+        for v in self.parsed:
+            if v in self._alias_lut:
+                num = self._alias_lut.get(v).count('|') + 1
+            else:
+                if ':' in v:
+                    root, *slice_args = v.split(':')
+                    if len(slice_args) == 1:
+                        start = 0
+                        stop, = map(int, slice_args)
+                        step = 1
+                    elif len(slice_args) == 2:
+                        start, stop = map(int, slice_args)
+                        step = 1
+                    else:
+                        raise NotImplementedError
+                    num = len(range(start, stop, step))
+                else:
+                    num = 1
+            size_list.append(num)
+        return size_list
 
     def __contains__(self, key):
         """
@@ -277,11 +420,29 @@ class FusedChannelSpec(ub.NiceRepr):
             component_indices[part] = index
         return component_indices
 
+    def streams(self):
+        """
+        Idempotence with :func:`ChannelSpec.streams`
+        """
+        return [self]
 
-class ChannelSpec(ub.NiceRepr):
+    def fuse(self):
+        """
+        Idempotence with :func:`ChannelSpec.streams`
+        """
+        return self
+
+
+class ChannelSpec(BaseChannelSpec):
     """
     Parse and extract information about network input channel specs for
     early or late fusion networks.
+
+    Behaves like a dictionary of FusedChannelSpec objects
+
+    TODO:
+        - [ ] Rename to something that indicates this is a collection of
+            FusedChannelSpec? MultiChannelSpec?
 
     Note:
         This class name and API is in flux and subject to change.
@@ -295,6 +456,7 @@ class ChannelSpec(ub.NiceRepr):
         not matter
 
     Example:
+        >>> from kwcoco.channel_spec import *  # NOQA
         >>> # Integer spec
         >>> ChannelSpec.coerce(3)
         <ChannelSpec(u0|u1|u2) ...>
@@ -358,28 +520,17 @@ class ChannelSpec(ub.NiceRepr):
 
     """
 
-    _alias_lut = {
-        'rgb': 'r|g|b',
-        'rgba': 'r|g|b|a',
-        'dxdy': 'dx|dy',
-        'fxfy': 'fx|fy',
-    }
-
-    _size_lut = {k: v.count('|') + 1 for k, v in _alias_lut.items()}
-
     def __init__(self, spec, parsed=None):
         # TODO: allow integer specs
-        self.spec = spec
+        self._spec = spec
         self._info = {
             'spec': spec,
             'parsed': parsed,
         }
 
-    def __nice__(self):
-        return self.spec
-
-    def __json__(self):
-        return self.spec
+    @property
+    def spec(self):
+        return self._spec
 
     def __contains__(self, key):
         """
@@ -400,6 +551,9 @@ class ChannelSpec(ub.NiceRepr):
 
     @classmethod
     def coerce(cls, data):
+        """
+        Returns ChannelSpec
+        """
         if isinstance(data, cls):
             self = data
             return self
@@ -423,11 +577,19 @@ class ChannelSpec(ub.NiceRepr):
     def parse(self):
         """
         Build internal representation
+
+        Example:
+            >>> from kwcoco.channel_spec import *  # NOQA
+            >>> self = ChannelSpec('b1|b2|b3|rgb,B:3')
+            >>> print(self.parse())
+            >>> print(self.normalize().parse())
         """
         if self._info.get('parsed', None) is None:
             # commas break inputs into multiple streams
             stream_specs = self.spec.split(',')
-            parsed = {ss: ss.split('|') for ss in stream_specs}
+            # parsed = {ss: ss.split('|') for ss in stream_specs}
+            parsed = {ss: FusedChannelSpec(ss.split('|'))
+                      for ss in stream_specs}
             self._info['parsed'] = parsed
         return self._info['parsed']
 
@@ -435,28 +597,25 @@ class ChannelSpec(ub.NiceRepr):
         """
         Replace aliases with explicit single-band-per-code specs
 
+        Returns:
+            ChannelSpec : normalized spec
+
         Example:
-            >>> self = ChannelSpec('b1|b2|b3|rgb')
-            >>> self.normalize()
-            >>> list(self.keys())
+            >>> self = ChannelSpec('b1|b2,b3|rgb,B:3')
+            >>> normed = self.normalize()
+            >>> print('self   = {}'.format(self))
+            >>> print('normed = {}'.format(normed))
+            self   = <ChannelSpec(b1|b2,b3|rgb,B:3)>
+            normed = <ChannelSpec(b1|b2,b3|r|g|b,B.0|B.1|B.2)>
         """
         new_parsed = {}
         for k1, v1 in self.parse().items():
-            norm_vals = list(
-                ub.flatten(self._alias_lut.get(v, v).split('|') for v in v1))
-            norm_key = '|'.join(norm_vals)
+            norm_vals = v1.normalize()
+            norm_key = norm_vals.spec
             new_parsed[norm_key] = norm_vals
         new_spec = ','.join(list(new_parsed.keys()))
         normed = ChannelSpec(new_spec, parsed=new_parsed)
         return normed
-        # spec = self.spec
-        # stream_specs = spec.split(',')
-        # parsed = {ss: ss for ss in stream_specs}
-        # for k1 in parsed.keys():
-        #     for alias, alias_spec in self._alias_lut.items():
-        #         parsed[k1] = parsed[k1].replace(alias, alias_spec)
-        # parsed = {k: v.split('|') for k, v in parsed.items()}
-        # return parsed
 
     def keys(self):
         spec = self.spec
@@ -469,6 +628,28 @@ class ChannelSpec(ub.NiceRepr):
 
     def items(self):
         return self.parse().items()
+
+    def fuse(self):
+        """
+        Fuse all parts into an early fused channel spec
+
+        Returns:
+            FusedChannelSpec
+
+        Example:
+            >>> from kwcoco.channel_spec import *  # NOQA
+            >>> self = ChannelSpec.coerce('b1|b2,b3|rgb,B:3')
+            >>> fused = self.fuse()
+            >>> print('self  = {}'.format(self))
+            >>> print('fused = {}'.format(fused))
+            self  = <ChannelSpec(b1|b2,b3|rgb,B:3)>
+            fused = <FusedChannelSpec(b1|b2|b3|rgb|B:3)>
+        """
+        parts = self.streams()
+        if len(parts) == 1:
+            return parts[0]
+        else:
+            return FusedChannelSpec(list(ub.flatten([p.parsed for p in parts])))
 
     def streams(self):
         """
@@ -491,36 +672,48 @@ class ChannelSpec(ub.NiceRepr):
 
     def difference(self, other):
         """
-        Set difference
+        Set difference. Remove all instances of other channels from
+        this set of channels.
 
         Example:
-            >>> self = ChannelSpec('rgb|disparity,flowx|flowy')
+            >>> from kwcoco.channel_spec import *
+            >>> self = ChannelSpec('rgb|disparity,flowx|r|flowy')
             >>> other = ChannelSpec('rgb')
-            >>> self.difference(other)
+            >>> print(self.difference(other))
             >>> other = ChannelSpec('flowx')
-            >>> self.difference(other)
+            >>> print(self.difference(other))
+            <ChannelSpec(disparity,flowx|flowy)>
+            <ChannelSpec(r|g|b|disparity,r|flowy)>
         """
-        assert len(list(other.keys())) == 1, 'can take diff with one stream'
-        other_norm = ub.oset(ub.peek(other.normalize().values()))
+        # assert len(list(other.keys())) == 1, 'can take diff with one stream'
+        other_norm = ChannelSpec.coerce(other).fuse().normalize()
+        # other_norm = ub.oset(ub.peek(other.normalize().values()))
         self_norm = self.normalize()
 
         new_streams = []
         for parts in self_norm.values():
-            new_parts = ub.oset(parts) - ub.oset(other_norm)
+            new_stream = parts.difference(other_norm)
+            # new_parts = ub.oset(parts) - ub.oset(other_norm)
             # shrink the representation of a complex r|g|b to an alias if
             # possible.
             # TODO: make this more efficient
-            for alias, alias_spec in self._alias_lut.items():
-                alias_parts = ub.oset(alias_spec.split('|'))
-                index = subsequence_index(new_parts, alias_parts)
-                if index is not None:
-                    oset_delitem(new_parts, index)
-                    oset_insert(new_parts, index.start, alias)
-            new_stream = '|'.join(new_parts)
+            # for alias, alias_spec in self._alias_lut.items():
+            #     alias_parts = ub.oset(alias_spec.split('|'))
+            #     index = subsequence_index(new_parts, alias_parts)
+            #     if index is not None:
+            #         oset_delitem(new_parts, index)
+            #         oset_insert(new_parts, index.start, alias)
+            # new_stream = '|'.join(new_parts)
             new_streams.append(new_stream)
-        new_spec = ','.join(new_streams)
+        new_spec = ','.join([s.spec for s in new_streams])
         new = self.__class__(new_spec)
         return new
+
+    def numel(self):
+        """
+        Total number of channels in this spec
+        """
+        return sum(self.sizes().values())
 
     def sizes(self):
         """
@@ -529,11 +722,11 @@ class ChannelSpec(ub.NiceRepr):
         IE: The EARLY-FUSED channel sizes
 
         Example:
-            >>> self = ChannelSpec('rgb|disparity,flowx|flowy')
+            >>> self = ChannelSpec('rgb|disparity,flowx|flowy,B:10')
             >>> self.sizes()
         """
         sizes = {
-            key: sum(self._size_lut.get(part, 1) for part in vals)
+            key: vals.numel()
             for key, vals in self.parse().items()
         }
         return sizes
@@ -543,8 +736,9 @@ class ChannelSpec(ub.NiceRepr):
         Returns the unique channels that will need to be given or loaded
         """
         import warnings
-        warnings.warn(
-            'FIXME: These kwargs are broken, but does anything use it?')
+        if normalize:
+            warnings.warn(
+                'FIXME: These kwargs are broken, but does anything use it?')
         if normalize:
             return set(ub.flatten(self.parse().values()))
         else:
@@ -565,8 +759,7 @@ class ChannelSpec(ub.NiceRepr):
         fused_keys = list(self.keys())
         for fused_key in fused_keys:
             components = parsed[fused_key]
-            for mode_key in components:
-                c = self._size_lut.get(mode_key, 1)
+            for mode_key, c in zip(components.parsed, components.sizes()):
                 shape = (c,) + tuple(dims)
                 item_shapes[mode_key] = shape
         return item_shapes
@@ -680,8 +873,10 @@ class ChannelSpec(ub.NiceRepr):
             # Slightly more complex implementation that attempts to minimize
             # concat operations.
             item_keys = tuple(sorted(item.keys()))
-            parsed_items = tuple(sorted([(k, tuple(v)) for k, v in parsed.items()]))
-            new_fused_indices = _cached_single_fused_mapping(item_keys, parsed_items, axis=axis)
+            parsed_items = tuple(sorted([(k, tuple(v.parsed))
+                                         for k, v in parsed.items()]))
+            new_fused_indices = _cached_single_fused_mapping(
+                item_keys, parsed_items, axis=axis)
 
             fused = {}
             for key, idx_list in new_fused_indices.items():
@@ -753,8 +948,8 @@ class ChannelSpec(ub.NiceRepr):
         components = dict()
         for key, parts in parsed.items():
             idx1 = 0
-            for part in parts:
-                size = self._size_lut.get(part, 1)
+            for part, size in zip(parts.parsed, parts.sizes()):
+                # size = self._size_lut.get(part, 1)
                 idx2 = idx1 + size
                 fused = inputs[key]
                 index = tuple([slice(None)] * axis + [slice(idx1, idx2)])
@@ -784,8 +979,7 @@ class ChannelSpec(ub.NiceRepr):
         component_indices = dict()
         for key, parts in parsed.items():
             idx1 = 0
-            for part in parts:
-                size = self._size_lut.get(part, 1)
+            for part, size in zip(parts.parsed, parts.sizes()):
                 idx2 = idx1 + size
                 index = tuple([slice(None)] * axis + [slice(idx1, idx2)])
                 idx1 = idx2
