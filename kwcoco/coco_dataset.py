@@ -1106,6 +1106,7 @@ class MixinCocoExtras(object):
                 'image_size': (600, 600),
                 'aux': None,
                 'multispectral': None,
+                'max_speed': 0.01,
             }
             suff_parts = []
             print('res = {!r}'.format(res))
@@ -1118,6 +1119,8 @@ class MixinCocoExtras(object):
             for part in suff_parts:
                 if part.startswith('frames'):
                     vidkw['num_frames'] = int(part.replace('frames', ''))
+                if part.startswith('speed'):
+                    vidkw['max_speed'] = float(part.replace('speed', ''))
                 if 'aux' == part:
                     vidkw['aux'] = True
                 elif 'multispectral' == part:
