@@ -381,7 +381,7 @@ class FusedChannelSpec(BaseChannelSpec):
         other_norm = ub.oset(other.normalize().parsed)
         self_norm = ub.oset(self.normalize().parsed)
         new_parsed = list(self_norm - other_norm)
-        new = self.__class__(new_parsed)
+        new = self.__class__(new_parsed, _is_normalized=True)
         return new
 
     def intersection(self, other):
@@ -395,7 +395,7 @@ class FusedChannelSpec(BaseChannelSpec):
         other_norm = ub.oset(other.normalize().parsed)
         self_norm = ub.oset(self.normalize().parsed)
         new_parsed = list(self_norm & other_norm)
-        new = self.__class__(new_parsed)
+        new = self.__class__(new_parsed, _is_normalized=True)
         return new
 
     def component_indices(self, axis=2):
