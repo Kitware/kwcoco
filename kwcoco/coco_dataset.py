@@ -3153,19 +3153,46 @@ class MixinCocoDraw(object):
             ]
             if channels is None:
                 print('avail_channels = {!r}'.format(avail_channels))
+                from kwcoco.channel_spec import FusedChannelSpec
+                avail_spec = FusedChannelSpec.coerce('|'.join(avail_channels)).normalize()
+                num_chans = avail_spec.numel()
+
+                if (num_chans) == 0:
+                    raise Exception('no channels!')
+                elif (num_chans) == 2:
+                    print('Auto choosing 1 channel')
+                    channels = avail_spec[0]
+                elif (num_chans) > 3:
+                    print('Auto choosing 3 channel')
+                    sensible_defaults = [
+                        FusedChannelSpec.coerce('red|green|blue'),
+                        FusedChannelSpec.coerce('r|g|b'),
+                    ]
+                    chosen = None
+                    for sensible in sensible_defaults:
+                        print('sensible = {!r}'.format(sensible))
+                        cand = avail_spec & sensible
+                        print('cand = {!r}'.format(cand))
+                        if cand.numel() == 3:
+                            chosen = cand
+                            break
+                    if chosen is None:
+                        chosen = avail_spec[0:3]
+                    print('chosen = {!r}'.format(chosen))
+                    channels = chosen
+
             print('loading image')
-            delayed = self.delayed_load(img['id'], channels=channels)
+            delayed = self.delayed_load(
+                img['id'], channels=channels, space='image')
             np_img = delayed.finalize()
             print('loaded image')
 
         np_img = kwimage.atleast_3channels(np_img)
 
-        # TODO: percentile normalization
-
         np_img01 = None
         if np_img.dtype.kind in {'i', 'u'}:
             if np_img.max() > 255:
-                np_img01 = np_img / np_img.max()
+                np_img01 = kwimage.normalize_intensity(np_img)
 
         fig = plt.gcf()
         ax = fig.gca()
@@ -3187,9 +3214,7 @@ class MixinCocoDraw(object):
                 alpha_mask[..., 3] = mask * 0.5
                 layers.append(alpha_mask)
 
-            with ub.Timer('overlay'):
-                masked_img = kwimage.overlay_alpha_layers(layers[::-1])
-
+            masked_img = kwimage.overlay_alpha_layers(layers[::-1])
             ax.imshow(masked_img)
         else:
             if np_img01 is not None:

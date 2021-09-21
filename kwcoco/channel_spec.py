@@ -143,6 +143,14 @@ class FusedChannelSpec(BaseChannelSpec):
 
         Or do we want to ensure the serialization is parsed before we
         construct the data structure?
+
+    Example:
+        >>> from kwcoco.channel_spec import *  # NOQA
+        >>> import pickle
+        >>> self = FusedChannelSpec.coerce(3)
+        >>> recon = pickle.loads(pickle.dumps(self))
+        >>> self = ChannelSpec.coerce('a|b,c|d')
+        >>> recon = pickle.loads(pickle.dumps(self))
     """
 
     _alias_lut = {
@@ -742,6 +750,8 @@ class ChannelSpec(BaseChannelSpec):
             >>> self = ChannelSpec('rgb|disparity,flowx|flowy,B:10')
             >>> self.sizes()
         """
+        print('self = {!r}'.format(self))
+        print('self._info = {}'.format(ub.repr2(self._info, nl=1)))
         sizes = {
             key: vals.numel()
             for key, vals in self.parse().items()
