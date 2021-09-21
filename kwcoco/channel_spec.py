@@ -552,14 +552,27 @@ class ChannelSpec(BaseChannelSpec):
     @classmethod
     def coerce(cls, data):
         """
-        Returns ChannelSpec
+        Attempt to interpret the data as a channel specification
+
+        Returns:
+            ChannelSpec
+
+        Example:
+            >>> from kwcoco.channel_spec import *  # NOQA
+            >>> data = FusedChannelSpec.coerce(3)
+            >>> assert ChannelSpec.coerce(data).spec == 'u0|u1|u2'
+            >>> data = ChannelSpec.coerce(3)
+            >>> assert data.spec == 'u0|u1|u2'
+            >>> assert ChannelSpec.coerce(data).spec == 'u0|u1|u2'
+            >>> data = ChannelSpec.coerce('u:3')
+            >>> assert data.normalize().spec == 'u.0|u.1|u.2'
         """
         if isinstance(data, cls):
             self = data
             return self
         elif isinstance(data, FusedChannelSpec):
             spec = data.spec
-            parsed = {spec: data.parsed}
+            parsed = {spec: data}
             self = cls(spec, parsed)
             return self
         else:
