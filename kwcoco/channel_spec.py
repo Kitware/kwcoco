@@ -161,13 +161,17 @@ class FusedChannelSpec(BaseChannelSpec):
 
     def __len__(self):
         import warnings
-        warnings.warn(ub.paragraph(
-            '''
-            Length Definition for FusedChannelSpec is in flux.
+        if not self._is_normalized:
+            warnings.warn(ub.paragraph(
+                '''
+                Length Definition for unormalized FusedChannelSpec is in flux.
 
-            It is unclear if it should be the number of atomic codes or the
-            expanded "numel", which is the number of "normalized" atomic codes.
-            '''))
+                It is unclear if it should be the (1) number of atomic codes or
+                (2) the expanded "numel", which is the number of "normalized"
+                atomic codes. Currently it returns the number "unnormalized"
+                atomic codes. Normalizing the FusedChannelSpec object or using
+                "numel" will supress this warning.
+                '''))
         return len(self.parsed)
 
     def __getitem__(self, index):
