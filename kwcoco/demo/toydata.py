@@ -308,7 +308,7 @@ def demodata_toy_dset(image_size=(600, 600),
 def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
         image_size=(600, 600), verbose=3, render=False, aux=None,
-        multispectral=False, rng=None, dpath=None, **kwargs):
+        multispectral=False, rng=None, dpath=None, max_speed=0.01, **kwargs):
     """
     Create a toy Coco Video Dataset
 
@@ -337,6 +337,8 @@ def random_video_dset(
 
         multispectral (bool): similar to aux, but does not have the concept of
             a "main" image.
+
+        max_speed (float): max speed of movers
 
         **kwargs : used for old backwards compatible argument names
             gsize - alias for image_size
@@ -391,7 +393,8 @@ def random_video_dset(
             image_size=image_size, num_frames=num_frames,
             num_tracks=num_tracks, tid_start=tid_start, anchors=anchors,
             gid_start=gid_start, video_id=vidid, render=False, autobuild=False,
-            aux=aux, multispectral=multispectral, rng=rng)
+            aux=aux, multispectral=multispectral, max_speed=max_speed,
+            rng=rng)
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
             tid_start = dset.dataset['annotations'][-1]['track_id'] + 1
@@ -434,9 +437,12 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
                              num_tracks=3, tid_start=1, gid_start=1,
                              video_id=1, anchors=None, rng=None, render=False,
                              dpath=None, autobuild=True, verbose=3, aux=None,
-                             multispectral=False, **kwargs):
+                             multispectral=False, max_speed=0.01, **kwargs):
     """
     Create the video scene layout of object positions.
+
+    Note:
+        Does not render the data unless specified.
 
     Args:
         image_size (Tuple[int, int]): size of the images
@@ -468,6 +474,9 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         multispectral (bool): if specified simulates multispectral imagry
             This is similar to aux, but has no "main" file.
 
+        max_speed (float):
+            max speed of movers
+
         **kwargs : used for old backwards compatible argument names
             gsize - alias for image_size
 
@@ -478,7 +487,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     Example:
         >>> from kwcoco.demo.toydata import *  # NOQA
         >>> anchors = np.array([ [0.3, 0.3],  [0.1, 0.1]])
-        >>> dset = random_single_video_dset(render=True, num_frames=10, num_tracks=10, anchors=anchors)
+        >>> dset = random_single_video_dset(render=True, num_frames=10, num_tracks=10, anchors=anchors, max_speed=0.2)
         >>> # xdoctest: +REQUIRES(--show)
         >>> # Show the tracks in a single image
         >>> import kwplot
@@ -655,13 +664,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     # Generate paths in a way that they are dependant on each other
     paths = random_multi_object_path(
         num_frames=num_frames,
-        num_objects=num_tracks, rng=rng)
+        num_objects=num_tracks, rng=rng,
+        max_speed=max_speed)
 
     for tid, path in zip(track_ids, paths):
-        # degree = rng.randint(1, 5)
-        # num = num_frames
-        # path = random_path(num, degree=degree, rng=rng)
-
         if anchors is None:
             anchors_ = anchors
         else:
@@ -1443,40 +1449,49 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
     return imdata, chan_to_auxinfo
 
 
-def random_multi_object_path(num_objects, num_frames, rng=None):
+def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
     """
 
-    import kwarray
-    import kwplot
-    plt = kwplot.autoplt()
-
-    num_objects = 5
-    num_frames = 100
-    rng = kwarray.ensure_rng(0)
-
-    from kwcoco.demo.toydata import *  # NOQA
-    paths = random_multi_object_path(num_objects, num_frames, rng)
-
-    from mpl_toolkits.mplot3d import Axes3D  # NOQA
-    ax = plt.gca(projection='3d')
-    ax.cla()
-
-    for path in paths:
-        time = np.arange(len(path))
-        ax.plot(time, path.T[0] * 1, path.T[1] * 1, 'o-')
-    ax.set_xlim(0, num_frames)
-    ax.set_ylim(-.01, 1.01)
-    ax.set_zlim(-.01, 1.01)
+    Ignore:
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> #
+        >>> import kwarray
+        >>> import kwplot
+        >>> plt = kwplot.autoplt()
+        >>> #
+        >>> num_objects = 5
+        >>> num_frames = 100
+        >>> rng = kwarray.ensure_rng(0)
+        >>> #
+        >>> from kwcoco.demo.toydata import *  # NOQA
+        >>> paths = random_multi_object_path(num_objects, num_frames, rng, max_speed=0.1)
+        >>> #
+        >>> from mpl_toolkits.mplot3d import Axes3D  # NOQA
+        >>> ax = plt.gca(projection='3d')
+        >>> ax.cla()
+        >>> #
+        >>> for path in paths:
+        >>>     time = np.arange(len(path))
+        >>>     ax.plot(time, path.T[0] * 1, path.T[1] * 1, 'o-')
+        >>> ax.set_xlim(0, num_frames)
+        >>> ax.set_ylim(-.01, 1.01)
+        >>> ax.set_zlim(-.01, 1.01)
 
     """
     import kwarray
     rng = kwarray.ensure_rng(rng)
 
-    USE_TORCH = 0
+    USE_BOIDS = 1
 
-    if not USE_TORCH:
+    if USE_BOIDS:
         from kwcoco.demo.boids import Boids
-        boids = Boids(num_objects, rng=rng).initialize()
+        config = {
+            'perception_thresh': 0.2,
+            'max_speed': max_speed,
+            'max_force': 0.001,
+            'damping': 0.99,
+        }
+        boids = Boids(num_objects, rng=rng, **config).initialize()
         paths = boids.paths(num_frames)
         return paths
     else:

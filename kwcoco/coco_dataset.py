@@ -260,7 +260,6 @@ import itertools as it
 import json
 import numpy as np
 import os
-import six
 import ubelt as ub
 import warnings
 import sortedcontainers
@@ -268,7 +267,8 @@ import numbers
 from collections import OrderedDict, defaultdict
 from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
                      commonprefix)
-from six.moves import cStringIO as StringIO
+from io import StringIO
+from functools import partial
 
 # Vectorized ORM-Like containers
 from kwcoco.coco_objects1d import Categories, Videos, Images, Annots
@@ -288,7 +288,7 @@ SPEC_KEYS = [
     'licenses',
     'categories',
     'keypoint_categories',  # support only partially implemented
-    'videos',  # support only partially implemented
+    'videos',
     'images',
     'annotations',
 ]
@@ -591,7 +591,7 @@ class MixinCocoAccessors(object):
         """
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
+        elif isinstance(id_or_name_or_dict, str):
             resolved_id = self.index.name_to_cat[id_or_name_or_dict]['id']
         else:
             resolved_id = id_or_name_or_dict['id']
@@ -603,7 +603,7 @@ class MixinCocoAccessors(object):
         """
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
+        elif isinstance(id_or_name_or_dict, str):
             resolved_id = self.index.file_name_to_img[id_or_name_or_dict]['id']
         else:
             resolved_id = id_or_name_or_dict['id']
@@ -615,7 +615,7 @@ class MixinCocoAccessors(object):
         """
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
-        elif isinstance(id_or_name_or_dict, six.string_types):
+        elif isinstance(id_or_name_or_dict, str):
             resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']
         else:
             resolved_id = id_or_name_or_dict['id']
@@ -692,7 +692,7 @@ class MixinCocoAccessors(object):
                     kpcat = _kpcat
             if kpcat is None:
                 raise KeyError('unable to find keypoint category')
-        elif isinstance(kp_identifier, six.string_types):
+        elif isinstance(kp_identifier, str):
             kpcat = None
             for _kpcat in self.dataset['keypoint_categories']:
                 if _kpcat['name'] == kp_identifier:
@@ -751,7 +751,7 @@ class MixinCocoAccessors(object):
                 if found is None:
                     raise KeyError(
                         'Cannot find a category with id={}'.format(cat_identifier))
-        elif isinstance(cat_identifier, six.string_types):
+        elif isinstance(cat_identifier, str):
             cat = self._alias_to_cat(cat_identifier)
         elif isinstance(cat_identifier, dict):
             cat = cat_identifier
@@ -793,7 +793,7 @@ class MixinCocoAccessors(object):
             fixed_cat = None
             for cat in self.dataset['categories']:
                 alias_list = cat.get('alias', [])
-                if isinstance(alias_list, six.string_types):
+                if isinstance(alias_list, str):
                     alias_list = [alias_list]
                 assert isinstance(alias_list, list)
                 alias_list = alias_list + [cat['name']]
@@ -1107,16 +1107,21 @@ class MixinCocoExtras(object):
                 'image_size': (600, 600),
                 'aux': None,
                 'multispectral': None,
+                'max_speed': 0.01,
             }
             suff_parts = []
+            print('res = {!r}'.format(res))
             if res:
                 kw['num_videos'] = int(res.named['num_videos'])
                 if 'suffix' in res.named:
                     suff_parts = res.named['suffix'].split('-')
+            print('suff_parts = {!r}'.format(suff_parts))
 
             for part in suff_parts:
                 if part.startswith('frames'):
-                    vidkw['num_frames'] = int(part[6:])
+                    vidkw['num_frames'] = int(part.replace('frames', ''))
+                if part.startswith('speed'):
+                    vidkw['max_speed'] = float(part.replace('speed', ''))
                 if 'aux' == part:
                     vidkw['aux'] = True
                 elif 'multispectral' == part:
@@ -1943,7 +1948,7 @@ class MixinCocoExtras(object):
 
     @data_root.setter
     def data_root(self, value):
-        self.bundle_dpath = value
+        self.bundle_dpath = value if value is None else os.fspath(value)
 
     @property
     def img_root(self):
@@ -2493,8 +2498,8 @@ class MixinCocoStats(object):
         Reports number of images, annotations, and categories.
 
         SeeAlso:
-            :func:`basic_stats`
-            :func:`extended_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.basic_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.extended_stats`
 
         Example:
             >>> import kwcoco
@@ -2529,8 +2534,8 @@ class MixinCocoStats(object):
         Reports number of images, annotations, and categories.
 
         SeeAlso:
-            :func:`basic_stats`
-            :func:`extended_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.basic_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.extended_stats`
 
         Example:
             >>> self = CocoDataset.demo()
@@ -3148,19 +3153,46 @@ class MixinCocoDraw(object):
             ]
             if channels is None:
                 print('avail_channels = {!r}'.format(avail_channels))
+                from kwcoco.channel_spec import FusedChannelSpec
+                avail_spec = FusedChannelSpec.coerce('|'.join(avail_channels)).normalize()
+                num_chans = avail_spec.numel()
+
+                if (num_chans) == 0:
+                    raise Exception('no channels!')
+                elif (num_chans) == 2:
+                    print('Auto choosing 1 channel')
+                    channels = avail_spec[0]
+                elif (num_chans) > 3:
+                    print('Auto choosing 3 channel')
+                    sensible_defaults = [
+                        FusedChannelSpec.coerce('red|green|blue'),
+                        FusedChannelSpec.coerce('r|g|b'),
+                    ]
+                    chosen = None
+                    for sensible in sensible_defaults:
+                        print('sensible = {!r}'.format(sensible))
+                        cand = avail_spec & sensible
+                        print('cand = {!r}'.format(cand))
+                        if cand.numel() == 3:
+                            chosen = cand
+                            break
+                    if chosen is None:
+                        chosen = avail_spec[0:3]
+                    print('chosen = {!r}'.format(chosen))
+                    channels = chosen
+
             print('loading image')
-            delayed = self.delayed_load(img['id'], channels=channels)
+            delayed = self.delayed_load(
+                img['id'], channels=channels, space='image')
             np_img = delayed.finalize()
             print('loaded image')
 
         np_img = kwimage.atleast_3channels(np_img)
 
-        # TODO: percentile normalization
-
         np_img01 = None
         if np_img.dtype.kind in {'i', 'u'}:
             if np_img.max() > 255:
-                np_img01 = np_img / np_img.max()
+                np_img01 = kwimage.normalize_intensity(np_img)
 
         fig = plt.gcf()
         ax = fig.gca()
@@ -3182,9 +3214,7 @@ class MixinCocoDraw(object):
                 alpha_mask[..., 3] = mask * 0.5
                 layers.append(alpha_mask)
 
-            with ub.Timer('overlay'):
-                masked_img = kwimage.overlay_alpha_layers(layers[::-1])
-
+            masked_img = kwimage.overlay_alpha_layers(layers[::-1])
             ax.imshow(masked_img)
         else:
             if np_img01 is not None:
@@ -3326,7 +3356,10 @@ class MixinCocoAddRemove(object):
 
         img = _dict()
         img['id'] = int(id)
-        img['file_name'] = file_name
+        try:
+            img['file_name'] = os.fspath(file_name)
+        except TypeError:
+            img['file_name'] = file_name
         img.update(**kw)
         self.index._add_image(id, img)
         self.dataset['images'].append(img)
@@ -4099,6 +4132,25 @@ class MixinCocoAddRemove(object):
         self._invalidate_hashid(['annotations'])
 
 
+# Defined as a global for pickle
+# TODO: add a pickled test, FIXME: I dont think this is safe
+def _lut_frame_index(imgs, gid):
+    return imgs[gid]['frame_index']
+
+
+class SortedSetQuiet(sortedcontainers.SortedSet):
+    def __repr__(self):
+        """Return string representation of sorted set.
+
+        ``ss.__repr__()`` <==> ``repr(ss)``
+
+        :return: string representation
+
+        """
+        type_name = type(self).__name__
+        return '{0}({1!r})'.format(type_name, list(self))
+
+
 class CocoIndex(object):
     """
     Fast lookup index for the COCO dataset with dynamic modification
@@ -4112,6 +4164,38 @@ class CocoIndex(object):
 
         cats (Dict[int, dict]):
             mapping between category ids and the category dictionaries
+
+        kpcats (Dict[int, dict]):
+            mapping between keypoint category ids and keypoint category
+            dictionaries
+
+        gid_to_aids (Dict[int, List[int]]):
+            mapping between an image-id and annotation-ids that belong to it
+
+        cid_to_aids (Dict[int, List[int]]):
+            mapping between an category-id and annotation-ids that belong to it
+
+        cid_to_gids (Dict[int, List[int]]):
+            mapping between an category-id and image-ids that contain
+            at least one annotation with this cateogry id.
+
+        trackid_to_aids (Dict[int, List[int]]):
+            mapping between a track-id and annotation-ids that belong to it
+
+        vidid_to_gids (Dict[int, List[int]]):
+            mapping between an video-id and images-ids that belong to it
+
+        name_to_video (Dict[str, dict]):
+            mapping between a video name and the video dictionary.
+
+        name_to_cat (Dict[str, dict]):
+            mapping between a category name and the category dictionary.
+
+        name_to_img (Dict[str, dict]):
+            mapping between a image name and the image dictionary.
+
+        file_name_to_img (Dict[str, dict]):
+            mapping between a image file_name and the image dictionary.
     """
 
     # _set = ub.oset  # many operations are much slower for oset
@@ -4122,9 +4206,12 @@ class CocoIndex(object):
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
         """
-        def _lut_frame_index(gid):
-            return index.imgs[gid]['frame_index']
-        return sortedcontainers.SortedSet(gids, key=_lut_frame_index)
+        # FIXME: likely need to do something to help this pickle nicely
+        return SortedSetQuiet(gids, key=partial(_lut_frame_index, index.imgs))
+        # This breaks in a different way
+        # def _lut_frame_index2(gid):
+        #     return index.imgs[gid]['frame_index']
+        # return sortedcontainers.SortedSet(gids, key=_lut_frame_index2)
 
     def __init__(index):
         index.anns = None
@@ -4137,9 +4224,9 @@ class CocoIndex(object):
         index.gid_to_aids = None
         index.cid_to_aids = None
         index.vidid_to_gids = None
-        index.name_to_video = None
         index.trackid_to_aids = None
 
+        index.name_to_video = None
         index.name_to_cat = None
         index.name_to_img = None
         index.file_name_to_img = None
@@ -4617,8 +4704,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         index (CocoIndex): an efficient lookup index into the coco data
             structure. The index defines its own attributes like
-            ``anns``, ``cats``, ``imgs``, etc. See :class:`CocoIndex` for more
-            details on which attributes are available.
+            ``anns``, ``cats``, ``imgs``, ``gid_to_aids``,
+            ``file_name_to_img``, etc. See :class:`CocoIndex` for more details
+            on which attributes are available.
 
         fpath (PathLike | None):
             if known, this stores the filepath the dataset was loaded from
@@ -4632,7 +4720,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         hashid (str | None) :
             If computed, this will be a hash uniquely identifing the dataset.
-            To ensure this is computed see  :func:`_build_hashid`.
+            To ensure this is computed see
+            :func:`kwcoco.coco_dataset.MixinCocoExtras._build_hashid`.
 
     References:
         http://cocodataset.org/#format
@@ -4760,8 +4849,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             # bundle_dpath, then we assume it is relative to the cwd.
             assumed_root = '.'
             inferred_date_type = 'json-dict'
-        elif isinstance(data, six.string_types):
-            path = data
+        elif isinstance(data, (str, os.PathLike)):
+            path = os.fspath(data)
             if isdir(path):
                 # data was a pointer to hopefully a kwcoco bundle
                 if bundle_dpath is None:
@@ -4823,8 +4912,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if bundle_dpath is not None:
             assumed_root = bundle_dpath
 
-        if isinstance(data, six.string_types):
-            # assumed_root = dirname(fpath)
+        if isinstance(data, (str, os.PathLike)):
+            if not exists(fpath):
+                raise Exception(ub.paragraph(
+                    '''
+                    Specified fpath={} does not exist. If you are trying
+                    to create a new dataset fist create a CocoDataset without
+                    any arguments, and then set the fpath attribute
+                    ''').format(fpath))
+
             with open(fpath, 'r') as file:
                 data = json.load(file)
 
@@ -4840,7 +4936,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             body_root = data.get('img_root', '')
             if body_root is None:
                 body_root = ''
-            elif isinstance(body_root, six.string_types):
+            elif isinstance(body_root, str):
                 _tmp = ub.expandpath(body_root)
                 if exists(_tmp):
                     body_root = _tmp
@@ -4893,7 +4989,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     @fpath.setter
     def fpath(self, value):
-        self._fpath = value
+        self._fpath = value if value is None else os.fspath(value)
         self._infer_dirs()
 
     def _infer_dirs(self):
@@ -5147,7 +5243,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
         """
-        if isinstance(file, six.string_types):
+        if isinstance(file, (str, os.PathLike)):
             with open(file, 'w') as fp:
                 self.dump(fp, indent=indent, newlines=newlines)
         else:
@@ -5651,7 +5747,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                       for r in dset_roots]
         items = [join('.', p) for p in dset_roots]
         common_root = longest_common_prefix(items, sep=os.path.sep)
-        relative_dsets = [(relpath(d.bundle_dpath, common_root),
+        # common_root = normpath(common_root)
+
+        relative_dsets = [(relpath(normpath(d.bundle_dpath), common_root),
                            d.dataset) for d in others]
 
         merged = _coco_union(relative_dsets, common_root)

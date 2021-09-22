@@ -19,6 +19,10 @@ class Archive(object):
     """
     Abstraction over zipfile and tarfile
 
+    SeeAlso:
+        https://github.com/RKrahl/archive-tools
+        https://pypi.org/project/arlib/
+
     Example:
         >>> from kwcoco.data.grab_spacenet import *  # NOQA
         >>> from os.path import join

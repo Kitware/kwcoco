@@ -29,6 +29,9 @@ class CocoRerootCLI:
             'src': scfg.Value(None, help=(
                 'Path to the coco dataset'), position=1),
 
+            'dst': scfg.Value(None, help=(
+                'Save the re-rooted dataset to a new file'), position=2),
+
             'new_prefix': scfg.Value(None, help=(
                 'Path to the new image root.')),
 
@@ -40,9 +43,6 @@ class CocoRerootCLI:
 
             'check': scfg.Value(True, help=(
                 'If True, checks that all data exists')),
-
-            'dst': scfg.Value(None, help=(
-                'Save the re-rooted dataset to a new file')),
         }
 
     @classmethod

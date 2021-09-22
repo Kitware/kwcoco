@@ -188,7 +188,6 @@ intersphinx_mapping = {
 }
 
 __dev_note__ = """
-python -m sphinx.ext.intersphinx https://docs.python.org/3/objects.inv
 python -m sphinx.ext.intersphinx https://kwarray.readthedocs.io/en/latest/objects.inv
 python -m sphinx.ext.intersphinx https://kwimage.readthedocs.io/en/latest/objects.inv
 python -m sphinx.ext.intersphinx https://ubelt.readthedocs.io/en/latest/objects.inv

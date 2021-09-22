@@ -933,7 +933,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             'nsupport': nsupport,
 
             'fp_cutoff': fp_cutoff,
-            'stabalize_thresh': fp_cutoff,
+            'stabalize_thresh': stabalize_thresh,
         }
 
         if self.cx is not None:
@@ -1196,6 +1196,116 @@ class Measures(ub.NiceRepr, DictProxy):
             # self.draw('roc')
             # kwplot.figure(fnum=fnum, pnum=(1, 3, 3))
             # self.draw('thresh', keys=['mcc', 'f1', 'acc'])
+
+    @classmethod
+    def combine(cls, tocombine, precision=None):
+        """
+        Combine binary confusion metrics
+
+        Args:
+            tocombine (List[Measures]): a list of measures to combine into one
+            precision (float | None):
+                If specified rounds thresholds to this precision which can
+                prevent a RAM explosion when combining a large number of
+                measures.
+
+        Returns:
+            Measures
+
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
+            >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
+            >>> measures1 = BinaryConfusionVectors.demo(n=15).measures()
+            >>> measures2 = measures1  # BinaryConfusionVectors.demo(n=15).measures()
+            >>> tocombine = [measures1, measures2]
+            >>> new_measures = Measures.combine(tocombine)
+            >>> new_measures.reconstruct()
+            >>> print('new_measures = {!r}'.format(new_measures))
+            >>> print('measures1 = {!r}'.format(measures1))
+            >>> print('measures2 = {!r}'.format(measures2))
+            >>> print(ub.repr2(measures1.__json__(), nl=1, sort=0))
+            >>> print(ub.repr2(measures2.__json__(), nl=1, sort=0))
+            >>> print(ub.repr2(new_measures.__json__(), nl=1, sort=0))
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> kwplot.figure(fnum=1)
+            >>> new_measures.summary_plot()
+            >>> measures1.summary_plot()
+            >>> measures1.draw('roc')
+            >>> measures2.draw('roc')
+            >>> new_measures.draw('roc')
+        """
+        from kwcoco.metrics.confusion_vectors import Measures
+
+        combo_thresh_asc = np.hstack([m['thresholds'] for m in tocombine])
+        if precision is not None:
+            combo_thresh_asc = combo_thresh_asc.round(precision)
+
+        combo_thresh_asc = np.unique(combo_thresh_asc)
+        new_thresh = combo_thresh_asc[::-1]
+
+        summable = {
+            'nsupport': 0,
+            'realpos_total': 0,
+            'realneg_total': 0,
+        }
+
+        fp_accum = np.zeros(len(new_thresh))
+        tp_accum = np.zeros(len(new_thresh))
+        tn_accum = np.zeros(len(new_thresh))
+        fn_accum = np.zeros(len(new_thresh))
+
+        for measures in tocombine:
+            thresholds = measures['thresholds']
+            if precision is not None:
+                thresholds = thresholds.round(precision)
+
+            right_idxs = np.searchsorted(combo_thresh_asc, thresholds, 'right')
+            left_idxs = len(combo_thresh_asc) - right_idxs
+            left_idxs = left_idxs.clip(0, len(combo_thresh_asc) - 1)
+            # NOTE: if the min is non-zero in each array the diff wont work
+            # reformulate if this case arrises
+            fp_pos = np.diff(np.r_[[0], measures['fp_count']])
+            tp_pos = np.diff(np.r_[[0], measures['tp_count']])
+            tn_pos = np.diff(np.r_[[0], measures['tn_count'][::-1]])[::-1]
+            fn_pos = np.diff(np.r_[[0], measures['fn_count'][::-1]])[::-1]
+            # Handle the case where we round the thresholds for space reasons
+            np.add.at(fp_accum, left_idxs, fp_pos)
+            np.add.at(tp_accum, left_idxs, tp_pos)
+            np.add.at(fn_accum, left_idxs, fn_pos)
+            np.add.at(tn_accum, left_idxs, tn_pos)
+
+            for k in summable:
+                summable[k] += measures[k]
+
+        new_fp = np.cumsum(fp_accum)
+        new_tp = np.cumsum(tp_accum)
+        new_tn = np.cumsum(tn_accum[::-1])[::-1]
+        new_fn = np.cumsum(fn_accum[::-1])[::-1]
+
+        new_info = {
+            'fp_count': new_fp,
+            'tp_count': new_tp,
+            'tn_count': new_tn,
+            'fn_count': new_fn,
+            'thresholds': new_thresh,
+        }
+        new_info.update(summable)
+
+        other = {
+            'fp_cutoff',
+            'monotonic_ppv',
+            'node',
+            'cx',
+            'stabalize_thresh',
+            'trunc_idx'
+        }
+        rest = ub.dict_isect(tocombine[0], other)
+        new_info.update(rest)
+        new_measures = Measures(new_info)
+        # new_measures.reconstruct()
+        return new_measures
 
 
 class PerClass_Measures(ub.NiceRepr, DictProxy):
