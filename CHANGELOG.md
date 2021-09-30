@@ -7,13 +7,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.13 - Unreleased
 
+### Added
+* Add `.images` to `Videos` 1D object.
+
 
 ## Version 0.2.12 - Released 2021-09-22
 
 
 ### Added
 * Initial implementation of shorthand channels
-* Parametarized `max_speed` of toydata objects
+* Parameterized `max_speed` of toydata objects
 * Add `combine_kwcoco_measures` function
 * Add new API methods to ChannelSpec objects
 

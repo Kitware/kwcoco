@@ -332,6 +332,19 @@ class Videos(ObjectList1D):
     def __init__(self, ids, dset):
         super().__init__(ids, dset, 'videos')
 
+    @property
+    def images(self):
+        """
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8').videos()
+            >>> print(self.images)
+            <ImageGroups(n=8, m=2.0, s=0.0)>
+        """
+        return ImageGroups(
+            [self._dset.images(vidid=vidid) for vidid in self._ids],
+            self._dset)
+
 
 class Images(ObjectList1D):
     """
