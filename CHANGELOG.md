@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Add `.images` to `Videos` 1D object.
+* Initial `copy_assets` behavior for kwcoco subset.
 
 
 ## Version 0.2.12 - Released 2021-09-22
