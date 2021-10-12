@@ -105,8 +105,10 @@ Example:
     >>> subcrop.finalize()
     >>> #
     >>> msi_crop = delayed.delayed_crop((slice(10, 80), slice(30, 50)))
-    >>> subdata = msi_crop.delayed_warp(kwimage.Affine.scale(3), dsize='auto').take_channels('B11|B1')
-    >>> subdata.finalize()
+    >>> msi_warp = msi_crop.delayed_warp(kwimage.Affine.scale(3), dsize='auto')
+    >>> subdata = msi_warp.take_channels('B11|B1')
+    >>> final = subdata.finalize()
+    >>> assert final.shape == (210, 60, 2)
 
 
 Example:
@@ -370,7 +372,7 @@ class DelayedImageOperation(DelayedVisionOperation):
 
     def delayed_warp(self, transform, dsize=None):
         """
-        Delayedly transform the underlying data.
+        Delayed transform the underlying data.
 
         Note:
             this deviates from kwimage warp functions because instead of
@@ -459,6 +461,17 @@ class DelayedNans(DelayedImageOperation):
         region_slices = (slice(5, 10), slice(1, 12))
         delayed = self.delayed_crop(region_slices)
 
+    Example:
+        >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+        >>> dsize = (307, 311)
+        >>> c1 = DelayedNans(dsize=dsize, channels=channel_spec.FusedChannelSpec.coerce('foo'))
+        >>> c2 = DelayedLoad.demo('astro', dsize=dsize).load_shape(True)
+        >>> cat = DelayedChannelConcat([c1, c2])
+        >>> warped_cat = cat.delayed_warp(kwimage.Affine.scale(1.07), dsize=(328, 332))
+        >>> warped_cat.finalize()
+
+        #>>> cropped = warped_cat.delayed_crop((slice(0, 300), slice(0, 100)))
+        #>>> cropped.finalize().shape
     """
     def __init__(self, dsize=None, channels=None):
         self.meta = {}
@@ -499,7 +512,11 @@ class DelayedNans(DelayedImageOperation):
     def _optimize_paths(self, **kwargs):
         # DEBUG_PRINT('DelayedLoad._optimize_paths')
         # hack
-        yield DelayedWarp(self, Affine(None), dsize=self.dsize)
+        # if 'dsize' in kwargs:
+        #     dsize = tuple(kwargs['dsize'])
+        # else:
+        dsize = self.dsize
+        yield DelayedWarp(self, Affine(None), dsize=dsize)
 
     @profile
     def finalize(self, **kwargs):
@@ -628,7 +645,11 @@ class DelayedLoad(DelayedImageOperation):
     def _optimize_paths(self, **kwargs):
         # DEBUG_PRINT('DelayedLoad._optimize_paths')
         # hack
-        yield DelayedWarp(self, Affine(None), dsize=self.dsize)
+        # if 'dsize' in kwargs:
+        #     dsize = tuple(kwargs['dsize'])
+        # else:
+        dsize = self.dsize
+        yield DelayedWarp(self, Affine(None), dsize=dsize)
         # raise AssertionError('hack so this is not called')
 
     def load_shape(self, use_channel_heuristic=False):
@@ -794,6 +815,7 @@ class DelayedLoad(DelayedImageOperation):
         new_dsize = (new_xstop - new_xstart,
                      new_ystop - new_ystart)
 
+        # TODO: it might be ok to remove this line
         assert self._immediates['dsize'] is None, 'does not handle'
 
         new = self.__class__(
@@ -1209,8 +1231,10 @@ class DelayedFrameConcat(DelayedVideoOperation):
         if ub.allsame(nband_cands):
             num_bands = nband_cands[0]
         else:
+            import xdev
+            xdev.embed()
             raise ValueError(
-                'components must all have the same delayed size')
+                'components must all have the same delayed size: got {}'.format(nband_cands))
         self.num_bands = num_bands
         self.num_frames = len(self.frames)
         self.meta = {
@@ -1308,6 +1332,32 @@ class DelayedFrameConcat(DelayedVideoOperation):
         new = DelayedFrameConcat(new_frames)
         return new
 
+    def delayed_warp(self, transform, dsize=None):
+        """
+        Delayed transform the underlying data.
+
+        Note:
+            this deviates from kwimage warp functions because instead of
+            "output_dims" (specified in c-style shape) we specify dsize (w, h).
+
+        Returns:
+            DelayedWarp : new delayed transform a chained transform
+        """
+        # warped = DelayedWarp(self, transform=transform, dsize=dsize)
+        # return warped
+
+        if dsize is None:
+            dsize = self.dsize
+        elif isinstance(dsize, str):
+            if dsize == 'auto':
+                dsize = _auto_dsize(transform, self.dsize)
+        new_frames = []
+        for frame in self.frames:
+            new_frame = frame.delayed_warp(transform, dsize=dsize)
+            new_frames.append(new_frame)
+        new = DelayedFrameConcat(new_frames)
+        return new
+
 
 class DelayedChannelConcat(DelayedImageOperation):
     """
@@ -1357,7 +1407,8 @@ class DelayedChannelConcat(DelayedImageOperation):
             dsize_cands = [comp.dsize for comp in self.components]
             if not ub.allsame(dsize_cands):
                 raise ValueError(
-                    'components must all have the same delayed size')
+                    # 'components must all have the same delayed size')
+                    'components must all have the same delayed size: got {}'.format(dsize_cands))
             dsize = dsize_cands[0]
         self.dsize = dsize
         self.num_bands = sum(comp.num_bands for comp in self.components)
@@ -1416,8 +1467,33 @@ class DelayedChannelConcat(DelayedImageOperation):
                 import xarray as xr
                 final = xr.concat(stack, dim='c')
             else:
+                for a in stack:
+                    print('a = {!r}'.format(a.shape))
                 final = np.concatenate(stack, axis=2)
         return final
+
+    def delayed_warp(self, transform, dsize=None):
+        """
+        Delayed transform the underlying data.
+
+        Note:
+            this deviates from kwimage warp functions because instead of
+            "output_dims" (specified in c-style shape) we specify dsize (w, h).
+
+        Returns:
+            DelayedWarp : new delayed transform a chained transform
+        """
+        if dsize is None:
+            dsize = self.dsize
+        elif isinstance(dsize, str):
+            if dsize == 'auto':
+                dsize = _auto_dsize(transform, self.dsize)
+        new_parts = []
+        for part in self.components:
+            new_frame = part.delayed_warp(transform, dsize=dsize)
+            new_parts.append(new_frame)
+        new = DelayedChannelConcat(new_parts)
+        return new
 
     @profile
     def take_channels(self, channels):
@@ -1649,6 +1725,7 @@ class DelayedWarp(DelayedImageOperation):
                 dsize = (w, h)
             elif isinstance(dsize, str):
                 if dsize == 'auto':
+                    # TODO: could use _auto_dsize
                     max_xy = np.ceil(self.bounds.data.max(axis=0))
                     max_x = int(max_xy[0])
                     max_y = int(max_xy[1])
@@ -1839,8 +1916,10 @@ class DelayedWarp(DelayedImageOperation):
             # Branch finalize
             final = sub_data.finalize(transform=transform, dsize=dsize,
                                       interpolation=interpolation, **kwargs)
-            # Ensure that the last dimension is channels
-            final = kwarray.atleast_nd(final, 3, front=False)
+            if len(final.shape) < 3:
+                # HACK: we are assuming xarray never hits this case
+                # Ensure that the last dimension is channels
+                final = kwarray.atleast_nd(final, 3, front=False)
         else:
             as_xarray = kwargs.get('as_xarray', False)
             # Leaf finalize
@@ -2125,3 +2204,17 @@ def _devcheck_corner():
 if __name__ == '__main__':
     import xdoctest
     xdoctest.doctest_module(__file__)
+
+
+def _auto_dsize(transform, sub_dsize):
+    sub_w, sub_h = sub_dsize
+    sub_bounds = kwimage.Coords(
+        np.array([[0,     0], [sub_w, 0],
+                  [0, sub_h], [sub_w, sub_h]])
+    )
+    bounds = sub_bounds.warp(transform.matrix)
+    max_xy = np.ceil(bounds.data.max(axis=0))
+    max_x = int(max_xy[0])
+    max_y = int(max_xy[1])
+    dsize = (max_x, max_y)
+    return dsize

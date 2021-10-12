@@ -14,6 +14,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * Improved speed of repeated calls to FusedChannelSpec.coerce and normalize
 
+### Fixed
+* Fixed bug in delayed image where nans did not correctly change size when warped
+* Fixed bug in delayed image where warps were not applied correctly to concatenated objects
+
 
 ## Version 0.2.12 - Released 2021-09-22
 
