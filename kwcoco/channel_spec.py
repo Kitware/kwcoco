@@ -154,13 +154,16 @@ class FusedChannelSpec(BaseChannelSpec):
     """
 
     _alias_lut = {
-        'rgb': 'r|g|b',
-        'rgba': 'r|g|b|a',
-        'dxdy': 'dx|dy',
-        'fxfy': 'fx|fy',
+        'rgb': ['r', 'g', 'b'],
+        'rgba': ['r', 'g', 'b', 'a'],
+        'dxdy': ['dx', 'dy'],
+        'fxfy': ['fx', 'fy'],
     }
 
-    _size_lut = {k: v.count('|') + 1 for k, v in _alias_lut.items()}
+    # Efficiency memorization of coerced string codes
+    _memo = {}
+
+    _size_lut = {k: len(v) for k, v in _alias_lut.items()}
 
     def __init__(self, parsed, _is_normalized=False):
         self.parsed = parsed
@@ -170,7 +173,7 @@ class FusedChannelSpec(BaseChannelSpec):
     def __len__(self):
         import warnings
         if not self._is_normalized:
-            warnings.warn(ub.paragraph(
+            text = ub.paragraph(
                 '''
                 Length Definition for unormalized FusedChannelSpec is in flux.
 
@@ -179,7 +182,8 @@ class FusedChannelSpec(BaseChannelSpec):
                 atomic codes. Currently it returns the number "unnormalized"
                 atomic codes. Normalizing the FusedChannelSpec object or using
                 "numel" will supress this warning.
-                '''))
+                ''')
+            warnings.warn(text)
         return len(self.parsed)
 
     def __getitem__(self, index):
@@ -219,13 +223,20 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> FusedChannelSpec.coerce(3)
             >>> FusedChannelSpec.coerce(FusedChannelSpec(['a']))
         """
+        try:
+            # Efficiency hack
+            return cls._memo[data]
+        except KeyError:
+            pass
         if isinstance(data, list):
             self = cls(data)
         elif isinstance(data, str):
             self = cls.parse(data)
+            cls._memo[data] = self
         elif isinstance(data, int):
             # we know the number of channels, but not their names
             self = cls(['u{}'.format(i) for i in range(data)])
+            cls._memo[data] = self
         elif isinstance(data, cls):
             self = data
         elif isinstance(data, ChannelSpec):
@@ -240,7 +251,7 @@ class FusedChannelSpec(BaseChannelSpec):
             raise TypeError('unknown type {}'.format(type(data)))
         return self
 
-    @ub.memoize_method
+    # @ub.memoize_method
     def normalize(self):
         """
         Replace aliases with explicit single-band-per-code specs
@@ -263,9 +274,11 @@ class FusedChannelSpec(BaseChannelSpec):
             return self
 
         norm_parsed = []
+        needed_normalization = False
         for v in self.parsed:
             if v in self._alias_lut:
-                norm_parsed.extend(self._alias_lut.get(v).split('|'))
+                norm_parsed.extend(self._alias_lut.get(v))
+                needed_normalization = True
             else:
                 if ':' in v:
                     root, *slice_args = v.split(':')
@@ -280,11 +293,15 @@ class FusedChannelSpec(BaseChannelSpec):
                         raise NotImplementedError
                     for idx in range(start, stop, step):
                         norm_parsed.append('{}.{}'.format(root, idx))
+                    needed_normalization = True
                 else:
                     norm_parsed.append(v)
-        # self._alias_lut.get(v, v).split('|')
-        # norm_parsed = list(ub.flatten(
-        #     for v in self.parsed))
+
+        if not needed_normalization:
+            # If we went through the normalized process and we didn't need it
+            # update ourself so we don't redo the work.
+            self._is_normalized = True
+            return self
         normed = FusedChannelSpec(norm_parsed, _is_normalized=True)
         return normed
 
@@ -315,7 +332,7 @@ class FusedChannelSpec(BaseChannelSpec):
         size_list = []
         for v in self.parsed:
             if v in self._alias_lut:
-                num = self._alias_lut.get(v).count('|') + 1
+                num = len(self._alias_lut.get(v))
             else:
                 if ':' in v:
                     root, *slice_args = v.split(':')

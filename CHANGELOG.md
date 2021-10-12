@@ -11,6 +11,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add `.images` to `Videos` 1D object.
 * Initial `copy_assets` behavior for kwcoco subset.
 
+### Changed
+* Improved speed of repeated calls to FusedChannelSpec.coerce and normalize
+
 
 ## Version 0.2.12 - Released 2021-09-22
 

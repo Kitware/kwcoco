@@ -270,6 +270,7 @@ class DelayedImageOperation(DelayedVisionOperation):
     Operations that pertain only to images
     """
 
+    @profile
     def delayed_crop(self, region_slices):
         """
         Create a new delayed image that performs a crop in the transformed
@@ -442,6 +443,7 @@ class DelayedIdentity(DelayedImageOperation):
         # Hack
         yield DelayedWarp(self, Affine(None), dsize=self.dsize)
 
+    @profile
     def finalize(self):
         final = self.sub_data
         final = kwarray.atleast_nd(final, 3, front=False)
@@ -499,6 +501,7 @@ class DelayedNans(DelayedImageOperation):
         # hack
         yield DelayedWarp(self, Affine(None), dsize=self.dsize)
 
+    @profile
     def finalize(self, **kwargs):
         if 'dsize' in kwargs:
             shape = tuple(kwargs['dsize'])[::-1] + (self.num_bands,)
@@ -676,6 +679,7 @@ class DelayedLoad(DelayedImageOperation):
     def fpath(self):
         return self.meta.get('fpath', None)
 
+    @profile
     def finalize(self, **kwargs):
         final = self.cache.get('final', None)
         if final is None:
@@ -878,6 +882,7 @@ class DelayedLoad(DelayedImageOperation):
         return new
 
 
+@ub.memoize
 def have_gdal():
     try:
         from osgeo import gdal
@@ -1005,6 +1010,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
         from os.path import basename
         return '.../' + basename(self.fpath)
 
+    @profile
     def __getitem__(self, index):
         """
         References:
@@ -1226,6 +1232,7 @@ class DelayedFrameConcat(DelayedVideoOperation):
         w, h = self.dsize
         return (self.num_frames, h, w, self.num_bands)
 
+    @profile
     def finalize(self, **kwargs):
         """
         Execute the final transform
@@ -1395,6 +1402,7 @@ class DelayedChannelConcat(DelayedImageOperation):
         w, h = self.dsize
         return (h, w, self.num_bands)
 
+    @profile
     def finalize(self, **kwargs):
         """
         Execute the final transform
@@ -1751,6 +1759,7 @@ class DelayedWarp(DelayedImageOperation):
             leaf = DelayedWarp(sub_data, transform, dsize=dsize)
             yield leaf
 
+    @profile
     def finalize(self, transform=None, dsize=None, interpolation='linear',
                  **kwargs):
         """
@@ -1920,6 +1929,7 @@ class DelayedCrop(DelayedImageOperation):
     def children(self):
         yield self.sub_data
 
+    @profile
     def finalize(self, **kwargs):
         if hasattr(self.sub_data, 'finalize'):
             return self.sub_data.finalize(**kwargs)[self.sub_slices]
@@ -1930,6 +1940,7 @@ class DelayedCrop(DelayedImageOperation):
         raise NotImplementedError('cant look at leafs through crop atm')
 
 
+@profile
 def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
     r"""
     Given a region in a "root" image and a trasnform between that "root" and
@@ -1954,7 +1965,9 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
 
     """
     # Transform the region bounds into the sub-image space
-    tf_root_to_leaf = np.asarray(Affine.coerce(tf_leaf_to_root).inv())
+    tf_leaf_to_root = Affine.coerce(tf_leaf_to_root)
+    tf_root_to_leaf = tf_leaf_to_root.inv()
+    tf_root_to_leaf = tf_root_to_leaf.__array__()
     leaf_region_bounds = root_region_bounds.warp(tf_root_to_leaf)
     leaf_region_box = leaf_region_bounds.bounding_box().to_ltrb()
 
@@ -1972,7 +1985,7 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
     crop_offset = leaf_crop_box.data[0, 0:2]
     root_offset = root_region_bounds.exterior.data.min(axis=0)
 
-    tf_root_to_newroot = Affine.affine(offset=root_offset).inv().matrix
+    tf_root_to_newroot = Affine.affine(offset=-root_offset).matrix
     tf_newleaf_to_leaf = Affine.affine(offset=crop_offset).matrix
 
     # Resample the smaller region to align it with the root region
@@ -2053,19 +2066,19 @@ def _devcheck_corner():
     # cropped-leaf-space not just the leaf-space, so we invert the implicit
     # crop
 
-    tf_crop_to_leaf = Affine.affine(offset=crop_offset)
+    tf_crop_to_leaf = Affine.translate(offset=crop_offset)
 
     # tf_newroot_to_root = Affine.affine(offset=region_box.data[0, 0:2])
-    tf_root_to_newroot = Affine.affine(offset=region_box.data[0, 0:2]).inv()
+    tf_root_to_newroot = Affine.translate(offset=region_box.data[0, 0:2]).inv()
 
-    tf_crop_to_leaf = Affine.affine(offset=crop_offset)
+    tf_crop_to_leaf = Affine.translate(offset=crop_offset)
     tf_crop_to_newroot = tf_root_to_newroot @ tf_leaf_to_root @ tf_crop_to_leaf
     tf_newroot_to_crop = tf_crop_to_newroot.inv()
 
     # tf_leaf_to_crop
-    # tf_corner_offset = Affine.affine(offset=offset_xy)
+    # tf_corner_offset = Affine.translate(offset=offset_xy)
 
-    subpixel_offset = Affine.affine(offset=offset_xy).matrix
+    subpixel_offset = Affine.translate(offset=offset_xy).matrix
     tf_crop_to_leaf = subpixel_offset
     # tf_crop_to_root = tf_leaf_to_root @ tf_crop_to_leaf
     # tf_root_to_crop = np.linalg.inv(tf_crop_to_root)
