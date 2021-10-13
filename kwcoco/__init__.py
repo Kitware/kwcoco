@@ -33,14 +33,16 @@ Python, this data structure is reasonably efficient.
         >>> import kwcoco
         >>> import json
         >>> # Create demo data
-        >>> demo = CocoDataset.demo()
+        >>> demo = kwcoco.CocoDataset.demo()
+        >>> # Reroot can switch between absolute / relative-paths
+        >>> demo.reroot(absolute=True)
         >>> # could also use demo.dump / demo.dumps, but this is more explicit
         >>> text = json.dumps(demo.dataset)
         >>> with open('demo.json', 'w') as file:
         >>>    file.write(text)
 
         >>> # Read from disk
-        >>> self = CocoDataset('demo.json')
+        >>> self = kwcoco.CocoDataset('demo.json')
 
         >>> # Add data
         >>> cid = self.add_category('Cat')
@@ -61,6 +63,7 @@ Python, this data structure is reasonably efficient.
 
 
         >>> # Inspect data
+        >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> import kwplot
         >>> kwplot.autompl()
         >>> self.show_image(gid=1)
@@ -92,14 +95,14 @@ Python, this data structure is reasonably efficient.
         [[37, 6, 230, 240], [124, 96, 45, 18]]
 
         >>> # built in conversions to efficient kwimage array DataStructures
-        >>> print(ub.repr2(annots.detections.data))
+        >>> print(ub.repr2(annots.detections.data, sv=1))
         {
             'boxes': <Boxes(xywh,
                          array([[ 37.,   6., 230., 240.],
                                 [124.,  96.,  45.,  18.]], dtype=float32))>,
-            'class_idxs': np.array([5, 3], dtype=np.int64),
-            'keypoints': <PointsList(n=2) at 0x7f07eda33220>,
-            'segmentations': <PolygonList(n=2) at 0x7f086365aa60>,
+            'class_idxs': [5, 3],
+            'keypoints': <PointsList(n=2)>,
+            'segmentations': <PolygonList(n=2)>,
         }
 
         >>> gids = list(self.imgs.keys())
@@ -258,7 +261,7 @@ The logic of this init is generated via:
     mkinit ~/code/kwcoco/kwcoco/__init__.py
 """
 
-__version__ = '0.2.12'
+__version__ = '0.2.13'
 
 __submodules__ = ['coco_dataset', 'abstract_coco_dataset']
 

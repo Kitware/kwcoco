@@ -5,12 +5,26 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.12 - Unreleased
+## Version 0.2.13 - Unreleased
+
+### Added
+* Add `.images` to `Videos` 1D object.
+* Initial `copy_assets` behavior for kwcoco subset.
+
+### Changed
+* Improved speed of repeated calls to FusedChannelSpec.coerce and normalize
+
+### Fixed
+* Fixed bug in delayed image where nans did not correctly change size when warped
+* Fixed bug in delayed image where warps were not applied correctly to concatenated objects
+
+
+## Version 0.2.12 - Released 2021-09-22
 
 
 ### Added
 * Initial implementation of shorthand channels
-* Parametarized `max_speed` of toydata objects
+* Parameterized `max_speed` of toydata objects
 * Add `combine_kwcoco_measures` function
 * Add new API methods to ChannelSpec objects
 

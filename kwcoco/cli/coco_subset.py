@@ -67,7 +67,9 @@ class CocoSubsetCLI(object):
                     Only applicable for dataset that contain videos.
 
                     Requries the "jq" python library is installed.
-                    '''))
+                    ''')),
+
+            'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
 
 
             # TODO: Add more filter criteria
@@ -117,6 +119,42 @@ class CocoSubsetCLI(object):
 
         new_dset.fpath = config['dst']
         print('Writing new_dset.fpath = {!r}'.format(new_dset.fpath))
+
+        new_dset.fpath = new_dset.fpath
+
+        if config['copy_assets']:
+            # Create a copy of the data, (currently only works for relative
+            # kwcoco files)
+            from os.path import join, dirname
+            import shutil
+            # new_dset.reroot(new_dset.bundle_dpath, old_prefix=dset.bundle_dpath)
+            tocopy = []
+            dstdirs = set()
+            for gid, new_img in new_dset.index.imgs.items():
+                old_img = dset.index.imgs[gid]
+                if new_img.get('file_name', None) is not None:
+                    new_fpath = join(new_dset.bundle_dpath, new_img['file_name'])
+                    old_fpath = join(dset.bundle_dpath, old_img['file_name'])
+                    dstdirs.add(dirname(new_fpath))
+                    tocopy.append((old_fpath, new_fpath))
+                new_aux_list = new_img.get('auxiliary', [])
+                old_aux_list = old_img.get('auxiliary', [])
+                for old_aux, new_aux in zip(old_aux_list, new_aux_list):
+                    new_fpath = join(new_dset.bundle_dpath, new_aux['file_name'])
+                    old_fpath = join(dset.bundle_dpath, old_aux['file_name'])
+                    dstdirs.add(dirname(new_fpath))
+                    tocopy.append((old_fpath, new_fpath))
+
+            # Ensure directories
+            for dpath in dstdirs:
+                ub.ensuredir(dpath)
+
+            pool = ub.JobPool(max_workers=4)
+            for src, dst in tocopy:
+                pool.submit(shutil.copy2, src, dst)
+
+            for future in pool.as_completed():
+                future.result()
 
         new_dset.dump(new_dset.fpath, newlines=True)
 
