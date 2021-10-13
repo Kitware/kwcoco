@@ -24,13 +24,14 @@ TODO:
 
 
 TODO:
-    - [ ]: Use FusedChannelSpec as a member of ChannelSpec
-    - [ ]: Handle special slice suffix for length calculations
+    - [x]: Use FusedChannelSpec as a member of ChannelSpec
+    - [x]: Handle special slice suffix for length calculations
 """
-import ubelt as ub
-import six
-import functools
 import abc
+import functools
+import six
+import ubelt as ub
+import warnings
 
 
 class BaseChannelSpec(ub.NiceRepr):
@@ -171,7 +172,6 @@ class FusedChannelSpec(BaseChannelSpec):
         self._is_normalized = _is_normalized
 
     def __len__(self):
-        import warnings
         if not self._is_normalized:
             text = ub.paragraph(
                 '''
@@ -251,7 +251,6 @@ class FusedChannelSpec(BaseChannelSpec):
             raise TypeError('unknown type {}'.format(type(data)))
         return self
 
-    # @ub.memoize_method
     def normalize(self):
         """
         Replace aliases with explicit single-band-per-code specs
