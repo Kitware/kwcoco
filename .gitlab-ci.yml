@@ -661,3 +661,50 @@ test_minimal_strict/cp36-cp36m-linux:
         *image_python36
     needs: 
         -  build/cp36-cp36m-linux
+
+
+.__local_docker_heredoc__:
+        - |
+            docker login gitlab.kitware.com:4567
+            #docker run -it gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.5
+            
+            # Test with strict requirements
+            IMAGE_NAME=gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.9
+            docker run -v $PWD:/io -v $HOME/.cache/pip:/pip_cache -it $IMAGE_NAME bash
+            ###############
+            # Inside Docker
+            git clone /io $HOME/repo
+            cd $HOME/repo
+            # Will need to chmod things afterwords
+            export PIP_CACHE_DIR=/pip_cache
+            echo $PIP_CACHE_DIR
+            chmod -R o+rw $PIP_CACHE_DIR
+            chmod -R o+rw $PIP_CACHE_DIR
+            chmod -R g+rw $PIP_CACHE_DIR
+            USER=$(whoami)
+            chown -R $USER $PIP_CACHE_DIR
+            source dev/make_strict_req.sh && pip install -r requirements-strict.txt --user
+            pip install -e . --user
+            python -m pytest 
+
+
+            cd $HOME
+            git clone https://gitlab.kitware.com/computer-vision/kwarray.git
+            cd $HOME/kwarray
+            git checkout dev/0.5.14
+
+            # python setup.py bdist_wheel --universal
+
+            python -V  # Print out python version for debugging
+            export PYVER=$(python -c "import sys; print('{}{}'.format(*sys.version_info[0:2]))")
+            pip install virtualenv
+            virtualenv venv$PYVER
+            source venv$PYVER/bin/activate
+            pip install pip -U
+            pip install pip setuptools -U
+            python -V  # Print out python version for debugging
+            pip install .[all]
+
+            # Fixes the LibGL error
+            #apt update && apt install libgl1-mesa-glx -y && rm -rf /var/lib/apt/lists/*
+            ./run_tests.py
