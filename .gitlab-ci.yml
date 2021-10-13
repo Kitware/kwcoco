@@ -96,14 +96,14 @@
 
         These should be added as secret variables in your Gitlab->CI->Variables settings.
 
-        Before you do this ensure that your master and release branch are marked as protected
+        Before you do this ensure that your main and release branch are marked as protected
         and only editable by people that you trust. 
         https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/repository#js-protected-branches-settings
 
         WARNING: If an untrusted actor gains the ability to write to a
         protected branch, then they will be able to exfiltrate your secrets.
 
-        Once you have protected the master and release branch, can add these
+        Once you have protected the main and release branch, can add these
         variables as the following url
         https://gitlab.kitware.com/computer-vision/kwimage/-/settings/ci_cd 
         
@@ -335,7 +335,7 @@ stages:
         - $GPG_EXECUTABLE --list-keys
         - $GPG_EXECUTABLE --list-keys
         # Decrypt and import GPG Keys / trust
-        # note CI_KITWARE_SECRET is a protected variables only available on master and release branch
+        # note CI_KITWARE_SECRET is a protected variables only available on main and release branch
         - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
         - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
         - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
@@ -354,9 +354,10 @@ stages:
     only:
         refs:
             # Gitlab will only expose protected variables on protected branches
-            # (which I've set to be master and release), so only run this stage
+            # (which I've set to be main, master, and release), so only run this stage
             # there.
             - master
+            - main
             - release
 
 
@@ -376,7 +377,7 @@ stages:
         - $GPG_EXECUTABLE --list-keys
         - $GPG_EXECUTABLE --list-keys
         # Decrypt and import GPG Keys / trust
-        # note CI_KITWARE_SECRET is a protected variables only available on master and release branch
+        # note CI_KITWARE_SECRET is a protected variables only available on main and release branch
         - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
         - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
         - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
