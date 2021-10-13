@@ -442,43 +442,43 @@ stages:
 # Python 3.10 Jobs
 
 
-build/cp3_10-cp3_10-linux:
-    <<: 
-        - *build_template
-    image:
-        *image_python3_10
+#build/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *build_template
+#    image:
+#        *image_python3_10
 
-test_full_loose/cp3_10-cp3_10-linux:
-    <<: 
-        - *test_full_loose_template
-    image:
-        *image_python3_10
-    needs: 
-        -  build/cp3_10-cp3_10-linux
+#test_full_loose/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *test_full_loose_template
+#    image:
+#        *image_python3_10
+#    needs: 
+#        -  build/cp3_10-cp3_10-linux
 
-test_minimal_loose/cp3_10-cp3_10-linux:
-    <<: 
-        - *test_minimal_loose_template
-    image:
-        *image_python3_10
-    needs: 
-        -  build/cp3_10-cp3_10-linux
+#test_minimal_loose/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *test_minimal_loose_template
+#    image:
+#        *image_python3_10
+#    needs: 
+#        -  build/cp3_10-cp3_10-linux
 
-test_full_strict/cp3_10-cp3_10-linux:
-    <<: 
-        - *test_full_strict_template
-    image:
-        *image_python3_10
-    needs: 
-        -  build/cp3_10-cp3_10-linux
+#test_full_strict/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *test_full_strict_template
+#    image:
+#        *image_python3_10
+#    needs: 
+#        -  build/cp3_10-cp3_10-linux
 
-test_minimal_strict/cp3_10-cp3_10-linux:
-    <<: 
-        - *test_minimal_strict_template
-    image:
-        *image_python3_10
-    needs: 
-        -  build/cp3_10-cp3_10-linux
+#test_minimal_strict/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *test_minimal_strict_template
+#    image:
+#        *image_python3_10
+#    needs: 
+#        -  build/cp3_10-cp3_10-linux
 
 # ---------------
 # Python 3.9 Jobs
