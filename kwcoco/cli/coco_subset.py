@@ -116,15 +116,13 @@ class CocoSubsetCLI(object):
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
         new_dset = query_subset(dset, config)
-        import xdev
-        xdev.embed()
 
         new_dset.fpath = config['dst']
         print('Writing new_dset.fpath = {!r}'.format(new_dset.fpath))
 
         new_dset.fpath = new_dset.fpath
 
-        if copy_assets['copy_assets']:
+        if config['copy_assets']:
             # Create a copy of the data, (currently only works for relative
             # kwcoco files)
             from os.path import join, dirname

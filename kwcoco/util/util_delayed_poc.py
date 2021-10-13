@@ -1231,8 +1231,6 @@ class DelayedFrameConcat(DelayedVideoOperation):
         if ub.allsame(nband_cands):
             num_bands = nband_cands[0]
         else:
-            import xdev
-            xdev.embed()
             raise ValueError(
                 'components must all have the same delayed size: got {}'.format(nband_cands))
         self.num_bands = num_bands
@@ -1404,6 +1402,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             raise ValueError('No components to concatenate')
         self.components = components
         if dsize is None:
+            print('self.components = {!r}'.format(self.components))
             dsize_cands = [comp.dsize for comp in self.components]
             if not ub.allsame(dsize_cands):
                 raise ValueError(

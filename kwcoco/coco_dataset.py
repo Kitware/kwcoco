@@ -320,14 +320,14 @@ class MixinCocoAccessors(object):
                 "video" for loading in video space.
 
         TODO:
-            - [ ] Currently can only take all or none of the channels from each
+            - [X] Currently can only take all or none of the channels from each
                 base-image / auxiliary dict. For instance if the main image is
                 r|g|b you can't just select g|b at the moment.
 
-            - [ ] The order of the channels in the delayed load should
+            - [X] The order of the channels in the delayed load should
                 match the requested channel order.
 
-            - [ ] TODO: add nans to bands that don't exist or throw an error
+            - [X] TODO: add nans to bands that don't exist or throw an error
 
         Example:
             >>> import kwcoco
@@ -385,13 +385,15 @@ class MixinCocoAccessors(object):
         # Get info about the primary image and check if its channels are
         # requested (if it even has any)
         info = img_info = self._delay_load_imglike(img)
-        if info.get('chan', None) is not None:
+        if info.get('chan_construct', None) is not None:
             include_flag = requested is None
             if not include_flag:
                 if requested.intersection(info['channels']):
                     include_flag = True
             if include_flag:
-                chan_list.append(info.get('chan', None))
+                chncls, chnkw = info['chan_construct']
+                chan = chncls(**chnkw)
+                chan_list.append(chan)
 
         for aux in img.get('auxiliary', []):
             info = self._delay_load_imglike(aux)
@@ -401,7 +403,8 @@ class MixinCocoAccessors(object):
                     include_flag = True
             if include_flag:
                 aux_to_img = Affine.coerce(aux.get('warp_aux_to_img', None))
-                chan = info['chan']()
+                chncls, chnkw = info['chan_construct']
+                chan = chncls(**chnkw)
                 chan = chan.delayed_warp(
                     aux_to_img, dsize=img_info['dsize'])
                 chan_list.append(chan)
@@ -436,6 +439,9 @@ class MixinCocoAccessors(object):
         return delayed
 
     def _delay_load_imglike(self, obj):
+        """
+        Helper function for delayed_load
+        """
         from kwcoco.util.util_delayed_poc import DelayedLoad
         from kwcoco.channel_spec import FusedChannelSpec
         info = {}
@@ -454,7 +460,9 @@ class MixinCocoAccessors(object):
         if fname is not None:
             bundle_dpath = self.bundle_dpath
             info['fpath'] = fpath = join(bundle_dpath, fname)
-            info['chan'] = lambda: DelayedLoad(fpath, channels=channels_, dsize=dsize)
+            # Delaying this gives us a small speed boost
+            info['chan_construct'] = (DelayedLoad, dict(
+                fpath=fpath, channels=channels_, dsize=dsize))
         return info
 
     def load_image(self, gid_or_img, channels=None):

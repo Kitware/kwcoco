@@ -226,7 +226,7 @@ class FusedChannelSpec(BaseChannelSpec):
         try:
             # Efficiency hack
             return cls._memo[data]
-        except KeyError:
+        except (KeyError, TypeError):
             pass
         if isinstance(data, list):
             self = cls(data)
