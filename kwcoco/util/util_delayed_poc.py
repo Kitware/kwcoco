@@ -1465,8 +1465,6 @@ class DelayedChannelConcat(DelayedImageOperation):
                 import xarray as xr
                 final = xr.concat(stack, dim='c')
             else:
-                for a in stack:
-                    print('a = {!r}'.format(a.shape))
                 final = np.concatenate(stack, axis=2)
         return final
 

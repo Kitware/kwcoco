@@ -8,6 +8,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.14 - Unreleased
 
 
+### Added
+* Moved Archive code to its own util module
+
+
 ## Version 0.2.13 - Released 2021-10-13
 
 ### Added
