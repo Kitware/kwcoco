@@ -22,24 +22,6 @@ class CategoryTree(ub.NiceRepr):
     Helps compute softmaxes and probabilities for tree-based categories
     where a directed edge (A, B) represents that A is a superclass of B.
 
-    Ignore:
-        going to ignore this
-
-        but mayb
-
-        wont do that else
-
-
-    Ignore:
-        fofo
-
-
-    ell leo
-
-
-    Ignore:
-        byab
-
     Note:
 
         There are three basic properties that this object maintains:

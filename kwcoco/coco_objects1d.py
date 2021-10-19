@@ -259,7 +259,7 @@ class ObjectGroups(ub.NiceRepr):
         self._groups = groups
 
     def _lookup(self, key):
-        return self._lookup(key)
+        return self._lookup(key)  # broken?
 
     def __getitem__(self, index):
         return self._groups[index]
@@ -604,6 +604,10 @@ class AnnotGroups(ObjectGroups):
     @property
     def cids(self):
         return self.lookup('category_id')
+
+    @property
+    def cnames(self):
+        return [getattr(group, 'cname') for group in self._groups]
 
 
 class ImageGroups(ObjectGroups):
