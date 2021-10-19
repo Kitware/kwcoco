@@ -436,6 +436,7 @@ class CategoryTree(ub.NiceRepr):
 
     def __setstate__(self, state):
         graph = from_directed_nested_tuples(state['graph'])
+        need_reindex = False
 
         if True:
             # Reconstruct redundant items
@@ -449,11 +450,17 @@ class CategoryTree(ub.NiceRepr):
             if 'idx_groups' not in state:
                 node_groups = list(traverse_siblings(graph))
                 node_to_idx = state['node_to_idx']
-                state['idx_groups'] = [sorted([node_to_idx[n] for n in group])
-                                       for group in node_groups]
+                try:
+                    state['idx_groups'] = [sorted([node_to_idx[n] for n in group])
+                                           for group in node_groups]
+                except KeyError:
+                    need_reindex = True
+                    pass
 
         self.__dict__.update(state)
         self.graph = graph
+        if need_reindex:
+            self._build_index()
 
     def __nice__(self):
         max_depth = tree_depth(self.graph)
