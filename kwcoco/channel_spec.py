@@ -766,8 +766,6 @@ class ChannelSpec(BaseChannelSpec):
             >>> self = ChannelSpec('rgb|disparity,flowx|flowy,B:10')
             >>> self.sizes()
         """
-        print('self = {!r}'.format(self))
-        print('self._info = {}'.format(ub.repr2(self._info, nl=1)))
         sizes = {
             key: vals.numel()
             for key, vals in self.parse().items()
