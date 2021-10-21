@@ -70,11 +70,11 @@ class CocoStatsCLI:
                 dset.tag = dset.fpath.replace(toremove, '')
 
         try:
-            from kwcoco.category_tree import _print_forest
+            import networkx as nx
             for dset in datasets:
                 print('dset = {!r}'.format(dset))
                 print('Category Heirarchy: ')
-                _print_forest(dset.object_categories().graph)
+                print(nx.forest_str(dset.object_categories().graph))
         except Exception:
             pass
 

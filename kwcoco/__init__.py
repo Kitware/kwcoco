@@ -266,10 +266,12 @@ __version__ = '0.2.14'
 __submodules__ = ['coco_dataset', 'abstract_coco_dataset']
 
 from kwcoco import coco_dataset
+from kwcoco import channel_spec
 
 from kwcoco.abstract_coco_dataset import (AbstractCocoDataset,)
 from kwcoco.category_tree import (CategoryTree,)
 from kwcoco.coco_dataset import (CocoDataset,)
+from kwcoco.channel_spec import (ChannelSpec, FusedChannelSpec,)
 
 __all__ = ['AbstractCocoDataset', 'CocoDataset', 'CategoryTree',
-           'coco_dataset']
+           'coco_dataset', 'FusedChannelSpec', 'ChannelSpec', 'coco_dataset']

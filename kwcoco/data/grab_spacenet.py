@@ -6,7 +6,7 @@ References:
 """
 import ubelt as ub
 import os
-from kwcoco.utils import util_archive
+from kwcoco.util import util_archive
 
 
 def grab_spacenet7(data_dpath):

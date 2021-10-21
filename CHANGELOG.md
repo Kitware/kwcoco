@@ -11,6 +11,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Moved Archive code to its own util module
 
+### Fixed
+* Removed debugging print statements
+* Fixed issue with pickling category tree
+
 
 ## Version 0.2.13 - Released 2021-10-13
 

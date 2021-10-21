@@ -620,34 +620,6 @@ def tree_depth(graph, root=None):
     return depth
 
 
-def _print_forest(graph):
-    """
-    Nice ascii representation of a forest
-
-    Ignore:
-        graph = nx.balanced_tree(r=2, h=3, create_using=nx.DiGraph)
-        _print_forest(graph)
-
-        graph = CategoryTree.demo('coco').graph
-        _print_forest(graph)
-    """
-    assert nx.is_forest(graph)
-    encoding = to_directed_nested_tuples(graph)
-    def _recurse(encoding, indent=''):
-        for idx, item in enumerate(encoding):
-            node, data, children = item
-            if idx == len(encoding) - 1:
-                this_prefix = indent + '└── '
-                next_prefix = indent + '    '
-            else:
-                this_prefix = indent + '├── '
-                next_prefix = indent + '│   '
-            label = graph.nodes[node].get('label', node)
-            print(this_prefix + str(label))
-            _recurse(children, indent=next_prefix)
-    _recurse(encoding)
-
-
 def to_directed_nested_tuples(graph, with_data=True):
     """
     Encodes each node and its children in a tuple as:

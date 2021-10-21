@@ -21,7 +21,6 @@ class Archive(object):
         https://pypi.org/project/arlib/
 
     Example:
-        >>> from kwcoco.data.grab_spacenet import *  # NOQA
         >>> from os.path import join
         >>> dpath = ub.ensure_app_cache_dir('ubelt', 'tests', 'archive')
         >>> ub.delete(dpath)

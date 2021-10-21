@@ -97,6 +97,9 @@ class BaseChannelSpec(ub.NiceRepr):
     def difference(self):
         ...
 
+    def __sub__(self, other):
+        return self.difference(other)
+
     def __nice__(self):
         return self.spec
 
@@ -402,7 +405,10 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> other = FCS('flowx')
             >>> self.difference(other)
         """
-        other_norm = ub.oset(other.normalize().parsed)
+        try:
+            other_norm = ub.oset(other.normalize().parsed)
+        except Exception:
+            other_norm = other
         self_norm = ub.oset(self.normalize().parsed)
         new_parsed = list(self_norm - other_norm)
         new = self.__class__(new_parsed, _is_normalized=True)
@@ -416,7 +422,10 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> other = FCS('r|b|XX')
             >>> self.intersection(other)
         """
-        other_norm = ub.oset(other.normalize().parsed)
+        try:
+            other_norm = ub.oset(other.normalize().parsed)
+        except Exception:
+            other_norm = other
         self_norm = ub.oset(self.normalize().parsed)
         new_parsed = list(self_norm & other_norm)
         new = self.__class__(new_parsed, _is_normalized=True)
