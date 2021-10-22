@@ -317,7 +317,7 @@ stages:
 
 .gpgsign_template: &gpgsign_template
     <<: 
-        - *common_test_template
+        - *common_template
 
     stage: 
         gpgsign
