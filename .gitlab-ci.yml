@@ -234,13 +234,13 @@ stages:
     # Coverage is a regex that will parse the coverage from the test stdout
     coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
 
-    #except:
-    #    refs:
-    #      - release 
-    #      - tags
-    #    changes:
-    #        - README.rst
-    #        - CHANGELOG.md
+    except:
+        refs:
+          - release 
+          - tags
+        changes:
+            - README.rst
+            - CHANGELOG.md
 
 
 # Define anchors to be used in "before_script" parts
@@ -330,7 +330,7 @@ stages:
         - $GPG_EXECUTABLE --list-keys
         - $GPG_EXECUTABLE --list-keys
         # Decrypt and import GPG Keys / trust
-        - source source dev/secrets_configuration.sh
+        - source dev/secrets_configuration.sh
         # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on master and release branch
         - CI_SECRET=${!VARNAME_CI_SECRET}
         - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
@@ -374,7 +374,7 @@ stages:
         - $GPG_EXECUTABLE --list-keys
         - $GPG_EXECUTABLE --list-keys
         # Decrypt and import GPG Keys / trust
-        - source source dev/secrets_configuration.sh
+        - source dev/secrets_configuration.sh
         # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on master and release branch
         - CI_SECRET=${!VARNAME_CI_SECRET}
         - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
