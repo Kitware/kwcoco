@@ -237,6 +237,7 @@ stages:
     except:
         refs:
           - release 
+          - main 
           - tags
         changes:
             - README.rst
