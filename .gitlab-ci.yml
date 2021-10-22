@@ -96,14 +96,14 @@
 
         These should be added as secret variables in your Gitlab->CI->Variables settings.
 
-        Before you do this ensure that your master and release branch are marked as protected
+        Before you do this ensure that your main and release branch are marked as protected
         and only editable by people that you trust. 
         https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/repository#js-protected-branches-settings
 
         WARNING: If an untrusted actor gains the ability to write to a
         protected branch, then they will be able to exfiltrate your secrets.
 
-        Once you have protected the master and release branch, can add these
+        Once you have protected the main and release branch, can add these
         variables as the following url
         https://gitlab.kitware.com/computer-vision/kwimage/-/settings/ci_cd 
         
@@ -234,11 +234,6 @@ stages:
     # Coverage is a regex that will parse the coverage from the test stdout
     coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
 
-    #cache:
-    #    paths:
-    #        - .cache/pip
-    #        - venv/
-
     #except:
     #    refs:
     #      - release 
@@ -335,10 +330,12 @@ stages:
         - $GPG_EXECUTABLE --list-keys
         - $GPG_EXECUTABLE --list-keys
         # Decrypt and import GPG Keys / trust
-        # note CI_KITWARE_SECRET is a protected variables only available on master and release branch
-        - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
-        - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
-        - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
+        - source source dev/secrets_configuration.sh
+        # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on master and release branch
+        - CI_SECRET=${!VARNAME_CI_SECRET}
+        - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
+        - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
+        - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
         - $GPG_EXECUTABLE --list-keys  || echo "first one fails for some reason"
         - $GPG_EXECUTABLE --list-keys  
         # The publish script only builds wheels and does gpg signing if TAG_AND_UPLOAD is False
@@ -354,9 +351,10 @@ stages:
     only:
         refs:
             # Gitlab will only expose protected variables on protected branches
-            # (which I've set to be master and release), so only run this stage
+            # (which I've set to be main, master, and release), so only run this stage
             # there.
             - master
+            - main
             - release
 
 
@@ -376,10 +374,12 @@ stages:
         - $GPG_EXECUTABLE --list-keys
         - $GPG_EXECUTABLE --list-keys
         # Decrypt and import GPG Keys / trust
-        # note CI_KITWARE_SECRET is a protected variables only available on master and release branch
-        - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
-        - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
-        - GLKWS=$CI_KITWARE_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
+        - source source dev/secrets_configuration.sh
+        # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on master and release branch
+        - CI_SECRET=${!VARNAME_CI_SECRET}
+        - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
+        - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
+        - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
         - $GPG_EXECUTABLE --list-keys  || echo "first one fails for some reason"
         - $GPG_EXECUTABLE --list-keys  
         # Install twine
@@ -411,16 +411,116 @@ stages:
             - release
 
 # Aliases for the images that run the tests
+.image_python3_10: &image_python3_10
+    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.10
+    #python:3.10
+.image_python39: &image_python39
+    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.9
+    #python:3.9
 .image_python38: &image_python38
     gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.8
+    #python:3.8
 .image_python37: &image_python37
     gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.7
+    #python:3.7
 .image_python36: &image_python36
     gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.6
+    #python:3.6
+#.image_python35: &image_python35
+#    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.5
+#    #python:3.5
+#.image_python27: &image_python27
+#    gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:2.7
+#    #python:2.7
+
 
 
 ### JOBS ###
 # Define the actual jobs
+
+# ---------------
+# Python 3.10 Jobs
+
+
+#build/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *build_template
+#    image:
+#        *image_python3_10
+
+#test_full_loose/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *test_full_loose_template
+#    image:
+#        *image_python3_10
+#    needs: 
+#        -  build/cp3_10-cp3_10-linux
+
+#test_minimal_loose/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *test_minimal_loose_template
+#    image:
+#        *image_python3_10
+#    needs: 
+#        -  build/cp3_10-cp3_10-linux
+
+#test_full_strict/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *test_full_strict_template
+#    image:
+#        *image_python3_10
+#    needs: 
+#        -  build/cp3_10-cp3_10-linux
+
+#test_minimal_strict/cp3_10-cp3_10-linux:
+#    <<: 
+#        - *test_minimal_strict_template
+#    image:
+#        *image_python3_10
+#    needs: 
+#        -  build/cp3_10-cp3_10-linux
+
+# ---------------
+# Python 3.9 Jobs
+
+
+build/cp39-cp39-linux:
+    <<: 
+        - *build_template
+    image:
+        *image_python39
+
+test_full_loose/cp39-cp39-linux:
+    <<: 
+        - *test_full_loose_template
+    image:
+        *image_python39
+    needs: 
+        -  build/cp39-cp39-linux
+
+test_minimal_loose/cp39-cp39-linux:
+    <<: 
+        - *test_minimal_loose_template
+    image:
+        *image_python39
+    needs: 
+        -  build/cp39-cp39-linux
+
+test_full_strict/cp39-cp39-linux:
+    <<: 
+        - *test_full_strict_template
+    image:
+        *image_python39
+    needs: 
+        -  build/cp39-cp39-linux
+
+test_minimal_strict/cp39-cp39-linux:
+    <<: 
+        - *test_minimal_strict_template
+    image:
+        *image_python39
+    needs: 
+        -  build/cp39-cp39-linux
 
 # ---------------
 # Python 3.8 Jobs
@@ -561,3 +661,50 @@ test_minimal_strict/cp36-cp36m-linux:
         *image_python36
     needs: 
         -  build/cp36-cp36m-linux
+
+
+.__local_docker_heredoc__:
+        - |
+            docker login gitlab.kitware.com:4567
+            #docker run -it gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.5
+            
+            # Test with strict requirements
+            IMAGE_NAME=gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.9
+            docker run -v $PWD:/io -v $HOME/.cache/pip:/pip_cache -it $IMAGE_NAME bash
+            ###############
+            # Inside Docker
+            git clone /io $HOME/repo
+            cd $HOME/repo
+            # Will need to chmod things afterwords
+            export PIP_CACHE_DIR=/pip_cache
+            echo $PIP_CACHE_DIR
+            chmod -R o+rw $PIP_CACHE_DIR
+            chmod -R o+rw $PIP_CACHE_DIR
+            chmod -R g+rw $PIP_CACHE_DIR
+            USER=$(whoami)
+            chown -R $USER $PIP_CACHE_DIR
+            source dev/make_strict_req.sh && pip install -r requirements-strict.txt --user
+            pip install -e . --user
+            python -m pytest 
+
+
+            cd $HOME
+            git clone https://gitlab.kitware.com/computer-vision/kwarray.git
+            cd $HOME/kwarray
+            git checkout dev/0.5.14
+
+            # python setup.py bdist_wheel --universal
+
+            python -V  # Print out python version for debugging
+            export PYVER=$(python -c "import sys; print('{}{}'.format(*sys.version_info[0:2]))")
+            pip install virtualenv
+            virtualenv venv$PYVER
+            source venv$PYVER/bin/activate
+            pip install pip -U
+            pip install pip setuptools -U
+            python -V  # Print out python version for debugging
+            pip install .[all]
+
+            # Fixes the LibGL error
+            #apt update && apt install libgl1-mesa-glx -y && rm -rf /var/lib/apt/lists/*
+            ./run_tests.py

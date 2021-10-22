@@ -15,6 +15,15 @@ The ChannelSpec has these simple rules:
         rgba = r|g|b|a
         dxdy = dy|dy
 
+    * Multiple channels can be specified via a "slice" notation. For example:
+
+        mychan.0:4
+
+        represents 4 channels:
+            mychan.0, mychan.1, mychan.2, and mychan.3
+
+        slices after the "." work like python slices
+
 For single arrays, the spec is always an early fused spec.
 
 TODO:
@@ -26,6 +35,30 @@ TODO:
 TODO:
     - [x]: Use FusedChannelSpec as a member of ChannelSpec
     - [x]: Handle special slice suffix for length calculations
+
+
+Note:
+    * do not specify the same channel in FusedChannelSpec twice
+
+Example:
+    >>> import kwcoco
+    >>> spec = kwcoco.ChannelSpec('b1|b2|b3,m.0:4|x1|x2,x.3|x.4|x.5')
+    >>> print(spec)
+    <ChannelSpec(b1|b2|b3,m.0:4|x1|x2,x.3|x.4|x.5)>
+    >>> for stream in spec.streams():
+    >>>     print(stream)
+    <FusedChannelSpec(b1|b2|b3)>
+    <FusedChannelSpec(m.0:4|x1|x2)>
+    <FusedChannelSpec(x.3|x.4|x.5)>
+    >>> # Normalization
+    >>> normalized = spec.normalize()
+    >>> print(normalized)
+    <ChannelSpec(b1|b2|b3,m.0|m.1|m.2|m.3|x1|x2,x.3|x.4|x.5)>
+    >>> print(normalized.fuse().spec)
+    b1|b2|b3|m.0|m.1|m.2|m.3|x1|x2|x.3|x.4|x.5
+    >>> print(normalized.fuse().concise().spec)
+    b1|b2|b3|m:4|x1|x2|x.3:6
+
 """
 import abc
 import functools
@@ -96,6 +129,9 @@ class BaseChannelSpec(ub.NiceRepr):
     @abc.abstractmethod
     def difference(self):
         ...
+
+    def __sub__(self, other):
+        return self.difference(other)
 
     def __nice__(self):
         return self.spec
@@ -210,7 +246,10 @@ class FusedChannelSpec(BaseChannelSpec):
 
     @classmethod
     def parse(cls, spec):
-        self = cls(spec.split('|'))
+        if not spec:
+            self = cls([])
+        else:
+            self = cls(spec.split('|'))
         return self
 
     @classmethod
@@ -222,6 +261,7 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> FusedChannelSpec.coerce('a|b|c')
             >>> FusedChannelSpec.coerce(3)
             >>> FusedChannelSpec.coerce(FusedChannelSpec(['a']))
+            >>> assert FusedChannelSpec.coerce('').numel() == 0
         """
         try:
             # Efficiency hack
@@ -251,6 +291,103 @@ class FusedChannelSpec(BaseChannelSpec):
             raise TypeError('unknown type {}'.format(type(data)))
         return self
 
+    def concise(self):
+        """
+        Shorted the channel spec by de-normaliz slice syntax
+
+        Returns:
+            FusedChannelSpec : concise spec
+
+        Example:
+            >>> from kwcoco.channel_spec import *  # NOQA
+            >>> self = FusedChannelSpec.coerce(
+            >>>      'b|a|a.0|a.1|a.2|a.5|c|a.8|a.9|b.0:3|c.0')
+            >>> short = self.concise()
+            >>> long = short.normalize()
+            >>> numels = [c.numel() for c in [self, short, long]]
+            >>> print('self.spec  = {!r}'.format(self.spec))
+            >>> print('short.spec = {!r}'.format(short.spec))
+            >>> print('long.spec  = {!r}'.format(long.spec))
+            >>> print('numels = {!r}'.format(numels))
+            self.spec  = 'b|a|a.0|a.1|a.2|a.5|c|a.8|a.9|b.0:3|c.0'
+            short.spec = 'b|a|a:3|a.5|c|a.8:10|b:3|c.0'
+            long.spec  = 'b|a|a.0|a.1|a.2|a.5|c|a.8|a.9|b.0|b.1|b.2|c.0'
+            numels = [13, 13, 13]
+            >>> assert long.concise().spec == short.spec
+        """
+        self_norm = self.normalize()
+
+        # TODO: build some helper API for building this sort of contiguous
+        # chain, I think we do several similar things in other places
+        # This accum logic is hard to reason about, so an API would be better.
+        new_parts = []
+        accum_root = None
+        accum_stop = None
+        accum_start = None
+        ready = None
+
+        def format_ready(r, start, stop):
+            if start + 1 == stop:
+                code = '{}.{}'.format(r, start)
+            elif start == 0:
+                code = '{}:{}'.format(r, stop)
+            else:
+                code = '{}.{}:{}'.format(r, start, stop)
+            return code
+
+        for part in self_norm.parsed:
+            # print('---')
+            # print('part = {!r}'.format(part))
+            # print('accum_root = {!r}'.format(accum_root))
+            if '.' in part:
+                # Part might be part of a contiguous streak
+                # (There should be a library for this)
+                root, index_suffix = part.split('.')
+                index = int(index_suffix)
+
+                if accum_root == root:
+                    # Check if we can continue an existing segment
+                    if index == accum_stop:
+                        # print('continue segment')
+                        accum_stop = index + 1
+                    else:
+                        # print('cannot continue, v1')
+                        ready = format_ready(accum_root, accum_start, accum_stop)
+                        accum_root = None
+                elif accum_root is not None:
+                    # print('cannot continue, v2')
+                    ready = format_ready(accum_root, accum_start, accum_stop)
+                    accum_root = None
+
+                if accum_root is None:
+                    # print('Start new segment')
+                    accum_root = root
+                    accum_start = index
+                    accum_stop = index + 1
+            else:
+                if accum_root is not None:
+                    # print('cannot continue, v3')
+                    ready = format_ready(accum_root, accum_start, accum_stop)
+                    accum_root = None
+
+            if ready is not None:
+                # print('Append ready={}'.format(ready))
+                new_parts.append(ready)
+                ready = None
+
+            if accum_root is None:
+                # print('Append part={}'.format(part))
+                new_parts.append(part)
+                ready = None
+
+        if accum_root is not None:
+            # print('end of iter, finalize last accum')
+            ready = format_ready(accum_root, accum_start, accum_stop)
+            new_parts.append(ready)
+
+        new = FusedChannelSpec(new_parts, _is_normalized=False)
+        return new
+
     def normalize(self):
         """
         Replace aliases with explicit single-band-per-code specs
@@ -262,12 +399,22 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> from kwcoco.channel_spec import *  # NOQA
             >>> self = FusedChannelSpec.coerce('b1|b2|b3|rgb')
             >>> normed = self.normalize()
-            >>> print('self   = {}'.format(ub.repr2(self, nl=1)))
-            >>> print('normed = {}'.format(ub.repr2(normed, nl=1)))
+            >>> print('self = {}'.format(self))
+            >>> print('normed = {}'.format(normed))
+            self = <FusedChannelSpec(b1|b2|b3|rgb)>
+            normed = <FusedChannelSpec(b1|b2|b3|r|g|b)>
             >>> self = FusedChannelSpec.coerce('B:1:11')
             >>> normed = self.normalize()
-            >>> print('self   = {}'.format(ub.repr2(self, nl=1)))
-            >>> print('normed = {}'.format(ub.repr2(normed, nl=1)))
+            >>> print('self = {}'.format(self))
+            >>> print('normed = {}'.format(normed))
+            self = <FusedChannelSpec(B:1:11)>
+            normed = <FusedChannelSpec(B.1|B.2|B.3|B.4|B.5|B.6|B.7|B.8|B.9|B.10)>
+            >>> self = FusedChannelSpec.coerce('B.1:11')
+            >>> normed = self.normalize()
+            >>> print('self = {}'.format(self))
+            >>> print('normed = {}'.format(normed))
+            self = <FusedChannelSpec(B.1:11)>
+            normed = <FusedChannelSpec(B.1|B.2|B.3|B.4|B.5|B.6|B.7|B.8|B.9|B.10)>
         """
         if self._is_normalized:
             return self
@@ -279,17 +426,9 @@ class FusedChannelSpec(BaseChannelSpec):
                 norm_parsed.extend(self._alias_lut.get(v))
                 needed_normalization = True
             else:
+                # Handle concise slice notation
                 if ':' in v:
-                    root, *slice_args = v.split(':')
-                    if len(slice_args) == 1:
-                        start = 0
-                        stop, = map(int, slice_args)
-                        step = 1
-                    elif len(slice_args) == 2:
-                        start, stop = map(int, slice_args)
-                        step = 1
-                    else:
-                        raise NotImplementedError
+                    root, start, stop, step = _parse_concise_slice_syntax(v)
                     for idx in range(start, stop, step):
                         norm_parsed.append('{}.{}'.format(root, idx))
                     needed_normalization = True
@@ -325,6 +464,9 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> self = FusedChannelSpec.coerce('b1|Z:3|b2|b3|rgb')
             >>> self.sizes()
             [1, 3, 1, 1, 3]
+            >>> assert(FusedChannelSpec.parse('a.0').numel()) == 1
+            >>> assert(FusedChannelSpec.parse('a:0').numel()) == 0
+            >>> assert(FusedChannelSpec.parse('a:1').numel()) == 1
         """
         if self._is_normalized:
             return [1] * len(self.parsed)
@@ -334,16 +476,7 @@ class FusedChannelSpec(BaseChannelSpec):
                 num = len(self._alias_lut.get(v))
             else:
                 if ':' in v:
-                    root, *slice_args = v.split(':')
-                    if len(slice_args) == 1:
-                        start = 0
-                        stop, = map(int, slice_args)
-                        step = 1
-                    elif len(slice_args) == 2:
-                        start, stop = map(int, slice_args)
-                        step = 1
-                    else:
-                        raise NotImplementedError
+                    root, start, stop, step = _parse_concise_slice_syntax(v)
                     num = len(range(start, stop, step))
                 else:
                     num = 1
@@ -401,8 +534,14 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> self.difference(other)
             >>> other = FCS('flowx')
             >>> self.difference(other)
+            >>> FCS = FusedChannelSpec.coerce
+            >>> assert len((FCS('a') - {'a'}).parsed) == 0
+            >>> assert len((FCS('a.0:3') - {'a.0'}).parsed) == 2
         """
-        other_norm = ub.oset(other.normalize().parsed)
+        try:
+            other_norm = ub.oset(other.normalize().parsed)
+        except Exception:
+            other_norm = other
         self_norm = ub.oset(self.normalize().parsed)
         new_parsed = list(self_norm - other_norm)
         new = self.__class__(new_parsed, _is_normalized=True)
@@ -416,7 +555,10 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> other = FCS('r|b|XX')
             >>> self.intersection(other)
         """
-        other_norm = ub.oset(other.normalize().parsed)
+        try:
+            other_norm = ub.oset(other.normalize().parsed)
+        except Exception:
+            other_norm = other
         self_norm = ub.oset(self.normalize().parsed)
         new_parsed = list(self_norm & other_norm)
         new = self.__class__(new_parsed, _is_normalized=True)
@@ -624,15 +766,40 @@ class ChannelSpec(BaseChannelSpec):
             >>> self = ChannelSpec('b1|b2|b3|rgb,B:3')
             >>> print(self.parse())
             >>> print(self.normalize().parse())
+            >>> ChannelSpec('').parse()
+
+        Example:
+            >>> base = ChannelSpec('rgb|disparity,flowx|r|flowy')
+            >>> other = ChannelSpec('rgb')
+            >>> self = base.intersection(other)
+            >>> assert self.numel() == 4
         """
         if self._info.get('parsed', None) is None:
             # commas break inputs into multiple streams
             stream_specs = self.spec.split(',')
             # parsed = {ss: ss.split('|') for ss in stream_specs}
-            parsed = {ss: FusedChannelSpec(ss.split('|'))
-                      for ss in stream_specs}
+            parsed = {
+                ss: FusedChannelSpec(ss.split('|'))
+                for ss in stream_specs if ss
+            }
             self._info['parsed'] = parsed
         return self._info['parsed']
+
+    def concise(self):
+        """
+        Example:
+            >>> self = ChannelSpec('b1|b2,b3|rgb|B.0,B.1|B.2')
+            >>> print(self.concise().spec)
+            b1|b2,b3|r|g|b|B.0,B.1:3
+        """
+        new_parsed = {}
+        for k1, v1 in self.parse().items():
+            norm_vals = v1.concise()
+            norm_key = norm_vals.spec
+            new_parsed[norm_key] = norm_vals
+        new_spec = ','.join(list(new_parsed.keys()))
+        short = ChannelSpec(new_spec, parsed=new_parsed)
+        return short
 
     def normalize(self):
         """
@@ -725,27 +892,66 @@ class ChannelSpec(BaseChannelSpec):
             >>> print(self.difference(other))
             <ChannelSpec(disparity,flowx|flowy)>
             <ChannelSpec(r|g|b|disparity,r|flowy)>
+
+        Example:
+            >>> from kwcoco.channel_spec import *
+            >>> self = ChannelSpec('a|b,c|d')
+            >>> new = self - {'a', 'b'}
+            >>> len(new.sizes()) == 1
+            >>> empty = new - 'c|d'
+            >>> assert empty.numel() == 0
         """
         # assert len(list(other.keys())) == 1, 'can take diff with one stream'
-        other_norm = ChannelSpec.coerce(other).fuse().normalize()
-        # other_norm = ub.oset(ub.peek(other.normalize().values()))
+        try:
+            other_norm = ChannelSpec.coerce(other).fuse().normalize()
+        except Exception:
+            other_norm = other
+
         self_norm = self.normalize()
 
         new_streams = []
         for parts in self_norm.values():
             new_stream = parts.difference(other_norm)
-            # new_parts = ub.oset(parts) - ub.oset(other_norm)
-            # shrink the representation of a complex r|g|b to an alias if
-            # possible.
-            # TODO: make this more efficient
-            # for alias, alias_spec in self._alias_lut.items():
-            #     alias_parts = ub.oset(alias_spec.split('|'))
-            #     index = subsequence_index(new_parts, alias_parts)
-            #     if index is not None:
-            #         oset_delitem(new_parts, index)
-            #         oset_insert(new_parts, index.start, alias)
-            # new_stream = '|'.join(new_parts)
-            new_streams.append(new_stream)
+            if len(new_stream.parsed) > 0:
+                new_streams.append(new_stream)
+        new_spec = ','.join([s.spec for s in new_streams])
+        new = self.__class__(new_spec)
+        return new
+
+    def intersection(self, other):
+        """
+        Set difference. Remove all instances of other channels from
+        this set of channels.
+
+        Example:
+            >>> from kwcoco.channel_spec import *
+            >>> self = ChannelSpec('rgb|disparity,flowx|r|flowy')
+            >>> other = ChannelSpec('rgb')
+            >>> new = self.intersection(other)
+            >>> print(new)
+            >>> print(new.numel())
+            >>> other = ChannelSpec('flowx')
+            >>> new = self.intersection(other)
+            >>> print(new)
+            >>> print(new.numel())
+            <ChannelSpec(r|g|b,r)>
+            4
+            <ChannelSpec(flowx)>
+            1
+        """
+        # assert len(list(other.keys())) == 1, 'can take diff with one stream'
+        try:
+            other_norm = ChannelSpec.coerce(other).fuse().normalize()
+        except Exception:
+            other_norm = other
+
+        self_norm = self.normalize()
+
+        new_streams = []
+        for parts in self_norm.values():
+            new_stream = parts.intersection(other_norm)
+            if len(new_stream.parsed) > 0:
+                new_streams.append(new_stream)
         new_spec = ','.join([s.spec for s in new_streams])
         new = self.__class__(new_spec)
         return new
@@ -764,10 +970,9 @@ class ChannelSpec(BaseChannelSpec):
 
         Example:
             >>> self = ChannelSpec('rgb|disparity,flowx|flowy,B:10')
+            >>> self.normalize().concise()
             >>> self.sizes()
         """
-        print('self = {!r}'.format(self))
-        print('self._info = {}'.format(ub.repr2(self._info, nl=1)))
         sizes = {
             key: vals.numel()
             for key, vals in self.parse().items()
@@ -1145,6 +1350,85 @@ def subsequence_index(oset1, oset2):
         if subset == oset2:
             index = sl
     return index
+
+
+def _parse_concise_slice_syntax(v):
+    """
+    Helper for our slice syntax, which is may be a bit strange
+
+    Example:
+        >>> print(_parse_concise_slice_syntax('B:10'))
+        >>> print(_parse_concise_slice_syntax('B.0:10:3'))
+        >>> print(_parse_concise_slice_syntax('B.:10:3'))
+        >>> print(_parse_concise_slice_syntax('B::10:3'))
+        >>> # Careful, this next one is quite different
+        >>> print(_parse_concise_slice_syntax('B:10:3'))
+        >>> print(_parse_concise_slice_syntax('B:3:10:3'))
+        >>> print(_parse_concise_slice_syntax('B.:10'))
+        >>> print(_parse_concise_slice_syntax('B.:3:'))
+        >>> print(_parse_concise_slice_syntax('B.:3:2'))
+        >>> print(_parse_concise_slice_syntax('B::2:3'))
+        >>> print(_parse_concise_slice_syntax('B.0:10:3'))
+        >>> print(_parse_concise_slice_syntax('B.:10:3'))
+        ('B', 0, 10, 1)
+        ('B', 0, 10, 3)
+        ('B', 0, 10, 3)
+        ('B', 0, 10, 3)
+        ('B', 10, 3, 1)
+        ('B', 3, 10, 3)
+        ('B', 0, 10, 1)
+        ('B', 0, 3, 1)
+        ('B', 0, 3, 2)
+        ('B', 0, 2, 3)
+        ('B', 0, 10, 3)
+        ('B', 0, 10, 3)
+        >>> import pytest
+        >>> with pytest.raises(ValueError):
+        >>>     _parse_concise_slice_syntax('B.0')
+        >>> with pytest.raises(ValueError):
+        >>>     _parse_concise_slice_syntax('B0')
+        >>> with pytest.raises(ValueError):
+        >>>     _parse_concise_slice_syntax('B:')
+        >>> with pytest.raises(ValueError):
+        >>>     _parse_concise_slice_syntax('B:0.10')
+        >>> with pytest.raises(ValueError):
+        >>>     _parse_concise_slice_syntax('B.::')
+    """
+    # The separator can be a ':' or a '.'
+    if '.' in v:
+        root, slice_suffix = v.split('.', 1)
+        slice_args = slice_suffix.split(':')
+        if len(slice_args) <= 1:
+            raise ValueError('invalid slice syntax: {}'.format(v))
+    else:
+        # import warnings
+        # warnings.warn('It is recommended to use . as the getitem op')
+        root, slice_suffix = v.split(':', 1)
+        slice_args = slice_suffix.split(':')
+    if len(slice_args) == 1:
+        start = 0
+        stop, = map(int, slice_args)
+        step = 1
+    elif len(slice_args) == 2:
+        start = int(slice_args[0]) if slice_args[0] else 0
+        stop = int(slice_args[1]) if slice_args[1] else None
+        step = 1
+    elif len(slice_args) == 3:
+        start = int(slice_args[0]) if slice_args[0] else 0
+        stop = int(slice_args[1]) if slice_args[1] else None
+        step = int(slice_args[2]) if slice_args[2] else 1
+    else:
+        raise ValueError('invalid slice syntax: {}'.format(v))
+
+    if stop is None:
+        raise ValueError('Must explicitly specify the endpoint: {}'.format(v))
+
+    CHECK_ERRORS = 1
+    if CHECK_ERRORS:
+        if '.' in root or ':' in root:
+            raise ValueError('invalid slice syntax: {}'.format(v))
+
+    return root, start, stop, step
 
 
 def oset_insert(self, index, obj):

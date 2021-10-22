@@ -1402,7 +1402,6 @@ class DelayedChannelConcat(DelayedImageOperation):
             raise ValueError('No components to concatenate')
         self.components = components
         if dsize is None:
-            print('self.components = {!r}'.format(self.components))
             dsize_cands = [comp.dsize for comp in self.components]
             if not ub.allsame(dsize_cands):
                 raise ValueError(
@@ -1466,8 +1465,6 @@ class DelayedChannelConcat(DelayedImageOperation):
                 import xarray as xr
                 final = xr.concat(stack, dim='c')
             else:
-                for a in stack:
-                    print('a = {!r}'.format(a.shape))
                 final = np.concatenate(stack, axis=2)
         return final
 

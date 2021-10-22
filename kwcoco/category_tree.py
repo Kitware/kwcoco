@@ -22,24 +22,6 @@ class CategoryTree(ub.NiceRepr):
     Helps compute softmaxes and probabilities for tree-based categories
     where a directed edge (A, B) represents that A is a superclass of B.
 
-    Ignore:
-        going to ignore this
-
-        but mayb
-
-        wont do that else
-
-
-    Ignore:
-        fofo
-
-
-    ell leo
-
-
-    Ignore:
-        byab
-
     Note:
 
         There are three basic properties that this object maintains:
@@ -454,6 +436,7 @@ class CategoryTree(ub.NiceRepr):
 
     def __setstate__(self, state):
         graph = from_directed_nested_tuples(state['graph'])
+        need_reindex = False
 
         if True:
             # Reconstruct redundant items
@@ -467,11 +450,17 @@ class CategoryTree(ub.NiceRepr):
             if 'idx_groups' not in state:
                 node_groups = list(traverse_siblings(graph))
                 node_to_idx = state['node_to_idx']
-                state['idx_groups'] = [sorted([node_to_idx[n] for n in group])
-                                       for group in node_groups]
+                try:
+                    state['idx_groups'] = [sorted([node_to_idx[n] for n in group])
+                                           for group in node_groups]
+                except KeyError:
+                    need_reindex = True
+                    pass
 
         self.__dict__.update(state)
         self.graph = graph
+        if need_reindex:
+            self._build_index()
 
     def __nice__(self):
         max_depth = tree_depth(self.graph)
@@ -629,34 +618,6 @@ def tree_depth(graph, root=None):
             return max(it.chain([0], (_inner(n) for n in graph.successors(root)))) + 1
     depth = _inner(root)
     return depth
-
-
-def _print_forest(graph):
-    """
-    Nice ascii representation of a forest
-
-    Ignore:
-        graph = nx.balanced_tree(r=2, h=3, create_using=nx.DiGraph)
-        _print_forest(graph)
-
-        graph = CategoryTree.demo('coco').graph
-        _print_forest(graph)
-    """
-    assert nx.is_forest(graph)
-    encoding = to_directed_nested_tuples(graph)
-    def _recurse(encoding, indent=''):
-        for idx, item in enumerate(encoding):
-            node, data, children = item
-            if idx == len(encoding) - 1:
-                this_prefix = indent + '└── '
-                next_prefix = indent + '    '
-            else:
-                this_prefix = indent + '├── '
-                next_prefix = indent + '│   '
-            label = graph.nodes[node].get('label', node)
-            print(this_prefix + str(label))
-            _recurse(children, indent=next_prefix)
-    _recurse(encoding)
 
 
 def to_directed_nested_tuples(graph, with_data=True):

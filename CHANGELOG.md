@@ -5,7 +5,20 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.13 - Unreleased
+## Version 0.2.14 - Unreleased
+
+
+### Added
+* Moved Archive code to its own util module
+* Extended channel slice syntax. Can now use "." to separate root from the slice notation.
+
+### Fixed
+* Removed debugging print statements
+* Fixed issue with pickling category tree
+* Fixed bugs with numel and zero channels
+
+
+## Version 0.2.13 - Released 2021-10-13
 
 ### Added
 * Add `.images` to `Videos` 1D object.

@@ -62,12 +62,9 @@ class CocoModifyCatsCLI:
         dset = kwcoco.CocoDataset.coerce(config['src'])
         print('dset = {!r}'.format(dset))
 
-        try:
-            from kwcoco.category_tree import _print_forest
-            print('Input Categories:')
-            _print_forest(dset.object_categories().graph)
-        except Exception:
-            pass
+        import networkx as nx
+        print('Input Categories:')
+        print(nx.forest_str(dset.object_categories().graph))
 
         if config['rename'] is not None:
             # parse rename string
@@ -100,7 +97,7 @@ class CocoModifyCatsCLI:
                 remove_cids, keep_annots=config['keep_annots'], verbose=1)
 
         print('Output Categories: ')
-        _print_forest(dset.object_categories().graph)
+        print(nx.forest_str(dset.object_categories().graph))
 
         if config['dst'] is None:
             print('dry run')
