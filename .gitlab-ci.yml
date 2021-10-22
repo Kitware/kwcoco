@@ -235,10 +235,10 @@ stages:
     coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
 
     except:
-        refs:
-          - release 
-          - main 
-          - tags
+        #refs:
+        #  - release 
+        #  - main 
+        #  - tags
         changes:
             - README.rst
             - CHANGELOG.md
