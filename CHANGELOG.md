@@ -7,8 +7,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.15 - Unreleased
 
+### Added
+* Ported channel related features to CocoImage
+* vidshapes-msi is now an alias for vidshapes-multispectral
+
 ### Changed
 * Split `kwcoco.demo.toydata` into `kwcoco.demo.toydata_image` and `kwcoco.demo.toydata_video`
+
+### Fixed
+* Bug in show_image with MSi
 
 
 ## Version 0.2.14 - Released 2021-10-21

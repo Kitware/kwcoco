@@ -3006,6 +3006,12 @@ class MixinCocoDraw(object):
             import kwcoco
             kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
             print(ub.repr2(list(kwargs.keys()), nl=1, si=1))
+
+        Example:
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi')
+            >>> dset.show_image(gid=1, channels='B8')
         """
         import matplotlib as mpl
         from matplotlib import pyplot as plt
@@ -3167,37 +3173,32 @@ class MixinCocoDraw(object):
             np_img = self.load_image(img, channels=channels)
         else:
             # hack for multispectral
-            avail_channels = [
-                aux.get('channels', None) for aux in img.get('auxiliary', [])
-            ]
+            coco_img = self._coco_image(gid)
+            avail_channels = coco_img.channels
+
             if channels is None:
-                print('avail_channels = {!r}'.format(avail_channels))
-                from kwcoco.channel_spec import FusedChannelSpec
-                avail_spec = FusedChannelSpec.coerce('|'.join(avail_channels)).normalize()
+                avail_spec = avail_channels.fuse().normalize()
                 num_chans = avail_spec.numel()
 
-                if (num_chans) == 0:
+                if num_chans == 0:
                     raise Exception('no channels!')
-                elif (num_chans) == 2:
+                elif num_chans <= 2:
                     print('Auto choosing 1 channel')
-                    channels = avail_spec[0]
-                elif (num_chans) > 3:
+                    channels = avail_spec.parsed[0]
+                elif num_chans > 3:
                     print('Auto choosing 3 channel')
                     sensible_defaults = [
-                        FusedChannelSpec.coerce('red|green|blue'),
-                        FusedChannelSpec.coerce('r|g|b'),
+                        'red|green|blue',
+                        'r|g|b',
                     ]
                     chosen = None
                     for sensible in sensible_defaults:
-                        print('sensible = {!r}'.format(sensible))
                         cand = avail_spec & sensible
-                        print('cand = {!r}'.format(cand))
                         if cand.numel() == 3:
                             chosen = cand
                             break
                     if chosen is None:
                         chosen = avail_spec[0:3]
-                    print('chosen = {!r}'.format(chosen))
                     channels = chosen
 
             print('loading image')

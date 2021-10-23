@@ -5,11 +5,13 @@ mkinit ~/code/kwcoco/kwcoco/util/__init__.py -w
 
 from kwcoco.util import dict_like
 from kwcoco.util import jsonschema_elements
+from kwcoco.util import util_archive
 from kwcoco.util import util_delayed_poc
 from kwcoco.util import util_futures
 from kwcoco.util import util_json
 from kwcoco.util import util_monkey
 from kwcoco.util import util_sklearn
+from kwcoco.util import util_truncate
 
 from kwcoco.util.dict_like import (DictLike,)
 from kwcoco.util.jsonschema_elements import (ALLOF, ANY, ANYOF, ARRAY, BOOLEAN,
@@ -18,6 +20,7 @@ from kwcoco.util.jsonschema_elements import (ALLOF, ANY, ANYOF, ARRAY, BOOLEAN,
                                              OBJECT, ONEOF, QuantifierElements,
                                              STRING, ScalarElements,
                                              SchemaElements, elem,)
+from kwcoco.util.util_archive import (Archive, unarchive_file,)
 from kwcoco.util.util_delayed_poc import (DelayedChannelConcat, DelayedCrop,
                                           DelayedFrameConcat, DelayedIdentity,
                                           DelayedImageOperation, DelayedLoad,
@@ -31,17 +34,19 @@ from kwcoco.util.util_json import (IndexableWalker, ensure_json_serializable,
                                    indexable_allclose,)
 from kwcoco.util.util_monkey import (SupressPrint,)
 from kwcoco.util.util_sklearn import (StratifiedGroupKFold,)
+from kwcoco.util.util_truncate import (smart_truncate,)
 
-__all__ = ['ALLOF', 'ANY', 'ANYOF', 'ARRAY', 'BOOLEAN', 'ContainerElements',
-           'DelayedChannelConcat', 'DelayedCrop', 'DelayedFrameConcat',
-           'DelayedIdentity', 'DelayedImageOperation', 'DelayedLoad',
-           'DelayedNans', 'DelayedVideoOperation', 'DelayedVisionOperation',
-           'DelayedWarp', 'DictLike', 'Element', 'Executor', 'INTEGER',
-           'IndexableWalker', 'JobPool', 'LazyGDalFrameFile', 'NOT', 'NULL',
-           'NUMBER', 'OBJECT', 'ONEOF', 'QuantifierElements', 'STRING',
-           'ScalarElements', 'SchemaElements', 'StratifiedGroupKFold',
-           'SupressPrint', 'dict_like', 'elem', 'ensure_json_serializable',
-           'find_json_unserializable', 'have_gdal', 'indexable_allclose',
-           'jsonschema_elements', 'profile', 'util_delayed_poc',
-           'util_futures', 'util_json', 'util_monkey', 'util_sklearn',
-           'validate_nonzero_data']
+__all__ = ['ALLOF', 'ANY', 'ANYOF', 'ARRAY', 'Archive', 'BOOLEAN',
+           'ContainerElements', 'DelayedChannelConcat', 'DelayedCrop',
+           'DelayedFrameConcat', 'DelayedIdentity', 'DelayedImageOperation',
+           'DelayedLoad', 'DelayedNans', 'DelayedVideoOperation',
+           'DelayedVisionOperation', 'DelayedWarp', 'DictLike', 'Element',
+           'Executor', 'INTEGER', 'IndexableWalker', 'JobPool',
+           'LazyGDalFrameFile', 'NOT', 'NULL', 'NUMBER', 'OBJECT', 'ONEOF',
+           'QuantifierElements', 'STRING', 'ScalarElements', 'SchemaElements',
+           'StratifiedGroupKFold', 'SupressPrint', 'dict_like', 'elem',
+           'ensure_json_serializable', 'find_json_unserializable', 'have_gdal',
+           'indexable_allclose', 'jsonschema_elements', 'profile',
+           'smart_truncate', 'unarchive_file', 'util_archive',
+           'util_delayed_poc', 'util_futures', 'util_json', 'util_monkey',
+           'util_sklearn', 'util_truncate', 'validate_nonzero_data']
