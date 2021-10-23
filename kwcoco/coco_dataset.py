@@ -1093,20 +1093,21 @@ class MixinCocoExtras(object):
             >>> assert len(dset.index.name_to_img) == len(dset.index.imgs) == 0
         """
         import parse
-        from kwcoco.demo import toydata
 
         if key.startswith('special:'):
             key = key.split(':')[1]
 
         if key.startswith('shapes'):
+            from kwcoco.demo import toydata_image
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:
                 kwargs['n_imgs'] = int(res.named['num_imgs'])
             if 'rng' not in kwargs and 'n_imgs' in kwargs:
                 kwargs['rng'] = kwargs['n_imgs']
-            self = toydata.demodata_toy_dset(**kwargs)
+            self = toydata_image.demodata_toy_dset(**kwargs)
             self.tag = key
         elif key.startswith('vidshapes'):
+            from kwcoco.demo import toydata_video
             verbose = kwargs.get('verbose', 1)
             res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
             if res is None:
@@ -1138,9 +1139,8 @@ class MixinCocoExtras(object):
                     vidkw['max_speed'] = float(part.replace('speed', ''))
                 if 'aux' == part:
                     vidkw['aux'] = True
-                elif 'multispectral' == part:
+                elif part in {'multispectral', 'msi'}:
                     vidkw['multispectral'] = True
-
 
             vidkw.update(kwargs)
             use_cache = vidkw.pop('use_cache', True)
@@ -1173,7 +1173,7 @@ class MixinCocoExtras(object):
             fpath = join(bundle_dpath, 'data.kwcoco.json')
 
             stamp = ub.CacheStamp(
-                'vidshape_stamp_v{:03d}'.format(toydata.TOYDATA_VERSION),
+                'vidshape_stamp_v{:03d}'.format(toydata_video.TOYDATA_VIDEO_VERSION),
                 dpath=cache_dpath,
                 cfgstr=cfgstr, enabled=use_cache,
                 product=[fpath], verbose=1,
@@ -1184,7 +1184,7 @@ class MixinCocoExtras(object):
             if stamp.expired():
                 vidkw['dpath'] = bundle_dpath
                 vidkw.pop('bundle_dpath', None)
-                self = toydata.random_video_dset(**vidkw)
+                self = toydata_video.random_video_dset(**vidkw)
                 if verbose > 3:
                     print('self.fpath = {!r}'.format(self.fpath))
                     print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
@@ -1238,7 +1238,7 @@ class MixinCocoExtras(object):
         TODO:
             - [ ] parametarize
         """
-        from kwcoco.demo.toydata import random_single_video_dset
+        from kwcoco.demo.toydata_video import random_single_video_dset
         dset = random_single_video_dset(num_frames=5, num_tracks=3,
                                         tid_start=1, rng=rng)
         return dset
@@ -2531,7 +2531,7 @@ class MixinCocoStats(object):
                 'n_cats': 8,
             }
 
-            >>> from kwcoco.demo.toydata import *  # NOQA
+            >>> from kwcoco.demo.toydata_video import random_video_dset
             >>> dset = random_video_dset(render=True, num_frames=2, num_tracks=10, rng=0)
             >>> print(ub.repr2(dset.basic_stats()))
             {
@@ -4514,8 +4514,8 @@ class CocoIndex(object):
             vidid - Video ID
 
         Example:
-            >>> from kwcoco.demo.toydata import *  # NOQA
-            >>> parent = CocoDataset.demo('vidshapes1', num_frames=4, rng=1)
+            >>> import kwcoco
+            >>> parent = kwcoco.CocoDataset.demo('vidshapes1', num_frames=4, rng=1)
             >>> index = parent.index
             >>> index.build(parent)
         """

@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.15 - Unreleased
 
+### Changed
+* Split `kwcoco.demo.toydata` into `kwcoco.demo.toydata_image` and `kwcoco.demo.toydata_video`
+
 
 ## Version 0.2.14 - Released 2021-10-21
 
