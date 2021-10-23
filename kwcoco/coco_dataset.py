@@ -1022,7 +1022,7 @@ class MixinCocoExtras(object):
         return self
 
     @classmethod
-    def demo(cls, key='photos', **kw):
+    def demo(cls, key='photos', **kwargs):
         """
         Create a toy coco dataset for testing and demo puposes
 
@@ -1031,7 +1031,7 @@ class MixinCocoExtras(object):
                 also undocumented sufixes that can control behavior.
                 TODO: better documentation for these demo datasets.
 
-            **kw : if key is shapes, these arguments are passed to toydata
+            **kwargs : if key is shapes, these arguments are passed to toydata
                 generation. The Kwargs section of this docstring documents a
                 subset of the available options. For full details, see
                 :func:`demodata_toy_dset` and :func:`random_video_dset`.
@@ -1101,12 +1101,13 @@ class MixinCocoExtras(object):
         if key.startswith('shapes'):
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:
-                kw['n_imgs'] = int(res.named['num_imgs'])
-            if 'rng' not in kw and 'n_imgs' in kw:
-                kw['rng'] = kw['n_imgs']
-            self = toydata.demodata_toy_dset(**kw)
+                kwargs['n_imgs'] = int(res.named['num_imgs'])
+            if 'rng' not in kwargs and 'n_imgs' in kwargs:
+                kwargs['rng'] = kwargs['n_imgs']
+            self = toydata.demodata_toy_dset(**kwargs)
             self.tag = key
         elif key.startswith('vidshapes'):
+            verbose = kwargs.get('verbose', 1)
             res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
             if res is None:
                 res = parse.parse('{prefix}{num_videos:d}', key)
@@ -1121,12 +1122,14 @@ class MixinCocoExtras(object):
                 'max_speed': 0.01,
             }
             suff_parts = []
-            print('res = {!r}'.format(res))
+            if verbose > 3:
+                print('res = {!r}'.format(res))
             if res:
-                kw['num_videos'] = int(res.named['num_videos'])
+                kwargs['num_videos'] = int(res.named['num_videos'])
                 if 'suffix' in res.named:
                     suff_parts = res.named['suffix'].split('-')
-            print('suff_parts = {!r}'.format(suff_parts))
+            if verbose > 3:
+                print('suff_parts = {!r}'.format(suff_parts))
 
             for part in suff_parts:
                 if part.startswith('frames'):
@@ -1138,16 +1141,19 @@ class MixinCocoExtras(object):
                 elif 'multispectral' == part:
                     vidkw['multispectral'] = True
 
-            vidkw.update(kw)
+
+            vidkw.update(kwargs)
             use_cache = vidkw.pop('use_cache', True)
 
             if 'rng' not in vidkw:
                 # Make rng determined by other params by default
                 vidkw['rng'] = int(ub.hash_data(ub.repr2(vidkw))[0:8], 16)
 
-            print('vidkw = {!r}'.format(vidkw))
             cfgstr = ub.hash_data(ub.repr2(vidkw), base='abc')[0:14]
-            print('cfgstr = {!r}'.format(cfgstr))
+
+            if verbose > 3:
+                print('vidkw = {!r}'.format(vidkw))
+                print('cfgstr = {!r}'.format(cfgstr))
 
             tag = key + '_' + cfgstr
 
@@ -1170,16 +1176,18 @@ class MixinCocoExtras(object):
                 'vidshape_stamp_v{:03d}'.format(toydata.TOYDATA_VERSION),
                 dpath=cache_dpath,
                 cfgstr=cfgstr, enabled=use_cache,
-                product=[fpath], verbose=100,
+                product=[fpath], verbose=1,
                 meta=vidkw
             )
-            print('stamp = {!r}'.format(stamp))
+            if verbose > 3:
+                print('stamp = {!r}'.format(stamp))
             if stamp.expired():
                 vidkw['dpath'] = bundle_dpath
                 vidkw.pop('bundle_dpath', None)
                 self = toydata.random_video_dset(**vidkw)
-                print('self.fpath = {!r}'.format(self.fpath))
-                print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
+                if verbose > 3:
+                    print('self.fpath = {!r}'.format(self.fpath))
+                    print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
 
                 self.fpath = fpath
                 if fpath is not None:
