@@ -9,5 +9,9 @@ Note:
 """
 from __future__ import absolute_import, division, print_function
 
-from .toydata_video import random_single_video_dset
+from .toydata_video import random_single_video_dset, random_video_dset
 from .toydata_image import demodata_toy_dset
+
+
+__all__ = ['demodata_toy_dset', 'random_single_video_dset',
+           'random_video_dset']
