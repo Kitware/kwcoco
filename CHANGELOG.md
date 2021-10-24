@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Ported channel related features to CocoImage
 * vidshapes-msi is now an alias for vidshapes-multispectral
+* Can now specify general channels for video toydata
 
 ### Changed
 * Split `kwcoco.demo.toydata` into `kwcoco.demo.toydata_image` and `kwcoco.demo.toydata_video`

@@ -28,7 +28,8 @@ TOYDATA_VIDEO_VERSION = 20
 def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
         image_size=(600, 600), verbose=3, render=False, aux=None,
-        multispectral=False, rng=None, dpath=None, max_speed=0.01, **kwargs):
+        multispectral=False, rng=None, dpath=None, max_speed=0.01,
+        channels=None, **kwargs):
     """
     Create a toy Coco Video Dataset
 
@@ -59,6 +60,9 @@ def random_video_dset(
             a "main" image.
 
         max_speed (float): max speed of movers
+
+        channels (str): experimental new way to get MSI with specific
+            band distributions.
 
         **kwargs : used for old backwards compatible argument names
             gsize - alias for image_size
@@ -114,7 +118,7 @@ def random_video_dset(
             num_tracks=num_tracks, tid_start=tid_start, anchors=anchors,
             gid_start=gid_start, video_id=vidid, render=False, autobuild=False,
             aux=aux, multispectral=multispectral, max_speed=max_speed,
-            rng=rng)
+            channels=channels, rng=rng)
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
             tid_start = dset.dataset['annotations'][-1]['track_id'] + 1
@@ -343,6 +347,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         if multispectral:
             channels = 'B1,B8,B8a,B10,B11'
             no_main_image = True
+    else:
+        no_main_image = True
 
     special_fusedbands_to_scale = {
         'disparity': 1,
@@ -598,6 +604,8 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
             to the rendered folder inside the kwcoco cache directory.
 
         renderkw (dict): See :func:`render_toy_image` for details.
+            Also takes imwrite keywords args only handled in this function.
+            TODO better docs.
 
     Example:
         >>> from kwcoco.demo.toydata_video import *  # NOQA
@@ -637,6 +645,15 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
 
     img_dpath = ub.ensuredir((bundle_dpath, '_assets/images'))
 
+    imwrite_kw = {}
+    imwrite_ops = {'compress', 'blocksize', 'interleave', 'options'}
+    imwrite_kw = ub.dict_isect(renderkw, imwrite_ops)
+    if imwrite_kw:
+        # imwrite_kw['backend'] = 'gdal'
+        # imwrite_kw['space'] = None
+        # imwrite kw requries gdal
+        from osgeo import gdal  # NOQA
+
     for gid in dset.imgs.keys():
         # Render data inside the image
         img = render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
@@ -664,9 +681,12 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
                 auxdata = auxdict.pop('imdata', None)
                 try:
                     from osgeo import gdal  # NOQA
-                    kwimage.imwrite(aux_fpath, auxdata, backend='gdal', space=None)
+                    kwimage.imwrite(
+                        aux_fpath, auxdata, backend='gdal', space=None,
+                        **imwrite_kw)
                 except Exception:
-                    kwimage.imwrite(aux_fpath, auxdata, space=None)
+                    kwimage.imwrite(
+                        aux_fpath, auxdata, space=None, **imwrite_kw)
             img['auxiliary'] = auxiliaries
 
     dset._build_index()
