@@ -156,7 +156,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
                              num_tracks=3, tid_start=1, gid_start=1,
                              video_id=1, anchors=None, rng=None, render=False,
                              dpath=None, autobuild=True, verbose=3, aux=None,
-                             multispectral=False, max_speed=0.01, **kwargs):
+                             multispectral=False, max_speed=0.01,
+                             channels=None, **kwargs):
     """
     Create the video scene layout of object positions.
 
@@ -195,6 +196,9 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
         max_speed (float):
             max speed of movers
+
+        channels (str | None | ChannelSpec):
+            if specified generates multispectral images with dummy channels
 
         **kwargs : used for old backwards compatible argument names
             gsize - alias for image_size
@@ -240,13 +244,14 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         >>> gsize = np.array([(600, 600)])
         >>> print(anchors * gsize)
         >>> dset = random_single_video_dset(render=True, num_frames=10,
-        >>>                                 anchors=anchors, num_tracks=10)
+        >>>                             anchors=anchors, num_tracks=10,
+        >>>                             image_size='random')
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> plt = kwplot.autoplt()
         >>> plt.clf()
         >>> gids = list(dset.imgs.keys())
-        >>> pnums = kwplot.PlotNums(nSubplots=len(gids), nRows=1)
+        >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
         >>> for gid in gids:
         >>>     dset.show_image(gid, pnum=pnums(), fnum=1, title=False)
         >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
@@ -278,6 +283,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     """
     import pandas as pd
     import kwcoco
+    from kwarray import distributions
     rng = kwarray.ensure_rng(rng)
 
     if 'gsize' in kwargs:  # nocover
@@ -292,75 +298,107 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     image_ids = list(range(gid_start, num_frames + gid_start))
     track_ids = list(range(tid_start, num_tracks + tid_start))
 
+    if isinstance(image_size, str):
+        if image_size == 'random':
+            image_size = (
+                distributions.Uniform(200, 800),
+                distributions.Uniform(200, 800),
+            )
+
+    coercable_width = image_size[0]
+    coercable_height = image_size[1]
+
+    if isinstance(coercable_width, distributions.Distribution):
+        video_width = int(coercable_width.sample())
+        video_height = int(coercable_height.sample())
+        image_width_distri = coercable_width
+        image_height_distri = coercable_height
+    else:
+        video_width = coercable_width
+        video_height = coercable_height
+        image_width_distri = distributions.Constant(coercable_width)
+        image_height_distri = distributions.Constant(coercable_height)
+
+    video_dsize = (video_width, video_height)
+    video_window = kwimage.Boxes([[0, 0, video_width, video_height]], 'xywh')
+
     dset = kwcoco.CocoDataset(autobuild=False)
     dset.add_video(
         name='toy_video_{}'.format(video_id),
-        width=image_size[0],
-        height=image_size[1],
+        width=video_width,
+        height=video_height,
         id=video_id,
     )
 
-    if multispectral and aux:
-        raise ValueError('cant have multispectral and aux')
+    if bool(multispectral) + bool(aux) + bool(channels) > 1:
+        raise ValueError('can only have one of multispectral, aux, or channels')
 
-    if multispectral:
-        s2_res = [60, 10, 20, 60, 20]
-        s2_bands = ['B1', 'B8', 'B8a', 'B10', 'B11']
-        aux = [
-            {'channels': b,
-             'warp_aux_to_img': kwimage.Affine.scale(60. / r).concise(),
-             'dtype': 'uint16'}
-            for b, r in zip(s2_bands, s2_res)
-        ]
+    # backwards compat
+    if channels is None:
+        if aux is True:
+            channels = 'disparity,flowx|flowy'
+        if multispectral:
+            channels = 'B1,B8A,B8a,B10,B11'
+    special_fusedbands_to_scale = {
+        'disparity': 1,
+        'flowx|flowy': 1,
+        'B1': 1,
+        'B2': 1 / 6,
+        'B8a': 1 / 3,
+        'B10': 1,
+        'B11': 1 / 3,
+    }
 
-        main_window = kwimage.Boxes([[0, 0, image_size[0], image_size[1]]],
-                                    'xywh')
-        for chaninfo in aux:
-            mat = kwimage.Affine.coerce(chaninfo['warp_aux_to_img']).inv().matrix
-            aux_window = main_window.warp(mat).quantize()
-            chaninfo['width'] = int(aux_window.width.ravel()[0])
-            chaninfo['height'] = int(aux_window.height.ravel()[0])
+    if channels is not None:
+        channels = kwcoco.ChannelSpec.coerce(channels)
 
     for frame_idx, gid in enumerate(image_ids):
+        image_height = int(image_height_distri.sample())
+        image_width = int(image_width_distri.sample())
+
+        warp_vid_from_img = kwimage.Affine.coerce(
+            scale=(video_width / image_width, video_height / image_height)
+        )
+        warp_img_from_vid = warp_vid_from_img.inv()
+
         img = {
             'id': gid,
             'file_name': '<todo-generate-{}-{}>'.format(video_id, frame_idx),
-            'width': image_size[0],
-            'height': image_size[1],
-            'warp_img_to_vid': {
-                'type': 'affine',
-                'matrix': [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            },
+            'width': image_width,
+            'height': image_height,
+            'warp_img_to_vid': warp_vid_from_img.concise(),
             'frame_index': frame_idx,
             'video_id': video_id,
         }
-        if multispectral:
-            # TODO: can we do better here?
-            img['name'] = 'generated-{}-{}'.format(video_id, frame_idx)
-            img['file_name'] = None
-            # Note do NOT remove width height. It is important to always
-            # have a primary spatial dimension reference for annotations.
-            # img.pop('width')
-            # img.pop('height')
 
-        if aux:
-            if aux is True:
-                aux = ['disparity', 'flowx|flowy']
-            aux = aux if ub.iterable(aux) else [aux]
+        if channels is not None:
             img['auxiliary'] = []
-            for chaninfo in aux:
-                if isinstance(chaninfo, str):
-                    chaninfo = {
-                        'channels': chaninfo,
-                        'width': image_size[0],
-                        'height': image_size[1],
-                        'warp_aux_to_img': None,
-                    }
-                # Add placeholder for auxiliary image data
+            for stream in channels.streams():
+                scale = special_fusedbands_to_scale.get(stream.spec, None)
+                if scale is None:
+                    warp_img_from_aux = kwimage.Affine.scale(scale=scale)
+                else:
+                    warp_img_from_aux = kwimage.Affine.random(rng=rng)
+
+                warp_aux_from_img = warp_img_from_aux.inv()
+                warp_aux_from_vid = warp_aux_from_img @ warp_img_from_vid
+                aux_window = video_window.warp(warp_aux_from_vid).quantize()
+
+                aux_width = aux_window.width.item()
+                aux_height = aux_window.height.item()
+
                 auxitem = {
                     'file_name': '<todo-generate-{}-{}>'.format(video_id, frame_idx),
+                    'channels': stream.spec,
+                    'width': aux_width,
+                    'height': aux_height,
+                    'warp_aux_to_img': warp_img_from_aux.concise(),
                 }
-                auxitem.update(chaninfo)
+                # hack for dtype
+                if stream.spec.startswith('B'):
+                    auxitem['dtype'] = 'uint16'
+                else:
+                    auxitem['dtype'] = 'uint8'
                 img['auxiliary'].append(auxitem)
 
         dset.add_image(**img)
@@ -386,6 +424,44 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         num_objects=num_tracks, rng=rng,
         max_speed=max_speed)
 
+    def warp_within_bounds(self, x_min, y_min, x_max, y_max):
+        """
+        Translate / scale the boxes to fit in the bounds
+
+        FIXME: do something reasonable
+
+        Example:
+            >>> from kwimage.structs.boxes import *  # NOQA
+            >>> self = Boxes.random(10).scale(1).translate(-10)
+            >>> x_min, y_min, x_max, y_max = 10, 10, 20, 20
+            >>> x_min, y_min, x_max, y_max = 0, 0, 20, 20
+            >>> print('self = {!r}'.format(self))
+            >>> scaled = warp_within_bounds(self, x_min, y_min, x_max, y_max)
+            >>> print('scaled = {!r}'.format(scaled))
+        """
+        tlbr = self.to_tlbr()
+        tl_x, tl_y, br_x, br_y = tlbr.components
+        tl_xy_min = np.c_[tl_x, tl_y].min(axis=0)
+        br_xy_max = np.c_[br_x, br_y].max(axis=0)
+        tl_xy_lb = np.array([x_min, y_min])
+        br_xy_ub = np.array([x_max, y_max])
+
+        size_ub = br_xy_ub - tl_xy_lb
+        size_max = br_xy_max - tl_xy_min
+
+        tl_xy_over = np.minimum(tl_xy_lb - tl_xy_min, 0)
+        # tl_xy_over = -tl_xy_min
+        # Now at the minimum coord
+        tmp = tlbr.translate(tl_xy_over)
+        _tl_x, _tl_y, _br_x, _br_y = tmp.components
+        tmp_tl_xy_min = np.c_[_tl_x, _tl_y].min(axis=0)
+        # tmp_br_xy_max = np.c_[_br_x, _br_y].max(axis=0)
+
+        tmp.translate(-tmp_tl_xy_min)
+        sf = np.minimum(size_ub / size_max, 1)
+        out = tmp.scale(sf).translate(tmp_tl_xy_min)
+        return out
+
     for tid, path in zip(track_ids, paths):
         if anchors is None:
             anchors_ = anchors
@@ -393,13 +469,13 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
             anchors_ = np.array([anchors[rng.randint(0, len(anchors))]])
 
         # Box scale
-        boxes = kwimage.Boxes.random(
+        video_boxes = kwimage.Boxes.random(
             num=num_frames, scale=1.0, format='cxywh', rng=rng,
             anchors=anchors_)
 
         # Smooth out varying box sizes
         alpha = rng.rand() * 0.1
-        wh = pd.DataFrame(boxes.data[:, 2:4], columns=['w', 'h'])
+        wh = pd.DataFrame(video_boxes.data[:, 2:4], columns=['w', 'h'])
 
         ar = wh['w'] / wh['h']
         min_ar = 0.25
@@ -409,64 +485,23 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         wh['h'][ar > max_ar] = wh['w'] * 0.25
 
         box_dims = wh.ewm(alpha=alpha, adjust=False).mean()
-        # print('path = {!r}'.format(path))
-        boxes.data[:, 0:2] = path
-        boxes.data[:, 2:4] = box_dims.values
-        # boxes = boxes.scale(0.1, about='center')
-        # boxes = boxes.scale(image_size).scale(0.5, about='center')
-        boxes = boxes.scale(image_size, about='origin')
-        boxes = boxes.scale(0.9, about='center')
-
-        def warp_within_bounds(self, x_min, y_min, x_max, y_max):
-            """
-            Translate / scale the boxes to fit in the bounds
-
-            FIXME: do something reasonable
-
-            Example:
-                >>> from kwimage.structs.boxes import *  # NOQA
-                >>> self = Boxes.random(10).scale(1).translate(-10)
-                >> x_min, y_min, x_max, y_max = 10, 10, 20, 20
-                >>> x_min, y_min, x_max, y_max = 0, 0, 20, 20
-                >>> print('self = {!r}'.format(self))
-                >>> scaled = warp_within_bounds(self, x_min, y_min, x_max, y_max)
-                >>> print('scaled = {!r}'.format(scaled))
-            """
-            tlbr = self.to_tlbr()
-            tl_x, tl_y, br_x, br_y = tlbr.components
-            tl_xy_min = np.c_[tl_x, tl_y].min(axis=0)
-            br_xy_max = np.c_[br_x, br_y].max(axis=0)
-            tl_xy_lb = np.array([x_min, y_min])
-            br_xy_ub = np.array([x_max, y_max])
-
-            size_ub = br_xy_ub - tl_xy_lb
-            size_max = br_xy_max - tl_xy_min
-
-            tl_xy_over = np.minimum(tl_xy_lb - tl_xy_min, 0)
-            # tl_xy_over = -tl_xy_min
-            # Now at the minimum coord
-            tmp = tlbr.translate(tl_xy_over)
-            _tl_x, _tl_y, _br_x, _br_y = tmp.components
-            tmp_tl_xy_min = np.c_[_tl_x, _tl_y].min(axis=0)
-            # tmp_br_xy_max = np.c_[_br_x, _br_y].max(axis=0)
-
-            tmp.translate(-tmp_tl_xy_min)
-            sf = np.minimum(size_ub / size_max, 1)
-            out = tmp.scale(sf).translate(tmp_tl_xy_min)
-            return out
+        video_boxes.data[:, 0:2] = path
+        video_boxes.data[:, 2:4] = box_dims.values
+        video_boxes = video_boxes.scale(video_dsize, about='origin')
+        video_boxes = video_boxes.scale(0.9, about='center')
 
         # oob_pad = -20  # allow some out of bounds
         # oob_pad = 20  # allow some out of bounds
-        # boxes = boxes.to_tlbr()
+        # video_boxes = video_boxes.to_tlbr()
         # TODO: need better path distributions
-        # boxes = warp_within_bounds(boxes, 0 - oob_pad, 0 - oob_pad, image_size[0] + oob_pad, image_size[1] + oob_pad)
-        boxes = boxes.to_xywh()
+        # video_boxes = warp_within_bounds(video_boxes, 0 - oob_pad, 0 - oob_pad, image_size[0] + oob_pad, image_size[1] + oob_pad)
+        video_boxes = video_boxes.to_xywh()
 
-        boxes.data = boxes.data.round(1)
+        video_boxes.data = video_boxes.data.round(1)
         cidx = rng.randint(0, len(classes))
-        dets = kwimage.Detections(
-            boxes=boxes,
-            class_idxs=np.array([cidx] * len(boxes)),
+        video_dets = kwimage.Detections(
+            boxes=video_boxes,
+            class_idxs=np.array([cidx] * len(video_boxes)),
             classes=classes,
         )
 
@@ -474,9 +509,9 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         if WITH_KPTS_SSEG:
             kpts = []
             ssegs = []
-            ddims = boxes.data[:, 2:4].astype(int)[:, ::-1]
-            offsets = boxes.data[:, 0:2].astype(int)
-            cnames = [classes[cidx] for cidx in dets.class_idxs]
+            ddims = video_boxes.data[:, 2:4].astype(int)[:, ::-1]
+            offsets = video_boxes.data[:, 0:2].astype(int)
+            cnames = [classes[cidx] for cidx in video_dets.class_idxs]
             for dims, xy_offset, cname in zip(ddims, offsets, cnames):
                 info = catpats._todo_refactor_geometric_info(cname, xy_offset, dims)
                 kpts.append(info['kpts'])
@@ -487,16 +522,19 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
                 else:
                     ssegs.append(info['segmentation'])
 
-            dets.data['keypoints'] = kwimage.PointsList(kpts)
-            dets.data['segmentations'] = kwimage.SegmentationList(ssegs)
-
-        anns = list(dets.to_coco(dset=dset, style='new'))
+            video_dets.data['keypoints'] = kwimage.PointsList(kpts)
+            video_dets.data['segmentations'] = kwimage.SegmentationList(ssegs)
 
         start_frame = 0
-        for frame_index, ann in enumerate(anns, start=start_frame):
-            ann['track_id'] = tid
-            ann['image_id'] = dset.dataset['images'][frame_index]['id']
-            dset.add_annotation(**ann)
+        for frame_index, video_det in enumerate(video_dets, start=start_frame):
+            frame_img = dset.dataset['images'][frame_index]
+            warp_vid_from_img = kwimage.Affine.coerce(frame_img['warp_img_to_vid'])
+            warp_img_from_vid = warp_vid_from_img.inv()
+            image_det = video_det.warp(warp_img_from_vid)
+            image_ann = list(image_det.to_coco(dset=dset, style='new'))[0]
+            image_ann['track_id'] = tid
+            image_ann['image_id'] = frame_img['id']
+            dset.add_annotation(**image_ann)
 
     HACK_FIX_COCO_KPTS_FORMAT = True
     if HACK_FIX_COCO_KPTS_FORMAT:
@@ -600,7 +638,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
             img_fpath = join(img_dpath, fname)
             img.update({
                 'file_name': img_fpath,
-                'channels': 'rgb',
+                'channels': 'r|g|b',
             })
             kwimage.imwrite(img_fpath, imdata)
 
@@ -793,7 +831,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     if imdata is not None:
         imdata = (imdata * 255).astype(np.uint8)
         imdata = kwimage.atleast_3channels(imdata)
-        main_channels = 'gray' if gray else 'rgb'
+        main_channels = 'gray' if gray else 'r|g|b'
         img.update({
             'imdata': imdata,
             'channels': main_channels,
