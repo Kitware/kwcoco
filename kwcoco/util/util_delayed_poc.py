@@ -1536,11 +1536,14 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> stacked = kwimage.stack_images(vizable.transpose(2, 0, 1))
             >>> kwplot.imshow(stacked)
 
+        CommandLine:
+            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/util_delayed_poc.py DelayedChannelConcat.take_channels:2 --profile
+
         Example:
             >>> # Test case where requested channel does not exist
             >>> import kwcoco
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral', use_cache=0, verbose=100)
             >>> self = dset.delayed_load(1)
             >>> channels = 'B1|foobar|bazbiz|B8'
             >>> new = self.take_channels(channels)

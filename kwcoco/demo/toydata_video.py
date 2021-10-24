@@ -24,6 +24,7 @@ except Exception:
 TOYDATA_VIDEO_VERSION = 19
 
 
+@profile
 def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
         image_size=(600, 600), verbose=3, render=False, aux=None,
@@ -152,6 +153,7 @@ def random_video_dset(
     return dset
 
 
+@profile
 def random_single_video_dset(image_size=(600, 600), num_frames=5,
                              num_tracks=3, tid_start=1, gid_start=1,
                              video_id=1, anchors=None, rng=None, render=False,
@@ -339,14 +341,14 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         if aux is True:
             channels = 'disparity,flowx|flowy'
         if multispectral:
-            channels = 'B1,B8A,B8a,B10,B11'
+            channels = 'B1,B8,B8a,B10,B11'
             no_main_image = True
 
     special_fusedbands_to_scale = {
         'disparity': 1,
         'flowx|flowy': 1,
         'B1': 1,
-        'B2': 1 / 6,
+        'B8': 1 / 6,
         'B8a': 1 / 3,
         'B10': 1,
         'B11': 1 / 3,
@@ -382,8 +384,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
             img['auxiliary'] = []
             for stream in channels.streams():
                 scale = special_fusedbands_to_scale.get(stream.spec, None)
-                if scale is None:
-                    warp_img_from_aux = kwimage.Affine.scale(scale=scale)
+                if scale is not None:
+                    warp_img_from_aux = kwimage.Affine.scale(scale=1 / scale)
                 else:
                     warp_img_from_aux = kwimage.Affine.random(rng=rng)
 
@@ -570,6 +572,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     return dset
 
 
+@profile
 def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     """
     Create toydata_video renderings for a preconstructed coco dataset.
@@ -670,6 +673,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     return dset
 
 
+@profile
 def render_toy_image(dset, gid, rng=None, renderkw=None):
     """
     Modifies dataset inplace, rendering synthetic annotations.
@@ -898,6 +902,7 @@ def false_color(twochan):
         return viz
 
 
+@profile
 def render_background(img, rng, gray, bg_intensity, bg_scale):
     # This is 2x as fast for image_size=(300,300)
     gw, gh = img['width'], img['height']
@@ -943,6 +948,7 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
     return imdata, chan_to_auxinfo
 
 
+@profile
 def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
     """
 
