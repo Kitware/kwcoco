@@ -25,7 +25,7 @@ except Exception:
 
 # Updated when toydata is modified.
 # Internal cachers use this to invalidate old caches
-TOYDATA_IMAGE_VERSION = 17
+TOYDATA_IMAGE_VERSION = 20
 
 
 @profile

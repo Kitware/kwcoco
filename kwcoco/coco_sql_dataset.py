@@ -1035,6 +1035,8 @@ class CocoSqlDatabase(AbstractCocoDataset,
         >>> # xdoctest: +REQUIRES(module:sqlalchemy)
         >>> from kwcoco.coco_sql_dataset import *  # NOQA
         >>> sql_dset, dct_dset = demo()
+        >>> dset1, dset2 = sql_dset, dct_dset
+        >>> tag1, tag2 = 'dset1', 'dset2'
         >>> assert_dsets_allclose(sql_dset, dct_dset)
     """
 
@@ -1485,7 +1487,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
 
     if sql_db_fpath is None:
         sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_',
-                                  ext='.view.v006.sqlite')
+                                  ext='.view.v007.sqlite')
 
     self = CocoSqlDatabase(sql_db_fpath, img_root=bundle_dpath, tag=tag)
 
