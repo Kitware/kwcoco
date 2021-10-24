@@ -21,7 +21,7 @@ except Exception:
     profile = ub.identity
 
 
-TOYDATA_VIDEO_VERSION = 17
+TOYDATA_VIDEO_VERSION = 19
 
 
 def random_video_dset(
@@ -334,11 +334,14 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         raise ValueError('can only have one of multispectral, aux, or channels')
 
     # backwards compat
+    no_main_image = False
     if channels is None:
         if aux is True:
             channels = 'disparity,flowx|flowy'
         if multispectral:
             channels = 'B1,B8A,B8a,B10,B11'
+            no_main_image = True
+
     special_fusedbands_to_scale = {
         'disparity': 1,
         'flowx|flowy': 1,
@@ -370,6 +373,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
             'frame_index': frame_idx,
             'video_id': video_id,
         }
+        if no_main_image:
+            # TODO: can we do better here?
+            img['name'] = 'generated-{}-{}'.format(video_id, frame_idx)
+            img['file_name'] = None
 
         if channels is not None:
             img['auxiliary'] = []
@@ -914,14 +921,16 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
         chankey = auxinfo['channels']
         # TODO:
         # Need to incorporate ChannelSpec abstraction here
-        if chankey in ['mx|my', 'motion']:
-            aux_bands = 2
-        elif chankey == 'flowx|flowy':
-            aux_bands = 2
-        elif chankey == 'disparity':
-            aux_bands = 1
-        else:
-            aux_bands = 1
+        import kwcoco
+        aux_bands = kwcoco.ChannelSpec.coerce(chankey).numel()
+        # if chankey in ['mx|my', 'motion']:
+        #     aux_bands = 2
+        # elif chankey == 'flowx|flowy':
+        #     aux_bands = 2
+        # elif chankey == 'disparity':
+        #     aux_bands = 1
+        # else:
+        #     aux_bands = 1
         # TODO: make non-aligned auxiliary information?
         aux_width = auxinfo.get('width', gw)
         aux_height = auxinfo.get('height', gh)
