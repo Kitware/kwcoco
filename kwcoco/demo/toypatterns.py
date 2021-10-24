@@ -244,7 +244,7 @@ class CategoryPatterns(object):
         else:
             kpts = None
             # center
-            kpts = kwimage.Points(xy=np.array([]))
+            kpts = kwimage.Points(xy=np.array([]).reshape(0, 2))
             # kpts = kwimage.Points(xy=np.array([[.5, .5]]))
             kpts = kpts.scale(size)
 
