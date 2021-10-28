@@ -1099,7 +1099,14 @@ class LazyGDalFrameFile(ub.NiceRepr):
                      for band_idx in band_indices]
             gdal_dtype = bands[0].DataType
             dtype = _gdal_to_numpy_dtype(gdal_dtype)
-            img_part = np.empty(shape, dtype=dtype)
+            try:
+                img_part = np.empty(shape, dtype=dtype)
+            except ValueError:
+                print('ERROR')
+                print('self.fpath = {!r}'.format(self.fpath))
+                print('dtype = {!r}'.format(dtype))
+                print('shape = {!r}'.format(shape))
+                raise
             for out_idx, band in enumerate(bands):
                 img_part[:, :, out_idx] = band.ReadAsArray(**gdalkw)
         else:
