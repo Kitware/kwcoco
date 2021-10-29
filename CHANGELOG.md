@@ -5,7 +5,23 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.14 - Unreleased
+## Version 0.2.15 - Unreleased
+
+### Added
+* Ported channel related features to CocoImage
+* vidshapes-msi is now an alias for vidshapes-multispectral
+* Can now specify general channels for video toydata
+
+### Changed
+* Split `kwcoco.demo.toydata` into `kwcoco.demo.toydata_image` and `kwcoco.demo.toydata_video`
+* Moved code from `coco_dataset` to `_helpers`
+
+### Fixed
+* Bug in `show_image` with MSI
+* Fixed bug in ObjectList1D.peek
+
+
+## Version 0.2.14 - Released 2021-10-21
 
 
 ### Added

@@ -1099,7 +1099,14 @@ class LazyGDalFrameFile(ub.NiceRepr):
                      for band_idx in band_indices]
             gdal_dtype = bands[0].DataType
             dtype = _gdal_to_numpy_dtype(gdal_dtype)
-            img_part = np.empty(shape, dtype=dtype)
+            try:
+                img_part = np.empty(shape, dtype=dtype)
+            except ValueError:
+                print('ERROR')
+                print('self.fpath = {!r}'.format(self.fpath))
+                print('dtype = {!r}'.format(dtype))
+                print('shape = {!r}'.format(shape))
+                raise
             for out_idx, band in enumerate(bands):
                 img_part[:, :, out_idx] = band.ReadAsArray(**gdalkw)
         else:
@@ -1536,11 +1543,14 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> stacked = kwimage.stack_images(vizable.transpose(2, 0, 1))
             >>> kwplot.imshow(stacked)
 
+        CommandLine:
+            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/util_delayed_poc.py DelayedChannelConcat.take_channels:2 --profile
+
         Example:
             >>> # Test case where requested channel does not exist
             >>> import kwcoco
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral', use_cache=0, verbose=100)
             >>> self = dset.delayed_load(1)
             >>> channels = 'B1|foobar|bazbiz|B8'
             >>> new = self.take_channels(channels)

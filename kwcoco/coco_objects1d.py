@@ -57,13 +57,16 @@ class ObjectList1D(ub.NiceRepr):
     def objs(self):
         """
         Returns:
-            List: all object dictionaries
+            List[ObjT]: all object dictionaries
         """
         return list(ub.take(self._id_to_obj, self._ids))
 
     def take(self, idxs):
         """
         Take a subset by index
+
+        Returns:
+            ObjectList1D
 
         Example:
             >>> import kwcoco
@@ -78,6 +81,9 @@ class ObjectList1D(ub.NiceRepr):
         """
         Take a subset by flags
 
+        Returns:
+            ObjectList1D
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -90,8 +96,24 @@ class ObjectList1D(ub.NiceRepr):
     def peek(self):
         """
         Return the first object dictionary
+
+        Returns:
+            ObjT: object dictionary
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo()
+            >>> self = dset.images()
+            >>> assert self.peek()['id'] == 1
+            >>> # Check that subsets return correct items
+            >>> sub0 = self.compress([i % 2 == 0 for i in range(len(self))])
+            >>> sub1 = self.compress([i % 2 == 1 for i in range(len(self))])
+            >>> assert sub0.peek()['id'] == 1
+            >>> assert sub1.peek()['id'] == 2
         """
-        return ub.peek(self._id_to_obj.values())
+        id_ = self._ids[0]
+        obj = self._id_to_obj[id_]
+        return obj
 
     def lookup(self, key, default=ub.NoParam, keepid=False):
         """

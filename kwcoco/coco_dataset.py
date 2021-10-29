@@ -262,7 +262,6 @@ import numpy as np
 import os
 import ubelt as ub
 import warnings
-import sortedcontainers
 import numbers
 from collections import OrderedDict, defaultdict
 from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
@@ -273,6 +272,11 @@ from functools import partial
 # Vectorized ORM-Like containers
 from kwcoco.coco_objects1d import Categories, Videos, Images, Annots
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
+
+from kwcoco._helpers import (
+    SortedSetQuiet, UniqueNameRemapper, _ID_Remapper, _NextId,
+    _delitems, _lut_frame_index
+)
 
 # Does having __all__ prevent readthedocs from building mixins?
 # __all__ = [
@@ -943,6 +947,16 @@ class MixinCocoAccessors(object):
         return kpnames
 
     def _coco_image(self, gid):
+        return self.coco_image(gid)
+
+    def coco_image(self, gid):
+        """
+        Args:
+            gid (int): image id
+
+        Returns:
+            kwcoco.coco_image.CocoImage
+        """
         # Experimental
         from kwcoco.coco_image import CocoImage
         img = self.index.imgs[gid]
@@ -1022,7 +1036,7 @@ class MixinCocoExtras(object):
         return self
 
     @classmethod
-    def demo(cls, key='photos', **kw):
+    def demo(cls, key='photos', **kwargs):
         """
         Create a toy coco dataset for testing and demo puposes
 
@@ -1031,7 +1045,7 @@ class MixinCocoExtras(object):
                 also undocumented sufixes that can control behavior.
                 TODO: better documentation for these demo datasets.
 
-            **kw : if key is shapes, these arguments are passed to toydata
+            **kwargs : if key is shapes, these arguments are passed to toydata
                 generation. The Kwargs section of this docstring documents a
                 subset of the available options. For full details, see
                 :func:`demodata_toy_dset` and :func:`random_video_dset`.
@@ -1093,20 +1107,22 @@ class MixinCocoExtras(object):
             >>> assert len(dset.index.name_to_img) == len(dset.index.imgs) == 0
         """
         import parse
-        from kwcoco.demo import toydata
 
         if key.startswith('special:'):
             key = key.split(':')[1]
 
         if key.startswith('shapes'):
+            from kwcoco.demo import toydata_image
             res = parse.parse('{prefix}{num_imgs:d}', key)
             if res:
-                kw['n_imgs'] = int(res.named['num_imgs'])
-            if 'rng' not in kw and 'n_imgs' in kw:
-                kw['rng'] = kw['n_imgs']
-            self = toydata.demodata_toy_dset(**kw)
+                kwargs['n_imgs'] = int(res.named['num_imgs'])
+            if 'rng' not in kwargs and 'n_imgs' in kwargs:
+                kwargs['rng'] = kwargs['n_imgs']
+            self = toydata_image.demodata_toy_dset(**kwargs)
             self.tag = key
         elif key.startswith('vidshapes'):
+            from kwcoco.demo import toydata_video
+            verbose = kwargs.get('verbose', 1)
             res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
             if res is None:
                 res = parse.parse('{prefix}{num_videos:d}', key)
@@ -1121,12 +1137,14 @@ class MixinCocoExtras(object):
                 'max_speed': 0.01,
             }
             suff_parts = []
-            print('res = {!r}'.format(res))
+            if verbose > 3:
+                print('res = {!r}'.format(res))
             if res:
-                kw['num_videos'] = int(res.named['num_videos'])
+                kwargs['num_videos'] = int(res.named['num_videos'])
                 if 'suffix' in res.named:
                     suff_parts = res.named['suffix'].split('-')
-            print('suff_parts = {!r}'.format(suff_parts))
+            if verbose > 3:
+                print('suff_parts = {!r}'.format(suff_parts))
 
             for part in suff_parts:
                 if part.startswith('frames'):
@@ -1135,19 +1153,21 @@ class MixinCocoExtras(object):
                     vidkw['max_speed'] = float(part.replace('speed', ''))
                 if 'aux' == part:
                     vidkw['aux'] = True
-                elif 'multispectral' == part:
+                elif part in {'multispectral', 'msi'}:
                     vidkw['multispectral'] = True
 
-            vidkw.update(kw)
+            vidkw.update(kwargs)
             use_cache = vidkw.pop('use_cache', True)
 
             if 'rng' not in vidkw:
                 # Make rng determined by other params by default
                 vidkw['rng'] = int(ub.hash_data(ub.repr2(vidkw))[0:8], 16)
 
-            print('vidkw = {!r}'.format(vidkw))
             cfgstr = ub.hash_data(ub.repr2(vidkw), base='abc')[0:14]
-            print('cfgstr = {!r}'.format(cfgstr))
+
+            if verbose > 3:
+                print('vidkw = {!r}'.format(vidkw))
+                print('cfgstr = {!r}'.format(cfgstr))
 
             tag = key + '_' + cfgstr
 
@@ -1167,19 +1187,21 @@ class MixinCocoExtras(object):
             fpath = join(bundle_dpath, 'data.kwcoco.json')
 
             stamp = ub.CacheStamp(
-                'vidshape_stamp_v{:03d}'.format(toydata.TOYDATA_VERSION),
+                'vidshape_stamp_v{:03d}'.format(toydata_video.TOYDATA_VIDEO_VERSION),
                 dpath=cache_dpath,
                 cfgstr=cfgstr, enabled=use_cache,
-                product=[fpath], verbose=100,
+                product=[fpath], verbose=1,
                 meta=vidkw
             )
-            print('stamp = {!r}'.format(stamp))
+            if verbose > 3:
+                print('stamp = {!r}'.format(stamp))
             if stamp.expired():
                 vidkw['dpath'] = bundle_dpath
                 vidkw.pop('bundle_dpath', None)
-                self = toydata.random_video_dset(**vidkw)
-                print('self.fpath = {!r}'.format(self.fpath))
-                print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
+                self = toydata_video.random_video_dset(**vidkw)
+                if verbose > 3:
+                    print('self.fpath = {!r}'.format(self.fpath))
+                    print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
 
                 self.fpath = fpath
                 if fpath is not None:
@@ -1230,7 +1252,7 @@ class MixinCocoExtras(object):
         TODO:
             - [ ] parametarize
         """
-        from kwcoco.demo.toydata import random_single_video_dset
+        from kwcoco.demo.toydata_video import random_single_video_dset
         dset = random_single_video_dset(num_frames=5, num_tracks=3,
                                         tid_start=1, rng=rng)
         return dset
@@ -2523,7 +2545,7 @@ class MixinCocoStats(object):
                 'n_cats': 8,
             }
 
-            >>> from kwcoco.demo.toydata import *  # NOQA
+            >>> from kwcoco.demo.toydata_video import random_video_dset
             >>> dset = random_video_dset(render=True, num_frames=2, num_tracks=10, rng=0)
             >>> print(ub.repr2(dset.basic_stats()))
             {
@@ -2771,138 +2793,6 @@ class MixinCocoStats(object):
         return selected_gids
 
 
-class _NextId(object):
-    """ Helper class to tracks unused ids for new items """
-
-    def __init__(self, parent):
-        self.parent = parent
-        self.unused = {
-            'categories': None,
-            'images': None,
-            'annotations': None,
-            'videos': None,
-        }
-
-    def _update_unused(self, key):
-        """ Scans for what the next safe id can be for ``key`` """
-        item_list = self.parent.dataset[key]
-        max_id = max(item['id'] for item in item_list) if item_list else 0
-        next_id = max(max_id + 1, len(item_list))
-        self.unused[key] = next_id
-
-    def get(self, key):
-        """ Get the next safe item id for ``key`` """
-        if self.unused[key] is None:
-            self._update_unused(key)
-        new_id = self.unused[key]
-        self.unused[key] += 1
-        return new_id
-
-
-class _ID_Remapper(object):
-    """
-    Helper to recycle ids for unions.
-
-    For each dataset we create a mapping between each old id and a new id.  If
-    possible and reuse=True we allow the new id to match the old id.  After
-    each dataset is finished we mark all those ids as used and subsequent
-    new-ids cannot be chosen from that pool.
-
-    Args:
-        reuse (bool): if True we are allowed to reuse ids
-            as long as they haven't been used before.
-
-    Example:
-        >>> video_trackids = [[1, 1, 3, 3, 200, 4], [204, 1, 2, 3, 3, 4, 5, 9]]
-        >>> self = _ID_Remapper(reuse=True)
-        >>> for tids in video_trackids:
-        >>>     new_tids = [self.remap(old_tid) for old_tid in tids]
-        >>>     self.block_seen()
-        >>>     print('new_tids = {!r}'.format(new_tids))
-        new_tids = [1, 1, 3, 3, 200, 4]
-        new_tids = [204, 205, 2, 206, 206, 207, 5, 9]
-        >>> #
-        >>> self = _ID_Remapper(reuse=False)
-        >>> for tids in video_trackids:
-        >>>     new_tids = [self.remap(old_tid) for old_tid in tids]
-        >>>     self.block_seen()
-        >>>     print('new_tids = {!r}'.format(new_tids))
-        new_tids = [0, 0, 1, 1, 2, 3]
-        new_tids = [4, 5, 6, 7, 7, 8, 9, 10]
-    """
-    def __init__(self, reuse=False):
-        self.blocklist = set()
-        self.mapping = dict()
-        self.reuse = reuse
-        self._nextid = 0
-
-    def remap(self, old_id):
-        """
-        Convert a old-id into a new-id. If self.reuse is True then we will
-        return the same id if it hasn't been blocked yet.
-        """
-        if old_id in self.mapping:
-            new_id = self.mapping[old_id]
-        else:
-            if not self.reuse or old_id in self.blocklist:
-                # We cannot reuse the old-id
-                new_id = self.next_id()
-            else:
-                # We can reuse the old-id
-                new_id = old_id
-                if isinstance(old_id, int) and old_id >= self._nextid:
-                    self._nextid = old_id + 1
-            self.mapping[old_id] = new_id
-        return new_id
-
-    def block_seen(self):
-        """
-        Mark all seen ids as unable to be used.
-        Any ids sent to remap will now generate new ids.
-        """
-        self.blocklist.update(self.mapping.values())
-        self.mapping = dict()
-
-    def next_id(self):
-        """ Generate a new id that hasnt been used yet """
-        next_id = self._nextid
-        self._nextid += 1
-        return next_id
-
-
-class UniqueNameRemapper(object):
-    """
-    helper to ensure names will be unique by appending suffixes
-
-    Example:
-        >>> from kwcoco.coco_dataset import *  # NOQA
-        >>> self = UniqueNameRemapper()
-        >>> assert self.remap('foo') == 'foo'
-        >>> assert self.remap('foo') == 'foo_v001'
-        >>> assert self.remap('foo') == 'foo_v002'
-        >>> assert self.remap('foo_v001') == 'foo_v003'
-    """
-    def __init__(self):
-        import re
-        self._seen = set()
-        self.suffix_pat = re.compile(r'(.*)_v(\d+)')
-
-    def remap(self, name):
-        suffix_pat = self.suffix_pat
-        match = suffix_pat.match(name)
-        if match:
-            prefix, _num = match.groups()
-            num = int(_num)
-        else:
-            prefix = name
-            num = 0
-        while name in self._seen:
-            num += 1
-            name = '{}_v{:03d}'.format(prefix, num)
-        self._seen.add(name)
-        return name
-
-
 class MixinCocoDraw(object):
     """
     Matplotlib / display functionality
@@ -2998,6 +2888,12 @@ class MixinCocoDraw(object):
             import kwcoco
             kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
             print(ub.repr2(list(kwargs.keys()), nl=1, si=1))
+
+        Example:
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi')
+            >>> dset.show_image(gid=1, channels='B8')
         """
         import matplotlib as mpl
         from matplotlib import pyplot as plt
@@ -3159,37 +3055,32 @@ class MixinCocoDraw(object):
             np_img = self.load_image(img, channels=channels)
         else:
             # hack for multispectral
-            avail_channels = [
-                aux.get('channels', None) for aux in img.get('auxiliary', [])
-            ]
+            coco_img = self._coco_image(gid)
+            avail_channels = coco_img.channels
+
             if channels is None:
-                print('avail_channels = {!r}'.format(avail_channels))
-                from kwcoco.channel_spec import FusedChannelSpec
-                avail_spec = FusedChannelSpec.coerce('|'.join(avail_channels)).normalize()
+                avail_spec = avail_channels.fuse().normalize()
                 num_chans = avail_spec.numel()
 
-                if (num_chans) == 0:
+                if num_chans == 0:
                     raise Exception('no channels!')
-                elif (num_chans) == 2:
+                elif num_chans <= 2:
                     print('Auto choosing 1 channel')
-                    channels = avail_spec[0]
-                elif (num_chans) > 3:
+                    channels = avail_spec.parsed[0]
+                elif num_chans > 3:
                     print('Auto choosing 3 channel')
                     sensible_defaults = [
-                        FusedChannelSpec.coerce('red|green|blue'),
-                        FusedChannelSpec.coerce('r|g|b'),
+                        'red|green|blue',
+                        'r|g|b',
                     ]
                     chosen = None
                     for sensible in sensible_defaults:
-                        print('sensible = {!r}'.format(sensible))
                         cand = avail_spec & sensible
-                        print('cand = {!r}'.format(cand))
                         if cand.numel() == 3:
                             chosen = cand
                             break
                     if chosen is None:
                         chosen = avail_spec[0:3]
-                    print('chosen = {!r}'.format(chosen))
                     channels = chosen
 
             print('loading image')
@@ -4143,25 +4034,6 @@ class MixinCocoAddRemove(object):
         self._invalidate_hashid(['annotations'])
 
 
-# Defined as a global for pickle
-# TODO: add a pickled test, FIXME: I dont think this is safe
-def _lut_frame_index(imgs, gid):
-    return imgs[gid]['frame_index']
-
-
-class SortedSetQuiet(sortedcontainers.SortedSet):
-    def __repr__(self):
-        """Return string representation of sorted set.
-
-        ``ss.__repr__()`` <==> ``repr(ss)``
-
-        :return: string representation
-
-        """
-        type_name = type(self).__name__
-        return '{0}({1!r})'.format(type_name, list(self))
-
-
 class CocoIndex(object):
     """
     Fast lookup index for the COCO dataset with dynamic modification
@@ -4506,8 +4378,8 @@ class CocoIndex(object):
             vidid - Video ID
 
         Example:
-            >>> from kwcoco.demo.toydata import *  # NOQA
-            >>> parent = CocoDataset.demo('vidshapes1', num_frames=4, rng=1)
+            >>> import kwcoco
+            >>> parent = kwcoco.CocoDataset.demo('vidshapes1', num_frames=4, rng=1)
             >>> index = parent.index
             >>> index.build(parent)
         """
@@ -5865,24 +5737,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         sql_dset = ensure_sql_coco_view(self, db_fpath=db_fpath,
                                         force_rewrite=force_rewrite)
         return sql_dset
-
-
-def _delitems(items, remove_idxs, thresh=750):
-    """
-    Args:
-        items (List): list which will be modified
-        remove_idxs (List[int]): integers to remove (MUST BE UNIQUE)
-    """
-    if len(remove_idxs) > thresh:
-        # Its typically faster to just make a new list when there are
-        # lots and lots of items to remove.
-        keep_idxs = sorted(set(range(len(items))) - set(remove_idxs))
-        newlist = [items[idx] for idx in keep_idxs]
-        items[:] = newlist
-    else:
-        # However, when there are a few hundred items to remove, del is faster.
-        for idx in sorted(remove_idxs, reverse=True):
-            del items[idx]
 
 
 def demo_coco_data():
