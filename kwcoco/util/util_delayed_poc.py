@@ -1108,7 +1108,14 @@ class LazyGDalFrameFile(ub.NiceRepr):
                 print('shape = {!r}'.format(shape))
                 raise
             for out_idx, band in enumerate(bands):
-                img_part[:, :, out_idx] = band.ReadAsArray(**gdalkw)
+                buf = band.ReadAsArray(**gdalkw)
+                if buf is None:
+                    raise IOError(ub.paragraph(
+                        '''
+                        GDAL was unable to read band: {}, {}, with={}
+                        from fpath={!r}
+                        '''.format(out_idx, band, gdalkw, self.fpath)))
+                img_part[:, :, out_idx] = buf
         else:
             channels = []
             for band_idx in band_indices:

@@ -223,12 +223,13 @@ class FusedChannelSpec(BaseChannelSpec):
         return len(self.parsed)
 
     def __getitem__(self, index):
+        norm = self.normalize()
         if isinstance(index, slice):
-            return self.__class__(self.parsed[index])
+            return self.__class__(norm.parsed[index])
         elif ub.iterable(index):
-            return self.__class__(list(ub.take(self.parsed, index)))
+            return self.__class__(list(ub.take(norm.parsed, index)))
         else:
-            return self.parsed[index]
+            return norm.parsed[index]
 
     @classmethod
     def concat(cls, items):
