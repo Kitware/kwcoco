@@ -7,17 +7,29 @@ class CocoToyDataCLI(object):
 
     class CLIConfig(scfg.Config):
         """
-        Create COCO toydata
+        Create COCO toydata for demo and testing purposes.
         """
         default = {
             'key': scfg.Value('shapes8', help=ub.paragraph(
                 '''
-                Special demodata code. Available options are:
-                photos, shapes8, vidshapes8, vidshapes8-multispectral
+                Special demodata code. Basic options that define which flavor
+                of demodata to generate are: `photos`, `shapes`, and
+                `vidshapes`. A numeric suffix e.g. `vidshapes8` can be
+                specified to indicate the size of the generated demo dataset.
+                There are other special suffixes that are available.
+                See the code in :method:`kwcoco.CocoDataset.demo` for details
+                on what is allowed.
 
-                Note that the number (e.g. 8) at the end of the "shapes"
-                datasets can be replaced by any number to specify the number of
-                images generated in the toy dataset.
+                As a quick summary: the vidshapes key is the most robust and
+                mature demodata set, and here are several useful variants of
+                the vidshapes key.
+
+                (1) vidshapes8 - the 8 suffix is the number of videos in this case.
+                (2) vidshapes8-multispectral - generate 8 multispectral videos.
+                (3) vidshapes8-msi - msi is an alias for multispectral.
+                (4) vidshapes8-frames5 - generate 8 videos with 5 frames each.
+                (4) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
+                    frames where the objects move with with a speed of 0.1.
                 '''), position=1),
 
             'dst': scfg.Value(None, help=ub.paragraph(
@@ -34,7 +46,12 @@ class CocoToyDataCLI(object):
                 toydata config.
                 ''')),
 
-            'use_cache': scfg.Value(True)
+            'use_cache': scfg.Value(True, help=ub.paragraph(
+                '''
+                if False, this will force the dataset to be regenerated.
+                Otherwise, it will only regenerate the data if it doesn't
+                already exist.
+                '''))
         }
         epilog = """
         Example Usage:

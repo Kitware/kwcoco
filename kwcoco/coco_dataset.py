@@ -1041,9 +1041,29 @@ class MixinCocoExtras(object):
         Create a toy coco dataset for testing and demo puposes
 
         Args:
-            key (str): either 'photos', 'shapes', or 'vidshapes'. There are
-                also undocumented sufixes that can control behavior.
+            key (str, default=photos):
+                Either 'photos', 'shapes', or 'vidshapes'. There are also
+                special sufixes that can control behavior.
+
+                Basic options that define which flavor of demodata to generate
+                are: `photos`, `shapes`, and `vidshapes`. A numeric suffix e.g.
+                `vidshapes8` can be specified to indicate the size of the
+                generated demo dataset.  There are other special suffixes that
+                are available.  See the code in this function for explicit
+                details on what is allowed.
+
                 TODO: better documentation for these demo datasets.
+
+                As a quick summary: the vidshapes key is the most robust and
+                mature demodata set, and here are several useful variants of
+                the vidshapes key.
+
+                (1) vidshapes8 - the 8 suffix is the number of videos in this case.
+                (2) vidshapes8-multispectral - generate 8 multispectral videos.
+                (3) vidshapes8-msi - msi is an alias for multispectral.
+                (4) vidshapes8-frames5 - generate 8 videos with 5 frames each.
+                (4) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
+                    frames where the objects move with with a speed of 0.1.
 
             **kwargs : if key is shapes, these arguments are passed to toydata
                 generation. The Kwargs section of this docstring documents a
@@ -1126,6 +1146,8 @@ class MixinCocoExtras(object):
             res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
             if res is None:
                 res = parse.parse('{prefix}{num_videos:d}', key)
+
+            # These are the variables the vidshapes generator accepts
             vidkw = {
                 'render': True,
                 'num_videos': 1,

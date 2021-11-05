@@ -647,6 +647,8 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
 
     imwrite_kw = {}
     imwrite_ops = {'compress', 'blocksize', 'interleave', 'options'}
+    if renderkw is None:
+        renderkw = {}
     imwrite_kw = ub.dict_isect(renderkw, imwrite_ops)
     if imwrite_kw:
         # imwrite_kw['backend'] = 'gdal'

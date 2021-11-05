@@ -9,6 +9,8 @@ TODO:
 
     - [ ] max_dets - TODO: in original pycocoutils but not here
 
+    - [ ] Flag that allows for polygon instead of bounding box overlap
+
     - [ ] How do we note what iou_thresh and area-range were in
           the result plots?
 
@@ -61,18 +63,18 @@ Example:
     >>>     xdev.view_directory(dpath)
 """
 import glob
+import json
+import kwarray
+import kwimage
 import numpy as np
+import scriptconfig as scfg
 import six
 import ubelt as ub
-import kwimage
-import kwarray
+import warnings
 from os.path import exists
 from os.path import isdir
 from os.path import isfile
 from os.path import join
-import scriptconfig as scfg
-import warnings
-import json
 from kwcoco.metrics.util import DictProxy
 
 
