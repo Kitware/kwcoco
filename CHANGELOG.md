@@ -8,6 +8,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.16 - Unreleased
 
 
+### Changed
+* Added more docs to demodata
+* Moved eval CLI code to the cli module.
+
+
+### Fixed
+* Annotation outside the image bounds now render correctly in the toydata module.
+* Fixed issue in FusedChannelSpec where a unnormalized getitem did not work correctly
+
+
 ## Version 0.2.15 - Released 2021-10-29
 
 ### Added

@@ -50,6 +50,7 @@ Example:
     >>> # those frames is in a different resolution. Furthermore,
     >>> # each of the frames consists of channels in different resolutions.
     >>> # Create raw channels in some "native" resolution for frame 1
+    >>> from kwcoco.util.util_delayed_poc import *  # NOQA
     >>> f1_chan1 = DelayedIdentity.demo('astro', chan=0, dsize=(300, 300))
     >>> f1_chan2 = DelayedIdentity.demo('astro', chan=1, dsize=(200, 200))
     >>> f1_chan3 = DelayedIdentity.demo('astro', chan=2, dsize=(10, 10))
@@ -1557,7 +1558,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> # Test case where requested channel does not exist
             >>> import kwcoco
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral', use_cache=0, verbose=100)
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral', use_cache=1, verbose=100)
             >>> self = dset.delayed_load(1)
             >>> channels = 'B1|foobar|bazbiz|B8'
             >>> new = self.take_channels(channels)

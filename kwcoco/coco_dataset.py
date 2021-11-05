@@ -1084,12 +1084,14 @@ class MixinCocoExtras(object):
             verbose (int, default=3): verbosity mode
 
         Example:
-            >>> print(CocoDataset.demo('photos'))
+            >>> # Basic demodata keys
+            >>> print(CocoDataset.demo('photos', verbose=1))
             >>> print(CocoDataset.demo('shapes', verbose=1))
             >>> print(CocoDataset.demo('vidshapes', verbose=1))
-
-            >>> print(CocoDataset.demo('shapes256', verbose=0))
+            >>> # Varaints of demodata keys
             >>> print(CocoDataset.demo('shapes8', verbose=0))
+            >>> print(CocoDataset.demo('shapes8-msi', verbose=0))
+            >>> print(CocoDataset.demo('shapes8-frames1-speed0.2-msi', verbose=0))
 
         Example:
             >>> import kwcoco
