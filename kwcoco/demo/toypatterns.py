@@ -7,6 +7,12 @@ import skimage
 import ubelt as ub
 
 
+try:
+    from xdev import profile
+except Exception:
+    profile = ub.identity
+
+
 class CategoryPatterns(object):
     """
     Example:
@@ -182,6 +188,7 @@ class CategoryPatterns(object):
                 size=size)
         return info
 
+    @profile
     def render_category(self, cname, chip, xy_offset=None, dims=None,
                         newstyle=True, size=None):
         """
@@ -211,6 +218,7 @@ class CategoryPatterns(object):
                                   newstyle=newstyle)
         return info
 
+    @profile
     def _todo_refactor_geometric_info(self, cname, xy_offset, dims):
         """
 
@@ -248,7 +256,12 @@ class CategoryPatterns(object):
             # kpts = kwimage.Points(xy=np.array([[.5, .5]]))
             kpts = kpts.scale(size)
 
-        template = cv2.resize(elem, size).astype(np.float32)
+        if size[0] == 0 or size[1] == 0:
+            print('size = {!r}'.format(size))
+            template = np.empty(size[::-1], dtype=np.float32)
+        else:
+            template = cv2.resize(elem, size).astype(np.float32)
+
         mask = (template > 0.05).astype(np.uint8)
         sseg = kwimage.Mask(mask, 'c_mask').to_multi_polygon()
 
@@ -262,6 +275,7 @@ class CategoryPatterns(object):
         }
         return info
 
+    @profile
     def _package_info(self, cname, data, mask, kpts, xy_offset, dims,
                       newstyle):
         """ packages data from _from_elem into coco-like annotation """
@@ -300,6 +314,7 @@ class CategoryPatterns(object):
         }
         return info
 
+    @profile
     def _from_elem(self, cname, chip, size=None):
         """
         Example:

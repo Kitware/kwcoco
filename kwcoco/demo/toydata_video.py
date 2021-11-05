@@ -73,7 +73,7 @@ def random_video_dset(
     Example:
         >>> from kwcoco.demo.toydata_video import *  # NOQA
         >>> dset = random_video_dset(render=True, num_videos=3, num_frames=2,
-        >>>                          num_tracks=10)
+        >>>                          num_tracks=5, image_size=(128, 128))
         >>> # xdoctest: +REQUIRES(--show)
         >>> dset.show_image(1, doclf=True)
         >>> dset.show_image(2, doclf=True)
@@ -613,7 +613,8 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
         >>> rng = None
         >>> rng = kwarray.ensure_rng(rng)
         >>> num_tracks = 3
-        >>> dset = random_video_dset(rng=rng, num_videos=3, num_frames=10, num_tracks=3)
+        >>> dset = random_video_dset(rng=rng, num_videos=3, num_frames=5,
+        >>>                          num_tracks=num_tracks, image_size=(128, 128))
         >>> dset = render_toy_dataset(dset, rng)
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
@@ -624,15 +625,12 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
         >>> for gid in gids:
         >>>     dset.show_image(gid, pnum=pnums(), fnum=1, title=False)
         >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
-        >>> #
-        >>> # for gid in gids:
-        >>> #    canvas = dset.draw_image(gid)
-        >>> #    kwplot.imshow(canvas, pnum=pnums(), fnum=2)
     """
     rng = kwarray.ensure_rng(rng)
     dset._build_index()
 
-    dset._ensure_json_serializable()
+    if 0:
+        dset._ensure_json_serializable()
     hashid = dset._build_hashid()[0:24]
 
     if dpath is None:
@@ -647,6 +645,8 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
 
     imwrite_kw = {}
     imwrite_ops = {'compress', 'blocksize', 'interleave', 'options'}
+    if renderkw is None:
+        renderkw = {}
     imwrite_kw = ub.dict_isect(renderkw, imwrite_ops)
     if imwrite_kw:
         # imwrite_kw['backend'] = 'gdal'
@@ -799,65 +799,11 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     dims = (gh, gw)
     annots = dset.annots(gid=gid)
 
-    def render_foreground(imdata, chan_to_auxinfo):
-        boxes = annots.boxes
-        tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(int)
-
-        # Render coco-style annotation dictionaries
-        for ann, tlbr in zip(annots.objs, tlbr_boxes):
-            catname = dset._resolve_to_cat(ann['category_id'])['name']
-            tl_x, tl_y, br_x, br_y = tlbr
-
-            # TODO: Use pad-infinite-slices to fix a bug here
-            # kwarray.padded_slice()
-
-            chip_index = tuple([slice(tl_y, br_y), slice(tl_x, br_x)])
-            if imdata is not None:
-                chip = imdata[chip_index]
-            else:
-                chip = None
-
-            size = (br_x - tl_x, br_y - tl_y)
-            xy_offset = (tl_x, tl_y)
-
-            if chip is None or chip.size:
-                # todo: no need to make kpts / sseg if not requested
-                info = catpats.render_category(
-                    catname, chip, xy_offset, dims, newstyle=newstyle,
-                    size=size)
-
-                if imdata is not None:
-                    fgdata = info['data']
-                    if gray:
-                        fgdata = fgdata.mean(axis=2, keepdims=True)
-                    imdata[tl_y:br_y, tl_x:br_x, :] = fgdata
-
-                if with_sseg:
-                    ann['segmentation'] = info['segmentation']
-                if with_kpts:
-                    ann['keypoints'] = info['keypoints']
-
-                if chan_to_auxinfo is not None:
-                    # chan_to_auxinfo.keys()
-                    coco_sseg = ann.get('segmentation', None)
-                    if coco_sseg:
-                        seg = kwimage.Segmentation.coerce(coco_sseg)
-                        seg = seg.to_multi_polygon()
-                        for chankey, auxinfo in chan_to_auxinfo.items():
-                            val = rng.uniform(0.2, 1.0)
-                            # transform annotation into aux space if it is
-                            # different
-                            warp_aux_to_img = auxinfo.get('warp_aux_to_img', None)
-                            if warp_aux_to_img is not None:
-                                mat = kwimage.Affine.coerce(warp_aux_to_img).matrix
-                                seg_ = seg.warp(mat)
-                                auxinfo['imdata'] = seg_.fill(auxinfo['imdata'], value=val)
-                            else:
-                                auxinfo['imdata'] = seg.fill(auxinfo['imdata'], value=val)
-        return imdata, chan_to_auxinfo
-
     imdata, chan_to_auxinfo = render_background(img, rng, gray, bg_intensity, bg_scale)
-    imdata, chan_to_auxinfo = render_foreground(imdata, chan_to_auxinfo)
+    imdata, chan_to_auxinfo = render_foreground(imdata, chan_to_auxinfo, dset,
+                                                annots, catpats, with_sseg,
+                                                with_kpts, dims, newstyle,
+                                                gray, rng)
 
     if imdata is not None:
         imdata = (imdata * 255).astype(np.uint8)
@@ -889,6 +835,97 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         auxinfo['imdata'] = auxdata
 
     return img
+
+
+@profile
+def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
+                      with_sseg, with_kpts, dims, newstyle, gray, rng):
+    boxes = annots.boxes
+
+    FIX_OOB_RENDER_ATTEMPT = 1  # seems to work now
+
+    if FIX_OOB_RENDER_ATTEMPT:
+        tlbr_boxes = boxes.to_tlbr().quantize().data.astype(int)
+    else:
+        tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(int)
+
+    # Render coco-style annotation dictionaries
+    for ann, tlbr in zip(annots.objs, tlbr_boxes):
+        catname = dset._resolve_to_cat(ann['category_id'])['name']
+        tl_x, tl_y, br_x, br_y = tlbr
+
+        if FIX_OOB_RENDER_ATTEMPT:
+            # hack
+            if tl_x == br_x:
+                tl_x = tl_x - 1
+                br_x = br_x + 1
+            if tl_y == br_y:
+                tl_y = tl_y - 1
+                br_y = br_y + 1
+
+        chip_index = tuple([slice(tl_y, br_y), slice(tl_x, br_x)])
+        if imdata is None:
+            chip = None
+        else:
+            # try:
+            # Use pad-infinite-slices to fix a bug here
+            # Requries that subsequent setting of the data is also
+            # accounted for
+            if FIX_OOB_RENDER_ATTEMPT:
+                data_slice, padding = kwarray.embed_slice(chip_index, imdata.shape)
+                # TODO: could have a kwarray function to expose this inverse slice
+                # functionality. Also having a top-level call to apply an embedded
+                # slice would be good
+                chip = kwarray.padded_slice(imdata, chip_index)
+                inverse_slice = (
+                    slice(padding[0][0], chip.shape[0] - padding[0][1]),
+                    slice(padding[1][0], chip.shape[1] - padding[1][1]),
+                )
+            else:
+                chip = imdata[chip_index]
+
+        size = (br_x - tl_x, br_y - tl_y)
+        xy_offset = (tl_x, tl_y)
+
+        if chip is None or chip.size:
+            # todo: no need to make kpts / sseg if not requested
+            info = catpats.render_category(
+                catname, chip, xy_offset, dims, newstyle=newstyle,
+                size=size)
+
+            if imdata is not None:
+                fgdata = info['data']
+                if gray:
+                    fgdata = fgdata.mean(axis=2, keepdims=True)
+                if FIX_OOB_RENDER_ATTEMPT:
+                    # imdata[tl_y:br_y, tl_x:br_x, :] = fgdata[inverse_slice]
+                    imdata[data_slice] = fgdata[inverse_slice]
+                else:
+                    imdata[tl_y:br_y, tl_x:br_x, :] = fgdata
+
+            if with_sseg:
+                ann['segmentation'] = info['segmentation']
+            if with_kpts:
+                ann['keypoints'] = info['keypoints']
+
+            if chan_to_auxinfo is not None:
+                # chan_to_auxinfo.keys()
+                coco_sseg = ann.get('segmentation', None)
+                if coco_sseg:
+                    seg = kwimage.Segmentation.coerce(coco_sseg)
+                    seg = seg.to_multi_polygon()
+                    for chankey, auxinfo in chan_to_auxinfo.items():
+                        val = rng.uniform(0.2, 1.0)
+                        # transform annotation into aux space if it is
+                        # different
+                        warp_aux_to_img = auxinfo.get('warp_aux_to_img', None)
+                        if warp_aux_to_img is not None:
+                            mat = kwimage.Affine.coerce(warp_aux_to_img).matrix
+                            seg_ = seg.warp(mat)
+                            auxinfo['imdata'] = seg_.fill(auxinfo['imdata'], value=val)
+                        else:
+                            auxinfo['imdata'] = seg.fill(auxinfo['imdata'], value=val)
+    return imdata, chan_to_auxinfo
 
 
 def false_color(twochan):

@@ -9,9 +9,10 @@ TODO:
 
     - [ ] max_dets - TODO: in original pycocoutils but not here
 
+    - [ ] Flag that allows for polygon instead of bounding box overlap
+
     - [ ] How do we note what iou_thresh and area-range were in
           the result plots?
-
 
 CommandLine:
     xdoctest -m kwcoco.coco_evaluator __doc__:0 --vd --slow
@@ -20,7 +21,8 @@ Example:
     >>> from kwcoco.coco_evaluator import *  # NOQA
     >>> from kwcoco.coco_evaluator import CocoEvaluator
     >>> import kwcoco
-    >>> true_dset = kwcoco.CocoDataset.demo('shapes128')
+    >>> # note: increase the number of images for better looking metrics
+    >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
     >>> from kwcoco.demo.perterb import perterb_coco
     >>> kwargs = {
     >>>     'box_noise': 0.5,
@@ -61,19 +63,25 @@ Example:
     >>>     xdev.view_directory(dpath)
 """
 import glob
+import json
+import kwarray
+import kwimage
 import numpy as np
+import scriptconfig as scfg
 import six
 import ubelt as ub
-import kwimage
-import kwarray
+import warnings
 from os.path import exists
 from os.path import isdir
 from os.path import isfile
 from os.path import join
-import scriptconfig as scfg
-import warnings
-import json
 from kwcoco.metrics.util import DictProxy
+
+
+try:
+    from xdev import profile
+except Exception:
+    profile = ub.identity
 
 
 try:
@@ -841,6 +849,9 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
 
 class CocoResults(ub.NiceRepr, DictProxy):
     """
+    CommandLine:
+        xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_evaluator.py CocoResults --profile
+
     Example:
         >>> from kwcoco.coco_evaluator import *  # NOQA
         >>> from kwcoco.coco_evaluator import CocoEvaluator
@@ -871,21 +882,23 @@ class CocoResults(ub.NiceRepr, DictProxy):
         >>> self2 = CocoResults.from_json(state)
         >>> #
         >>> # xdoctest: +REQUIRES(module:kwplot)
-        >>> results.dump_figures(dpath)
+        >>> results.dump_figures(dpath, figsize=(3, 2), tight=False)  # make this go faster
         >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
 
     """
     def __init__(results, resdata=None):
         results.proxy = resdata
 
-    def dump_figures(results, out_dpath, expt_title=None):
+    def dump_figures(results, out_dpath, expt_title=None, figsize='auto',
+                     tight=True):
         for key, result in results.items():
             dpath = ub.ensuredir((out_dpath, key))
             if expt_title is None:
                 title = str(key)
             else:
                 title = expt_title + ' ' + str(key)
-            result.dump_figures(dpath, expt_title=title)
+            result.dump_figures(dpath, expt_title=title, figsize=figsize,
+                                tight=tight)
 
     def __json__(results):
         from kwcoco.util.util_json import ensure_json_serializable
@@ -922,7 +935,8 @@ class CocoSingleResult(ub.NiceRepr):
     Container class to store, draw, summarize, and serialize results from
     CocoEvaluator.
 
-    Ignore:
+    Example:
+        >>> # xdoctest: +REQUIRES(--slow)
         >>> from kwcoco.coco_evaluator import *  # NOQA
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> import kwcoco
@@ -1002,7 +1016,9 @@ class CocoSingleResult(ub.NiceRepr):
             state = result.__json__()
             json.dump(state, file, indent=indent)
 
-    def dump_figures(result, out_dpath, expt_title=None):
+    @profile
+    def dump_figures(result, out_dpath, expt_title=None, figsize='auto',
+                     tight=True, verbose=1):
         if expt_title is None:
             expt_title = result.meta.get('expt_title', '')
         metrics_dpath = ub.ensuredir(out_dpath)
@@ -1012,11 +1028,12 @@ class CocoSingleResult(ub.NiceRepr):
 
         # TODO: separate into standalone method that is able to run on
         # serialized / cached metrics on disk.
-        print('drawing evaluation metrics')
+        if verbose:
+            print('drawing evaluation metrics')
         import kwplot
         import matplotlib as mpl  # NOQA
         # TODO: kwcoco matplotlib backend context
-        ctx = kwplot.BackendContext(backend='agg')
+        ctx = kwplot.BackendContext(backend='Agg')
         ctx.__enter__()
 
         try:
@@ -1025,13 +1042,8 @@ class CocoSingleResult(ub.NiceRepr):
         except Exception:
             pass
 
-        figsize = (9, 7)
-
-        def writefig(fig, dpath: str, fname: str):
-            fig_fpath = join(metrics_dpath, fname)
-            print('write fig_fpath = {!r}'.format(fig_fpath))
-            fig.set_size_inches(figsize)
-            fig.savefig(fig_fpath, bbox_inches='tight')
+        if figsize == 'auto':
+            figsize = (9, 7)
 
         # --- classless (nocls)
 
@@ -1040,30 +1052,30 @@ class CocoSingleResult(ub.NiceRepr):
         nocls_measures.draw(key='pr')
         kwplot.figure(fnum=1, pnum=(1, 2, 2))
         nocls_measures.draw(key='roc')
-        writefig(fig, metrics_dpath, 'nocls_pr_roc.png')
+        _writefig(fig, metrics_dpath, 'nocls_pr_roc.png', figsize, verbose, tight)
         fig = kwplot.figure(fnum=1, pnum=(1, 1, 1), doclf=True, **figkw)
         nocls_measures.draw(key='thresh')
-        writefig(fig, metrics_dpath, 'nocls_thresh.png')
+        _writefig(fig, metrics_dpath, 'nocls_thresh.png', figsize, verbose, tight)
 
         # --- perclass (ovr)
 
         fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
         ovr_measures.draw(key='roc', fnum=2)
-        writefig(fig, metrics_dpath, 'ovr_roc.png')
+        _writefig(fig, metrics_dpath, 'ovr_roc.png', figsize, verbose, tight)
 
         fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
         ovr_measures.draw(key='pr', fnum=2)
-        writefig(fig, metrics_dpath, 'ovr_pr.png')
+        _writefig(fig, metrics_dpath, 'ovr_pr.png', figsize, verbose, tight)
 
         if hasattr(result, 'ovr_measures2'):
             ovr_measures2 = result.ovr_measures2
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures2.draw(key='pr', fnum=2, prefix='coi-vs-bg-only')
-            writefig(fig, metrics_dpath, 'ovr_pr_coi_vs_bg.png')
+            _writefig(fig, metrics_dpath, 'ovr_pr_coi_vs_bg.png', figsize, verbose, tight)
 
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures2.draw(key='roc', fnum=2, prefix='coi-vs-bg-only')
-            writefig(fig, metrics_dpath, 'ovr_roc_coi_vs_bg.png')
+            _writefig(fig, metrics_dpath, 'ovr_roc_coi_vs_bg.png', figsize, verbose, tight)
 
         dump_config = {
             # 'keys': ['mcc', 'g1', 'f1', 'acc', 'ppv', 'tpr', 'mk', 'bm']
@@ -1072,7 +1084,7 @@ class CocoSingleResult(ub.NiceRepr):
         for key in dump_config['keys']:
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures.draw(fnum=2, key=key)
-            writefig(fig, metrics_dpath, 'ovr_{}.png'.format(key))
+            _writefig(fig, metrics_dpath, 'ovr_{}.png'.format(key), figsize, verbose, tight)
 
         # NOTE: The threshold on these confusion matrices is VERY low.
         # FIXME: robustly skip in cases where predictions have no class information
@@ -1081,7 +1093,7 @@ class CocoSingleResult(ub.NiceRepr):
             fig = kwplot.figure(fnum=3, doclf=True)
             confusion = cfsn_vecs.confusion_matrix()
             ax = kwplot.plot_matrix(confusion, fnum=3, showvals=0, logscale=True)
-            writefig(fig, metrics_dpath, 'confusion.png')
+            _writefig(fig, metrics_dpath, 'confusion.png', figsize, verbose, tight)
 
             # classes_of_interest = coco_eval.config['classes_of_interest']
             # if classes_of_interest:
@@ -1089,7 +1101,7 @@ class CocoSingleResult(ub.NiceRepr):
             #     subkeys = ['background'] + classes_of_interest
             #     coi_confusion = confusion[subkeys].loc[subkeys]
             #     ax = kwplot.plot_matrix(coi_confusion, fnum=3, showvals=0, logscale=True)
-            #     writefig(fig, metrics_dpath, 'confusion_coi.png')
+            #     _writefig(fig, metrics_dpath, 'confusion_coi.png', figsize, verbose)
             #     print('write fig_fpath = {!r}'.format(fig_fpath))
             #     ax.figure.savefig(fig_fpath)
 
@@ -1098,16 +1110,30 @@ class CocoSingleResult(ub.NiceRepr):
             row_norm_cfsn = row_norm_cfsn.fillna(0)
             ax = kwplot.plot_matrix(row_norm_cfsn, fnum=3, showvals=0, logscale=0)
             ax.set_title('Row (truth) normalized confusions')
-            writefig(fig, metrics_dpath, 'row_confusion.png')
+            _writefig(fig, metrics_dpath, 'row_confusion.png', figsize, verbose, tight)
 
             fig = kwplot.figure(fnum=3, doclf=True)
             col_norm_cfsn = confusion / confusion.values.sum(axis=0, keepdims=True)
             col_norm_cfsn = col_norm_cfsn.fillna(0)
             ax = kwplot.plot_matrix(col_norm_cfsn, fnum=3, showvals=0, logscale=0)
             ax.set_title('Column (pred) normalized confusions')
-            writefig(fig, metrics_dpath, 'col_confusion.png')
+            _writefig(fig, metrics_dpath, 'col_confusion.png', figsize, verbose, tight)
         except Exception:
             pass
+
+
+@profile
+def _writefig(fig, metrics_dpath, fname, figsize, verbose, tight):
+    fig_fpath = join(metrics_dpath, fname)
+    if verbose:
+        print('write fig_fpath = {!r}'.format(fig_fpath))
+    fig.set_size_inches(figsize)
+    if tight:
+        fig.tight_layout()
+    fig.savefig(fig_fpath)
+    # import kwplot
+    # kwplot.jk(fig)
+    # fig.savefig(fig_fpath, bbox_inches='tight')
 
 
 def _load_dets(pred_fpaths, workers=0):
@@ -1175,111 +1201,10 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
     else:
         return dets
 
-
-class CocoEvalCLIConfig(scfg.Config):
-    """
-    Evaluate detection metrics using a predicted and truth coco file.
-    """
-    default = ub.dict_union(CocoEvalConfig.default, {
-        # These should go into the CLI args, not the class config args
-        'expt_title': scfg.Value('', type=str, help='title for plots'),
-        'draw': scfg.Value(True, help='draw metric plots'),
-        'out_dpath': scfg.Value('./coco_metrics', type=str),
-    })
-
-
-def main(cmdline=True, **kw):
-    r"""
-    TODO:
-        - [ ] should live in kwcoco.cli.coco_eval
-
-    CommandLine:
-
-        # Generate test data
-        xdoctest -m kwcoco.cli.coco_eval CocoEvalCLI.main
-
-        kwcoco eval \
-            --true_dataset=$HOME/.cache/kwcoco/tests/eval/true.mscoco.json \
-            --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
-            --out_dpath=$HOME/.cache/kwcoco/tests/eval/out \
-            --force_pycocoutils=False \
-            --area_range=all,0-4096,4096-inf
-
-        nautilus $HOME/.cache/kwcoco/tests/eval/out
-    """
-    cli_config = CocoEvalCLIConfig(cmdline=cmdline, default=kw)
-    print('cli_config = {}'.format(ub.repr2(dict(cli_config), nl=1)))
-
-    eval_config = ub.dict_subset(cli_config, CocoEvaluator.Config.default)
-
-    coco_eval = CocoEvaluator(eval_config)
-    coco_eval._init()
-
-    results = coco_eval.evaluate()
-
-    ub.ensuredir(cli_config['out_dpath'])
-
-    metrics_fpath = join(cli_config['out_dpath'], 'metrics.json')
-    print('dumping metrics_fpath = {!r}'.format(metrics_fpath))
-    results.dump(metrics_fpath, indent='    ')
-
-    if cli_config['draw']:
-        results.dump_figures(
-            cli_config['out_dpath'],
-            expt_title=cli_config['expt_title']
-        )
-
-    if 'coco_dset' in coco_eval.true_extra:
-        truth_dset = coco_eval.true_extra['coco_dset']
-    elif 'sampler' in coco_eval.true_extra:
-        truth_dset = coco_eval.true_extra['sampler'].dset
-    else:
-        truth_dset = None
-
-    if truth_dset is not None and getattr(results, 'cfsn_vecs', None):
-        print('Attempting to draw examples')
-        gid_to_stats = {}
-        gids, groupxs = kwarray.group_indices(results.cfsn_vecs.data['gid'])
-        for gid, groupx in zip(gids, groupxs):
-            true_vec = results.cfsn_vecs.data['true'][groupx]
-            pred_vec = results.cfsn_vecs.data['pred'][groupx]
-            is_true = (true_vec > 0)
-            is_pred = (pred_vec > 0)
-            has_pred = is_true & is_pred
-
-            stats = {
-                'num_assigned_pred': has_pred.sum(),
-                'num_true': is_true.sum(),
-                'num_pred': is_pred.sum(),
-            }
-            stats['frac_assigned'] = stats['num_assigned_pred'] / stats['num_true']
-            gid_to_stats[gid] = stats
-
-        set([stats['frac_assigned'] for stast in gid_to_stats.values()])
-        gid = ub.argmax(gid_to_stats, key=lambda x: x['num_pred'] * x['num_true'])
-        stat_gids = [gid]
-
-        rng = kwarray.ensure_rng(None)
-        random_gids = rng.choice(gids, size=5).tolist()
-
-        found_gids = truth_dset.find_representative_images(gids)
-        draw_gids = list(ub.unique(found_gids + stat_gids + random_gids))
-
-        for gid in ub.ProgIter(draw_gids):
-            truth_dets = coco_eval.gid_to_true[gid]
-            pred_dets = coco_eval.gid_to_pred[gid]
-
-            canvas = truth_dset.load_image(gid)
-            canvas = truth_dets.draw_on(canvas, color='green', sseg=False)
-            canvas = pred_dets.draw_on(canvas, color='blue', sseg=False)
-
-            viz_dpath = ub.ensuredir((cli_config['out_dpath'], 'viz'))
-            fig_fpath = join(viz_dpath, 'eval-gid={}.jpg'.format(gid))
-            kwimage.imwrite(fig_fpath, canvas)
-
 if __name__ == '__main__':
     """
     CommandLine:
         python ~/code/kwcoco/kwcoco/coco_evaluator.py
     """
-    main()
+    from kwcoco.cli import coco_eval as coco_eval_cli
+    coco_eval_cli.main()

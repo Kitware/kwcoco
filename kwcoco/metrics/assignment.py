@@ -14,6 +14,11 @@ TODO:
 
     - [ ] relevant classes / classes / classes-of-interest we care about needs
         to be a first class member of detection metrics.
+
+    - [ ] Add parameter that allows one prediction to "match" to more than one
+        truth object. (example: we have a duck detector problem and all the
+        ducks in a row are annotated as separate object, and we only care about
+        getting the group)
 """
 import warnings
 import networkx as nx
