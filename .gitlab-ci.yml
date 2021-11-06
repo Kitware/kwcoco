@@ -21,126 +21,6 @@
         
         NOTE: THESE INSTRUCTION ARE BEING MOVED AND UPDATED IN THE DEV FOLDER
 
-        ============
-        GITLAB-CI INSTRUCTIONS
-        ============
-
-        This file was designed to be used as a template. You can adapt it to
-        new projects with a few simple changes.  Namely perform the following
-        search and replaces.
-
-        ```bash
-        cat .gitlab-ci.yml | \
-            sed 's|computer-vision|<YOUR-GROUP>|g' | \
-            sed 's|kwcoco|<YOUR-REPO>|g' | \
-            sed 's|travis-ci-Erotemic|<YOUR-GPG-ID>|g' | \
-            sed 's|CI_KITWARE_SECRET|<YOUR_CI_SECRET>|g' | \
-            sed 's|GITLAB_KITWARE_PUSH_TOKEN|<YOUR_GIT_PUSH_TOKEN>|g' | \
-            sed 's|gitlab.kitware.com|gitlab.your-instance.com|g' | \
-        tee /tmp/repl && colordiff .gitlab-ci.yml /tmp/repl
-        ```
-
-        To use this script you need the following configurations on your gitlab instance.
-
-        NOTES
-        -----
-
-        * This script will require matainence for new releases of Python
-
-        * Make sure you add Runners to your project 
-        https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/ci_cd 
-        in Runners-> Shared Runners
-        and Runners-> Available specific runners
-
-
-        GITLAB SECRETS
-        --------------
-
-        Almost all of the stages in this pipeline can be performed on a local
-        machine (making it much easier to debug) as well as the gitlab-ci
-        machine. However, there are a handeful of required environment
-        variables which will contain sensitive information. These variables are
-
-        * TWINE_USERNAME - this is your pypi username
-            twine info is only needed if you want to automatically publish to pypi
-
-        * TWINE_PASSWORD - this is your pypi password 
-
-        * CI_KITWARE_SECRET - We will use this as a secret key to encrypt/decrypt gpg secrets 
-            This is only needed if you want to automatically sign published
-            wheels with a gpg key.
-
-        * GITLAB_KITWARE_PUSH_TOKEN - 
-            This is only needed if you want to automatically git-tag release branches.
-
-            Create a new personall access token in User->Settings->Tokens, 
-            You can name the token GITLAB_KITWARE_PUSH_TOKEN_VALUE
-            Give it api and write repository permissions
-
-            SeeAlso: https://gitlab.kitware.com/profile/personal_access_tokens
-
-            Take this variable and record its value somewhere safe. I put it in my secrets file as such:
-
-                export GITLAB_KITWARE_PUSH_TOKEN_VALUE=<paste-the-value-here>
-
-            I also create another variable with the prefix "git-push-token", which is necessary
-
-                export GITLAB_KITWARE_PUSH_TOKEN=git-push-token:$GITLAB_KITWARE_PUSH_TOKEN_VALUE
-
-            Then add this as a secret variable here: https://gitlab.kitware.com/groups/computer-vision/-/settings/ci_cd
-            Note the value of GITLAB_KITWARE_PUSH_TOKEN will look something like: "git-push-token:{token-password}"
-            For instance it may look like this: "git-push-token:62zutpzqga6tvrhklkdjqm"
-
-            References:
-                https://stackoverflow.com/questions/51465858/how-do-you-push-to-a-gitlab-repo-using-a-gitlab-ci-job
-
-        These should be added as secret variables in your Gitlab->CI->Variables settings.
-
-        Before you do this ensure that your main and release branch are marked as protected
-        and only editable by people that you trust. 
-        https://gitlab.kitware.com/computer-vision/kwcoco/-/settings/repository#js-protected-branches-settings
-
-        WARNING: If an untrusted actor gains the ability to write to a
-        protected branch, then they will be able to exfiltrate your secrets.
-
-        Once you have protected the main and release branch, can add these
-        variables as the following url
-        https://gitlab.kitware.com/computer-vision/kwimage/-/settings/ci_cd 
-        
-        WARNING: These variables contain secret information. Ensure that these
-        the protected and masked settings are enabled when you create them.
-
-
-        ENCRYPTING SECRETS
-        ------------------
-
-        The following script demonstrates how to securely encrypt a secret GPG key. It is assumed that you have 
-        a file secret_loader.sh that looks like this
-
-        ```bash
-            source secretfile
-        ```
-
-        and then a secretfile that looks like this
-
-        ```bash
-            #!/bin/bash
-            echo /some/secret/file 
-
-            export TWINE_USERNAME=<pypi-username>
-            export TWINE_PASSWORD=<pypi-password>
-            export CI_KITWARE_SECRET="<a-very-long-secret-string>"
-            export GITLAB_KITWARE_PUSH_TOKEN='git-push-token:<token-password>'
-        ```
-
-        You should also make a secret_unloader.sh that points to a script that
-        unloads these secret variables from the environment.
-
-        Given this file-structure setup, you can then run the following
-        commands verbatim. Alternatively just populate the environment
-        variables and run line-by-line without creating the secret
-        loader/unloader scripts.
-
         INSTRUCTIONS MOVED TO DEV FILE
 
         TEST GITLAB_KITWARE_PUSH_TOKEN 
@@ -279,7 +159,7 @@ stages:
         - *_setup_virtualenv_template
         - *_install_strict_minimal_requirements
         - pip install .[tests]  
-        - pip install opencv-python-headless
+        - pip install opencv-python-headless==4.5.3.56
 
 
 .test_full_strict_template: &test_full_strict_template
@@ -291,7 +171,7 @@ stages:
         - *_setup_virtualenv_template
         - *_install_strict_full_requirements
         - pip install .[all]  
-        - pip install opencv-python-headless
+        - pip install opencv-python-headless==4.5.3.56
 
 .test_minimal_loose_template: &test_minimal_loose_template
     # Tags define which runners will accept which jobs
