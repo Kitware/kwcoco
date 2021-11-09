@@ -1424,7 +1424,13 @@ class DelayedChannelConcat(DelayedImageOperation):
                     'components must all have the same delayed size: got {}'.format(dsize_cands))
             dsize = dsize_cands[0]
         self.dsize = dsize
-        self.num_bands = sum(comp.num_bands for comp in self.components)
+        try:
+            self.num_bands = sum(comp.num_bands for comp in self.components)
+        except TypeError:
+            if any(comp.num_bands is None for comp in self.components):
+                self.num_bands = None
+            else:
+                raise
         self.meta = {
             'shape': self.shape,
             'num_bands': self.num_bands,
