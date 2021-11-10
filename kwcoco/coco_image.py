@@ -202,7 +202,11 @@ class CocoImage(ub.NiceRepr):
 
             - [ ] TODO: add nans to bands that don't exist or throw an error
 
+            - [ ] This function could stand to have a better name. Maybe imread
+                  with a delayed=True flag? Or maybe just delayed_load?
+
         Example:
+            >>> from kwcoco.coco_image import *  # NOQA
             >>> import kwcoco
             >>> gid = 1
             >>> #
@@ -244,8 +248,18 @@ class CocoImage(ub.NiceRepr):
             >>> delayed = dset.delayed_load(gid, channels='B8|foo|bar|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo()
+            >>> coco_img = dset.coco_image(1)
+            >>> # Test case where nothing is registered in the dataset
+            >>> delayed = coco_img.delay()
+            >>> final = delayed.finalize()
+            >>> assert final.shape == (512, 512, 3)
         """
-        from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedChannelConcat
+        from kwcoco.util.util_delayed_poc import DelayedChannelConcat
+        from kwcoco.util.util_delayed_poc import DelayedNans
         from kwimage.transform import Affine
         from kwcoco.channel_spec import FusedChannelSpec
         if bundle_dpath is None:
@@ -256,53 +270,52 @@ class CocoImage(ub.NiceRepr):
         if requested is not None:
             requested = FusedChannelSpec.coerce(requested).normalize()
 
-        def _delay_load_imglike(obj):
-            from os.path import join
-            info = {}
-            fname = obj.get('file_name', None)
-            channels_ = obj.get('channels', None)
-            if channels_ is not None:
-                channels_ = FusedChannelSpec.coerce(channels_).normalize()
-            info['channels'] = channels_
-            width = obj.get('width', None)
-            height = obj.get('height', None)
-            if height is not None and width is not None:
-                info['dsize'] = dsize = (width, height)
-            else:
-                info['dsize'] = None
-            if fname is not None:
-                info['fpath'] = fpath = join(bundle_dpath, fname)
-                info['chan'] = DelayedLoad(fpath, channels=channels_, dsize=dsize)
-            return info
-
-        # obj = img
-        info = img_info = _delay_load_imglike(img)
-
         chan_list = []
-        if info.get('chan', None) is not None:
+        # Get info about the primary image and check if its channels are
+        # requested (if it even has any)
+        info = img_info = _delay_load_imglike(bundle_dpath, img)
+        if info.get('chan_construct', None) is not None:
             include_flag = requested is None
             if not include_flag:
                 if requested.intersection(info['channels']):
                     include_flag = True
             if include_flag:
-                chan_list.append(info.get('chan', None))
+                chncls, chnkw = info['chan_construct']
+                chan = chncls(**chnkw)
+                chan_list.append(chan)
 
         for aux in img.get('auxiliary', []):
-            info = _delay_load_imglike(aux)
-            aux_to_img = Affine.coerce(aux.get('warp_aux_to_img', None))
-            chan = info['chan']
-
+            info = _delay_load_imglike(bundle_dpath, aux)
             include_flag = requested is None
             if not include_flag:
                 if requested.intersection(info['channels']):
                     include_flag = True
             if include_flag:
+                aux_to_img = Affine.coerce(aux.get('warp_aux_to_img', None))
+                chncls, chnkw = info['chan_construct']
+                chan = chncls(**chnkw)
                 chan = chan.delayed_warp(
                     aux_to_img, dsize=img_info['dsize'])
                 chan_list.append(chan)
 
+        if space == 'video':
+            vidid = img['video_id']
+            video = self.dset.index.videos[vidid]
+            width = video.get('width', img.get('width', None))
+            height = video.get('height', img.get('height', None))
+        else:
+            width = img.get('width', None)
+            height = img.get('height', None)
+        dsize = (width, height)
+
         if len(chan_list) == 0:
-            raise ValueError('no data')
+            if requested is not None:
+                # Handle case where the image doesnt have the requested
+                # channels.
+                delayed = DelayedNans(dsize=dsize, channels=requested)
+                return delayed
+            else:
+                raise ValueError('no data registered in kwcoco image')
         else:
             delayed = DelayedChannelConcat(chan_list)
 
@@ -317,13 +330,33 @@ class CocoImage(ub.NiceRepr):
         if space == 'image':
             pass
         elif space == 'video':
-            vidid = img['video_id']
-            video = self.dset.index.videos[vidid]
-            width = video.get('width', img.get('width', None))
-            height = video.get('height', img.get('height', None))
-            video_dsize = (width, height)
             img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
-            delayed = delayed.delayed_warp(img_to_vid, dsize=video_dsize)
+            delayed = delayed.delayed_warp(img_to_vid, dsize=dsize)
         else:
             raise KeyError('space = {}'.format(space))
         return delayed
+
+
+def _delay_load_imglike(bundle_dpath, obj):
+    from kwcoco.util.util_delayed_poc import DelayedLoad
+    from os.path import join
+    from kwcoco.channel_spec import FusedChannelSpec
+    info = {}
+    fname = obj.get('file_name', None)
+    channels_ = obj.get('channels', None)
+    if channels_ is not None:
+        channels_ = FusedChannelSpec.coerce(channels_)
+        channels_ = channels_.normalize()
+    info['channels'] = channels_
+    width = obj.get('width', None)
+    height = obj.get('height', None)
+    if height is not None and width is not None:
+        info['dsize'] = dsize = (width, height)
+    else:
+        info['dsize'] = dsize = (None, None)
+    if fname is not None:
+        info['fpath'] = fpath = join(bundle_dpath, fname)
+        # Delaying this gives us a small speed boost
+        info['chan_construct'] = (DelayedLoad, dict(
+            fpath=fpath, channels=channels_, dsize=dsize))
+    return info

@@ -375,99 +375,9 @@ class MixinCocoAccessors(object):
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
         """
-        from kwcoco.util.util_delayed_poc import DelayedChannelConcat
-        from kwimage.transform import Affine
-        from kwcoco.channel_spec import FusedChannelSpec
-
-        requested = channels
-        if requested is not None:
-            requested = FusedChannelSpec.coerce(requested)
-
-        img = self.index.imgs[gid]
-        chan_list = []
-
-        # Get info about the primary image and check if its channels are
-        # requested (if it even has any)
-        info = img_info = self._delay_load_imglike(img)
-        if info.get('chan_construct', None) is not None:
-            include_flag = requested is None
-            if not include_flag:
-                if requested.intersection(info['channels']):
-                    include_flag = True
-            if include_flag:
-                chncls, chnkw = info['chan_construct']
-                chan = chncls(**chnkw)
-                chan_list.append(chan)
-
-        for aux in img.get('auxiliary', []):
-            info = self._delay_load_imglike(aux)
-            include_flag = requested is None
-            if not include_flag:
-                if requested.intersection(info['channels']):
-                    include_flag = True
-            if include_flag:
-                aux_to_img = Affine.coerce(aux.get('warp_aux_to_img', None))
-                chncls, chnkw = info['chan_construct']
-                chan = chncls(**chnkw)
-                chan = chan.delayed_warp(
-                    aux_to_img, dsize=img_info['dsize'])
-                chan_list.append(chan)
-
-        if len(chan_list) == 0:
-            raise ValueError('no data')
-        else:
-            delayed = DelayedChannelConcat(chan_list)
-
-        # Reorder channels in the requested order
-        if requested is not None:
-            delayed = delayed.take_channels(requested)
-
-        if hasattr(delayed, 'components'):
-            if len(delayed.components) == 1:
-                delayed = delayed.components[0]
-
-        if space == 'image':
-            # Image space is the default
-            pass
-        elif space == 'video':
-            vidid = img['video_id']
-            video = self.index.videos[vidid]
-            width = video.get('width', img.get('width', None))
-            height = video.get('height', img.get('height', None))
-            video_dsize = (width, height)
-            img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
-            delayed = delayed.delayed_warp(img_to_vid, dsize=video_dsize)
-        else:
-            raise KeyError('space = {}'.format(space))
-
+        coco_img = self.coco_image(gid)
+        delayed = coco_img.delay(channels=channels, space=space)
         return delayed
-
-    def _delay_load_imglike(self, obj):
-        """
-        Helper function for delayed_load
-        """
-        from kwcoco.util.util_delayed_poc import DelayedLoad
-        from kwcoco.channel_spec import FusedChannelSpec
-        info = {}
-        fname = obj.get('file_name', None)
-        channels_ = obj.get('channels', None)
-        if channels_ is not None:
-            channels_ = FusedChannelSpec.coerce(channels_)
-            channels_ = channels_.normalize()
-        info['channels'] = channels_
-        width = obj.get('width', None)
-        height = obj.get('height', None)
-        if height is not None and width is not None:
-            info['dsize'] = dsize = (width, height)
-        else:
-            info['dsize'] = None
-        if fname is not None:
-            bundle_dpath = self.bundle_dpath
-            info['fpath'] = fpath = join(bundle_dpath, fname)
-            # Delaying this gives us a small speed boost
-            info['chan_construct'] = (DelayedLoad, dict(
-                fpath=fpath, channels=channels_, dsize=dsize))
-        return info
 
     def load_image(self, gid_or_img, channels=None):
         """
@@ -485,9 +395,15 @@ class MixinCocoAccessors(object):
             - [ ] allow specification of multiple channels - use delayed image
                 for this.
         """
-        import kwimage
-        gpath = self.get_image_fpath(gid_or_img, channels=channels)
-        np_img = kwimage.imread(gpath)
+        try:
+            import kwimage
+            gpath = self.get_image_fpath(gid_or_img, channels=channels)
+            np_img = kwimage.imread(gpath)
+        except Exception:
+            img = self._resolve_to_img(gid_or_img)
+            np_img = self.delayed_load(img['id'], channels=channels).finalize()
+        return np_img
+
         return np_img
 
     def get_image_fpath(self, gid_or_img, channels=None):
