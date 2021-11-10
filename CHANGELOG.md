@@ -7,6 +7,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.17 - Unreleased
 
+### Added
+* Added "channels" argument to kwcoco subset
+
+### Fixed
+* Bug in `delayed_load` when none of the requested channels exist
+
 
 ## Version 0.2.16 - Released 2021-11-05
 

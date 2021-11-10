@@ -52,6 +52,13 @@ class CocoSubsetCLI(object):
                     Requries the "jq" python library is installed.
                     ''')),
 
+            'channels': scfg.Value(
+                None, help=ub.paragraph(
+                    '''
+                    if specified select only images that contain these channels
+                    (specified as a kwcoco channel spec)
+                    ''')),
+
             'select_videos': scfg.Value(
                 None, help=ub.paragraph(
                     '''
@@ -263,6 +270,14 @@ def query_subset(dset, config):
         except Exception:
             print('JQ Query Failed: {}'.format(query_text))
             raise
+
+    if config['channels'] is not None:
+        import kwcoco
+        requested_chans = kwcoco.ChannelSpec(config['channels'])
+        valid_gids = [
+            gid for gid in valid_gids
+            if (requested_chans & dset.coco_image(gid).channels).numel() == requested_chans.numel()
+        ]
 
     new_dset = dset.subset(valid_gids)
     return new_dset

@@ -202,6 +202,9 @@ class CocoImage(ub.NiceRepr):
 
             - [ ] TODO: add nans to bands that don't exist or throw an error
 
+            - [ ] This function could stand to have a better name. Maybe imread
+                  with a delayed=True flag? Or maybe just delayed_load?
+
         Example:
             >>> from kwcoco.coco_image import *  # NOQA
             >>> import kwcoco

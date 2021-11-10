@@ -283,7 +283,7 @@ class FusedChannelSpec(BaseChannelSpec):
         elif isinstance(data, ChannelSpec):
             parsed = data.parse()
             if len(parsed) == 1:
-                self = cls(ub.peek(parsed.values()))
+                self = cls(ub.peek(parsed.values()).parsed)
             else:
                 raise ValueError(
                     'Cannot coerce ChannelSpec to a FusedChannelSpec '
