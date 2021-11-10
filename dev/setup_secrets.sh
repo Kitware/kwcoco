@@ -89,21 +89,47 @@ GITLAB ACTION INSTRUCTIONS
 
 setup_package_environs(){
     __doc__="
-    Setup environment variables specific for this project. The remainder of
-    this script should ideally be general to any repo.
+    Setup environment variables specific for this project.
+    The remainder of this script should ideally be general to any repo.  These
+    non-secret variables are written to disk and loaded by the script, such
+    that the specific repo only needs to modify that configuration file.
     "
 
-    #REPO_DPATH=$HOME/code/xdoctest
-    REPO_DPATH=$HOME/code/kwcoco
-    VARNAME_CI_SECRET="CI_KITWARE_SECRET"
-    GPG_IDENTIFIER="=Erotemic-CI <erotemic@gmail.com>"
+    echo '
+    export VARNAME_CI_SECRET="CI_KITWARE_SECRET"
+    export VARNAME_TWINE_USERNAME="TWINE_USERNAME"
+    export VARNAME_TWINE_PASSWORD="TWINE_PASSWORD"
+    export VARNAME_TEST_TWINE_USERNAME="TEST_TWINE_USERNAME"
+    export VARNAME_TEST_TWINE_PASSWORD="TEST_TWINE_PASSWORD"
+    export VARNAME_PUSH_TOKEN="GITLAB_KITWARE_TOKEN"
+    export GPG_IDENTIFIER="=Erotemic-CI <erotemic@gmail.com>"
+    ' | python -c "import sys; from textwrap import dedent; print(dedent(sys.stdin.read()).strip(chr(10)))" > dev/secrets_configuration.sh
+    git add dev/secrets_configuration.sh
 
-    #VARNAME_TWINE_USERNAME="TWINE_USERNAME"
-    #VARNAME_TWINE_PASSWORD="TWINE_PASSWORD"
-    #TWINE_USERNAME_VARNAME="PYUTILS_TWINE_USERNAME"
-    #TWINE_PASSWORD_VARNAME="PYUTILS_TWINE_USERNAME"
-    #CI_SECRET_VARNAME="EROTEMIC_CI_SECRET"
+    echo '
+    export VARNAME_CI_SECRET="EROTEMIC_CI_SECRET"
+    export VARNAME_TWINE_USERNAME="TWINE_USERNAME"
+    export VARNAME_TWINE_PASSWORD="TWINE_PASSWORD"
+    export VARNAME_TEST_TWINE_USERNAME="TEST_TWINE_USERNAME"
+    export VARNAME_TEST_TWINE_PASSWORD="TEST_TWINE_PASSWORD"
+    export GPG_IDENTIFIER="=Erotemic-CI <erotemic@gmail.com>"
+    ' | python -c "import sys; from textwrap import dedent; print(dedent(sys.stdin.read()).strip(chr(10)))" > dev/secrets_configuration.sh
+    git add dev/secrets_configuration.sh
+
+    echo '
+    export VARNAME_CI_SECRET="PYUTILS_CI_SECRET"
+    export GPG_IDENTIFIER="=PyUtils-CI <openpyutils@gmail.com>"
+    export VARNAME_TWINE_PASSWORD="PYUTILS_TWINE_PASSWORD"
+    export VARNAME_TWINE_PASSWORD="PYUTILS_TWINE_PASSWORD"
+    ' | python -c "import sys; from textwrap import dedent; print(dedent(sys.stdin.read()).strip(chr(10)))" > dev/secrets_configuration.sh
+    git add dev/secrets_configuration.sh
+
+    #echo '
+    #export VARNAME_CI_SECRET="PYUTILS_CI_SECRET"
+    #export GPG_IDENTIFIER="=PyUtils-CI <openpyutils@gmail.com>"
+    #' | python -c "import sys; from textwrap import dedent; print(dedent(sys.stdin.read()).strip(chr(10)))" > dev/secrets_configuration.sh
 }
+
 
 
 export_encrypted_code_signing_keys(){

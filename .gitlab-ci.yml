@@ -177,8 +177,8 @@ stages:
         - $GPG_EXECUTABLE --list-keys
         - $GPG_EXECUTABLE --list-keys
         # Decrypt and import GPG Keys / trust
-        - source dev/secrets_configuration.sh
         # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on master and release branch
+        - source dev/secrets_configuration.sh
         - CI_SECRET=${!VARNAME_CI_SECRET}
         - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
         - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
@@ -223,7 +223,9 @@ stages:
         # Decrypt and import GPG Keys / trust
         - source dev/secrets_configuration.sh
         # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on master and release branch
+        - source dev/secrets_configuration.sh
         - CI_SECRET=${!VARNAME_CI_SECRET}
+        - PUSH_TOKEN=${!VARNAME_PUSH_TOKEN}
         - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
         - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
         - GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
