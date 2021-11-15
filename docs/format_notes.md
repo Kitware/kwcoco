@@ -84,3 +84,15 @@ cache_dpath  = f'{bundle_dpath}/.cache'                     # For ndsampler use 
 
 * Should the schema be modified such that custom user attributes are
   **ideally** stored in an unstructured "properties" dictionary?
+
+
+
+# Common Conventions
+
+
+* Although not in the formal spec (yet), we use some special conventions for
+  handling special data.
+
+* An image or auxiliary object can hold image data directly with the key
+  "imdata". Typically, this should not be saved to disk with the manifest,
+  but used to hold intermediate in-memory results.

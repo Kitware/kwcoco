@@ -12,6 +12,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Added "channels" argument to kwcoco subset
+* Added `add_auxiliary_item` to `CocoImage`
+* `CocoImage.delay` can now handle the case where `imdata` is given directly in the image dictionary.
 
 ### Fixed
 * Bug in `delayed_load` when none of the requested channels exist
