@@ -167,7 +167,21 @@ class Measures(ub.NiceRepr, DictProxy):
             # self.draw('thresh', keys=['mcc', 'f1', 'acc'])
 
     @classmethod
-    def combine(cls, tocombine, precision=None, growth=None):
+    def demo(cls, **kwargs):
+        """
+        Create a demo Measures object for testing / demos
+
+        Args:
+            **kwargs: passed to :func:`BinaryConfusionVectors.demo`.
+                some valid keys are: n, rng, p_rue, p_error, p_miss.
+        """
+        from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
+        bin_cfsn = BinaryConfusionVectors.demo(**kwargs)
+        measures = bin_cfsn.measures()
+        return measures
+
+    @classmethod
+    def combine(cls, tocombine, precision=None, growth=None, thresh_bins=None):
         """
         Combine binary confusion metrics
 
@@ -188,14 +202,16 @@ class Measures(ub.NiceRepr, DictProxy):
                 maximum length of an input. We might make this more numerical
                 in the future.
 
+            thresh_bins (int):
+                Force this many threshold bins.
+
         Returns:
             Measures
 
         Example:
             >>> from kwcoco.metrics.confusion_measures import *  # NOQA
-            >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
-            >>> measures1 = BinaryConfusionVectors.demo(n=15).measures()
-            >>> measures2 = measures1  # BinaryConfusionVectors.demo(n=15).measures()
+            >>> measures1 = Measures.demo(n=15)
+            >>> measures2 = measures1
             >>> tocombine = [measures1, measures2]
             >>> new_measures = Measures.combine(tocombine)
             >>> new_measures.reconstruct()
@@ -217,10 +233,9 @@ class Measures(ub.NiceRepr, DictProxy):
 
         Ignore:
             >>> from kwcoco.metrics.confusion_measures import *  # NOQA
-            >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
             >>> rng = kwarray.ensure_rng(0)
             >>> tocombine = [
-            >>>     BinaryConfusionVectors.demo(n=rng.randint(40, 50), rng=rng, p_true=0.2, p_error=0.4, p_miss=0.6).measures()
+            >>>     Measures.demo(n=rng.randint(40, 50), rng=rng, p_true=0.2, p_error=0.4, p_miss=0.6)
             >>>     for _ in range(80)
             >>> ]
             >>> # xdoctest: +REQUIRES(--show)
@@ -231,16 +246,6 @@ class Measures(ub.NiceRepr, DictProxy):
             >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
             >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
             >>>     combo.summary_plot(fnum=idx + 1, title=str(growth))
-
-        Ignore:
-            cfsn_vecs = BinaryConfusionVectors({
-                'is_true':    [  1,   0,   0,   0,    1,     0,     1,     1,     0],
-                'pred_score': [0.9, 0.7, 0.6, 0.5, 1e-9, 2e-10, 1e-10, 2e-17, 1e-17],
-            })
-            measures = BinaryConfusionVectors.demo(n=7).measures()
-            counts = ub.map_vals(lambda x: list(map(int, x)),
-                                 measures.counts().pandas().to_dict('list'))
-            print(ub.repr2(counts, nl=1, precision=1))
 
         Example:
             >>> # Demonstrate issues that can arrise from choosing a precision
@@ -279,6 +284,32 @@ class Measures(ub.NiceRepr, DictProxy):
             >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
             >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
             >>>     #print(combo.counts().pandas())
+
+        Example:
+            >>> # Test case: combining a single measures should leave it unchanged
+            >>> from kwcoco.metrics.confusion_measures import *  # NOQA
+            >>> measures = Measures.demo(n=40, p_true=0.2, p_error=0.4, p_miss=0.6)
+            >>> df1 = measures.counts().pandas().fillna(0)
+            >>> print(df1)
+            >>> tocombine = [measures]
+            >>> combo = Measures.combine(tocombine)
+            >>> df2 = combo.counts().pandas().fillna(0)
+            >>> print(df2)
+            >>> assert np.allclose(df1, df2)
+
+            >>> combo = Measures.combine(tocombine, thresh_bins=2)
+            >>> df3 = combo.counts().pandas().fillna(0)
+            >>> print(df3)
+
+            >>> # I am NOT sure if this is correct or not
+            >>> combo = Measures.combine(tocombine, thresh_bins=20)
+            >>> df4 = combo.counts().pandas().fillna(0)
+            >>> print(df4)
+
+            assert np.allclose(combo['thresholds'], measures['thresholds'])
+            assert np.allclose(combo['fp_count'], measures['fp_count'])
+            assert np.allclose(combo['tp_count'], measures['tp_count'])
+            assert np.allclose(combo['tp_count'], measures['tp_count'])
         """
         if precision is not None and np.isinf(precision):
             precision = None
@@ -289,50 +320,79 @@ class Measures(ub.NiceRepr, DictProxy):
         tocombine_thresh = [m['thresholds'] for m in tocombine]
 
         orig_thresholds = np.unique(np.hstack(tocombine_thresh))
-        if growth is not None:
+        finite_flags = np.isfinite(orig_thresholds)
+        nonfinite_flags = ~finite_flags
+        if np.any(nonfinite_flags):
+            orig_finite_thresholds = orig_thresholds[finite_flags]
+            # If we have any non-finite threshold values we are stuck with them
+            nonfinite_vals = orig_thresholds[nonfinite_flags]
+        else:
+            orig_finite_thresholds = orig_thresholds
+            nonfinite_vals = []
+
+        if thresh_bins is not None:
+            assert growth is None
+            assert precision is None
+            threshold_pool = orig_finite_thresholds
+            # Subdivide threshold pool until we get enough values
+            while thresh_bins > len(threshold_pool):
+                even_slice = threshold_pool[:(len(threshold_pool) // 2) * 2]
+                mean_vals = np.r_[[0], even_slice, [1]].reshape(-1, 2).mean(axis=1)
+                threshold_pool = np.hstack([mean_vals, threshold_pool])
+                threshold_pool = np.unique(threshold_pool)
+
+            chosen_idxs = np.linspace(0, len(threshold_pool) - 1, thresh_bins).round().astype(int)
+            chosen_idxs = np.unique(chosen_idxs)
+            combo_thresh_asc = threshold_pool[chosen_idxs]
+        elif growth is not None:
             if precision is not None:
                 raise ValueError('dont use precision with growth')
             # Keep a minimum number of threshold and allow
             # the resulting metrics to grow by some factor
             num_per_item = list(map(len, tocombine_thresh))
             if growth == 'max':
-                max_breakpoints = max(num_per_item)
+                max_num_thresholds = max(num_per_item)
             elif growth == 'min':
-                max_breakpoints = min(num_per_item)
+                max_num_thresholds = min(num_per_item)
             elif growth == 'log':
                 # Each item after the first is only allowed to contribute
                 # some of its thresholds defined by the base-e-log.
                 modulated_sizes = sorted([np.log(n) for n in num_per_item])
-                max_breakpoints = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
             elif growth == 'root':
                 # Each item after the first is only allowed to contribute
                 # some of its thresholds defined by the square root.
                 modulated_sizes = sorted([np.sqrt(n) for n in num_per_item])
-                max_breakpoints = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
             elif growth == 'half':
                 # Each item after the first is only allowed to contribute
                 # some of its thresholds, half of them.
                 modulated_sizes = sorted([n / 2 for n in num_per_item])
-                max_breakpoints = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
             else:
                 raise KeyError(growth)
-            chosen_idxs = np.linspace(0, len(orig_thresholds) - 1, max_breakpoints).round().astype(int)
+            chosen_idxs = np.linspace(0, len(orig_finite_thresholds) - 1, max_num_thresholds).round().astype(int)
             chosen_idxs = np.unique(chosen_idxs)
-            combo_thresh_asc = orig_thresholds[chosen_idxs]
+            combo_thresh_asc = orig_finite_thresholds[chosen_idxs]
         elif precision is not None:
-            round_thresholds = orig_thresholds.round(precision)
+            round_thresholds = orig_finite_thresholds.round(precision)
             combo_thresh_asc = np.unique(round_thresholds)
         else:
-            combo_thresh_asc = orig_thresholds
+            combo_thresh_asc = orig_finite_thresholds
+
+        if nonfinite_vals:
+            # Force inclusion of non-finite thresholds
+            combo_thresh_asc = np.hstack([combo_thresh_asc, nonfinite_vals])
+            combo_thresh_asc.sort()
 
         new_thresh = combo_thresh_asc[::-1]
 
-        # From this point on, the rest of the logic should work with respect to
-        # an arbitrary choice of threshold bins, thus the critical step is
-        # choosing what these bins should be in order to minimize lossyness of
-        # the combined accumulated measures while also keeping a reasonable
-        # memory footprint. Regardless, it might be good to double check this
-        # logic.
+        # From this point on, the rest of the logic should (if the
+        # implementation is correct) work with respect to an arbitrary choice
+        # of threshold bins, thus the critical step is choosing what these bins
+        # should be in order to minimize lossyness of the combined accumulated
+        # measures while also keeping a reasonable memory footprint.
+        # Regardless, it might be good to double check this logic.
 
         summable = {
             'nsupport': 0,
@@ -341,6 +401,7 @@ class Measures(ub.NiceRepr, DictProxy):
         }
 
         # Initialize new counts for each entry in the new threshold array
+        # XX_accum[idx] represents the number of *new* XX cases at index idx
         fp_accum = np.zeros(len(new_thresh))
         tp_accum = np.zeros(len(new_thresh))
         tn_accum = np.zeros(len(new_thresh))
@@ -349,23 +410,48 @@ class Measures(ub.NiceRepr, DictProxy):
         # For each item to combine, find where its counts should go in the new
         # combined confusion array.
         for measures in tocombine:
+
+            # this thresh is descending
             thresholds = measures['thresholds']
+            # XX_pos[idx] is the number of *new* XX cases at index idx at
+            # thresholds[idx] for *these* measures.
+
+            fp_pos, _, _ = reversable_diff(measures['fp_count'])
+            tp_pos, _, _ = reversable_diff(measures['tp_count'])
+
+            tn_pos, tn_p, tn_s = reversable_diff(measures['tn_count'], reverse=1)
+            fn_pos, _, _ = reversable_diff(measures['fn_count'], reverse=1)
+
+            # if 0:
+            #     arr = measures['tn_count']
+            #     diff_arr = tn_pos
+            #     prefix = tn_p
+            #     suffix = tn_s
+            #     offset = tn_offset
+            #     recon_arr = np.cumsum(diff_arr[::-1])[::-1] + offset
+            #     recon_arr[0:len(prefix)] += prefix
+            #     recon_arr[len(recon_arr) - len(suffix):] += suffix
+
+            # # NOTE: if the min is non-zero in each array the diff wont work
+            # # reformulate if this case arrises
+            # fp_pos = np.diff(np.r_[[0], measures['fp_count']])
+            # tp_pos = np.diff(np.r_[[0], measures['tp_count']])
+            # tn_pos = np.diff(np.r_[[0], measures['tn_count'][::-1]])[::-1]
+            # fn_pos = np.diff(np.r_[[0], measures['fn_count'][::-1]])[::-1]
 
             # Is this correct? Do we round *this* measure's thresholds?
             # before comparing to the new threshold array?
             # if precision is not None:
             #     thresholds = thresholds.round(precision)
 
+            # Find the locations where the thresholds from "these" measures
+            # should be inserted into the combined measures.
             right_idxs = np.searchsorted(combo_thresh_asc, thresholds, 'right')
             left_idxs = len(combo_thresh_asc) - right_idxs
             left_idxs = left_idxs.clip(0, len(combo_thresh_asc) - 1)
-            # NOTE: if the min is non-zero in each array the diff wont work
-            # reformulate if this case arrises
-            fp_pos = np.diff(np.r_[[0], measures['fp_count']])
-            tp_pos = np.diff(np.r_[[0], measures['tp_count']])
-            tn_pos = np.diff(np.r_[[0], measures['tn_count'][::-1]])[::-1]
-            fn_pos = np.diff(np.r_[[0], measures['fn_count'][::-1]])[::-1]
-            # Handle the case where we round the thresholds for space reasons
+
+            # Accumulate these values from these measures into the appropriate
+            # new threshold position. note: np.add.at is unbuffered
             np.add.at(fp_accum, left_idxs, fp_pos)
             np.add.at(tp_accum, left_idxs, tp_pos)
             np.add.at(fn_accum, left_idxs, fn_pos)
@@ -374,10 +460,15 @@ class Measures(ub.NiceRepr, DictProxy):
             for k in summable:
                 summable[k] += measures[k]
 
-        new_fp = np.cumsum(fp_accum)
-        new_tp = np.cumsum(tp_accum)
-        new_tn = np.cumsum(tn_accum[::-1])[::-1]
-        new_fn = np.cumsum(fn_accum[::-1])[::-1]
+        new_fp = np.cumsum(fp_accum)  # will increase with index
+        new_tp = np.cumsum(tp_accum)  # will increase with index
+        new_tn = np.cumsum(tn_accum[::-1])[::-1]  # will decrease with index
+        new_fn = np.cumsum(fn_accum[::-1])[::-1]  # will decrease with index
+
+        if -np.inf in nonfinite_vals:
+            # Not sure if this is right...
+            new_fp[-1] = np.inf
+            new_tn[-1] = -np.inf
 
         new_info = {
             'fp_count': new_fp,
@@ -400,6 +491,87 @@ class Measures(ub.NiceRepr, DictProxy):
         new_info.update(rest)
         new_measures = Measures(new_info)
         return new_measures
+
+
+def reversable_diff(arr, assume_sorted=1, reverse=False):
+    """
+    Does a reversable array difference operation.
+
+    This will be used to find positions where accumulation happened in
+    confusion count array.
+
+    Ignore:
+        >>> from kwcoco.metrics.confusion_measures import *  # NOQA
+        >>> funcs = {
+        >>>     'at_zero': [0, 3, 9, 43, 333],
+        >>>     'at_nonzero': [2, 3, 9, 43, 333],
+        >>>     'at_negative': [-2, 3, 9, 43, 333],
+        >>>     'at_neginf': [-np.inf, 3, 9, 43, 333],
+        >>>     'at_dblinf': [-np.inf, -np.inf, 3, 9, 43, 333, np.inf, np.inf],
+        >>> }
+        >>> for k, arr in funcs.items():
+        >>>     arr = np.asarray(arr) + 30
+        >>>     diff_arr, prefix, suffix = reversable_diff(arr)
+        >>>     recon_arr = np.cumsum(diff_arr)
+        >>>     recon_arr[0:len(prefix)] += prefix
+        >>>     recon_arr[len(recon_arr) - len(suffix):] += suffix
+        >>>     print('k = {!r}'.format(k))
+        >>>     print('diff_arr  = {!r}'.format(diff_arr))
+        >>>     print('arr       = {!r}'.format(arr))
+        >>>     print('recon_arr = {!r}'.format(recon_arr))
+        >>> for k, arr in funcs.items():
+        >>>     arr = np.asarray(arr)[::-1] + 30
+        >>>     diff_arr, prefix, suffix = reversable_diff(arr, reverse=True)
+        >>>     recon_arr = np.cumsum(diff_arr[::-1])[::-1]
+        >>>     recon_arr[0:len(prefix)] += prefix
+        >>>     recon_arr[len(recon_arr) - len(suffix):] += suffix
+        >>>     print('k = {!r}'.format(k))
+        >>>     print('diff_arr  = {!r}'.format(diff_arr))
+        >>>     print('arr       = {!r}'.format(arr))
+        >>>     print('recon_arr = {!r}'.format(recon_arr))
+    """
+    import math
+    assert assume_sorted
+    if len(arr) == 0:
+        raise ValueError('todo: default value for empty')
+
+    if reverse:
+        arr = arr[::-1]
+
+    n = len(arr)
+
+    last_idx = n - 1
+
+    first_finite_idx = 0
+    for first_finite_idx, v in zip(range(n), arr):
+        if math.isfinite(v):
+            break
+
+    last_finite_idx = n
+    for last_finite_idx, v in zip(range(last_idx, -1, -1), arr[::-1]):
+        if math.isfinite(v):
+            break
+
+    suffix_len = last_idx - last_finite_idx
+    prefix_len = first_finite_idx
+    offset = arr[first_finite_idx]  # This is + C
+    prefix = arr[:first_finite_idx]
+    suffix = arr[last_finite_idx + 1:]
+    finite_body = arr[first_finite_idx:last_finite_idx + 1]
+
+    diff_arr = np.r_[[0] * prefix_len, [offset], np.diff(finite_body), [0] * suffix_len]
+
+    # The goal is to be able to recon perfectly
+    def invert(diff_arr):
+        recon_arr = np.cumsum(diff_arr)
+        recon_arr[0:len(prefix)] += prefix
+        recon_arr[len(recon_arr) - len(suffix):] += suffix
+        return recon_arr
+
+    if reverse:
+        diff_arr = diff_arr[::-1]
+        prefix, suffix = suffix[::-1], prefix[::-1]
+    return diff_arr, prefix, suffix
 
 
 class PerClass_Measures(ub.NiceRepr, DictProxy):
@@ -483,6 +655,131 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
         kwplot.figure(fnum=fnum, doclf=True, figtitle=title)
         for key in subplots:
             self.draw(key, fnum=fnum, pnum=pnum_())
+
+
+class MeasureCombiner:
+    """
+    Helper to iteravely combine binary measures generated by some process
+
+    Example:
+        >>> from kwcoco.metrics.confusion_measures import *  # NOQA
+        >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
+        >>> rng = kwarray.ensure_rng(0)
+        >>> bin_combiner = MeasureCombiner(growth='max')
+        >>> for _ in range(80):
+        >>>     bin_cfsn_vecs = BinaryConfusionVectors.demo(n=rng.randint(40, 50), rng=rng, p_true=0.2, p_error=0.4, p_miss=0.6)
+        >>>     bin_measures = bin_cfsn_vecs.measures()
+        >>>     bin_combiner.submit(bin_measures)
+        >>> combined = bin_combiner.finalize()
+        >>> print('combined = {!r}'.format(combined))
+
+    """
+    def __init__(self, precision=None, growth=None, thresh_bins=None):
+        self.measures = None
+        self.growth = growth
+        self.thresh_bins = thresh_bins
+        self.precision = precision
+        self.queue = []
+
+    @property
+    def queue_size(self):
+        return len(self.queue)
+
+    def submit(self, other):
+        self.queue.append(other)
+
+    def combine(self):
+        # Reduce measures over the chunk
+        if self.measures is None:
+            to_combine = self.queue
+        else:
+            to_combine = [self.measures] + self.queue
+
+        if len(to_combine) == 0:
+            pass
+        if len(to_combine) == 1:
+            self.measures = to_combine[0]
+        else:
+            self.measures = Measures.combine(
+                to_combine, precision=self.precision, growth=self.growth, thresh_bins=self.thresh_bins)
+        self.queue = []
+
+    def finalize(self):
+        if self.queue:
+            self.combine()
+        if self.measures is None:
+            return False
+        else:
+            self.measures.reconstruct()
+            return self.measures
+
+
+class OneVersusRestMeasureCombiner:
+    """
+    Helper to iteravely combine ovr measures generated by some process
+
+    Example:
+        >>> from kwcoco.metrics.confusion_measures import *  # NOQA
+        >>> from kwcoco.metrics.confusion_vectors import OneVsRestConfusionVectors
+        >>> rng = kwarray.ensure_rng(0)
+        >>> ovr_combiner = OneVersusRestMeasureCombiner(growth='max')
+        >>> for _ in range(80):
+        >>>     ovr_cfsn_vecs = OneVsRestConfusionVectors.demo()
+        >>>     ovr_measures = ovr_cfsn_vecs.measures()
+        >>>     ovr_combiner.submit(ovr_measures)
+        >>> combined = ovr_combiner.finalize()
+        >>> print('combined = {!r}'.format(combined))
+    """
+    def __init__(self, precision=None, growth=None, thresh_bins=None):
+        self.catname_to_combiner = {}
+        self.precision = precision
+        self.growth = precision
+        self.thresh_bins = thresh_bins
+        self.queue_size = 0
+
+    def submit(self, other):
+        self.queue_size += 1
+        for catname, other_m in other['perclass'].items():
+            if catname not in self.catname_to_combiner:
+                combiner = MeasureCombiner(
+                    precision=self.precision, growth=self.growth,
+                    thresh_bins=self.thresh_bins)
+                self.catname_to_combiner[catname] = combiner
+            self.catname_to_combiner[catname].submit(other_m)
+
+    def _summary(self):
+        for catname, combiner in self.catname_to_combiner.items():
+            # combiner summary
+            # combiner.measures
+            if combiner.measures is not None:
+                combiner.measures.reconstruct()
+            print('catname = {!r}'.format(catname))
+            print('combiner.measures = {}'.format(ub.repr2(combiner.measures, nl=1)))
+            for qx, measure in enumerate(combiner.queue):
+                measure.reconstruct()
+                print('  * queue[{}] = {}'.format(qx, ub.repr2(measure, nl=1)))
+
+    def combine(self):
+        for combiner in self.catname_to_combiner.values():
+            combiner.combine()
+        self.queue_size = 0
+
+    def finalize(self):
+        catname_to_measures = {}
+        for catname, combiner in self.catname_to_combiner.items():
+            catname_to_measures[catname] = combiner.finalize()
+        perclass = PerClass_Measures(catname_to_measures)
+        # TODO: consolidate in kwcoco
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+            mAUC = np.nanmean([item['trunc_auc'] for item in perclass.values()])
+            mAP = np.nanmean([item['ap'] for item in perclass.values()])
+        compatible_format = {
+            'perclass': perclass,
+            'mAUC': mAUC,
+            'mAP': mAP,
+        }
+        return compatible_format
 
 
 def populate_info(info):
@@ -850,125 +1147,3 @@ def populate_info(info):
         # print('ap = {!r}'.format(ap))
         # ap = np.sum(np.diff(rec) * prec[1:])
         info['ap'] = float(ap)
-
-
-class MeasureCombiner:
-    """
-    Helper to iteravely combine binary measures generated by some process
-
-    Example:
-        >>> from kwcoco.metrics.confusion_measures import *  # NOQA
-        >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
-        >>> rng = kwarray.ensure_rng(0)
-        >>> bin_combiner = MeasureCombiner(growth='max')
-        >>> for _ in range(80):
-        >>>     bin_cfsn_vecs = BinaryConfusionVectors.demo(n=rng.randint(40, 50), rng=rng, p_true=0.2, p_error=0.4, p_miss=0.6)
-        >>>     bin_measures = bin_cfsn_vecs.measures()
-        >>>     bin_combiner.submit(bin_measures)
-        >>> combined = bin_combiner.finalize()
-        >>> print('combined = {!r}'.format(combined))
-
-    """
-    def __init__(self, precision=None, growth=None):
-        self.measures = None
-        self.growth = growth
-        self.precision = precision
-        self.queue = []
-
-    @property
-    def queue_size(self):
-        return len(self.queue)
-
-    def submit(self, other):
-        self.queue.append(other)
-
-    def combine(self):
-        # Reduce measures over the chunk
-        if self.measures is None:
-            to_combine = self.queue
-        else:
-            to_combine = [self.measures] + self.queue
-
-        if len(to_combine) == 0:
-            pass
-        if len(to_combine) == 1:
-            self.measures = to_combine[0]
-        else:
-            self.measures = Measures.combine(
-                to_combine, precision=self.precision, growth=self.growth)
-        self.queue = []
-
-    def finalize(self):
-        if self.queue:
-            self.combine()
-        if self.measures is None:
-            return False
-        else:
-            self.measures.reconstruct()
-            return self.measures
-
-
-class OneVersusRestMeasureCombiner:
-    """
-    Helper to iteravely combine ovr measures generated by some process
-
-    Example:
-        >>> from kwcoco.metrics.confusion_measures import *  # NOQA
-        >>> from kwcoco.metrics.confusion_vectors import OneVsRestConfusionVectors
-        >>> rng = kwarray.ensure_rng(0)
-        >>> ovr_combiner = OneVersusRestMeasureCombiner(growth='max')
-        >>> for _ in range(80):
-        >>>     ovr_cfsn_vecs = OneVsRestConfusionVectors.demo()
-        >>>     ovr_measures = ovr_cfsn_vecs.measures()
-        >>>     ovr_combiner.submit(ovr_measures)
-        >>> combined = ovr_combiner.finalize()
-        >>> print('combined = {!r}'.format(combined))
-    """
-    def __init__(self, precision=None, growth=None):
-        self.catname_to_combiner = {}
-        self.precision = precision
-        self.growth = precision
-        self.queue_size = 0
-
-    def submit(self, other):
-        self.queue_size += 1
-        for catname, other_m in other['perclass'].items():
-            if catname not in self.catname_to_combiner:
-                combiner = MeasureCombiner(
-                    precision=self.precision, growth=self.growth)
-                self.catname_to_combiner[catname] = combiner
-            self.catname_to_combiner[catname].submit(other_m)
-
-    def _summary(self):
-        for catname, combiner in self.catname_to_combiner.items():
-            # combiner summary
-            # combiner.measures
-            if combiner.measures is not None:
-                combiner.measures.reconstruct()
-            print('catname = {!r}'.format(catname))
-            print('combiner.measures = {}'.format(ub.repr2(combiner.measures, nl=1)))
-            for qx, measure in enumerate(combiner.queue):
-                measure.reconstruct()
-                print('  * queue[{}] = {}'.format(qx, ub.repr2(measure, nl=1)))
-
-    def combine(self):
-        for combiner in self.catname_to_combiner.values():
-            combiner.combine()
-        self.queue_size = 0
-
-    def finalize(self):
-        catname_to_measures = {}
-        for catname, combiner in self.catname_to_combiner.items():
-            catname_to_measures[catname] = combiner.finalize()
-        perclass = PerClass_Measures(catname_to_measures)
-        # TODO: consolidate in kwcoco
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='Mean of empty slice')
-            mAUC = np.nanmean([item['trunc_auc'] for item in perclass.values()])
-            mAP = np.nanmean([item['ap'] for item in perclass.values()])
-        compatible_format = {
-            'perclass': perclass,
-            'mAUC': mAUC,
-            'mAP': mAP,
-        }
-        return compatible_format
