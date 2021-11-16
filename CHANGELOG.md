@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * `CocoImage.delay` can now handle the case where `imdata` is given directly in the image dictionary.
 * `Measures.combine` now has a `growth` parameter that works somewhat better
   than the previous `precision` parameter.
+* Add measure combiner helper classes
 
 
 ### Changed
