@@ -1144,7 +1144,7 @@ class Measures(ub.NiceRepr, DictProxy):
             'max_f1': self['max_f1'],
             # 'max_g1': self['max_g1'],
             'nsupport': self['nsupport'],
-            # 'realpos_total': self['realpos_total'],
+            'realpos_total': self['realpos_total'],
             # 'realneg_total': self['realneg_total'],
             'catname': self.get('node', None),
         }

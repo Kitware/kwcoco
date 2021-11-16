@@ -88,20 +88,24 @@ class CategoryTree(ub.NiceRepr):
         >>> # The coerce classmethod is the easiest way to create an instance
         >>> import kwcoco
         >>> kwcoco.CategoryTree.coerce(['a', 'b', 'c'])
-        <CategoryTree(nNodes=3, nodes=['a', 'b', 'c']) ...
+        <CategoryTree...nNodes=3, nodes=...'a', 'b', 'c'...
         >>> kwcoco.CategoryTree.coerce(4)
-        <CategoryTree(nNodes=4, nodes=['class_1', 'class_2', 'class_3', ...
+        <CategoryTree...nNodes=4, nodes=...'class_1', 'class_2', 'class_3', ...
         >>> kwcoco.CategoryTree.coerce(4)
     """
-    def __init__(self, graph=None):
+    def __init__(self, graph=None, checks=True):
         """
         Args:
             graph (nx.DiGraph):
                 either the graph representing a category hierarchy
+
+            checks (bool, default=True):
+                if false, bypass input checks
+
         """
         if graph is None:
             graph = nx.DiGraph()
-        else:
+        elif checks:
             if len(graph) > 0:
                 if not nx.is_directed_acyclic_graph(graph):
                     raise ValueError('The category graph must a DAG')
@@ -284,6 +288,18 @@ class CategoryTree(ub.NiceRepr):
             if kwargs.pop('add_zero', True):
                 graph.add_node(str(0))
             assert not kwargs
+        elif key == 'animals_v1':
+            graph = nx.from_dict_of_lists({
+                'background': [],
+                'foreground': ['animal'],
+                'animal': ['mammal', 'fish', 'insect', 'reptile'],
+                'mammal': ['dog', 'cat', 'human', 'zebra'],
+                'zebra': ['grevys', 'plains'],
+                'grevys': ['fred'],
+                'dog': ['boxer', 'beagle', 'golden'],
+                'cat': ['maine coon', 'persian', 'sphynx'],
+                'reptile': ['bearded dragon', 't-rex'],
+            }, nx.DiGraph)
         else:
             raise KeyError(key)
         self = cls(graph)
@@ -571,6 +587,68 @@ class CategoryTree(ub.NiceRepr):
         # import graphid
         # graphid.util.show_nx(self.graph)
 
+    def forest_str(self):
+        import networkx as nx
+        text = nx.forest_str(self.graph)
+        # print(text)
+        return text
+
+    def normalize(self):
+        """
+        Applies a normalization scheme to the categories.
+
+        Note: this may break other tasks that depend on exact category names.
+
+        Returns:
+            CategoryTree
+
+        Example:
+            >>> from kwcoco.category_tree import *  # NOQA
+            >>> import kwcoco
+            >>> orig = kwcoco.CategoryTree.demo('animals_v1')
+            >>> self = kwcoco.CategoryTree(nx.relabel_nodes(orig.graph, str.upper))
+            >>> norm = self.normalize()
+        """
+        # nx.adjacency_data(self.graph)
+        def normalize_name(name):
+            return name.lower().replace(' ', '')
+
+        new_graph = self.graph.__class__()
+
+        node_mapping = {}
+        new_nodes = []
+        for old_node, old_data in self.graph.nodes(data=True):
+            new_node = normalize_name(old_node)
+            new_data = old_data.copy()
+            if 'id' not in old_data:
+                new_data['id'] = self.node_to_id[old_node]
+            if 'supercategory' in old_data:
+                new_data['supercategory'] = normalize_name(old_data['supercategory'])
+            if 'name' in old_data:
+                new_data['name'] = normalize_name(old_data['name'])
+            new_nodes.append((new_node, new_data))
+            node_mapping[old_node] = new_node
+            new_graph.add_node(new_node, **new_data)
+
+        for old_u, old_v, old_data in self.graph.edges(data=True):
+            new_u = node_mapping[old_u]
+            new_v = node_mapping[old_v]
+            new_data = old_data.copy()
+            new_graph.add_edge(new_u, new_v, **new_data)
+
+        new = self.__class__(new_graph)
+        return new
+
+        # json_data = nx.node_link_data(self.graph)
+        # for path, data in ub.IndexableWalker(json_data):
+        #     pass
+        # nx.cytoscape_data(self.graph)
+        # nx.node_link_graph(self.graph)
+        # to_directed_nested_tuples(self.graph)
+        # for
+        # name.lower().replace(' ', '_')
+        # self.idx_to_node
+
 
 def source_nodes(graph):
     """ generates source nodes --- nodes without incoming edges """
@@ -622,6 +700,8 @@ def tree_depth(graph, root=None):
 
 def to_directed_nested_tuples(graph, with_data=True):
     """
+    Serialize a networkx graph.
+
     Encodes each node and its children in a tuple as:
         (node, children)
     """
@@ -644,6 +724,8 @@ def to_directed_nested_tuples(graph, with_data=True):
 
 def from_directed_nested_tuples(encoding):
     """
+    Unserialize a networkx graph.
+
     Example:
         >>> from kwcoco.category_tree import *
         >>> graph = nx.generators.gnr_graph(20, 0.3, seed=790).reverse()

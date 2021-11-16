@@ -1009,7 +1009,8 @@ class CocoSingleResult(ub.NiceRepr):
         """
         Serialize to json file
         """
-        if isinstance(file, str):
+        import pathlib
+        if isinstance(file, (str, pathlib.Path)):
             with open(file, 'w') as fp:
                 return result.dump(fp, indent=indent)
         else:
