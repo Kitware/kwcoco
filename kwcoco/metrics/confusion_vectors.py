@@ -1078,7 +1078,8 @@ class Measures(ub.NiceRepr, DictProxy):
         return self.get('node', None)
 
     def __nice__(self):
-        return ub.repr2(self.summary(), nl=0, precision=3, strvals=True, align=':')
+        info = self.summary()
+        return ub.repr2(info, nl=0, precision=3, strvals=True, align=':')
 
     def reconstruct(self):
         populate_info(info=self)
@@ -1138,13 +1139,13 @@ class Measures(ub.NiceRepr, DictProxy):
 
     def summary(self):
         return {
-            'ap': self['ap'],
-            'auc': self['auc'],
+            'ap': self.get('ap', None),
+            'auc': self.get('auc', None),
             # 'max_mcc': self['max_mcc'],
-            'max_f1': self['max_f1'],
+            'max_f1': self.get('max_f1', None),
             # 'max_g1': self['max_g1'],
-            'nsupport': self['nsupport'],
-            'realpos_total': self['realpos_total'],
+            'nsupport': self.get('nsupport', None),
+            'realpos_total': self.get('realpos_total', None),
             # 'realneg_total': self['realneg_total'],
             'catname': self.get('node', None),
         }
