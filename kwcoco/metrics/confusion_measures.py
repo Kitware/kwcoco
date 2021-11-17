@@ -336,10 +336,17 @@ class Measures(ub.NiceRepr, DictProxy):
             threshold_pool = orig_finite_thresholds
             # Subdivide threshold pool until we get enough values
             while thresh_bins > len(threshold_pool):
-                even_slice = threshold_pool[:(len(threshold_pool) // 2) * 2]
-                mean_vals = np.r_[[0], even_slice, [1]].reshape(-1, 2).mean(axis=1)
+                # x = [1, 2, 3, 4, 5]
+                # x = [1, 2, 3, 4, 5, 6]
+                # even_slice = threshold_pool[:(len(threshold_pool) // 2) * 2]
+                # odd_slice = threshold_pool[1:(len(threshold_pool) // 2) * 2]
+                x = threshold_pool
+                even_slice = x[:(len(x) // 2) * 2]
+                odd_slice = x[1:len(x) - (len(x) % 2 == 0)]
+                mean_vals = np.r_[[0, threshold_pool[0]], even_slice, odd_slice, [1, threshold_pool[-1]]].reshape(-1, 2).mean(axis=1)
                 threshold_pool = np.hstack([mean_vals, threshold_pool])
                 threshold_pool = np.unique(threshold_pool)
+                print('threshold_pool = {!r}'.format(len(threshold_pool)))
 
             chosen_idxs = np.linspace(0, len(threshold_pool) - 1, thresh_bins).round().astype(int)
             chosen_idxs = np.unique(chosen_idxs)
@@ -689,6 +696,7 @@ class MeasureCombiner:
         self.queue.append(other)
 
     def combine(self):
+        print('MEAUSRE COMBINE self.queue_size = {!r}'.format(self.queue_size))
         # Reduce measures over the chunk
         if self.measures is None:
             to_combine = self.queue
@@ -701,16 +709,20 @@ class MeasureCombiner:
             self.measures = to_combine[0]
         else:
             self.measures = Measures.combine(
-                to_combine, precision=self.precision, growth=self.growth, thresh_bins=self.thresh_bins)
+                to_combine, precision=self.precision, growth=self.growth,
+                thresh_bins=self.thresh_bins)
         self.queue = []
 
     def finalize(self):
+        print('Measure finalize.1')
         if self.queue:
             self.combine()
+        print('Measure finalize.2')
         if self.measures is None:
             return False
         else:
             self.measures.reconstruct()
+            print('Measure finalize.3')
             return self.measures
 
 
@@ -760,6 +772,7 @@ class OneVersusRestMeasureCombiner:
                 print('  * queue[{}] = {}'.format(qx, ub.repr2(measure, nl=1)))
 
     def combine(self):
+        print('CLASS COMBINE self.queue_size = {!r}'.format(self.queue_size))
         for combiner in self.catname_to_combiner.values():
             combiner.combine()
         self.queue_size = 0
