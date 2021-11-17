@@ -2,6 +2,19 @@
 """
 Classes that store accumulated confusion measures (usually derived from
 confusion vectors).
+
+
+For each chosen threshold value:
+    * thresholds[i] - the i-th threshold value
+
+
+The primary data we manipulate are arrays of "confusion" counts, i.e.
+
+    * tp_count[i] - true positives at the i-th threshold
+    * fp_count[i] - false positives at the i-th threshold
+    * fn_count[i] - false negatives at the i-th threshold
+    * tn_count[i] - true negatives at the i-th threshold
+
 """
 import kwarray
 import numpy as np
@@ -346,7 +359,6 @@ class Measures(ub.NiceRepr, DictProxy):
                 mean_vals = np.r_[[0, threshold_pool[0]], even_slice, odd_slice, [1, threshold_pool[-1]]].reshape(-1, 2).mean(axis=1)
                 threshold_pool = np.hstack([mean_vals, threshold_pool])
                 threshold_pool = np.unique(threshold_pool)
-                print('threshold_pool = {!r}'.format(len(threshold_pool)))
 
             chosen_idxs = np.linspace(0, len(threshold_pool) - 1, thresh_bins).round().astype(int)
             chosen_idxs = np.unique(chosen_idxs)
@@ -696,7 +708,6 @@ class MeasureCombiner:
         self.queue.append(other)
 
     def combine(self):
-        print('MEAUSRE COMBINE self.queue_size = {!r}'.format(self.queue_size))
         # Reduce measures over the chunk
         if self.measures is None:
             to_combine = self.queue
@@ -714,15 +725,12 @@ class MeasureCombiner:
         self.queue = []
 
     def finalize(self):
-        print('Measure finalize.1')
         if self.queue:
             self.combine()
-        print('Measure finalize.2')
         if self.measures is None:
             return False
         else:
             self.measures.reconstruct()
-            print('Measure finalize.3')
             return self.measures
 
 
@@ -765,8 +773,6 @@ class OneVersusRestMeasureCombiner:
             # combiner.measures
             if combiner.measures is not None:
                 combiner.measures.reconstruct()
-            print('catname = {!r}'.format(catname))
-            print('combiner.measures = {}'.format(ub.repr2(combiner.measures, nl=1)))
             for qx, measure in enumerate(combiner.queue):
                 measure.reconstruct()
                 print('  * queue[{}] = {}'.format(qx, ub.repr2(measure, nl=1)))
