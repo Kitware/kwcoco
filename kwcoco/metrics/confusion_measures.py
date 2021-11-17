@@ -778,7 +778,6 @@ class OneVersusRestMeasureCombiner:
                 print('  * queue[{}] = {}'.format(qx, ub.repr2(measure, nl=1)))
 
     def combine(self):
-        print('CLASS COMBINE self.queue_size = {!r}'.format(self.queue_size))
         for combiner in self.catname_to_combiner.values():
             combiner.combine()
         self.queue_size = 0
