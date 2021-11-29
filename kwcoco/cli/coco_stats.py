@@ -113,34 +113,21 @@ class CocoStatsCLI:
         if config['video_attrs']:
             print('Video Attrs')
             for dset in datasets:
-                print('dset.tag = {!r}'.format(dset.tag))
-                attrs = ub.ddict(lambda: 0)
-                for ann in dset.imgs.values():
-                    for key, value in ann.items():
-                        if value:
-                            attrs[key] += 1
+                attrs = dset.videos().attribute_frequency()
                 print('video_attrs = {}'.format(ub.repr2(attrs, nl=1)))
 
         if config['image_attrs']:
             print('Image Attrs')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
-                attrs = ub.ddict(lambda: 0)
-                for ann in dset.imgs.values():
-                    for key, value in ann.items():
-                        if value:
-                            attrs[key] += 1
+                attrs = dset.images().attribute_frequency()
                 print('image_attrs = {}'.format(ub.repr2(attrs, nl=1)))
 
         if config['annot_attrs']:
             print('Annot Attrs')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
-                attrs = ub.ddict(lambda: 0)
-                for ann in dset.anns.values():
-                    for key, value in ann.items():
-                        if value:
-                            attrs[key] += 1
+                attrs = dset.annots().attribute_frequency()
                 print('annot_attrs = {}'.format(ub.repr2(attrs, nl=1)))
 
         if config['boxes']:

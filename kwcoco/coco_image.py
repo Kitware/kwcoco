@@ -1,5 +1,6 @@
 import ubelt as ub
 import numpy as np
+from os.path import join
 
 
 class CocoImage(ub.NiceRepr):
@@ -117,7 +118,13 @@ class CocoImage(ub.NiceRepr):
         height = self.img.get('height', None)
         return width, height
 
-    def primary_asset(self, requires=[]):
+    def primary_image_filepath(self, requires=None):
+        dpath = self.dset.bundle_dpath
+        fname = self.primary_asset()['file_name']
+        fpath = join(dpath, fname)
+        return fpath
+
+    def primary_asset(self, requires=None):
         """
         Compute a "main" image asset.
 
@@ -130,6 +137,8 @@ class CocoImage(ub.NiceRepr):
             - [ ] Add in primary heuristics
         """
         import kwimage
+        if requires is None:
+            requires = []
         img = self.img
         has_base_image = img.get('file_name', None) is not None
         candidates = []
@@ -164,6 +173,17 @@ class CocoImage(ub.NiceRepr):
         )
         obj = candidates[idx]['obj']
         return obj
+
+
+    def iter_image_filepaths(self):
+        """
+        """
+        assert self.dset is not None
+        dpath = self.dset.bundle_dpath
+        for obj in self.iter_asset_objs():
+            fname = obj.get('file_name')
+            fpath = join(dpath, fname)
+            yield fpath
 
     def iter_asset_objs(self):
         """

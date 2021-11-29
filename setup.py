@@ -199,6 +199,11 @@ if __name__ == '__main__':
             'all': parse_requirements('requirements.txt'),
             'tests': parse_requirements('requirements/tests.txt'),
             'optional': parse_requirements('requirements/optional.txt', with_version=True),
+            # Really annoying that this is the best we can do
+            # The user *must* choose either headless or graphics
+            # to get a complete working install.
+            'headless': parse_requirements('requirements/headless.txt'),
+            'graphics': parse_requirements('requirements/graphics.txt'),
         },
         license='Apache 2',
         entry_points={
