@@ -220,8 +220,6 @@ stages:
         - openssl version
         - $GPG_EXECUTABLE --list-keys
         - $GPG_EXECUTABLE --list-keys
-        # Decrypt and import GPG Keys / trust
-        - source dev/secrets_configuration.sh
         # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on master and release branch
         - source dev/secrets_configuration.sh
         - CI_SECRET=${!VARNAME_CI_SECRET}
@@ -250,6 +248,7 @@ stages:
                 git config user.name "Gitlab-CI"
             fi
             TAG_NAME="v${VERSION}"
+            echo "TAG_NAME = $TAG_NAME"
             if [ $(git tag -l "$TAG_NAME") ]; then
                 echo "Tag already exists"
             else
@@ -257,8 +256,7 @@ stages:
                 # git push origin :refs/tags/$TAG_NAME
                 # and then tag with -f
                 git tag $TAG_NAME -m "tarball tag $VERSION"
-                git tag $VERSION -m "tarball tag $VERSION"
-                git push --tags "https://${PUSH_TOKEN}@${URL_HOST}"
+                git push --tags "https://git-push-token:${PUSH_TOKEN}@${URL_HOST}"
             fi
 
           
