@@ -14,6 +14,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * `Measures.combine` now has a `growth` and `force_bins` parameter that works somewhat better
   than the previous `precision` parameter.
 * Add measure combiner helper classes
+* Support for detaching `CocoImage` from the `dset` object (for multiprocessing)
 
 
 ### Changed

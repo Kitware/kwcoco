@@ -1,9 +1,8 @@
 """
 Vectorized ORM-like objects used in conjunction with coco_dataset
 """
-import numpy as np
-import ubelt as ub
 from os.path import join
+import numpy as np
 import ubelt as ub
 
 
@@ -53,6 +52,9 @@ class ObjectList1D(ub.NiceRepr):
     @property
     def _id_to_obj(self):
         return self._dset.index._id_lookup[self._key]
+
+    def __getitem__(self, index):
+        return self._ids[index]
 
     @property
     def objs(self):
@@ -399,9 +401,6 @@ class Images(ObjectList1D):
 
     def __init__(self, ids, dset):
         super().__init__(ids, dset, 'images')
-
-    def __getitem__(self, index):
-        pass
 
     @property
     def coco_images(self):

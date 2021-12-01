@@ -33,11 +33,42 @@ class CocoImage(ub.NiceRepr):
     def __init__(self, img, dset=None):
         self.img = img
         self.dset = dset
+        self._bundle_dpath = None
+        self._video = None
 
     @classmethod
     def from_gid(cls, dset, gid):
         img = dset.index.imgs[gid]
         self = cls(img, dset=dset)
+        return self
+
+    @property
+    def bundle_dpath(self):
+        if self.dset is not None:
+            return self.dset.bundle_dpath
+        else:
+            return self._bundle_dpath
+
+    @property
+    def video(self):
+        """
+        Helper to grab the video for this image if it exists
+        """
+        if self._video is None:
+            vidid = self.img['video_id']
+            video = self.dset.index.videos[vidid]
+        else:
+            video = self._video
+        return video
+
+    def detach(self):
+        """
+        Removes references to the underlying coco dataset, but keeps special
+        information such that it wont be needed.
+        """
+        self._bundle_dpath = self.bundle_dpath
+        self._video = self.video
+        self.dset = None
         return self
 
     def __nice__(self):
@@ -119,7 +150,7 @@ class CocoImage(ub.NiceRepr):
         return width, height
 
     def primary_image_filepath(self, requires=None):
-        dpath = self.dset.bundle_dpath
+        dpath = self.bundle_dpath
         fname = self.primary_asset()['file_name']
         fpath = join(dpath, fname)
         return fpath
@@ -174,12 +205,10 @@ class CocoImage(ub.NiceRepr):
         obj = candidates[idx]['obj']
         return obj
 
-
     def iter_image_filepaths(self):
         """
         """
-        assert self.dset is not None
-        dpath = self.dset.bundle_dpath
+        dpath = self.bundle_dpath
         for obj in self.iter_asset_objs():
             fname = obj.get('file_name')
             fpath = join(dpath, fname)
@@ -258,7 +287,7 @@ class CocoImage(ub.NiceRepr):
             >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
             >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
         """
-        from os.path import isabs, join
+        from os.path import isabs, join  # NOQA
         import kwimage
         from kwcoco.channel_spec import FusedChannelSpec
 
@@ -297,17 +326,17 @@ class CocoImage(ub.NiceRepr):
                 if __debug__ and file_name is None:
                     raise ValueError(
                         'file_name must be given if imwrite is True')
-                if self.dset is None:
-                    fpath = file_name
-                    if not isabs(fpath):
-                        raise ValueError(ub.paragraph(
-                            '''
-                            Got relative file_name, but no dataset is attached
-                            to this coco image. Attatch a dataset or use an
-                            absolute path.
-                            '''))
-                else:
-                    fpath = join(self.dset.bundle_dpath, file_name)
+                # if self.dset is None:
+                #     fpath = file_name
+                #     if not isabs(fpath):
+                #         raise ValueError(ub.paragraph(
+                #             '''
+                #             Got relative file_name, but no dataset is attached
+                #             to this coco image. Attatch a dataset or use an
+                #             absolute path.
+                #             '''))
+                # else:
+                fpath = join(self.bundle_dpath, file_name)
                 kwimage.imwrite(fpath, imdata)
             else:
                 aux['imdata'] = imdata
@@ -427,7 +456,7 @@ class CocoImage(ub.NiceRepr):
         from kwimage.transform import Affine
         from kwcoco.channel_spec import FusedChannelSpec
         if bundle_dpath is None:
-            bundle_dpath = self.dset.bundle_dpath
+            bundle_dpath = self.bundle_dpath
 
         img = self.img
         requested = channels
@@ -458,8 +487,7 @@ class CocoImage(ub.NiceRepr):
                     chan_list.append(chan)
 
         if space == 'video':
-            vidid = img['video_id']
-            video = self.dset.index.videos[vidid]
+            video = self.video
             width = video.get('width', img.get('width', None))
             height = video.get('height', img.get('height', None))
         else:
