@@ -391,20 +391,28 @@ class DelayedImageOperation(DelayedVisionOperation):
 
 class DelayedIdentity(DelayedImageOperation):
     """
-    Noop leaf that does nothing. Mostly used in tests atm.
+    Noop leaf that does nothing. Can be used to hold raw data.
 
     Typically used to just hold raw data.
 
     DelayedIdentity.demo('astro', chan=0, dsize=(32, 32))
+
+    Example:
+        >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+        >>> sub_data = np.random.rand(31, 37, 3)
+        >>> self = DelayedIdentity(sub_data)
+        >>> self = DelayedIdentity(sub_data, channels='L|a|b')
     """
     __hack_dont_optimize__ = True
 
-    def __init__(self, sub_data):
+    def __init__(self, sub_data, dsize=None, channels=None):
         self.sub_data = sub_data
         self.meta = {}
         self.cache = {}
         h, w = self.sub_data.shape[0:2]
-        self.dsize = (w, h)
+        if dsize is None:
+            dsize = (w, h)
+        self.dsize = dsize
         if len(self.sub_data.shape) == 2:
             num_bands = 1
         elif len(self.sub_data.shape) == 3:
@@ -417,6 +425,11 @@ class DelayedIdentity(DelayedImageOperation):
         self.shape = (h, w, self.num_bands)
         self.meta['dsize'] = self.dsize
         self.meta['shape'] = self.shape
+        if channels is None:
+            # self.channels = channel_spec.FusedChannelSpec.coerce(num_bands)
+            self.channels = None
+        else:
+            self.channels = channel_spec.FusedChannelSpec.coerce(channels)
 
     @classmethod
     def demo(cls, key='astro', chan=None, dsize=None):
@@ -451,6 +464,38 @@ class DelayedIdentity(DelayedImageOperation):
         final = self.sub_data
         final = kwarray.atleast_nd(final, 3, front=False)
         return final
+
+    def take_channels(self, channels):
+        if not isinstance(self.sub_data, np.ndarray):
+            return super().take_channels(channels)
+
+        # Perform operation immediately
+        if isinstance(channels, list):
+            top_idx_mapping = channels
+        else:
+            channels = channel_spec.FusedChannelSpec.coerce(channels)
+            # Computer subindex integer mapping
+            request_codes = channels.as_list()
+            top_codes = self.channels.as_oset()
+            top_idx_mapping = [
+                top_codes.index(code)
+                for code in request_codes
+            ]
+
+        new_chan_ixs = top_idx_mapping
+        channels = self.channels
+        if channels is not None:
+            new_chan_parsed = list(ub.take(channels.parsed, top_idx_mapping))
+            channels = channel_spec.FusedChannelSpec(new_chan_parsed)
+
+        new_data = self.sub_data[..., new_chan_ixs]
+
+        new = self.__class__(
+            sub_data=new_data,
+            dsize=self.dsize,
+            channels=channels,
+        )
+        return new
 
 
 class DelayedNans(DelayedImageOperation):

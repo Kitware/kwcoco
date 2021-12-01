@@ -1,9 +1,9 @@
 """
 Vectorized ORM-like objects used in conjunction with coco_dataset
 """
+from os.path import join
 import numpy as np
 import ubelt as ub
-from os.path import join
 
 
 class ObjectList1D(ub.NiceRepr):
@@ -52,6 +52,9 @@ class ObjectList1D(ub.NiceRepr):
     @property
     def _id_to_obj(self):
         return self._dset.index._id_lookup[self._key]
+
+    def __getitem__(self, index):
+        return self._ids[index]
 
     @property
     def objs(self):
@@ -272,6 +275,26 @@ class ObjectList1D(ub.NiceRepr):
         """
         return self.lookup(key, default=default)
 
+    def attribute_frequency(self):
+        """
+        Compute the number of times each key is used in a dictionary
+
+        Returns:
+            Dict[str, int]
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo()
+            >>> self = dset.annots()
+            >>> attrs = self.attribute_frequency()
+            >>> print('attrs = {}'.format(ub.repr2(attrs, nl=1)))
+        """
+        attrs = ub.ddict(lambda: 0)
+        for obj in self._id_to_obj.values():
+            for key, value in obj.items():
+                attrs[key] += 1
+        return attrs
+
 
 class ObjectGroups(ub.NiceRepr):
     """
@@ -379,8 +402,9 @@ class Images(ObjectList1D):
     def __init__(self, ids, dset):
         super().__init__(ids, dset, 'images')
 
-    def __getitem__(self, index):
-        pass
+    @property
+    def coco_images(self):
+        return [self._dset.coco_image(gid) for gid in self]
 
     @property
     def gids(self):

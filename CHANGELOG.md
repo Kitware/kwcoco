@@ -5,7 +5,23 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.17 - Unreleased
+## Version 0.2.18 - Unreleased
+
+
+### Added
+* Added `add_auxiliary_item` to `CocoImage`
+* `CocoImage.delay` can now handle the case where `imdata` is given directly in the image dictionary.
+* `Measures.combine` now has a `growth` and `force_bins` parameter that works somewhat better
+  than the previous `precision` parameter.
+* Add measure combiner helper classes
+* Support for detaching `CocoImage` from the `dset` object (for multiprocessing)
+
+
+### Changed
+* Split part of `confusion_vectors.py` into new file `confusion_measures.py`
+
+
+## Version 0.2.17 - Released 2021-11-10
 
 ### Added
 * Added "channels" argument to kwcoco subset

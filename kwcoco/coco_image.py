@@ -1,4 +1,6 @@
 import ubelt as ub
+import numpy as np
+from os.path import join
 
 
 class CocoImage(ub.NiceRepr):
@@ -31,11 +33,42 @@ class CocoImage(ub.NiceRepr):
     def __init__(self, img, dset=None):
         self.img = img
         self.dset = dset
+        self._bundle_dpath = None
+        self._video = None
 
     @classmethod
     def from_gid(cls, dset, gid):
         img = dset.index.imgs[gid]
         self = cls(img, dset=dset)
+        return self
+
+    @property
+    def bundle_dpath(self):
+        if self.dset is not None:
+            return self.dset.bundle_dpath
+        else:
+            return self._bundle_dpath
+
+    @property
+    def video(self):
+        """
+        Helper to grab the video for this image if it exists
+        """
+        if self._video is None:
+            vidid = self.img['video_id']
+            video = self.dset.index.videos[vidid]
+        else:
+            video = self._video
+        return video
+
+    def detach(self):
+        """
+        Removes references to the underlying coco dataset, but keeps special
+        information such that it wont be needed.
+        """
+        self._bundle_dpath = self.bundle_dpath
+        self._video = self.video
+        self.dset = None
         return self
 
     def __nice__(self):
@@ -99,7 +132,8 @@ class CocoImage(ub.NiceRepr):
         img_parts = []
         for obj in self.iter_asset_objs():
             obj_parts = obj.get('channels', None)
-            obj_chan = FusedChannelSpec.coerce(obj_parts).normalize()
+            # obj_chan = FusedChannelSpec.coerce(obj_parts).normalize()
+            obj_chan = FusedChannelSpec.coerce(obj_parts)
             img_parts.append(obj_chan.spec)
         spec = ChannelSpec(','.join(img_parts))
         return spec
@@ -115,7 +149,13 @@ class CocoImage(ub.NiceRepr):
         height = self.img.get('height', None)
         return width, height
 
-    def primary_asset(self, requires=[]):
+    def primary_image_filepath(self, requires=None):
+        dpath = self.bundle_dpath
+        fname = self.primary_asset()['file_name']
+        fpath = join(dpath, fname)
+        return fpath
+
+    def primary_asset(self, requires=None):
         """
         Compute a "main" image asset.
 
@@ -128,7 +168,8 @@ class CocoImage(ub.NiceRepr):
             - [ ] Add in primary heuristics
         """
         import kwimage
-        import numpy as np
+        if requires is None:
+            requires = []
         img = self.img
         has_base_image = img.get('file_name', None) is not None
         candidates = []
@@ -164,9 +205,21 @@ class CocoImage(ub.NiceRepr):
         obj = candidates[idx]['obj']
         return obj
 
+    def iter_image_filepaths(self):
+        """
+        """
+        dpath = self.bundle_dpath
+        for obj in self.iter_asset_objs():
+            fname = obj.get('file_name')
+            fpath = join(dpath, fname)
+            yield fpath
+
     def iter_asset_objs(self):
         """
         Iterate through base + auxiliary dicts that have file paths
+
+        Yields:
+            dict: an image or auxiliary dictionary
         """
         img = self.img
         has_base_image = img.get('file_name', None) is not None
@@ -178,9 +231,135 @@ class CocoImage(ub.NiceRepr):
         for obj in img.get('auxiliary', []):
             yield obj
 
+    def add_auxiliary_item(self, file_name=None, channels=None,
+                           imdata=None, warp_aux_to_img=None, width=None,
+                           height=None, imwrite=False):
+        """
+        Adds an auxiliary item to the image dictionary.
+
+        This operation can be done purely in-memory (the default), or the image
+        data can be written to a file on disk (via the imwrite=True flag).
+
+        Args:
+            file_name (str | None):
+                The name of the file relative to the bundle directory. If
+                unspecified, imdata must be given.
+
+            channels (str | kwcoco.FusedChannelSpec):
+                The channel code indicating what each of the bands represents.
+                These channels should be disjoint wrt to the existing data in
+                this image (this is not checked).
+
+            imdata (ndarray | None):
+                The underlying image data this auxiliary item represents.  If
+                unspecified, it is assumed file_name points to a path on disk
+                that will eventually exist. If imdata, file_name, and the
+                special imwrite=True flag are specified, this function will
+                write the data to disk.
+
+            warp_aux_to_img (kwimage.Affine):
+                The transformation from this auxiliary space to image space.
+                If unspecified, assumes this item is related to image space by
+                only a scale factor.
+
+            width (int):
+                Width of the data in auxiliary space (inferred if unspecified)
+
+            height (int):
+                Height of the data in auxiliary space (inferred if unspecified)
+
+            imwrite (bool):
+                If specified, both imdata and file_name must be specified, and
+                this will write the data to disk. Note: it it recommended that
+                you simply call imwrite yourself before or after calling this
+                function. This lets you better control imwrite parameters.
+
+        TODO:
+            - [ ] Allow imwrite to specify an executor that is used to
+            return a Future so the imwrite call does not block.
+
+        Example:
+            >>> from kwcoco.coco_image import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> coco_img = dset.coco_image(1)
+            >>> imdata = np.random.rand(32, 32, 5)
+            >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
+            >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
+        """
+        from os.path import isabs, join  # NOQA
+        import kwimage
+        from kwcoco.channel_spec import FusedChannelSpec
+
+        img = self.img
+
+        if imdata is None and file_name is None:
+            raise ValueError('must specify file_name or imdata')
+
+        if width is None and imdata is not None:
+            width = imdata.shape[1]
+
+        if height is None and imdata is not None:
+            height = imdata.shape[0]
+
+        if warp_aux_to_img is None:
+            if width is None or height is None:
+                raise ValueError('unable to infer aux_to_img without width')
+            # Assume we can just scale up the auxiliary data to match the image
+            # space unless the user says otherwise
+            warp_aux_to_img = kwimage.Affine.scale((
+                img['width'] / width, img['height'] / height))
+
+        if channels is not None:
+            channels = FusedChannelSpec.coerce(channels).spec
+
+        # Make the aux info dict
+        aux = {
+            'file_name': file_name,
+            'height': height,
+            'width': width,
+            'channels': channels,
+            'warp_aux_to_img': warp_aux_to_img.concise(),
+        }
+        if imdata is not None:
+            if imwrite:
+                if __debug__ and file_name is None:
+                    raise ValueError(
+                        'file_name must be given if imwrite is True')
+                # if self.dset is None:
+                #     fpath = file_name
+                #     if not isabs(fpath):
+                #         raise ValueError(ub.paragraph(
+                #             '''
+                #             Got relative file_name, but no dataset is attached
+                #             to this coco image. Attatch a dataset or use an
+                #             absolute path.
+                #             '''))
+                # else:
+                fpath = join(self.bundle_dpath, file_name)
+                kwimage.imwrite(fpath, imdata)
+            else:
+                aux['imdata'] = imdata
+
+        auxiliary = img.get('auxiliary', None)
+        if auxiliary is None:
+            auxiliary = img['auxiliary'] = []
+        auxiliary.append(aux)
+        if self.dset is not None:
+            self.dset._invalidate_hashid()
+
     def delay(self, channels=None, space='image', bundle_dpath=None):
         """
-        Experimental method
+        Perform a delayed load on the data in this image.
+
+        The delayed load can load a subset of channels, and perform lazy
+        warping operations. If the underlying data is in a tiled format this
+        can reduce the amount of disk IO needed to read the data if only a
+        small crop or lower resolution view of the data is needed.
+
+        Note:
+            This method is experimental and relies on the delayed load
+            proof-of-concept.
 
         Args:
             gid (int): image id to load
@@ -200,7 +379,7 @@ class CocoImage(ub.NiceRepr):
             - [X] The order of the channels in the delayed load should
                 match the requested channel order.
 
-            - [ ] TODO: add nans to bands that don't exist or throw an error
+            - [X] TODO: add nans to bands that don't exist or throw an error
 
             - [ ] This function could stand to have a better name. Maybe imread
                   with a delayed=True flag? Or maybe just delayed_load?
@@ -257,50 +436,58 @@ class CocoImage(ub.NiceRepr):
             >>> delayed = coco_img.delay()
             >>> final = delayed.finalize()
             >>> assert final.shape == (512, 512, 3)
+
+        Example:
+            >>> # Test that delay works when imdata is stored in the image
+            >>> # dictionary itself.
+            >>> from kwcoco.coco_image import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> coco_img = dset.coco_image(1)
+            >>> imdata = np.random.rand(6, 6, 5)
+            >>> imdata[:] = np.arange(5)[None, None, :]
+            >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
+            >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
+            >>> delayed = coco_img.delay(channels='B1|Aux:2:4')
+            >>> final = delayed.finalize()
         """
         from kwcoco.util.util_delayed_poc import DelayedChannelConcat
         from kwcoco.util.util_delayed_poc import DelayedNans
         from kwimage.transform import Affine
         from kwcoco.channel_spec import FusedChannelSpec
         if bundle_dpath is None:
-            bundle_dpath = self.dset.bundle_dpath
+            bundle_dpath = self.bundle_dpath
 
         img = self.img
         requested = channels
         if requested is not None:
             requested = FusedChannelSpec.coerce(requested).normalize()
 
-        chan_list = []
         # Get info about the primary image and check if its channels are
         # requested (if it even has any)
-        info = img_info = _delay_load_imglike(bundle_dpath, img)
-        if info.get('chan_construct', None) is not None:
-            include_flag = requested is None
-            if not include_flag:
-                if requested.intersection(info['channels']):
-                    include_flag = True
-            if include_flag:
-                chncls, chnkw = info['chan_construct']
-                chan = chncls(**chnkw)
-                chan_list.append(chan)
-
+        img_info = _delay_load_imglike(bundle_dpath, img)
+        obj_info_list = [(img_info, img)]
         for aux in img.get('auxiliary', []):
             info = _delay_load_imglike(bundle_dpath, aux)
-            include_flag = requested is None
-            if not include_flag:
-                if requested.intersection(info['channels']):
-                    include_flag = True
-            if include_flag:
-                aux_to_img = Affine.coerce(aux.get('warp_aux_to_img', None))
-                chncls, chnkw = info['chan_construct']
-                chan = chncls(**chnkw)
-                chan = chan.delayed_warp(
-                    aux_to_img, dsize=img_info['dsize'])
-                chan_list.append(chan)
+            obj_info_list.append((info, aux))
+
+        chan_list = []
+        for info, obj in obj_info_list:
+            if info.get('chan_construct', None) is not None:
+                include_flag = requested is None
+                if not include_flag:
+                    if requested.intersection(info['channels']):
+                        include_flag = True
+                if include_flag:
+                    aux_to_img = Affine.coerce(obj.get('warp_aux_to_img', None))
+                    chncls, chnkw = info['chan_construct']
+                    chan = chncls(**chnkw)
+                    chan = chan.delayed_warp(
+                        aux_to_img, dsize=img_info['dsize'])
+                    chan_list.append(chan)
 
         if space == 'video':
-            vidid = img['video_id']
-            video = self.dset.index.videos[vidid]
+            video = self.video
             width = video.get('width', img.get('width', None))
             height = video.get('height', img.get('height', None))
         else:
@@ -338,11 +525,12 @@ class CocoImage(ub.NiceRepr):
 
 
 def _delay_load_imglike(bundle_dpath, obj):
-    from kwcoco.util.util_delayed_poc import DelayedLoad
+    from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedIdentity
     from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
     info = {}
     fname = obj.get('file_name', None)
+    imdata = obj.get('imdata', None)
     channels_ = obj.get('channels', None)
     if channels_ is not None:
         channels_ = FusedChannelSpec.coerce(channels_)
@@ -354,7 +542,10 @@ def _delay_load_imglike(bundle_dpath, obj):
         info['dsize'] = dsize = (width, height)
     else:
         info['dsize'] = dsize = (None, None)
-    if fname is not None:
+    if imdata is not None:
+        info['chan_construct'] = (DelayedIdentity, dict(
+            sub_data=imdata, channels=channels_, dsize=dsize))
+    elif fname is not None:
         info['fpath'] = fpath = join(bundle_dpath, fname)
         # Delaying this gives us a small speed boost
         info['chan_construct'] = (DelayedLoad, dict(

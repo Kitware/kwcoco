@@ -24,6 +24,7 @@ def perterb_coco(coco_dset, **kwargs):
         >>>     'box_noise': 0.5,
         >>>     'n_fp': 3,
         >>>     'with_probs': 1,
+        >>>     'with_heatmaps': 1,
         >>> }
         >>> pred_dset = perterb_coco(true_dset, **kwargs)
         >>> pred_dset._check_json_serializable()
@@ -55,6 +56,7 @@ def perterb_coco(coco_dset, **kwargs):
 
     null_pred = kwargs.get('null_pred', False)
     with_probs = kwargs.get('with_probs', False)
+    with_heatmaps = kwargs.get('with_heatmaps', False)
 
     # specify an amount of overlap between true and false scores
     score_noise = kwargs.get('score_noise', 0.2)
@@ -206,6 +208,51 @@ def perterb_coco(coco_dset, **kwargs):
 
         for aid, prob in zip(annots.aids, pred_probs):
             new_dset.anns[aid]['prob'] = prob.tolist()
+
+    # Hack in the per-class heatmaps
+    if with_heatmaps:
+        for gid in new_dset.images():
+            annots = new_dset.annots(gid=gid)
+            img = new_dset.index.imgs[gid]
+            w = img['width']
+            h = img['height']
+            c = len(classes)
+            # Build up basic prob masks
+            heatmaps = np.zeros((c, h, w), dtype=np.float32)
+            for ann in annots.objs:
+                poly = kwimage.Segmentation.coerce(ann['segmentation']).to_multi_polygon()
+                cid = ann['category_id']
+                cidx = classes.id_to_idx[cid]
+                probs = heatmaps[cidx]
+                poly.fill(probs, 1)
+
+            chan_datas = []
+            # Add lots of noise to the data
+            dims = (h, w)
+            for cidx in range(len(classes)):
+                chan_data = heatmaps[cidx]
+                chan_data += (rng.randn(*dims) * 0.1)
+                chan_data + chan_data.clip(0, 1)
+                chan_data = kwimage.gaussian_blur(chan_data, sigma=1.2)
+                chan_data = chan_data.clip(0, 1)
+                mask = rng.randn(*dims)
+                chan_data = chan_data * ((kwimage.fourier_mask(chan_data, mask)[..., 0]) + .5)
+                chan_data += (rng.randn(*dims) * 0.1)
+                chan_data = chan_data.clip(0, 1)
+                chan_datas.append(chan_data)
+            hwc_probs = np.stack(chan_datas, axis=2)
+
+            coco_img = new_dset.coco_image(gid)
+            chanspec = '|'.join(list(classes))
+            # heatmap_fpath = dummy_heatmap_dpath / 'dummy_heatmap_{}.tif'.format(img['id'])
+            # kwimage.imwrite(heatmap_fpath, hwc_probs, backend='gdal', compress='NONE',
+            #                 blocksize=96)
+            coco_img.add_auxiliary_item(
+                # file_name=str(heatmap_fpath),
+                imdata=hwc_probs,
+                channels=chanspec,
+            )
+
     return new_dset
 
 

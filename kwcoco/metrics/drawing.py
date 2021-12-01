@@ -422,7 +422,9 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
         precision, recall = [0], [0]
 
     label_suffix = _realpos_label_suffix(info)
-    label = 'ap={:0.2f}: ({})'.format(ap, label_suffix)
+    label = 'ap={:0.2f}: ({}) {}'.format(ap, label_suffix, prefix)
+
+    color = kw.pop('color', 'distinct')
 
     ax = kwplot.multi_plot(
         xdata=recall, ydata=precision, fnum=fnum, label=label,
@@ -430,7 +432,7 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
         xlabel='recall', ylabel='precision',
         title=prefix + 'classless AP={:.4f}'.format(ap),
         legend_loc='lower right',
-        color='distinct', linestyle='cycle', marker='cycle', **kw
+        color=color, linestyle='cycle', marker='cycle', **kw
     )
 
     # if 0:

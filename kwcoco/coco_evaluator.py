@@ -65,6 +65,7 @@ Example:
 import glob
 import json
 import kwarray
+import os
 import kwimage
 import numpy as np
 import scriptconfig as scfg
@@ -892,7 +893,7 @@ class CocoResults(ub.NiceRepr, DictProxy):
     def dump_figures(results, out_dpath, expt_title=None, figsize='auto',
                      tight=True):
         for key, result in results.items():
-            dpath = ub.ensuredir((out_dpath, key))
+            dpath = ub.ensuredir((os.fspath(out_dpath), key))
             if expt_title is None:
                 title = str(key)
             else:
@@ -922,7 +923,8 @@ class CocoResults(ub.NiceRepr, DictProxy):
         """
         Serialize to json file
         """
-        if isinstance(file, str):
+        import pathlib
+        if isinstance(file, (str, pathlib.Path)):
             with open(file, 'w') as fp:
                 return result.dump(fp, indent=indent)
         else:
@@ -1009,7 +1011,8 @@ class CocoSingleResult(ub.NiceRepr):
         """
         Serialize to json file
         """
-        if isinstance(file, str):
+        import pathlib
+        if isinstance(file, (str, pathlib.Path)):
             with open(file, 'w') as fp:
                 return result.dump(fp, indent=indent)
         else:
@@ -1021,7 +1024,7 @@ class CocoSingleResult(ub.NiceRepr):
                      tight=True, verbose=1):
         if expt_title is None:
             expt_title = result.meta.get('expt_title', '')
-        metrics_dpath = ub.ensuredir(out_dpath)
+        metrics_dpath = ub.ensuredir(os.fspath(out_dpath))
 
         nocls_measures = result.nocls_measures
         ovr_measures = result.ovr_measures

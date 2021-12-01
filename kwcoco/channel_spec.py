@@ -203,6 +203,10 @@ class FusedChannelSpec(BaseChannelSpec):
     _size_lut = {k: len(v) for k, v in _alias_lut.items()}
 
     def __init__(self, parsed, _is_normalized=False):
+        if __debug__ and not isinstance(parsed, list):
+            raise TypeError(
+                'FusedChannelSpec is only directly constructable via a list. '
+                'Use coerce for a general constructor')
         self.parsed = parsed
         # denote if we are already normalized or not for speed.
         self._is_normalized = _is_normalized

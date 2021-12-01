@@ -2204,6 +2204,7 @@ class MixinCocoStats(object):
                 legacy (default=False): if true tries to convert data
                     structures to items compatible with the original
                     pycocotools spec
+                workers (int): number of parallel jobs for IO tasks
 
         Example:
             >>> import kwcoco
