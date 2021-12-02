@@ -266,7 +266,7 @@ __version__ = '0.2.18'
 __submodules__ = ['coco_dataset', 'abstract_coco_dataset']
 
 from kwcoco import coco_dataset
-from kwcoco import channel_spec
+from kwcoco import channel_spec  # NOQA
 
 from kwcoco.abstract_coco_dataset import (AbstractCocoDataset,)
 from kwcoco.category_tree import (CategoryTree,)
