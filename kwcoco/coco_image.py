@@ -49,6 +49,10 @@ class CocoImage(ub.NiceRepr):
         else:
             return self._bundle_dpath
 
+    @bundle_dpath.setter
+    def bundle_dpath(self, value):
+        self._bundle_dpath = value
+
     @property
     def video(self):
         """
@@ -60,6 +64,10 @@ class CocoImage(ub.NiceRepr):
         else:
             video = self._video
         return video
+
+    @video.setter
+    def video(self, value):
+        self._video = value
 
     def detach(self):
         """
