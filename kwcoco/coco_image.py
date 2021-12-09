@@ -58,9 +58,12 @@ class CocoImage(ub.NiceRepr):
         """
         Helper to grab the video for this image if it exists
         """
-        if self._video is None:
-            vidid = self.img['video_id']
-            video = self.dset.index.videos[vidid]
+        if self._video is None and self.dset is not None:
+            vidid = self.img.get('video_id', None)
+            if vidid is None:
+                video = None
+            else:
+                video = self.dset.index.videos[vidid]
         else:
             video = self._video
         return video

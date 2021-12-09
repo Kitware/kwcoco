@@ -350,6 +350,9 @@ def draw_roc(info, prefix='', fnum=1, **kw):
     title = prefix + 'AUC*: {:.4f}'.format(auc)
     falsepos_total = fp_count[-1]
 
+    label_suffix = _realpos_label_suffix(info)
+    label = 'AUC*={:0.4f}: ({}) {}'.format(auc, label_suffix, prefix)
+
     if 0:
         # TODO: deprecate multi_plot for seaborn?
         fig = kwplot.figure(fnum=fnum)
@@ -371,6 +374,7 @@ def draw_roc(info, prefix='', fnum=1, **kw):
             # xlabel='FA count (false positive count)',
             xlabel='fpr (count={})'.format(falsepos_total),
             ylabel='tpr (count={})'.format(realpos_total_disp),
+            label=label,
             title=title,
             ylim=(0, 1), ypad=1e-2,
             xlim=(0, 1), xpad=1e-2,

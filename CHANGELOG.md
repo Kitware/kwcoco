@@ -7,6 +7,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.19 - Unreleased
 
+### Fixed
+* CocoImage now returns None for `video` if it doesn't have one.
 
 ## Version 0.2.18 - Released 2021-12-01
 
