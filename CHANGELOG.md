@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.19 - Unreleased
 
+### Added
+
+* DelayedImage.finalize now accepts a `nodata` argument, which handles invalid
+  data pixels correctly under transformations.
+
 ### Fixed
 * CocoImage now returns None for `video` if it doesn't have one.
 

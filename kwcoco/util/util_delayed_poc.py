@@ -30,6 +30,11 @@ Concepts:
     the end.
 
 
+TODO:
+    - [ ] Need to handle masks / nodata values when warping. Might need to
+          rely more on gdal / rasterio for this.
+
+
 Conventions:
 
     * dsize = (always in width / height), no channels are present
@@ -748,7 +753,15 @@ class DelayedLoad(DelayedImageOperation):
 
     @profile
     def finalize(self, **kwargs):
+        """
+        Args:
+            **kwargs:
+                nodata : if specified this data item is treated as nodata, the
+                    data is then converted to floats and the nodata value is
+                    replaced with nan.
+        """
         final = self.cache.get('final', None)
+        nodata = self.cache.get('nodata', None)
         if final is None:
             if have_gdal():
                 # TODO: warn if we dont have a COG.
@@ -771,6 +784,12 @@ class DelayedLoad(DelayedImageOperation):
             sl = space_slice + chan_slice
 
             final = pre_final[sl]
+
+            # Handle nan
+            if nodata is not None:
+                if final.dtype.kind != 'f':
+                    final = final.astype(np.float32)
+                final[final == nodata] = np.nan
 
             dsize = self._immediates.get('dsize', None)
             if dsize is not None:
@@ -1003,9 +1022,6 @@ class LazyGDalFrameFile(ub.NiceRepr):
         self = LazyGDalFrameFile(fpath)
         self.shape
         self[:]
-
-
-
     """
     def __init__(self, fpath):
         self.fpath = fpath
