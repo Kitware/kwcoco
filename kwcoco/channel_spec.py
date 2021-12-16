@@ -525,6 +525,14 @@ class FusedChannelSpec(BaseChannelSpec):
     def as_set(self):
         return set(self.normalize().parsed)
 
+    def as_path(self):
+        """
+        Returns a string suitable for use in a path.
+
+        Note, this may no longer be a valid channel spec
+        """
+        return self.spec.replace('|', '_')
+
     def __set__(self):
         return self.as_set()
 
@@ -882,6 +890,14 @@ class ChannelSpec(BaseChannelSpec):
                 'Can only work on single-streams. '
                 'TODO make class for single streams')
         return ub.peek(parsed.values())
+
+    def as_path(self):
+        """
+        Returns a string suitable for use in a path.
+
+        Note, this may no longer be a valid channel spec
+        """
+        return self.spec.replace('|', '_')
 
     def difference(self, other):
         """

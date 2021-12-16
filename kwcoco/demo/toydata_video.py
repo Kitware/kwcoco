@@ -163,7 +163,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
                              video_id=1, anchors=None, rng=None, render=False,
                              dpath=None, autobuild=True, verbose=3, aux=None,
                              multispectral=False, max_speed=0.01,
-                             channels=None, **kwargs):
+                             channels=None, multisensor=False, **kwargs):
     """
     Create the video scene layout of object positions.
 
@@ -205,6 +205,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
         channels (str | None | ChannelSpec):
             if specified generates multispectral images with dummy channels
+
+        multisensor (bool):
+            if True, generates demodata from "multiple sensors", in
+                other words, observations may have different "bands".
 
         **kwargs : used for old backwards compatible argument names
             gsize - alias for image_size
@@ -279,6 +283,27 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         >>> # test that we can render
         >>> render_toy_dataset(dset, rng=0, dpath=None, renderkw={})
 
+    Example:
+        >>> from kwcoco.demo.toydata_video import *  # NOQA
+        >>> dset = random_single_video_dset(num_frames=4, num_tracks=1, multispectral=True, multisensor=True, image_size='random', rng=2338)
+        >>> dset._check_json_serializable()
+        >>> assert dset.imgs[1]['auxiliary'][1]['channels']
+        >>> # Print before and after render
+        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset['images'], nl=-2)))
+        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset, nl=-2)))
+        >>> print(ub.hash_data(dset.dataset))
+        >>> # test that we can render
+        >>> render_toy_dataset(dset, rng=0, dpath=None, renderkw={})
+        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset['images'], nl=-2)))
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> from kwcoco.demo.toydata_video import _draw_video_sequence  # NOQA
+        >>> gids = [1, 2, 3, 4]
+        >>> final = _draw_video_sequence(dset, gids)
+        >>> print('dset.fpath = {!r}'.format(dset.fpath))
+        >>> kwplot.imshow(final)
+
     Ignore:
         import xdev
         globals().update(xdev.get_func_kwargs(random_single_video_dset))
@@ -307,8 +332,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     if isinstance(image_size, str):
         if image_size == 'random':
             image_size = (
-                distributions.Uniform(200, 800),
-                distributions.Uniform(200, 800),
+                distributions.Uniform(200, 800, rng=rng),
+                distributions.Uniform(200, 800, rng=rng),
             )
 
     coercable_width = image_size[0]
@@ -360,8 +385,19 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         'B11': 1 / 3,
     }
 
+    sensor_to_channels = {}
     if channels is not None:
         channels = kwcoco.ChannelSpec.coerce(channels)
+        sensor_to_channels['sensor1'] = channels
+
+    if multisensor:
+        assert channels is not None
+        # todo: give users a way to specify (1) how many sensors, and (2)
+        # what the channels for each sensor should be.
+        sensor_to_channels['sensor2'] = kwcoco.ChannelSpec.coerce('r|g|b,disparity,gauss,B8|B11')
+        sensor_to_channels['sensor3'] = kwcoco.ChannelSpec.coerce('r|g|b,flowx|flowy,distri,B10|B11')
+
+    sensors = sorted(sensor_to_channels.keys())
 
     for frame_idx, gid in enumerate(image_ids):
         image_height = int(image_height_distri.sample())
@@ -386,13 +422,21 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
             img['name'] = 'generated-{}-{}'.format(video_id, frame_idx)
             img['file_name'] = None
 
-        if channels is not None:
+        if sensors:
+            frame_sensor_idx = rng.randint(0, len(sensors))
+            frame_sensor = sensors[frame_sensor_idx]
+            frame_channels = sensor_to_channels[frame_sensor]
+
             img['auxiliary'] = []
-            for stream in channels.streams():
+            for stream in frame_channels.streams():
                 scale = special_fusedbands_to_scale.get(stream.spec, None)
                 if scale is not None:
                     warp_img_from_aux = kwimage.Affine.scale(scale=1 / scale)
                 else:
+                    # about = (image_width / 2, image_height / 2)
+                    # params = kwimage.Affine.random_params(rng=rng)
+                    # params['about'] = about
+                    # warp_img_from_aux = kwimage.Affine.coerce(params)
                     warp_img_from_aux = kwimage.Affine.random(rng=rng)
 
                 warp_aux_from_img = warp_img_from_aux.inv()
@@ -500,8 +544,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         wh['h'][ar > max_ar] = wh['w'] * 0.25
 
         box_dims = wh.ewm(alpha=alpha, adjust=False).mean()
+
         video_boxes.data[:, 0:2] = path
         video_boxes.data[:, 2:4] = box_dims.values
+
         video_boxes = video_boxes.scale(video_dsize, about='origin')
         video_boxes = video_boxes.scale(0.9, about='center')
 
@@ -578,6 +624,59 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     return dset
 
 
+def _draw_video_sequence(dset, gids):
+    """
+    Helper to draw a multi-sensor sequence
+
+    Ignore:
+        from kwcoco.demo.toydata_video import _draw_video_sequence  # NOQA
+        gids = [1, 2, 3]
+        final = _draw_video_sequence(dset, gids)
+        import kwplot
+        kwplot.autompl()
+        kwplot.imshow(final)
+    """
+    horizontal_stack = []
+    max_width = 256
+    images = dset.images(gids)
+    for coco_img in images.coco_images:
+        chan_names = coco_img.channels.fuse()
+        chan_hwc = coco_img.delay(space='video').finalize()
+        chan_chw = chan_hwc.transpose(2, 0, 1)
+        cells = []
+        for raw_data, chan_name in zip(chan_chw, chan_names):
+            # norm_data = kwimage.normalize_intensity(raw_data.astype(np.float32)).clip(0, 1)
+            norm_data = kwimage.normalize(raw_data.astype(np.float32)).clip(0, 1)
+            cells.append({
+                'norm_data': norm_data,
+                'raw_data': raw_data,
+                'text': chan_name,
+            })
+        vertical_stack = []
+        header_dims = {'width': max_width}
+        header_part = kwimage.draw_header_text(
+            image=header_dims, fit=False,
+            text='t={frame_index} gid={id}'.format(**coco_img.img),
+            color='salmon')
+        vertical_stack.append(header_part)
+        for cell in cells:
+            norm_data = cell['norm_data']
+            cell_canvas = kwimage.imresize(norm_data, dsize=(max_width, None))
+            cell_canvas = cell_canvas.clip(0, 1)
+            cell_canvas = kwimage.atleast_3channels(cell_canvas)
+            cell_canvas = kwimage.draw_text_on_image(
+                cell_canvas, cell['text'], (1, 1), valign='top',
+                color='white', border=3)
+            vertical_stack.append(cell_canvas)
+
+        vertical_stack = [kwimage.ensure_uint255(d) for d in vertical_stack]
+        column_img = kwimage.stack_images(vertical_stack, axis=0)
+
+        horizontal_stack.append(column_img)
+    final = kwimage.stack_images(horizontal_stack, axis=1)
+    return final
+
+
 @profile
 def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
     """
@@ -626,6 +725,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
         >>>     dset.show_image(gid, pnum=pnums(), fnum=1, title=False)
         >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
     """
+    import kwcoco
     rng = kwarray.ensure_rng(rng)
     dset._build_index()
 
@@ -672,9 +772,9 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
         auxiliaries = img.pop('auxiliary', None)
         if auxiliaries is not None:
             for auxdict in auxiliaries:
+                chan_part = kwcoco.ChannelSpec.coerce(auxdict['channels']).as_path()
                 aux_dpath = ub.ensuredir(
-                    (bundle_dpath, '_assets',
-                     'aux', 'aux_' + auxdict['channels']))
+                    (bundle_dpath, '_assets', 'aux', 'aux_' + chan_part))
                 aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
                 ub.ensuredir(aux_dpath)
                 auxdict['file_name'] = aux_fpath
@@ -818,12 +918,19 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         # Postprocess the auxiliary data so it looks interesting
         # It would be really cool if we could do this based on what
         # the simulated channel was.
+        import kwcoco
         chankey = auxinfo['channels']
         auxdata = chan_to_auxinfo[chankey]['imdata']
-        mask = rng.rand(*auxdata.shape[0:2]) > 0.5
-        auxdata = kwimage.fourier_mask(auxdata, mask)
-        auxdata = (auxdata - auxdata.min())
-        auxdata = (auxdata / max(1e-8, auxdata.max()))
+        auxchan = kwcoco.FusedChannelSpec.coerce(chankey)
+        for chan_idx, chan_name in enumerate(auxchan.as_list()):
+            if chan_name == 'flowx':
+                auxdata[..., chan_idx] = np.gradient(auxdata[..., chan_idx], axis=0)
+            elif chan_name == 'flowy':
+                auxdata[..., chan_idx] = np.gradient(auxdata[..., chan_idx], axis=1)
+            elif chan_name.startswith('B') or 1:
+                mask = rng.rand(*auxdata[..., chan_idx].shape[0:2]) > 0.5
+                auxdata[..., chan_idx] = kwimage.fourier_mask(auxdata[..., chan_idx], mask)[..., 0]
+        auxdata = kwarray.normalize(auxdata)
         auxdata = auxdata.clip(0, 1)
         _dtype = auxinfo.pop('dtype', 'uint8').lower()
         if _dtype == 'uint8':
@@ -840,49 +947,39 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
 @profile
 def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
                       with_sseg, with_kpts, dims, newstyle, gray, rng):
+    """
+    Renders demo annoations on top of a demo background
+    """
     boxes = annots.boxes
 
-    FIX_OOB_RENDER_ATTEMPT = 1  # seems to work now
-
-    if FIX_OOB_RENDER_ATTEMPT:
-        tlbr_boxes = boxes.to_tlbr().quantize().data.astype(int)
-    else:
-        tlbr_boxes = boxes.to_tlbr().clip(0, 0, None, None).data.round(0).astype(int)
+    tlbr_boxes = boxes.to_tlbr().quantize().data.astype(int)
 
     # Render coco-style annotation dictionaries
     for ann, tlbr in zip(annots.objs, tlbr_boxes):
         catname = dset._resolve_to_cat(ann['category_id'])['name']
         tl_x, tl_y, br_x, br_y = tlbr
 
-        if FIX_OOB_RENDER_ATTEMPT:
-            # hack
-            if tl_x == br_x:
-                tl_x = tl_x - 1
-                br_x = br_x + 1
-            if tl_y == br_y:
-                tl_y = tl_y - 1
-                br_y = br_y + 1
+        # hack
+        if tl_x == br_x:
+            tl_x = tl_x - 1
+            br_x = br_x + 1
+        if tl_y == br_y:
+            tl_y = tl_y - 1
+            br_y = br_y + 1
 
         chip_index = tuple([slice(tl_y, br_y), slice(tl_x, br_x)])
         if imdata is None:
             chip = None
         else:
-            # try:
-            # Use pad-infinite-slices to fix a bug here
-            # Requries that subsequent setting of the data is also
-            # accounted for
-            if FIX_OOB_RENDER_ATTEMPT:
-                data_slice, padding = kwarray.embed_slice(chip_index, imdata.shape)
-                # TODO: could have a kwarray function to expose this inverse slice
-                # functionality. Also having a top-level call to apply an embedded
-                # slice would be good
-                chip = kwarray.padded_slice(imdata, chip_index)
-                inverse_slice = (
-                    slice(padding[0][0], chip.shape[0] - padding[0][1]),
-                    slice(padding[1][0], chip.shape[1] - padding[1][1]),
-                )
-            else:
-                chip = imdata[chip_index]
+            data_slice, padding = kwarray.embed_slice(chip_index, imdata.shape)
+            # TODO: could have a kwarray function to expose this inverse slice
+            # functionality. Also having a top-level call to apply an embedded
+            # slice would be good
+            chip = kwarray.padded_slice(imdata, chip_index)
+            inverse_slice = (
+                slice(padding[0][0], chip.shape[0] - padding[0][1]),
+                slice(padding[1][0], chip.shape[1] - padding[1][1]),
+            )
 
         size = (br_x - tl_x, br_y - tl_y)
         xy_offset = (tl_x, tl_y)
@@ -897,11 +994,7 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
                 fgdata = info['data']
                 if gray:
                     fgdata = fgdata.mean(axis=2, keepdims=True)
-                if FIX_OOB_RENDER_ATTEMPT:
-                    # imdata[tl_y:br_y, tl_x:br_x, :] = fgdata[inverse_slice]
-                    imdata[data_slice] = fgdata[inverse_slice]
-                else:
-                    imdata[tl_y:br_y, tl_x:br_x, :] = fgdata
+                imdata[data_slice] = fgdata[inverse_slice]
 
             if with_sseg:
                 ann['segmentation'] = info['segmentation']
@@ -916,15 +1009,71 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
                     seg = seg.to_multi_polygon()
                     for chankey, auxinfo in chan_to_auxinfo.items():
                         val = rng.uniform(0.2, 1.0)
-                        # transform annotation into aux space if it is
-                        # different
+                        # transform annotation into aux space
                         warp_aux_to_img = auxinfo.get('warp_aux_to_img', None)
                         if warp_aux_to_img is not None:
-                            mat = kwimage.Affine.coerce(warp_aux_to_img).matrix
-                            seg_ = seg.warp(mat)
-                            auxinfo['imdata'] = seg_.fill(auxinfo['imdata'], value=val)
+                            warp_aux_from_img = kwimage.Affine.coerce(warp_aux_to_img).inv().matrix
+                            seg_ = seg.warp(warp_aux_from_img)
                         else:
-                            auxinfo['imdata'] = seg.fill(auxinfo['imdata'], value=val)
+                            seg_ = seg
+                        c = kwimage.num_channels(auxinfo['imdata'])
+                        if c < 4:
+                            # hack work around bug in kwimage, where only first
+                            # channel was filled
+                            val = (val,) * c
+                        auxinfo['imdata'] = seg_.fill(auxinfo['imdata'], value=val)
+    return imdata, chan_to_auxinfo
+
+
+@profile
+def render_background(img, rng, gray, bg_intensity, bg_scale):
+    # This is 2x as fast for image_size=(300,300)
+    gw, gh = img['width'], img['height']
+    if img.get('file_name', None) is None:
+        imdata = None
+    else:
+        if gray:
+            gshape = (gh, gw, 1)
+            imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
+                                               rng=rng, dtype=np.float32)
+        else:
+            gshape = (gh, gw, 3)
+            # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
+            #                                    rng=rng, dtype=np.float32)
+            # hack because 3 channels is slower
+            imdata = kwarray.uniform(0, 1, gshape, rng=rng, dtype=np.float32)
+        np.clip(imdata, 0, 1, out=imdata)
+
+    chan_to_auxinfo = {}
+    for auxinfo in img.get('auxiliary', []):
+        import kwcoco
+        chankey = auxinfo['channels']
+        aux_bands = kwcoco.ChannelSpec.coerce(chankey).numel()
+        aux_width = auxinfo.get('width', gw)
+        aux_height = auxinfo.get('height', gh)
+        auxshape = (aux_height, aux_width, aux_bands)
+        if chankey == 'gauss':
+            auxdata = np.stack([
+                kwimage.gaussian_patch(auxshape[0:2])
+                for b in range(aux_bands)], axis=2)
+            auxdata = kwarray.normalize(auxdata) * rng.rand()
+        elif chankey == 'distri':
+            # Random distribution currently broken, fix later
+            # random_distri = kwarray.distributions.Distribution.random(rng=rng)
+            # auxdata = random_distri.sample(*auxshape)
+            scale = rng.randint(0, 100) * rng.rand()
+            auxdata = rng.exponential(scale, size=auxshape)
+            auxdata = kwarray.normalize(auxdata)
+        else:
+            auxdata = kwarray.uniform(0, 0.4, auxshape, rng=rng, dtype=np.float32)
+
+        # if True or True or True:
+        #     auxdata[:] = 0
+        # auxdata = (auxdata - auxdata.min())
+        # auxdata = (auxdata / max(1e-8, auxdata.min()))
+        auxinfo['imdata'] = auxdata
+        chan_to_auxinfo[chankey] = auxinfo
+
     return imdata, chan_to_auxinfo
 
 
@@ -960,52 +1109,6 @@ def false_color(twochan):
 
 
 @profile
-def render_background(img, rng, gray, bg_intensity, bg_scale):
-    # This is 2x as fast for image_size=(300,300)
-    gw, gh = img['width'], img['height']
-    if img.get('file_name', None) is None:
-        imdata = None
-    else:
-        if gray:
-            gshape = (gh, gw, 1)
-            imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
-                                               rng=rng, dtype=np.float32)
-        else:
-            gshape = (gh, gw, 3)
-            # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
-            #                                    rng=rng, dtype=np.float32)
-            # hack because 3 channels is slower
-            imdata = kwarray.uniform(0, 1, gshape, rng=rng, dtype=np.float32)
-        np.clip(imdata, 0, 1, out=imdata)
-
-    chan_to_auxinfo = {}
-    for auxinfo in img.get('auxiliary', []):
-        chankey = auxinfo['channels']
-        # TODO:
-        # Need to incorporate ChannelSpec abstraction here
-        import kwcoco
-        aux_bands = kwcoco.ChannelSpec.coerce(chankey).numel()
-        # if chankey in ['mx|my', 'motion']:
-        #     aux_bands = 2
-        # elif chankey == 'flowx|flowy':
-        #     aux_bands = 2
-        # elif chankey == 'disparity':
-        #     aux_bands = 1
-        # else:
-        #     aux_bands = 1
-        # TODO: make non-aligned auxiliary information?
-        aux_width = auxinfo.get('width', gw)
-        aux_height = auxinfo.get('height', gh)
-        auxshape = (aux_height, aux_width, aux_bands)
-        # auxdata = np.zeros(auxshape, dtype=np.float32)
-        auxdata = kwarray.uniform(0, 0.01, auxshape, rng=rng, dtype=np.float32)
-        auxinfo['imdata'] = auxdata
-        chan_to_auxinfo[chankey] = auxinfo
-
-    return imdata, chan_to_auxinfo
-
-
-@profile
 def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
     """
 
@@ -1034,6 +1137,14 @@ def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
         >>> ax.set_ylim(-.01, 1.01)
         >>> ax.set_zlim(-.01, 1.01)
 
+    Ignore:
+        >>> from kwcoco.demo.toydata_video import *  # NOQA
+        >>> num_objects = 1
+        >>> num_frames = 2
+        >>> rng = kwarray.ensure_rng(342)
+        >>> paths = random_multi_object_path(num_objects, num_frames, rng, max_speed=0.1)
+        >>> print('paths = {!r}'.format(paths))
+        >>> print(ub.hash_data(paths))
     """
     import kwarray
     rng = kwarray.ensure_rng(rng)

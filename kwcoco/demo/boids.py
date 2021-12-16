@@ -104,6 +104,25 @@ class Boids(ub.NiceRepr):
             ax.set_ylim(0, 1)
             xdev.InteractiveIter.draw()
         rx = 0
+
+    Example:
+        >>> # Test determenism
+        >>> from kwcoco.demo.boids import *  # NOQA
+        >>> num_frames = 2
+        >>> num_objects = 1
+        >>> rng = 4532
+        >>> self = Boids(num=num_objects, rng=rng).initialize()
+        >>> #print(ub.hash_data(self.pos))
+        >>> #print(ub.hash_data(self.vel))
+        >>> #print(ub.hash_data(self.acc))
+        >>> tocheck = []
+        >>> for i in range(100):
+        >>>     self = Boids(num=num_objects, rng=rng).initialize()
+        >>>     self.step()
+        >>>     self.step()
+        >>>     self.step()
+        >>>     tocheck.append(self.pos.copy())
+        >>> assert ub.allsame(list(map(ub.hash_data, tocheck)))
     """
 
     def __init__(self, num, dims=2, rng=None, **kwargs):
@@ -257,7 +276,7 @@ class Boids(ub.NiceRepr):
         sep_steering = clamp_mag(sep_steering, 1.0 * self.config['max_force'], axis=None)
 
         # Add some small random movement
-        rand_steering = clamp_mag(np.random.randn(*self.pos.shape), 0.08 * self.config['max_force'], axis=None)
+        rand_steering = clamp_mag(self.rng.randn(*self.pos.shape), 0.08 * self.config['max_force'], axis=None)
 
         self.sep_steering = sep_steering
         self.com_steering = com_steering
@@ -322,7 +341,8 @@ class Boids(ub.NiceRepr):
         Update positions, velocities, and accelerations
         """
         self.boundary_conditions()
-        self.acc += self.compute_forces()
+        force = self.compute_forces()
+        self.acc += force
         self.pos += self.vel
         self.vel += self.acc
 

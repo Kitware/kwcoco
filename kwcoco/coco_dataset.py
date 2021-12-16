@@ -1211,37 +1211,30 @@ class MixinCocoExtras(object):
             >>> self = CocoDataset.demo()
             >>> self._build_hashid(hash_pixels=True, verbose=3)
             ...
-            >>> # Note: kwimage has changes the name of carl.png to carl.jpg
-            >>> # in 0.7.0, so that modifies some of the hash. Once 0.7.0
-            >>> # is landed, we can update this test to re-check for
-            >>> # those hashes.
+            >>> # Shorten hashes for readability
+            >>> walker = ub.IndexableWalker(self.hashid_parts)
+            >>> for path, val in walker:
+            >>>     if isinstance(val, str):
+            >>>         walker[path] = val[0:8]
+            >>> # Note: this may change in different versions of kwcoco
             >>> print('self.hashid_parts = ' + ub.repr2(self.hashid_parts))
-            >>> print('self.hashid = {!r}'.format(self.hashid))
+            >>> print('self.hashid = {!r}'.format(self.hashid[0:8]))
             self.hashid_parts = {
                 'annotations': {
-                    'json': 'e573f49da7b76e27d0...',
+                    'json': 'e573f49d',
                     'num': 11,
                 },
                 'images': {
-                    'pixels': '67d741fefc8...',
-                    'json': '...',
+                    'pixels': '2e329adc',
+                    'json': '2221c714',
                     'num': 3,
                 },
                 'categories': {
-                    'json': '82d22e0079...',
+                    'json': '82d22e00',
                     'num': 8,
                 },
             }
-            self.hashid = '...
-
-            # Old
-            'json': '6a446126490aa...',
-            self.hashid = '4769119614e921...
-
-            # New
-            json': '2221c71496a0...
-            self.hashid = '77d445f05...
-
+            self.hashid = 'fb15bf48'
 
         Doctest:
             >>> self = CocoDataset.demo()

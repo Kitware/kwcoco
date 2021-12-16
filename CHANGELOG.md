@@ -12,8 +12,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * DelayedImage.finalize now accepts a `nodata` argument, which handles invalid
   data pixels correctly under transformations.
 
+* Toydata can now generate "multi-sensor" demodata.
+
 ### Fixed
 * CocoImage now returns None for `video` if it doesn't have one.
+ 
+* BOIDS is now deterministic given a seed
+
+* Various toydata bugs
 
 ## Version 0.2.18 - Released 2021-12-01
 
