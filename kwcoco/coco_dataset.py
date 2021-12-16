@@ -1236,7 +1236,7 @@ class MixinCocoExtras(object):
                     'num': 8,
                 },
             }
-            self.hashid = 'fb15bf48'
+            self.hashid = '77d445f0'
 
         Doctest:
             >>> self = CocoDataset.demo()
