@@ -28,8 +28,8 @@ TOYDATA_VIDEO_VERSION = 20
 def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
         image_size=(600, 600), verbose=3, render=False, aux=None,
-        multispectral=False, rng=None, dpath=None, max_speed=0.01,
-        channels=None, **kwargs):
+        multispectral=False, multisensor=False, rng=None, dpath=None,
+        max_speed=0.01, channels=None, **kwargs):
     """
     Create a toy Coco Video Dataset
 
@@ -106,7 +106,8 @@ def random_video_dset(
             warnings.warn('gsize is deprecated. Use image_size param instead',
                           DeprecationWarning)
         image_size = kwargs.pop('gsize')
-    assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
+    if len(kwargs) != 0:
+        raise ValueError('unknown kwargs={}'.format(kwargs))
 
     rng = kwarray.ensure_rng(rng)
     subsets = []
@@ -117,8 +118,8 @@ def random_video_dset(
             image_size=image_size, num_frames=num_frames,
             num_tracks=num_tracks, tid_start=tid_start, anchors=anchors,
             gid_start=gid_start, video_id=vidid, render=False, autobuild=False,
-            aux=aux, multispectral=multispectral, max_speed=max_speed,
-            channels=channels, rng=rng)
+            aux=aux, multispectral=multispectral, multisensor=multisensor,
+            max_speed=max_speed, channels=channels, rng=rng)
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
             tid_start = dset.dataset['annotations'][-1]['track_id'] + 1

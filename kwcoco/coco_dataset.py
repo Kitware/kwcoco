@@ -1074,6 +1074,7 @@ class MixinCocoExtras(object):
                 'image_size': (600, 600),
                 'aux': None,
                 'multispectral': None,
+                'multisensor': False,
                 'max_speed': 0.01,
             }
             suff_parts = []
