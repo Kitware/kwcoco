@@ -1209,7 +1209,8 @@ class MixinCocoExtras(object):
             verbose (int): verbosity level
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> self._build_hashid(hash_pixels=True, verbose=3)
             ...
             >>> # Shorten hashes for readability
@@ -1226,7 +1227,7 @@ class MixinCocoExtras(object):
                     'num': 11,
                 },
                 'images': {
-                    'pixels': '2e329adc',
+                    'pixels': '67d741fe',
                     'json': '2221c714',
                     'num': 3,
                 },
