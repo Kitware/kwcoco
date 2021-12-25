@@ -114,12 +114,15 @@ def random_video_dset(
     tid_start = 1
     gid_start = 1
     for vidid in range(1, num_videos + 1):
+        if verbose > 2:
+            print('generate vidid = {!r}'.format(vidid))
+
         dset = random_single_video_dset(
             image_size=image_size, num_frames=num_frames,
             num_tracks=num_tracks, tid_start=tid_start, anchors=anchors,
             gid_start=gid_start, video_id=vidid, render=False, autobuild=False,
             aux=aux, multispectral=multispectral, multisensor=multisensor,
-            max_speed=max_speed, channels=channels, rng=rng)
+            max_speed=max_speed, channels=channels, rng=rng, verbose=verbose)
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
             tid_start = dset.dataset['annotations'][-1]['track_id'] + 1
@@ -151,7 +154,10 @@ def random_video_dset(
         if dpath is None:
             dpath = ub.ensure_app_cache_dir('kwcoco', 'demo_vidshapes')
 
-        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw)
+        if verbose > 2:
+            print('rendering')
+        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw,
+                           verbose=verbose)
         dset.fpath = join(dpath, 'data.kwcoco.json')
 
     dset._build_index()
@@ -401,6 +407,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     sensors = sorted(sensor_to_channels.keys())
 
     for frame_idx, gid in enumerate(image_ids):
+        if verbose > 2:
+            print('generate gid = {!r}'.format(gid))
         image_height = int(image_height_distri.sample())
         image_width = int(image_width_distri.sample())
 
@@ -522,6 +530,9 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         out = tmp.scale(sf).translate(tmp_tl_xy_min)
         return out
 
+    if verbose > 2:
+        print('generate tracks')
+
     for tid, path in zip(track_ids, paths):
         if anchors is None:
             anchors_ = anchors
@@ -619,7 +630,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         if not render:
             renderkw = None
     if renderkw is not None:
-        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw)
+        if verbose > 2:
+            print('rendering')
+        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw,
+                           verbose=verbose)
     if autobuild:
         dset._build_index()
     return dset
@@ -679,7 +693,7 @@ def _draw_video_sequence(dset, gids):
 
 
 @profile
-def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
+def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     """
     Create toydata_video renderings for a preconstructed coco dataset.
 
@@ -755,7 +769,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None):
         # imwrite kw requries gdal
         from osgeo import gdal  # NOQA
 
-    for gid in dset.imgs.keys():
+    for gid in ub.ProgIter(dset.imgs.keys(), desc='render gid', verbose=verbose > 2):
         # Render data inside the image
         img = render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
 

@@ -51,7 +51,10 @@ class CocoToyDataCLI(object):
                 if False, this will force the dataset to be regenerated.
                 Otherwise, it will only regenerate the data if it doesn't
                 already exist.
-                '''))
+                ''')),
+
+            'verbose': scfg.Value(False, help=ub.paragraph(
+                ''' Verbosity ''')),
         }
         epilog = """
         Example Usage:
@@ -79,9 +82,11 @@ class CocoToyDataCLI(object):
         """
         import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
+        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
         demo_kwargs = {
             'use_cache': config['use_cache'],
+            'verbose': config['verbose'],
         }
 
         if config['bundle_dpath'] is not None:

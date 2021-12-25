@@ -1065,7 +1065,22 @@ class MixinCocoExtras(object):
             if res is None:
                 res = parse.parse('{prefix}{num_videos:d}', key)
 
-            # These are the variables the vidshapes generator accepts
+            """
+            The rule is that the suffix will be split by the '-' character
+            and any registered pattern or alias will impact the kwargs
+            for random_video_dset
+            """
+            suff_parts = []
+            if verbose > 3:
+                print('res = {!r}'.format(res))
+            if res:
+                kwargs['num_videos'] = int(res.named['num_videos'])
+                if 'suffix' in res.named:
+                    suff_parts = [p for p in res.named['suffix'].split('-') if p]
+            if verbose > 3:
+                print('suff_parts = {!r}'.format(suff_parts))
+
+            # The allowed suffix patterns and aliases are defined here
             vidkw = {
                 'render': True,
                 'num_videos': 1,
@@ -1076,28 +1091,50 @@ class MixinCocoExtras(object):
                 'multispectral': None,
                 'multisensor': False,
                 'max_speed': 0.01,
+                'verbose': verbose,
             }
-            suff_parts = []
-            if verbose > 3:
-                print('res = {!r}'.format(res))
-            if res:
-                kwargs['num_videos'] = int(res.named['num_videos'])
-                if 'suffix' in res.named:
-                    suff_parts = res.named['suffix'].split('-')
-            if verbose > 3:
-                print('suff_parts = {!r}'.format(suff_parts))
-
+            vidkw_aliases = {
+                'num_frames': {'frames'},
+                'num_videos': {'videos'},
+                'max_speed': {'speed'},
+                'image_size': {'gsize'},
+                'multispectral': {'msi'},
+            }
+            alias_to_key = {k: v for v, ks in vidkw_aliases.items() for k in ks}
+            import re
+            # These are the variables the vidshapes generator accepts
             for part in suff_parts:
-                if part.startswith('frames'):
-                    vidkw['num_frames'] = int(part.replace('frames', ''))
-                if part.startswith('speed'):
-                    vidkw['max_speed'] = float(part.replace('speed', ''))
-                if 'aux' == part:
-                    vidkw['aux'] = True
-                elif part in {'multispectral', 'msi'}:
-                    vidkw['multispectral'] = True
+                match = re.search(r'[\d]', part)
+                if match is None:
+                    value = True
+                    key = part
+                else:
+                    key = part[:match.span()[0]]
+                    value = part[match.span()[0]:]
+                key = alias_to_key.get(key, key)
+                if key == 'num_frames':
+                    value = int(value)
+                if key == 'num_videos':
+                    value = int(value)
+                if key == 'max_speed':
+                    value = float(value)
+                if key == 'multispectral':
+                    value = bool(value)
+                if key == 'multisensor':
+                    value = bool(value)
+                if key == 'render':
+                    value = bool(value)
+
+                # if key.startswith('rand'):
+                #     pass
+                if key in {'randgsize', 'randsize', 'image_sizerandom'}:
+                    key = 'image_size'
+                    value = 'random'
+
+                vidkw[key] = value
 
             vidkw.update(kwargs)
+            print('vidkw = {}'.format(ub.repr2(vidkw, nl=1)))
             use_cache = vidkw.pop('use_cache', True)
 
             if 'rng' not in vidkw:
