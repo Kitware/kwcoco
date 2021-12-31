@@ -2025,7 +2025,7 @@ class MixinCocoObjects(object):
 
         return Annots(aids, self)
 
-    def images(self, gids=None, vidid=None):
+    def images(self, gids=None, vidid=None, names=None):
         """
         Return vectorized image objects
 
@@ -2035,6 +2035,9 @@ class MixinCocoObjects(object):
 
             vidid (int): returns all images that belong to this video id.
                 mutually exclusive with `gids` arg.
+
+            names (List[str]):
+                lookup images by their names.
 
         Returns:
             Images: vectorized image object
@@ -2055,6 +2058,9 @@ class MixinCocoObjects(object):
         """
         if vidid is not None:
             gids = self.index.vidid_to_gids[vidid]
+
+        if names is not None:
+            gids = [self.index.name_to_img[name]['id'] for name in names]
 
         if gids is None:
             gids = sorted(self.index.imgs.keys())
@@ -2083,13 +2089,16 @@ class MixinCocoObjects(object):
             cids = sorted(self.index.cats.keys())
         return Categories(cids, self)
 
-    def videos(self, vidids=None):
+    def videos(self, vidids=None, names=None):
         """
         Return vectorized video objects
 
         Args:
             vidids (List[int]): video ids to reference, if unspecified
                  all videos are returned.
+
+            names (List[str]):
+                lookup videos by their name.
 
         Returns:
             Videos: vectorized video object
@@ -2112,6 +2121,8 @@ class MixinCocoObjects(object):
         """
         if vidids is None:
             vidids = sorted(self.index.videos.keys())
+        if names is not None:
+            vidids = [self.index.name_to_video[name]['id'] for name in names]
         return Videos(vidids, self)
 
 
