@@ -11,7 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * names kwarg to CocoDataset.images / videos
 
-* DelayedImage.finalize now accepts a `nodata` argument, which handles invalid
+* `DelayedImage.finalize` now accepts a `nodata` argument, which handles invalid
   data pixels correctly under transformations.
 
 * Toydata can now generate "multi-sensor" demodata.
