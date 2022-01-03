@@ -765,7 +765,8 @@ class ChannelSpec(BaseChannelSpec):
             elif isinstance(data, six.string_types):
                 spec = data
             else:
-                raise TypeError(type(data))
+                raise TypeError('type(data)={}, data={!r}'.format(
+                    type(data), data))
 
             self = cls(spec)
             return self
