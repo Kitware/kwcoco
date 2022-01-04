@@ -1065,7 +1065,22 @@ class MixinCocoExtras(object):
             if res is None:
                 res = parse.parse('{prefix}{num_videos:d}', key)
 
-            # These are the variables the vidshapes generator accepts
+            """
+            The rule is that the suffix will be split by the '-' character
+            and any registered pattern or alias will impact the kwargs
+            for random_video_dset
+            """
+            suff_parts = []
+            if verbose > 3:
+                print('res = {!r}'.format(res))
+            if res:
+                kwargs['num_videos'] = int(res.named['num_videos'])
+                if 'suffix' in res.named:
+                    suff_parts = [p for p in res.named['suffix'].split('-') if p]
+            if verbose > 3:
+                print('suff_parts = {!r}'.format(suff_parts))
+
+            # The allowed suffix patterns and aliases are defined here
             vidkw = {
                 'render': True,
                 'num_videos': 1,
@@ -1074,29 +1089,52 @@ class MixinCocoExtras(object):
                 'image_size': (600, 600),
                 'aux': None,
                 'multispectral': None,
+                'multisensor': False,
                 'max_speed': 0.01,
+                'verbose': verbose,
             }
-            suff_parts = []
-            if verbose > 3:
-                print('res = {!r}'.format(res))
-            if res:
-                kwargs['num_videos'] = int(res.named['num_videos'])
-                if 'suffix' in res.named:
-                    suff_parts = res.named['suffix'].split('-')
-            if verbose > 3:
-                print('suff_parts = {!r}'.format(suff_parts))
-
+            vidkw_aliases = {
+                'num_frames': {'frames'},
+                'num_videos': {'videos'},
+                'max_speed': {'speed'},
+                'image_size': {'gsize'},
+                'multispectral': {'msi'},
+            }
+            alias_to_key = {k: v for v, ks in vidkw_aliases.items() for k in ks}
+            import re
+            # These are the variables the vidshapes generator accepts
             for part in suff_parts:
-                if part.startswith('frames'):
-                    vidkw['num_frames'] = int(part.replace('frames', ''))
-                if part.startswith('speed'):
-                    vidkw['max_speed'] = float(part.replace('speed', ''))
-                if 'aux' == part:
-                    vidkw['aux'] = True
-                elif part in {'multispectral', 'msi'}:
-                    vidkw['multispectral'] = True
+                match = re.search(r'[\d]', part)
+                if match is None:
+                    value = True
+                    key = part
+                else:
+                    key = part[:match.span()[0]]
+                    value = part[match.span()[0]:]
+                key = alias_to_key.get(key, key)
+                if key == 'num_frames':
+                    value = int(value)
+                if key == 'num_videos':
+                    value = int(value)
+                if key == 'max_speed':
+                    value = float(value)
+                if key == 'multispectral':
+                    value = bool(value)
+                if key == 'multisensor':
+                    value = bool(value)
+                if key == 'render':
+                    value = bool(value)
+
+                # if key.startswith('rand'):
+                #     pass
+                if key in {'randgsize', 'randsize', 'image_sizerandom'}:
+                    key = 'image_size'
+                    value = 'random'
+
+                vidkw[key] = value
 
             vidkw.update(kwargs)
+            print('vidkw = {}'.format(ub.repr2(vidkw, nl=1)))
             use_cache = vidkw.pop('use_cache', True)
 
             if 'rng' not in vidkw:
@@ -1208,40 +1246,34 @@ class MixinCocoExtras(object):
             verbose (int): verbosity level
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> self._build_hashid(hash_pixels=True, verbose=3)
             ...
-            >>> # Note: kwimage has changes the name of carl.png to carl.jpg
-            >>> # in 0.7.0, so that modifies some of the hash. Once 0.7.0
-            >>> # is landed, we can update this test to re-check for
-            >>> # those hashes.
+            >>> # Shorten hashes for readability
+            >>> walker = ub.IndexableWalker(self.hashid_parts)
+            >>> for path, val in walker:
+            >>>     if isinstance(val, str):
+            >>>         walker[path] = val[0:8]
+            >>> # Note: this may change in different versions of kwcoco
             >>> print('self.hashid_parts = ' + ub.repr2(self.hashid_parts))
-            >>> print('self.hashid = {!r}'.format(self.hashid))
+            >>> print('self.hashid = {!r}'.format(self.hashid[0:8]))
             self.hashid_parts = {
                 'annotations': {
-                    'json': 'e573f49da7b76e27d0...',
+                    'json': 'e573f49d',
                     'num': 11,
                 },
                 'images': {
-                    'pixels': '67d741fefc8...',
-                    'json': '...',
+                    'pixels': '67d741fe',
+                    'json': '2221c714',
                     'num': 3,
                 },
                 'categories': {
-                    'json': '82d22e0079...',
+                    'json': '82d22e00',
                     'num': 8,
                 },
             }
-            self.hashid = '...
-
-            # Old
-            'json': '6a446126490aa...',
-            self.hashid = '4769119614e921...
-
-            # New
-            json': '2221c71496a0...
-            self.hashid = '77d445f05...
-
+            self.hashid = '77d445f0'
 
         Doctest:
             >>> self = CocoDataset.demo()
@@ -1993,7 +2025,7 @@ class MixinCocoObjects(object):
 
         return Annots(aids, self)
 
-    def images(self, gids=None, vidid=None):
+    def images(self, gids=None, vidid=None, names=None):
         """
         Return vectorized image objects
 
@@ -2003,6 +2035,9 @@ class MixinCocoObjects(object):
 
             vidid (int): returns all images that belong to this video id.
                 mutually exclusive with `gids` arg.
+
+            names (List[str]):
+                lookup images by their names.
 
         Returns:
             Images: vectorized image object
@@ -2023,6 +2058,9 @@ class MixinCocoObjects(object):
         """
         if vidid is not None:
             gids = self.index.vidid_to_gids[vidid]
+
+        if names is not None:
+            gids = [self.index.name_to_img[name]['id'] for name in names]
 
         if gids is None:
             gids = sorted(self.index.imgs.keys())
@@ -2051,13 +2089,16 @@ class MixinCocoObjects(object):
             cids = sorted(self.index.cats.keys())
         return Categories(cids, self)
 
-    def videos(self, vidids=None):
+    def videos(self, vidids=None, names=None):
         """
         Return vectorized video objects
 
         Args:
             vidids (List[int]): video ids to reference, if unspecified
                  all videos are returned.
+
+            names (List[str]):
+                lookup videos by their name.
 
         Returns:
             Videos: vectorized video object
@@ -2080,6 +2121,8 @@ class MixinCocoObjects(object):
         """
         if vidids is None:
             vidids = sorted(self.index.videos.keys())
+        if names is not None:
+            vidids = [self.index.name_to_video[name]['id'] for name in names]
         return Videos(vidids, self)
 
 
