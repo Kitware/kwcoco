@@ -235,7 +235,8 @@ stages:
         - pip install six pyopenssl ndg-httpsclient pyasn1 -U 
         - pip install requests[security] twine 
         # Execute the publish script for real this time
-        - MB_PYTHON_TAG=$MB_PYTHON_TAG DO_GPG=True GPG_KEYID=$GPG_KEYID TWINE_PASSWORD=$TWINE_PASSWORD TWINE_USERNAME=$TWINE_USERNAME GPG_EXECUTABLE=$GPG_EXECUTABLE CURRENT_BRANCH=release DEPLOY_BRANCH=release DO_TAG=True DO_UPLOAD=True ./publish.sh || echo "upload already exists"
+        - TWINE_REPOSITORY_URL="https://upload.pypi.org/legacy/"
+        - TWINE_REPOSITORY_URL=$TWINE_REPOSITORY_URL MB_PYTHON_TAG=$MB_PYTHON_TAG DO_GPG=True GPG_KEYID=$GPG_KEYID TWINE_PASSWORD=$TWINE_PASSWORD TWINE_USERNAME=$TWINE_USERNAME GPG_EXECUTABLE=$GPG_EXECUTABLE CURRENT_BRANCH=release DEPLOY_BRANCH=release DO_TAG=True DO_UPLOAD=True ./publish.sh || echo "upload already exists"
         # do sed twice to handle the case of https clone with and without a read token
         - | 
             # Have the server git-tag the release and push the tags
