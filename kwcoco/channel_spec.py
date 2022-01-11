@@ -62,7 +62,6 @@ Example:
 """
 import abc
 import functools
-import six
 import ubelt as ub
 import warnings
 
@@ -762,7 +761,7 @@ class ChannelSpec(BaseChannelSpec):
             if isinstance(data, int):
                 # we know the number of channels, but not their names
                 spec = '|'.join(['u{}'.format(i) for i in range(data)])
-            elif isinstance(data, six.string_types):
+            elif isinstance(data, str):
                 spec = data
             else:
                 raise TypeError('type(data)={}, data={!r}'.format(

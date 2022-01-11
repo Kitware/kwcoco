@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 mkinit ~/code/kwcoco/kwcoco/util/__init__.py -w
 """

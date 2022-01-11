@@ -69,7 +69,6 @@ import os
 import kwimage
 import numpy as np
 import scriptconfig as scfg
-import six
 import ubelt as ub
 import warnings
 from os.path import exists
@@ -542,7 +541,7 @@ class CocoEvaluator(object):
             gid_to_det, _extra = CocoEvaluator._coerce_dets(
                 coco_dset, verbose, workers=workers)
             extra.update(_extra)
-        elif isinstance(dataset, six.string_types):
+        elif isinstance(dataset, str):
             if exists(dataset):
                 # on-disk detections
                 if isdir(dataset):

@@ -14,7 +14,6 @@ parse >= 1.12.0
 scikit-learn >= 0.24.0
 scipy>=1.5.4
 scriptconfig >= 0.5.8
-six >= 1.11.0
 sortedcontainers >= 2.3.0
 ubelt >= 0.10.0
 uritools >= 3.0.0

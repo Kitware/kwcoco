@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Generates "toydata" for demo and testing purposes.
 
@@ -6,7 +5,6 @@ This is the video version of the toydata generator and should be prefered to
 the loose image version in toydata_image.
 
 """
-from __future__ import absolute_import, division, print_function
 from os.path import join
 import numpy as np
 import ubelt as ub

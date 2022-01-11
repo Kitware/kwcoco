@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.20 - Unreleased
 
+### Changed
+
+* Removed old Python2 constructs
+
 
 ## Version 0.2.19 - Released 2022-01-04
 

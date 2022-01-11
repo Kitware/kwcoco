@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 An implementation and extension of the original MS-COCO API [1]_.
 
@@ -254,7 +253,6 @@ References:
     .. [3] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
 import copy
 import itertools as it
 import json

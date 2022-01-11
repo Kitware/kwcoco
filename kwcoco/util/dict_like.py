@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import, division, print_function, unicode_literals
-import six
 import ubelt as ub
 
 
@@ -51,7 +48,7 @@ class DictLike(ub.NiceRepr):
         return len(list(self.keys()))
 
     def __iter__(self):
-        return iter(self.keys())
+        return self.keys()
 
     def __contains__(self, key):
         return key in self.keys()
@@ -66,16 +63,10 @@ class DictLike(ub.NiceRepr):
         return self.setitem(key, value)
 
     def items(self):
-        if six.PY2:
-            return list(self.iteritems())
-        else:
-            return self.iteritems()
+        return ((key, self[key]) for key in self.keys())
 
     def values(self):
-        if six.PY2:
-            return list(self.itervalues())
-        else:
-            return self.itervalues()
+        return (self[key] for key in self.keys())
 
     def copy(self):
         return dict(self.items())
@@ -89,15 +80,6 @@ class DictLike(ub.NiceRepr):
     def update(self, other):
         for k, v in other.items():
             self[k] = v
-
-    def iteritems(self):
-        return ((key, self[key]) for key in self.iterkeys())
-
-    def itervalues(self):
-        return (self[key] for key in self.keys())
-
-    def iterkeys(self):
-        return (key for key in self.keys())
 
     def get(self, key, default=None):
         try:
