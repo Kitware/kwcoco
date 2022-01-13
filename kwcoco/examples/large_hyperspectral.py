@@ -1,4 +1,8 @@
-def test_large_hyperspectral_data():
+import xdev
+
+
+@xdev.profile
+def benchmark_large_hyperspectral():
     import ubelt as ub
     import kwimage
     import kwarray
@@ -11,7 +15,8 @@ def test_large_hyperspectral_data():
     H = W = 1024
 
     basis = {
-        'nbands': [3, 16, 32, 64, 128, 256],
+        # 'nbands': [3, 16, 32, 64, 128, 256],
+        'nbands': [3, 16, 32, 64, 128],
     }
 
     rows = []
@@ -29,17 +34,28 @@ def test_large_hyperspectral_data():
 
         fpath = base_dpath / 'big_img.tif'
 
-        if 1:
-            # Using the RAW-COG format should be roughly equivalent to BSQ/BIL
-            kwimage.imwrite(fpath, imdata, compress='RAW', backend='gdal')
+        slider = kwarray.SlidingWindow(
+            shape=(H, W), window=(64, 64), overlap=0.0,
+            keepbound=True, allow_overshoot=True)
 
+        # Using the RAW-COG format should be roughly equivalent to BSQ/BIL
+        # kwimage.imwrite(fpath, imdata, compress='RAW', backend='gdal')
+
+        import spectral.io.envi
+        from spectral.io import bsqfile
+        import spectral
+        spy_fpath = base_dpath / 'big_img_{}.hdr'.format(nbands)
+        spectral.envi.save_image(str(spy_fpath), imdata, interleave='BSQ', ext='bsq', force=True)
+        fpath = spy_fpath
+
+        if 1:
             # Create an empty CocoDataset
             coco_dset = kwcoco.CocoDataset()
             # Set the target location for the kwcoco file so we can use relative paths
             coco_dset.fpath = str(base_dpath / 'data.kwcoco.json')
 
             img = {
-                'name': 'big_img.tif',
+                'name': 'big_img',
                 'height': H,
                 'width': W,
                 'channels': 'hyper:{}'.format(nbands),  # code for channels
@@ -56,9 +72,6 @@ def test_large_hyperspectral_data():
             # Demonstrate how to loop over all slices in the image and time how long it
             # takes.
             img_shape = (img['height'], img['width'])
-            slider = kwarray.SlidingWindow(
-                shape=img_shape, window=(64, 64), overlap=0.0,
-                keepbound=True, allow_overshoot=True)
 
             # Loop over the entire image and load in small parts
             # Time how long it takes to do this.
@@ -75,43 +88,57 @@ def test_large_hyperspectral_data():
             })
 
         if 1:
+            fpath = spy_fpath.augment(ext='.bsq')
             from kwcoco.util import util_delayed_poc
-            frame = util_delayed_poc.LazyGDalFrameFile(str(fpath))
-            kwcoco_prog = ub.ProgIter(slider, desc='read-sliding-via-gdal')
-            for slices in kwcoco_prog:
+            gdal_prog = ub.ProgIter(slider, desc='read-sliding-via-gdal')
+            for slices in gdal_prog:
+                frame = util_delayed_poc.LazyGDalFrameFile(str(fpath))
                 final_data = frame[slices]
-            frame = None
+                frame = None
 
             rows.append({
                 'method': 'gdal',
                 'nbands': nbands,
-                'hz': kwcoco_prog._iters_per_second,
+                'hz': gdal_prog._iters_per_second,
+            })
+
+        if 1:
+            fpath = spy_fpath.augment(ext='.bsq')
+            import rasterio
+            gdal_prog = ub.ProgIter(slider, desc='read-sliding-via-rasterio')
+            for slices in gdal_prog:
+                sl_y, sl_x = slices
+                rio_ds = rasterio.open(str(fpath), 'r')
+                indexes = list(range(1, nbands + 1))
+                data = rio_ds.read(indexes=indexes, window=((sl_y.start, sl_y.stop), (sl_x.start, sl_x.stop)))
+                final_data = data.transpose(1, 2, 0)
+
+            rows.append({
+                'method': 'rasterio',
+                'nbands': nbands,
+                'hz': gdal_prog._iters_per_second,
             })
 
         if 1:
             # Compare to `spectral`
             # pip isntall spectral
-
             import spectral.io.envi
             from spectral.io import bsqfile
             import spectral
             spy_fpath = base_dpath / 'big_img_{}.hdr'.format(nbands)
             spectral.envi.save_image(str(spy_fpath), imdata, interleave='BSQ', ext='bsq', force=True)
 
-            try:
-                spy_prog = ub.ProgIter(slider, desc='read-sliding-via-spectral')
-                for slices in spy_prog:
-                    spy_img = spectral.envi.open(str(spy_fpath))
-                    sl_y, sl_x = slices
-                    final_data = spy_img.read_subregion((sl_y.start, sl_y.stop), (sl_x.start, sl_x.stop))
+            spy_prog = ub.ProgIter(slider, desc='read-sliding-via-spectral')
+            for slices in spy_prog:
+                spy_img = spectral.envi.open(str(spy_fpath))
+                sl_y, sl_x = slices
+                final_data = spy_img.read_subregion((sl_y.start, sl_y.stop), (sl_x.start, sl_x.stop))
 
-                rows.append({
-                    'method': 'spectral',
-                    'nbands': nbands,
-                    'hz': spy_prog._iters_per_second,
-                })
-            except Exception:
-                pass
+            rows.append({
+                'method': 'spectral',
+                'nbands': nbands,
+                'hz': spy_prog._iters_per_second,
+            })
 
     # Analysis
     import pandas as pd
@@ -124,5 +151,18 @@ def test_large_hyperspectral_data():
 
     import kwplot
     sns = kwplot.autosns()
+    plt = kwplot.autoplt()
+    kwplot.figure(fnum=1, doclf=True)
     ax = sns.lineplot(data=results, x='nbands', hue='method', y='hz')
     ax.set_yscale('log')
+
+    if 1:
+        plt.show()
+
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python -m kwcoco.examples.large_hyperspectral --profile
+    """
+    benchmark_large_hyperspectral()

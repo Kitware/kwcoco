@@ -190,6 +190,7 @@ Example:
         dsize=(0, 1),
     )
 """
+import os
 import ubelt as ub
 import numpy as np
 import kwimage
@@ -766,6 +767,9 @@ class DelayedLoad(DelayedImageOperation):
             if have_gdal():
                 # TODO: warn if we dont have a COG.
                 pre_final = LazyGDalFrameFile(self.fpath)
+                # TODO: choose the fastest lazy backend for the file
+                # pre_final = LazyRasterIOFrameFile(self.fpath)  # which is faster?
+                # pre_final = LazySpectralFrameFile(self.fpath)  # which is faster?
             else:
                 import warnings
                 warnings.warn('DelayedLoad may not be efficient without gdal')
@@ -987,6 +991,178 @@ _GDAL_DTYPE_LUT = {
 }
 
 
+class LazySpectralFrameFile(ub.NiceRepr):
+    """
+    Potentially faster than GDAL for HDR formats.
+    """
+    def __init__(self, fpath):
+        self.fpath = os.fspath(fpath)
+
+    @ub.memoize_property
+    def _ds(self):
+        import spectral
+        from os.path import exists
+        if not exists(self.fpath):
+            raise Exception('File does not exist: {}'.format(self.fpath))
+        ds = spectral.envi.open(self.fpath)
+        return ds
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+
+    @property
+    def shape(self):
+        return self._ds.shape
+
+    @property
+    def dtype(self):
+        return self._ds.dtype
+
+    def __nice__(self):
+        from os.path import basename
+        return '.../' + basename(self.fpath)
+
+    @profile
+    def __getitem__(self, index):
+        ds = self._ds
+
+        height, width, C = ds.shape
+        if not ub.iterable(index):
+            index = [index]
+
+        index = list(index)
+        if len(index) < 3:
+            n = (3 - len(index))
+            index = index + [None] * n
+
+        ypart = _rectify_slice_dim(index[0], height)
+        xpart = _rectify_slice_dim(index[1], width)
+        channel_part = _rectify_slice_dim(index[2], C)
+        trailing_part = [channel_part]
+
+        if len(trailing_part) == 1:
+            channel_part = trailing_part[0]
+            if isinstance(channel_part, list):
+                band_indices = channel_part
+            else:
+                band_indices = range(*channel_part.indices(C))
+        else:
+            band_indices = range(C)
+            assert len(trailing_part) <= 1
+
+        ystart, ystop = map(int, [ypart.start, ypart.stop])
+        xstart, xstop = map(int, [xpart.start, xpart.stop])
+
+        img_part = ds.read_subregion(
+            row_bounds=(ystart, ystop), col_bounds=(xstart, xstop),
+            bands=band_indices)
+        return img_part
+
+
+class LazyRasterIOFrameFile(ub.NiceRepr):
+    """
+
+    fpath = '/home/joncrall/.cache/kwcoco/demo/large_hyperspectral/big_img_128.bsq'
+    lazy_rio = LazyRasterIOFrameFile(fpath)
+    ds = lazy_rio._ds
+
+    Ignore:
+        # Can rasterio read multiple bands at once?
+        # Seems like that is an overhead for hyperspectral images
+
+        import rasterio
+        riods = rasterio.open(fpath)
+        import timerit
+
+        ti = timerit.Timerit(1, bestof=1, verbose=2)
+        b = tuple(range(1, riods.count + 1))
+        for timer in ti.reset('rasterio'):
+            with timer:
+                riods.read(b)
+
+        lazy_rio = LazyRasterIOFrameFile(fpath)
+        for timer in ti.reset('LazyRasterIOFrameFile'):
+            with timer:
+                lazy_rio[:]
+
+        lazy_gdal = LazyGDalFrameFile(fpath)
+        for timer in ti.reset('LazyGDalFrameFile'):
+            with timer:
+                lazy_gdal[:]
+
+    """
+    def __init__(self, fpath):
+        self.fpath = os.fspath(fpath)
+
+    @ub.memoize_property
+    def _ds(self):
+        import rasterio
+        from os.path import exists
+        if not exists(self.fpath):
+            raise Exception('File does not exist: {}'.format(self.fpath))
+        ds = rasterio.open(self.fpath, mode='r')
+        return ds
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+
+    @property
+    def shape(self):
+        ds = self._ds
+        return (ds.height, ds.width, ds.count)
+
+    @property
+    def dtype(self):
+        # Assume the first is the same as the rest
+        ds = self._ds
+        dtype = getattr(np, ds.dtypes[0])
+        return dtype
+
+    def __nice__(self):
+        from os.path import basename
+        return '.../' + basename(self.fpath)
+
+    @profile
+    def __getitem__(self, index):
+        ds = self._ds
+        width = ds.width
+        height = ds.height
+        C = ds.count
+
+        if not ub.iterable(index):
+            index = [index]
+
+        index = list(index)
+        if len(index) < 3:
+            n = (3 - len(index))
+            index = index + [None] * n
+
+        ypart = _rectify_slice_dim(index[0], height)
+        xpart = _rectify_slice_dim(index[1], width)
+        channel_part = _rectify_slice_dim(index[2], C)
+        trailing_part = [channel_part]
+
+        if len(trailing_part) == 1:
+            channel_part = trailing_part[0]
+            if isinstance(channel_part, list):
+                band_indices = channel_part
+            else:
+                band_indices = range(*channel_part.indices(C))
+        else:
+            band_indices = range(C)
+            assert len(trailing_part) <= 1
+
+        ystart, ystop = map(int, [ypart.start, ypart.stop])
+        xstart, xstop = map(int, [xpart.start, xpart.stop])
+
+        indexes = [b + 1 for b in band_indices]
+        img_part = ds.read(indexes=indexes, window=((ystart, ystop), (xstart, xstop)))
+        img_part = img_part.transpose(1, 2, 0)
+        return img_part
+
+
 class LazyGDalFrameFile(ub.NiceRepr):
     """
     TODO:
@@ -1024,7 +1200,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
         self[:]
     """
     def __init__(self, fpath):
-        self.fpath = fpath
+        self.fpath = os.fspath(fpath)
 
     @ub.memoize_property
     def _ds(self):
