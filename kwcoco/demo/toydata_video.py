@@ -19,7 +19,7 @@ except Exception:
     profile = ub.identity
 
 
-TOYDATA_VIDEO_VERSION = 20
+TOYDATA_VIDEO_VERSION = 21
 
 
 @profile
