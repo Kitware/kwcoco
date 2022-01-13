@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 
 * Removed old Python2 constructs
+* Modified multisensor to use concise channel codes
 
 
 ## Version 0.2.19 - Released 2022-01-04

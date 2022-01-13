@@ -401,6 +401,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         # what the channels for each sensor should be.
         sensor_to_channels['sensor2'] = kwcoco.ChannelSpec.coerce('r|g|b,disparity,gauss,B8|B11')
         sensor_to_channels['sensor3'] = kwcoco.ChannelSpec.coerce('r|g|b,flowx|flowy,distri,B10|B11')
+        sensor_to_channels['sensor4'] = kwcoco.ChannelSpec.coerce('B11,X.2,Y:2:6')
 
     sensors = sorted(sensor_to_channels.keys())
 
