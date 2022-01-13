@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * Removed old Python2 constructs
 * Modified multisensor to use concise channel codes
+* Moved `LazyGDalFrameFile` to `kwcoco.util.lazy_frame_backends` to experiment with different image subregion loaders
 
 
 ## Version 0.2.19 - Released 2022-01-04

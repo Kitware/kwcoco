@@ -4,12 +4,15 @@ import xdev
 @xdev.profile
 def benchmark_large_hyperspectral():
     import ubelt as ub
-    import kwimage
+    # import kwimage
     import kwarray
     import kwcoco
     import numpy as np
 
-    base_dpath = ub.Path(ub.ensure_app_cache_dir('kwcoco/demo/large_hyperspectral'))
+    from osgeo import gdal
+    gdal.UseExceptions()
+
+    base_dpath = ub.Path(ub.ensure_app_cache_dir('kwcoco/demo/bench_large_hyperspectral'))
 
     MB = (2.0 ** 20)
     H = W = 1024
@@ -41,9 +44,10 @@ def benchmark_large_hyperspectral():
         # Using the RAW-COG format should be roughly equivalent to BSQ/BIL
         # kwimage.imwrite(fpath, imdata, compress='RAW', backend='gdal')
 
+        # Compare to `spectral`
+        # pip isntall spectral
         import spectral.io.envi
-        from spectral.io import bsqfile
-        import spectral
+        import spectral  # NOQA
         spy_fpath = base_dpath / 'big_img_{}.hdr'.format(nbands)
         spectral.envi.save_image(str(spy_fpath), imdata, interleave='BSQ', ext='bsq', force=True)
         fpath = spy_fpath
@@ -71,7 +75,7 @@ def benchmark_large_hyperspectral():
 
             # Demonstrate how to loop over all slices in the image and time how long it
             # takes.
-            img_shape = (img['height'], img['width'])
+            # img_shape = (img['height'], img['width'])
 
             # Loop over the entire image and load in small parts
             # Time how long it takes to do this.
@@ -120,11 +124,6 @@ def benchmark_large_hyperspectral():
             })
 
         if 1:
-            # Compare to `spectral`
-            # pip isntall spectral
-            import spectral.io.envi
-            from spectral.io import bsqfile
-            import spectral
             spy_fpath = base_dpath / 'big_img_{}.hdr'.format(nbands)
             spectral.envi.save_image(str(spy_fpath), imdata, interleave='BSQ', ext='bsq', force=True)
 
@@ -163,6 +162,6 @@ def benchmark_large_hyperspectral():
 if __name__ == '__main__':
     """
     CommandLine:
-        python -m kwcoco.examples.large_hyperspectral --profile
+        python -m kwcoco.examples.bench_large_hyperspectral --profile
     """
     benchmark_large_hyperspectral()
