@@ -230,7 +230,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         cx_to_matchable_txs = {}
         for cx, compat_cx in cx_to_matchable_cxs.items():
             matchable_cxs = cx_to_matchable_cxs[cx]
-            compat_txs = ub.dict_take(cx_to_txs, matchable_cxs, default=[])
+            compat_txs = ub.take(cx_to_txs, matchable_cxs, default=[])
             compat_txs = np.array(sorted(ub.flatten(compat_txs)), dtype=int)
             cx_to_matchable_txs[cx] = compat_txs
 
