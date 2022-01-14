@@ -620,7 +620,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
             ignore_idxs = np.where(ignore_overlap > ioaa_thresh)[0]
 
             if ignore_sseg is not None:
-                from shapely.ops import cascaded_union
+                from shapely.ops import unary_union
                 # If the ignore region has segmentations further refine our
                 # estimate of which predictions should be ignored.
                 ignore_sseg = ignore_sseg.to_polygon_list()
@@ -640,7 +640,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
                     except Exception:
                         pass
                 # ignore_regions = [p.to_shapely() for p in ignore_polys]
-                ignore_region = cascaded_union(ignore_regions).buffer(0)
+                ignore_region = unary_union(ignore_regions).buffer(0)
 
                 cand_pred = pred_boxes.take(ignore_idxs)
 
