@@ -771,7 +771,7 @@ class DelayedLoad(DelayedImageOperation):
                 # pre_final = LazyGDalFrameFile(self.fpath)
                 # TODO: choose the fastest lazy backend for the file
                 # pre_final = lazy_frame_backends.LazyRasterIOFrameFile(self.fpath)  # which is faster?
-                pre_final = lazy_frame_backends.LazySpectralFrameFile(self.fpath)  # which is faster?
+                # pre_final = lazy_frame_backends.LazySpectralFrameFile(self.fpath)  # which is faster?
             else:
                 import warnings
                 warnings.warn('DelayedLoad may not be efficient without gdal')
