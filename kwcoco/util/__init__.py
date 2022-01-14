@@ -10,7 +10,6 @@ from kwcoco.util import util_delayed_poc
 from kwcoco.util import util_futures
 from kwcoco.util import util_json
 from kwcoco.util import util_monkey
-from kwcoco.util import util_resources
 from kwcoco.util import util_sklearn
 from kwcoco.util import util_truncate
 
@@ -35,7 +34,6 @@ from kwcoco.util.util_json import (IndexableWalker, ensure_json_serializable,
                                    find_json_unserializable,
                                    indexable_allclose,)
 from kwcoco.util.util_monkey import (SupressPrint,)
-from kwcoco.util.util_resources import (coerce_num_workers,)
 from kwcoco.util.util_sklearn import (StratifiedGroupKFold,)
 from kwcoco.util.util_truncate import (smart_truncate,)
 
@@ -48,10 +46,10 @@ __all__ = ['ALLOF', 'ANY', 'ANYOF', 'ARRAY', 'Archive', 'BOOLEAN',
            'LazyGDalFrameFile', 'LazyRasterIOFrameFile',
            'LazySpectralFrameFile', 'NOT', 'NULL', 'NUMBER', 'OBJECT', 'ONEOF',
            'QuantifierElements', 'STRING', 'ScalarElements', 'SchemaElements',
-           'StratifiedGroupKFold', 'SupressPrint', 'coerce_num_workers',
+           'StratifiedGroupKFold', 'SupressPrint',
            'dict_like', 'elem', 'ensure_json_serializable',
            'find_json_unserializable', 'indexable_allclose',
            'jsonschema_elements', 'lazy_frame_backends',
            'smart_truncate', 'unarchive_file', 'util_archive',
            'util_delayed_poc', 'util_futures', 'util_json', 'util_monkey',
-           'util_resources', 'util_sklearn', 'util_truncate']
+           'util_sklearn', 'util_truncate']

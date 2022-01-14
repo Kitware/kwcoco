@@ -529,7 +529,6 @@ test_minimal_strict/cp36-cp36m-linux:
             IMAGE_NAME=gitlab.kitware.com:4567/computer-vision/ci-docker/gl-python:3.9
             docker run -v $PWD:/io -v $HOME/.cache/pip:/pip_cache -it $IMAGE_NAME bash
 
-            time docker run -it python:3.8 /bin/bash -c "python3 -m pip install kwcoco"
             ###############
             # Inside Docker
             git clone /io $HOME/repo
@@ -542,10 +541,12 @@ test_minimal_strict/cp36-cp36m-linux:
             chmod -R g+rw $PIP_CACHE_DIR
             USER=$(whoami)
             chown -R $USER $PIP_CACHE_DIR
-            source dev/make_strict_req.sh && pip install -r requirements-strict.txt --user
-            pip install -e . --user
+
+            pip install -e . 
             python -m pytest 
 
+
+            source dev/make_strict_req.sh && pip install -r requirements-strict.txt --user
 
             cd $HOME
             git clone https://gitlab.kitware.com/computer-vision/kwarray.git
