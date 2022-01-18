@@ -526,7 +526,7 @@ class SqlDictProxy(DictLike):
             for item in _raw_yielder(result):
                 yield item[0]
 
-    def itervalues(proxy):
+    def values(proxy):
         if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.cls)
             if proxy.ignore_null:
@@ -580,16 +580,13 @@ class SqlDictProxy(DictLike):
                 item = dict(zip(colnames, cast_row))
                 yield item
 
-    def iteritems(proxy):
+    def items(proxy):
         if proxy.keyattr is None:
             keyattr_name = 'id'
         else:
             keyattr_name = proxy.keyattr.name
-        for value in proxy.itervalues():
+        for value in proxy.values():
             yield (value[keyattr_name], value)
-
-    items = iteritems
-    values = itervalues
 
 
 class SqlIdGroupDictProxy(DictLike):
@@ -647,9 +644,9 @@ class SqlIdGroupDictProxy(DictLike):
         >>> proxy = sql_dset.index.vidid_to_gids
         >>> from kwcoco.util.util_json import indexable_allclose
         >>> assert indexable_allclose(orig, dict(proxy))
-        >>> items = list(proxy.iteritems())
-        >>> vals = list(proxy.itervalues())
-        >>> keys = list(proxy.iterkeys())
+        >>> items = list(proxy.items())
+        >>> vals = list(proxy.values())
+        >>> keys = list(proxy.keys())
         >>> assert len(keys) == len(vals)
         >>> assert dict(zip(keys, vals)) == dict(items)
     """
@@ -739,7 +736,7 @@ class SqlIdGroupDictProxy(DictLike):
             for item in _raw_yielder(result):
                 yield item[0]
 
-    def iteritems(proxy):
+    def items(proxy):
         _set = set if proxy.group_order_attr is None else ub.oset
         if proxy.group_order_attr is not None:
             print('proxy.group_order_attr = {!r}'.format(proxy.group_order_attr))
@@ -856,7 +853,7 @@ class SqlIdGroupDictProxy(DictLike):
                     tup = (key, group)
                     yield tup
 
-    def itervalues(proxy):
+    def values(proxy):
         # Not sure if there if iterating over just the valuse can be more
         # efficient than iterating over the items and discarding the values.
         for key, val in proxy.items():

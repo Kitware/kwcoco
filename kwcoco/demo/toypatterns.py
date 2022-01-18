@@ -1,5 +1,4 @@
 import cv2
-import six
 import kwarray
 import kwimage
 import numpy as np
@@ -86,7 +85,7 @@ class CategoryPatterns(object):
                 arg = list(ub.take(cname_to_cat, catnames))
             elif ub.iterable(data) and len(data) > 0:
                 # choose specific catgories
-                if isinstance(data[0], six.string_types):
+                if isinstance(data[0], str):
                     catnames = data
                     cname_to_cat = {c['name']: c for c in CategoryPatterns._default_categories}
                     arg = list(ub.take(cname_to_cat, catnames))

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Generates "toydata" for demo and testing purposes.
 
@@ -6,7 +5,6 @@ This is the video version of the toydata generator and should be prefered to
 the loose image version in toydata_image.
 
 """
-from __future__ import absolute_import, division, print_function
 from os.path import join
 import numpy as np
 import ubelt as ub
@@ -21,7 +19,7 @@ except Exception:
     profile = ub.identity
 
 
-TOYDATA_VIDEO_VERSION = 20
+TOYDATA_VIDEO_VERSION = 21
 
 
 @profile
@@ -403,6 +401,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         # what the channels for each sensor should be.
         sensor_to_channels['sensor2'] = kwcoco.ChannelSpec.coerce('r|g|b,disparity,gauss,B8|B11')
         sensor_to_channels['sensor3'] = kwcoco.ChannelSpec.coerce('r|g|b,flowx|flowy,distri,B10|B11')
+        sensor_to_channels['sensor4'] = kwcoco.ChannelSpec.coerce('B11,X.2,Y:2:6')
 
     sensors = sorted(sensor_to_channels.keys())
 

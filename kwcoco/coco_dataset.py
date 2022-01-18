@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 An implementation and extension of the original MS-COCO API [1]_.
 
@@ -254,7 +253,6 @@ References:
     .. [3] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
 import copy
 import itertools as it
 import json
@@ -1134,21 +1132,19 @@ class MixinCocoExtras(object):
                 vidkw[key] = value
 
             vidkw.update(kwargs)
-            print('vidkw = {}'.format(ub.repr2(vidkw, nl=1)))
             use_cache = vidkw.pop('use_cache', True)
 
             if 'rng' not in vidkw:
                 # Make rng determined by other params by default
-                vidkw['rng'] = int(ub.hash_data(ub.repr2(vidkw))[0:8], 16)
+                vidkw['rng'] = int(ub.hash_data(sorted(vidkw.items()))[0:8], 16)
 
-            cfgstr = ub.hash_data(ub.repr2(vidkw), base='abc')[0:14]
+            depends = ub.hash_data(sorted(vidkw.items()), base='abc')[0:14]
 
             if verbose > 3:
                 print('vidkw = {!r}'.format(vidkw))
-                print('cfgstr = {!r}'.format(cfgstr))
+                print('depends = {!r}'.format(depends))
 
-            tag = key + '_' + cfgstr
-
+            tag = key + '_' + depends
             dpath = vidkw.pop('dpath', None)
             bundle_dpath = vidkw.get('bundle_dpath', None)
             if dpath is not None:
@@ -1167,7 +1163,7 @@ class MixinCocoExtras(object):
             stamp = ub.CacheStamp(
                 'vidshape_stamp_v{:03d}'.format(toydata_video.TOYDATA_VIDEO_VERSION),
                 dpath=cache_dpath,
-                cfgstr=cfgstr, enabled=use_cache,
+                depends=depends, enabled=use_cache,
                 product=[fpath], verbose=1,
                 meta=vidkw
             )

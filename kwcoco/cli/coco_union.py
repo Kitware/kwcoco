@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 from os.path import dirname
 import ubelt as ub
 import scriptconfig as scfg

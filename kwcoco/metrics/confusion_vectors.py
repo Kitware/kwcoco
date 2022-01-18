@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Classes that store raw confusion vectors, which can be accumulated into
 confusion measures.
@@ -6,7 +5,6 @@ confusion measures.
 import numpy as np
 import ubelt as ub
 import warnings
-import six
 from kwcoco.metrics.functional import fast_confusion_matrix
 from kwcoco.metrics.sklearn_alts import _binary_clf_curve2
 from kwcoco.category_tree import CategoryTree
@@ -338,7 +336,7 @@ class ConfusionVectors(ub.NiceRepr):
                         'classes must be known if negative_classes are strings')
                 return [c.lower() for c in cfsn_vecs.classes]
             for c in negative_classes:
-                if isinstance(c, six.string_types):
+                if isinstance(c, str):
                     classes = _lower_classes()
                     try:
                         cidx = classes.index(c)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Classes that store accumulated confusion measures (usually derived from
 confusion vectors).

@@ -2,7 +2,6 @@
 mkinit kwcoco.metrics -w --relative
 """
 # flake8: noqa
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 
 __submodules__ = [

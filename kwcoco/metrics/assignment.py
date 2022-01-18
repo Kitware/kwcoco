@@ -230,7 +230,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         cx_to_matchable_txs = {}
         for cx, compat_cx in cx_to_matchable_cxs.items():
             matchable_cxs = cx_to_matchable_cxs[cx]
-            compat_txs = ub.dict_take(cx_to_txs, matchable_cxs, default=[])
+            compat_txs = ub.take(cx_to_txs, matchable_cxs, default=[])
             compat_txs = np.array(sorted(ub.flatten(compat_txs)), dtype=int)
             cx_to_matchable_txs[cx] = compat_txs
 
@@ -620,7 +620,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
             ignore_idxs = np.where(ignore_overlap > ioaa_thresh)[0]
 
             if ignore_sseg is not None:
-                from shapely.ops import cascaded_union
+                from shapely.ops import unary_union
                 # If the ignore region has segmentations further refine our
                 # estimate of which predictions should be ignored.
                 ignore_sseg = ignore_sseg.to_polygon_list()
@@ -640,7 +640,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
                     except Exception:
                         pass
                 # ignore_regions = [p.to_shapely() for p in ignore_polys]
-                ignore_region = cascaded_union(ignore_regions).buffer(0)
+                ignore_region = unary_union(ignore_regions).buffer(0)
 
                 cand_pred = pred_boxes.take(ignore_idxs)
 

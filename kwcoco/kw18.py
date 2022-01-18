@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 A helper for converting COCO to / from KW18 format.
 
@@ -37,7 +36,6 @@ frame of one track and all rows have the same number of columns. The fields are:
     (vehicle), or 3 (other).
     20) Activity ID -- refer to activities.txt for index and list of activities.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
 import kwarray
 import numpy as np
 
@@ -309,8 +307,7 @@ class KW18(kwarray.DataFrameArray):
         return self
 
     def dump(self, file):
-        import six
-        if isinstance(file, six.string_types):
+        if isinstance(file, str):
             with open(file, 'w') as fp:
                 self.dump(fp)
         else:

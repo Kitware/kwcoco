@@ -4,7 +4,7 @@ Notes about a deep dive into sqlalchemy picking appart some internals
 from kwcoco.coco_sql_dataset import *  # NOQA
 
 
-def itervalues(proxy):
+def values(proxy):
     """
     from kwcoco.coco_sql_dataset import *  # NOQA
     import pytest
