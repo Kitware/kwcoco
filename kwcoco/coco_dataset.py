@@ -1755,8 +1755,7 @@ class MixinCocoExtras(object):
                new_prefix=None,
                absolute=False,
                check=True,
-               safe=True,
-               smart=False):
+               safe=True):
         """
         Modify the prefix of the image/data paths onto a new image/data root.
 
@@ -1786,11 +1785,6 @@ class MixinCocoExtras(object):
 
             safe (bool, default=True):
                 if True, does not overwrite values until all checks pass
-
-            smart (bool, default=False):
-                If True, we can try different reroot strategies and choose the
-                one that works. Note, always be wary when algorithms try to be
-                smart. NOT IMPLEMENTED. DEPRECATE or TODO?
 
         CommandLine:
             xdoctest -m kwcoco.coco_dataset MixinCocoExtras.reroot
@@ -1848,9 +1842,6 @@ class MixinCocoExtras(object):
         if new_img_root is None:
             new_img_root = self.bundle_dpath
 
-        if smart:
-            raise NotImplementedError('we are not smart yet (probably a good thing)')
-
         def _reroot_path(file_name):
             """ Reroot a single file """
 
@@ -1872,6 +1863,8 @@ class MixinCocoExtras(object):
             # respect to this new root (assuming the previous root was also
             # valid)
             if old_prefix is None and new_prefix is None:
+                # This is not a good check, fails if we want to
+                # do a relative reroot outside of the original dataset
                 if new_img_root is not None and cur_gpath.startswith(new_img_root):
                     file_name = relpath(cur_gpath, new_img_root)
 
