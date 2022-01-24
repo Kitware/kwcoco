@@ -291,6 +291,9 @@ class CocoEvaluator(object):
         if coco_eval.config['use_image_names']:
             # TODO: currently this is a hacky implementation that modifies the
             # pred dset, we should not do that, just store a gid mapping.
+
+            # TODO: we will port the watch associate-images functionality soon,
+            # which should supercede this.
             pred_to_true_gid = {}
             true_coco = true_extra['coco_dset']
             pred_coco = pred_extra['coco_dset']
