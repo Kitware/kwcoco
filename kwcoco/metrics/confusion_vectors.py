@@ -705,9 +705,17 @@ class BinaryConfusionVectors(ub.NiceRepr):
     """
 
     def __init__(self, data, cx=None, classes=None):
-        if isinstance(data, dict):
-            import kwarray
+        import kwarray
+        if data is None:
+            # Init an empty object
+            data = kwarray.DataFrameArray({
+                'is_true': np.empty((0,), dtype=bool),
+                'pred_score': np.empty((0,), dtype=float),
+                'weight': np.empty((0,), dtype=float),
+            })
+        elif isinstance(data, dict):
             data = kwarray.DataFrameArray(ub.map_vals(np.asarray, data))
+
         self.data = data
         self.cx = cx
         self.classes = classes

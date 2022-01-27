@@ -8,6 +8,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.21 - Unreleased
 
 
+### Changed
+* Minor improvements to confusion measures.
+
+
 ## Version 0.2.20 - Released 2022-01-18
 
 ### Changed

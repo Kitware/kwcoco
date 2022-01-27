@@ -4774,7 +4774,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     '''
                     Specified fpath={} does not exist. If you are trying
                     to create a new dataset fist create a CocoDataset without
-                    any arguments, and then set the fpath attribute
+                    any arguments, and then set the fpath attribute.
+                    We may loosen this requirement in the future.
                     ''').format(fpath))
 
             with open(fpath, 'r') as file:
