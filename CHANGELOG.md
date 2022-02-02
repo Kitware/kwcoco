@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 * Minor improvements to confusion measures.
+* AP / ROC curves now report real/support using concise SI for large numbers
 
 
 ## Version 0.2.20 - Released 2022-01-18

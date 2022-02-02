@@ -65,18 +65,87 @@ def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
     return ax
 
 
-def inty_display(val, eps=1e-8, ndigits=2):
+def demo_format_options():
+    # https://docs.python.org/3.10/library/string.html#formatstrings
+
+    grid = {
+        'type': ['e', 'E', 'f', 'F', 'g', 'G'],
+        'alternate': ['', '#'],
+        'width': [''],
+        # 'group': ['', '_', ','],
+        'group': [''],
+        'precision': ['', '.0', '.1'],
+    }
+    for kw in ub.named_product(grid):
+        val = 432423423
+        fmt = '{alternate}{width}{group}{precision}{type}'.format(**kw)
+        fmtstr = '{:' + fmt + '}'
+        out = fmtstr.format(val)
+        print('kw = {}'.format(ub.repr2(kw, nl=0, sort=0)))
+        print(out)
+
+
+def concice_si_display(val, eps=1e-8, precision=2, si_thresh=4):
     """
-    Make a number as inty as possible
+    Display numbers in scientific notation if above a threshold
+
+    Args:
+        eps (float):
+            threshold to be formated as an integer if other integer conditions
+            hold.
+
+        precision (int):
+            maximum significant digits (might print less)
+
+        si_thresh (int):
+            If the number is less than 10^{si_thresh}, then it will be printed
+            as an integer if it is within eps of an integer.
+
+    References:
+        https://docs.python.org/2/library/stdtypes.html#string-formatting-operations
+
+    Example:
+        >>> grid = {
+        >>>     'sign': [1, -1],
+        >>>     'exp': [1, -1],
+        >>>     'big_part': [0, 32132e3, 4000000032],
+        >>>     'med_part': [0, 0.5, 0.9432, 0.000043, 0.01, 1, 2],
+        >>>     'small_part': [0, 1321e-3, 43242e-11],
+        >>> }
+        >>> for kw in ub.named_product(grid):
+        >>>     sign = kw.pop('sign')
+        >>>     exp = kw.pop('exp')
+        >>>     raw = (sum(map(float, kw.values())))
+        >>>     val = sign * raw ** exp if raw != 0 else sign * raw
+        >>>     print('{:>20} - {}'.format(concice_si_display(val), val))
+        >>> from kwcoco.metrics.drawing import *  # NOQA
+        >>> print(concice_si_display(40000000432432))
+        >>> print(concice_si_display(473243280432890))
+        >>> print(concice_si_display(473243284289))
+        >>> print(concice_si_display(473243289))
+        >>> print(concice_si_display(4739))
+        >>> print(concice_si_display(473))
+        >>> print(concice_si_display(0.432432))
+        >>> print(concice_si_display(0.132432))
+        >>> print(concice_si_display(1.0000043))
+        >>> print(concice_si_display(01.00000000000000000000000000043))
     """
-    try:
-        val_int = int(val)
-        if abs(val - val_int) > eps:
-            raise ValueError('not close to an int')
-        final = '{}'.format(val_int)
-    except (ValueError, TypeError):
-        final = '{}'.format(round(val, ndigits))
-    return final
+    import math
+    ndigits = 1 if val == 0 else int(math.log10(abs(val)))
+    if ndigits <= 4 and (abs(val) > 1 or abs(val) < eps):
+        try:
+            val_int = int(val)
+            if abs(val - val_int) > eps:
+                raise ValueError('not close to an int')
+            val_str = '{}'.format(val_int)
+        except (ValueError, TypeError):
+            val_str = '{}'.format(round(val, precision))
+    else:
+        # Floaty SI display, but with the +0 after the "e"
+        val_str = ('{:.' + str(precision) + 'g}').format(val)
+        val_str = val_str.replace('e+', 'e').replace('e0', 'e')
+        val_str = val_str.replace('e-0', 'e-')
+    return val_str
 
 
 def _realpos_label_suffix(info):
@@ -88,6 +157,7 @@ def _realpos_label_suffix(info):
         info (Dict): with keys, nsuppert, realpos_total
 
     Example:
+        >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> info = {'nsupport': 10, 'realpos_total': 10}
         >>> _realpos_label_suffix(info)
         10/10
@@ -103,16 +173,22 @@ def _realpos_label_suffix(info):
         >>> info = {'nsupport': 10.009}
         >>> _realpos_label_suffix(info)
         10.01
+        >>> info = {'nsupport': 3331033334342.432, 'realpos_total': 1033334342.432}
+        >>> _realpos_label_suffix(info)
+        1e9/3.3e12
+        >>> info = {'nsupport': 0.007, 'realpos_total': 0.0000893}
+        >>> _realpos_label_suffix(info)
+        8.9e-5/0.007
     """
     nsupport = info['nsupport']
     nsupport = float('nan') if nsupport is None else float(nsupport)
 
     rpt = info.get('realpos_total', None)
-    nsupport_dsp = inty_display(nsupport)
+    nsupport_dsp = concice_si_display(nsupport)
     if rpt is None:
         return nsupport_dsp
     else:
-        rpt_dsp = inty_display(rpt)
+        rpt_dsp = concice_si_display(rpt)
         return '{}/{}'.format(rpt_dsp, nsupport_dsp)
 
 
@@ -367,7 +443,7 @@ def draw_roc(info, prefix='', fnum=1, **kw):
         sns.lineplot(data=data, x=xlabel, y=ylabel, markers='', ax=ax)
         ax.set_title(title)
     else:
-        realpos_total_disp = inty_display(realpos_total)
+        realpos_total_disp = concice_si_display(realpos_total)
 
         ax = kwplot.multi_plot(
             list(fp_rate), list(tp_rate), marker='',

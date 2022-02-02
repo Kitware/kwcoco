@@ -4599,7 +4599,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> # Start by looking up an image by it's COCO id.
         >>> image_id = 1
         >>> img = self.index.imgs[image_id]
-        >>> print(ub.repr2(img, nl=1))
+        >>> print(ub.repr2(img, nl=1, sort=1))
         {
             'file_name': 'astro.png',
             'id': 1,
@@ -4621,7 +4621,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> # Use annotation category id to look up that information
         >>> category_id = ann['category_id']
         >>> cat = self.index.cats[category_id]
-        >>> print('cat = {}'.format(ub.repr2(cat, nl=1)))
+        >>> print('cat = {}'.format(ub.repr2(cat, nl=1, sort=1)))
         cat = {
             'id': 1,
             'name': 'astronaut',
@@ -4630,7 +4630,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> #
         >>> # Now play with some helper functions, like extended statistics
         >>> extended_stats = self.extended_stats()
-        >>> print('extended_stats = {}'.format(ub.repr2(extended_stats, nl=1, precision=2)))
+        >>> print('extended_stats = {}'.format(ub.repr2(extended_stats, nl=1, precision=2, sort=1)))
         extended_stats = {
             'annots_per_img': {'mean': 3.67, 'std': 3.86, 'min': 0.00, 'max': 9.00, 'nMin': 1, 'nMax': 1, 'shape': (3,)},
             'imgs_per_cat': {'mean': 0.88, 'std': 0.60, 'min': 0.00, 'max': 2.00, 'nMin': 2, 'nMax': 1, 'shape': (8,)},
