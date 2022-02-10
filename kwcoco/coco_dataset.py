@@ -1390,13 +1390,63 @@ class MixinCocoExtras(object):
         Called whenever the coco dataset is modified. It is possible to specify
         which parts were modified so unmodified parts can be reused next time
         the hash is constructed.
+
+        TODO:
+            - [ ] Rename to _notify_modification --- or something like that
         """
+        self._state['was_modified'] = True
         self.hashid = None
         if parts is not None and self.hashid_parts is not None:
             for part in parts:
                 self.hashid_parts.pop(part, None)
         else:
             self.hashid_parts = None
+
+    def _cached_hashid(self):
+        """
+        Under Construction.
+        """
+        cache_miss = True
+        enable_cache = (
+            self._state['was_loaded'] and
+            not self._state['was_modified']
+        )
+        if enable_cache:
+            coco_fpath = ub.Path(self.fpath)
+            enable_cache = coco_fpath.exists()
+
+        if enable_cache:
+            hashid_sidecar_fpath = ub.Path(str(coco_fpath) + '.hashid.cache')
+            # Generate current lookup key
+            fpath_stat = coco_fpath.stat()
+            status_key = {
+                'st_size': fpath_stat.st_size,
+                'st_mtime': fpath_stat.st_mtime
+            }
+            if hashid_sidecar_fpath.exists():
+                cached_data = json.loads(hashid_sidecar_fpath.read_text())
+                if cached_data['status_key'] == status_key:
+                    self.hashid = cached_data['hashid']
+                    self.hashid_parts = cached_data['hashid_parts']
+                    cache_miss = False
+
+        if cache_miss:
+            self._build_hashid()
+            hashid = self.hashid
+            hashid_parts = self.hashid_parts
+            hashid_cache_data = {
+                'hashid': hashid,
+                'hashid_parts': hashid_parts,
+                'status_key': status_key,
+            }
+            hashid_sidecar_fpath.write_text(json.dumps(hashid_cache_data))
+        return self.hashid
+
+    def _dataset_id(self):
+        hashid = self._cached_hashid()
+        coco_fpath = ub.Path(self.fpath)
+        dset_id = '_'.join([coco_fpath.parent.stem, coco_fpath.stem, hashid[0:8]])
+        return dset_id
 
     def _ensure_imgsize(self, workers=0, verbose=1, fail=False):
         """
@@ -4685,6 +4735,14 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """
         self._fpath = None
 
+        # Info about what was the origin of this object and if anything
+        # happened to it over its lifetime.
+        self._state = {
+            'was_loaded': False,
+            'was_saved': False,
+            'was_modified': 0,
+        }
+
         if img_root is not None:
             bundle_dpath = img_root
         if data is None:
@@ -4778,6 +4836,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     We may loosen this requirement in the future.
                     ''').format(fpath))
 
+            self._state['was_loaded'] = True
             with open(fpath, 'r') as file:
                 data = json.load(file)
 
@@ -5113,6 +5172,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     print('Failed to dump ex = {!r}'.format(ex))
                     self._check_json_serializable()
                     raise
+                else:
+                    self._state['was_saved'] = True
 
     def _check_json_serializable(self, verbose=1):
         """
