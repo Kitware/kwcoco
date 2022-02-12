@@ -169,6 +169,27 @@ class BaseChannelSpec(ub.NiceRepr):
         # the parent implementation of this is backwards
         return self.intersection(other)
 
+    def path_sanitize(self):
+        """
+        Clean up the channel spec so it can be used in a pathname.
+
+        Returns:
+            str: path suitable for usage in a filename
+
+        Note:
+            This mapping is not invertible and should not be relied on
+            to reconstruct the path spec. This is only a convenience.
+
+        Example:
+            >>> import kwcoco
+            >>> print(kwcoco.FusedChannelSpec.coerce('a chan with space|bar|baz').path_sanitize())
+            a chan with space_bar_baz
+            >>> print(kwcoco.ChannelSpec.coerce('foo|bar|baz,biz').path_sanitize())
+            foo_bar_baz,biz
+        """
+        spec = self.spec
+        return spec.replace('|', '_').replace(':', '-')
+
 
 class FusedChannelSpec(BaseChannelSpec):
     """

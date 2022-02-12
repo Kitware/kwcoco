@@ -1432,17 +1432,32 @@ class MixinCocoExtras(object):
 
         if cache_miss:
             self._build_hashid()
-            hashid = self.hashid
-            hashid_parts = self.hashid_parts
-            hashid_cache_data = {
-                'hashid': hashid,
-                'hashid_parts': hashid_parts,
-                'status_key': status_key,
-            }
-            hashid_sidecar_fpath.write_text(json.dumps(hashid_cache_data))
+            if enable_cache:
+                hashid_cache_data = {
+                    'hashid': self.hashid,
+                    'hashid_parts': self.hashid_parts,
+                    'status_key': status_key,
+                }
+                hashid_sidecar_fpath.write_text(json.dumps(hashid_cache_data))
         return self.hashid
 
     def _dataset_id(self):
+        """
+        A human interpretable name that can be used to uniquely identify the
+        dataset.
+
+        Note:
+            This function is currently subject to change.
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> print(self._dataset_id())
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> print(self._dataset_id())
+            >>> self = kwcoco.CocoDataset()
+            >>> print(self._dataset_id())
+        """
         hashid = self._cached_hashid()
         coco_fpath = ub.Path(self.fpath)
         dset_id = '_'.join([coco_fpath.parent.stem, coco_fpath.stem, hashid[0:8]])
