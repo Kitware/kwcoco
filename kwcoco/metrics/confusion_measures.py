@@ -122,6 +122,24 @@ class Measures(ub.NiceRepr, DictProxy):
             'catname': self.get('node', None),
         }
 
+    def maximized_thresholds(self):
+        """
+        Returns thresholds that maximize metrics.
+        """
+        # TODO: clean up the underlying storage of this info
+        maximized_info = {}
+        for k in self.keys():
+            if k.startswith('_max_'):
+                v = self[k]
+                metric_value, thresh_value = v
+                metric_name = k.split('_max_', 1)[1]
+                maximized_info[metric_name] = {
+                    'thresh': thresh_value,
+                    'metric_value': metric_value,
+                    'metric_name': metric_name,
+                }
+        return maximized_info
+
     def counts(self):
         counts_df = ub.dict_isect(self, [
             'fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds'])
@@ -727,6 +745,7 @@ class MeasureCombiner:
         if self.queue:
             self.combine()
         if self.measures is None:
+            # Note: might want to return None instead?
             return False
         else:
             self.measures.reconstruct()

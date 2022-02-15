@@ -64,3 +64,92 @@ def main():
         #
         dset_remote_abs = dset.copy().reroot(host, old_prefix=remote, absolute=True, check=0)
         report(dset_remote_abs, 'dset_remote_abs')
+
+
+def demo_reroot_bug1():
+    """
+    This demos a case that does not work correctly.
+
+    TODO:
+        Check case where:
+
+            * Files (including auxiliary) are relative to a bundle path
+
+                bundle_path1 = '/my/data/repos/my_bundle1'
+
+            * Then we reroot to an absolute directory
+
+            * Then we we change the bundle path to
+
+                bundle_path2 = '/my/data/repos/my_bundle2'
+
+            * Then we reroot to a relative directory. This should result in
+                filepaths changing such that they all start with
+
+                ../my_bundle1/
+    """
+    import kwcoco
+    import ubelt as ub
+    import kwimage
+    dset = kwcoco.CocoDataset()
+    dpath = ub.Path(ub.ensure_app_cache_dir('kwcoco/tests/reroot'))
+    dset.fpath = dpath / 'data/repos/my_bundle1/data.kwcoco.json'
+    dset.add_image(file_name='assets/img1.jpg')
+
+    fpath1 = ub.Path(dset.coco_image(1).primary_image_filepath())
+    fpath1.parent.ensuredir()
+    # TODO: kwimage should error if the write fails
+    kwimage.imwrite(fpath1, kwimage.grab_test_image())
+    assert fpath1.exists()
+
+    dset.reroot(absolute=True)
+    dset.index.imgs[1]['file_name']
+
+    # Now change the file path, which changes the bundle
+    dset.fpath = dpath / 'data/repos/my_bundle2/data.kwcoco.json'
+    assert len(dset.missing_images()) == 1
+
+    dset.reroot(absolute=False)
+    # Image should be relative, but it is not
+    dset.index.imgs[1]['file_name']
+
+    if 0:
+        # Workaround
+        import kwcoco
+        import os
+        import ubelt as ub
+        import kwimage
+        dset1 = kwcoco.CocoDataset()
+        dpath = ub.Path(ub.ensure_app_cache_dir('kwcoco/tests/reroot'))
+
+        # We want to modify a dataset in bundle1 and write it in bundle2
+        # the new dataset should reference a relative path to bundle1
+        bundle_dpath1 = (dpath / 'data/repos/my_bundle1').ensuredir()
+        bundle_dpath2 = (dpath / 'data/repos/my_bundle2').ensuredir()
+
+        dset1.fpath = bundle_dpath1 / 'data.kwcoco.json'
+        dset1.add_image(file_name='assets/img1.jpg')
+
+        fpath1 = ub.Path(dset1.coco_image(1).primary_image_filepath())
+        fpath1.parent.ensuredir()
+        kwimage.imwrite(fpath1, kwimage.grab_test_image())
+
+        assert fpath1.exists()
+
+        # Method1: reroot after changing the bundle
+        dset2 = dset1.copy()
+        dset2.fpath = bundle_dpath2 / 'data.kwcoco.json'
+        assert not ub.Path(dset2.coco_image(1).primary_image_filepath()).exists(), (
+            'naive changing of bundle dpath will cause image to be missreferenced'
+        )
+        new_prefix = os.path.relpath(bundle_dpath1, bundle_dpath2)
+        dset2.reroot(new_prefix=new_prefix)
+        assert not dset2.missing_images()
+
+        # Method2: absolute reroot first
+        dset3 = dset1.copy()
+        dset3.reroot(absolute=True)
+        dset3.fpath = bundle_dpath2 / 'data.kwcoco.json'
+        new_prefix = os.path.relpath(bundle_dpath1, bundle_dpath2)
+        dset3.reroot(old_prefix=dset1.bundle_dpath, new_prefix=new_prefix, absolute=False)
+        dset3.imgs[1]
