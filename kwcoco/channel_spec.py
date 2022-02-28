@@ -1,4 +1,31 @@
 """
+This module defines the KWCOCO Channel Specification and API.
+
+The KWCOCO Channel specification is a way to semantically express how a
+combination of image channels are grouped. This can specify how these channels
+(somtimes called bands or features) are arranged on disk or input to an
+algorithm. The core idea reduces to a ``Set[List[str]]`` --- or a unordered set
+of ordered sequences of strings corresponding to channel "names". The way these
+are specified is with a "," to separate lists in an unordered set and with a
+"|" to separate the channel names. Other syntax exists for convinience, but
+a strict normalized channel spec only contains these core symbols.
+
+Another way to think of a kwcoco channel spec is that splitting the spec by ","
+gives groups of channels that should be processed together and "late-fused".
+Within each group the "|" operator "early-fuses" the channels.
+
+For instance, say we had a network and we wanted to process 3-channel rgb
+images in one stream and 1-channel infrared images in a second stream and then
+fuse them together. The kwcoco channel specification for channels labled as
+'red', 'green', 'blue', and 'infrared' would be:
+
+    ``infrared,red|green|blue``
+
+Note, it is up to an algorithm to do any early-late fusion. KWCoco simply
+provides the specification as a tool to quickly access a particular combination
+of channels from disk.
+
+
 The ChannelSpec has these simple rules:
 
 .. code::
