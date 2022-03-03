@@ -1405,6 +1405,13 @@ class MixinCocoExtras(object):
     def _cached_hashid(self):
         """
         Under Construction.
+
+        The idea is to cache the hashid when we are sure that the dataset was
+        loaded from a file and has not been modified.  We can record the
+        modification time of the file (because we know it hasn't changed in
+        memory), and use that as a key to the cache. If the modification time
+        on the file is different than the one recorded in the cache, we know
+        the cache could be invalid, so we recompute the hashid.
         """
         cache_miss = True
         enable_cache = (
@@ -1509,15 +1516,19 @@ class MixinCocoExtras(object):
                 desc = 'populate imgsize for untagged coco dataset'
 
             pool = ub.JobPool('thread', max_workers=workers)
+            bundle_dpath = self.bundle_dpath
             for img in ub.ProgIter(self.dataset['images'], verbose=verbose,
                                    desc='submit image size jobs'):
-                gpath = join(self.bundle_dpath, img['file_name'])
-                if 'width' not in img or 'height' not in img:
-                    job = pool.submit(kwimage.load_image_shape, gpath)
-                    job.img = img
+                auxiliary = img.get('auxiliary', [])
+                for obj in [img] + auxiliary:
+                    fname = obj['file_name']
+                    if fname is not None:
+                        gpath = join(bundle_dpath, fname)
+                        if 'width' not in obj or 'height' not in obj:
+                            job = pool.submit(kwimage.load_image_shape, gpath)
+                            job.obj = obj
 
-            for job in ub.ProgIter(pool.as_completed(), total=len(pool),
-                                   verbose=verbose, desc=desc):
+            for job in pool.as_completed(desc=desc, progkw={'verbose': verbose}):
                 try:
                     h, w = job.result()[0:2]
                 except Exception:
@@ -1525,8 +1536,8 @@ class MixinCocoExtras(object):
                         raise
                     bad_images.append(job.img)
                 else:
-                    job.img['width'] = w
-                    job.img['height'] = h
+                    job.obj['width'] = w
+                    job.obj['height'] = h
         return bad_images
 
     def _ensure_image_data(self, gids=None, verbose=1):

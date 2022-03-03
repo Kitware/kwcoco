@@ -13,6 +13,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add experimental `_dataset_id` function to `kwcoco.CocoDataset` for unique
   but human interpretable dataset identifiers.
 
+### Changed
+
+* Conform now adds width / height to auxiliary objects
+* Enhanced the `CocoImage.primary_asset` function
+
+
 
 ## Version 0.2.21 - Released 2022-02-15
 
