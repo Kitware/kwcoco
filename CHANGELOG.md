@@ -17,6 +17,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * Conform now adds width / height to auxiliary objects
 * Enhanced the `CocoImage.primary_asset` function
+* gdal reader now uses an auto nodata mode, somewhat experimental.
 
 
 
