@@ -298,6 +298,10 @@ class LazyGDalFrameFile(ub.NiceRepr):
         >>> # import kwplot
         >>> # kwplot.imshow(self[:])
 
+    Args:
+        nodata
+        masking_method
+
     Example:
         >>> # See if we can reproduce the INTERLEAVE bug
 
@@ -315,9 +319,13 @@ class LazyGDalFrameFile(ub.NiceRepr):
         self.shape
         self[:]
     """
-    def __init__(self, fpath, nodata=None):
+    def __init__(self, fpath, nodata='auto'):
         self.fpath = fpath
         self.nodata = nodata
+        if nodata == 'auto':
+            self.masking_method = 'float'
+        else:
+            self.masking_method = nodata
 
     @classmethod
     def available(self):
@@ -418,9 +426,19 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> kwplot.autompl()
             >>> kwplot.imshow(img_part)
 
+            >>> self = LazyGDalFrameFile.demo(dsize=(6600, 4400))
+            >>> self.nodata = 0
+            >>> index = [slice(2100, 2508, None), slice(4916, 5324, None), None]
+            >>> img_part = self[index]
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> kwplot.imshow(img_part / 255)
+
         Example:
             >>> # Test nodata works correctly
             >>> from kwcoco.util.lazy_frame_backends import *  # NOQA
+            >>> from kwcoco.util.lazy_frame_backends import _demo_geoimg_with_nodata
             >>> fpath = _demo_geoimg_with_nodata()
             >>> self = LazyGDalFrameFile(fpath, nodata='auto')
             >>> imdata = self[:]
@@ -428,9 +446,9 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> import kwplot
             >>> import kwarray
             >>> kwplot.autompl()
-            >>> norm_imdata = kwimage.normalize_intensity(imdata)
-            >>> kwplot.imshow(norm_imdata)
-
+            >>> imdata = kwimage.normalize_intensity(imdata)
+            >>> imdata = np.nan_to_num(imdata)
+            >>> kwplot.imshow(imdata)
         """
         ds = self._ds
         width = ds.RasterXSize
@@ -478,6 +496,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
         nodata = self.nodata
         needs_nodata = nodata is not None
         auto_nodata = nodata == 'auto'
+        read_nodata = isinstance(nodata, str)
         shape = (ysize, xsize, len(band_indices))
         # mask_shape = (ysize, xsize, len(band_indices))
         mask_shape = (ysize, xsize,)
@@ -485,8 +504,6 @@ class LazyGDalFrameFile(ub.NiceRepr):
             # TODO: can we remove the band dimension here?
             mask = np.zeros(mask_shape, dtype=bool)
 
-        # PREALLOC = 1
-        # if PREALLOC:
         # preallocate like kwimage.im_io._imread_gdal
         from kwimage.im_io import _gdal_to_numpy_dtype
         bands = [ds.GetRasterBand(1 + band_idx)
@@ -509,29 +526,39 @@ class LazyGDalFrameFile(ub.NiceRepr):
                     GDAL was unable to read band: {}, {}, with={}
                     from fpath={!r}
                     '''.format(out_idx, band, gdalkw, self.fpath)))
-            if auto_nodata:
-                nodata = band.GetNoDataValue()
-            mask |= (buf == nodata)
-            # mask[:, :, out_idx] = (buf == nodata)
+            # print('auto_nodata = {!r}'.format(auto_nodata))
+            if read_nodata:
+                _nodata = band.GetNoDataValue()
+            else:
+                _nodata = nodata
+                # print('nodata = {!r}'.format(_nodata))
+            if _nodata is not None:
+                mask |= (buf == _nodata)
+                # mask[:, :, out_idx] = (buf == _nodata)
             img_part[:, :, out_idx] = buf
             buf = None
-        # else:
-        #     channels = []
-        #     for band_idx in band_indices:
-        #         band = ds.GetRasterBand(1 + band_idx)
-        #         channel = band.ReadAsArray(**gdalkw)
-        #         channels.append(channel)
-        #     img_part = np.dstack(channels)
+
+        # masking_method = self.masking_method == 'auto'
+        # if masking_method is None:
+        #     pass
+        # elif masking_method
+        if auto_nodata:
+            needs_nodata = mask.any()
 
         if needs_nodata:
-            # Hack it so nodata becomes nan
-            masked_hack_dtype = np.result_type(img_part.dtype, np.float32)
-            img_part = img_part.astype(masked_hack_dtype)
-            img_part[np.where(mask)] = np.nan
-            imdata = img_part
-            # Using a regular masked array might be better
-            # imdata = np.ma.array(img_part, mask=mask3, fill_value=None)
-            # mask3 = np.dstack([mask] * C)
+            if self.masking_method == 'float':
+                # print('float mask')
+                # Hack it so nodata becomes nan
+                masked_hack_dtype = np.result_type(img_part.dtype, np.float32)
+                img_part = img_part.astype(masked_hack_dtype)
+                img_part[np.where(mask)] = np.nan
+                imdata = img_part
+            elif self.masking_method == 'ma':
+                # Using a regular masked array might be better
+                mask3 = np.dstack([mask] * C)
+                imdata = np.ma.array(img_part, mask=mask3, fill_value=None)
+            else:
+                raise NotImplementedError(self.masking_method)
         else:
             imdata = img_part
         return imdata
