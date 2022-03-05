@@ -1,4 +1,4 @@
-kwplot >= 0.4.8
+kwplot >= 0.4.11
 seaborn >= 0.9.0
 sqlalchemy >= 1.3.22
 

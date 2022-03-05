@@ -239,6 +239,46 @@ class LazyRasterIOFrameFile(ub.NiceRepr):
         return img_part
 
 
+def _demo_geoimg_with_nodata():
+    """
+    Example:
+        from kwcoco.util.lazy_frame_backends import *  # NOQA
+        fpath = _demo_geoimg_with_nodata()
+        self = LazyGDalFrameFile.demo()
+
+    """
+    import kwimage
+    from osgeo import gdal, osr
+    gdal.UseExceptions()
+
+    # Make a dummy geotiff
+    imdata = kwimage.grab_test_image('airport')
+    dpath = ub.Path.appdir('kwcoco/test/geotiff').ensuredir()
+    geo_fpath = dpath / 'dummy_geotiff.tif'
+
+    # compute dummy values for a geotransform to CRS84
+    img_h, img_w = imdata.shape[0:2]
+    img_box = kwimage.Boxes([[0, 0, img_w, img_h]], 'xywh')
+    wld_box = kwimage.Boxes([[-73.7595528, 42.6552404, 0.0001, 0.0001]], 'xywh')
+    img_corners = img_box.corners()
+    wld_corners = wld_box.corners()
+    transform = kwimage.Affine.fit(img_corners, wld_corners)
+
+    nodata = -9999
+
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    crs = srs.ExportToWkt()
+
+    # Set a region to be nodata
+    imdata = imdata.astype(np.int16)
+    imdata[-100:] = nodata
+    imdata[0:200:, -200:-180] = nodata
+
+    kwimage.imwrite(geo_fpath, imdata, backend='gdal', nodata=-9999, crs=crs, transform=transform)
+    return geo_fpath
+
+
 class LazyGDalFrameFile(ub.NiceRepr):
     """
     TODO:
@@ -258,6 +298,10 @@ class LazyGDalFrameFile(ub.NiceRepr):
         >>> # import kwplot
         >>> # kwplot.imshow(self[:])
 
+    Args:
+        nodata
+        masking_method
+
     Example:
         >>> # See if we can reproduce the INTERLEAVE bug
 
@@ -275,8 +319,13 @@ class LazyGDalFrameFile(ub.NiceRepr):
         self.shape
         self[:]
     """
-    def __init__(self, fpath):
+    def __init__(self, fpath, nodata=None):
         self.fpath = fpath
+        self.nodata = nodata
+        if nodata == 'auto':
+            self.masking_method = 'float'
+        else:
+            self.masking_method = nodata
 
     @classmethod
     def available(self):
@@ -376,6 +425,31 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> import kwplot
             >>> kwplot.autompl()
             >>> kwplot.imshow(img_part)
+
+            >>> self = LazyGDalFrameFile.demo(dsize=(6600, 4400))
+            >>> self.nodata = 0
+            >>> index = [slice(2100, 2508, None), slice(4916, 5324, None), None]
+            >>> img_part = self[index]
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> kwplot.imshow(img_part / 255)
+
+        Example:
+            >>> # Test nodata works correctly
+            >>> # xdoctest: +REQUIRES(module:osgeo)
+            >>> from kwcoco.util.lazy_frame_backends import *  # NOQA
+            >>> from kwcoco.util.lazy_frame_backends import _demo_geoimg_with_nodata
+            >>> fpath = _demo_geoimg_with_nodata()
+            >>> self = LazyGDalFrameFile(fpath, nodata='auto')
+            >>> imdata = self[:]
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> import kwarray
+            >>> kwplot.autompl()
+            >>> imdata = kwimage.normalize_intensity(imdata)
+            >>> imdata = np.nan_to_num(imdata)
+            >>> kwplot.imshow(imdata)
         """
         ds = self._ds
         width = ds.RasterXSize
@@ -420,40 +494,75 @@ class LazyGDalFrameFile(ub.NiceRepr):
         gdalkw = dict(xoff=xstart, yoff=ystart,
                       win_xsize=xsize, win_ysize=ysize)
 
-        PREALLOC = 1
-        if PREALLOC:
-            # preallocate like kwimage.im_io._imread_gdal
-            from kwimage.im_io import _gdal_to_numpy_dtype
-            shape = (ysize, xsize, len(band_indices))
-            bands = [ds.GetRasterBand(1 + band_idx)
-                     for band_idx in band_indices]
-            gdal_dtype = bands[0].DataType
-            dtype = _gdal_to_numpy_dtype(gdal_dtype)
-            try:
-                img_part = np.empty(shape, dtype=dtype)
-            except ValueError:
-                print('ERROR')
-                print('self.fpath = {!r}'.format(self.fpath))
-                print('dtype = {!r}'.format(dtype))
-                print('shape = {!r}'.format(shape))
-                raise
-            for out_idx, band in enumerate(bands):
-                buf = band.ReadAsArray(**gdalkw)
-                if buf is None:
-                    raise IOError(ub.paragraph(
-                        '''
-                        GDAL was unable to read band: {}, {}, with={}
-                        from fpath={!r}
-                        '''.format(out_idx, band, gdalkw, self.fpath)))
-                img_part[:, :, out_idx] = buf
+        nodata = self.nodata
+        needs_nodata = nodata is not None
+        auto_nodata = nodata == 'auto'
+        read_nodata = isinstance(nodata, str)
+        shape = (ysize, xsize, len(band_indices))
+        # mask_shape = (ysize, xsize, len(band_indices))
+        mask_shape = (ysize, xsize,)
+        if needs_nodata:
+            # TODO: can we remove the band dimension here?
+            mask = np.zeros(mask_shape, dtype=bool)
+
+        # preallocate like kwimage.im_io._imread_gdal
+        from kwimage.im_io import _gdal_to_numpy_dtype
+        bands = [ds.GetRasterBand(1 + band_idx)
+                 for band_idx in band_indices]
+        gdal_dtype = bands[0].DataType
+        dtype = _gdal_to_numpy_dtype(gdal_dtype)
+        try:
+            img_part = np.empty(shape, dtype=dtype)
+        except ValueError:
+            print('ERROR')
+            print('self.fpath = {!r}'.format(self.fpath))
+            print('dtype = {!r}'.format(dtype))
+            print('shape = {!r}'.format(shape))
+            raise
+        for out_idx, band in enumerate(bands):
+            buf = band.ReadAsArray(**gdalkw)
+            if buf is None:
+                raise IOError(ub.paragraph(
+                    '''
+                    GDAL was unable to read band: {}, {}, with={}
+                    from fpath={!r}
+                    '''.format(out_idx, band, gdalkw, self.fpath)))
+            # print('auto_nodata = {!r}'.format(auto_nodata))
+            if read_nodata:
+                _nodata = band.GetNoDataValue()
+            else:
+                _nodata = nodata
+                # print('nodata = {!r}'.format(_nodata))
+            if _nodata is not None:
+                mask |= (buf == _nodata)
+                # mask[:, :, out_idx] = (buf == _nodata)
+            img_part[:, :, out_idx] = buf
+            buf = None
+
+        # masking_method = self.masking_method == 'auto'
+        # if masking_method is None:
+        #     pass
+        # elif masking_method
+        if auto_nodata:
+            needs_nodata = mask.any()
+
+        if needs_nodata:
+            if self.masking_method == 'float':
+                # print('float mask')
+                # Hack it so nodata becomes nan
+                masked_hack_dtype = np.result_type(img_part.dtype, np.float32)
+                img_part = img_part.astype(masked_hack_dtype)
+                img_part[np.where(mask)] = np.nan
+                imdata = img_part
+            elif self.masking_method == 'ma':
+                # Using a regular masked array might be better
+                mask3 = np.dstack([mask] * C)
+                imdata = np.ma.array(img_part, mask=mask3, fill_value=None)
+            else:
+                raise NotImplementedError(self.masking_method)
         else:
-            channels = []
-            for band_idx in band_indices:
-                band = ds.GetRasterBand(1 + band_idx)
-                channel = band.ReadAsArray(**gdalkw)
-                channels.append(channel)
-            img_part = np.dstack(channels)
-        return img_part
+            imdata = img_part
+        return imdata
 
     def __array__(self):
         """

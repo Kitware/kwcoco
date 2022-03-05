@@ -5,8 +5,26 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.21 - Unreleased
+## Version 0.2.22 - Unreleased
 
+### Added
+
+* `path_sanatize` to `kwcoco.ChannelSpec` to make a path-safe suffix for a filename
+* Add experimental `_dataset_id` function to `kwcoco.CocoDataset` for unique
+  but human interpretable dataset identifiers.
+
+### Changed
+
+* Conform now adds width / height to auxiliary objects
+* Enhanced the `CocoImage.primary_asset` function
+* gdal reader now uses an auto nodata mode, somewhat experimental.
+
+
+
+## Version 0.2.21 - Released 2022-02-15
+
+### Added
+* Caching mechanism for model hashids
 
 ### Changed
 * Minor improvements to confusion measures.

@@ -142,7 +142,7 @@ Example:
     >>> #
     >>> img_dsize = (128, 128)
     >>> transform1 = kwimage.Affine.coerce(scale=0.5)
-    >>> transform2 = kwimage.Affine.coerce(theta=0.5, shear=0.01, offset=(-20, -40))
+    >>> transform2 = kwimage.Affine.coerce(theta=0.5, shearx=0.01, offset=(-20, -40))
     >>> transform3 = kwimage.Affine.coerce(offset=(64, 0)) @ kwimage.Affine.random(rng=10)
     >>> part1 = aux1.delayed_warp(np.eye(3), dsize=img_dsize)
     >>> part2 = aux2.delayed_warp(transform2, dsize=img_dsize)
@@ -762,17 +762,20 @@ class DelayedLoad(DelayedImageOperation):
                     replaced with nan.
         """
         final = self.cache.get('final', None)
-        nodata = self.cache.get('nodata', None)
+        nodata = kwargs.get('nodata', None)
         if final is None:
             from kwcoco.util import lazy_frame_backends
+            using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()
             if lazy_frame_backends.LazyGDalFrameFile.available():
                 # TODO: warn if we dont have a COG.
-                pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath)
+                pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath, nodata=nodata)
                 # pre_final = LazyGDalFrameFile(self.fpath)
                 # TODO: choose the fastest lazy backend for the file
                 # pre_final = lazy_frame_backends.LazyRasterIOFrameFile(self.fpath)  # which is faster?
                 # pre_final = lazy_frame_backends.LazySpectralFrameFile(self.fpath)  # which is faster?
             else:
+                if nodata == 'auto':
+                    raise Exception('need gdal for auto no-data')
                 import warnings
                 warnings.warn('DelayedLoad may not be efficient without gdal')
                 # TODO: delay even further with gdal
@@ -792,10 +795,11 @@ class DelayedLoad(DelayedImageOperation):
             final = pre_final[sl]
 
             # Handle nan
-            if nodata is not None:
-                if final.dtype.kind != 'f':
-                    final = final.astype(np.float32)
-                final[final == nodata] = np.nan
+            if not using_gdal:
+                if nodata is not None:
+                    if final.dtype.kind != 'f':
+                        final = final.astype(np.float32)
+                    final[final == nodata] = np.nan
 
             dsize = self._immediates.get('dsize', None)
             if dsize is not None:
@@ -1715,7 +1719,7 @@ class DelayedWarp(DelayedImageOperation):
         sub_data = self.sub_data
         flag = getattr(sub_data, '__hack_dont_optimize__', False)
         if flag:
-            sub_data = sub_data.finalize()
+            sub_data = sub_data.finalize(**kwargs)
 
         if hasattr(sub_data, 'finalize'):
             # Branch finalize

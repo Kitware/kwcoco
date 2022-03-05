@@ -1405,6 +1405,13 @@ class MixinCocoExtras(object):
     def _cached_hashid(self):
         """
         Under Construction.
+
+        The idea is to cache the hashid when we are sure that the dataset was
+        loaded from a file and has not been modified.  We can record the
+        modification time of the file (because we know it hasn't changed in
+        memory), and use that as a key to the cache. If the modification time
+        on the file is different than the one recorded in the cache, we know
+        the cache could be invalid, so we recompute the hashid.
         """
         cache_miss = True
         enable_cache = (
@@ -1432,17 +1439,32 @@ class MixinCocoExtras(object):
 
         if cache_miss:
             self._build_hashid()
-            hashid = self.hashid
-            hashid_parts = self.hashid_parts
-            hashid_cache_data = {
-                'hashid': hashid,
-                'hashid_parts': hashid_parts,
-                'status_key': status_key,
-            }
-            hashid_sidecar_fpath.write_text(json.dumps(hashid_cache_data))
+            if enable_cache:
+                hashid_cache_data = {
+                    'hashid': self.hashid,
+                    'hashid_parts': self.hashid_parts,
+                    'status_key': status_key,
+                }
+                hashid_sidecar_fpath.write_text(json.dumps(hashid_cache_data))
         return self.hashid
 
     def _dataset_id(self):
+        """
+        A human interpretable name that can be used to uniquely identify the
+        dataset.
+
+        Note:
+            This function is currently subject to change.
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> print(self._dataset_id())
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> print(self._dataset_id())
+            >>> self = kwcoco.CocoDataset()
+            >>> print(self._dataset_id())
+        """
         hashid = self._cached_hashid()
         coco_fpath = ub.Path(self.fpath)
         dset_id = '_'.join([coco_fpath.parent.stem, coco_fpath.stem, hashid[0:8]])
@@ -1494,24 +1516,28 @@ class MixinCocoExtras(object):
                 desc = 'populate imgsize for untagged coco dataset'
 
             pool = ub.JobPool('thread', max_workers=workers)
+            bundle_dpath = self.bundle_dpath
             for img in ub.ProgIter(self.dataset['images'], verbose=verbose,
                                    desc='submit image size jobs'):
-                gpath = join(self.bundle_dpath, img['file_name'])
-                if 'width' not in img or 'height' not in img:
-                    job = pool.submit(kwimage.load_image_shape, gpath)
-                    job.img = img
+                auxiliary = img.get('auxiliary', [])
+                for obj in [img] + auxiliary:
+                    fname = obj['file_name']
+                    if fname is not None:
+                        gpath = join(bundle_dpath, fname)
+                        if 'width' not in obj or 'height' not in obj:
+                            job = pool.submit(kwimage.load_image_shape, gpath)
+                            job.obj = obj
 
-            for job in ub.ProgIter(pool.as_completed(), total=len(pool),
-                                   verbose=verbose, desc=desc):
+            for job in pool.as_completed(desc=desc, progkw={'verbose': verbose}):
                 try:
                     h, w = job.result()[0:2]
                 except Exception:
                     if fail:
                         raise
-                    bad_images.append(job.img)
+                    bad_images.append(job.obj)
                 else:
-                    job.img['width'] = w
-                    job.img['height'] = h
+                    job.obj['width'] = w
+                    job.obj['height'] = h
         return bad_images
 
     def _ensure_image_data(self, gids=None, verbose=1):

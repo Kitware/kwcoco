@@ -635,6 +635,12 @@ a coco file using process similar to the following code:
     print(my_dset.dumps(newlines=True))
 
 
+The KWCOCO Channel Specification
+--------------------------------
+
+See the documentation for ``kwcoco/channel_spec.py`` for more details.
+
+
 
 .. [1] http://cocodataset.org/#format-data
 

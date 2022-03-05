@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import ubelt as ub
 import scriptconfig as scfg
-
+import numpy as np
 
 class CocoStatsCLI:
     name = 'stats'
@@ -19,6 +19,8 @@ class CocoStatsCLI:
                 '''
                 show bounding box stats in width-height format.
                 ''')),
+
+            'image_size': scfg.Value(False, help='show image size stats'),
 
             'annot_attrs': scfg.Value(False, help='show annotation attribute information'),
             'image_attrs': scfg.Value(False, help='show image attribute information'),
@@ -134,6 +136,44 @@ class CocoStatsCLI:
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
                 print(ub.repr2(dset.boxsize_stats(), nl=-1, precision=2))
+
+        if config['image_size']:
+            print('Image size stats')
+            for dset in datasets:
+                print('dset.tag = {!r}'.format(dset.tag))
+                images = dset.images()
+                heights = np.array(images.lookup('height', np.nan))
+                widths = np.array(images.lookup('width', np.nan))
+                rt_areas = np.sqrt(heights * widths)
+                imgsize_df = pd.DataFrame({
+                    'height': heights,
+                    'widths': widths,
+                    'rt_areas': rt_areas,
+                })
+                size_stats = imgsize_df.describe()
+                print(size_stats)
+                idx = np.argmax(rt_areas)
+
+                try:
+                    biggest_image = images.take([idx]).coco_images[0]
+                    max_area_h = biggest_image.img['height']
+                    max_area_w = biggest_image.img['width']
+                    print('Max image: {} x {}'.format(max_area_w, max_area_h))
+                    pixels = max_area_w * max_area_h
+                    total_disk_bytes = 0
+                    for fpath in list(biggest_image.iter_image_filepaths()):
+                        fpath = ub.Path(fpath)
+                        num_bytes = fpath.stat().st_size
+                        total_disk_bytes += num_bytes
+                    total_disk_gb = total_disk_bytes / 2 ** 30
+                    pixel_gb_per_bit = (pixels / 8) / 2 ** 30
+                    print('total_disk_gb = {!r}'.format(total_disk_gb))
+                    print('pixel_gb_per_bit = {!r}'.format(pixel_gb_per_bit))
+                except Exception:
+                    print('error getting max size')
+
+                # print('dset.tag = {!r}'.format(dset.tag))
+                # print(ub.repr2(dset.boxsize_stats(), nl=-1, precision=2))
 
         if config['embed']:
             # Hidden hack

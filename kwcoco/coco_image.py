@@ -170,6 +170,17 @@ class CocoImage(ub.NiceRepr):
         """
         Compute a "main" image asset.
 
+        Notes:
+            Uses a heuristic.
+
+            * First, try to find the auxiliary image that has with the smallest
+            distortion to the base image (if known via warp_aux_to_img)
+
+            * Second, break ties by using the largest image if w / h is known
+
+            * Last, if previous information not available use the first
+              auxiliary image.
+
         Args:
             requires (List[str]):
                 list of attribute that must be non-None to consider an object
@@ -177,6 +188,29 @@ class CocoImage(ub.NiceRepr):
 
         TODO:
             - [ ] Add in primary heuristics
+
+        Example:
+            >>> import kwarray
+            >>> from kwcoco.coco_image import *  # NOQA
+            >>> rng = kwarray.ensure_rng(0)
+            >>> def random_auxiliary(name, w=None, h=None):
+            >>>     return {'file_name': name, 'width': w, 'height': h}
+            >>> self = CocoImage({
+            >>>     'auxiliary': [
+            >>>         random_auxiliary('1'),
+            >>>         random_auxiliary('2'),
+            >>>         random_auxiliary('3'),
+            >>>     ]
+            >>> })
+            >>> assert self.primary_asset()['file_name'] == '1'
+            >>> self = CocoImage({
+            >>>     'auxiliary': [
+            >>>         random_auxiliary('1'),
+            >>>         random_auxiliary('2', 3, 3),
+            >>>         random_auxiliary('3'),
+            >>>     ]
+            >>> })
+            >>> assert self.primary_asset()['file_name'] == '2'
         """
         import kwimage
         if requires is None:
@@ -193,16 +227,18 @@ class CocoImage(ub.NiceRepr):
 
         # Choose "best" auxiliary image based on a hueristic.
         eye = kwimage.Affine.eye().matrix
-        for obj in img.get('auxiliary', []):
+        for idx, obj in enumerate(img.get('auxiliary', [])):
             # Take frobenius norm to get "distance" between transform and
             # the identity. We want to find the auxiliary closest to the
             # identity transform.
             warp_aux_to_img = kwimage.Affine.coerce(obj.get('warp_aux_to_img', None))
-            fro_dist = np.linalg.norm(warp_aux_to_img.matrix - eye, ord='fro')
-
+            fro_dist = np.linalg.norm(warp_aux_to_img - eye, ord='fro')
+            w = obj.get('width', None) or 0
+            h = obj.get('height', None) or 0
             if all(k in obj for k in requires):
                 candidates.append({
-                    'area': obj['width'] * obj['height'],
+                    'idx': idx,
+                    'area': w * h,
                     'fro_dist': fro_dist,
                     'obj': obj,
                 })
@@ -211,7 +247,8 @@ class CocoImage(ub.NiceRepr):
             return None
 
         idx = ub.argmin(
-            candidates, key=lambda val: (val['fro_dist'], -val['area'])
+            candidates, key=lambda val: (
+                val['fro_dist'], -val['area'], val['idx'])
         )
         obj = candidates[idx]['obj']
         return obj
