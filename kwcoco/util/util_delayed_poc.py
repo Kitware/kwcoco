@@ -142,7 +142,7 @@ Example:
     >>> #
     >>> img_dsize = (128, 128)
     >>> transform1 = kwimage.Affine.coerce(scale=0.5)
-    >>> transform2 = kwimage.Affine.coerce(theta=0.5, shear=0.01, offset=(-20, -40))
+    >>> transform2 = kwimage.Affine.coerce(theta=0.5, shearx=0.01, offset=(-20, -40))
     >>> transform3 = kwimage.Affine.coerce(offset=(64, 0)) @ kwimage.Affine.random(rng=10)
     >>> part1 = aux1.delayed_warp(np.eye(3), dsize=img_dsize)
     >>> part2 = aux2.delayed_warp(transform2, dsize=img_dsize)

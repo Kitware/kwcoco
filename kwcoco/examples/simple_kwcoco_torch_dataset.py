@@ -174,7 +174,7 @@ class KWCocoSimpleTorchDataset(DatasetBase):
                 random_transform = kwimage.Affine.random(
                     # scale= not implemented as a distribution yet
                     # offset= not implemented as a distribution yet
-                    shear=0,
+                    shearx=0,
                     theta=0,
                     rng=self.rng
                 )
