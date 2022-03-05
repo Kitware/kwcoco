@@ -437,6 +437,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
         Example:
             >>> # Test nodata works correctly
+            >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.lazy_frame_backends import *  # NOQA
             >>> from kwcoco.util.lazy_frame_backends import _demo_geoimg_with_nodata
             >>> fpath = _demo_geoimg_with_nodata()
