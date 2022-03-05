@@ -1534,7 +1534,7 @@ class MixinCocoExtras(object):
                 except Exception:
                     if fail:
                         raise
-                    bad_images.append(job.img)
+                    bad_images.append(job.obj)
                 else:
                     job.obj['width'] = w
                     job.obj['height'] = h

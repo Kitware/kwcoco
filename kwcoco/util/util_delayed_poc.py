@@ -762,7 +762,7 @@ class DelayedLoad(DelayedImageOperation):
                     replaced with nan.
         """
         final = self.cache.get('final', None)
-        nodata = kwargs.get('nodata', 'auto')
+        nodata = kwargs.get('nodata', None)
         if final is None:
             from kwcoco.util import lazy_frame_backends
             using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()

@@ -319,7 +319,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
         self.shape
         self[:]
     """
-    def __init__(self, fpath, nodata='auto'):
+    def __init__(self, fpath, nodata=None):
         self.fpath = fpath
         self.nodata = nodata
         if nodata == 'auto':
