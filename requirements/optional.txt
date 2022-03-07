@@ -1,5 +1,7 @@
-kwplot >= 0.4.11
-seaborn >= 0.9.0
-sqlalchemy >= 1.3.22
+kwplot>=0.4.11
+seaborn>=0.9.0
+sqlalchemy>=1.3.22
+affine>=2.3.0
+# gdal  # not a robust requirement
 
-jq >= 1.1.3
+jq>=1.1.3
