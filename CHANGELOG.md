@@ -7,9 +7,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.23 - Unreleased
 
-
 ### Fixed
-
 * Bug in delayed with nodata
 
 ## Version 0.2.22 - Released 2022-03-05

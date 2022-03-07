@@ -761,7 +761,7 @@ class DelayedLoad(DelayedImageOperation):
                     data is then converted to floats and the nodata value is
                     replaced with nan.
         """
-        nodata = kwargs.get('nodata', 'auto')
+        nodata = kwargs.get('nodata', None)
         final = self.cache.get('final', None)
         if final is None:
             from kwcoco.util import lazy_frame_backends
