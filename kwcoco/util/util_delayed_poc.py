@@ -217,7 +217,7 @@ class DelayedVisionOperation(ub.NiceRepr):
         channels = self.channels
         return '{}, {}'.format(self.shape, channels)
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         raise NotImplementedError
 
     def children(self):
@@ -466,7 +466,7 @@ class DelayedIdentity(DelayedImageOperation):
         yield DelayedWarp(self, Affine(None), dsize=self.dsize)
 
     @profile
-    def finalize(self):
+    def finalize(self, **kwargs):
         final = self.sub_data
         final = kwarray.atleast_nd(final, 3, front=False)
         return final
@@ -761,8 +761,8 @@ class DelayedLoad(DelayedImageOperation):
                     data is then converted to floats and the nodata value is
                     replaced with nan.
         """
-        final = self.cache.get('final', None)
         nodata = kwargs.get('nodata', None)
+        final = self.cache.get('final', None)
         if final is None:
             from kwcoco.util import lazy_frame_backends
             using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()
@@ -1719,7 +1719,8 @@ class DelayedWarp(DelayedImageOperation):
         sub_data = self.sub_data
         flag = getattr(sub_data, '__hack_dont_optimize__', False)
         if flag:
-            sub_data = sub_data.finalize(**kwargs)
+            subkw = ub.dict_diff(kwargs, {'as_xarray'})
+            sub_data = sub_data.finalize(**subkw)
 
         if hasattr(sub_data, 'finalize'):
             # Branch finalize
