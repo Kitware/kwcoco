@@ -22,6 +22,12 @@ import warnings
 from kwcoco.metrics.util import DictProxy
 
 
+try:
+    from xdev import profile
+except Exception:
+    profile = ub.identity
+
+
 class Measures(ub.NiceRepr, DictProxy):
     """
     Holds accumulated confusion counts, and derived measures
@@ -63,6 +69,7 @@ class Measures(ub.NiceRepr, DictProxy):
         """
         Example:
             >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors  # NOQA
+            >>> from kwcoco.metrics.confusion_measures import *  # NOQA
             >>> binvecs = BinaryConfusionVectors.demo(n=10, p_error=0.5)
             >>> self = binvecs.measures()
             >>> info = self.__json__()
@@ -211,6 +218,7 @@ class Measures(ub.NiceRepr, DictProxy):
         return measures
 
     @classmethod
+    @profile
     def combine(cls, tocombine, precision=None, growth=None, thresh_bins=None):
         """
         Combine binary confusion metrics
@@ -332,7 +340,12 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> print(df3)
 
             >>> # I am NOT sure if this is correct or not
-            >>> combo = Measures.combine(tocombine, thresh_bins=20)
+            >>> thresh_bins = 20
+            >>> combo = Measures.combine(tocombine, thresh_bins=thresh_bins)
+            >>> df4 = combo.counts().pandas().fillna(0)
+            >>> print(df4)
+
+            >>> combo = Measures.combine(tocombine, thresh_bins=np.linspace(0, 1, 20))
             >>> df4 = combo.counts().pandas().fillna(0)
             >>> print(df4)
 
@@ -340,6 +353,8 @@ class Measures(ub.NiceRepr, DictProxy):
             assert np.allclose(combo['fp_count'], measures['fp_count'])
             assert np.allclose(combo['tp_count'], measures['tp_count'])
             assert np.allclose(combo['tp_count'], measures['tp_count'])
+
+            globals().update(xdev.get_func_kwargs(Measures.combine))
         """
         if precision is not None and np.isinf(precision):
             precision = None
@@ -349,77 +364,16 @@ class Measures(ub.NiceRepr, DictProxy):
         # respect to this new threshold array.
         tocombine_thresh = [m['thresholds'] for m in tocombine]
 
-        orig_thresholds = np.unique(np.hstack(tocombine_thresh))
-        finite_flags = np.isfinite(orig_thresholds)
-        nonfinite_flags = ~finite_flags
-        if np.any(nonfinite_flags):
-            orig_finite_thresholds = orig_thresholds[finite_flags]
-            # If we have any non-finite threshold values we are stuck with them
-            nonfinite_vals = orig_thresholds[nonfinite_flags]
-        else:
-            orig_finite_thresholds = orig_thresholds
+        if ub.iterable(thresh_bins):
+            combo_thresh_asc = thresh_bins
             nonfinite_vals = []
-
-        if thresh_bins is not None:
-            assert growth is None
-            assert precision is None
-            threshold_pool = orig_finite_thresholds
-            # Subdivide threshold pool until we get enough values
-            while thresh_bins > len(threshold_pool):
-                # x = [1, 2, 3, 4, 5]
-                # x = [1, 2, 3, 4, 5, 6]
-                # even_slice = threshold_pool[:(len(threshold_pool) // 2) * 2]
-                # odd_slice = threshold_pool[1:(len(threshold_pool) // 2) * 2]
-                x = threshold_pool
-                even_slice = x[:(len(x) // 2) * 2]
-                odd_slice = x[1:len(x) - (len(x) % 2 == 0)]
-                mean_vals = np.r_[[0, threshold_pool[0]], even_slice, odd_slice, [1, threshold_pool[-1]]].reshape(-1, 2).mean(axis=1)
-                threshold_pool = np.hstack([mean_vals, threshold_pool])
-                threshold_pool = np.unique(threshold_pool)
-
-            chosen_idxs = np.linspace(0, len(threshold_pool) - 1, thresh_bins).round().astype(int)
-            chosen_idxs = np.unique(chosen_idxs)
-            combo_thresh_asc = threshold_pool[chosen_idxs]
-        elif growth is not None:
-            if precision is not None:
-                raise ValueError('dont use precision with growth')
-            # Keep a minimum number of threshold and allow
-            # the resulting metrics to grow by some factor
-            num_per_item = list(map(len, tocombine_thresh))
-            if growth == 'max':
-                max_num_thresholds = max(num_per_item)
-            elif growth == 'min':
-                max_num_thresholds = min(num_per_item)
-            elif growth == 'log':
-                # Each item after the first is only allowed to contribute
-                # some of its thresholds defined by the base-e-log.
-                modulated_sizes = sorted([np.log(n) for n in num_per_item])
-                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
-            elif growth == 'root':
-                # Each item after the first is only allowed to contribute
-                # some of its thresholds defined by the square root.
-                modulated_sizes = sorted([np.sqrt(n) for n in num_per_item])
-                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
-            elif growth == 'half':
-                # Each item after the first is only allowed to contribute
-                # some of its thresholds, half of them.
-                modulated_sizes = sorted([n / 2 for n in num_per_item])
-                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
-            else:
-                raise KeyError(growth)
-            chosen_idxs = np.linspace(0, len(orig_finite_thresholds) - 1, max_num_thresholds).round().astype(int)
-            chosen_idxs = np.unique(chosen_idxs)
-            combo_thresh_asc = orig_finite_thresholds[chosen_idxs]
-        elif precision is not None:
-            round_thresholds = orig_finite_thresholds.round(precision)
-            combo_thresh_asc = np.unique(round_thresholds)
         else:
-            combo_thresh_asc = orig_finite_thresholds
-
-        if nonfinite_vals:
-            # Force inclusion of non-finite thresholds
-            combo_thresh_asc = np.hstack([combo_thresh_asc, nonfinite_vals])
-            combo_thresh_asc.sort()
+            combo_thresh_asc, nonfinite_vals = _combine_threshold(
+                tocombine_thresh, thresh_bins, growth, precision)
+            if nonfinite_vals:
+                # Force inclusion of non-finite thresholds
+                combo_thresh_asc = np.hstack([combo_thresh_asc, nonfinite_vals])
+                combo_thresh_asc.sort()
 
         new_thresh = combo_thresh_asc[::-1]
 
@@ -457,28 +411,6 @@ class Measures(ub.NiceRepr, DictProxy):
 
             tn_pos, tn_p, tn_s = reversable_diff(measures['tn_count'], reverse=1)
             fn_pos, _, _ = reversable_diff(measures['fn_count'], reverse=1)
-
-            # if 0:
-            #     arr = measures['tn_count']
-            #     diff_arr = tn_pos
-            #     prefix = tn_p
-            #     suffix = tn_s
-            #     offset = tn_offset
-            #     recon_arr = np.cumsum(diff_arr[::-1])[::-1] + offset
-            #     recon_arr[0:len(prefix)] += prefix
-            #     recon_arr[len(recon_arr) - len(suffix):] += suffix
-
-            # # NOTE: if the min is non-zero in each array the diff wont work
-            # # reformulate if this case arrises
-            # fp_pos = np.diff(np.r_[[0], measures['fp_count']])
-            # tp_pos = np.diff(np.r_[[0], measures['tp_count']])
-            # tn_pos = np.diff(np.r_[[0], measures['tn_count'][::-1]])[::-1]
-            # fn_pos = np.diff(np.r_[[0], measures['fn_count'][::-1]])[::-1]
-
-            # Is this correct? Do we round *this* measure's thresholds?
-            # before comparing to the new threshold array?
-            # if precision is not None:
-            #     thresholds = thresholds.round(precision)
 
             # Find the locations where the thresholds from "these" measures
             # should be inserted into the combined measures.
@@ -527,6 +459,86 @@ class Measures(ub.NiceRepr, DictProxy):
         new_info.update(rest)
         new_measures = Measures(new_info)
         return new_measures
+
+
+def _combine_threshold(tocombine_thresh, thresh_bins, growth, precision):
+    """
+    Logic to take care of combining thresholds in the case bins are not given
+
+    This can be fairly slow and lead to unnecessary memory usage
+    """
+    orig_thresholds = np.unique(np.hstack(tocombine_thresh))
+    finite_flags = np.isfinite(orig_thresholds)
+    nonfinite_flags = ~finite_flags
+    if np.any(nonfinite_flags):
+        orig_finite_thresholds = orig_thresholds[finite_flags]
+        # If we have any non-finite threshold values we are stuck with them
+        nonfinite_vals = orig_thresholds[nonfinite_flags]
+    else:
+        orig_finite_thresholds = orig_thresholds
+        nonfinite_vals = []
+
+    if thresh_bins is None:
+        if growth is not None:
+            if precision is not None:
+                raise ValueError('dont use precision with growth')
+            # Keep a minimum number of threshold and allow
+            # the resulting metrics to grow by some factor
+            num_per_item = list(map(len, tocombine_thresh))
+            if growth == 'max':
+                max_num_thresholds = max(num_per_item)
+            elif growth == 'min':
+                max_num_thresholds = min(num_per_item)
+            elif growth == 'log':
+                # Each item after the first is only allowed to contribute
+                # some of its thresholds defined by the base-e-log.
+                modulated_sizes = sorted([np.log(n) for n in num_per_item])
+                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+            elif growth == 'root':
+                # Each item after the first is only allowed to contribute
+                # some of its thresholds defined by the square root.
+                modulated_sizes = sorted([np.sqrt(n) for n in num_per_item])
+                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+            elif growth == 'half':
+                # Each item after the first is only allowed to contribute
+                # some of its thresholds, half of them.
+                modulated_sizes = sorted([n / 2 for n in num_per_item])
+                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+            else:
+                raise KeyError(growth)
+            chosen_idxs = np.linspace(0, len(orig_finite_thresholds) - 1, max_num_thresholds).round().astype(int)
+            chosen_idxs = np.unique(chosen_idxs)
+            combo_thresh_asc = orig_finite_thresholds[chosen_idxs]
+        elif precision is not None:
+            round_thresholds = orig_finite_thresholds.round(precision)
+            combo_thresh_asc = np.unique(round_thresholds)
+        else:
+            combo_thresh_asc = orig_finite_thresholds
+    else:
+        assert growth is None
+        assert precision is None
+        if isinstance(thresh_bins, int):
+            threshold_pool = orig_finite_thresholds
+            # Subdivide threshold pool until we get enough values
+            while thresh_bins > len(threshold_pool):
+                # x = [1, 2, 3, 4, 5]
+                # x = [1, 2, 3, 4, 5, 6]
+                # even_slice = threshold_pool[:(len(threshold_pool) // 2) * 2]
+                # odd_slice = threshold_pool[1:(len(threshold_pool) // 2) * 2]
+                x = threshold_pool
+                even_slice = x[:(len(x) // 2) * 2]
+                odd_slice = x[1:len(x) - (len(x) % 2 == 0)]
+                mean_vals = np.r_[[0, threshold_pool[0]], even_slice, odd_slice, [1, threshold_pool[-1]]].reshape(-1, 2).mean(axis=1)
+                threshold_pool = np.hstack([mean_vals, threshold_pool])
+                threshold_pool = np.unique(threshold_pool)
+
+            chosen_idxs = np.linspace(0, len(threshold_pool) - 1, thresh_bins).round().astype(int)
+            chosen_idxs = np.unique(chosen_idxs)
+            combo_thresh_asc = threshold_pool[chosen_idxs]
+        else:
+            raise TypeError
+
+    return combo_thresh_asc, nonfinite_vals
 
 
 def reversable_diff(arr, assume_sorted=1, reverse=False):
@@ -818,6 +830,7 @@ class OneVersusRestMeasureCombiner:
         return compatible_format
 
 
+@profile
 def populate_info(info):
     """
     Given raw accumulated confusion counts, populated secondary measures like
@@ -917,12 +930,9 @@ def populate_info(info):
         ppv[np.isnan(ppv)] = 0
 
         if monotonic_ppv:
-            # trick to make precision monotonic (which is probably not correct)
-            if 0:
-                print('ppv = {!r}'.format(ppv))
+            # trick to make precision monotonic (which is probably not entirely
+            # correct)
             ppv = np.maximum.accumulate(ppv[::-1])[::-1]
-            if 0:
-                print('ppv = {!r}'.format(ppv))
 
         # can set tpr_denom denominator to one
         tpr_denom = (tp + fn)  #
@@ -961,7 +971,9 @@ def populate_info(info):
         info['bm'] = tpr + tnr - 1  # informedness
         info['mk'] = ppv + npv - 1  # markedness
 
-        info['acc'] = (tp + tn) / (tp + tn + fp + fn)
+        tp_add_tn = tp + tn
+        # info['acc'] = (tp + tn) / (tp + tn + fp + fn)
+        info['acc'] = (tp_add_tn) / (tp_add_tn + fp + fn)
 
         # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
         # mcc_numer = (tp * tn) - (fp * fn)
@@ -976,17 +988,22 @@ def populate_info(info):
         fdr  = 1 - ppv  # false discovery rate
         fmr  = 1 - npv  # false ommision rate (for)
 
+        ppv_mul_tpr = ppv * tpr
+
         info['tnr'] = tnr
         info['npv'] = npv
-        info['mcc'] = np.sqrt(ppv * tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
+        # info['mcc'] = np.sqrt(ppv * tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
+        info['mcc'] = np.sqrt(ppv_mul_tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
 
-        f1_numer = (2 * ppv * tpr)
+        # f1_numer = (2 * ppv * tpr)
+        f1_numer = (2 * ppv_mul_tpr)
         f1_denom = (ppv + tpr)
         f1_denom[f1_denom == 0] = 1
         info['f1'] =  f1_numer / f1_denom
 
         # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
-        info['g1'] = np.sqrt(ppv * tpr)
+        # info['g1'] = np.sqrt(ppv * tpr)
+        info['g1'] = np.sqrt(ppv_mul_tpr)
 
         keys = ['mcc', 'g1', 'f1', 'acc']
         finite_thresh = thresh[finite_flags]

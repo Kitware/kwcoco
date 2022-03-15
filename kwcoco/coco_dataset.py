@@ -270,6 +270,7 @@ from functools import partial
 # Vectorized ORM-Like containers
 from kwcoco.coco_objects1d import Categories, Videos, Images, Annots
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
+from kwcoco import exceptions
 
 from kwcoco._helpers import (
     SortedSetQuiet, UniqueNameRemapper, _ID_Remapper, _NextId,
@@ -3303,7 +3304,7 @@ class MixinCocoAddRemove(object):
         if id is None:
             id = self._next_ids.get('images')
         elif self.imgs and id in self.imgs:
-            raise IndexError('Image id={} already exists'.format(id))
+            raise exceptions.DuplicateAddError('Image id={} already exists'.format(id))
 
         img = _dict()
         img['id'] = int(id)
@@ -3548,12 +3549,12 @@ class MixinCocoAddRemove(object):
         """
         index = self.index
         if index.cats and name in index.name_to_cat:
-            raise ValueError('Category name={!r} already exists'.format(name))
+            raise exceptions.DuplicateAddError('Category name={!r} already exists'.format(name))
 
         if id is None:
             id = self._next_ids.get('categories')
         elif index.cats and id in index.cats:
-            raise IndexError('Category id={} already exists'.format(id))
+            raise exceptions.DuplicateAddError('Category id={} already exists'.format(id))
 
         cat = _dict()
         cat['id'] = int(id)
@@ -3593,7 +3594,7 @@ class MixinCocoAddRemove(object):
         """
         try:
             id = self.add_image(file_name=file_name, id=id, **kw)
-        except ValueError:
+        except exceptions.DuplicateAddError:
             img = self.index.file_name_to_img[file_name]
             id = img['id']
         return id
@@ -3616,7 +3617,7 @@ class MixinCocoAddRemove(object):
         try:
             id = self.add_category(name=name, supercategory=supercategory,
                                    id=id, **kw)
-        except ValueError:
+        except exceptions.DuplicateAddError:
             cat = self.index.name_to_cat[name]
             id = cat['id']
         return id
@@ -4197,7 +4198,7 @@ class CocoIndex(object):
             name = video['name']
             if index._CHECKS:
                 if name in index.name_to_video:
-                    raise ValueError(
+                    raise exceptions.DuplicateAddError(
                         'video with name={} already exists'.format(name))
             index.videos[vidid] = video
             if vidid not in index.vidid_to_gids:
@@ -4226,14 +4227,14 @@ class CocoIndex(object):
             name = img.get('name', None)
             if index._CHECKS:
                 if file_name is None and name is None:
-                    raise ValueError(
+                    raise exceptions.InvalidAddError(
                         'at least one of file_name or name must be specified')
                 if file_name in index.file_name_to_img:
-                    raise ValueError(
+                    raise exceptions.DuplicateAddError(
                         'image with file_name={} already exists'.format(
                             file_name))
                 if name in index.name_to_img:
-                    raise ValueError(
+                    raise exceptions.DuplicateAddError(
                         'image with name={} already exists'.format(name))
             index.imgs[gid] = img
             index.gid_to_aids[gid] = index._set()
@@ -4246,7 +4247,7 @@ class CocoIndex(object):
 
             if 'video_id' in img:
                 if img.get('frame_index', None) is None:
-                    raise ValueError(
+                    raise exceptions.InvalidAddError(
                         'Images with video-ids must have a frame_index')
                 vidid = img['video_id']
                 try:

@@ -198,6 +198,11 @@ from kwcoco import channel_spec
 from kwcoco.util.lazy_frame_backends import LazyGDalFrameFile  # NOQA
 
 try:
+    import xarray as xr
+except ImportError:
+    xr = None
+
+try:
     import xdev
     profile = xdev.profile
 except Exception:
@@ -579,7 +584,6 @@ class DelayedNans(DelayedImageOperation):
 
         as_xarray = kwargs.get('as_xarray', False)
         if as_xarray:
-            import xarray as xr
             channels = self.channels
             coords = {}
             if channels is not None:

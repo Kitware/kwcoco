@@ -11,6 +11,11 @@ from kwcoco.category_tree import CategoryTree
 from kwcoco.metrics.confusion_measures import (
     Measures, PerClass_Measures, populate_info)
 
+try:
+    from xdev import profile
+except Exception:
+    profile = ub.identity
+
 
 class ConfusionVectors(ub.NiceRepr):
     """
@@ -848,6 +853,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         populate_info(info)
         return measures
 
+    @profile
     def _binary_clf_curves(self, stabalize_thresh=7, fp_cutoff=None):
         """
         Compute TP, FP, TN, and FN counts for this binary confusion vector.

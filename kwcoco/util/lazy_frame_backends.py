@@ -248,8 +248,8 @@ def _demo_geoimg_with_nodata():
 
     """
     import kwimage
-    from osgeo import gdal, osr
-    gdal.UseExceptions()
+    from osgeo import osr
+    # gdal.UseExceptions()
 
     # Make a dummy geotiff
     imdata = kwimage.grab_test_image('airport')
