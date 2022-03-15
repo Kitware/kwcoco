@@ -2,6 +2,11 @@ import ubelt as ub
 import numpy as np
 from os.path import join
 
+try:
+    from xdev import profile
+except Exception:
+    profile = ub.identity
+
 
 class CocoImage(ub.NiceRepr):
     """
@@ -396,6 +401,7 @@ class CocoImage(ub.NiceRepr):
         if self.dset is not None:
             self.dset._invalidate_hashid()
 
+    @profile
     def delay(self, channels=None, space='image', bundle_dpath=None):
         """
         Perform a delayed load on the data in this image.
@@ -533,6 +539,8 @@ class CocoImage(ub.NiceRepr):
                     chan = chan.delayed_warp(
                         aux_to_img, dsize=img_info['dsize'])
                     chan_list.append(chan)
+
+        # TODO: allow load in auxiliary space
 
         if space == 'video':
             video = self.video

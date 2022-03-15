@@ -261,7 +261,7 @@ The logic of this init is generated via:
     mkinit ~/code/kwcoco/kwcoco/__init__.py
 """
 
-__version__ = '0.2.23'
+__version__ = '0.2.24'
 
 __submodules__ = ['coco_dataset', 'abstract_coco_dataset']
 

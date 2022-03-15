@@ -57,6 +57,7 @@ def perterb_coco(coco_dset, **kwargs):
     null_pred = kwargs.get('null_pred', False)
     with_probs = kwargs.get('with_probs', False)
     with_heatmaps = kwargs.get('with_heatmaps', False)
+    verbose = kwargs.get('verbose', 0)
 
     # specify an amount of overlap between true and false scores
     score_noise = kwargs.get('score_noise', 0.2)
@@ -109,7 +110,8 @@ def perterb_coco(coco_dset, **kwargs):
 
     index_invalidated = False
 
-    for gid in coco_dset.imgs.keys():
+    for gid in ub.ProgIter(coco_dset.imgs.keys(), desc='perterb imgs',
+                           verbose=verbose):
         # Sample random variables
         n_fp_ = n_fp_RV()
         n_fn_ = n_fn_RV()
@@ -211,7 +213,7 @@ def perterb_coco(coco_dset, **kwargs):
 
     # Hack in the per-class heatmaps
     if with_heatmaps:
-        for gid in new_dset.images():
+        for gid in ub.ProgIter(new_dset.images(), desc='Perterb heatmaps', verbose=verbose):
             annots = new_dset.annots(gid=gid)
             img = new_dset.index.imgs[gid]
             w = img['width']

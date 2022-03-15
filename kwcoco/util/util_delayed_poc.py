@@ -69,20 +69,20 @@ Example:
     >>> f1_dsize = np.array((3, 3))
     >>> f2_dsize = np.array((2, 2))
     >>> f1_img = DelayedChannelConcat([
-    >>>     f1_chan1.delayed_warp(Affine.scale(f1_dsize / f1_chan1.dsize), dsize=f1_dsize),
-    >>>     f1_chan2.delayed_warp(Affine.scale(f1_dsize / f1_chan2.dsize), dsize=f1_dsize),
-    >>>     f1_chan3.delayed_warp(Affine.scale(f1_dsize / f1_chan3.dsize), dsize=f1_dsize),
+    >>>     f1_chan1.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan1.dsize), dsize=f1_dsize),
+    >>>     f1_chan2.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan2.dsize), dsize=f1_dsize),
+    >>>     f1_chan3.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan3.dsize), dsize=f1_dsize),
     >>> ])
     >>> f2_img = DelayedChannelConcat([
-    >>>     f2_chan1.delayed_warp(Affine.scale(f2_dsize / f2_chan1.dsize), dsize=f2_dsize),
-    >>>     f2_chan2.delayed_warp(Affine.scale(f2_dsize / f2_chan2.dsize), dsize=f2_dsize),
-    >>>     f2_chan3.delayed_warp(Affine.scale(f2_dsize / f2_chan3.dsize), dsize=f2_dsize),
+    >>>     f2_chan1.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan1.dsize), dsize=f2_dsize),
+    >>>     f2_chan2.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan2.dsize), dsize=f2_dsize),
+    >>>     f2_chan3.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan3.dsize), dsize=f2_dsize),
     >>> ])
     >>> # Combine frames into a video
     >>> vid_dsize = np.array((280, 280))
     >>> vid = DelayedFrameConcat([
-    >>>     f1_img.delayed_warp(Affine.scale(vid_dsize / f1_img.dsize), dsize=vid_dsize),
-    >>>     f2_img.delayed_warp(Affine.scale(vid_dsize / f2_img.dsize), dsize=vid_dsize),
+    >>>     f1_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f1_img.dsize), dsize=vid_dsize),
+    >>>     f2_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f2_img.dsize), dsize=vid_dsize),
     >>> ])
     >>> vid.nesting
     >>> print('vid.nesting = {}'.format(ub.repr2(vid.__json__(), nl=-2)))
@@ -194,9 +194,13 @@ import ubelt as ub
 import numpy as np
 import kwimage
 import kwarray
-from kwimage.transform import Affine
 from kwcoco import channel_spec
 from kwcoco.util.lazy_frame_backends import LazyGDalFrameFile  # NOQA
+
+try:
+    import xarray as xr
+except ImportError:
+    xr = None
 
 try:
     import xdev
@@ -299,7 +303,7 @@ class DelayedImageOperation(DelayedVisionOperation):
 
         Example:
             >>> dsize = (100, 100)
-            >>> tf2 = Affine.affine(scale=3).matrix
+            >>> tf2 = kwimage.Affine.affine(scale=3).matrix
             >>> self = DelayedWarp(np.random.rand(33, 33), tf2, dsize)
             >>> region_slices = (slice(5, 10), slice(1, 12))
             >>> delayed_crop = self.delayed_crop(region_slices)
@@ -309,10 +313,10 @@ class DelayedImageOperation(DelayedVisionOperation):
         Example:
             >>> chan1 = DelayedLoad.demo('astro')
             >>> chan2 = DelayedLoad.demo('carl')
-            >>> warped1a = chan1.delayed_warp(Affine.scale(1.2).matrix)
-            >>> warped2a = chan2.delayed_warp(Affine.scale(1.5))
-            >>> warped1b = warped1a.delayed_warp(Affine.scale(1.2).matrix)
-            >>> warped2b = warped2a.delayed_warp(Affine.scale(1.5))
+            >>> warped1a = chan1.delayed_warp(kwimage.Affine.scale(1.2).matrix)
+            >>> warped2a = chan2.delayed_warp(kwimage.Affine.scale(1.5))
+            >>> warped1b = warped1a.delayed_warp(kwimage.Affine.scale(1.2).matrix)
+            >>> warped2b = warped2a.delayed_warp(kwimage.Affine.scale(1.5))
             >>> #
             >>> region_slices = (slice(97, 677), slice(5, 691))
             >>> self = warped2b
@@ -463,7 +467,7 @@ class DelayedIdentity(DelayedImageOperation):
     def _optimize_paths(self, **kwargs):
         # DEBUG_PRINT('DelayedIdentity._optimize_paths')
         # Hack
-        yield DelayedWarp(self, Affine(None), dsize=self.dsize)
+        yield DelayedWarp(self, kwimage.Affine(None), dsize=self.dsize)
 
     @profile
     def finalize(self, **kwargs):
@@ -568,7 +572,7 @@ class DelayedNans(DelayedImageOperation):
         #     dsize = tuple(kwargs['dsize'])
         # else:
         dsize = self.dsize
-        yield DelayedWarp(self, Affine(None), dsize=dsize)
+        yield DelayedWarp(self, kwimage.Affine(None), dsize=dsize)
 
     @profile
     def finalize(self, **kwargs):
@@ -580,7 +584,6 @@ class DelayedNans(DelayedImageOperation):
 
         as_xarray = kwargs.get('as_xarray', False)
         if as_xarray:
-            import xarray as xr
             channels = self.channels
             coords = {}
             if channels is not None:
@@ -701,7 +704,7 @@ class DelayedLoad(DelayedImageOperation):
         #     dsize = tuple(kwargs['dsize'])
         # else:
         dsize = self.dsize
-        yield DelayedWarp(self, Affine(None), dsize=dsize)
+        yield DelayedWarp(self, kwimage.Affine(None), dsize=dsize)
         # raise AssertionError('hack so this is not called')
 
     def load_shape(self, use_channel_heuristic=False):
@@ -755,6 +758,9 @@ class DelayedLoad(DelayedImageOperation):
     @profile
     def finalize(self, **kwargs):
         """
+        TODO:
+            - [ ] Load from overviews if a scale will be necessary
+
         Args:
             **kwargs:
                 nodata : if specified this data item is treated as nodata, the
@@ -762,7 +768,9 @@ class DelayedLoad(DelayedImageOperation):
                     replaced with nan.
         """
         nodata = kwargs.get('nodata', None)
-        final = self.cache.get('final', None)
+        # Probably should not use a cache here?
+        # final = self.cache.get('final', None)
+        final = None
         if final is None:
             from kwcoco.util import lazy_frame_backends
             using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()
@@ -804,7 +812,7 @@ class DelayedLoad(DelayedImageOperation):
             dsize = self._immediates.get('dsize', None)
             if dsize is not None:
                 final = kwimage.imresize(final, dsize=dsize, antialias=True)
-            self.cache['final'] = final
+            # self.cache['final'] = final
 
         as_xarray = kwargs.get('as_xarray', False)
         if as_xarray:
@@ -1010,8 +1018,8 @@ class DelayedFrameConcat(DelayedVideoOperation):
         >>> # Combine frames into a video
         >>> vid_dsize = np.array((100, 100))
         >>> self = vid = DelayedFrameConcat([
-        >>>     f1_img.delayed_warp(Affine.scale(vid_dsize / f1_img.dsize)),
-        >>>     f2_img.delayed_warp(Affine.scale(vid_dsize / f2_img.dsize)),
+        >>>     f1_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f1_img.dsize)),
+        >>>     f2_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f2_img.dsize)),
         >>> ], dsize=vid_dsize)
         >>> print(ub.repr2(vid.nesting(), nl=-1, sort=0))
         >>> final = vid.finalize(interpolation='nearest', dsize=(32, 32))
@@ -1097,17 +1105,17 @@ class DelayedFrameConcat(DelayedVideoOperation):
             >>> f1_dsize = np.array(f1_chan1.dsize)
             >>> f2_dsize = np.array(f2_chan1.dsize)
             >>> f1_img = DelayedChannelConcat([
-            >>>     f1_chan1.delayed_warp(Affine.scale(f1_dsize / f1_chan1.dsize), dsize=f1_dsize),
-            >>>     f1_chan2.delayed_warp(Affine.scale(f1_dsize / f1_chan2.dsize), dsize=f1_dsize),
+            >>>     f1_chan1.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan1.dsize), dsize=f1_dsize),
+            >>>     f1_chan2.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan2.dsize), dsize=f1_dsize),
             >>> ])
             >>> f2_img = DelayedChannelConcat([
-            >>>     f2_chan1.delayed_warp(Affine.scale(f2_dsize / f2_chan1.dsize), dsize=f2_dsize),
-            >>>     f2_chan2.delayed_warp(Affine.scale(f2_dsize / f2_chan2.dsize), dsize=f2_dsize),
+            >>>     f2_chan1.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan1.dsize), dsize=f2_dsize),
+            >>>     f2_chan2.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan2.dsize), dsize=f2_dsize),
             >>> ])
             >>> vid_dsize = np.array((280, 280))
             >>> full_vid = DelayedFrameConcat([
-            >>>     f1_img.delayed_warp(Affine.scale(vid_dsize / f1_img.dsize), dsize=vid_dsize),
-            >>>     f2_img.delayed_warp(Affine.scale(vid_dsize / f2_img.dsize), dsize=vid_dsize),
+            >>>     f1_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f1_img.dsize), dsize=vid_dsize),
+            >>>     f2_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f2_img.dsize), dsize=vid_dsize),
             >>> ])
             >>> region_slices = (slice(80, 200), slice(80, 200))
             >>> print(ub.repr2(full_vid.nesting(), nl=-1, sort=0))
@@ -1178,7 +1186,7 @@ class DelayedChannelConcat(DelayedImageOperation):
         >>> comp2 = DelayedWarp(np.random.rand(11, 7, 3))
         >>> comp3 = DelayedWarp(
         >>>     np.random.rand(3, 5, 2),
-        >>>     transform=Affine.affine(scale=(7/5, 11/3)).matrix,
+        >>>     transform=kwimage.Affine.affine(scale=(7/5, 11/3)).matrix,
         >>>     dsize=(7, 11)
         >>> )
         >>> components = [comp1, comp2, comp3]
@@ -1189,7 +1197,7 @@ class DelayedChannelConcat(DelayedImageOperation):
 
         >>> # We should be able to nest DelayedChannelConcat inside virutal images
         >>> frame1 = DelayedWarp(
-        >>>     chans, transform=Affine.affine(scale=2.2).matrix,
+        >>>     chans, transform=kwimage.Affine.affine(scale=2.2).matrix,
         >>>     dsize=(20, 26))
         >>> frame2 = DelayedWarp(
         >>>     np.random.rand(3, 3, 6), dsize=(20, 26))
@@ -1242,7 +1250,7 @@ class DelayedChannelConcat(DelayedImageOperation):
         components = []
         for _ in range(num_parts):
             subcomp = DelayedWarp.random(rng=rng)
-            tf = Affine.random(rng=rng).matrix
+            tf = kwimage.Affine.random(rng=rng).matrix
             comp = subcomp.delayed_warp(tf, dsize=(self_w, self_h))
             components.append(comp)
         self = DelayedChannelConcat(components)
@@ -1510,7 +1518,7 @@ class DelayedWarp(DelayedImageOperation):
         >>> self.finalize().shape
     """
     def __init__(self, sub_data, transform=None, dsize=None):
-        transform = Affine.coerce(transform)
+        transform = kwimage.Affine.coerce(transform)
 
         # TODO: We probably don't need to track sub-bounds, size, shape
         # or any of that anywhere except at the root and leaf.
@@ -1585,7 +1593,7 @@ class DelayedWarp(DelayedImageOperation):
         layer = raw
         depth = nest_distri.sample()
         for _ in range(depth):
-            tf = Affine.random(rng=rng).matrix
+            tf = kwimage.Affine.random(rng=rng).matrix
             layer = DelayedWarp(layer, tf, dsize='auto')
         self = layer
         return self
@@ -1691,8 +1699,8 @@ class DelayedWarp(DelayedImageOperation):
             >>> # Test aliasing
             >>> s = DelayedIdentity.demo()
             >>> s = DelayedIdentity.demo('checkerboard')
-            >>> a = s.delayed_warp(Affine.scale(0.05), dsize='auto')
-            >>> b = s.delayed_warp(Affine.scale(3), dsize='auto')
+            >>> a = s.delayed_warp(kwimage.Affine.scale(0.05), dsize='auto')
+            >>> b = s.delayed_warp(kwimage.Affine.scale(3), dsize='auto')
 
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
@@ -1715,7 +1723,7 @@ class DelayedWarp(DelayedImageOperation):
         # from kwimage import im_cv2
         if dsize is None:
             dsize = self.meta['dsize']
-        transform = Affine.coerce(transform) @ self.meta['transform']
+        transform = kwimage.Affine.coerce(transform) @ self.meta['transform']
         sub_data = self.sub_data
         flag = getattr(sub_data, '__hack_dont_optimize__', False)
         if flag:
@@ -1841,7 +1849,7 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
         >>> region_shape = (100, 100, 1)
         >>> root_region_box = kwimage.Boxes.from_slice(region_slices, shape=region_shape)
         >>> root_region_bounds = root_region_box.to_polygons()[0]
-        >>> tf_leaf_to_root = Affine.affine(scale=7).matrix
+        >>> tf_leaf_to_root = kwimage.Affine.affine(scale=7).matrix
         >>> slices, tf_new = _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root)
         >>> print('tf_new =\n{!r}'.format(tf_new))
         >>> print('slices = {!r}'.format(slices))
@@ -1854,7 +1862,7 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
 
     """
     # Transform the region bounds into the sub-image space
-    tf_leaf_to_root = Affine.coerce(tf_leaf_to_root)
+    tf_leaf_to_root = kwimage.Affine.coerce(tf_leaf_to_root)
     tf_root_to_leaf = tf_leaf_to_root.inv()
     tf_root_to_leaf = tf_root_to_leaf.__array__()
     leaf_region_bounds = root_region_bounds.warp(tf_root_to_leaf)
@@ -1874,8 +1882,8 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
     crop_offset = leaf_crop_box.data[0, 0:2]
     root_offset = root_region_bounds.exterior.data.min(axis=0)
 
-    tf_root_to_newroot = Affine.affine(offset=-root_offset).matrix
-    tf_newleaf_to_leaf = Affine.affine(offset=crop_offset).matrix
+    tf_root_to_newroot = kwimage.Affine.affine(offset=-root_offset).matrix
+    tf_newleaf_to_leaf = kwimage.Affine.affine(offset=crop_offset).matrix
 
     # Resample the smaller region to align it with the root region
     # Note: The right most transform is applied first
@@ -1955,19 +1963,19 @@ def _devcheck_corner():
     # cropped-leaf-space not just the leaf-space, so we invert the implicit
     # crop
 
-    tf_crop_to_leaf = Affine.translate(offset=crop_offset)
+    tf_crop_to_leaf = kwimage.Affine.translate(offset=crop_offset)
 
-    # tf_newroot_to_root = Affine.affine(offset=region_box.data[0, 0:2])
-    tf_root_to_newroot = Affine.translate(offset=region_box.data[0, 0:2]).inv()
+    # tf_newroot_to_root = kwimage.Affine.affine(offset=region_box.data[0, 0:2])
+    tf_root_to_newroot = kwimage.Affine.translate(offset=region_box.data[0, 0:2]).inv()
 
-    tf_crop_to_leaf = Affine.translate(offset=crop_offset)
+    tf_crop_to_leaf = kwimage.Affine.translate(offset=crop_offset)
     tf_crop_to_newroot = tf_root_to_newroot @ tf_leaf_to_root @ tf_crop_to_leaf
     tf_newroot_to_crop = tf_crop_to_newroot.inv()
 
     # tf_leaf_to_crop
-    # tf_corner_offset = Affine.translate(offset=offset_xy)
+    # tf_corner_offset = kwimage.Affine.translate(offset=offset_xy)
 
-    subpixel_offset = Affine.translate(offset=offset_xy).matrix
+    subpixel_offset = kwimage.Affine.translate(offset=offset_xy).matrix
     tf_crop_to_leaf = subpixel_offset
     # tf_crop_to_root = tf_leaf_to_root @ tf_crop_to_leaf
     # tf_root_to_crop = np.linalg.inv(tf_crop_to_root)

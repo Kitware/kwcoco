@@ -5,7 +5,18 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.23 - Unreleased
+## Version 0.2.24 - Unreleased
+
+### Added
+* verbose flag to perterb function
+* Added new exceptions `DuplicateAddError` and `InvalidAddError` to better
+  indicate why an add image/category/annotation failed.
+
+### Changed
+* Combine measures can now take an explicit set of threshold bins to accumulate to.
+
+
+## Version 0.2.23 - Released 2022-03-07
 
 ### Fixed
 * Bug in delayed with nodata
