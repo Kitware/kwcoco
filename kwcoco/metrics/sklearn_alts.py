@@ -5,6 +5,13 @@ non-negative integers.
 """
 from scipy.sparse import coo_matrix
 import numpy as np
+import ubelt as ub
+
+
+try:
+    from xdev import profile
+except Exception:
+    profile = ub.identity
 
 
 def confusion_matrix(y_true, y_pred, n_labels=None, labels=None,
@@ -70,6 +77,7 @@ def class_accuracy_from_confusion(cfsn):
     return class_acc
 
 
+@profile
 def _binary_clf_curve2(y_true, y_score, pos_label=None, sample_weight=None):
     """
     MODIFIED VERSION OF SCIKIT-LEARN API
