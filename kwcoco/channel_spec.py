@@ -149,11 +149,23 @@ class BaseChannelSpec(ub.NiceRepr):
         ...
 
     @abc.abstractmethod
-    def intersection(self):
+    def intersection(self, other):
+        ...
+
+    @abc.abstractmethod
+    def union(self, other):
         ...
 
     @abc.abstractmethod
     def difference(self):
+        ...
+
+    @abc.abstractmethod
+    def issubset(self, other):
+        ...
+
+    @abc.abstractmethod
+    def issuperset(self, other):
         ...
 
     def __sub__(self, other):
@@ -168,6 +180,9 @@ class BaseChannelSpec(ub.NiceRepr):
     def __and__(self, other):
         # the parent implementation of this is backwards
         return self.intersection(other)
+
+    def __or__(self, other):
+        return self.union(other)
 
     def path_sanitize(self):
         """
@@ -624,6 +639,40 @@ class FusedChannelSpec(BaseChannelSpec):
         new = self.__class__(new_parsed, _is_normalized=True)
         return new
 
+    def union(self, other):
+        """
+        Example:
+            >>> from kwcoco.channel_spec import *  # NOQA
+            >>> FCS = FusedChannelSpec.coerce
+            >>> self = FCS('rgb|disparity|flowx|flowy')
+            >>> other = FCS('r|b|XX')
+            >>> self.union(other)
+        """
+        try:
+            other_norm = ub.oset(other.normalize().parsed)
+        except Exception:
+            other_norm = other
+        self_norm = ub.oset(self.normalize().parsed)
+        new_parsed = list(self_norm | other_norm)
+        new = self.__class__(new_parsed, _is_normalized=True)
+        return new
+
+    def issubset(self, other):
+        try:
+            other_norm = ub.oset(other.normalize().parsed)
+        except Exception:
+            other_norm = other
+        self_norm = ub.oset(self.normalize().parsed)
+        return self_norm.issubset(other_norm)
+
+    def issuperset(self, other):
+        try:
+            other_norm = ub.oset(other.normalize().parsed)
+        except Exception:
+            other_norm = other
+        self_norm = ub.oset(self.normalize().parsed)
+        return self_norm.issuperset(other_norm)
+
     def component_indices(self, axis=2):
         """
         Look up component indices within this stream
@@ -1024,6 +1073,46 @@ class ChannelSpec(BaseChannelSpec):
         new_spec = ','.join([s.spec for s in new_streams])
         new = self.__class__(new_spec)
         return new
+
+    def union(self, other):
+        """
+        Union simply tags on a second channel spec onto this one.
+        Duplicates are maintained.
+
+        Example:
+            >>> from kwcoco.channel_spec import *
+            >>> self = ChannelSpec('rgb|disparity,flowx|r|flowy')
+            >>> other = ChannelSpec('rgb')
+            >>> new = self.union(other)
+            >>> print(new)
+            >>> print(new.numel())
+            >>> other = ChannelSpec('flowx')
+            >>> new = self.union(other)
+            >>> print(new)
+            >>> print(new.numel())
+            <ChannelSpec(r|g|b|disparity,flowx|r|flowy,r|g|b)>
+            10
+            <ChannelSpec(r|g|b|disparity,flowx|r|flowy,flowx)>
+            8
+        """
+        # assert len(list(other.keys())) == 1, 'can take diff with one stream'
+        try:
+            other_norm = ChannelSpec.coerce(other).normalize()
+        except Exception:
+            other_norm = other
+
+        self_norm = self.normalize()
+        new_streams = list(self_norm.values())
+        new_streams += list(other_norm.values())
+        new_spec = ','.join([s.spec for s in new_streams])
+        new = self.__class__(new_spec)
+        return new
+
+    def issubset(self, other):
+        raise NotImplementedError
+
+    def issuperset(self, other):
+        raise NotImplementedError
 
     def numel(self):
         """

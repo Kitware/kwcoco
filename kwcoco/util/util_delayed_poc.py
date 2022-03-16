@@ -196,6 +196,7 @@ import kwimage
 import kwarray
 from kwcoco import channel_spec
 from kwcoco.util.lazy_frame_backends import LazyGDalFrameFile  # NOQA
+from kwcoco import exceptions
 
 try:
     import xarray as xr
@@ -1043,7 +1044,7 @@ class DelayedFrameConcat(DelayedVideoOperation):
         if ub.allsame(nband_cands):
             num_bands = nband_cands[0]
         else:
-            raise ValueError(
+            raise exceptions.CoordinateCompatibilityError(
                 'components must all have the same delayed size: got {}'.format(nband_cands))
         self.num_bands = num_bands
         self.num_frames = len(self.frames)
@@ -1216,7 +1217,7 @@ class DelayedChannelConcat(DelayedImageOperation):
         if dsize is None:
             dsize_cands = [comp.dsize for comp in self.components]
             if not ub.allsame(dsize_cands):
-                raise ValueError(
+                raise exceptions.CoordinateCompatibilityError(
                     # 'components must all have the same delayed size')
                     'components must all have the same delayed size: got {}'.format(dsize_cands))
             dsize = dsize_cands[0]

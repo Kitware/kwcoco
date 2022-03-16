@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.25 - Unreleased
 
+### Added
+* Can now load do delayed loading of data in auxiliary space. (throws an error
+  if multiple auxiliary streams are mixed)
+* issubset issuperset for FusedChannelSpec
+* union for FusedChannelSpec and ChannelSpec
+* `find_asset_obj` for CocoImage
+
 
 ## Version 0.2.24 - Released 2022-03-15
 

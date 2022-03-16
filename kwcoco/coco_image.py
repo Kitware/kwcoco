@@ -284,6 +284,19 @@ class CocoImage(ub.NiceRepr):
         for obj in img.get('auxiliary', []):
             yield obj
 
+    def find_asset_obj(self, channels):
+        """
+        Find the asset dictionary with the specified channels
+        """
+        from kwcoco.channel_spec import FusedChannelSpec
+        found = None
+        for obj in self.iter_asset_objs():
+            obj_channels = FusedChannelSpec.coerce(obj['channels'])
+            if (obj_channels & channels).numel():
+                found = obj
+                break
+        return found
+
     def add_auxiliary_item(self, file_name=None, channels=None,
                            imdata=None, warp_aux_to_img=None, width=None,
                            height=None, imwrite=False):
@@ -504,6 +517,29 @@ class CocoImage(ub.NiceRepr):
             >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
             >>> delayed = coco_img.delay(channels='B1|Aux:2:4')
             >>> final = delayed.finalize()
+
+        Example:
+            >>> # Test delay when loading in auxiliary space
+            >>> from kwcoco.coco_image import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
+            >>> coco_img = dset.coco_image(1)
+            >>> stream1 = coco_img.channels.streams()[0]
+            >>> stream2 = coco_img.channels.streams()[1]
+            >>> aux_delayed = coco_img.delay(stream1, space='auxiliary')
+            >>> img_delayed = coco_img.delay(stream1, space='image')
+            >>> vid_delayed = coco_img.delay(stream1, space='video')
+            >>> #
+            >>> aux_imdata = aux_delayed.finalize()
+            >>> img_imdata = img_delayed.finalize()
+            >>> assert aux_imdata.shape != img_imdata.shape
+            >>> # Cannot load multiple auxiliary items at the same time in
+            >>> # auxiliary space
+            >>> import pytest
+            >>> fused_channels = stream1 | stream2
+            >>> with pytest.raises(kwcoco.exceptions.CoordinateCompatibilityError):
+            >>>     aux_delayed2 = coco_img.delay(fused_channels, space='auxiliary')
+
         """
         from kwcoco.util.util_delayed_poc import DelayedChannelConcat
         from kwcoco.util.util_delayed_poc import DelayedNans
@@ -533,11 +569,12 @@ class CocoImage(ub.NiceRepr):
                     if requested.intersection(info['channels']):
                         include_flag = True
                 if include_flag:
-                    aux_to_img = Affine.coerce(obj.get('warp_aux_to_img', None))
                     chncls, chnkw = info['chan_construct']
                     chan = chncls(**chnkw)
-                    chan = chan.delayed_warp(
-                        aux_to_img, dsize=img_info['dsize'])
+                    if space != 'auxiliary':
+                        aux_to_img = Affine.coerce(obj.get('warp_aux_to_img', None))
+                        chan = chan.delayed_warp(
+                            aux_to_img, dsize=img_info['dsize'])
                     chan_list.append(chan)
 
         # TODO: allow load in auxiliary space
@@ -570,7 +607,7 @@ class CocoImage(ub.NiceRepr):
             if len(delayed.components) == 1:
                 delayed = delayed.components[0]
 
-        if space == 'image':
+        if space in {'image', 'auxiliary'}:
             pass
         elif space == 'video':
             img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
