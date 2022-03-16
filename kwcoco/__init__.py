@@ -261,17 +261,31 @@ The logic of this init is generated via:
     mkinit ~/code/kwcoco/kwcoco/__init__.py
 """
 
-__version__ = '0.2.24'
+__version__ = '0.2.25'
 
-__submodules__ = ['coco_dataset', 'abstract_coco_dataset']
+__submodules__ = {
+    'abstract_coco_dataset': ['AbstractCocoDataset'],
+    'coco_dataset': ['CocoDataset'],
+    'coco_image': ['CocoImage'],
+    'category_tree': ['CategoryTree'],
+    'channel_spec': ['ChannelSpec', 'FusedChannelSpec'],
+    'exceptions': [],
+}
 
+from kwcoco import abstract_coco_dataset
+from kwcoco import category_tree
+from kwcoco import channel_spec
 from kwcoco import coco_dataset
-from kwcoco import channel_spec  # NOQA
+from kwcoco import coco_image
+from kwcoco import exceptions
 
 from kwcoco.abstract_coco_dataset import (AbstractCocoDataset,)
-from kwcoco.category_tree import (CategoryTree,)
 from kwcoco.coco_dataset import (CocoDataset,)
+from kwcoco.coco_image import (CocoImage,)
+from kwcoco.category_tree import (CategoryTree,)
 from kwcoco.channel_spec import (ChannelSpec, FusedChannelSpec,)
 
-__all__ = ['AbstractCocoDataset', 'CocoDataset', 'CategoryTree',
-           'coco_dataset', 'FusedChannelSpec', 'ChannelSpec', 'coco_dataset']
+__all__ = ['AbstractCocoDataset', 'CategoryTree', 'ChannelSpec', 'CocoDataset',
+           'CocoImage', 'FusedChannelSpec', 'abstract_coco_dataset',
+           'category_tree', 'channel_spec', 'coco_dataset', 'coco_image',
+           'exceptions']

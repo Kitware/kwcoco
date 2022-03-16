@@ -51,6 +51,7 @@ An informal spec is as follows:
                 'width':     <int>    # pixel width of auxiliary image
                 'height':    <int>    # pixel height of auxiliary image
                 'warp_aux_to_img': <TransformSpec>,  # tranform from "base" image space to auxiliary image space. (identity if unspecified)
+                'quantization': <QuantizationSpec>,  # indicates that the underlying data was quantized
             }, ...
         ]
 
@@ -82,6 +83,16 @@ An informal spec is as follows:
         fuse" inputs by separating them with a "," and "early fuse" by
         separating with a "|". Early fusion returns a solid array/tensor, late
         fusion returns separated arrays/tensors.
+
+    QuantizationSpec:
+        This is a dictionary of the form:
+            {
+                'orig_min': <float>, # min original intensity
+                'orig_max': <float>, # min original intensity
+                'quant_min': <int>, # min quantized intensity
+                'quant_max': <int>, # max quantized intensity
+                'nodata': <int|None>,  # integer value to interpret as nan
+            }
 
     # Ground truth is specified as annotations, each belongs to a spatial
     # region in an image. This must reference a subregion of the image in pixel
