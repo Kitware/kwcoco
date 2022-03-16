@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.25 - Unreleased
+## Version 0.2.26 - Unreleased
+
+
+## Version 0.2.25 - Released 2022-03-16
 
 ### Added
 * Can now load do delayed loading of data in auxiliary space. (throws an error
