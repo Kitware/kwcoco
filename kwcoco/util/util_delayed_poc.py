@@ -413,10 +413,34 @@ class DelayedIdentity(DelayedImageOperation):
         >>> sub_data = np.random.rand(31, 37, 3)
         >>> self = DelayedIdentity(sub_data)
         >>> self = DelayedIdentity(sub_data, channels='L|a|b')
+
+        >>> # test with quantization
+        >>> rng = kwarray.ensure_rng(32)
+        >>> sub_data_quant = (rng.rand(31, 37, 3) * 1000).astype(np.int16)
+        >>> sub_data_quant[0, 0] = -9999
+        >>> self = DelayedIdentity(sub_data_quant, channels='L|a|b', quantization={
+        >>>     'orig_min': 0.,
+        >>>     'orig_max': 1.,
+        >>>     'quant_min': 0,
+        >>>     'quant_max': 1000,
+        >>>     'nodata': -9999,
+        >>> })
+        >>> final1 = self.finalize(dequantize=True)
+        >>> final2 = self.finalize(dequantize=False)
+        >>> assert np.all(np.isnan(final1[0, 0]))
+        >>> scale = final2 / final1
+        >>> scales = scale[scale > 0]
+        >>> assert np.all(np.isclose(scales, 1000))
+        >>> # check that take channels works
+        >>> new_subdata = self.take_channels('a')
+        >>> sub_final1 = new_subdata.finalize(dequantize=True)
+        >>> sub_final2 = new_subdata.finalize(dequantize=False)
+        >>> assert sub_final1.dtype.kind == 'f'
+        >>> assert sub_final2.dtype.kind == 'i'
     """
     __hack_dont_optimize__ = True
 
-    def __init__(self, sub_data, dsize=None, channels=None):
+    def __init__(self, sub_data, dsize=None, channels=None, quantization=None):
         self.sub_data = sub_data
         self.meta = {}
         self.cache = {}
@@ -424,6 +448,7 @@ class DelayedIdentity(DelayedImageOperation):
         if dsize is None:
             dsize = (w, h)
         self.dsize = dsize
+        self.quantization = quantization
         if len(self.sub_data.shape) == 2:
             num_bands = 1
         elif len(self.sub_data.shape) == 3:
@@ -436,6 +461,7 @@ class DelayedIdentity(DelayedImageOperation):
         self.shape = (h, w, self.num_bands)
         self.meta['dsize'] = self.dsize
         self.meta['shape'] = self.shape
+        self.meta['quantization'] = self.quantization
         if channels is None:
             # self.channels = channel_spec.FusedChannelSpec.coerce(num_bands)
             self.channels = None
@@ -472,8 +498,12 @@ class DelayedIdentity(DelayedImageOperation):
 
     @profile
     def finalize(self, **kwargs):
+        dequantize_ = kwargs.get('dequantize', True)
         final = self.sub_data
         final = kwarray.atleast_nd(final, 3, front=False)
+        if self.quantization is not None and dequantize_:
+            # Note: this is very inefficient on crop
+            final = dequantize(final, self.quantization)
         return final
 
     def take_channels(self, channels):
@@ -505,8 +535,28 @@ class DelayedIdentity(DelayedImageOperation):
             sub_data=new_data,
             dsize=self.dsize,
             channels=channels,
+            quantization=self.quantization,
         )
         return new
+
+
+def dequantize(quant_data, quantization):
+    """
+    Helper for dequantization
+    """
+    dequant = quant_data.astype(np.float32)
+    orig_min = quantization.get('orig_min', 0)
+    orig_max = quantization.get('orig_max', 1)
+    quant_min = quantization.get('quant_min', 0)
+    quant_max = quantization['quant_max']
+    nodata = quantization.get('nodata', None)
+    orig_extent = orig_max - orig_min
+    quant_extent = quant_max - quant_min
+    dequant = (dequant - quant_min) * (orig_extent / quant_extent) + orig_min
+    if nodata is not None:
+        mask = quant_data == nodata
+        dequant[mask] = np.nan
+    return dequant
 
 
 class DelayedNans(DelayedImageOperation):
@@ -640,6 +690,23 @@ class DelayedLoad(DelayedImageOperation):
         >>> fpath = kwimage.grab_test_image_fpath()
         >>> channels = channel_spec.FusedChannelSpec.coerce('rgb')
         >>> self = DelayedLoad(fpath, channels=channels)
+
+    Example:
+        >>> # Test with quantization
+        >>> fpath = kwimage.grab_test_image_fpath()
+        >>> channels = channel_spec.FusedChannelSpec.coerce('rgb')
+        >>> self = DelayedLoad(fpath, channels=channels, quantization={
+        >>>     'orig_min': 0.,
+        >>>     'orig_max': 1.,
+        >>>     'quant_min': 0,
+        >>>     'quant_max': 256,
+        >>>     'nodata': None,
+        >>> })
+        >>> final1 = self.finalize(dequantize=False)
+        >>> final2 = self.finalize(dequantize=True)
+        >>> assert final1.dtype.kind == 'u'
+        >>> assert final2.dtype.kind == 'f'
+        >>> assert final2.max() <= 1
     """
     __hack_dont_optimize__ = True
 
@@ -650,7 +717,8 @@ class DelayedLoad(DelayedImageOperation):
                  num_bands=None,
                  immediate_crop=None,
                  immediate_chan_idxs=None,
-                 immediate_dsize=None):
+                 immediate_dsize=None,
+                 quantization=None):
         # self.data = {}
         self.meta = {}
         self.cache = {}
@@ -667,6 +735,7 @@ class DelayedLoad(DelayedImageOperation):
             'dsize': immediate_dsize,
             'chan_idxs': immediate_chan_idxs,
         }
+        self.quantization = quantization
 
         if num_bands is not None:
             self.meta['num_bands'] = num_bands
@@ -805,10 +874,15 @@ class DelayedLoad(DelayedImageOperation):
 
             # Handle nan
             if not using_gdal:
-                if nodata is not None:
+                if nodata is not None and isinstance(nodata, int):
                     if final.dtype.kind != 'f':
                         final = final.astype(np.float32)
                     final[final == nodata] = np.nan
+
+            dequantize_ = kwargs.get('dequantize', True)
+            if self.quantization is not None and dequantize_:
+                # Note: this is very inefficient on crop
+                final = dequantize(final, self.quantization)
 
             dsize = self._immediates.get('dsize', None)
             if dsize is not None:
@@ -983,7 +1057,8 @@ class DelayedLoad(DelayedImageOperation):
             dsize=self.dsize,
             immediate_dsize=self._immediates['dsize'],
             immediate_crop=self._immediates['crop'],
-            immediate_chan_idxs=new_chan_ixs
+            immediate_chan_idxs=new_chan_ixs,
+            quantization=self.quantization,
         )
         return new
 

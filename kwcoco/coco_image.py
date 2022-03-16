@@ -289,6 +289,7 @@ class CocoImage(ub.NiceRepr):
         Find the asset dictionary with the specified channels
         """
         from kwcoco.channel_spec import FusedChannelSpec
+        channels = FusedChannelSpec.coerce(channels)
         found = None
         for obj in self.iter_asset_objs():
             obj_channels = FusedChannelSpec.coerce(obj['channels'])
@@ -635,12 +636,15 @@ def _delay_load_imglike(bundle_dpath, obj):
         info['dsize'] = dsize = (width, height)
     else:
         info['dsize'] = dsize = (None, None)
+    quantization = obj.get('quantization', None)
     if imdata is not None:
         info['chan_construct'] = (DelayedIdentity, dict(
-            sub_data=imdata, channels=channels_, dsize=dsize))
+            sub_data=imdata, channels=channels_, dsize=dsize,
+            quantization=quantization))
     elif fname is not None:
         info['fpath'] = fpath = join(bundle_dpath, fname)
         # Delaying this gives us a small speed boost
         info['chan_construct'] = (DelayedLoad, dict(
-            fpath=fpath, channels=channels_, dsize=dsize))
+            fpath=fpath, channels=channels_, dsize=dsize,
+            quantization=quantization))
     return info

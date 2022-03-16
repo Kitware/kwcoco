@@ -13,6 +13,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * issubset issuperset for FusedChannelSpec
 * union for FusedChannelSpec and ChannelSpec
 * `find_asset_obj` for CocoImage
+* Added quantization spec. CocoImage.delay will now return a dequantized image
+  if quantization metadata is available.
 
 
 ## Version 0.2.24 - Released 2022-03-15
