@@ -51,6 +51,28 @@ The ChannelSpec has these simple rules:
 
         slices after the "." work like python slices
 
+The detailed grammar for the spec is:
+
+    ?value: stream
+
+    getitem_arg : INT
+                | INT ":" INT
+
+    chan_code : CNAME
+              | CNAME "." getitem_arg
+
+    fused : [chan_code ("|" chan_code)*]
+
+    stream : [fused ("," fused)*]
+
+    %import common.CNAME
+    %import common.INT
+
+
+Note that a stream refers to a the full ChannelSpec and fused refers to
+FusedChannelSpec.
+
+
 For single arrays, the spec is always an early fused spec.
 
 TODO:
@@ -62,6 +84,43 @@ TODO:
 TODO:
     - [x]: Use FusedChannelSpec as a member of ChannelSpec
     - [x]: Handle special slice suffix for length calculations
+
+
+TODO:
+
+    Sensor Codes
+    ------------
+    Let S1 = sensor 1
+    Let S2 = sensor 2
+    Let S3 = sensor 3
+
+    Using a <sensor>:<pure_fused_channel_spec> indicates that the fused
+    channels belong to that sensor.
+
+    For example:
+
+        S1:red|green|blue
+        S1:B.0:3 = S1:C.0|C.1|C.2
+
+    To specify that R|G|B channels exist in sensor 1 and sensor 2 you could do:
+
+        S1:R|G|B,S2:R|G|B
+
+        or the more concise syntax allows for a distributive law
+
+        (S1,S2):R|G|B
+
+        Notice, how the "R|G|B" channel code is distributed over the ","
+        in the parenthesis.
+
+
+
+    There should be There is a multi-sensor
+
+
+    S1:
+
+
 
 
 Note:
