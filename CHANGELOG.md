@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.26 - Unreleased
 
+### Added
+
+* Method to get the valid region for a CocoImage in image or video space
+
 
 ## Version 0.2.25 - Released 2022-03-16
 

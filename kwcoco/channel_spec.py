@@ -53,20 +53,34 @@ The ChannelSpec has these simple rules:
 
 The detailed grammar for the spec is:
 
-    ?value: stream
+    ?start: stream
 
-    getitem_arg : INT
-                | INT ":" INT
+    // An identifier can contain spaces
+    IDEN: ("_"|LETTER) ("_"|" "|LETTER|DIGIT)*
 
-    chan_code : CNAME
-              | CNAME "." getitem_arg
+    chan_single : IDEN
+    chan_getitem : IDEN "." INT
+    chan_getslice_0b : IDEN ":" INT
+    chan_getslice_ab : IDEN "." INT ":" INT
 
-    fused : [chan_code ("|" chan_code)*]
+    // A channel code can just be an ID, or it can have a getitem
+    // style syntax with a scalar or slice as an argument
+    chan_code : chan_single | chan_getslice_0b | chan_getslice_ab | chan_getitem
 
-    stream : [fused ("," fused)*]
+    // Fused channels are an ordered sequence of channel codes (without sensors)
+    fused : chan_code ("|" chan_code)*
 
-    %import common.CNAME
+    // Channels can be specified in a sequence but must contain parens
+    fused_seq : "(" fused ("," fused)* ")"
+
+    channel_rhs : fused | fused_seq
+
+    stream : channel_rhs ("," channel_rhs)*
+
+    %import common.DIGIT
+    %import common.LETTER
     %import common.INT
+
 
 
 Note that a stream refers to a the full ChannelSpec and fused refers to
@@ -112,16 +126,6 @@ TODO:
 
         Notice, how the "R|G|B" channel code is distributed over the ","
         in the parenthesis.
-
-
-
-    There should be There is a multi-sensor
-
-
-    S1:
-
-
-
 
 Note:
     * do not specify the same channel in FusedChannelSpec twice
@@ -389,11 +393,12 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> FusedChannelSpec.coerce(FusedChannelSpec(['a']))
             >>> assert FusedChannelSpec.coerce('').numel() == 0
         """
-        try:
-            # Efficiency hack
-            return cls._memo[data]
-        except (KeyError, TypeError):
-            pass
+        if 1:
+            try:
+                # Efficiency hack
+                return cls._memo[data]
+            except (KeyError, TypeError):
+                pass
         if isinstance(data, list):
             self = cls(data)
         elif isinstance(data, str):

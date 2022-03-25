@@ -617,6 +617,26 @@ class CocoImage(ub.NiceRepr):
             raise KeyError('space = {}'.format(space))
         return delayed
 
+    def valid_region(self, space='image'):
+        """
+        If this image has a valid polygon, return it in image, or video space
+        """
+        import kwimage
+        valid_coco_poly = self.img.get('valid_region', None)
+        if valid_coco_poly is None:
+            valid_poly = None
+        else:
+            kw_poly_img = kwimage.MultiPolygon.coerce(valid_coco_poly)
+            if space == 'image':
+                valid_poly = kw_poly_img
+            elif space == 'video':
+                warp_vid_from_img = kwimage.Affine.coerce(self.img.get('warp_img_to_vid', None))
+                valid_poly = kw_poly_img.warp(warp_vid_from_img)
+            else:
+                # To warp it into an auxiliary space we need to know which one
+                raise NotImplementedError(space)
+        return valid_poly
+
 
 def _delay_load_imglike(bundle_dpath, obj):
     from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedIdentity
