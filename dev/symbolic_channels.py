@@ -7,6 +7,7 @@ import lark
 
 SENSOR_CHAN_GRAMMAR = ub.codeblock(
     '''
+    // SENSOR_CHAN_GRAMMAR
     ?start: stream
 
     // An identifier can contain spaces
@@ -53,6 +54,7 @@ SENSOR_CHAN_GRAMMAR = ub.codeblock(
 
 CHANNEL_ONLY_GRAMMAR = ub.codeblock(
     '''
+    // CHANNEL_ONLY_GRAMMAR
     ?start: stream
 
     // An identifier can contain spaces
@@ -199,27 +201,27 @@ def sensor_channel_lark():
     channel_only_parser_python = lark.Lark(CHANNEL_ONLY_GRAMMAR,  start='start', parser='lalr')
 
     codes = [
-        # '(S2,L8):(R|G|B.0:3,a),bc'
-        # 'R',
-        # 'R|G',
+        '(S2,L8):(R|G|B.0:3,a),bc'
+        'R',
+        'R|G',
         'R|G|mat.0',
         'R|G|mat.0:3',
         'R|G|mat:3',
         'R|G|mat:3,lwir|inv:3|nir',
         'R,G,B,d|e.3',
-        # 'S2:(R,G,B,d|e.3)',
-        # 'S2:(R,G,B,d|e.3)',
-        # 'S2:a:3,d:3',
-        # 'S2:(a:3,d:3)',
-        # 'S2:a:3',
-        # '(S2,L8,WV):(a:3,b:3,c:3)',
-        # '(S2,L8,WV):(a:3,b:3,c:3),rgb',
-        # 'blue|green|red|nir|swir16|swir22,matseg_0|matseg_1|matseg_2|matseg_3|invariants.0:8|forest|built_up|water',
-        # '(S2,L8):R|G|B,X|Y|Z,WV:pan',
-        # '(S2,L8):R|G|B,X|Y|Z,WV:(pan,depth)',
-        # '(S2,L8,WV):(a|b|c,d)',
-        # '(S2,L8,WV):(a:3|b:3|c:3,d:3)',
-        # 'fsdf fds:Q,R,WV:(a:3|boo bar:3|c:3,d:3),B:3,S:S:3',
+        'S2:(R,G,B,d|e.3)',
+        'S2:(R,G,B,d|e.3)',
+        'S2:a:3,d:3',
+        'S2:(a:3,d:3)',
+        'S2:a:3',
+        '(S2,L8,WV):(a:3,b:3,c:3)',
+        '(S2,L8,WV):(a:3,b:3,c:3),rgb',
+        'blue|green|red|nir|swir16|swir22,matseg_0|matseg_1|matseg_2|matseg_3|invariants.0:8|forest|built_up|water',
+        '(S2,L8):R|G|B,X|Y|Z,WV:pan',
+        '(S2,L8):R|G|B,X|Y|Z,WV:(pan,depth)',
+        '(S2,L8,WV):(a|b|c,d)',
+        '(S2,L8,WV):(a:3|b:3|c:3,d:3)',
+        'fsdf fds:Q,R,WV:(a:3|boo bar:3|c:3,d:3),B:3,S:S:3',
     ]
 
     # codes = [
@@ -233,7 +235,7 @@ def sensor_channel_lark():
         print('-----')
         print('code = {!r}'.format(code))
         tree = sensor_channel_parser_cython.parse(code)
-        print(tree.pretty())
+        # print(tree.pretty())
         transformed = NormalizeTransformer().transform(tree)
         print('transformed = {}'.format(ub.repr2(transformed, nl=1)))
         print('-----')
