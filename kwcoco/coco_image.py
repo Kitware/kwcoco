@@ -645,6 +645,7 @@ class CocoImage(ub.NiceRepr):
             raise KeyError('space = {}'.format(space))
         return delayed
 
+    @ub.memoize_method
     def valid_region(self, space='image'):
         """
         If this image has a valid polygon, return it in image, or video space
@@ -658,7 +659,7 @@ class CocoImage(ub.NiceRepr):
             if space == 'image':
                 valid_poly = kw_poly_img
             elif space == 'video':
-                warp_vid_from_img = kwimage.Affine.coerce(self.img.get('warp_img_to_vid', None))
+                warp_vid_from_img = self.warp_vid_from_img
                 valid_poly = kw_poly_img.warp(warp_vid_from_img)
             else:
                 # To warp it into an auxiliary space we need to know which one
