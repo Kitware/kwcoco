@@ -12,6 +12,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Method to get the valid region for a CocoImage in image or video space
 
 
+### Changed
+
+* CocoSqlDatabase is now lazy exposed at the top level in Python 3.7+
+* Better SQL support in CocoImage
+* Add maxlen in `path_sanitize`
+* Warp properties in CocoImage
+* Stub out CocoAsset
+
+
 ## Version 0.2.25 - Released 2022-03-16
 
 ### Added

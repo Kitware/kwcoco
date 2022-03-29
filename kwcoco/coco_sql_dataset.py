@@ -1065,6 +1065,47 @@ class CocoSqlDatabase(AbstractCocoDataset,
             parts.append(info)
         return ', '.join(parts)
 
+    @classmethod
+    def coerce(self, data):
+        """
+        Create an SQL CocoDataset from the input pointer.
+
+        Example:
+            import kwcoco
+            dset = kwcoco.CocoDataset.demo('shapes8')
+            data = dset.fpath
+            self = CocoSqlDatabase.coerce(data)
+
+            from kwcoco.coco_sql_dataset import CocoSqlDatabase
+            import kwcoco
+            dset = kwcoco.CocoDataset.coerce('spacenet7.kwcoco.json')
+
+            self = CocoSqlDatabase.coerce(dset)
+
+            from kwcoco.coco_sql_dataset import CocoSqlDatabase
+            sql_dset = CocoSqlDatabase.coerce('spacenet7.kwcoco.json')
+
+            # from kwcoco.coco_sql_dataset import CocoSqlDatabase
+            import kwcoco
+            sql_dset = kwcoco.CocoDataset.coerce('_spacenet7.kwcoco.view.v006.sqlite')
+
+        """
+        import kwcoco
+        import pathlib
+        if isinstance(data, (str, pathlib.Path)):
+            import os
+            data = os.fspath(data)
+            if data.endswith('.json'):
+                dct_db_fpath = data
+                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath)
+            else:
+                raise NotImplementedError
+        elif isinstance(data, kwcoco.CocoDataset):
+            self = cached_sql_coco_view(dset=data)
+        else:
+            raise NotImplementedError
+        return self
+
     def __getstate__(self):
         """
         Return only the minimal info when pickling this object.
@@ -1419,44 +1460,6 @@ class CocoSqlDatabase(AbstractCocoDataset,
     @data_fpath.setter
     def data_fpath(self, value):
         self.fpath = value
-
-    @classmethod
-    def coerce(self, data):
-        """
-        Create an SQL CocoDataset from the input pointer.
-
-        Example:
-            import kwcoco
-            dset = kwcoco.CocoDataset.demo('shapes8')
-            data = dset.fpath
-            self = CocoSqlDatabase.coerce(data)
-
-            from kwcoco.coco_sql_dataset import CocoSqlDatabase
-            import kwcoco
-            dset = kwcoco.CocoDataset.coerce('spacenet7.kwcoco.json')
-
-            self = CocoSqlDatabase.coerce(dset)
-
-            from kwcoco.coco_sql_dataset import CocoSqlDatabase
-            sql_dset = CocoSqlDatabase.coerce('spacenet7.kwcoco.json')
-
-            # from kwcoco.coco_sql_dataset import CocoSqlDatabase
-            import kwcoco
-            sql_dset = kwcoco.CocoDataset.coerce('_spacenet7.kwcoco.view.v006.sqlite')
-
-        """
-        import kwcoco
-        if isinstance(data, str):
-            if data.endswith('.json'):
-                dct_db_fpath = data
-                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath)
-            else:
-                raise NotImplementedError
-        elif isinstance(data, kwcoco.CocoDataset):
-            self = cached_sql_coco_view(dset=data)
-        else:
-            raise NotImplementedError
-        return self
 
 
 def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,

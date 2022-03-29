@@ -247,9 +247,14 @@ class BaseChannelSpec(ub.NiceRepr):
     def __or__(self, other):
         return self.union(other)
 
-    def path_sanitize(self):
+    def path_sanitize(self, maxlen=None):
         """
         Clean up the channel spec so it can be used in a pathname.
+
+        Args:
+            maxlen (int):
+                if specified, and the name is longer than this length, it is
+                shortened. Must be 8 or greater.
 
         Returns:
             str: path suitable for usage in a filename
@@ -264,9 +269,22 @@ class BaseChannelSpec(ub.NiceRepr):
             a chan with space_bar_baz
             >>> print(kwcoco.ChannelSpec.coerce('foo|bar|baz,biz').path_sanitize())
             foo_bar_baz,biz
+
+        Example:
+            >>> import kwcoco
+            >>> print(kwcoco.ChannelSpec.coerce('foo.0:3').normalize().path_sanitize(24))
+            foo.0_foo.1_foo.2
+            >>> print(kwcoco.ChannelSpec.coerce('foo.0:256').normalize().path_sanitize(24))
+            tuuxtfnrsvdhezkdndysxo_256
         """
         spec = self.spec
-        return spec.replace('|', '_').replace(':', '-')
+        pname = spec.replace('|', '_').replace(':', '-')
+        if maxlen is not None and len(pname) > maxlen:
+            num_bands = self.numel()
+            hashlen = maxlen - 2
+            hashlen = max(8, hashlen)
+            pname = '{}_{}'.format(ub.hash_data(pname, base='abc')[0:hashlen], num_bands)
+        return pname
 
 
 class FusedChannelSpec(BaseChannelSpec):

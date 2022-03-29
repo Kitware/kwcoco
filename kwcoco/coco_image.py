@@ -127,19 +127,47 @@ class CocoImage(ub.NiceRepr):
         return stats
 
     def __getitem__(self, key):
-        return self.img[key]
+        """
+        Proxy getter attribute for underlying `self.img` dictionary
+        """
+        if 'extra' in self.img:
+            # SQL compatibility
+            try:
+                return self.img[key]
+            except KeyError:
+                return self.img['extra'][key]
+        else:
+            return self.img[key]
 
     def keys(self):
-        return self.img.keys()
+        """
+        Proxy getter attribute for underlying `self.img` dictionary
+        """
+        if 'extra' in self.img:
+            # SQL compatibility
+            return iter([*self.img.keys(), *self.img['extra'].keys()])
+        else:
+            return self.img.keys()
 
     def get(self, key, default=ub.NoParam):
         """
-        Duck type some of the dict interface
+        Proxy getter attribute for underlying `self.img` dictionary
         """
-        if default is ub.NoParam:
-            return self.img.get(key)
+        # Workaround for sql-view
+        if 'extra' in self.img:
+            if key in self.img:
+                return self.img[key]
+            elif key in self.img['extra']:
+                return self.img['extra'][key]
+            elif default is ub.NoParam:
+                raise KeyError(key)
+            else:
+                return default
         else:
-            return self.img.get(key, default)
+            if default is ub.NoParam:
+                return self.img.get(key)
+            else:
+                return self.img.get(key, default)
 
     @property
     def channels(self):
@@ -636,6 +664,69 @@ class CocoImage(ub.NiceRepr):
                 # To warp it into an auxiliary space we need to know which one
                 raise NotImplementedError(space)
         return valid_poly
+
+    # def warp_vid_from_img(self):
+    #     pass
+
+    # def warp_vid_from_img(self):
+    #     pass
+
+    @ub.memoize_property
+    def warp_vid_from_img(self):
+        import kwimage
+        warp_img_to_vid = kwimage.Affine.coerce(self.img.get('warp_img_to_vid', None))
+        return warp_img_to_vid
+
+    @ub.memoize_property
+    def warp_img_from_vid(self):
+        return self.warp_vid_from_img.inv()
+
+    def _annot_segmentation(self, ann, space='video'):
+        import kwimage
+        warp_vid_from_img = self.warp_vid_from_img
+        img_sseg = kwimage.MultiPolygon.coerce(ann['segmentation'])
+        if space == 'image':
+            warped_sseg = img_sseg
+            pass
+        elif space == 'video':
+            vid_sseg = img_sseg.warp(warp_vid_from_img)
+            warped_sseg = vid_sseg
+        else:
+            raise NotImplementedError(space)  # auxiliary/asset space
+        return warped_sseg
+
+
+class CocoAsset(object):
+    """
+    Represents one 2D image file relative to a parent img.
+
+    Could be a single asset, or an image with sub-assets, but sub-assets are
+    ignored here.
+
+    Initially we called these "auxiliary" items, but I think we should
+    change their name to "assets", which better maps with STAC terminology.
+    """
+
+    def __getitem__(self, key):
+        """
+        Proxy getter attribute for underlying `self.obj` dictionary
+        """
+        return self.obj[key]
+
+    def keys(self):
+        """
+        Proxy getter attribute for underlying `self.obj` dictionary
+        """
+        return self.obj.keys()
+
+    def get(self, key, default=ub.NoParam):
+        """
+        Proxy getter attribute for underlying `self.obj` dictionary
+        """
+        if default is ub.NoParam:
+            return self.obj.get(key)
+        else:
+            return self.obj.get(key, default)
 
 
 def _delay_load_imglike(bundle_dpath, obj):
