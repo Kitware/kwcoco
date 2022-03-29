@@ -544,7 +544,7 @@ def dequantize(quant_data, quantization):
     """
     Helper for dequantization
     """
-    dequant = quant_data.astype(np.float32)
+    orig_dtype = quantization.get('orig_dtype', 'float32')
     orig_min = quantization.get('orig_min', 0)
     orig_max = quantization.get('orig_max', 1)
     quant_min = quantization.get('quant_min', 0)
@@ -552,6 +552,8 @@ def dequantize(quant_data, quantization):
     nodata = quantization.get('nodata', None)
     orig_extent = orig_max - orig_min
     quant_extent = quant_max - quant_min
+
+    dequant = quant_data.astype(orig_dtype)
     dequant = (dequant - quant_min) * (orig_extent / quant_extent) + orig_min
     if nodata is not None:
         mask = quant_data == nodata

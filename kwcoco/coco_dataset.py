@@ -5108,6 +5108,13 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> self2 = CocoDataset(json.loads(text), tag='demo2')
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
+
+        Example:
+            >>> from kwcoco.coco_dataset import *
+            >>> self = CocoDataset.coerce('vidshapes1-msi-multisensor', verbose=3)
+            >>> self.remove_annotations(self.annots())
+            >>> text = self.dumps(newlines=True, indent='  ')
+            >>> print(text)
         """
         def _json_dumps(data, indent=None):
             fp = StringIO()
@@ -5120,6 +5127,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             fp.seek(0)
             text = fp.read()
             return text
+
+        def _json_lines_dumps(key, value, indent):
+            value_lines = [_json_dumps(v) for v in value]
+            if value_lines:
+                value_body = (',\n' + indent).join(value_lines)
+                value_repr = '[\n' + indent + value_body + '\n]'
+            else:
+                value_repr = '[]'
+            item_repr = '{}: {}'.format(_json_dumps(key), value_repr)
+            return item_repr
 
         # Instead of using json to dump the whole thing make the text a bit
         # more pretty.
@@ -5137,7 +5154,24 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 # We know each main entry is a list, so make it such that
                 # Each entry gets its own line
                 value = self.dataset[key]
-                value_lines = [_json_dumps(v) for v in value]
+                if key == 'images':
+                    # Except image, where every auxiliary item also gets a line
+                    value_lines = []
+                    for img in value:
+                        if 'auxiliary' in img:
+                            topimg = img.copy()
+                            aux_items = topimg.pop('auxiliary')
+                            aux_items_repr = _json_lines_dumps('auxiliary', aux_items, indent + indent)
+                            topimg_repr = _json_dumps(topimg)
+                            if len(topimg) == 0:
+                                v2 = '{' + aux_items_repr + '}'
+                            else:
+                                v2 = topimg_repr[:-1] + ', ' + aux_items_repr + '}'
+                        else:
+                            v2 = _json_dumps(img)
+                        value_lines.append(v2)
+                else:
+                    value_lines = [_json_dumps(v) for v in value]
                 if value_lines:
                     value_body = (',\n' + indent).join(value_lines)
                     value_repr = '[\n' + indent + value_body + '\n]'
@@ -5152,7 +5186,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 value_repr = _json_dumps(value)
                 item_repr = '{}: {}'.format(_json_dumps(key), value_repr)
                 dict_lines.append(item_repr)
-            text = '{\n' + ',\n'.join(dict_lines) + '\n}'
+            text = ''.join(['{\n', ',\n'.join(dict_lines), '\n}'])
         else:
             # TODO: do main key sorting here as well
             text = _json_dumps(self.dataset, indent=indent)

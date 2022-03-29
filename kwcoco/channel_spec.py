@@ -51,6 +51,42 @@ The ChannelSpec has these simple rules:
 
         slices after the "." work like python slices
 
+The detailed grammar for the spec is:
+
+    ?start: stream
+
+    // An identifier can contain spaces
+    IDEN: ("_"|LETTER) ("_"|" "|LETTER|DIGIT)*
+
+    chan_single : IDEN
+    chan_getitem : IDEN "." INT
+    chan_getslice_0b : IDEN ":" INT
+    chan_getslice_ab : IDEN "." INT ":" INT
+
+    // A channel code can just be an ID, or it can have a getitem
+    // style syntax with a scalar or slice as an argument
+    chan_code : chan_single | chan_getslice_0b | chan_getslice_ab | chan_getitem
+
+    // Fused channels are an ordered sequence of channel codes (without sensors)
+    fused : chan_code ("|" chan_code)*
+
+    // Channels can be specified in a sequence but must contain parens
+    fused_seq : "(" fused ("," fused)* ")"
+
+    channel_rhs : fused | fused_seq
+
+    stream : channel_rhs ("," channel_rhs)*
+
+    %import common.DIGIT
+    %import common.LETTER
+    %import common.INT
+
+
+
+Note that a stream refers to a the full ChannelSpec and fused refers to
+FusedChannelSpec.
+
+
 For single arrays, the spec is always an early fused spec.
 
 TODO:
@@ -63,6 +99,33 @@ TODO:
     - [x]: Use FusedChannelSpec as a member of ChannelSpec
     - [x]: Handle special slice suffix for length calculations
 
+
+TODO:
+
+    Sensor Codes
+    ------------
+    Let S1 = sensor 1
+    Let S2 = sensor 2
+    Let S3 = sensor 3
+
+    Using a <sensor>:<pure_fused_channel_spec> indicates that the fused
+    channels belong to that sensor.
+
+    For example:
+
+        S1:red|green|blue
+        S1:B.0:3 = S1:C.0|C.1|C.2
+
+    To specify that R|G|B channels exist in sensor 1 and sensor 2 you could do:
+
+        S1:R|G|B,S2:R|G|B
+
+        or the more concise syntax allows for a distributive law
+
+        (S1,S2):R|G|B
+
+        Notice, how the "R|G|B" channel code is distributed over the ","
+        in the parenthesis.
 
 Note:
     * do not specify the same channel in FusedChannelSpec twice
@@ -184,9 +247,14 @@ class BaseChannelSpec(ub.NiceRepr):
     def __or__(self, other):
         return self.union(other)
 
-    def path_sanitize(self):
+    def path_sanitize(self, maxlen=None):
         """
         Clean up the channel spec so it can be used in a pathname.
+
+        Args:
+            maxlen (int):
+                if specified, and the name is longer than this length, it is
+                shortened. Must be 8 or greater.
 
         Returns:
             str: path suitable for usage in a filename
@@ -201,9 +269,22 @@ class BaseChannelSpec(ub.NiceRepr):
             a chan with space_bar_baz
             >>> print(kwcoco.ChannelSpec.coerce('foo|bar|baz,biz').path_sanitize())
             foo_bar_baz,biz
+
+        Example:
+            >>> import kwcoco
+            >>> print(kwcoco.ChannelSpec.coerce('foo.0:3').normalize().path_sanitize(24))
+            foo.0_foo.1_foo.2
+            >>> print(kwcoco.ChannelSpec.coerce('foo.0:256').normalize().path_sanitize(24))
+            tuuxtfnrsvdhezkdndysxo_256
         """
         spec = self.spec
-        return spec.replace('|', '_').replace(':', '-')
+        pname = spec.replace('|', '_').replace(':', '-')
+        if maxlen is not None and len(pname) > maxlen:
+            num_bands = self.numel()
+            hashlen = maxlen - 2
+            hashlen = max(8, hashlen)
+            pname = '{}_{}'.format(ub.hash_data(pname, base='abc')[0:hashlen], num_bands)
+        return pname
 
 
 class FusedChannelSpec(BaseChannelSpec):
@@ -330,11 +411,12 @@ class FusedChannelSpec(BaseChannelSpec):
             >>> FusedChannelSpec.coerce(FusedChannelSpec(['a']))
             >>> assert FusedChannelSpec.coerce('').numel() == 0
         """
-        try:
-            # Efficiency hack
-            return cls._memo[data]
-        except (KeyError, TypeError):
-            pass
+        if 1:
+            try:
+                # Efficiency hack
+                return cls._memo[data]
+            except (KeyError, TypeError):
+                pass
         if isinstance(data, list):
             self = cls(data)
         elif isinstance(data, str):
