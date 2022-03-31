@@ -656,14 +656,17 @@ class CocoImage(ub.NiceRepr):
             valid_poly = None
         else:
             kw_poly_img = kwimage.MultiPolygon.coerce(valid_coco_poly)
-            if space == 'image':
-                valid_poly = kw_poly_img
-            elif space == 'video':
-                warp_vid_from_img = self.warp_vid_from_img
-                valid_poly = kw_poly_img.warp(warp_vid_from_img)
+            if kw_poly_img is None:
+                valid_poly = None
             else:
-                # To warp it into an auxiliary space we need to know which one
-                raise NotImplementedError(space)
+                if space == 'image':
+                    valid_poly = kw_poly_img
+                elif space == 'video':
+                    warp_vid_from_img = self.warp_vid_from_img
+                    valid_poly = kw_poly_img.warp(warp_vid_from_img)
+                else:
+                    # To warp it into an auxiliary space we need to know which one
+                    raise NotImplementedError(space)
         return valid_poly
 
     # def warp_vid_from_img(self):
