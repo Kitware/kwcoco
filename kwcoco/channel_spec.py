@@ -280,6 +280,7 @@ class BaseChannelSpec(ub.NiceRepr):
         spec = self.spec
         pname = spec.replace('|', '_').replace(':', '-')
         if maxlen is not None and len(pname) > maxlen:
+            # prevent long names for docker (limit is 242 chars)
             num_bands = self.numel()
             hashlen = maxlen - 2
             hashlen = max(8, hashlen)
