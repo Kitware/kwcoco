@@ -18,3 +18,5 @@ sortedcontainers >= 2.3.0
 ubelt >= 1.0.0
 uritools >= 3.0.0
 xarray >= 0.16.0
+
+safer>=4.4.1

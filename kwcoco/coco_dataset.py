@@ -33,6 +33,12 @@ An informal spec is as follows:
     # Specifies how to find sensor data of a particular scene at a particular
     # time. This is usually paths to rgb images, but auxiliary information
     # can be used to specify multiple bands / etc...
+
+    # NOTE: in the future we will transition from calling these auxiliary items
+    # to calling these asset items. As such the key will change from
+    # "auxiliary" to "asset". The API will be updated to maintain backwards
+    # compatibility while this transition occurs.
+
     image = {
         'id': int,
 
@@ -48,9 +54,9 @@ An informal spec is as follows:
             {
                 'file_name': str,     # relative path to associated file
                 'channels': <ChannelSpec>,   # a string encoding
-                'width':     <int>    # pixel width of auxiliary image
-                'height':    <int>    # pixel height of auxiliary image
-                'warp_aux_to_img': <TransformSpec>,  # tranform from "base" image space to auxiliary image space. (identity if unspecified)
+                'width':     <int>    # pixel width of image asset
+                'height':    <int>    # pixel height of image asset
+                'warp_aux_to_img': <TransformSpec>,  # tranform from "base" image space to auxiliary/asset space. (identity if unspecified)
                 'quantization': <QuantizationSpec>,  # indicates that the underlying data was quantized
             }, ...
         ]
@@ -199,14 +205,20 @@ An informal spec is as follows:
             'id': int,
             'file_name': str,    # path to the "base" image (may be None)
             'name': str,         # a unique name for the image (must be given if file_name is None)
-            'channels': <spec>,  # a spec code that indicates the layout of the "base" image channels.
+            'channels': <ChannelSpec>,  # a spec code that indicates the layout of the "base" image channels.
             'auxiliary': [  # information about auxiliary channels
                 {
                     'file_name': str,
-                    'channels': <spec>
+                    'channels': <ChannelSpec>
                 }, ... # can have many auxiliary channels with unique specs
             ]
         }
+
+        Note that specifing a filename / channels for the base image is not
+        necessary, and mainly useful for augmenting an existing single-image
+        dataset with multimodal information. Typically if an image consists of
+        more than one file, all file information should be stored in the
+        "auxiliary" or "assets" list.
 
     Video Sequences:
         For video sequences, we add the following video level index:
@@ -441,6 +453,8 @@ class MixinCocoAccessors(object):
         found = None
         if 'auxiliary' in img:
             auxlist = img['auxiliary']
+        elif 'assets' in img:
+            auxlist = img['assets']
         else:
             raise KeyError('no auxilary data')
         for aux in auxlist:
@@ -1531,7 +1545,7 @@ class MixinCocoExtras(object):
             bundle_dpath = self.bundle_dpath
             for img in ub.ProgIter(self.dataset['images'], verbose=verbose,
                                    desc='submit image size jobs'):
-                auxiliary = img.get('auxiliary', [])
+                auxiliary = img.get('auxiliary', img.get('assets', []))
                 for obj in [img] + auxiliary:
                     fname = obj['file_name']
                     if fname is not None:
@@ -1612,7 +1626,7 @@ class MixinCocoExtras(object):
                     bad_paths.append((index, gpath, gid))
 
             if check_aux:
-                for aux in img.get('auxiliary', []):
+                for aux in img.get('auxiliary', img.get('assets', [])):
                     gpath = join(self.bundle_dpath, aux['file_name'])
                     if not exists(gpath):
                         bad_paths.append((index, gpath, gid))
@@ -1651,7 +1665,7 @@ class MixinCocoExtras(object):
                     bad_paths.append((index, gpath, gid))
 
             if check_aux:
-                for aux in img.get('auxiliary', []):
+                for aux in img.get('auxiliary', img.get('assets', [])):
                     gpath = join(self.bundle_dpath, aux['file_name'])
                     if not exists(gpath):
                         bad_paths.append((index, gpath, gid))
@@ -1988,6 +2002,10 @@ class MixinCocoExtras(object):
                         new['auxiliary'] = aux_fname = []
                         for aux in img.get('auxiliary', []):
                             aux_fname.append(_reroot_path(aux['file_name']))
+                    if 'assets' in img:
+                        new['assets'] = aux_fname = []
+                        for aux in img.get('assets', []):
+                            aux_fname.append(_reroot_path(aux['file_name']))
                     gid_to_new[gid] = new
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
@@ -1999,6 +2017,9 @@ class MixinCocoExtras(object):
                 if 'auxiliary' in new:
                     for aux_fname, aux in zip(new['auxiliary'], img['auxiliary']):
                         aux['file_name'] = aux_fname
+                if 'assets' in new:
+                    for aux_fname, aux in zip(new['assets'], img['assets']):
+                        aux['file_name'] = aux_fname
         else:
             for img in self.imgs.values():
                 try:
@@ -2006,6 +2027,8 @@ class MixinCocoExtras(object):
                     if gname is not None:
                         img['file_name'] = _reroot_path(gname)
                     for aux in img.get('auxiliary', []):
+                        aux['file_name'] = _reroot_path(aux['file_name'])
+                    for aux in img.get('assets', []):
                         aux['file_name'] = _reroot_path(aux['file_name'])
                 except Exception:
                     raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
@@ -5167,6 +5190,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                 v2 = '{' + aux_items_repr + '}'
                             else:
                                 v2 = topimg_repr[:-1] + ', ' + aux_items_repr + '}'
+                        elif 'assets' in img:
+                            topimg = img.copy()
+                            aux_items = topimg.pop('assets')
+                            aux_items_repr = _json_lines_dumps('assets', aux_items, indent + indent)
+                            topimg_repr = _json_dumps(topimg)
+                            if len(topimg) == 0:
+                                v2 = '{' + aux_items_repr + '}'
+                            else:
+                                v2 = topimg_repr[:-1] + ', ' + aux_items_repr + '}'
                         else:
                             v2 = _json_dumps(img)
                         value_lines.append(v2)
@@ -5193,7 +5225,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         return text
 
-    def dump(self, file, indent=None, newlines=False):
+    def dump(self, file, indent=None, newlines=False, temp_file=True):
         """
         Writes the dataset out to the json format
 
@@ -5204,6 +5236,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             newlines (bool):
                 if True, each annotation, image, category gets its own line.
+
+            temp_file (bool | str, default=True):
+                Argument to :func:`safer.open`.  Ignored if ``file`` is not a
+                PathLike object.
 
         Example:
             >>> import tempfile
@@ -5232,7 +5268,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert self2.dataset is not self.dataset
         """
         if isinstance(file, (str, os.PathLike)):
-            with open(file, 'w') as fp:
+            import safer
+            with safer.open(file, 'w', temp_file=temp_file) as fp:
                 self.dump(fp, indent=indent, newlines=newlines)
         else:
             if newlines:
@@ -5650,6 +5687,13 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                             new_aux['file_name'] = join(subdir, old_aux['file_name'])
                             new_auxiliary.append(new_aux)
                         new_img['auxiliary'] = new_auxiliary
+                    if 'assets' in old_img:
+                        new_auxiliary = []
+                        for old_aux in old_img['assets']:
+                            new_aux = old_aux.copy()
+                            new_aux['file_name'] = join(subdir, old_aux['file_name'])
+                            new_auxiliary.append(new_aux)
+                        new_img['assets'] = new_auxiliary
 
                     video_img_id = video_id_map.get(old_img.get('video_id'), None)
                     if video_img_id is not None:
