@@ -153,6 +153,7 @@ class CocoImage(ub.NiceRepr):
         Example:
             >>> import pytest
             >>> # without extra populated
+            >>> import kwcoco
             >>> self = kwcoco.CocoImage({'foo': 1})
             >>> assert self.get('foo') == 1
             >>> assert self.get('foo', None) == 1
@@ -362,6 +363,7 @@ class CocoImage(ub.NiceRepr):
         Example:
             >>> # Test with concise channel code
             >>> import kwcoco
+            >>> coco_img = kwcoco.CocoImage({'width': 128, 'height': 128})
             >>> coco_img.add_auxiliary_item(
             >>>     'msi.png', channels='foo.0:128', width=32, height=32)
             >>> assert coco_img.find_asset_obj('foo') is None
