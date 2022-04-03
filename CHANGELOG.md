@@ -7,8 +7,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.28 - Unreleased
 
+### Changed
+* CocoDataset.dump now uses `safer` with `temp_file=True` by default.
+* Initial steps to rename "auxiliary" to "assets" in a backwards compatible way.
+
 
 ## Version 0.2.27 - Released 2022-03-31
+
+### Fixed
+* Bug in valid region warp
 
 
 ## Version 0.2.26 - Released 2022-03-29

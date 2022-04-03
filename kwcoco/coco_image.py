@@ -126,18 +126,14 @@ class CocoImage(ub.NiceRepr):
                 stats[key] = repr(ex)
         return stats
 
+    def __contains__(self, key):
+        return key in self.keys()
+
     def __getitem__(self, key):
         """
         Proxy getter attribute for underlying `self.img` dictionary
         """
-        if 'extra' in self.img:
-            # SQL compatibility
-            try:
-                return self.img[key]
-            except KeyError:
-                return self.img['extra'][key]
-        else:
-            return self.img[key]
+        return self.get(key)
 
     def keys(self):
         """
@@ -145,29 +141,59 @@ class CocoImage(ub.NiceRepr):
         """
         if 'extra' in self.img:
             # SQL compatibility
-            return iter([*self.img.keys(), *self.img['extra'].keys()])
+            _keys = ub.flatten([self.img.keys(), self.img['extra'].keys()])
+            return iter((k for k in _keys if k != 'extra'))
         else:
             return self.img.keys()
 
     def get(self, key, default=ub.NoParam):
         """
         Proxy getter attribute for underlying `self.img` dictionary
+
+        Example:
+            >>> import pytest
+            >>> # without extra populated
+            >>> self = kwcoco.CocoImage({'foo': 1})
+            >>> assert self.get('foo') == 1
+            >>> assert self.get('foo', None) == 1
+            >>> # with extra populated
+            >>> self = kwcoco.CocoImage({'extra': {'foo': 1}})
+            >>> assert self.get('foo') == 1
+            >>> assert self.get('foo', None) == 1
+            >>> # without extra empty
+            >>> self = kwcoco.CocoImage({})
+            >>> with pytest.raises(KeyError):
+            >>>     self.get('foo')
+            >>> assert self.get('foo', None) is None
+            >>> # with extra empty
+            >>> self = kwcoco.CocoImage({'extra': {'bar': 1}})
+            >>> with pytest.raises(KeyError):
+            >>>     self.get('foo')
+            >>> assert self.get('foo', None) is None
         """
-        # Workaround for sql-view
-        if 'extra' in self.img:
-            if key in self.img:
-                return self.img[key]
-            elif key in self.img['extra']:
-                return self.img['extra'][key]
-            elif default is ub.NoParam:
-                raise KeyError(key)
+        _img = self.img
+        if default is ub.NoParam:
+            if 'extra' in _img:
+                # Workaround for sql-view
+                if key in _img:
+                    return _img[key]
+                else:
+                    _extra = _img['extra']
+                    if key in _extra:
+                        return _extra[key]
+                    else:
+                        raise KeyError(key)
             else:
-                return default
+                return _img[key]
         else:
-            if default is ub.NoParam:
-                return self.img.get(key)
+            if 'extra' in _img:
+                # Workaround for sql-view
+                if key in _img:
+                    return _img.get(key, default)
+                else:
+                    return _img['extra'].get(key, default)
             else:
-                return self.img.get(key, default)
+                return _img.get(key, default)
 
     @property
     def channels(self):
@@ -260,7 +286,8 @@ class CocoImage(ub.NiceRepr):
 
         # Choose "best" auxiliary image based on a hueristic.
         eye = kwimage.Affine.eye().matrix
-        for idx, obj in enumerate(img.get('auxiliary', [])):
+        asset_objs = img.get('auxiliary', img.get('assets', []))
+        for idx, obj in enumerate(asset_objs):
             # Take frobenius norm to get "distance" between transform and
             # the identity. We want to find the auxiliary closest to the
             # identity transform.
@@ -311,10 +338,36 @@ class CocoImage(ub.NiceRepr):
             yield obj
         for obj in img.get('auxiliary', []):
             yield obj
+        for obj in img.get('assets', []):
+            yield obj
 
     def find_asset_obj(self, channels):
         """
         Find the asset dictionary with the specified channels
+
+        Example:
+            >>> import kwcoco
+            >>> coco_img = kwcoco.CocoImage({'width': 128, 'height': 128})
+            >>> coco_img.add_auxiliary_item(
+            >>>     'rgb.png', channels='red|green|blue', width=32, height=32)
+            >>> assert coco_img.find_asset_obj('red') is not None
+            >>> assert coco_img.find_asset_obj('green') is not None
+            >>> assert coco_img.find_asset_obj('blue') is not None
+            >>> assert coco_img.find_asset_obj('red|blue') is not None
+            >>> assert coco_img.find_asset_obj('red|green|blue') is not None
+            >>> assert coco_img.find_asset_obj('red|green|blue') is not None
+            >>> assert coco_img.find_asset_obj('black') is None
+            >>> assert coco_img.find_asset_obj('r') is None
+
+        Example:
+            >>> # Test with concise channel code
+            >>> import kwcoco
+            >>> coco_img.add_auxiliary_item(
+            >>>     'msi.png', channels='foo.0:128', width=32, height=32)
+            >>> assert coco_img.find_asset_obj('foo') is None
+            >>> assert coco_img.find_asset_obj('foo.3') is not None
+            >>> assert coco_img.find_asset_obj('foo.3:5') is not None
+            >>> assert coco_img.find_asset_obj('foo.3000') is None
         """
         from kwcoco.channel_spec import FusedChannelSpec
         channels = FusedChannelSpec.coerce(channels)
@@ -326,11 +379,23 @@ class CocoImage(ub.NiceRepr):
                 break
         return found
 
+    def _assets_key(self):
+        """
+        Internal helper for transition from auxiliary -> assets in the image
+        spec
+        """
+        if 'auxiliary' in self:
+            return 'auxiliary'
+        elif 'assets' in self:
+            return 'assets'
+        else:
+            return 'auxiliary'
+
     def add_auxiliary_item(self, file_name=None, channels=None,
                            imdata=None, warp_aux_to_img=None, width=None,
                            height=None, imwrite=False):
         """
-        Adds an auxiliary item to the image dictionary.
+        Adds an auxiliary / asset item to the image dictionary.
 
         This operation can be done purely in-memory (the default), or the image
         data can be written to a file on disk (via the imwrite=True flag).
@@ -398,18 +463,23 @@ class CocoImage(ub.NiceRepr):
             height = imdata.shape[0]
 
         if warp_aux_to_img is None:
+            img_width = img.get('width', None)
+            img_height = img.get('height', None)
+            if img_width is None or img_height is None:
+                raise ValueError('Parent image canvas has an unknown size. '
+                                 'Need to set width/height')
             if width is None or height is None:
-                raise ValueError('unable to infer aux_to_img without width')
+                raise ValueError('Unable to infer aux_to_img without width')
             # Assume we can just scale up the auxiliary data to match the image
             # space unless the user says otherwise
             warp_aux_to_img = kwimage.Affine.scale((
-                img['width'] / width, img['height'] / height))
+                img_width / width, img_height / height))
 
         if channels is not None:
             channels = FusedChannelSpec.coerce(channels).spec
 
         # Make the aux info dict
-        aux = {
+        obj = {
             'file_name': file_name,
             'height': height,
             'width': width,
@@ -434,12 +504,13 @@ class CocoImage(ub.NiceRepr):
                 fpath = join(self.bundle_dpath, file_name)
                 kwimage.imwrite(fpath, imdata)
             else:
-                aux['imdata'] = imdata
+                obj['imdata'] = imdata
 
-        auxiliary = img.get('auxiliary', None)
-        if auxiliary is None:
-            auxiliary = img['auxiliary'] = []
-        auxiliary.append(aux)
+        assets_key = self._assets_key()
+        asset_list = img.get(assets_key, None)
+        if asset_list is None:
+            asset_list = img[assets_key] = []
+        asset_list.append(obj)
         if self.dset is not None:
             self.dset._invalidate_hashid()
 
@@ -586,7 +657,8 @@ class CocoImage(ub.NiceRepr):
         # requested (if it even has any)
         img_info = _delay_load_imglike(bundle_dpath, img)
         obj_info_list = [(img_info, img)]
-        for aux in img.get('auxiliary', []):
+        auxlist = img.get('auxiliary', img.get('assets', []))
+        for aux in auxlist:
             info = _delay_load_imglike(bundle_dpath, aux)
             obj_info_list.append((info, aux))
 
@@ -600,13 +672,13 @@ class CocoImage(ub.NiceRepr):
                 if include_flag:
                     chncls, chnkw = info['chan_construct']
                     chan = chncls(**chnkw)
-                    if space != 'auxiliary':
+                    if space not in {'auxiliary', 'asset'}:
                         aux_to_img = Affine.coerce(obj.get('warp_aux_to_img', None))
                         chan = chan.delayed_warp(
                             aux_to_img, dsize=img_info['dsize'])
                     chan_list.append(chan)
 
-        # TODO: allow load in auxiliary space
+        # TODO: allow load in auxiliary/asset space
 
         if space == 'video':
             video = self.video
@@ -636,7 +708,7 @@ class CocoImage(ub.NiceRepr):
             if len(delayed.components) == 1:
                 delayed = delayed.components[0]
 
-        if space in {'image', 'auxiliary'}:
+        if space in {'image', 'auxiliary', 'asset'}:
             pass
         elif space == 'video':
             img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
@@ -702,6 +774,8 @@ class CocoImage(ub.NiceRepr):
 
 class CocoAsset(object):
     """
+    A Coco Asset / Auxiliary Item
+
     Represents one 2D image file relative to a parent img.
 
     Could be a single asset, or an image with sub-assets, but sub-assets are

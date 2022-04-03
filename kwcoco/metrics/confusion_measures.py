@@ -355,6 +355,52 @@ class Measures(ub.NiceRepr, DictProxy):
             assert np.allclose(combo['tp_count'], measures['tp_count'])
 
             globals().update(xdev.get_func_kwargs(Measures.combine))
+
+        Example:
+            >>> # Test degenerate case
+            >>> from kwcoco.metrics.confusion_measures import *  # NOQA
+            >>> tocombine = [
+            >>>     {'fn_count': [0.0], 'fp_count': [359980.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [7747.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [360849.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [424.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [367003.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [991.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [367976.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [1017.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [676338.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [7067.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [676348.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [7406.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [676626.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [7858.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [676693.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [10969.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677269.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [11188.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677331.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [11734.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677395.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [11556.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677418.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [11621.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677422.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [11424.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677648.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [9804.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677826.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [2470.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677834.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [2470.0]},
+            >>>     {'fn_count': [0.0], 'fp_count': [677835.0], 'thresholds': [0.0], 'tn_count': [0.0], 'tp_count': [2470.0]},
+            >>>     {'fn_count': [11123.0, 0.0], 'fp_count': [0.0, 676754.0], 'thresholds': [0.0002442002442002442, 0.0], 'tn_count': [676754.0, 0.0], 'tp_count': [2.0, 11125.0]},
+            >>>     {'fn_count': [7738.0, 0.0], 'fp_count': [0.0, 676466.0], 'thresholds': [0.0002442002442002442, 0.0], 'tn_count': [676466.0, 0.0], 'tp_count': [0.0, 7738.0]},
+            >>>     {'fn_count': [8653.0, 0.0], 'fp_count': [0.0, 676341.0], 'thresholds': [0.0002442002442002442, 0.0], 'tn_count': [676341.0, 0.0], 'tp_count': [0.0, 8653.0]},
+            >>> ]
+            >>> thresh_bins = np.linspace(0, 1, 4)
+            >>> combo = Measures.combine(tocombine, thresh_bins=thresh_bins).reconstruct()
+            >>> print('tocombine = {}'.format(ub.repr2(tocombine, nl=2)))
+            >>> print('thresh_bins = {!r}'.format(thresh_bins))
+            >>> print(ub.repr2(combo.__json__(), nl=1))
+            >>> for thresh_bins in [4096, 1]:
+            >>>     combo = Measures.combine(tocombine, thresh_bins=thresh_bins).reconstruct()
+            >>>     print('thresh_bins = {!r}'.format(thresh_bins))
+            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
+            >>> for precision in [6, 5, 2]:
+            >>>     combo = Measures.combine(tocombine, precision=precision).reconstruct()
+            >>>     print('precision = {!r}'.format(precision))
+            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
+            >>> for growth in [None, 'max', 'log', 'root', 'half']:
+            >>>     combo = Measures.combine(tocombine, growth=growth).reconstruct()
+            >>>     print('growth = {!r}'.format(growth))
+            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
         """
         if precision is not None and np.isinf(precision):
             precision = None
@@ -426,7 +472,8 @@ class Measures(ub.NiceRepr, DictProxy):
             np.add.at(tn_accum, left_idxs, tn_pos)
 
             for k in summable:
-                summable[k] += measures[k]
+                if k in measures:
+                    summable[k] += measures[k]
 
         new_fp = np.cumsum(fp_accum)  # will increase with index
         new_tp = np.cumsum(tp_accum)  # will increase with index
@@ -518,6 +565,8 @@ def _combine_threshold(tocombine_thresh, thresh_bins, growth, precision):
         assert growth is None
         assert precision is None
         if isinstance(thresh_bins, int):
+            # Fixme, this might not be the correct way to do this.
+
             threshold_pool = orig_finite_thresholds
             # Subdivide threshold pool until we get enough values
             while thresh_bins > len(threshold_pool):
@@ -924,6 +973,8 @@ def populate_info(info):
         # It is very possible that we will divide by zero in this func
         warnings.filterwarnings('ignore', message='invalid .* true_divide')
         warnings.filterwarnings('ignore', message='invalid value')
+        warnings.filterwarnings('ignore', message='divide by zero',
+                                category=RuntimeWarning)
 
         pred_pos = (tp + fp)  # number of predicted positives
         ppv = tp / pred_pos  # precision
