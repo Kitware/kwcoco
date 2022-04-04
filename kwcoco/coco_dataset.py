@@ -278,7 +278,21 @@ References:
 """
 import copy
 import itertools as it
-import json
+
+# We can use ujson as long as my patch is in it. It does seem faster.
+# See https://github.com/ultrajson/ultrajson/pull/514
+try:
+    import ujson
+except ImportError:
+    import json
+else:
+    # if ujson.__version__ > '5.1':
+    if ujson.__version__ == '5.1.1.dev18':
+        import ujson as json
+    else:
+        import json
+
+# import ujson as json  # TODO: can we improve speed with ujson?
 import numpy as np
 import os
 import ubelt as ub
@@ -5118,7 +5132,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         Example:
             >>> from kwcoco.coco_dataset import *
-            >>> import json
             >>> self = CocoDataset.demo()
             >>> text = self.dumps(newlines=True)
             >>> print(text)
@@ -5140,6 +5153,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> print(text)
         """
         def _json_dumps(data, indent=None):
+            if indent is not None:
+                if isinstance(indent, str):
+                    assert indent.strip(' ') == 0, 'must be all spaces'
+                    indent = len(indent)
+            if indent is None:
+                indent = 0
             fp = StringIO()
             try:
                 json.dump(data, fp, indent=indent, ensure_ascii=False)
@@ -5267,6 +5286,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
         """
+        if indent is not None and isinstance(indent, str):
+            assert indent.strip(' ') == 0, 'must be all spaces'
+            indent = len(indent)
+        if indent is None:
+            indent = 0
         if isinstance(file, (str, os.PathLike)):
             import safer
             with safer.open(file, 'w', temp_file=temp_file) as fp:
