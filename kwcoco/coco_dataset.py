@@ -281,7 +281,9 @@ import itertools as it
 
 # We can use ujson as long as my patch is in it. It does seem faster.
 # See https://github.com/ultrajson/ultrajson/pull/514
+import json as pjson
 try:
+    raise ImportError
     import ujson
 except ImportError:
     import json
@@ -1374,12 +1376,12 @@ class MixinCocoExtras(object):
                 _anns_ordered = (self.anns[aid] for aid in aids)
                 anns_ordered = [_ditems(ann) for ann in _anns_ordered]
                 try:
-                    anns_text = json.dumps(anns_ordered)
+                    anns_text = pjson.dumps(anns_ordered)
                 except TypeError:
                     if __debug__:
                         for ann in anns_ordered:
                             try:
-                                json.dumps(ann)
+                                pjson.dumps(ann)
                             except TypeError:
                                 print('FAILED TO ENCODE ann = {!r}'.format(ann))
                                 break
@@ -1395,7 +1397,7 @@ class MixinCocoExtras(object):
             if not hashid_parts['images'].get('json', None):
                 if gids is None:
                     gids = sorted(self.imgs.keys())
-                imgs_text = json.dumps(
+                imgs_text = pjson.dumps(
                     [_ditems(self.imgs[gid]) for gid in gids])
                 hashid_parts['images']['json'] = ub.hash_data(
                     imgs_text, hasher='sha512')
@@ -1406,7 +1408,7 @@ class MixinCocoExtras(object):
 
             if not hashid_parts['categories'].get('json', None):
                 cids = sorted(self.cats.keys())
-                cats_text = json.dumps(
+                cats_text = pjson.dumps(
                     [_ditems(self.cats[cid]) for cid in cids])
                 hashid_parts['categories']['json'] = ub.hash_data(
                     cats_text, hasher='sha512')
@@ -4755,6 +4757,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> #
         >>> # Now play with some helper functions, like extended statistics
         >>> extended_stats = self.extended_stats()
+        >>> # xdoctest: +IGNORE_WANT
         >>> print('extended_stats = {}'.format(ub.repr2(extended_stats, nl=1, precision=2, sort=1)))
         extended_stats = {
             'annots_per_img': {'mean': 3.67, 'std': 3.86, 'min': 0.00, 'max': 9.00, 'nMin': 1, 'nMax': 1, 'shape': (3,)},

@@ -201,7 +201,7 @@ def grab_coco_camvid():
 
     # Ubelt's stamp-based caches are super cheap and let you take control of
     # the data format.
-    stamp = ub.CacheStamp('camvid_coco', cfgstr=SCRIPT_VERSION,
+    stamp = ub.CacheStamp('camvid_coco', depends=[SCRIPT_VERSION],
                           dpath=cache_dpath, product=coco_fpath, hasher='sha1',
                           verbose=3)
     if stamp.expired():
@@ -216,7 +216,7 @@ def grab_coco_camvid():
     # We can also cache the index build step independently. This uses
     # ubelt.Cacher, which is pickle based, and writes the actual object to
     # disk. Each type of caching has its own uses and tradeoffs.
-    cacher = ub.Cacher('prebuilt-coco', cfgstr=SCRIPT_VERSION,
+    cacher = ub.Cacher('prebuilt-coco', depends=[SCRIPT_VERSION],
                        dpath=cache_dpath, verbose=3)
     dset = cacher.tryload()
     if dset is None:
