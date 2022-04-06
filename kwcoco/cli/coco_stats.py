@@ -3,6 +3,7 @@ import ubelt as ub
 import scriptconfig as scfg
 import numpy as np
 
+
 class CocoStatsCLI:
     name = 'stats'
 
@@ -87,7 +88,7 @@ class CocoStatsCLI:
             for dset in datasets:
                 tag_to_stats[dset.tag] = dset.basic_stats()
             df = pd.DataFrame.from_dict(tag_to_stats)
-            print(df.to_string(float_format=lambda x: '%0.3f' % x))
+            print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['extended']:
             tag_to_ext_stats = {}
@@ -102,7 +103,7 @@ class CocoStatsCLI:
                 print('\n--{!r}'.format(key))
                 df = pd.DataFrame.from_dict(
                     {k: v[key] for k, v in tag_to_ext_stats.items()})
-                print(df.to_string(float_format=lambda x: '%0.3f' % x))
+                print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['catfreq']:
             tag_to_freq = {}

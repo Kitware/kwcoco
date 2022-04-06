@@ -1125,6 +1125,7 @@ class MixinCocoExtras(object):
                 'render': True,
                 'num_videos': 1,
                 'num_frames': 2,
+                'num_tracks': 2,
                 'anchors': None,
                 'image_size': (600, 600),
                 'aux': None,
@@ -1180,7 +1181,9 @@ class MixinCocoExtras(object):
                 # Make rng determined by other params by default
                 vidkw['rng'] = int(ub.hash_data(sorted(vidkw.items()))[0:8], 16)
 
-            depends = ub.hash_data(sorted(vidkw.items()), base='abc')[0:14]
+            depends_items = vidkw.copy()
+            depends_items.pop('verbose', None)
+            depends = ub.hash_data(sorted(depends_items.items()), base='abc')[0:14]
 
             if verbose > 3:
                 print('vidkw = {!r}'.format(vidkw))
@@ -1206,7 +1209,7 @@ class MixinCocoExtras(object):
                 'vidshape_stamp_v{:03d}'.format(toydata_video.TOYDATA_VIDEO_VERSION),
                 dpath=cache_dpath,
                 depends=depends, enabled=use_cache,
-                product=[fpath], verbose=1,
+                product=[fpath], verbose=verbose,
                 meta=vidkw
             )
             if verbose > 3:
@@ -1221,6 +1224,7 @@ class MixinCocoExtras(object):
 
                 self.fpath = fpath
                 if fpath is not None:
+                    ub.Path(fpath).parent.ensuredir()
                     self.dump(fpath, newlines=True)
                     stamp.renew()
             else:
@@ -5158,7 +5162,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         def _json_dumps(data, indent=None):
             if indent is not None:
                 if isinstance(indent, str):
-                    assert indent.strip(' ') == 0, 'must be all spaces'
+                    assert indent.count(' ') == len(indent), 'must be all spaces, got {!r}'.format(indent)
                     indent = len(indent)
             if indent is None:
                 indent = 0
@@ -5290,7 +5294,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert self2.dataset is not self.dataset
         """
         if indent is not None and isinstance(indent, str):
-            assert indent.strip(' ') == 0, 'must be all spaces'
+            assert indent.count(' ') == len(indent), 'must be all spaces, got {!r}'.format(indent)
             indent = len(indent)
         if indent is None:
             indent = 0
