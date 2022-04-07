@@ -1,16 +1,60 @@
+import kwcoco
+import ubelt as ub
+import timerit
+import pint
+import random
+import kwarray
+
+
+def _iter_images_worker(dset):
+    gids = list(dset.images())
+    gids = kwarray.shuffle(gids)
+    for gid in gids:
+        dset.index.imgs[gid]
+
+
+USE_TORCH = 1
+if USE_TORCH:
+    import torch
+    DatasetBase = torch.utils.data.Dataset
+    class DemoTorchDataset(DatasetBase):
+        def __init__(self, coco_dset):
+            import kwcoco
+            self.coco_dset = kwcoco.CocoDataset.coerce(coco_dset)
+            self.gids = list(self.coco_dset.imgs.keys())
+
+        def __len__(self):
+            return len(self.gids)
+
+        def __getitem__(self, index):
+            gid = self.gids[index]
+            img = self.coco_dset.index.imgs[gid]
+            return img
+
+        def make_loader(self, batch_size=1, num_workers=0, shuffle=False,
+                        pin_memory=False):
+            loader = torch.utils.data.DataLoader(
+                self, batch_size=batch_size, num_workers=num_workers,
+                shuffle=shuffle, pin_memory=pin_memory, collate_fn=ub.identity, worker_init_fn=worker_init_fn)
+            return loader
+
+    def worker_init_fn(worker_id):
+        worker_info = torch.utils.data.get_worker_info()
+        self = worker_info.dataset
+        if hasattr(self.coco_dset, 'connect'):
+            # Reconnect to the backend if we are using SQL
+            self.coco_dset.connect(readonly=True)
+
 
 def main():
     """
     Demo scalability of the system (requires lots of disk space)
     """
-    import ubelt as ub
-    import kwcoco
-    import timerit
-    import pint
-    import random
 
     # Prepare data
     num_videos_basis = [1, 5, 100, 1000, 10_000, 60_000, 100_000, 1_000_000]
+    # num_videos_basis = [1, 5, 100, 1000, 10_000, 60_000, 100_000]
+    # num_videos_basis = [1, 5, 100, 1000, 10_000, 60_000]
     # num_videos_basis = [1, 5, 100, 1000, 10_000]
     # num_videos_basis = [1, 5, 100, 1000]
     json_fpaths = []
@@ -89,6 +133,31 @@ def main():
         }
         log_task(task, ti, common)
 
+        if USE_TORCH:
+            task = 'iter-torch'
+            for timer in ti.reset(f'{backend}-{task}-{num_images}'):
+                with timer:
+                    torch_dset = DemoTorchDataset(dset)
+                    loader = torch_dset.make_loader(num_workers=4)
+                    for batch in loader:
+                        pass
+
+            log_task(task, ti, common)
+
+        if 0:
+            task = 'iter-shuffled-images-worker'
+            for timer in ti.reset(f'{backend}-{task}-{num_images}'):
+                with timer:
+                    pool = ub.JobPool(mode='process', max_workers=4)
+                    pool.submit(_iter_images_worker, dset)
+                    pool.submit(_iter_images_worker, dset)
+                    pool.submit(_iter_images_worker, dset)
+                    pool.submit(_iter_images_worker, dset)
+                    for job in pool.as_completed():
+                        job.result()
+
+            log_task(task, ti, common)
+
         if 0:
             task = 'iter-images'
             for timer in ti.reset(f'{backend}-{task}-{num_images}'):
@@ -97,21 +166,23 @@ def main():
                         pass
             log_task(task, ti, common)
 
-        task = 'random-image-by-index'
-        for timer in ti.reset(f'{backend}-{task}-{num_images}'):
-            with timer:
-                for _ in range(100):
-                    idx = random.randint(0, num_images - 1)
-                    dset.dataset['images'][idx]
-        log_task(task, ti, common)
+        if 0:
+            task = 'random-image-by-index-serial'
+            for timer in ti.reset(f'{backend}-{task}-{num_images}'):
+                with timer:
+                    for _ in range(100):
+                        idx = random.randint(0, num_images - 1)
+                        dset.dataset['images'][idx]
+            log_task(task, ti, common)
 
-        task = 'random-image-by-gid'
-        for timer in ti.reset(f'{backend}-{task}-{num_images}'):
-            with timer:
-                for _ in range(100):
-                    gid = random.choice(gids)
-                    dset.index.imgs[gid]
-        log_task(task, ti, common)
+        if 1:
+            task = 'random-image-by-gid-serial'
+            for timer in ti.reset(f'{backend}-{task}-{num_images}'):
+                with timer:
+                    for _ in range(100):
+                        gid = random.choice(gids)
+                        dset.index.imgs[gid]
+            log_task(task, ti, common)
 
     import pandas as pd
     df = pd.DataFrame(measures)
@@ -119,10 +190,11 @@ def main():
 
     import kwplot
     sns = kwplot.autosns()
+    plt = kwplot.autoplt()
 
     unique_tasks = df['task'].unique()
 
-    pnum_ = kwplot.PlotNums(nSubplots=len(unique_tasks) + 1)
+    pnum_ = kwplot.PlotNums(nSubplots=len(unique_tasks))
     fnum = 1
     fig = kwplot.figure(fnum=fnum)
     fig.clf()
@@ -139,11 +211,21 @@ def main():
         ax.set_yscale('log')
         ax.set_title(task)
 
-    ax = kwplot.figure(fnum=fnum, pnum=pnum_()).gca()
-    size_df = df[df['task'] == 'load']
-    size_df['size'] = [s.m for s in size_df['size']]
-    xlabel = 'num_images'
-    ylabel = 'size'
-    ax = sns.lineplot(data=size_df, x=xlabel, y=ylabel, marker='o', ax=ax, **plotkw)
-    ax.set_yscale('log')
-    ax.set_title('file-size')
+    if 0:
+        ax = kwplot.figure(fnum=fnum, pnum=pnum_()).gca()
+        size_df = df[df['task'] == 'load']
+        size_df['size'] = [s.m for s in size_df['size']]
+        xlabel = 'num_images'
+        ylabel = 'size'
+        ax = sns.lineplot(data=size_df, x=xlabel, y=ylabel, marker='o', ax=ax, **plotkw)
+        ax.set_yscale('log')
+        ax.set_title('file-size')
+    plt.show()
+
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/dev/benchmark_scalability.py
+    """
+    main()
