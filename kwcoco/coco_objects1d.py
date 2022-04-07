@@ -196,6 +196,17 @@ class ObjectList1D(ub.NiceRepr):
                 attr_list = [_lut[_id].get(key, default) for _id in self._ids]
         return attr_list
 
+    def _iter_get(self, key, default=ub.NoParam):
+        """
+        Iterator version of get, not in stable API yet.
+        """
+        _lut = self._id_to_obj
+        if default is ub.NoParam:
+            attr_iter = (_lut[_id][key] for _id in self._ids)
+        else:
+            attr_iter = (_lut[_id].get(key, default) for _id in self._ids)
+        return attr_iter
+
     def set(self, key, values):
         """
         Assign a value to each annotation
