@@ -282,17 +282,17 @@ import itertools as it
 # We can use ujson as long as my patch is in it. It does seem faster.
 # See https://github.com/ultrajson/ultrajson/pull/514
 import json as pjson
-try:
-    raise ImportError
-    import ujson
-except ImportError:
-    import json
-else:
-    # if ujson.__version__ > '5.1':
-    if ujson.__version__ == '5.1.1.dev18':
-        import ujson as json
-    else:
-        import json
+# try:
+#     raise ImportError
+#     import ujson
+# except ImportError:
+import json
+# else:
+#     # if ujson.__version__ > '5.1':
+#     if ujson.__version__ == '5.1.1.dev18':
+#         import ujson as json
+#     else:
+#         import json
 
 # import ujson as json  # TODO: can we improve speed with ujson?
 import numpy as np
