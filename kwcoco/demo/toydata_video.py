@@ -111,10 +111,16 @@ def random_video_dset(
     subsets = []
     tid_start = 1
     gid_start = 1
-    for vidid in range(1, num_videos + 1):
-        if verbose > 2:
-            print('generate vidid = {!r}'.format(vidid))
-
+    if verbose > 2:
+        print('generate videos')
+    vidid_iter = range(1, num_videos + 1)
+    if verbose == 3:
+        vidid_iter = ub.ProgIter(vidid_iter, total=num_videos, desc='generate videos', verbose=1)
+    elif verbose > 3:
+        vidid_iter = ub.ProgIter(vidid_iter, total=num_videos, desc='generate videos', verbose=3)
+    for vidid in vidid_iter:
+        # if verbose > 3:
+        #     print('generate vidid = {!r}'.format(vidid))
         dset = random_single_video_dset(
             image_size=image_size, num_frames=num_frames,
             num_tracks=num_tracks, tid_start=tid_start, anchors=anchors,
@@ -133,6 +139,8 @@ def random_video_dset(
     if num_videos == 1:
         dset = subsets[0]
     else:
+        if verbose > 2:
+            print('union videos')
         import kwcoco
         assert len(subsets) > 1, '{}'.format(len(subsets))
         dset = kwcoco.CocoDataset.union(*subsets)
@@ -158,7 +166,13 @@ def random_video_dset(
                            verbose=verbose)
         dset.fpath = join(dpath, 'data.kwcoco.json')
 
+    if verbose > 2:
+        print('build index')
+
     dset._build_index()
+
+    if verbose > 2:
+        print('finished random_video_dset')
     return dset
 
 
@@ -406,7 +420,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     sensors = sorted(sensor_to_channels.keys())
 
     for frame_idx, gid in enumerate(image_ids):
-        if verbose > 2:
+        if verbose > 3:
             print('generate gid = {!r}'.format(gid))
         image_height = int(image_height_distri.sample())
         image_width = int(image_width_distri.sample())
@@ -529,7 +543,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         out = tmp.scale(sf).translate(tmp_tl_xy_min)
         return out
 
-    if verbose > 2:
+    if verbose > 3:
         print('generate tracks')
 
     for tid, path in zip(track_ids, paths):

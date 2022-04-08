@@ -362,8 +362,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
         cache_dpath = ub.ensure_app_cache_dir('kwcoco/demo')
         fpath = join(cache_dpath, key + '.cog.tiff')
         depends = ub.odict(dsize=dsize)
-        cfgstr = ub.hash_data(depends)
-        stamp = ub.CacheStamp(fname=key, cfgstr=cfgstr, dpath=cache_dpath,
+        stamp = ub.CacheStamp(fname=key, depends=depends, dpath=cache_dpath,
                               product=[fpath])
         if stamp.expired():
             img = kwimage.grab_test_image(key, dsize=dsize)

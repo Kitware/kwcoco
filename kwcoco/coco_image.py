@@ -713,7 +713,8 @@ class CocoImage(ub.NiceRepr):
         if space in {'image', 'auxiliary', 'asset'}:
             pass
         elif space == 'video':
-            img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
+            img_to_vid = self.warp_vid_from_img
+            # img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
             delayed = delayed.delayed_warp(img_to_vid, dsize=dsize)
         else:
             raise KeyError('space = {}'.format(space))
@@ -753,6 +754,9 @@ class CocoImage(ub.NiceRepr):
     def warp_vid_from_img(self):
         import kwimage
         warp_img_to_vid = kwimage.Affine.coerce(self.img.get('warp_img_to_vid', None))
+        if warp_img_to_vid.matrix is None:
+            # Hack to ensure the matrix property always is an array
+            warp_img_to_vid.matrix = np.asarray(warp_img_to_vid)
         return warp_img_to_vid
 
     @ub.memoize_property

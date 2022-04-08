@@ -5,7 +5,19 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.28 - Unreleased
+## Version 0.2.29 - Unreleased
+
+### Changed
+* Better verbosity for demodata
+* Experimental support for ujson
+* Remove deprecated usage of cfgstr with ubelt.Cacher
+* kwcoco stats output is modified
+
+### Fixed
+* CocoImage Affine transform matrixes are now always populated.
+
+
+## Version 0.2.28 - Released 2022-04-02
 
 ### Changed
 * CocoDataset.dump now uses `safer` with `temp_file=True` by default.

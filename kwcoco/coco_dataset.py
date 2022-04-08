@@ -278,7 +278,23 @@ References:
 """
 import copy
 import itertools as it
+
+# We can use ujson as long as my patch is in it. It does seem faster.
+# See https://github.com/ultrajson/ultrajson/pull/514
+import json as pjson
+# try:
+#     raise ImportError
+#     import ujson
+# except ImportError:
 import json
+# else:
+#     # if ujson.__version__ > '5.1':
+#     if ujson.__version__ == '5.1.1.dev18':
+#         import ujson as json
+#     else:
+#         import json
+
+# import ujson as json  # TODO: can we improve speed with ujson?
 import numpy as np
 import os
 import ubelt as ub
@@ -1109,6 +1125,7 @@ class MixinCocoExtras(object):
                 'render': True,
                 'num_videos': 1,
                 'num_frames': 2,
+                'num_tracks': 2,
                 'anchors': None,
                 'image_size': (600, 600),
                 'aux': None,
@@ -1164,7 +1181,9 @@ class MixinCocoExtras(object):
                 # Make rng determined by other params by default
                 vidkw['rng'] = int(ub.hash_data(sorted(vidkw.items()))[0:8], 16)
 
-            depends = ub.hash_data(sorted(vidkw.items()), base='abc')[0:14]
+            depends_items = vidkw.copy()
+            depends_items.pop('verbose', None)
+            depends = ub.hash_data(sorted(depends_items.items()), base='abc')[0:14]
 
             if verbose > 3:
                 print('vidkw = {!r}'.format(vidkw))
@@ -1190,7 +1209,7 @@ class MixinCocoExtras(object):
                 'vidshape_stamp_v{:03d}'.format(toydata_video.TOYDATA_VIDEO_VERSION),
                 dpath=cache_dpath,
                 depends=depends, enabled=use_cache,
-                product=[fpath], verbose=1,
+                product=[fpath], verbose=verbose,
                 meta=vidkw
             )
             if verbose > 3:
@@ -1205,6 +1224,7 @@ class MixinCocoExtras(object):
 
                 self.fpath = fpath
                 if fpath is not None:
+                    ub.Path(fpath).parent.ensuredir()
                     self.dump(fpath, newlines=True)
                     stamp.renew()
             else:
@@ -1360,12 +1380,12 @@ class MixinCocoExtras(object):
                 _anns_ordered = (self.anns[aid] for aid in aids)
                 anns_ordered = [_ditems(ann) for ann in _anns_ordered]
                 try:
-                    anns_text = json.dumps(anns_ordered)
+                    anns_text = pjson.dumps(anns_ordered)
                 except TypeError:
                     if __debug__:
                         for ann in anns_ordered:
                             try:
-                                json.dumps(ann)
+                                pjson.dumps(ann)
                             except TypeError:
                                 print('FAILED TO ENCODE ann = {!r}'.format(ann))
                                 break
@@ -1381,7 +1401,7 @@ class MixinCocoExtras(object):
             if not hashid_parts['images'].get('json', None):
                 if gids is None:
                     gids = sorted(self.imgs.keys())
-                imgs_text = json.dumps(
+                imgs_text = pjson.dumps(
                     [_ditems(self.imgs[gid]) for gid in gids])
                 hashid_parts['images']['json'] = ub.hash_data(
                     imgs_text, hasher='sha512')
@@ -1392,7 +1412,7 @@ class MixinCocoExtras(object):
 
             if not hashid_parts['categories'].get('json', None):
                 cids = sorted(self.cats.keys())
-                cats_text = json.dumps(
+                cats_text = pjson.dumps(
                     [_ditems(self.cats[cid]) for cid in cids])
                 hashid_parts['categories']['json'] = ub.hash_data(
                     cats_text, hasher='sha512')
@@ -4741,6 +4761,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> #
         >>> # Now play with some helper functions, like extended statistics
         >>> extended_stats = self.extended_stats()
+        >>> # xdoctest: +IGNORE_WANT
         >>> print('extended_stats = {}'.format(ub.repr2(extended_stats, nl=1, precision=2, sort=1)))
         extended_stats = {
             'annots_per_img': {'mean': 3.67, 'std': 3.86, 'min': 0.00, 'max': 9.00, 'nMin': 1, 'nMax': 1, 'shape': (3,)},
@@ -5118,7 +5139,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         Example:
             >>> from kwcoco.coco_dataset import *
-            >>> import json
             >>> self = CocoDataset.demo()
             >>> text = self.dumps(newlines=True)
             >>> print(text)
@@ -5140,6 +5160,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> print(text)
         """
         def _json_dumps(data, indent=None):
+            if indent is not None:
+                if isinstance(indent, str):
+                    assert indent.count(' ') == len(indent), 'must be all spaces, got {!r}'.format(indent)
+                    indent = len(indent)
+            if indent is None:
+                indent = 0
             fp = StringIO()
             try:
                 json.dump(data, fp, indent=indent, ensure_ascii=False)
@@ -5267,6 +5293,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
         """
+        if indent is not None and isinstance(indent, str):
+            assert indent.count(' ') == len(indent), 'must be all spaces, got {!r}'.format(indent)
+            indent = len(indent)
+        if indent is None:
+            indent = 0
         if isinstance(file, (str, os.PathLike)):
             import safer
             with safer.open(file, 'w', temp_file=temp_file) as fp:
