@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.30 - Unreleased
 
+### Added
+* kwcoco validate now accepts `--require_relative` which causes non-portable
+  kwcoco files with non-relative paths to fail.
+
 
 ## Version 0.2.29 - Released 2022-04-08
 
@@ -17,7 +21,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * kwcoco stats output is modified
 
 ### Fixed
-* CocoImage Affine transform matrixes are now always populated.
+* CocoImage Affine transform `matrix` attribute is now always populated.
 
 
 ## Version 0.2.28 - Released 2022-04-02

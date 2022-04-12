@@ -43,12 +43,12 @@ An informal spec is as follows:
         'id': int,
 
         'name': str,  # an encouraged but optional unique name
-        'file_name': str,  # relative path to the "base" image data
+        'file_name': str,  # relative path to the "base" image data (optional if auxiliary items are specified)
 
         'width': int,   # pixel width of "base" image
         'height': int,  # pixel height of "base" image
 
-        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image
+        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image (optional if auxiliary items are specified)
 
         'auxiliary': [  # information about any auxiliary channels / bands
             {
@@ -197,7 +197,7 @@ An informal spec is as follows:
 
         TODO: Support WTK
 
-    Auxiliary Channels:
+    Auxiliary Channels / Image Assets:
         For multimodal or multispectral images it is possible to specify
         auxiliary channels in an image dictionary as follows:
 
@@ -219,6 +219,42 @@ An informal spec is as follows:
         dataset with multimodal information. Typically if an image consists of
         more than one file, all file information should be stored in the
         "auxiliary" or "assets" list.
+
+        NEW DOCS:
+            In an MSI use case you should think of the "auxiliary" list as a
+            list of single file assets that are composed to make the entire
+            image. Your assets might include sensed bands, computed features,
+            or quality information. For instance a list of auxiliary items may
+            look like this:
+
+            image = {
+                "name": "my_msi_image",
+                "width": 400,
+                "height": 400,
+
+                "video_id": 2,
+                "timestamp": "2020-01-1",
+                "frame_index": 5,
+                "warp_img_to_vid": {"type": "affine", "scale", 1.4},
+
+                "auxiliary": [
+                   {"channels": "red|green|blue": "file_name": "rgb.tif", "warp_aux_to_img": {"scale": 1.0}, "height": 400, "width": 400, ...},
+                   ...
+                   {"channels": "cloudmask": "file_name": "cloudmask.tif", "warp_aux_to_img": {"scale": 4.0}, "height": 100, "width": 100, ...},
+                   {"channels": "nir": "file_name": "nir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
+                   {"channels": "swir": "file_name": "swir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
+                   {"channels": "model1_predictions:0.6": "file_name": "model1_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                   {"channels": "model2_predictions:0.3": "file_name": "model2_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                ]
+            }
+
+            Note that there is no file_name or channels parameter in the image
+            object itself. This pattern indicates that image is composed of
+            multiple assets. One could indicate that an asset is primary by
+            giving its information to the parent image, but for better STAC
+            compatibility, all assets for MSI images should simply be listed
+            as "auxiliary" items.
+
 
     Video Sequences:
         For video sequences, we add the following video level index:
@@ -2458,6 +2494,9 @@ class MixinCocoStats(object):
                 corrupted (default=False): validates data in registered files
                 verbose (default=1): verbosity flag
                 fastfail (default=False): if True raise errors immediately
+                require_relative (default=False):
+                    if>0, paths must be relative to bundle root.
+                    if>1, paths must be inside bundle root.
 
         Returns:
             dict: result containing keys:
@@ -2564,6 +2603,20 @@ class MixinCocoStats(object):
                 msg = 'There are {} corrupted images'.format(len(corrupted))
                 _error(msg)
                 result['corrupted'] = corrupted
+
+        if config.get('require_relative', False):
+            rr = config.get('require_relative', False)
+            for gid in dset.imgs.keys():
+                coco_img = dset.coco_image(gid)
+                for obj in coco_img.iter_asset_objs():
+                    fname = ub.Path(obj['file_name'])
+                    if rr > 0:
+                        if fname.is_absolute():
+                            _error('non relative fname = {!r}'.format(fname))
+                    if rr > 1:
+                        if '..' in fname.parts:
+                            _error('non internal fname = {!r}'.format(fname))
+
         return result
 
     def stats(self, **kwargs):

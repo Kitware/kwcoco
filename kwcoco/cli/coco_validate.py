@@ -18,6 +18,8 @@ class CocoValidateCLI:
             'missing': scfg.Value(True, help='If True check if all assets (e.g. images) exist'),
             'corrupted': scfg.Value(False, help='If True check the assets can be read'),
 
+            'require_relative': scfg.Value(False, help='If 1, requires all assets are relative to the bundle dpath. If 2, then they must be inside the bundle dpath'),
+
             'fix': scfg.Value(None, help=ub.paragraph(
                 '''
                 Code indicating strategy to attempt to fix the dataset.
