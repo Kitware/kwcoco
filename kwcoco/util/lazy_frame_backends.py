@@ -8,11 +8,56 @@ import numpy as np
 import kwimage
 from os.path import join, exists
 
+from collections import OrderedDict
+
 try:
     import xdev
     profile = xdev.profile
 except Exception:
     profile = ub.identity
+
+
+class CacheDict(OrderedDict):
+    """
+    Dict with a limited length, ejecting LRUs as needed.
+
+    Example:
+        >>> c = CacheDict(cache_len=2)
+        >>> c[1] = 1
+        >>> c[2] = 2
+        >>> c[3] = 3
+        >>> c
+        CacheDict([(2, 2), (3, 3)])
+        >>> c[2]
+        2
+        >>> c[4] = 4
+        >>> c
+        CacheDict([(2, 2), (4, 4)])
+        >>>
+
+    References:
+        https://gist.github.com/davesteele/44793cd0348f59f8fadd49d7799bd306
+    """
+
+    def __init__(self, *args, cache_len: int = 10, **kwargs):
+        assert cache_len > 0
+        self.cache_len = cache_len
+        super().__init__(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        super().move_to_end(key)
+        while len(self) > self.cache_len:
+            oldkey = next(iter(self))
+            super().__delitem__(oldkey)
+
+    def __getitem__(self, key):
+        val = super().__getitem__(key)
+        super().move_to_end(key)
+        return val
+
+
+GLOBAL_GDAL_CACHE = CacheDict(cache_len=32)
 
 
 @ub.memoize
@@ -327,6 +372,8 @@ class LazyGDalFrameFile(ub.NiceRepr):
         else:
             self.masking_method = nodata
 
+        self._ds_cache = None
+
     @classmethod
     def available(self):
         """
@@ -334,23 +381,35 @@ class LazyGDalFrameFile(ub.NiceRepr):
         """
         return _have_gdal()
 
-    @ub.memoize_property
-    def _ds(self):
+    @profile
+    def _reload_cache(self):
         from osgeo import gdal
-        if not exists(self.fpath):
-            raise Exception('File does not exist: {}'.format(self.fpath))
         _fpath = os.fspath(self.fpath)
         if _fpath.endswith('.hdr'):
             # Use spectral-like process to point gdal to the correct file given
             # the hdr
             ext = '.' + _read_envi_header(_fpath)['interleave']
             _fpath = ub.augpath(_fpath, ext=ext)
-        ds = gdal.Open(_fpath, gdal.GA_ReadOnly)
-        if ds is None:
-            raise Exception((
-                'GDAL Failed to open the fpath={!r} for an unknown reason. '
-                'Call gdal.UseExceptions() beforehand to get the '
-                'real exception').format(self.fpath))
+
+        if _fpath in GLOBAL_GDAL_CACHE:
+            self._ds_cache = GLOBAL_GDAL_CACHE[_fpath]
+        else:
+            ds = gdal.Open(_fpath, gdal.GA_ReadOnly)
+            if ds is None:
+                if not exists(self.fpath):
+                    raise Exception('File does not exist: {}'.format(self.fpath))
+                raise Exception((
+                    'GDAL Failed to open the fpath={!r} for an unknown reason. '
+                    'Call gdal.UseExceptions() beforehand to get the '
+                    'real exception').format(self.fpath))
+            self._ds_cache = ds
+            GLOBAL_GDAL_CACHE[_fpath] = ds
+
+    @property
+    def _ds(self):
+        if self._ds_cache is None:
+            self._reload_cache()
+        ds = self._ds_cache
         return ds
 
     @classmethod
