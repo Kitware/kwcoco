@@ -448,6 +448,16 @@ class CocoImage(ub.NiceRepr):
             >>> imdata = np.random.rand(32, 32, 5)
             >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
             >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset()
+            >>> gid = dset.add_image(name='my_image_name', width=200, height=200)
+            >>> coco_img = dset.coco_image(gid)
+            >>> coco_img.add_auxiliary_item('path/img1_B0.tif', channels='B0', width=200, height=200)
+            >>> coco_img.add_auxiliary_item('path/img1_B1.tif', channels='B1', width=200, height=200)
+            >>> coco_img.add_auxiliary_item('path/img1_B2.tif', channels='B2', width=200, height=200)
+            >>> coco_img.add_auxiliary_item('path/img1_TCI.tif', channels='r|g|b', width=200, height=200)
         """
         from os.path import isabs, join  # NOQA
         import kwimage
