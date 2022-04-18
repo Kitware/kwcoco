@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * kwcoco validate now accepts `--require_relative` which causes non-portable
   kwcoco files with non-relative paths to fail.
+* kwcoco validate now checks for duplicate bands in the auxiliary dictionary.
 
 
 ## Version 0.2.29 - Released 2022-04-08

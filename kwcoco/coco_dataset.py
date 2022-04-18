@@ -2492,6 +2492,12 @@ class MixinCocoStats(object):
                 unique (default=True): validates unique secondary keys
                 missing (default=True): validates registered files exist
                 corrupted (default=False): validates data in registered files
+                channels (default=True):
+                    validates that channels in auxiliary/asset items are all
+                    unique.
+                require_relative (default=False):
+                    Causes validation to fail if paths are non-portable, i.e.
+                    all paths must be relative to the bundle directory.
                 verbose (default=1): verbosity flag
                 fastfail (default=False): if True raise errors immediately
                 require_relative (default=False):
@@ -2590,6 +2596,24 @@ class MixinCocoStats(object):
             _check_unique(dset, table_key='annotations', col_key='id')
             _check_unique(dset, table_key='categories', col_key='id')
 
+        if config.get('channels', True):
+            for img in self.dataset.get('images', []):
+                seen = set()
+                assets = img.get('auxiliary', []) + img.get('assets', [])
+
+                for obj in assets:
+                    channels = obj.get('channels', None)
+                    if channels is None:
+                        gid = img['id']
+                        _error('Asset in gid={} is missing channels, obj={}'.format(gid, obj))
+                    else:
+                        from kwcoco import FusedChannelSpec
+                        channels = FusedChannelSpec.coerce(channels)
+                        for chan in channels.as_list():
+                            if chan in seen:
+                                gid = img['id']
+                                _error('The chan={} is specified more than once in gid={}'.format(chan, gid))
+                            seen.add(chan)
         if config.get('missing', True):
             missing = dset.missing_images(check_aux=True, verbose=verbose)
             if missing:
@@ -3381,14 +3405,18 @@ class MixinCocoAddRemove(object):
         Register a new image with the dataset
 
         Args:
-            file_name (str): relative or absolute path to image
+            file_name (str | None): relative or absolute path to image.
+                 if not given, then "name" must be specified and we will
+                 exepect that "auxiliary" assets are eventually added.
             id (None or int): ADVANCED. Force using this image id.
             name (str): a unique key to identify this image
             width (int): base width of the image
             height (int): base height of the image
-            channels (ChannelSpec): specification of base channels
-            auxiliary (List[Dict]): specification of auxiliary information
-            video_id (int): parent video, if applicable
+            channels (ChannelSpec): specification of base channels.
+                Only relevant if file_name is given.
+            auxiliary (List[Dict]): specification of auxiliary assets.
+                See CocoImage.add_auxiliary_item for details
+            video_id (int): id of parent video, if applicable
             frame_index (int): frame index in parent video
             timestamp (number | str): timestamp of frame index
             **kw : stores arbitrary key/value pairs in this new image
@@ -3425,44 +3453,37 @@ class MixinCocoAddRemove(object):
         self._invalidate_hashid()
         return id
 
-    # def add_auxiliary(self, gid, fpath, warp_aux_to_img, channels=None):
-    #     """
-    #     Adds an auxiliary file to an image.
-    #     """
-    #     from kwimage.transform import Affine
-    #     import kwimage
-    #     from os.path import relpath, join
-    #     # See the auxiliary image spec
-    #     chandata = np.random.rand(300, 300)
+    def add_auxiliary_item(self, gid, file_name=None, channels=None, **kwargs):
+        """
+        Adds an auxiliary / asset item to the image dictionary.
 
-    #     # Need to ensure this is correct for your method
-    #     warp_aux_to_img = Affine.random().__json__()
+        Args:
+            gid (int):
+                The image id to add the auxiliary/asset item to.
 
-    #     # Add custom channel names with pipes
-    #     channels = 'my_fancy_channel_code'
+            file_name (str | None):
+                The name of the file relative to the bundle directory. If
+                unspecified, imdata must be given.
 
-    #     # Write your data somewhere in the coco bundle path
-    #     dpath = ub.ensuredir((self.bundle_dpath, 'my_aux_channels'))
-    #     fpath = join(dpath, 'my_aux_for_{}.tif'.format(gid))
-    #     fname = relpath(fpath, self.bundle_dpath)
+            channels (str | kwcoco.FusedChannelSpec):
+                The channel code indicating what each of the bands represents.
+                These channels should be disjoint wrt to the existing data in
+                this image (this is not checked).
 
-    #     kwimage.imwrite(fpath, chandata)
+            **kwargs:
+                See :method:`CocoImage.add_auxiliary_item` for more details
 
-    #     aux = {
-    #         'file_name': fname,
-    #         'width': chandata.shape[1],
-    #         'height': chandata.shape[0],
-    #         'warp_aux_to_img': warp_aux_to_img,
-    #         'channels': channels,
-    #     }
-
-    #     # lookup the image you want to add to
-    #     img = self.index.imgs[gid]
-    #     # Ensure there is an auxiliary image list
-    #     auxiliary = img.setdefault('auxiliary', [])
-    #     # Add the auxiliary information to the image
-    #     auxiliary.append(aux)
-    #     self._invalidate_hashid()
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset()
+            >>> gid = dset.add_image(name='my_image_name', width=200, height=200)
+            >>> dset.add_auxiliary_item(gid, 'path/fake_B0.tif', channels='B0',
+            >>>                         width=200, height=200,
+            >>>                         warp_aux_to_img={'scale': 1.0})
+        """
+        coco_img = self.coco_image(gid)
+        coco_img.add_auxiliary_item(file_name=file_name, channels=channels,
+                                    **kwargs)
 
     def add_annotation(self, image_id, category_id=None, bbox=ub.NoParam,
                        segmentation=ub.NoParam, keypoints=ub.NoParam, id=None,

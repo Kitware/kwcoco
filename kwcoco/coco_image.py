@@ -486,6 +486,8 @@ class CocoImage(ub.NiceRepr):
             # space unless the user says otherwise
             warp_aux_to_img = kwimage.Affine.scale((
                 img_width / width, img_height / height))
+        else:
+            warp_aux_to_img = kwimage.Affine.coerce(warp_aux_to_img)
 
         if channels is not None:
             channels = FusedChannelSpec.coerce(channels).spec
@@ -525,6 +527,9 @@ class CocoImage(ub.NiceRepr):
         asset_list.append(obj)
         if self.dset is not None:
             self.dset._invalidate_hashid()
+
+    # Alias for add_auxiliary_item (which will eventually be deprecated)
+    add_asset = add_auxiliary_item
 
     @profile
     def delay(self, channels=None, space='image', bundle_dpath=None):
