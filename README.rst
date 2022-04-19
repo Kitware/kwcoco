@@ -807,24 +807,25 @@ Now lets create a kwcoco dataset to register them. We use the channel spec to de
 
 .. code-block:: python
 
-   import ubelt as ub
-   import os
-   bundle_dpath = ub.Path('demo_bundle')
+    import ubelt as ub
+    import os
+    bundle_dpath = ub.Path('demo_bundle')
 
-   import kwcoco
-   dset = kwcoco.CocoDataset()
-   dset.fpath = bundle_dpath / 'data.kwcoco.json'
+    import kwcoco
+    import kwimage
+    dset = kwcoco.CocoDataset()
+    dset.fpath = bundle_dpath / 'data.kwcoco.json'
 
-   # We will define a map from our suffix codes in the filename to
-   # kwcoco channel specs that indicate the number of channels
-   channel_spec_mapping = {
+    # We will define a map from our suffix codes in the filename to
+    # kwcoco channel specs that indicate the number of channels
+    channel_spec_mapping = {
        'rgb': 'red|green|blue',  # rgb is 3 channels
        'flow': 'fx|fy',  # flow is 2 channels
        'ir': 'ir',
        'depth': 'depth',
-   }
+    }
 
-   for video_dpath in bundle_dpath.glob('video*'):
+    for video_dpath in bundle_dpath.glob('video*'):
        # Add a video and give it a name.
        vidid = dset.add_video(name=video_dpath.name)
 
@@ -851,7 +852,7 @@ Now lets create a kwcoco dataset to register them. We use the channel spec to de
            # Use the prefix for the image name
            name = rgbdata['fpath'].stem.split('_rgb')[0]
 
-           height, width = kwimage.imread(rgbdata['fpath']).shape[0:2]
+           height, width = kwimage.load_image_shape(rgbdata['fpath'])[0:2]
 
            # First add the base image. We will add this image as
            # without a file_name because all of its data will be stored 
@@ -877,8 +878,8 @@ Now lets create a kwcoco dataset to register them. We use the channel spec to de
                    file_name=file_name, channels=item['channels'], width=width,
                    height=height)
 
-     # We can always double check we did not make errors using kwcoco validate
-     dset.validate()
+    # We can always double check we did not make errors using kwcoco validate
+    dset.validate()
 
 
 Now we have a multispectral multi-resolution dataset. You can load specific
@@ -888,24 +889,24 @@ or a RAW format) using the delayed load interface.
 .. code-block:: python
 
 
-   # Get a coco image.
-   gid = 1
-   coco_img = dset.coco_image(gid)
+    # Get a coco image.
+    gid = 1
+    coco_img = dset.coco_image(gid)
 
-   # Tell delayed load what channels we want. We can 
-   # also specify which "space" we want to load it in.
-   # Note: that when specifying channels from multiple asset items
-   # it is not possible to sample in the the auxiliary / asset space 
-   # so only image and video are allowed there.
-   delayed_img = coco_img.delay('fx|depth|red', space='image')
+    # Tell delayed load what channels we want. We can 
+    # also specify which "space" we want to load it in.
+    # Note: that when specifying channels from multiple asset items
+    # it is not possible to sample in the the auxiliary / asset space 
+    # so only image and video are allowed there.
+    delayed_img = coco_img.delay('fx|depth|red', space='image')
 
-   # We finalize the data to load it
-   imdata = delayed_img.finalize()
+    # We finalize the data to load it
+    imdata = delayed_img.finalize()
 
-   # We can show it if we want, but it's just random data.
-   import kwplot
-   kwplot.autompl()
-   kwplot.imshow(imdata)
+    # We can show it if we want, but it's just random data.
+    import kwplot
+    kwplot.autompl()
+    kwplot.imshow(imdata)
 
 
 Somewhat more interesting is to use the KWCOCO demodata. We can see here that
