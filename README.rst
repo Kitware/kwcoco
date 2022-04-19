@@ -1,5 +1,5 @@
-The Kitware COCO Module
-=======================
+KWCOCO - The Kitware COCO Module
+================================
 
 .. # TODO Get CI services running on gitlab 
 
@@ -24,12 +24,12 @@ have improved implementations in several places, including segmentations,
 keypoints, annotation tracks, multi-spectral images, and videos (which
 represents a generic sequence of images).
 
-A kwcoco file is a "manifest" that serves as a single reference that points to
+A KWCOCO file is a "manifest" that serves as a single reference that points to
 all images, categories, and annotations in a computer vision dataset. Thus,
 when applying an algorithm to a dataset, it is sufficient to have the algorithm
-take one dataset parameter: the path to the kwcoco file.  Generally a kwcoco
+take one dataset parameter: the path to the KWCOCO file.  Generally a KWCOCO
 file will live in a "bundle" directory along with the data that it references,
-and paths in the kwcoco file will be relative to the location of the kwcoco
+and paths in the KWCOCO file will be relative to the location of the KWCOCO
 file itself.
 
 The main data structure in this model is largely based on the implementation in
@@ -57,10 +57,10 @@ The `kwcoco <https://pypi.org/project/kwcoco/>`_.  package can be installed via 
     pip install kwcoco
 
 
-The kwcoco CLI
+The KWCOCO CLI
 --------------
 
-After installing kwcoco, you will also have the ``kwcoco`` command line tool. 
+After installing KWCOCO, you will also have the ``kwcoco`` command line tool. 
 This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 --help`` should provide a good starting point.
 
@@ -100,7 +100,7 @@ Toy Data
 --------
 
 Don't have a dataset with you, but you still want to test out your algorithms?
-Try the kwcoco shapes demo dataset, and generate an arbitrarily large dataset.
+Try the KWCOCO shapes demo dataset, and generate an arbitrarily large dataset.
 
 The toydata submodule renders simple objects on a noisy background ---
 optionally with auxiliary channels --- and provides bounding boxes,
@@ -241,7 +241,8 @@ An informal description of the spec is written here:
         'supercategory': str,   # parent category name
     }
 
-    # Videos are used to manage collections of sequences of images.
+    # Videos are used to manage collections or sequences of images.
+    # Frames do not necesarilly have to be aligned or uniform time steps
     video = {
         'id': int,
         'name': str,  # a unique name for this video.
@@ -255,24 +256,31 @@ An informal description of the spec is written here:
     # Specifies how to find sensor data of a particular scene at a particular
     # time. This is usually paths to rgb images, but auxiliary information
     # can be used to specify multiple bands / etc...
+
+    # NOTE: in the future we will transition from calling these auxiliary items
+    # to calling these asset items. As such the key will change from
+    # "auxiliary" to "asset". The API will be updated to maintain backwards
+    # compatibility while this transition occurs.
+
     image = {
         'id': int,
 
         'name': str,  # an encouraged but optional unique name
-        'file_name': str,  # relative path to the "base" image data
+        'file_name': str,  # relative path to the "base" image data (optional if auxiliary items are specified)
 
         'width': int,   # pixel width of "base" image
         'height': int,  # pixel height of "base" image
 
-        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image
+        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image (optional if auxiliary items are specified)
 
         'auxiliary': [  # information about any auxiliary channels / bands
             {
                 'file_name': str,     # relative path to associated file
                 'channels': <ChannelSpec>,   # a string encoding
-                'width':     <int>    # pixel width of auxiliary image
-                'height':    <int>    # pixel height of auxiliary image
-                'warp_aux_to_img': <TransformSpec>,  # tranform from "base" image space to auxiliary image space. (identity if unspecified)
+                'width':     <int>    # pixel width of image asset
+                'height':    <int>    # pixel height of image asset
+                'warp_aux_to_img': <TransformSpec>,  # tranform from "base" image space to auxiliary/asset space. (identity if unspecified)
+                'quantization': <QuantizationSpec>,  # indicates that the underlying data was quantized
             }, ...
         ]
 
@@ -304,6 +312,16 @@ An informal description of the spec is written here:
         fuse" inputs by separating them with a "," and "early fuse" by
         separating with a "|". Early fusion returns a solid array/tensor, late
         fusion returns separated arrays/tensors.
+
+    QuantizationSpec:
+        This is a dictionary of the form:
+            {
+                'orig_min': <float>, # min original intensity
+                'orig_max': <float>, # min original intensity
+                'quant_min': <int>, # min quantized intensity
+                'quant_max': <int>, # max quantized intensity
+                'nodata': <int|None>,  # integer value to interpret as nan
+            }
 
     # Ground truth is specified as annotations, each belongs to a spatial
     # region in an image. This must reference a subregion of the image in pixel
@@ -402,7 +420,7 @@ An informal description of the spec is written here:
 
         TODO: Support WTK
 
-    Auxiliary Channels:
+    Auxiliary Channels / Image Assets:
         For multimodal or multispectral images it is possible to specify
         auxiliary channels in an image dictionary as follows:
 
@@ -410,14 +428,56 @@ An informal description of the spec is written here:
             'id': int,
             'file_name': str,    # path to the "base" image (may be None)
             'name': str,         # a unique name for the image (must be given if file_name is None)
-            'channels': <spec>,  # a spec code that indicates the layout of the "base" image channels.
+            'channels': <ChannelSpec>,  # a spec code that indicates the layout of the "base" image channels.
             'auxiliary': [  # information about auxiliary channels
                 {
                     'file_name': str,
-                    'channels': <spec>
+                    'channels': <ChannelSpec>
                 }, ... # can have many auxiliary channels with unique specs
             ]
         }
+
+        Note that specifing a filename / channels for the base image is not
+        necessary, and mainly useful for augmenting an existing single-image
+        dataset with multimodal information. Typically if an image consists of
+        more than one file, all file information should be stored in the
+        "auxiliary" or "assets" list.
+
+        NEW DOCS:
+            In an MSI use case you should think of the "auxiliary" list as a
+            list of single file assets that are composed to make the entire
+            image. Your assets might include sensed bands, computed features,
+            or quality information. For instance a list of auxiliary items may
+            look like this:
+
+            image = {
+                "name": "my_msi_image",
+                "width": 400,
+                "height": 400,
+
+                "video_id": 2,
+                "timestamp": "2020-01-1",
+                "frame_index": 5,
+                "warp_img_to_vid": {"type": "affine", "scale", 1.4},
+
+                "auxiliary": [
+                   {"channels": "red|green|blue": "file_name": "rgb.tif", "warp_aux_to_img": {"scale": 1.0}, "height": 400, "width": 400, ...},
+                   ...
+                   {"channels": "cloudmask": "file_name": "cloudmask.tif", "warp_aux_to_img": {"scale": 4.0}, "height": 100, "width": 100, ...},
+                   {"channels": "nir": "file_name": "nir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
+                   {"channels": "swir": "file_name": "swir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
+                   {"channels": "model1_predictions:0.6": "file_name": "model1_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                   {"channels": "model2_predictions:0.3": "file_name": "model2_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                ]
+            }
+
+            Note that there is no file_name or channels parameter in the image
+            object itself. This pattern indicates that image is composed of
+            multiple assets. One could indicate that an asset is primary by
+            giving its information to the parent image, but for better STAC
+            compatibility, all assets for MSI images should simply be listed
+            as "auxiliary" items.
+
 
     Video Sequences:
         For video sequences, we add the following video level index:
@@ -454,7 +514,7 @@ For more information on the "warp" transforms see `warping_and_spaces <docs/sour
 The CocoDatset API Grouped by Functinoality
 -------------------------------------------
 
-The following are grouped attribute/method names of a kwcoco.CocoDataset.
+The following are grouped attribute/method names of a ``kwcoco.CocoDataset``.
 See the in-code documentation for further details.
 
 .. code:: python
@@ -564,8 +624,8 @@ See the in-code documentation for further details.
     }
 
 
-Converting your data to COCO
-----------------------------
+Converting your RGB data to KWCOCO
+----------------------------------
 
 Assuming you have programmatic access to your dataset you can easily convert to
 a coco file using process similar to the following code:
@@ -633,6 +693,277 @@ a coco file using process similar to the following code:
 
     # Dump the underlying json `dataset` object to a string
     print(my_dset.dumps(newlines=True))
+
+
+KWCOCO Spaces
+-------------
+
+There are 3 spaces that a user of kwcoco may need to be concerned with
+depending on their dataset: (1) video space, (2) image space, and (3)
+asset/auxiliary space.
+
+Videos can contain multiple images, images can contain multiple asset/auxiliary
+items, and kwcoco needs to know about any transformation that relates between
+different levels in this heirarchy.
+
+1. Video space - In a sequence of images, each individual image might be at a
+   different resolution, or misaligned with other images in the sequence.
+   This space is only important when working with images in "video" sequences.
+
+2. Image space - If an image contains multiple auxiliary / asset items, this is
+   the space that they are all re sampled to at the "image level". Note all
+   annotations on images should always be given in image space by convention.
+
+1. Auxiliary / Asset Space - This is the native space/resolution of the raster
+   image data that lives on disk that KWCOCO points to. When an image consists of
+   only a single asset. This space is only important when an image contains
+   multiple files at different resolutions.
+
+
+When an item is registered in a space. (i.e. you register a video, image, or
+auxiliary/asset item), kwcoco will benefit from knowing (1) the width/height of
+the object in it's own space, and any transformation from that object to it's
+parent space --- i.e. an auxiliary/asset item needs to know how to be
+transformed into image space, and an image needs to know how to be transformed
+into video space (if applicable). This warping can be as simple as a scale
+factor or as complex as a full homography matrix (and we may generalize beyond
+this), and is specified via the `TransformSpec`. When this transform is
+unspecified it is assumed to be the identity transform, so for pre-aligned
+datasets, the user does not need to worry about the differentiation between
+spaces and simply work in "image space".
+
+
+Converting your Multispectral Multiresolution Data to KWCOCO
+------------------------------------------------------------
+
+KWCOCO has the ability to work with multispectral images. More generally, a
+KWCOCO image can contain any number of "raster assets". The motivating use case
+is multispectral imagery, but this also incorporates more general use cases
+where rasters can represent metadata from a depth sensor, or stereo images,
+etc.
+
+Put plainly, a KWCOCO image can consist of multiple image files, and each of
+those image file can have any number of channels. Furthermore, these image
+files do not need to have the same resolution. However, the channels
+within a single image currently must be unique.
+
+Because images can be in different resolutions, we need to bring up the topic
+of "KWCOCO spaces". For full info on this, see the discussion on "KWCOCO
+spaces", but briefly, there are 3 spaces that a user of kwcoco needs to be
+concerned with: (1) video space, (2) image space, and (3) asset/auxiliary
+space, and KWCOCO will want to know how. 
+
+As a simple example, lets assume you have a dataset containing sequences of RGB
+images, corresponding infrared images, depth estimations, and optical flow
+estimations. The infrared images are stored in half-resolution of the RGB
+images, but the depth and flow data is at the same resolution as the RGB data.
+The RGB images have 3 channels the flow images have 2 channels, and depth and
+ir have 1 channel.
+
+
+If our images on disk look like:
+
+
+.. code:: 
+
+    - video1/vid1_frame1_rgb.tif
+    - video1/vid1_frame1_ir.tif
+    - video1/vid1_frame1_depth.tif
+    - video1/vid1_frame1_flow.tif
+    - video1/vid1_frame2_rgb.tif
+    - video1/vid1_frame2_ir.tif
+    - video1/vid1_frame2_depth.tif
+    - video1/vid1_frame2_flow.tif
+    - video1/vid1_frame3_rgb.tif
+    - video1/vid1_frame3_ir.tif
+    - video1/vid1_frame3_depth.tif
+    - video1/vid1_frame3_flow.tif
+
+
+We can add them to a custom kwcoco file using the following code.
+
+First, lets's actually make dummy data for those images on disk.
+
+.. code:: python
+
+   import numpy as np
+   import kwimage
+   import ubelt as ub
+   num_frames = 3
+   num_videos = 1
+   width, height = 64, 64
+
+   bundle_dpath = ub.Path('demo_bundle').ensuredir()
+   for vidid in range(1, num_videos + 1):
+       vid_dpath = (bundle_dpath / f'video{vidid}').ensuredir()
+       for frame_num in range(1, num_frames + 1):
+           kwimage.imwrite(vid_dpath / f'vid{vidid}_frame{frame_num}_rgb.tif', np.random.rand(height, width, 3))
+           kwimage.imwrite(vid_dpath / f'vid{vidid}_frame{frame_num}_ir.tif', np.random.rand(height // 2, width // 2))
+           kwimage.imwrite(vid_dpath / f'vid{vidid}_frame{frame_num}_depth.tif', np.random.rand(height, width, 1))
+           kwimage.imwrite(vid_dpath / f'vid{vidid}_frame{frame_num}_flow.tif', np.random.rand(height, width, 2))
+
+
+Now lets create a kwcoco dataset to register them. We use the channel spec to denote what the channels are.
+
+.. code:: python
+
+   import ubelt as ub
+   import os
+   bundle_dpath = ub.Path('demo_bundle')
+
+   import kwcoco
+   dset = kwcoco.CocoDataset()
+   dset.fpath = bundle_dpath / 'data.kwcoco.json'
+
+   # We will define a map from our suffix codes in the filename to
+   # kwcoco channel specs that indicate the number of channels
+   channel_spec_mapping = {
+       'rgb': 'red|green|blue',  # rgb is 3 channels
+       'flow': 'fx|fy',  # flow is 2 channels
+       'ir': 'ir',
+       'depth': 'depth',
+   }
+
+   for video_dpath in bundle_dpath.glob('video*'):
+       # Add a video and give it a name.
+       vidid = dset.add_video(name=video_dpath.name)
+
+       # Parse out information that we need from the filenames. 
+       # Lots of different ways to do this depending on the use case.
+       assets = []
+       for fpath in video_dpath.glob('*.tif'):
+           _, frame_part, chan_part = fpath.stem.split('_')
+           frame_index = int(frame_part[5:])
+           assets.append({
+               'frame_num': frame_index,
+               'channels': channel_spec_mapping[chan_part],
+               'fpath': fpath,
+           })
+
+       # Group all data from the same frame together.
+       frame_to_group = ub.group_items(assets, lambda x: x['frame_num'])
+       for frame_index, group in frame_to_group.items():
+           # Let us lookup data by channels
+           chan_to_item = {item['channels']: item for item in group}
+           # Grab the RGB data as it will be our "primary" asset
+           rgbdata = chan_to_item['red|green|blue']
+
+           # Use the prefix for the image name
+           name = rgbdata['fpath'].stem.split('_rgb')[0]
+
+           height, width = kwimage.imread(rgbdata['fpath']).shape[0:2]
+
+           # First add the base image. We will add this image as
+           # without a file_name because all of its data will be stored 
+           # in its auxiliary list. We will assume all images in the
+           # video are aligned, so we set `warp_img_to_vid` to be the
+           # identity matrix.
+           gid = dset.add_image(
+               name=name, width=width, height=height,
+               warp_img_to_vid=kwimage.Affine.eye().concise())
+
+           # We could have constructed the auxiliary item dictionaries
+           # explicitly and added them in the previous step, but we 
+           # will use the CocoImage api to do this instead.
+           coco_img = dset.coco_image(gid)
+
+           for item in group:
+               fpath = item['fpath']
+               # There are better ways of getting width/height here, 
+               # doing this one for simplicity.
+               height, width = kwimage.imread(fpath).shape[0:2]
+               file_name = os.fspath(fpath.relative_to(bundle_dpath))
+               coco_img.add_auxiliary_item(
+                   file_name=file_name, channels=item['channels'], width=width,
+                   height=height)
+
+     # We can always double check we did not make errors using kwcoco validate
+     dset.validate()
+
+
+Now we have a multispectral multi-resolution dataset. You can load specific
+subsets of channels (in specific subregions is your data is stored in the COG
+or a RAW format) using the delayed load interface.
+
+.. code:: python
+
+
+   # Get a coco image.
+   gid = 1
+   coco_img = dset.coco_image(gid)
+
+   # Tell delayed load what channels we want. We can 
+   # also specify which "space" we want to load it in.
+   # Note: that when specifying channels from multiple asset items
+   # it is not possible to sample in the the auxiliary / asset space 
+   # so only image and video are allowed there.
+   delayed_img = coco_img.delay('fx|depth|red', space='image')
+
+   # We finalize the data to load it
+   imdata = delayed_img.finalize()
+
+   # We can show it if we want, but it's just random data.
+   import kwplot
+   kwplot.autompl()
+   kwplot.imshow(imdata)
+
+
+Somewhat more interesting is to use the KWCOCO demodata. We can see here that
+videos can contain multiple images at different resolutions and each image can
+contain different number of channels.
+
+.. code:: python
+
+    import kwcoco
+    import kwarray
+    import kwimage
+    dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
+
+    gid = 1
+    coco_img = dset.coco_image(gid)
+
+    # Randomly select 3 channels to use
+    avail_channels = coco_img.channels.fuse().as_list()
+    channels = '|'.join(kwarray.shuffle(avail_channels)[0:3])
+    print('channels = {!r}'.format(channels))
+
+    delayed_img = coco_img.delay(channels, space='video')
+
+    imdata = delayed_img.finalize()
+
+    # Depending on the sensor intensity might be out of standard ranges,
+    # we can use kwimage to robustly normalize for this. This lets
+    # us visualize data with false color.
+    canvas = kwimage.normalize_intensity(imdata, axis=2)
+    canvas = np.ascontiguousarray(canvas)
+
+    # We can draw the annotations on the image, but be cognizant of the spaces.
+    # Annotations are always in "image" space, so if we loaded in "video" space
+    # then we need to warp to that.
+    imgspace_dets = dset.annots(gid=gid).detections
+    vidspace_dets = imgspace_dets.warp(coco_img.warp_vid_from_img)
+
+    canvas = vidspace_dets.draw_on(canvas)
+
+    import kwplot
+    kwplot.autompl()
+    kwplot.imshow(canvas)
+
+
+The result of the above code is (note the data is random, so it may differ on your machine):
+
+.. image:: https://i.imgur.com/hrFFwII.png
+   :height: 100px
+   :align: left
+
+
+Key notes to takeaway:
+
+* KWCOCO can register many assets at different resolutions, register groups depicting the same scene at a particular time into an "image", and then groups of images can be grouped into "videos".
+
+* Annotations are always specified in image space
+
+* Channel code within a single image should never be duplicated.
 
 
 The KWCOCO Channel Specification
