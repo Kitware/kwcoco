@@ -64,7 +64,7 @@ After installing KWCOCO, you will also have the ``kwcoco`` command line tool.
 This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 --help`` should provide a good starting point.
 
-.. code:: 
+.. code-block:: 
 
     usage: kwcoco [-h] [--version] {stats,union,split,show,toydata,eval,conform,modify_categories,reroot,validate,subset,grab} ...
 
@@ -125,7 +125,7 @@ segmentation formats than the original COCO format. Despite being written in
 Python, this data structure is reasonably efficient.
 
 
-.. code:: python
+.. code-block:: python
 
         >>> import kwcoco
         >>> import json
@@ -232,7 +232,7 @@ Dataset Spec:
 
 An informal description of the spec is written here:
 
-.. code:: 
+.. code-block:: 
 
     # All object categories are defined here.
     category = {
@@ -517,7 +517,7 @@ The CocoDatset API Grouped by Functinoality
 The following are grouped attribute/method names of a ``kwcoco.CocoDataset``.
 See the in-code documentation for further details.
 
-.. code:: python
+.. code-block:: python
 
     {
         'classmethod': [
@@ -630,7 +630,7 @@ Converting your RGB data to KWCOCO
 Assuming you have programmatic access to your dataset you can easily convert to
 a coco file using process similar to the following code:
 
-.. code:: python
+.. code-block:: python
 
     # ASSUME INPUTS 
     # my_classes: a list of category names
@@ -764,7 +764,7 @@ ir have 1 channel.
 If our images on disk look like:
 
 
-.. code:: 
+.. code-block:: 
 
     - video1/vid1_frame1_rgb.tif
     - video1/vid1_frame1_ir.tif
@@ -784,7 +784,7 @@ We can add them to a custom kwcoco file using the following code.
 
 First, lets's actually make dummy data for those images on disk.
 
-.. code:: python
+.. code-block:: python
 
    import numpy as np
    import kwimage
@@ -805,7 +805,7 @@ First, lets's actually make dummy data for those images on disk.
 
 Now lets create a kwcoco dataset to register them. We use the channel spec to denote what the channels are.
 
-.. code:: python
+.. code-block:: python
 
    import ubelt as ub
    import os
@@ -885,7 +885,7 @@ Now we have a multispectral multi-resolution dataset. You can load specific
 subsets of channels (in specific subregions is your data is stored in the COG
 or a RAW format) using the delayed load interface.
 
-.. code:: python
+.. code-block:: python
 
 
    # Get a coco image.
@@ -912,7 +912,7 @@ Somewhat more interesting is to use the KWCOCO demodata. We can see here that
 videos can contain multiple images at different resolutions and each image can
 contain different number of channels.
 
-.. code:: python
+.. code-block:: python
 
     import kwcoco
     import kwarray
