@@ -870,9 +870,7 @@ Now lets create a kwcoco dataset to register them. We use the channel spec to de
 
            for item in group:
                fpath = item['fpath']
-               # There are better ways of getting width/height here, 
-               # doing this one for simplicity.
-               height, width = kwimage.imread(fpath).shape[0:2]
+               height, width = kwimage.load_image_shape(fpath)[0:2]
                file_name = os.fspath(fpath.relative_to(bundle_dpath))
                coco_img.add_auxiliary_item(
                    file_name=file_name, channels=item['channels'], width=width,
