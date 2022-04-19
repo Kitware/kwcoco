@@ -849,6 +849,7 @@ class DelayedLoad(DelayedImageOperation):
             if lazy_frame_backends.LazyGDalFrameFile.available():
                 # TODO: warn if we dont have a COG.
                 pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath, nodata=nodata)
+                pre_final._ds
                 # pre_final = LazyGDalFrameFile(self.fpath)
                 # TODO: choose the fastest lazy backend for the file
                 # pre_final = lazy_frame_backends.LazyRasterIOFrameFile(self.fpath)  # which is faster?

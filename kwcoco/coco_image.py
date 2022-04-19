@@ -448,6 +448,16 @@ class CocoImage(ub.NiceRepr):
             >>> imdata = np.random.rand(32, 32, 5)
             >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
             >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset()
+            >>> gid = dset.add_image(name='my_image_name', width=200, height=200)
+            >>> coco_img = dset.coco_image(gid)
+            >>> coco_img.add_auxiliary_item('path/img1_B0.tif', channels='B0', width=200, height=200)
+            >>> coco_img.add_auxiliary_item('path/img1_B1.tif', channels='B1', width=200, height=200)
+            >>> coco_img.add_auxiliary_item('path/img1_B2.tif', channels='B2', width=200, height=200)
+            >>> coco_img.add_auxiliary_item('path/img1_TCI.tif', channels='r|g|b', width=200, height=200)
         """
         from os.path import isabs, join  # NOQA
         import kwimage
@@ -476,6 +486,8 @@ class CocoImage(ub.NiceRepr):
             # space unless the user says otherwise
             warp_aux_to_img = kwimage.Affine.scale((
                 img_width / width, img_height / height))
+        else:
+            warp_aux_to_img = kwimage.Affine.coerce(warp_aux_to_img)
 
         if channels is not None:
             channels = FusedChannelSpec.coerce(channels).spec
@@ -515,6 +527,9 @@ class CocoImage(ub.NiceRepr):
         asset_list.append(obj)
         if self.dset is not None:
             self.dset._invalidate_hashid()
+
+    # Alias for add_auxiliary_item (which will eventually be deprecated)
+    add_asset = add_auxiliary_item
 
     @profile
     def delay(self, channels=None, space='image', bundle_dpath=None):
