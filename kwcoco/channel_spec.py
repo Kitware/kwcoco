@@ -670,6 +670,11 @@ class FusedChannelSpec(BaseChannelSpec):
     def as_set(self):
         return set(self.normalize().parsed)
 
+    # TODO: deprecate "as" methods in favor of "to" methods
+    to_set = as_set
+    to_oset = as_oset
+    to_list = as_list
+
     def as_path(self):
         """
         Returns a string suitable for use in a path.

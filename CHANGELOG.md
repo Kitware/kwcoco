@@ -8,6 +8,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.2.31 - Unreleased
 
 
+### Changed
+* kwcoco subset can now accept dst as the second positional argument
+
+
+### Fixed
+* Fix issue in kwcoco subset where paths were invalid if written outside of
+  the source kwcoco bundle.
+
+
 ## Version 0.2.30 - Released 2022-04-19
 
 ### Added
