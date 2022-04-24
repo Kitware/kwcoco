@@ -364,14 +364,16 @@ class LazyGDalFrameFile(ub.NiceRepr):
         self.shape
         self[:]
     """
-    def __init__(self, fpath, nodata=None):
+    def __init__(self, fpath, nodata=None, overview=None):
         self.fpath = fpath
         self.nodata = nodata
+        self.overview = overview
         if nodata == 'auto':
             self.masking_method = 'float'
         else:
             self.masking_method = nodata
-
+        if self.overview is None:
+            self.overview = 0
         self._ds_cache = None
 
     @classmethod
@@ -434,29 +436,28 @@ class LazyGDalFrameFile(ub.NiceRepr):
     def ndim(self):
         return len(self.shape)
 
-    @property
+    @ub.memoize_property
     def shape(self):
-        # if 0:
-        #     ds = self.ds
-        #     INTERLEAVE = ds.GetMetadata('IMAGE_STRUCTURE').get('INTERLEAVE', '')  # handle INTERLEAVE=BAND
-        #     if INTERLEAVE == 'BAND':
-        #         pass
-        #     ds.GetMetadata('')  # handle TIFFTAG_IMAGEDESCRIPTION
-        #     from osgeo import gdal
-        #     subdataset_infos = ds.GetSubDatasets()
-        #     subdatasets = []
-        #     for subinfo in subdataset_infos:
-        #         path = subinfo[0]
-        #         sub_ds = gdal.Open(path, gdal.GA_ReadOnly)
-        #         subdatasets.append(sub_ds)
-        #     for sub in subdatasets:
-        #         sub.ReadAsArray()
-        #         print((sub.RasterXSize, sub.RasterYSize, sub.RasterCount))
-        #     sub = subdatasets[0][0]
         ds = self._ds
-        width = ds.RasterXSize
-        height = ds.RasterYSize
-        C = ds.RasterCount
+        default_band0 = ds.GetRasterBand(1)
+
+        if self.overview:
+            self.num_overviews = default_band0.GetOverviewCount()
+            self.load_overview = min(self.overview, self.num_overviews)
+            if self.load_overview:
+                self.post_overview = self.overview - self.load_overview
+                assert self.post_overview == 0, 'unhandled'
+                band0 = default_band0.GetOverview(self.load_overview - 1)
+            else:
+                band0 = default_band0
+        else:
+            band0 = default_band0
+        self.num_channels = ds.RasterCount
+        self.width = band0.XSize
+        self.height = band0.YSize
+        width = self.width
+        height = self.height
+        C = self.num_channels
         return (height, width, C)
 
     @property
@@ -508,11 +509,39 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> imdata = kwimage.normalize_intensity(imdata)
             >>> imdata = np.nan_to_num(imdata)
             >>> kwplot.imshow(imdata)
+
+        Example:
+            >>> # xdoctest: +REQUIRES(--ipfs)
+            >>> # Demo code to develop support for overviews
+            >>> import kwimage
+            >>> from kwcoco.util.lazy_frame_backends import *  # NOQA
+            >>> fpath = ub.grabdata('https://ipfs.io/ipfs/QmaFcb565HM9FV8f41jrfCZcu1CXsZZMXEosjmbgeBhFQr', fname='PXL_20210411_150641385.jpg')
+            >>> print(LazyGDalFrameFile(fpath, overview=0).shape)
+            >>> print(LazyGDalFrameFile(fpath, overview=1).shape)
+            >>> print(LazyGDalFrameFile(fpath, overview=2).shape)
+            >>> print(LazyGDalFrameFile(fpath, overview=3).shape)
+            >>> # print(LazyGDalFrameFile(fpath, overview=4).shape)
+            >>> print(LazyGDalFrameFile(fpath, overview=0)[:].shape)
+            >>> print(LazyGDalFrameFile(fpath, overview=1)[:].shape)
+            >>> print(LazyGDalFrameFile(fpath, overview=2)[:].shape)
+            >>> print(LazyGDalFrameFile(fpath, overview=3)[:].shape)
+            >>> print(LazyGDalFrameFile(fpath, overview=3)[0:20].shape)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> import kwarray
+            >>> kwplot.autompl()
+            >>> datas = []
+            >>> for overview in range(0, 4):
+            >>>     self = LazyGDalFrameFile(fpath, overview=overview)
+            >>>     imdata = self[100:200, 100:200]
+            >>>     imdata = kwimage.draw_header_text(imdata, f'{overview=}\n{self.shape}\n[100:200, 100:200]', fit='shrink')
+            >>>     datas.append(imdata)
+            >>> canvas = kwimage.stack_images(datas, axis=1, pad=10)
+            >>> canvas = kwimage.draw_header_text(canvas, 'demo of lazy crops with overviews', fit='shrink')
+            >>> kwplot.imshow(canvas)
         """
         ds = self._ds
-        width = ds.RasterXSize
-        height = ds.RasterYSize
-        C = ds.RasterCount
+        height, width, C = self.shape
 
         if 1:
             INTERLEAVE = ds.GetMetadata('IMAGE_STRUCTURE').get('INTERLEAVE', '')
@@ -552,74 +581,13 @@ class LazyGDalFrameFile(ub.NiceRepr):
         gdalkw = dict(xoff=xstart, yoff=ystart,
                       win_xsize=xsize, win_ysize=ysize)
 
+        from kwimage.im_io import _gdal_read
+        gdal_dset = ds
         nodata = self.nodata
-        needs_nodata = nodata is not None
-        auto_nodata = nodata == 'auto'
-        read_nodata = isinstance(nodata, str)
-        shape = (ysize, xsize, len(band_indices))
-        # mask_shape = (ysize, xsize, len(band_indices))
-        mask_shape = (ysize, xsize,)
-        if needs_nodata:
-            # TODO: can we remove the band dimension here?
-            mask = np.zeros(mask_shape, dtype=bool)
-
-        # preallocate like kwimage.im_io._imread_gdal
-        from kwimage.im_io import _gdal_to_numpy_dtype
-        bands = [ds.GetRasterBand(1 + band_idx)
-                 for band_idx in band_indices]
-        gdal_dtype = bands[0].DataType
-        dtype = _gdal_to_numpy_dtype(gdal_dtype)
-        try:
-            img_part = np.empty(shape, dtype=dtype)
-        except ValueError:
-            print('ERROR')
-            print('self.fpath = {!r}'.format(self.fpath))
-            print('dtype = {!r}'.format(dtype))
-            print('shape = {!r}'.format(shape))
-            raise
-        for out_idx, band in enumerate(bands):
-            buf = band.ReadAsArray(**gdalkw)
-            if buf is None:
-                raise IOError(ub.paragraph(
-                    '''
-                    GDAL was unable to read band: {}, {}, with={}
-                    from fpath={!r}
-                    '''.format(out_idx, band, gdalkw, self.fpath)))
-            # print('auto_nodata = {!r}'.format(auto_nodata))
-            if read_nodata:
-                _nodata = band.GetNoDataValue()
-            else:
-                _nodata = nodata
-                # print('nodata = {!r}'.format(_nodata))
-            if _nodata is not None:
-                mask |= (buf == _nodata)
-                # mask[:, :, out_idx] = (buf == _nodata)
-            img_part[:, :, out_idx] = buf
-            buf = None
-
-        # masking_method = self.masking_method == 'auto'
-        # if masking_method is None:
-        #     pass
-        # elif masking_method
-        if auto_nodata:
-            needs_nodata = mask.any()
-
-        if needs_nodata:
-            if self.masking_method == 'float':
-                # print('float mask')
-                # Hack it so nodata becomes nan
-                masked_hack_dtype = np.result_type(img_part.dtype, np.float32)
-                img_part = img_part.astype(masked_hack_dtype)
-                img_part[np.where(mask)] = np.nan
-                imdata = img_part
-            elif self.masking_method == 'ma':
-                # Using a regular masked array might be better
-                mask3 = np.dstack([mask] * C)
-                imdata = np.ma.array(img_part, mask=mask3, fill_value=None)
-            else:
-                raise NotImplementedError(self.masking_method)
-        else:
-            imdata = img_part
+        ignore_color_table = True
+        overview = self.overview
+        imdata, _ = _gdal_read(gdal_dset, overview, nodata, ignore_color_table,
+                               band_indices, gdalkw)
         return imdata
 
     def __array__(self):
