@@ -529,14 +529,37 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> import kwarray
+            >>> import timerit
             >>> kwplot.autompl()
             >>> datas = []
+            >>> ti = timerit.Timerit(50, bestof=3, verbose=0)
             >>> for overview in range(0, 4):
-            >>>     self = LazyGDalFrameFile(fpath, overview=overview)
-            >>>     imdata = self[100:200, 100:200]
-            >>>     imdata = kwimage.draw_header_text(imdata, f'{overview=}\n{self.shape}\n[100:200, 100:200]', fit='shrink')
+            >>>     import timerit
+            >>>     for timer in ti.reset('time'):
+            >>>         with timer:
+            >>>             self = LazyGDalFrameFile(fpath, overview=overview)
+            >>>             imdata = self[100:200, 100:200]
+            >>>     sec = ti.mean()
+            >>>     imdata = kwimage.draw_header_text(imdata, f'{overview=}\n{self.shape}\n[100:200, 100:200]\n{sec:0.6f}', fit='shrink')
             >>>     datas.append(imdata)
-            >>> canvas = kwimage.stack_images(datas, axis=1, pad=10)
+            >>> for overview in range(0, 4):
+            >>>     import timerit
+            >>>     aff = kwimage.Affine.coerce(scale=1 / (2 ** overview))
+            >>>     crop_box = kwimage.Boxes.from_slice((slice(100, 200), slice(100, 200)))
+            >>>     raw_crop = crop_box.warp(aff.inv()).quantize().to_slices()[0]
+            >>>     for timer in ti.reset('time'):
+            >>>         with timer:
+            >>>             self = LazyGDalFrameFile(fpath, overview=0)
+            >>>             raw_imdata = self[raw_crop]
+            >>>             imdata = kwimage.warp_affine(raw_imdata, aff, dsize=(100, 100), interpolation='lanczos', antialias=1)
+            >>>     sec = ti.mean()
+            >>>     def _slicestr(sl):
+            >>>         return '{}:{}'.format(sl.start, sl.stop)
+            >>>     crop_str = '[{}, {}]'.format(_slicestr(raw_crop[0]), _slicestr(raw_crop[1]))
+            >>>     imdata = kwimage.draw_header_text(imdata, f'simulate overview\n{self.shape}\n{crop_str}\n{sec:0.6f}', fit='shrink')
+            >>>     datas.append(imdata)
+            >>> # TODO: time the alternative case where you load everything and then crop
+            >>> canvas = kwimage.stack_images_grid(datas, chunksize=4, axis=0, pad=10)
             >>> canvas = kwimage.draw_header_text(canvas, 'demo of lazy crops with overviews', fit='shrink')
             >>> kwplot.imshow(canvas)
         """

@@ -1804,6 +1804,7 @@ class DelayedWarp(DelayedImageOperation):
             >>> # xdoctest: +REQUIRES(--ipfs)
             >>> # Demo code to develop support for overviews
             >>> import kwimage
+            >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> fpath = ub.grabdata('https://ipfs.io/ipfs/QmaFcb565HM9FV8f41jrfCZcu1CXsZZMXEosjmbgeBhFQr', fname='PXL_20210411_150641385.jpg')
             >>> data0 = kwimage.imread(fpath, overview=0, backend='gdal')
             >>> data1 = kwimage.imread(fpath, overview=1, backend='gdal')
@@ -1833,8 +1834,10 @@ class DelayedWarp(DelayedImageOperation):
         # or use IO overviews, we should do that and modify the transform.
         probably_io = getattr(sub_data, '__hack_dont_optimize__', False)
         if probably_io:
+            subkw = ub.dict_diff(kwargs, {'as_xarray'})
+
             # Auto overview support
-            AUTO_OVERVIEWS = True
+            AUTO_OVERVIEWS = 0
             if AUTO_OVERVIEWS:
                 params = transform.decompose()
                 sx, sy = params['scale']
@@ -1842,9 +1845,8 @@ class DelayedWarp(DelayedImageOperation):
                     num_downs, residual_sx, residual_sy = kwimage.im_cv2._prepare_scale_residual(sx, sy, fudge=0)
                     rest_warp = transform @ kwimage.Affine.scale((residual_sx, residual_sy))
                     transform = rest_warp
+                subkw['overview'] = num_downs
 
-            subkw = ub.dict_diff(kwargs, {'as_xarray'})
-            subkw['overview'] = num_downs
             sub_data = sub_data.finalize(**subkw)
 
         if hasattr(sub_data, 'finalize'):
