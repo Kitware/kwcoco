@@ -607,6 +607,8 @@ class LazyGDalFrameFile(ub.NiceRepr):
         from kwimage.im_io import _gdal_read
         gdal_dset = ds
         nodata = self.nodata
+        if nodata == 'auto':
+            nodata = 'float'  # just use floats
         ignore_color_table = True
         overview = self.overview
         imdata, _ = _gdal_read(gdal_dset, overview, nodata, ignore_color_table,
