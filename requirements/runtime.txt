@@ -1,6 +1,6 @@
 jsonschema >= 3.2.0
 kwarray >= 0.6.0
-kwimage >= 0.8.1
+kwimage >= 0.8.6
 
 networkx >= 2.6.2            ;                              python_version >= '3.7.0'   # Python 3.7+
 networkx >= 2.2.0, <= 2.5.1  ; python_version < '3.7.0' and python_version >= '3.6.0'   # Python 3.6
