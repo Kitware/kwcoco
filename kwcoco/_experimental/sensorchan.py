@@ -322,7 +322,7 @@ def _global_sensor_chan_parser():
 @functools.cache
 def concise_sensor_chan(spec):
     """
-    Example:
+    Ignore:
         spec = 'L8:matseg.0|matseg.1|matseg.2|matseg.3,L8:red,S2:red,S2:forest|brush|bare_ground|built_up|cropland|wetland|water|snow_or_ice_field,S2:matseg.0|matseg.1|matseg.2|matseg.3'
     """
     sensor_channel_parser = _global_sensor_chan_parser()
