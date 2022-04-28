@@ -2046,6 +2046,8 @@ class MixinCocoExtras(object):
                         'Image does not exist: {!r}'.format(new_gpath))
             return new_file_name
 
+        # from kwcoco.util import util_reroot
+
         if safe:
             gid_to_new = {}
             for gid, img in self.imgs.items():
