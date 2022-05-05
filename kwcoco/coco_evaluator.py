@@ -1013,13 +1013,15 @@ class CocoSingleResult(ub.NiceRepr):
         """
         Serialize to json file
         """
-        import pathlib
-        if isinstance(file, (str, pathlib.Path)):
-            with open(file, 'w') as fp:
-                return result.dump(fp, indent=indent)
-        else:
+        try:
+            fpath = os.fspath(file)
+        except TypeError:
             state = result.__json__()
             json.dump(state, file, indent=indent)
+        else:
+            import safer
+            with safer.open(fpath, 'w', temp_file=True) as fp:
+                return result.dump(fp, indent=indent)
 
     @profile
     def dump_figures(result, out_dpath, expt_title=None, figsize='auto',
@@ -1136,9 +1138,6 @@ def _writefig(fig, metrics_dpath, fname, figsize, verbose, tight):
     if tight:
         fig.tight_layout()
     fig.savefig(fig_fpath)
-    # import kwplot
-    # kwplot.jk(fig)
-    # fig.savefig(fig_fpath, bbox_inches='tight')
 
 
 def _load_dets(pred_fpaths, workers=0):
