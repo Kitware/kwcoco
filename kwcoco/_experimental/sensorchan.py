@@ -14,7 +14,7 @@ SENSOR_CHAN_GRAMMAR = ub.codeblock(
     ?start: stream
 
     // An identifier can contain spaces
-    IDEN: ("_"|LETTER) ("_"|" "|"-"|LETTER|DIGIT)*
+    IDEN: ("_"|"*"|LETTER) ("_"|" "|"-"|"*"|LETTER|DIGIT)*
 
     chan_single : IDEN
     chan_getitem : IDEN "." INT
@@ -61,7 +61,7 @@ CHANNEL_ONLY_GRAMMAR = ub.codeblock(
     ?start: stream
 
     // An identifier can contain spaces
-    IDEN: ("_"|LETTER) ("_"|" "|"-"|LETTER|DIGIT)*
+    IDEN: ("_"|LETTER) ("_"|" "|"-"|LETTER|DIGIT|"*")*
 
     chan_single : IDEN
     chan_getitem : IDEN "." INT
@@ -306,6 +306,35 @@ class ConciseTransformer(lark.Transformer):
         return concise
 
 
+class ConcisePartsTransformer(ConciseTransformer):
+    def stream(self, items):
+        flat_items = list(ub.flatten(items))
+        flat_sensors = [str(f.sensor) for f in flat_items]
+        flat_chans = [str(f.chan) for f in flat_items]
+        chan_to_sensors = ub.group_items(flat_sensors, flat_chans)
+
+        pass1_sensors = []
+        pass1_chans = []
+        for chan, sensors in chan_to_sensors.items():
+            sense_part = ','.join(sorted(sensors))
+            if len(sensors) > 1:
+                sense_part = '({})'.format(sense_part)
+            pass1_sensors.append(sense_part)
+            pass1_chans.append(str(chan))
+
+        pass2_parts = []
+        sensor_to_chan = ub.group_items(pass1_chans, pass1_sensors)
+        for sensor, chans in sensor_to_chan.items():
+            chan_part = ','.join(chans)
+            if len(chans) > 1:
+                chan_part = '({})'.format(chan_part)
+            pass2_parts.append('{}:{}'.format(sensor, chan_part))
+
+        parts = pass2_parts
+        concise = sorted(parts)
+        return concise
+
+
 # @ub.memoize
 
 @functools.cache
@@ -329,5 +358,20 @@ def concise_sensor_chan(spec):
     tree = sensor_channel_parser.parse(spec)
     # transformed = NormalizeTransformer().transform(tree)
     transformed = ConciseTransformer().transform(tree)
+    return transformed
+    # print('transformed = {}'.format(ub.repr2(transformed, nl=1)))
+
+
+@functools.cache
+def sensorchan_parts(spec):
+    """
+    Ignore:
+        spec = 'L8:matseg.0|matseg.1|matseg.2|matseg.3,L8:red,(PLANET,S2):a|b|c,S2:red,S2:forest|brush|bare_ground|built_up|cropland|wetland|water|snow_or_ice_field,S2:matseg.0|matseg.1|matseg.2|matseg.3'
+        spec = concise_sensor_chan(spec)
+        spec = '*:rgb'
+    """
+    sensor_channel_parser = _global_sensor_chan_parser()
+    tree = sensor_channel_parser.parse(spec)
+    transformed = ConcisePartsTransformer().transform(tree)
     return transformed
     # print('transformed = {}'.format(ub.repr2(transformed, nl=1)))
