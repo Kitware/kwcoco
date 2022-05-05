@@ -13,19 +13,26 @@ class CocoUnionCLI(object):
         """
         default = {
             'src': scfg.Value([], nargs='+', help='path to multiple input datasets', position=1),
-            'dst': scfg.Value('combo.mscoco.json', help='path to output dataset'),
+            'dst': scfg.Value('combo.kwcoco.json', help='path to output dataset'),
             'absolute': scfg.Value(False, help='if True, converts paths to absolute paths before doing union')
         }
         epilog = """
         Example Usage:
-            kwcoco union --src special:shapes8 special:shapes1 --dst=combo.mscoco.json
+            kwcoco union --src special:shapes8 special:shapes1 --dst=combo.kwcoco.json
         """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
         Example:
-            >>> kw = {'src': ['special:shapes8', 'special:shapes1']}
+            >>> from kwcoco.cli.coco_union import *  # NOQA
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/cli/union').ensuredir()
+            >>> dst_fpath = dpath / 'combo.kwcoco.json'
+            >>> kw = {
+            >>>     'src': ['special:shapes8', 'special:shapes1'],
+            >>>     'dst': dst_fpath
+            >>> }
             >>> cmdline = False
             >>> cls = CocoUnionCLI
             >>> cls.main(cmdline, **kw)

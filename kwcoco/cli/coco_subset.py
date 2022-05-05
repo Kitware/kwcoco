@@ -111,8 +111,12 @@ class CocoSubsetCLI(object):
     def main(cls, cmdline=True, **kw):
         """
         Example:
+            >>> from kwcoco.cli.coco_subset import *  # NOQA
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/cli/union').ensuredir()
             >>> kw = {'src': 'special:shapes8',
-            >>>       'dst': 'subset.json', 'include_categories': 'superstar'}
+            >>>       'dst': dpath / 'subset.json',
+            >>>       'include_categories': 'superstar'}
             >>> cmdline = False
             >>> cls = CocoSubsetCLI
             >>> cls.main(cmdline, **kw)
