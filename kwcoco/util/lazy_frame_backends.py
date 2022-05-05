@@ -57,7 +57,9 @@ class CacheDict(OrderedDict):
         return val
 
 
-GLOBAL_GDAL_CACHE = CacheDict(cache_len=32)
+# Only can use this cache if we assume we are in readonly mode
+# GLOBAL_GDAL_CACHE = CacheDict(cache_len=32)
+GLOBAL_GDAL_CACHE = None
 
 
 @ub.memoize
@@ -345,7 +347,6 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
     Args:
         nodata
-        masking_method
 
     Example:
         >>> # See if we can reproduce the INTERLEAVE bug
@@ -368,10 +369,10 @@ class LazyGDalFrameFile(ub.NiceRepr):
         self.fpath = fpath
         self.nodata = nodata
         self.overview = overview
-        if nodata == 'auto':
-            self.masking_method = 'float'
-        else:
-            self.masking_method = nodata
+        # if nodata == 'auto':
+        #     self.masking_method = 'float'
+        # else:
+        #     self.masking_method = nodata
         if self.overview is None:
             self.overview = 0
         self._ds_cache = None
@@ -393,7 +394,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
             ext = '.' + _read_envi_header(_fpath)['interleave']
             _fpath = ub.augpath(_fpath, ext=ext)
 
-        if _fpath in GLOBAL_GDAL_CACHE:
+        if GLOBAL_GDAL_CACHE is not None and _fpath in GLOBAL_GDAL_CACHE:
             self._ds_cache = GLOBAL_GDAL_CACHE[_fpath]
         else:
             ds = gdal.Open(_fpath, gdal.GA_ReadOnly)
@@ -405,7 +406,8 @@ class LazyGDalFrameFile(ub.NiceRepr):
                     'Call gdal.UseExceptions() beforehand to get the '
                     'real exception').format(self.fpath))
             self._ds_cache = ds
-            GLOBAL_GDAL_CACHE[_fpath] = ds
+            if GLOBAL_GDAL_CACHE is not None:
+                GLOBAL_GDAL_CACHE[_fpath] = ds
 
     @property
     def _ds(self):
