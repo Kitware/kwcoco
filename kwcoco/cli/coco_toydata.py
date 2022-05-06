@@ -75,7 +75,10 @@ class CocoToyDataCLI(object):
     def main(cls, cmdline=True, **kw):
         """
         Example:
-            >>> kw = {'key': 'shapes8', 'dst': 'test.json'}
+            >>> from kwcoco.cli.coco_toydata import *  # NOQA
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/cli/demo').ensuredir()
+            >>> kw = {'key': 'shapes8', 'dst': dpath / 'test.json'}
             >>> cmdline = False
             >>> cls = CocoToyDataCLI
             >>> cls.main(cmdline, **kw)

@@ -506,11 +506,13 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
 
     color = kw.pop('color', 'distinct')
 
+    node = info.get('node', 'classless')
+
     ax = kwplot.multi_plot(
         xdata=recall, ydata=precision, fnum=fnum, label=label,
         xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
         xlabel='recall', ylabel='precision',
-        title=prefix + 'classless AP={:.4f}'.format(ap),
+        title=prefix + '{} AP={:.4f}'.format(node, ap),
         legend_loc='lower right',
         color=color, linestyle='cycle', marker='cycle', **kw
     )

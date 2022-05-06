@@ -840,6 +840,8 @@ class DelayedLoad(DelayedImageOperation):
                     replaced with nan.
         """
         nodata = kwargs.get('nodata', None)
+        overview = kwargs.get('overview', None)
+
         # Probably should not use a cache here?
         # final = self.cache.get('final', None)
         final = None
@@ -848,7 +850,9 @@ class DelayedLoad(DelayedImageOperation):
             using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()
             if lazy_frame_backends.LazyGDalFrameFile.available():
                 # TODO: warn if we dont have a COG.
-                pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath, nodata=nodata)
+                pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath,
+                                                                  nodata=nodata,
+                                                                  overview=overview)
                 pre_final._ds
                 # pre_final = LazyGDalFrameFile(self.fpath)
                 # TODO: choose the fastest lazy backend for the file
@@ -1795,6 +1799,24 @@ class DelayedWarp(DelayedImageOperation):
             >>> kwplot.imshow(kwimage.imresize(s.finalize(), dsize=a.dsize, interpolation='linear'), pnum=pnum_(), title='resize linear')
             >>> kwplot.imshow(kwimage.imresize(s.finalize(), dsize=a.dsize, interpolation='nearest'), pnum=pnum_(), title='resize nearest')
             >>> kwplot.imshow(kwimage.imresize(s.finalize(), dsize=a.dsize, interpolation='cubic'), pnum=pnum_(), title='resize cubic')
+
+        Example:
+            >>> # xdoctest: +REQUIRES(--ipfs)
+            >>> # Demo code to develop support for overviews
+            >>> import kwimage
+            >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+            >>> fpath = ub.grabdata('https://ipfs.io/ipfs/QmaFcb565HM9FV8f41jrfCZcu1CXsZZMXEosjmbgeBhFQr', fname='PXL_20210411_150641385.jpg')
+            >>> data0 = kwimage.imread(fpath, overview=0, backend='gdal')
+            >>> data1 = kwimage.imread(fpath, overview=1, backend='gdal')
+            >>> delayed_load = DelayedLoad(fpath=fpath)
+            >>> delayed_load._ensure_dsize()
+            >>> self = delayed_load.warp(kwimage.Affine.affine(scale=0.1), dsize='auto')
+            >>> transform = kwimage.Affine.affine(scale=2.0)
+            >>> imdata = self.finalize(transform=transform)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> kwplot.imshow(imdata)
         """
         # todo: needs to be extended for the case where the sub_data is a
         # nested chain of transforms.
@@ -1804,12 +1826,33 @@ class DelayedWarp(DelayedImageOperation):
             dsize = self.meta['dsize']
         transform = kwimage.Affine.coerce(transform) @ self.meta['transform']
         sub_data = self.sub_data
-        flag = getattr(sub_data, '__hack_dont_optimize__', False)
-        if flag:
+
+        # Errr, do we have to handle this here?
+        # This probably means that we are about to perform an IO or data
+        # generation operation. These are often more expensive than the
+        # transforms themselves, so if can do things like generate less data,
+        # or use IO overviews, we should do that and modify the transform.
+        probably_io = getattr(sub_data, '__hack_dont_optimize__', False)
+        if probably_io:
             subkw = ub.dict_diff(kwargs, {'as_xarray'})
+
+            # Auto overview support
+            AUTO_OVERVIEWS = 0
+            if AUTO_OVERVIEWS:
+                params = transform.decompose()
+                sx, sy = params['scale']
+                if sx < 1 and sy < 1:
+                    num_downs, residual_sx, residual_sy = kwimage.im_cv2._prepare_scale_residual(sx, sy, fudge=0)
+                    rest_warp = transform @ kwimage.Affine.scale((residual_sx, residual_sy))
+                    transform = rest_warp
+                subkw['overview'] = num_downs
+
             sub_data = sub_data.finalize(**subkw)
 
         if hasattr(sub_data, 'finalize'):
+            # This is not the final transform. Pass our transform down the
+            # pipeline to delay it as long as possible.
+
             # Branch finalize
             final = sub_data.finalize(transform=transform, dsize=dsize,
                                       interpolation=interpolation, **kwargs)
@@ -1826,6 +1869,9 @@ class DelayedWarp(DelayedImageOperation):
             sub_data_ = np.asarray(sub_data)
             M = np.asarray(transform)
             antialias = kwargs.get('antialias', True)
+
+            # TODO: Use overviews here.
+
             final = kwimage.warp_affine(sub_data_, M, dsize=dsize,
                                         interpolation=interpolation,
                                         antialias=antialias)
@@ -2016,7 +2062,8 @@ def _devcheck_corner():
     for leaf in self._optimize_paths():
         pass
 
-    tf_leaf_to_root = leaf['transform']
+    # tf_leaf_to_root = leaf['transform']
+    tf_leaf_to_root = leaf.meta['transform']
     tf_root_to_leaf = np.linalg.inv(tf_leaf_to_root)
 
     leaf_region_bounds = region_bounds.warp(tf_root_to_leaf)
@@ -2063,7 +2110,7 @@ def _devcheck_corner():
         import kwplot
         kwplot.autoplt()
 
-        lw, lh = leaf['sub_data_shape'][0:2]
+        lw, lh = leaf.sub_data.shape[0:2]
         leaf_box = kwimage.Boxes([[0, 0, lw, lh]], 'xywh')
         root_box = kwimage.Boxes([[0, 0, self.dsize[0], self.dsize[1]]], 'xywh')
 
@@ -2075,9 +2122,12 @@ def _devcheck_corner():
         leaf_box.draw(setlim=True, ax=ax2)
 
         region_bounds.draw(ax=ax1, color='green', alpha=.4)
+        root_crop_corners.draw(ax=ax1, color='purple', alpha=.4)
+        ax1.set_title('root')
+
         leaf_region_bounds.draw(ax=ax2, color='green', alpha=.4)
         leaf_crop_box.draw(ax=ax2, color='purple')
-        root_crop_corners.draw(ax=ax1, color='purple', alpha=.4)
+        ax2.set_title('leaf')
 
         new_w = region_box.to_xywh().data[0, 2]
         new_h = region_box.to_xywh().data[0, 3]

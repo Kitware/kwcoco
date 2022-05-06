@@ -2046,6 +2046,8 @@ class MixinCocoExtras(object):
                         'Image does not exist: {!r}'.format(new_gpath))
             return new_file_name
 
+        # from kwcoco.util import util_reroot
+
         if safe:
             gid_to_new = {}
             for gid, img in self.imgs.items():
@@ -5372,11 +5374,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             indent = len(indent)
         if indent is None:
             indent = 0
-        if isinstance(file, (str, os.PathLike)):
-            import safer
-            with safer.open(file, 'w', temp_file=temp_file) as fp:
-                self.dump(fp, indent=indent, newlines=newlines)
-        else:
+        try:
+            fpath = os.fspath(file)
+        except TypeError:
             if newlines:
                 file.write(self.dumps(indent=indent, newlines=newlines))
             else:
@@ -5388,6 +5388,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     raise
                 else:
                     self._state['was_saved'] = True
+        else:
+            import safer
+            with safer.open(fpath, 'w', temp_file=temp_file) as fp:
+                self.dump(fp, indent=indent, newlines=newlines)
 
     def _check_json_serializable(self, verbose=1):
         """

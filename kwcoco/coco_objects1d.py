@@ -56,9 +56,22 @@ class ObjectList1D(ub.NiceRepr):
     def __getitem__(self, index):
         return self._ids[index]
 
+    def unique(self):
+        """
+        Removes any duplicates entries in this object
+
+        Returns:
+            ObjectList1D
+        """
+        subids = list(ub.unique(self._ids))
+        newself = self.__class__(subids, self._dset)
+        return newself
+
     @property
     def objs(self):
         """
+        Get the underlying object dictionary for each object.
+
         Returns:
             List[ObjT]: all object dictionaries
         """

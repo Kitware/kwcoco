@@ -29,6 +29,7 @@ class CocoEvalCLI:
 
         Example:
             >>> # xdoctest: +REQUIRES(module:kwplot)
+            >>> from kwcoco.cli.coco_eval import *  # NOQA
             >>> import ubelt as ub
             >>> from kwcoco.cli.coco_eval import *  # NOQA
             >>> from os.path import join
@@ -50,7 +51,7 @@ class CocoEvalCLI:
             >>> CocoEvalCLI.main(
             >>>     true_dataset=true_dset.fpath,
             >>>     pred_dataset=pred_dset.fpath,
-            >>>     draw=draw)
+            >>>     draw=draw, out_dpath=dpath)
         """
         main(cmdline=True, **kw)
 

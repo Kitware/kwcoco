@@ -26,8 +26,12 @@ class CocoSplitCLI(object):
     def main(cls, cmdline=True, **kw):
         """
         Example:
+            >>> from kwcoco.cli.coco_split import *  # NOQA
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/cli/split').ensuredir()
             >>> kw = {'src': 'special:shapes8',
-            >>>       'dst1': 'train.json', 'dst2': 'test.json'}
+            >>>       'dst1': dpath / 'train.json',
+            >>>       'dst2': dpath / 'test.json'}
             >>> cmdline = False
             >>> cls = CocoSplitCLI
             >>> cls.main(cmdline, **kw)

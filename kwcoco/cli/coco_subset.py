@@ -12,7 +12,7 @@ class CocoSubsetCLI(object):
         """
         default = {
             'src': scfg.Value(None, help='input dataset path', position=1),
-            'dst': scfg.Value(None, help='output dataset path'),
+            'dst': scfg.Value(None, help='output dataset path', position=2),
             'include_categories': scfg.Value(
                 None, type=str, help=ub.paragraph(
                     '''
@@ -77,6 +77,13 @@ class CocoSubsetCLI(object):
 
             'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
 
+            'absolute': scfg.Value('auto', help=ub.paragraph(
+                '''
+                if True will reroot all paths to be absolute before writing. If
+                "auto", becomes True if the dest dataset is written outside of
+                the source bundle directory and copy_assets is False.
+                '''
+            ))
 
             # TODO: Add more filter criteria
             #
@@ -104,8 +111,12 @@ class CocoSubsetCLI(object):
     def main(cls, cmdline=True, **kw):
         """
         Example:
+            >>> from kwcoco.cli.coco_subset import *  # NOQA
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/cli/union').ensuredir()
             >>> kw = {'src': 'special:shapes8',
-            >>>       'dst': 'subset.json', 'include_categories': 'superstar'}
+            >>>       'dst': dpath / 'subset.json',
+            >>>       'include_categories': 'superstar'}
             >>> cmdline = False
             >>> cls = CocoSubsetCLI
             >>> cls.main(cmdline, **kw)
@@ -116,23 +127,38 @@ class CocoSubsetCLI(object):
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
         if config['src'] is None:
-            raise Exception('must specify source: {}'.format(config['src']))
+            raise Exception('must specify subset src: {}'.format(config['src']))
+
+        if config['dst'] is None:
+            raise Exception('must specify subset dst: {}'.format(config['dst']))
 
         print('reading fpath = {!r}'.format(config['src']))
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
+        if config['absolute'] == 'auto' and not config['copy_assets']:
+            dst_fpath = ub.Path(config['dst'])
+            src_fpath = ub.Path(dset.fpath)
+
+            src_bundle_dpath = src_fpath.absolute().parent
+            dst_bundle_dpath = dst_fpath.absolute().parent
+
+            # Destinations are different, we will need to force a reroot
+            absolute = (src_bundle_dpath.resolve() !=
+                        dst_bundle_dpath.resolve())
+        else:
+            absolute = config['absolute']
+
         new_dset = query_subset(dset, config)
-
-        new_dset.fpath = config['dst']
-        print('Writing new_dset.fpath = {!r}'.format(new_dset.fpath))
-
-        new_dset.fpath = new_dset.fpath
+        if absolute:
+            new_dset.reroot(absolute=absolute)
+        new_dset.fpath = dst_fpath
 
         if config['copy_assets']:
             # Create a copy of the data, (currently only works for relative
             # kwcoco files)
             from os.path import join, dirname
             import shutil
+            print('Copying assets')
             # new_dset.reroot(new_dset.bundle_dpath, old_prefix=dset.bundle_dpath)
             tocopy = []
             dstdirs = set()
@@ -159,9 +185,10 @@ class CocoSubsetCLI(object):
             for src, dst in tocopy:
                 pool.submit(shutil.copy2, src, dst)
 
-            for future in pool.as_completed():
+            for future in pool.as_completed(desc='copy assets'):
                 future.result()
 
+        print('Writing new_dset.fpath = {!r}'.format(new_dset.fpath))
         new_dset.dump(new_dset.fpath, newlines=True)
 
 
