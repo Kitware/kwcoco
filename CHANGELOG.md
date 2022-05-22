@@ -7,19 +7,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.32 - Unreleased
 
+### Fixed
+* Fix compatibility issue with datasets that do not contain an annotations list
 
 ## Version 0.2.31 - Released 2022-05-06
-
 
 ### Changed
 * kwcoco subset can now accept dst as the second positional argument
 
-
 ### Fixed
 * Fix issue in kwcoco subset where paths were invalid if written outside of
   the source kwcoco bundle.
-* Remove the gdal cache, which caused issues in read/write cases.
-
 
 ## Version 0.2.30 - Released 2022-04-19
 

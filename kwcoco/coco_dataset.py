@@ -2292,17 +2292,17 @@ class MixinCocoStats(object):
     @property
     def n_annots(self):
         """ The number of annotations in the dataset """
-        return len(self.dataset['annotations'])
+        return len(self.dataset.get('annotations', []))
 
     @property
     def n_images(self):
         """ The number of images in the dataset """
-        return len(self.dataset['images'])
+        return len(self.dataset.get('images', []))
 
     @property
     def n_cats(self):
         """ The number of categories in the dataset """
-        return len(self.dataset['categories'])
+        return len(self.dataset.get('categories', []))
 
     @property
     def n_videos(self):
@@ -2837,7 +2837,7 @@ class MixinCocoStats(object):
         if aids is not None:
             anns = ub.take(self.anns, aids)
         else:
-            anns = self.dataset['annotations']
+            anns = self.dataset.get('annotations', [])
 
         for ann in anns:
             if 'bbox' in ann:
