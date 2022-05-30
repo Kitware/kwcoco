@@ -149,7 +149,6 @@ class NormalizeTransformer(lark.Transformer):
 
     def fused(self, items):
         ret = Fused(list(ub.flatten(items)))
-        print(f'{ret=}')
         return ret
 
     def channel_rhs(self, items):
