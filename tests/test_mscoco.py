@@ -4,7 +4,7 @@ def grab_mscoco_annotations():
     """
     import ubelt as ub
     from kwcoco.util import util_archive
-    dpath = ub.Path.appdir('kwcoco/data/mscoco')
+    dpath = ub.Path.appdir('kwcoco/data/mscoco').ensuredir()
 
     mscoco_urls = {
         'trainval2017': 'http://images.cocodataset.org/annotations/annotations_trainval2017.zip',
