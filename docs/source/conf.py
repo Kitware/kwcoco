@@ -120,9 +120,6 @@ intersphinx_mapping = {
     # 'xxhash': ('https://pypi.org/project/xxhash/', None),
     # 'pygments': ('https://pygments.org/docs/', None),
     # 'tqdm': ('https://tqdm.github.io/', None),
-
-    'python': ('https://docs.python.org/3', None),
-    'click': ('https://click.palletsprojects.com/', None),
     # Requries that the repo have objects.inv
     'kwarray': ('https://kwarray.readthedocs.io/en/latest/', None),
     'kwimage': ('https://kwimage.readthedocs.io/en/latest/', None),
