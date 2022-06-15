@@ -2,8 +2,10 @@ from typing import List
 from typing import Union
 from typing import Iterable
 from typing import Any
+from typing import TypeVar
 import ubelt as ub
-from typing import Any
+
+ObjT = TypeVar('ObjT')
 
 
 class ObjectList1D(ub.NiceRepr):

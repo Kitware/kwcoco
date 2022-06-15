@@ -394,7 +394,7 @@ class DelayedImageOperation(DelayedVisionOperation):
             "output_dims" (specified in c-style shape) we specify dsize (w, h).
 
         Returns:
-            DelayedWarp : new delayed transform a chained transform
+            DelayedCrop : new delayed transform a chained transform
         """
         warped = DelayedWarp(self, transform=transform, dsize=dsize)
         return warped

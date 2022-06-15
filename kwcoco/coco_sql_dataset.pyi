@@ -6,8 +6,6 @@ from kwcoco.coco_dataset import MixinCocoAccessors, MixinCocoDraw, MixinCocoObje
 from kwcoco.util.dict_like import DictLike
 from typing import Any
 
-CocoBase: Incomplete
-
 
 class CocoBase:
     ...

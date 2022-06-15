@@ -210,6 +210,9 @@ if __name__ == '__main__':
                 'kwcoco = kwcoco.cli.__main__:main',
             ],
         },
+        package_data={
+            'kwcoco': ['py.typed', '*.pyi'],
+        },
         packages=find_packages('.'),
         python_requires='>=3.6',
         classifiers=[

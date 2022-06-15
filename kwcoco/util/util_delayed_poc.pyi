@@ -3,12 +3,10 @@ from typing import Union
 from typing import List
 from typing import Any
 import kwimage
-import kwimage
 import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
 from kwcoco import channel_spec
-from typing import Any
 
 profile: Incomplete
 
@@ -43,15 +41,15 @@ class DelayedVideoOperation(DelayedVisionOperation):
 
 class DelayedImageOperation(DelayedVisionOperation):
 
-    def delayed_crop(self, region_slices: Tuple[slice, slice]) -> DelayedCrop:
+    def delayed_crop(self, region_slices: Tuple[slice, slice]) -> 'DelayedCrop':
         ...
 
     def delayed_warp(self,
                      transform,
-                     dsize: Incomplete | None = ...) -> DelayedWarp:
+                     dsize: Incomplete | None = ...) -> 'DelayedWarp':
         ...
 
-    def take_channels(self, channels) -> None:
+    def take_channels(self, channels) -> DelayedVisionOperation:
         ...
 
 
@@ -156,7 +154,7 @@ class DelayedLoad(DelayedImageOperation):
     def coerce(cls, data) -> None:
         ...
 
-    def children(self) -> None:
+    def children(self) -> Generator[Any, None, None]:
         ...
 
     def nesting(self):
@@ -188,12 +186,12 @@ class DelayedLoad(DelayedImageOperation):
     def finalize(self, **kwargs):
         ...
 
-    def delayed_crop(self, region_slices: Tuple[slice, slice]) -> DelayedLoad:
+    def delayed_crop(self, region_slices: Tuple[slice, slice]) -> 'DelayedCrop':
         ...
 
     def take_channels(
         self, channels: Union[List[int], slice, channel_spec.FusedChannelSpec]
-    ) -> DelayedLoad:
+    ) -> 'DelayedLoad':
         ...
 
 
@@ -207,7 +205,7 @@ class DelayedFrameConcat(DelayedVideoOperation):
     def __init__(self, frames, dsize: Incomplete | None = ...) -> None:
         ...
 
-    def children(self) -> None:
+    def children(self) -> Generator[Any, None, None]:
         ...
 
     @property
@@ -221,12 +219,12 @@ class DelayedFrameConcat(DelayedVideoOperation):
     def finalize(self, **kwargs):
         ...
 
-    def delayed_crop(self, region_slices):
+    def delayed_crop(self, region_slices) -> 'DelayedCrop':
         ...
 
     def delayed_warp(self,
                      transform,
-                     dsize: Incomplete | None = ...) -> DelayedWarp:
+                     dsize: Incomplete | None = ...) -> 'DelayedWarp':
         ...
 
 
@@ -239,7 +237,7 @@ class DelayedChannelConcat(DelayedImageOperation):
     def __init__(self, components, dsize: Incomplete | None = ...) -> None:
         ...
 
-    def children(self) -> None:
+    def children(self) -> Generator[Any, None, None]:
         ...
 
     @classmethod
@@ -259,7 +257,7 @@ class DelayedChannelConcat(DelayedImageOperation):
 
     def delayed_warp(self,
                      transform,
-                     dsize: Incomplete | None = ...) -> DelayedWarp:
+                     dsize: Incomplete | None = ...) -> 'DelayedWarp':
         ...
 
     comp: Incomplete

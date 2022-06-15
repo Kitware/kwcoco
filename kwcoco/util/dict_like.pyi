@@ -1,5 +1,7 @@
 import ubelt as ub
+from typing import Any
 from _typeshed import Incomplete
+from collections.abc import Generator
 
 
 class DictLike(ub.NiceRepr):
@@ -13,7 +15,7 @@ class DictLike(ub.NiceRepr):
     def delitem(self, key) -> None:
         ...
 
-    def keys(self) -> None:
+    def keys(self) -> Generator[Any, None, None]:
         ...
 
     def __len__(self):
