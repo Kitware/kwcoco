@@ -10,11 +10,11 @@ networkx >= 2.2.0, <= 2.4.0  ; python_version < '3.7.0' and python_version >= '3
 numpy>=1.21.6    ;                            python_version >= '3.10'    # Python 3.10+
 numpy>=1.19.3    ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
 numpy>=1.19.2    ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
-numpy>=1.15.4    ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
-numpy>=1.13.3    ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
-numpy>=1.11.1    ; python_version < '3.6' and python_version >= '3.5'    # Python 3.5
-numpy>=1.11.1    ; python_version < '3.5' and python_version >= '3.4'    # Python 3.4
-numpy>=1.11.1    ; python_version < '3.4' and python_version >= '2.7'    # Python 2.7
+numpy>=1.19.2    ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
+numpy>=1.19.2    ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
+numpy>=1.16.0    ; python_version < '3.6' and python_version >= '3.5'    # Python 3.5
+numpy>=1.15.0    ; python_version < '3.5' and python_version >= '3.4'    # Python 3.4
+numpy>=1.16.0    ; python_version < '3.4' and python_version >= '2.7'    # Python 2.7
 
 #numpy >= 1.20.0
 
