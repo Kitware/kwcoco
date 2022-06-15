@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.2.32 - Unreleased
 
+### Added
+* Initial non-experimental version of SensorChanSpec with limited functionality
+
 ### Fixed
 * Fix compatibility issue with datasets that do not contain an annotations list
 

@@ -278,6 +278,7 @@ __submodules__ = {
 __lazy_submodules__ = {
     # TODO: always lazy submodules
     'coco_sql_dataset': ['CocoSqlDatabase'],
+    'sensorchan_spec': ['SensorChanSpec'],
 }
 
 from kwcoco import abstract_coco_dataset
