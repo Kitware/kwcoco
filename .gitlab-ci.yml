@@ -140,7 +140,7 @@ stages:
     before_script:
         - *_setup_virtualenv_template
         - pip install .[tests,headless]
-        - pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U
+        - pip install GDAL==3.3.3 --find-links https://girder.github.io/large_image_wheels -U
 
 
 .test_full_loose_template: &test_full_loose_template
@@ -151,7 +151,7 @@ stages:
     before_script:
         - *_setup_virtualenv_template
         - pip install .[all,headless]  
-        - pip install GDAL>=3.3.1 --find-links https://girder.github.io/large_image_wheels -U
+        - pip install GDAL>=3.3.3 --find-links https://girder.github.io/large_image_wheels -U
 
 
 
