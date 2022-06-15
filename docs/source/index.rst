@@ -24,7 +24,8 @@ For notes about warping and spaces see :doc:`warping_and_spaces <warping_and_spa
    :show-inheritance:
 
 
-
 .. toctree::
-   :titlesonly:
-   kwcoco
+   :maxdepth: 8
+   :caption: Package Layout
+
+   modules

@@ -2488,7 +2488,7 @@ class MixinCocoStats(object):
 
         Corresponds to the ``kwcoco validate`` CLI tool.
 
-        KWArgs:
+        Args:
             **config :
                 schema (default=True): validates the json-schema
                 unique (default=True): validates unique secondary keys
@@ -2507,7 +2507,7 @@ class MixinCocoStats(object):
                     if>1, paths must be inside bundle root.
 
         Returns:
-            dict: result containing keys:
+            dict: result containing keys -
                 status (bool): False if any errors occurred
                 errors (List[str]): list of all error messages
                 missing (List): List of any missing images
