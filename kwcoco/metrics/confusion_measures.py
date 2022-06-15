@@ -244,7 +244,7 @@ class Measures(ub.NiceRepr, DictProxy):
                 Force this many threshold bins.
 
         Returns:
-            Measures
+            kwcoco.metrics.confusion_measures.Measures
 
         Example:
             >>> from kwcoco.metrics.confusion_measures import *  # NOQA

@@ -113,9 +113,9 @@ class DetectionMetrics(ub.NiceRepr):
         Register/Add predicted detections for an image
 
         Args:
-            pred_dets (Detections): predicted detections
+            pred_dets (kwimage.Detections): predicted detections
             imgname (str): a unique string to identify the image
-            gid (int, optional): the integer image id if known
+            gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
         dmet.gid_to_pred_dets[gid] = pred_dets
@@ -125,9 +125,9 @@ class DetectionMetrics(ub.NiceRepr):
         Register/Add groundtruth detections for an image
 
         Args:
-            true_dets (Detections): groundtruth
+            true_dets (kwimage.Detections): groundtruth
             imgname (str): a unique string to identify the image
-            gid (int, optional): the integer image id if known
+            gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
         dmet.gid_to_true_dets[gid] = true_dets
@@ -179,7 +179,7 @@ class DetectionMetrics(ub.NiceRepr):
                 preferred over descendents of the true class, over unreleated
                 classes.
 
-            ignore_classes (set, default={'ignore'}):
+            ignore_classes (set | str, default={'ignore'}):
                 class names indicating ignore regions
 
             background_class (str, default=ub.NoParam):
@@ -187,7 +187,7 @@ class DetectionMetrics(ub.NiceRepr):
                 determine it with heuristics. A value of None means there is no
                 background class.
 
-            verbose (int, default='auto'): verbosity flag. In auto mode,
+            verbose (int | str, default='auto'): verbosity flag. In auto mode,
                 verbose=1 if len(gids) > 1000.
 
             workers (int, default=0):

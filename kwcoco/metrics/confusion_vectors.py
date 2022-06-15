@@ -368,7 +368,7 @@ class ConfusionVectors(ub.NiceRepr):
                      mode=1,
                      keyby='name',
                      ignore_classes={'ignore'},
-                     approx=0):
+                     approx=False):
         """
         Transforms cfsn_vecs into one-vs-rest BinaryConfusionVectors for each
         category.
@@ -732,9 +732,9 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
         Args:
             n (int): number of rows
-            p_true (int): fraction of real positive cases
-            p_error (int): probability of making a recoverable mistake
-            p_miss (int): probability of making a unrecoverable mistake
+            p_true (float): fraction of real positive cases
+            p_error (float): probability of making a recoverable mistake
+            p_miss (float): probability of making a unrecoverable mistake
             rng (int | RandomState): random seed / state
 
         Returns:

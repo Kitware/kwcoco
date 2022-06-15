@@ -36,6 +36,10 @@ class DictLike(ub.NiceRepr):
         raise NotImplementedError('abstract delitem function')
 
     def keys(self):
+        """
+        Returns:
+            Generator[Any, None, None]
+        """
         raise NotImplementedError('abstract keys function')
 
     # def __repr__(self):

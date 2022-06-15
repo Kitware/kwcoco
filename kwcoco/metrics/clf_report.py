@@ -407,13 +407,13 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     One-vs-rest classification report
 
     Args:
-        mc_y_true (ndarray[int]): multiclass truth labels (integer label
+        mc_y_true (ndarray[Any, Int]): multiclass truth labels (integer label
             format). Shape [N].
 
         mc_probs (ndarray): multiclass probabilities for each class.
             Shape [N x C].
 
-        target_names (Dict[int, str] : mapping from int label to string name
+        target_names (Dict[int, str]): mapping from int label to string name
 
         sample_weight (ndarray): weight for each item. Shape [N].
 

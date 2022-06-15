@@ -548,7 +548,7 @@ class CocoImage(ub.NiceRepr):
         Args:
             gid (int): image id to load
 
-            channels (FusedChannelSpec): specific channels to load.
+            channels (kwcoco.FusedChannelSpec): specific channels to load.
                 if unspecified, all channels are loaded.
 
             space (str):

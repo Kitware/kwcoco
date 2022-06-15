@@ -229,6 +229,9 @@ class DelayedVisionOperation(ub.NiceRepr):
         """
         Abstract method, which should generate all of the direct children of a
         node in the operation tree.
+
+        Yields:
+            DelayedVisionOperation:
         """
         raise NotImplementedError
 
@@ -300,7 +303,7 @@ class DelayedImageOperation(DelayedVisionOperation):
             in the middle.
 
         Returns:
-            DelayedWarp: lazy executed delayed transform
+            DelayedCrop: lazy executed delayed transform
 
         Example:
             >>> dsize = (100, 100)
@@ -397,6 +400,10 @@ class DelayedImageOperation(DelayedVisionOperation):
         return warped
 
     def take_channels(self, channels):
+        """
+        Returns:
+            DelayedVisionOperation
+        """
         raise NotImplementedError
 
 
@@ -486,6 +493,10 @@ class DelayedIdentity(DelayedImageOperation):
         return self
 
     def children(self):
+        """
+        Yields:
+            Any
+        """
         yield from []
 
     # def delayed_crop(self, region_slices):
@@ -507,6 +518,10 @@ class DelayedIdentity(DelayedImageOperation):
         return final
 
     def take_channels(self, channels):
+        """
+        Returns:
+            DelayedIdentity
+        """
         if not isinstance(self.sub_data, np.ndarray):
             return super().take_channels(channels)
 
@@ -616,6 +631,10 @@ class DelayedNans(DelayedImageOperation):
         return self.meta.get('channels', None)
 
     def children(self):
+        """
+        Yields:
+            Any
+        """
         yield from []
 
     def _optimize_paths(self, **kwargs):
@@ -759,6 +778,10 @@ class DelayedLoad(DelayedImageOperation):
         raise NotImplementedError
 
     def children(self):
+        """
+        Yields:
+            Any
+        """
         yield from []
 
     def nesting(self):
@@ -1137,6 +1160,10 @@ class DelayedFrameConcat(DelayedVideoOperation):
         }
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         yield from self.frames
 
     @property
@@ -1317,6 +1344,10 @@ class DelayedChannelConcat(DelayedImageOperation):
         }
 
     def children(self):
+        """
+        Yields:
+            Any
+        """
         yield from self.components
 
     @classmethod
@@ -1561,7 +1592,7 @@ class DelayedWarp(DelayedImageOperation):
         sub_data (DelayedWarp | ArrayLike):
             array-like image data at a naitive resolution
 
-        transform (Transform):
+        transform (kwimage.Transform):
             transforms data from native "sub"-image-space to
             "self"-image-space.
 
@@ -1689,6 +1720,10 @@ class DelayedWarp(DelayedImageOperation):
             return None
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         yield self.sub_data
 
     @property
@@ -1745,7 +1780,7 @@ class DelayedWarp(DelayedImageOperation):
         Can pass a parent transform to augment this underlying transform.
 
         Args:
-            transform (Transform): an additional transform to perform
+            transform (kwimage.Transform): an additional transform to perform
             dsize (Tuple[int, int]): overrides destination canvas size
 
         Example:
@@ -1949,6 +1984,10 @@ class DelayedCrop(DelayedImageOperation):
             return None
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         yield self.sub_data
 
     @profile

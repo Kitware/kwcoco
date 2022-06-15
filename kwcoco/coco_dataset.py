@@ -1,5 +1,5 @@
 """
-An implementation and extension of the original MS-COCO API [1]_.
+An implementation and extension of the original MS-COCO API [CocoFormat]_.
 
 Extends the format to also include line annotations.
 
@@ -149,9 +149,9 @@ An informal spec is as follows:
 
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
-        encoding. We reuse the original C functions are in [2]_ in
-        ``kwimage.structs.Mask`` to provide a convinient way to abstract this
-        rather esoteric bytes encoding.
+        encoding. We reuse the original C functions are in [PyCocoToolsMask]_
+        in ``kwimage.structs.Mask`` to provide a convinient way to abstract
+        this rather esoteric bytes encoding.
 
         For pure python implementations see kwimage:
             Converting from an image to RLE can be done via kwimage.run_length_encoding
@@ -307,10 +307,9 @@ TODO:
 
 
 References:
-    .. [1] http://cocodataset.org/#format-data
-    .. [2] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
-    .. [3] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
-
+    .. [CocoFormat] http://cocodataset.org/#format-data
+    .. [PyCocoToolsMask] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
+    .. [CocoTutorial] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
 """
 import copy
 import itertools as it
@@ -390,7 +389,7 @@ class MixinCocoAccessors(object):
         Args:
             gid (int): image id to load
 
-            channels (FusedChannelSpec): specific channels to load.
+            channels (kwcoco.FusedChannelSpec): specific channels to load.
                 if unspecified, all channels are loaded.
 
             space (str):
@@ -458,7 +457,7 @@ class MixinCocoAccessors(object):
         Reads an image from disk and
 
         Args:
-            gid_or_img (int or dict): image id or image dict
+            gid_or_img (int | dict): image id or image dict
             channels (str | None): if specified, load data from auxiliary
                 channels instead
 
@@ -485,7 +484,7 @@ class MixinCocoAccessors(object):
         Returns the full path to the image
 
         Args:
-            gid_or_img (int or dict): image id or image dict
+            gid_or_img (int | dict): image id or image dict
             channels (str, default=None): if specified, return a path to data
                 containing auxiliary channels instead
 
@@ -543,7 +542,7 @@ class MixinCocoAccessors(object):
         Maybe depricate?
 
         Args:
-            aid_or_int (int or dict): annot id or dict
+            aid_or_int (int | dict): annot id or dict
             image (ArrayLike, default=None): preloaded image
                 (note: this process is inefficient unless image is specified)
 
@@ -904,7 +903,8 @@ class MixinCocoAccessors(object):
         Uses new-style if possible, otherwise this falls back on old-style.
 
         Returns:
-            List[str]: names: list of keypoint category names
+            List[str]:
+                names - list of keypoint category names
 
         Example:
             >>> self = CocoDataset.demo()
@@ -1739,7 +1739,7 @@ class MixinCocoExtras(object):
         Rename categories with a potentially coarser categorization.
 
         Args:
-            mapper (dict or Function): maps old names to new names.
+            mapper (dict | Callable): maps old names to new names.
                 If multiple names are mapped to the same category, those
                 categories will be merged.
 
@@ -2154,7 +2154,7 @@ class MixinCocoObjects(object):
                  mutually exclusive with other arguments.
 
         Returns:
-            Annots: vectorized annotation object
+            kwcoco.coco_objects1d.Annots: vectorized annotation object
 
         Example:
             >>> import kwcoco
@@ -2198,7 +2198,7 @@ class MixinCocoObjects(object):
                 lookup images by their names.
 
         Returns:
-            Images: vectorized image object
+            kwcoco.coco_objects1d.Images: vectorized image object
 
         Example:
             >>> import kwcoco
@@ -2234,7 +2234,7 @@ class MixinCocoObjects(object):
                  all categories are returned.
 
         Returns:
-            Categories: vectorized category object
+            kwcoco.coco_objects1d.Categories: vectorized category object
 
         Example:
             >>> import kwcoco
@@ -2259,7 +2259,7 @@ class MixinCocoObjects(object):
                 lookup videos by their name.
 
         Returns:
-            Videos: vectorized video object
+            kwcoco.coco_objects1d.Videos: vectorized video object
 
         TODO:
             - [ ] This conflicts with what should be the property that
@@ -2801,20 +2801,26 @@ class MixinCocoStats(object):
 
         Args:
             anchors (int): if specified also computes box anchors
-                via
-                KMeans clustering
+                via KMeans clustering
+
             perclass (bool): if True also computes stats for each category
+
             gids (List[int], default=None):
                 if specified only compute stats for these image ids.
+
             aids (List[int], default=None):
                 if specified only compute stats for these annotation ids.
+
             verbose (int): verbosity level
-            clusterkw (dict): kwargs for :class:`sklearn.cluster.KMeans` used
+
+            clusterkw (dict):
+                kwargs for :class:`sklearn.cluster.KMeans` used
                 if computing anchors.
+
             statskw (dict): kwargs for :func:`kwarray.stats_dict`
 
         Returns:
-            Dict[str, Dict[str, Dict | ndarray]:
+            Dict[str, Dict[str, Dict | ndarray]]:
                 Stats are returned in width-height format.
 
         Example:
@@ -2996,7 +3002,7 @@ class MixinCocoDraw(object):
 
         Args:
             gid (int): image id to draw
-            channels (ChannelSpec): the channel to draw on
+            channels (kwcoco.ChannelSpec): the channel to draw on
 
         Returns:
             ndarray: canvas
@@ -3360,7 +3366,7 @@ class MixinCocoAddRemove(object):
 
         Args:
             name (str): Unique name for this video.
-            id (None or int): ADVANCED. Force using this image id.
+            id (None | int): ADVANCED. Force using this image id.
             **kw : stores arbitrary key/value pairs in this new video
 
         Returns:
@@ -3410,7 +3416,7 @@ class MixinCocoAddRemove(object):
             file_name (str | None): relative or absolute path to image.
                  if not given, then "name" must be specified and we will
                  exepect that "auxiliary" assets are eventually added.
-            id (None or int): ADVANCED. Force using this image id.
+            id (None | int): ADVANCED. Force using this image id.
             name (str): a unique key to identify this image
             width (int): base width of the image
             height (int): base height of the image
@@ -3500,12 +3506,14 @@ class MixinCocoAddRemove(object):
 
             bbox (list | kwimage.Boxes): bounding box in xywh format
 
-            segmentation (MaskLike | MultiPolygonLike): keypoints in some
+            segmentation (Dict | List | Any): keypoints in some
                 accepted format, see :func:`kwimage.Mask.to_coco` and
                 :func:`kwimage.MultiPolygon.to_coco`.
+                Extended types: `MaskLike | MultiPolygonLike`.
 
-            keypoints (KeypointsLike): keypoints in some accepted
+            keypoints (Any): keypoints in some accepted
                 format, see :func:`kwimage.Keypoints.to_coco`.
+                Extended types: `KeypointsLike`.
 
             id (None | int): Force using this annotation id. Typically you
                 should NOT specify this. A new unused id will be chosen and
@@ -3656,8 +3664,8 @@ class MixinCocoAddRemove(object):
 
         Args:
             name (str): name of the new category
-            supercategory (str, optional): parent of this category
-            id (int, optional): use this category id, if it was not taken
+            supercategory (str | None): parent of this category
+            id (int | None): use this category id, if it was not taken
             **kw : stores arbitrary key/value pairs in this new image
 
         Returns:
@@ -3711,7 +3719,7 @@ class MixinCocoAddRemove(object):
 
         Args:
             file_name (str): relative or absolute path to image
-            id (None or int): ADVANCED. Force using this image id.
+            id (None | int): ADVANCED. Force using this image id.
             **kw : stores arbitrary key/value pairs in this new image
 
         Returns:
@@ -4549,7 +4557,7 @@ class CocoIndex(object):
         Build all id-to-obj reverse indexes from scratch.
 
         Args:
-            parent (CocoDataset): the dataset to index
+            parent (kwcoco.CocoDataset): the dataset to index
 
         Notation:
             aid - Annotation ID
@@ -5332,7 +5340,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         Writes the dataset out to the json format
 
         Args:
-            file (PathLike | FileLike):
+            file (PathLike | IO):
                 Where to write the data.  Can either be a path to a file or an
                 open file pointer / stream.
 
@@ -5539,7 +5547,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             **kwargs : constructor options for the new merged CocoDataset
 
         Returns:
-            CocoDataset: a new merged coco dataset
+            kwcoco.CocoDataset: a new merged coco dataset
 
         CommandLine:
             xdoctest -m kwcoco.coco_dataset CocoDataset.union
