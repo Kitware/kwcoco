@@ -208,7 +208,7 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'UBeltdoc'
+htmlhelp_basename = 'kwcocodoc'
 
 
 # -- Options for LaTeX output ------------------------------------------------
