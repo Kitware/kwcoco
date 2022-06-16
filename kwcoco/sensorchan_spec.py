@@ -94,6 +94,7 @@ class SensorChanSpec(ub.NiceRepr):
 
     Example:
         >>> # Check with generic sensors
+        >>> # xdoctest: +REQUIRES(module:lark)
         >>> from kwcoco.sensorchan_spec import SensorChanSpec
         >>> import kwcoco
         >>> self = SensorChanSpec('(*):BGR,*:BGR,*:nir,*:land.0:4')
@@ -104,7 +105,6 @@ class SensorChanSpec(ub.NiceRepr):
         >>> print(s2)
         <SensorChanSpec(*:BGR,*:BGR,*:nir,*:land.0|land.1|land.2|land.3)>
         <SensorChanSpec((*,*):BGR,*:(nir,land:4))>
-
         >>> import kwcoco
         >>> c = kwcoco.ChannelSpec.coerce('BGR,BGR,nir,land.0:8')
         >>> c1 = c.normalize()
@@ -127,6 +127,7 @@ class SensorChanSpec(ub.NiceRepr):
             SensorChanSpec
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:lark)
             >>> from kwcoco.sensorchan_spec import *  # NOQA
             >>> from kwcoco.sensorchan_spec import SensorChanSpec
             >>> data = SensorChanSpec.coerce(3)

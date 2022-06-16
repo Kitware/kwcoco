@@ -3,6 +3,7 @@ kwarray >= 0.6.0
 kwimage >= 0.8.6
 
 # python ~/local/tools/supported_python_versions_pip.py networkx --request_min=2.2.0
+# python ~/local/tools/supported_python_versions_pip.py imageio
 networkx>=2.7           ;                            python_version >= '3.8'    # Python 3.8+
 networkx>=2.6.2         ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
 networkx>=2.2.0,<=2.5.1 ; python_version < '3.7.0' and python_version >= '3.6.0'   # Python 3.6
