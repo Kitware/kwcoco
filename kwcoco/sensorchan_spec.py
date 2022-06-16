@@ -8,6 +8,12 @@ import ubelt as ub
 import itertools as it
 import functools
 
+
+try:
+    cache = functools.cache
+except AttributeError:
+    cache = ub.memoize
+
 try:
     from lark import Transformer
 except ImportError:
@@ -355,7 +361,7 @@ class SensorChanTransformer(Transformer):
         return parts
 
 
-@functools.cache
+@cache
 def _global_sensor_chan_parser():
     # https://github.com/lark-parser/lark/blob/master/docs/_static/lark_cheatsheet.pdf
     import lark
@@ -367,7 +373,7 @@ def _global_sensor_chan_parser():
     return sensor_channel_parser
 
 
-@functools.cache
+@cache
 def normalize_sensor_chan(spec):
     """
     Example:
@@ -389,7 +395,7 @@ def normalize_sensor_chan(spec):
     return new_spec
 
 
-@functools.cache
+@cache
 def concise_sensor_chan(spec):
     """
     Example:
@@ -410,7 +416,7 @@ def concise_sensor_chan(spec):
     return new_spec
 
 
-# @functools.cache
+# @cache
 def sensorchan_concise_parts(spec):
     """
     Ignore:
