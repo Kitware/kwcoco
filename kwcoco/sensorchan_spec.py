@@ -73,8 +73,8 @@ class SensorChanSpec(ub.NiceRepr):
 
     Example:
         >>> # xdoctest: +REQUIRES(module:lark)
-        >>> import kwcoco
-        >>> self = kwcoco.SensorChanSpec('(L8,S2):BGR,WV:BGR,S2:nir,L8:land.0:4')
+        >>> from kwcoco.sensorchan_spec import SensorChanSpec
+        >>> self = SensorChanSpec('(L8,S2):BGR,WV:BGR,S2:nir,L8:land.0:4')
         >>> s1 = self.normalize()
         >>> s2 = self.concise()
         >>> streams = self.streams()
@@ -94,8 +94,9 @@ class SensorChanSpec(ub.NiceRepr):
 
     Example:
         >>> # Check with generic sensors
+        >>> from kwcoco.sensorchan_spec import SensorChanSpec
         >>> import kwcoco
-        >>> self = kwcoco.SensorChanSpec('(*):BGR,*:BGR,*:nir,*:land.0:4')
+        >>> self = SensorChanSpec('(*):BGR,*:BGR,*:nir,*:land.0:4')
         >>> self.concise().normalize()
         >>> s1 = self.normalize()
         >>> s2 = self.concise()
@@ -127,6 +128,7 @@ class SensorChanSpec(ub.NiceRepr):
 
         Example:
             >>> from kwcoco.sensorchan_spec import *  # NOQA
+            >>> from kwcoco.sensorchan_spec import SensorChanSpec
             >>> data = SensorChanSpec.coerce(3)
             >>> assert SensorChanSpec.coerce(data).normalize().spec == '*:u0|u1|u2'
             >>> data = SensorChanSpec.coerce(3)
@@ -196,8 +198,8 @@ class FusedChanNode:
     Example:
         s = FusedChanNode('a|b|c.0|c.1|c.2')
         c = s.concise()
-        print(f's={s}')
-        print(f'c={c}')
+        print(s)
+        print(c)
     """
     def __init__(self, chan):
         import kwcoco

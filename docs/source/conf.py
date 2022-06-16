@@ -27,6 +27,25 @@ Notes:
         ensure your github account is connected to readthedocs
         https://readthedocs.org/accounts/social/connections/
 
+        ### For gitlab
+
+        The user will need to enable the repo on their readthedocs account:
+        https://readthedocs.org/dashboard/import/manual/?
+
+        To enable the read-the-docs go to https://readthedocs.org/dashboard/ and login
+
+        Make sure you have a .readthedocs.yml file
+
+        Click import project: (for github you can select, but gitlab you need to import manually)
+            Set the Repository NAME: $REPO_NAME
+            Set the Repository URL: $REPO_URL
+
+        For gitlab you also need to setup an integrations and add gitlab
+        incoming webhook Then go to $REPO_URL/hooks and add the URL
+
+        Will also need to activate the main branch:
+            https://readthedocs.org/projects/kwcoco/versions/
+
 """
 #
 # Configuration file for the Sphinx documentation builder.
