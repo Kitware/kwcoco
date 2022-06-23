@@ -163,14 +163,14 @@ setup_package_environs_github_pyutils(){
 upload_github_secrets(){
     load_secrets
     unset GITHUB_TOKEN
-    gh auth login
+    #printf "%s" "$GITHUB_TOKEN" | gh auth login --hostname Github.com --with-token 
+    gh auth login 
     source dev/secrets_configuration.sh
     gh secret set "$VARNAME_CI_SECRET" -b"${!VARNAME_CI_SECRET}"
     gh secret set "$VARNAME_TWINE_USERNAME" -b"${!VARNAME_TWINE_USERNAME}"
     gh secret set "$VARNAME_TWINE_PASSWORD" -b"${!VARNAME_TWINE_PASSWORD}"
     gh secret set "$VARNAME_TEST_TWINE_PASSWORD" -b"${!VARNAME_TEST_TWINE_PASSWORD}"
     gh secret set "$VARNAME_TEST_TWINE_USERNAME" -b"${!VARNAME_TEST_TWINE_USERNAME}"
-
 }
 
 
@@ -386,6 +386,11 @@ export_encrypted_code_signing_keys(){
     git add dev/gpg_owner_trust
     git add dev/public_gpg_key
 }
+
+
+# See the xcookie module gitlab python API
+#gitlab_set_protected_branches(){
+#}
 
 
 _test_gnu(){

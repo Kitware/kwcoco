@@ -1,11 +1,11 @@
 from typing import List
 from typing import Union
 from typing import Iterable
+from typing import Dict
 from typing import Any
-from typing import TypeVar
+import kwimage
 import ubelt as ub
-
-ObjT = TypeVar('ObjT')
+from typing import Any
 
 
 class ObjectList1D(ub.NiceRepr):
@@ -25,17 +25,17 @@ class ObjectList1D(ub.NiceRepr):
     def __getitem__(self, index):
         ...
 
-    def unique(self):
+    def unique(self) -> ObjectList1D:
         ...
 
     @property
     def objs(self) -> List[ObjT]:
         ...
 
-    def take(self, idxs):
+    def take(self, idxs) -> ObjectList1D:
         ...
 
-    def compress(self, flags):
+    def compress(self, flags) -> ObjectList1D:
         ...
 
     def peek(self) -> ObjT:
@@ -44,16 +44,19 @@ class ObjectList1D(ub.NiceRepr):
     def lookup(self,
                key: Union[str, Iterable],
                default=...,
-               keepid: bool = ...):
+               keepid: bool = ...) -> Dict[str, ObjT]:
         ...
 
-    def get(self, key: str, default=..., keepid: bool = ...):
+    def get(self,
+            key: str,
+            default=...,
+            keepid: bool = ...) -> Dict[str, ObjT]:
         ...
 
     def set(self, key: str, values: Union[Iterable, Any]) -> None:
         ...
 
-    def attribute_frequency(self):
+    def attribute_frequency(self) -> Dict[str, int]:
         ...
 
 
@@ -160,7 +163,7 @@ class Annots(ObjectList1D):
         ...
 
     @property
-    def images(self):
+    def images(self) -> Images:
         ...
 
     @property
@@ -176,11 +179,11 @@ class Annots(ObjectList1D):
         ...
 
     @property
-    def cids(self):
+    def cids(self) -> List[int]:
         ...
 
     @property
-    def cnames(self):
+    def cnames(self) -> List[int]:
         ...
 
     @cnames.setter
@@ -188,7 +191,7 @@ class Annots(ObjectList1D):
         ...
 
     @property
-    def detections(self):
+    def detections(self) -> kwimage.Detections:
         ...
 
     @property

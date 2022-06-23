@@ -1,4 +1,5 @@
 from typing import Union
+from typing import List
 from typing import Dict
 from torch import Tensor
 import abc
@@ -12,20 +13,22 @@ class BaseChannelSpec(ub.NiceRepr):
 
     @property
     @abc.abstractmethod
-    def spec(self):
+    def spec(self) -> str:
         ...
 
     @classmethod
     @abc.abstractmethod
-    def coerce(cls, data: Union[str, int, list, dict, BaseChannelSpec]):
+    def coerce(
+            cls, data: Union[str, int, list, dict,
+                             BaseChannelSpec]) -> BaseChannelSpec:
         ...
 
     @abc.abstractmethod
-    def streams(self):
+    def streams(self) -> List[FusedChannelSpec]:
         ...
 
     @abc.abstractmethod
-    def normalize(self):
+    def normalize(self) -> BaseChannelSpec:
         ...
 
     @abc.abstractmethod
@@ -106,7 +109,7 @@ class FusedChannelSpec(BaseChannelSpec):
     def numel(self):
         ...
 
-    def sizes(self):
+    def sizes(self) -> List[int]:
         ...
 
     def __contains__(self, key):
@@ -176,7 +179,7 @@ class ChannelSpec(BaseChannelSpec):
         ...
 
     @classmethod
-    def coerce(cls, data):
+    def coerce(cls, data) -> ChannelSpec:
         ...
 
     def parse(self):
@@ -197,7 +200,7 @@ class ChannelSpec(BaseChannelSpec):
     def items(self):
         ...
 
-    def fuse(self):
+    def fuse(self) -> FusedChannelSpec:
         ...
 
     def streams(self):
@@ -246,7 +249,7 @@ class ChannelSpec(BaseChannelSpec):
         ...
 
 
-def subsequence_index(oset1, oset2):
+def subsequence_index(oset1, oset2) -> None | slice:
     ...
 
 

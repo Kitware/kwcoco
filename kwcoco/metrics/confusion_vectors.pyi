@@ -26,7 +26,7 @@ class ConfusionVectors(ub.NiceRepr):
         ...
 
     @classmethod
-    def demo(cfsn_vecs, **kw):
+    def demo(cfsn_vecs, **kw) -> ConfusionVectors:
         ...
 
     @classmethod
@@ -42,11 +42,13 @@ class ConfusionVectors(ub.NiceRepr):
     def confusion_matrix(cfsn_vecs, compress: bool = False) -> pd.DataFrame:
         ...
 
-    def coarsen(cfsn_vecs, cxs):
+    def coarsen(cfsn_vecs, cxs) -> ConfusionVectors:
         ...
 
-    def binarize_classless(cfsn_vecs,
-                           negative_classes: List[Union[str, int]] = None):
+    def binarize_classless(
+        cfsn_vecs,
+        negative_classes: List[Union[str,
+                                     int]] = None) -> BinaryConfusionVectors:
         ...
 
     def binarize_ovr(cfsn_vecs,
@@ -71,7 +73,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         ...
 
     @classmethod
-    def demo(cls):
+    def demo(cls) -> ConfusionVectors:
         ...
 
     def keys(self):
@@ -108,7 +110,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
              p_true: float = 0.5,
              p_error: float = 0.2,
              p_miss: float = 0.0,
-             rng: Union[int, RandomState] = None):
+             rng: Union[int, RandomState] = None) -> BinaryConfusionVectors:
         ...
 
     @property

@@ -6,6 +6,8 @@ from kwcoco.coco_dataset import MixinCocoAccessors, MixinCocoDraw, MixinCocoObje
 from kwcoco.util.dict_like import DictLike
 from typing import Any
 
+CocoBase: Incomplete
+
 
 class CocoBase:
     ...
@@ -241,7 +243,7 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoAccessors,
     def name_to_cat(self):
         ...
 
-    def raw_table(self, table_name: str):
+    def raw_table(self, table_name: str) -> DataFrame:
         ...
 
     def tabular_targets(self):

@@ -224,7 +224,17 @@ if __name__ == '__main__':
             ],
         },
         package_data={
-            'kwcoco': ['py.typed', '*.pyi'],
+            'kwcoco': [
+                'py.typed',
+                '*.pyi',
+                'cli/*.pyi',
+                'util/*.pyi',
+                'demo/*.pyi',
+                'data/*.pyi',
+                'examples/*.pyi',
+                'metrics/*.pyi',
+                'util/delayed_poc/*.pyi',
+            ],
         },
         packages=find_packages('.'),
         python_requires='>=3.6',

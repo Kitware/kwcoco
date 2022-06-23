@@ -45,18 +45,20 @@ class DetectionMetrics(ub.NiceRepr):
     def pred_detections(dmet, gid):
         ...
 
-    def confusion_vectors(dmet,
-                          iou_thresh: Union[float, List[float]] = 0.5,
-                          bias: float = 0,
-                          gids: List[int] = None,
-                          compat: str = 'mutex',
-                          prioritize: str = 'iou',
-                          ignore_classes: Union[set, str] = 'ignore',
-                          background_class: str = ...,
-                          verbose: Union[int, str] = 'auto',
-                          workers: int = 0,
-                          track_probs: str = 'try',
-                          max_dets: Incomplete | None = ...):
+    def confusion_vectors(
+        dmet,
+        iou_thresh: Union[float, List[float]] = 0.5,
+        bias: float = 0,
+        gids: List[int] = None,
+        compat: str = 'mutex',
+        prioritize: str = 'iou',
+        ignore_classes: Union[set, str] = 'ignore',
+        background_class: str = ...,
+        verbose: Union[int, str] = 'auto',
+        workers: int = 0,
+        track_probs: str = 'try',
+        max_dets: Incomplete | None = ...
+    ) -> ConfusionVectors | Dict[float, ConfusionVectors]:
         ...
 
     def score_kwant(dmet, iou_thresh: float = ...):

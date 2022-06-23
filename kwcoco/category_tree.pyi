@@ -93,7 +93,7 @@ class CategoryTree(ub.NiceRepr):
         ...
 
     @property
-    def cats(self):
+    def cats(self) -> Dict[str, Dict[str, object]]:
         ...
 
     def index(self, node):
@@ -105,7 +105,7 @@ class CategoryTree(ub.NiceRepr):
     def forest_str(self):
         ...
 
-    def normalize(self):
+    def normalize(self) -> CategoryTree:
         ...
 
 

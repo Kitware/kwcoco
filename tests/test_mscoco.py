@@ -25,6 +25,9 @@ def grab_mscoco_annotations():
 
 
 def test_standard_coco_dataset():
+    import pytest
+    pytest.skip('slow test')
+
     import kwcoco
     mscoco_fpaths = grab_mscoco_annotations()
 

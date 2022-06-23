@@ -60,7 +60,7 @@ class MixinCocoAccessors:
     def keypoint_categories(self) -> kwcoco.CategoryTree:
         ...
 
-    def coco_image(self, gid: int):
+    def coco_image(self, gid: int) -> kwcoco.coco_image.CocoImage:
         ...
 
 
