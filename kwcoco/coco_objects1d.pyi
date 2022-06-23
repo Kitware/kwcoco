@@ -5,7 +5,9 @@ from typing import Dict
 from typing import Any
 import kwimage
 import ubelt as ub
-from typing import Any
+from typing import Any, TypeVar
+
+ObjT = TypeVar('ObjT')
 
 
 class ObjectList1D(ub.NiceRepr):

@@ -5,10 +5,6 @@ from lark import Transformer
 cache: Incomplete
 
 
-class Transformer:
-    ...
-
-
 SENSOR_CHAN_GRAMMAR: Incomplete
 
 

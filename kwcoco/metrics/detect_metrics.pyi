@@ -6,6 +6,7 @@ import ubelt as ub
 from typing import Dict
 import ubelt as ub
 from _typeshed import Incomplete
+from kwcoco.metrics.confusion_vectors import ConfusionVectors
 
 
 class DetectionMetrics(ub.NiceRepr):
