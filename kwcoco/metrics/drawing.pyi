@@ -1,6 +1,7 @@
 from typing import Union
 from typing import Dict
 import kwcoco
+import kwcoco.metrics.confusion_measures
 from _typeshed import Incomplete
 
 

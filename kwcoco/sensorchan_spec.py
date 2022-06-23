@@ -17,7 +17,8 @@ except AttributeError:
 try:
     from lark import Transformer
 except ImportError:
-    Transformer = object
+    class Transformer:
+        pass
 
 SENSOR_CHAN_GRAMMAR = ub.codeblock(
     '''

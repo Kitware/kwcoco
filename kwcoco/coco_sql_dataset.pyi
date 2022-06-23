@@ -1,3 +1,4 @@
+import pandas
 import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
@@ -243,7 +244,7 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoAccessors,
     def name_to_cat(self):
         ...
 
-    def raw_table(self, table_name: str) -> DataFrame:
+    def raw_table(self, table_name: str) -> pandas.DataFrame:
         ...
 
     def tabular_targets(self):

@@ -7,10 +7,9 @@ import kwimage
 import kwarray
 from kwcoco import channel_spec
 from kwcoco import exceptions
-from kwcoco.util.lazy_frame_backends import LazyGDalFrameFile  # NOQA
 from kwcoco.util.delayed_poc.delayed_base import DelayedImageOperation
 from kwcoco.util.delayed_poc.delayed_base import DelayedVideoOperation
-import ubelt as ub  # NOQA
+from kwcoco.util.delayed_poc.delayed_base import DelayedVisionOperation  # NOQA
 
 try:
     import xarray as xr

@@ -8,6 +8,7 @@ import networkx
 from typing import List
 from typing import Tuple
 from typing import Callable
+import kwcoco.coco_objects1d
 from typing import Dict
 import kwimage
 from typing import Any

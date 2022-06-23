@@ -110,7 +110,7 @@ class DelayedImageOperation(DelayedVisionOperation):
             in the middle.
 
         Returns:
-            DelayedCrop: lazy executed delayed transform
+            DelayedImageOperation: lazy executed delayed transform
 
         Example:
             >>> from kwcoco.util.delayed_poc.delayed_nodes import DelayedWarp
@@ -208,8 +208,12 @@ class DelayedImageOperation(DelayedVisionOperation):
             this deviates from kwimage warp functions because instead of
             "output_dims" (specified in c-style shape) we specify dsize (w, h).
 
+        Args:
+            transform (Any): coercable transform
+            dsize (Tuple[int, int] | None): output width/height
+
         Returns:
-            DelayedCrop : new delayed transform a chained transform
+            kwcoco.util.delayed_poc.delayed_nodes.DelayedWarp: new delayed transform a chained transform
         """
         from kwcoco.util.delayed_poc.delayed_nodes import DelayedWarp
         warped = DelayedWarp(self, transform=transform, dsize=dsize)
@@ -217,7 +221,11 @@ class DelayedImageOperation(DelayedVisionOperation):
 
     def take_channels(self, channels):
         """
+        Args:
+            channels (Any):
+
         Returns:
-            DelayedVisionOperation
+            DelayedVisionOperation :
+                delayed operation only on specified channels
         """
         raise NotImplementedError

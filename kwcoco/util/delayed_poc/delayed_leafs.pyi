@@ -5,6 +5,7 @@ from typing import List
 from numpy import ndarray
 from typing import Dict
 from _typeshed import Incomplete
+from collections.abc import Generator
 from kwcoco import channel_spec
 from kwcoco.util.delayed_poc.delayed_base import DelayedImageOperation
 from typing import Any
@@ -36,7 +37,7 @@ class DelayedNans(DelayedImageOperation):
     def channels(self):
         ...
 
-    def children(self) -> None:
+    def children(self) -> Generator[Any, None, None]:
         ...
 
     def finalize(self, **kwargs):
@@ -74,7 +75,7 @@ class DelayedLoad(DelayedImageOperation):
     def coerce(cls, data) -> None:
         ...
 
-    def children(self) -> None:
+    def children(self) -> Generator[Any, None, None]:
         ...
 
     def nesting(self):
@@ -144,7 +145,7 @@ class DelayedIdentity(DelayedImageOperation):
              dsize: Incomplete | None = ...):
         ...
 
-    def children(self) -> None:
+    def children(self) -> Generator[Any, None, None]:
         ...
 
     def finalize(self, **kwargs):

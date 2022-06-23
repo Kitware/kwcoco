@@ -1,6 +1,7 @@
 from typing import List
 from typing import Union
 import kwcoco
+import kwcoco.metrics.confusion_measures
 import ubelt as ub
 from _typeshed import Incomplete
 from kwcoco.metrics.util import DictProxy

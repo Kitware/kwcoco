@@ -187,7 +187,7 @@ class Annots(ObjectList1D):
         ...
 
     @cnames.setter
-    def cnames(self, cnames) -> None:
+    def cnames(self, cnames) -> List[int]:
         ...
 
     @property

@@ -8,7 +8,7 @@ import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
 from kwcoco import channel_spec
-from kwcoco.util.delayed_poc.delayed_base import DelayedImageOperation, DelayedVideoOperation
+from kwcoco.util.delayed_poc.delayed_base import DelayedImageOperation, DelayedVideoOperation, DelayedVisionOperation as DelayedVisionOperation
 from typing import Any
 
 profile: Incomplete
@@ -24,7 +24,7 @@ class DelayedFrameConcat(DelayedVideoOperation):
     def __init__(self, frames, dsize: Incomplete | None = ...) -> None:
         ...
 
-    def children(self) -> None:
+    def children(self) -> Generator[Any, None, None]:
         ...
 
     @property
@@ -75,7 +75,7 @@ class DelayedChannelConcat(DelayedImageOperation):
                  jagged: bool = ...) -> None:
         ...
 
-    def children(self) -> None:
+    def children(self) -> Generator[Any, None, None]:
         ...
 
     @classmethod

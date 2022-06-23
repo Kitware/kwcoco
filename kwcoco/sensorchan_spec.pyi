@@ -3,7 +3,12 @@ from _typeshed import Incomplete
 from lark import Transformer
 
 cache: Incomplete
-Transformer = object
+
+
+class Transformer:
+    ...
+
+
 SENSOR_CHAN_GRAMMAR: Incomplete
 
 

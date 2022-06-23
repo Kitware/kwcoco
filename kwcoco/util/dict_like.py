@@ -27,18 +27,34 @@ class DictLike(ub.NiceRepr):
     """
 
     def getitem(self, key):
+        """
+        Args:
+            key (Any): a key
+
+        Returns:
+            Any: a value
+        """
         raise NotImplementedError('abstract getitem function')
 
     def setitem(self, key, value):
+        """
+        Args:
+            key (Any):
+            value (Any):
+        """
         raise NotImplementedError('abstract setitem function')
 
     def delitem(self, key):
+        """
+        Args:
+            key (Any):
+        """
         raise NotImplementedError('abstract delitem function')
 
     def keys(self):
         """
-        Returns:
-            Generator[Any, None, None]
+        Yields:
+            Any: a key
         """
         raise NotImplementedError('abstract keys function')
 
@@ -49,36 +65,82 @@ class DictLike(ub.NiceRepr):
     #     return str(self.asdict())
 
     def __len__(self):
+        """
+        Returns:
+            int:
+        """
         return len(list(self.keys()))
 
     def __iter__(self):
         return self.keys()
 
     def __contains__(self, key):
+        """
+        Args:
+            key (Any):
+
+        Returns:
+            bool:
+        """
         return key in self.keys()
 
     def __delitem__(self, key):
+        """
+        Args:
+            key (Any):
+        """
         return self.delitem(key)
 
     def __getitem__(self, key):
+        """
+        Args:
+            key (Any):
+
+        Returns:
+            Any:
+        """
         return self.getitem(key)
 
     def __setitem__(self, key, value):
+        """
+        Args:
+            key (Any):
+            value (Any):
+        """
         return self.setitem(key, value)
 
     def items(self):
-        return ((key, self[key]) for key in self.keys())
+        """
+        Yields:
+            Tuple[Any, Any]: a key value pair
+        """
+        yield from ((key, self[key]) for key in self.keys())
 
     def values(self):
-        return (self[key] for key in self.keys())
+        """
+        Yields:
+            Any: a value
+        """
+        for key in self.keys():
+            yield self[key]
+        # yield from (self[key] for key in self.keys())
 
     def copy(self):
+        """
+        Returns:
+            Dict:
+        """
         return dict(self.items())
 
     def to_dict(self):
+        """
+        Returns:
+            Dict:
+        """
         # pandas like API
         return dict(self.items())
 
+    # TODO: deprecate and remove
     asdict = to_dict
 
     def update(self, other):
@@ -86,6 +148,14 @@ class DictLike(ub.NiceRepr):
             self[k] = v
 
     def get(self, key, default=None):
+        """
+        Args:
+            key (Any):
+            default (Any):
+
+        Returns:
+            Any:
+        """
         try:
             return self[key]
         except KeyError:
