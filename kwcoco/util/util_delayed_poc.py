@@ -31,7 +31,7 @@ Concepts:
 
 
 TODO:
-    - [ ] Need to handle masks / nodata values when warping. Might need to
+    - [x] Need to handle masks / nodata values when warping. Might need to
           rely more on gdal / rasterio for this.
 
 
@@ -1279,6 +1279,23 @@ class DelayedFrameConcat(DelayedVideoOperation):
         return new
 
 
+class JaggedArray(ub.NiceRepr):
+    """
+    The result of an unaligned concatenate
+    """
+    def __init__(self, parts, axis):
+        self.parts = parts
+        self.axis = axis
+
+    def __nice__(self):
+        return '{}, axis={}'.format(self.shape, self.axis)
+
+    @property
+    def shape(self):
+        shapes = [p.shape for p in self.parts]
+        return shapes
+
+
 class DelayedChannelConcat(DelayedImageOperation):
     """
     Represents multiple channels in an image that could be concatenated
@@ -1288,10 +1305,12 @@ class DelayedChannelConcat(DelayedImageOperation):
             component may be comprised of multiple channels.
 
     TODO:
-        - [ ] can this be generalized into a delayed concat?
+        - [ ] can this be generalized into a delayed concat and combined with DelayedFrameConcat?
         - [ ] can all concats be delayed until the very end?
 
     Example:
+        >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+        >>> # Create 3 delayed operations to concatenate
         >>> comp1 = DelayedWarp(np.random.rand(11, 7))
         >>> comp2 = DelayedWarp(np.random.rand(11, 7, 3))
         >>> comp3 = DelayedWarp(
@@ -1318,12 +1337,25 @@ class DelayedChannelConcat(DelayedImageOperation):
         >>> frame1.finalize()
         >>> vid = DelayedFrameConcat([frame1, frame2, frame3])
         >>> print(ub.repr2(vid.nesting(), nl=-1, sort=False))
+
+    Example:
+        >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+        >>> # If requested, we can return arrays of the different sizes.
+        >>> # but usually this will raise an error.
+        >>> comp1 = DelayedWarp.random(dsize=(32, 32), nesting=(1, 5), channels=1)
+        >>> comp2 = DelayedWarp.random(dsize=(8, 8), nesting=(1, 5), channels=1)
+        >>> comp3 = DelayedWarp.random(dsize=(64, 64), nesting=(1, 5), channels=1)
+        >>> components = [comp1, comp2, comp3]
+        >>> self = DelayedChannelConcat(components, jagged=True)
+        >>> final = self.finalize()
+        >>> print('final = {!r}'.format(final))
     """
-    def __init__(self, components, dsize=None):
+    def __init__(self, components, dsize=None, jagged=False):
         if len(components) == 0:
             raise ValueError('No components to concatenate')
         self.components = components
-        if dsize is None:
+        self.jagged = jagged
+        if dsize is None and not jagged:
             dsize_cands = [comp.dsize for comp in self.components]
             if not ub.allsame(dsize_cands):
                 raise exceptions.CoordinateCompatibilityError(
@@ -1374,13 +1406,19 @@ class DelayedChannelConcat(DelayedImageOperation):
     def channels(self):
         sub_channs = []
         for comp in self.components:
-            sub_channs.append(comp.channels)
+            comp_channels = comp.channels
+            if comp_channels is None:
+                return None
+            sub_channs.append(comp_channels)
         channs = channel_spec.FusedChannelSpec.concat(sub_channs)
         return channs
 
     @property
     def shape(self):
-        w, h = self.dsize
+        if self.jagged:
+            w = h = None
+        else:
+            w, h = self.dsize
         return (h, w, self.num_bands)
 
     @profile
@@ -1393,11 +1431,14 @@ class DelayedChannelConcat(DelayedImageOperation):
         if len(stack) == 1:
             final = stack[0]
         else:
-            if as_xarray:
-                import xarray as xr
-                final = xr.concat(stack, dim='c')
+            if self.jagged:
+                final = JaggedArray(stack, axis=2)
             else:
-                final = np.concatenate(stack, axis=2)
+                if as_xarray:
+                    import xarray as xr
+                    final = xr.concat(stack, dim='c')
+                else:
+                    final = np.concatenate(stack, axis=2)
         return final
 
     def delayed_warp(self, transform, dsize=None):
@@ -1572,7 +1613,7 @@ class DelayedChannelConcat(DelayedImageOperation):
                     sub_comp = comp.take_channels(sub_idxs)
                     new_components.append(sub_comp)
 
-        new = DelayedChannelConcat(new_components)
+        new = DelayedChannelConcat(new_components, jagged=self.jagged)
         return new
 
 
@@ -1687,28 +1728,94 @@ class DelayedWarp(DelayedImageOperation):
         }
 
     @classmethod
-    def random(cls, nesting=(2, 5), rng=None):
+    def random(cls,
+               dsize=None,
+               raw_width=(8, 64),
+               raw_height=(8, 64),
+               channels=(1, 5),
+               nesting=(2, 5),
+               rng=None):
         """
+        Create a random delayed warp operation for testing / demo
+
+        Args:
+            dsize (Tuple[int, int] | None):
+                The width and height of the finalized data.
+                If unspecified, it will be a function of the random warps.
+
+            raw_width (int | Tuple[int, int]):
+                The exact or min / max width of the random raw data
+
+            raw_height (int | Tuple[int, int]):
+                The exact or min / max height of the random raw data
+
+            nesting (Tuple[int, int]):
+                The exact or min / max random depth of warp nestings
+
+            channels (int | Tuple[int, int]):
+                The exact or min / max number of random channels.
+
+        Returns:
+            DelayedWarp
+
         Example:
             >>> self = DelayedWarp.random(nesting=(4, 7))
             >>> print('self = {!r}'.format(self))
             >>> print(ub.repr2(self.nesting(), nl=-1, sort=0))
+
+        Ignore:
+            import kwplot
+            kwplot.autompl()
+            self = DelayedWarp.random(dsize=(32, 32), nesting=(1, 5), channels=3)
+            data = self.finalize()
+            kwplot.imshow(data)
         """
-        from kwarray.distributions import DiscreteUniform, Uniform
+        from kwarray.distributions import DiscreteUniform, Uniform, Constant
         rng = kwarray.ensure_rng(rng)
-        chan_distri = DiscreteUniform.coerce((1, 5), rng=rng)
-        nest_distri = DiscreteUniform.coerce(nesting, rng=rng)
-        size_distri = DiscreteUniform.coerce((8, 64), rng=rng)
+
+        def distribution_coercion_rules(scalar, pair):
+            # The rules for how to coerce a kwarray distribution are ambiguous
+            # but perhaps we can define a nice way to define what they are on a
+            # per-case basis, where domain knowledge can break the ambiguity?
+            def coerce(arg, rng=None):
+                # Choose the class to coerce into based on the rules
+                cls = None
+                if not ub.iterable(arg):
+                    cls = scalar
+                    arg = [arg]
+                else:
+                    if len(arg) == 2:
+                        cls = pair
+                if cls is None:
+                    raise TypeError(type(arg))
+                return cls.coerce(arg, rng=rng)
+            return coerce
+
+        coercer = distribution_coercion_rules(scalar=Constant, pair=DiscreteUniform)
+
+        chan_distri = coercer(channels, rng=rng)
+        nest_distri = coercer(nesting, rng=rng)
+        rw_distri = coercer(raw_width, rng=rng)
+        rh_distri = coercer(raw_height, rng=rng)
         raw_distri = Uniform(rng=rng)
         leaf_c = chan_distri.sample()
-        leaf_w = size_distri.sample()
-        leaf_h = size_distri.sample()
-        raw = raw_distri.sample(leaf_h, leaf_w, leaf_c)
+        leaf_w = rw_distri.sample()
+        leaf_h = rh_distri.sample()
+
+        raw = raw_distri.sample(leaf_h, leaf_w, leaf_c).astype(np.float32)
         layer = raw
         depth = nest_distri.sample()
         for _ in range(depth):
             tf = kwimage.Affine.random(rng=rng).matrix
             layer = DelayedWarp(layer, tf, dsize='auto')
+
+        # Final warp to the desired output size
+        if dsize is not None:
+            ow, oh = dsize
+            w, h = layer.dsize
+            tf = kwimage.Affine.scale((h / oh, w / ow))
+            layer = DelayedWarp(layer, tf, dsize=dsize)
+
         self = layer
         return self
 

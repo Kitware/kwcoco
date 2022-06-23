@@ -532,7 +532,8 @@ class CocoImage(ub.NiceRepr):
     add_asset = add_auxiliary_item
 
     @profile
-    def delay(self, channels=None, space='image', bundle_dpath=None):
+    def delay(self, channels=None, space='image', bundle_dpath=None,
+              jagged=False):
         """
         Perform a delayed load on the data in this image.
 
@@ -554,6 +555,10 @@ class CocoImage(ub.NiceRepr):
             space (str):
                 can either be "image" for loading in image space, or
                 "video" for loading in video space.
+
+            jagged (bool):
+                if True, then does not concatenate the channels and instead
+                returns a delayed jagged concatenate.
 
         TODO:
             - [X] Currently can only take all or none of the channels from each
@@ -636,27 +641,29 @@ class CocoImage(ub.NiceRepr):
             >>> final = delayed.finalize()
 
         Example:
-            >>> # Test delay when loading in auxiliary space
+            >>> # Test delay when loading in asset space
             >>> from kwcoco.coco_image import *  # NOQA
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
             >>> coco_img = dset.coco_image(1)
             >>> stream1 = coco_img.channels.streams()[0]
             >>> stream2 = coco_img.channels.streams()[1]
-            >>> aux_delayed = coco_img.delay(stream1, space='auxiliary')
+            >>> aux_delayed = coco_img.delay(stream1, space='asset')
             >>> img_delayed = coco_img.delay(stream1, space='image')
             >>> vid_delayed = coco_img.delay(stream1, space='video')
             >>> #
             >>> aux_imdata = aux_delayed.finalize()
             >>> img_imdata = img_delayed.finalize()
             >>> assert aux_imdata.shape != img_imdata.shape
-            >>> # Cannot load multiple auxiliary items at the same time in
-            >>> # auxiliary space
+            >>> # Cannot load multiple asset items at the same time in
+            >>> # asset space
             >>> import pytest
             >>> fused_channels = stream1 | stream2
             >>> with pytest.raises(kwcoco.exceptions.CoordinateCompatibilityError):
-            >>>     aux_delayed2 = coco_img.delay(fused_channels, space='auxiliary')
-
+            >>>     aux_delayed2 = coco_img.delay(fused_channels, space='asset')
+            >>> # But we can if we allow jagged-ness
+            >>> aux_delayed3 = coco_img.delay(fused_channels, space='asset', jagged=True)
+            >>> aux_delayed3.finalize()
         """
         from kwcoco.util.util_delayed_poc import DelayedChannelConcat
         from kwcoco.util.util_delayed_poc import DelayedNans
@@ -715,7 +722,7 @@ class CocoImage(ub.NiceRepr):
             else:
                 raise ValueError('no data registered in kwcoco image')
         else:
-            delayed = DelayedChannelConcat(chan_list)
+            delayed = DelayedChannelConcat(chan_list, jagged=jagged)
 
         # Reorder channels in the requested order
         if requested is not None:
