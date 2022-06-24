@@ -14,6 +14,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * Fix compatibility issue with datasets that do not contain an annotations list
+* Issue where the original coco polygons did not validate correctly in the schema.
 
 ## Version 0.2.31 - Released 2022-05-06
 

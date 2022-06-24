@@ -2566,7 +2566,11 @@ class MixinCocoStats(object):
             try:
                 COCO_SCHEMA.validate(dset.dataset)
             except jsonschema.exceptions.ValidationError as ex:
-                msg = 'Failed to validate schema: {}'.format(str(ex))
+                err = ex
+                print(f'err.absolute_path={err.absolute_path}')
+                import xdev
+                xdev.embed()
+                msg = 'Failed to validate schema: {}'.format(str(err))
                 _error(msg)
 
         def _check_unique(dset, table_key, col_key, required=True):
