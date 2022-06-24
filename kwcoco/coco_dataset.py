@@ -2457,8 +2457,16 @@ class MixinCocoStats(object):
                                 segmentation
                                 '''))
                     else:
-                        x, y, w, h = ann['bbox']
-                        ann['area'] = w * h
+                        try:
+                            x, y, w, h = ann['bbox']
+                        except KeyError:
+                            warnings.warn(ub.paragraph(
+                                '''
+                                Unable to add "area" key because an annotation
+                                is missing or has a malformed "bbox" entry
+                                '''))
+                        else:
+                            ann['area'] = w * h
 
         if config.get('legacy', False):
             try:
@@ -2490,21 +2498,24 @@ class MixinCocoStats(object):
 
         Args:
             **config :
-                schema (default=True): validates the json-schema
-                unique (default=True): validates unique secondary keys
-                missing (default=True): validates registered files exist
-                corrupted (default=False): validates data in registered files
+                schema (default=True): if True, validate the json-schema
+                unique (default=True): if True, validate unique secondary keys
+                missing (default=True): if True, validate registered files exist
+                corrupted (default=False): if True, validate data in registered files
                 channels (default=True):
-                    validates that channels in auxiliary/asset items are all
-                    unique.
+                    if True, validate that channels in auxiliary/asset items
+                    are all unique.
                 require_relative (default=False):
-                    Causes validation to fail if paths are non-portable, i.e.
-                    all paths must be relative to the bundle directory.
+                    if True, causes validation to fail if paths are
+                    non-portable, i.e.  all paths must be relative to the
+                    bundle directory. if>0, paths must be relative to bundle
+                    root.  if>1, paths must be inside bundle root.
+                img_attrs (default='warn'):
+                    if truthy, check that image attributes contain width and
+                    height entries. If 'warn', then warn if they do not exist.
+                    If 'error', then fail.
                 verbose (default=1): verbosity flag
                 fastfail (default=False): if True raise errors immediately
-                require_relative (default=False):
-                    if>0, paths must be relative to bundle root.
-                    if>1, paths must be inside bundle root.
 
         Returns:
             dict: result containing keys -
@@ -2558,35 +2569,84 @@ class MixinCocoStats(object):
                 msg = 'Failed to validate schema: {}'.format(str(ex))
                 _error(msg)
 
-        if config.get('unique', True):
-            def _check_unique(dset, table_key, col_key, required=True):
-                if verbose:
-                    print('Check {!r} has unique {!r}'.format(
-                        table_key, col_key))
-                items = dset.dataset.get(table_key, [])
-                seen = set()
-                num_unset = 0
-                for obj in items:
-                    value = obj.get(col_key, None)
-                    if value is None:
-                        num_unset += 1
-                    else:
-                        if value in seen:
-                            msg = 'Duplicate {} {} = {!r}'.format(
-                                table_key, col_key, value)
-                            _error(msg)
-                        else:
-                            seen.add(value)
-                if num_unset > 0:
-                    msg = ub.paragraph(
-                        '''
-                        Table {!r} is missing {} / {} values for column {!r}
-                        '''
-                    ).format(table_key, num_unset, len(items), col_key)
-                    if required:
+        def _check_unique(dset, table_key, col_key, required=True):
+            if verbose:
+                print('Check table {!r} has unique {!r}'.format(
+                    table_key, col_key))
+            items = dset.dataset.get(table_key, [])
+            seen = set()
+            num_unset = 0
+            for obj in items:
+                value = obj.get(col_key, None)
+                if value is None:
+                    num_unset += 1
+                else:
+                    if value in seen:
+                        msg = 'Duplicate {} {} = {!r}'.format(
+                            table_key, col_key, value)
                         _error(msg)
                     else:
-                        _warn(msg)
+                        seen.add(value)
+            if num_unset > 0:
+                msg = ub.paragraph(
+                    '''
+                    Table {!r} is missing {} / {} values for column {!r}
+                    '''
+                ).format(table_key, num_unset, len(items), col_key)
+                if required:
+                    _error(msg)
+                else:
+                    _warn(msg)
+
+        def _check_attrs(dset, table_key, col_key, required=True):
+            if verbose:
+                print('Check table {!r} entries have attr {!r}'.format(
+                    table_key, col_key))
+            items = dset.dataset.get(table_key, [])
+            num_unset = 0
+            for obj in items:
+                value = obj.get(col_key, None)
+                if value is None:
+                    num_unset += 1
+            if num_unset > 0:
+                msg = ub.paragraph(
+                    '''
+                    Table {!r} is missing {} / {} values for column {!r}
+                    '''
+                ).format(table_key, num_unset, len(items), col_key)
+                if required:
+                    _error(msg)
+                else:
+                    _warn(msg)
+
+        def _check_subtable_attrs(dset, table_key, subtable_keys, col_key, required=True):
+            if verbose:
+                print('Check subtable {!r} / {!r} entries have attr {!r}'.format(
+                    table_key, subtable_keys, col_key))
+            items = dset.dataset.get(table_key, [])
+            num_unset = 0
+            num_subobjs = 0
+            for obj in items:
+                # hack for asset/auxiliary
+                _ = ub.dict_isect(obj, subtable_keys)
+                sub_objs = ub.peek(_.values()) if _ else None
+                for sub_obj in sub_objs:
+                    num_subobjs += 1
+                    value = sub_obj.get(col_key, None)
+                    if value is None:
+                        num_unset += 1
+            if num_unset > 0:
+                msg = ub.paragraph(
+                    '''
+                    Subtable {!r}/{!r} is missing {} / {} values for column {!r}
+                    '''
+                ).format(table_key, subtable_keys, num_unset, num_subobjs, col_key)
+                if required:
+                    _error(msg)
+                else:
+                    _warn(msg)
+
+        if config.get('unique', True):
 
             _check_unique(dset, table_key='categories', col_key='name')
             _check_unique(dset, table_key='videos', col_key='name')
@@ -2597,6 +2657,13 @@ class MixinCocoStats(object):
             _check_unique(dset, table_key='videos', col_key='id')
             _check_unique(dset, table_key='annotations', col_key='id')
             _check_unique(dset, table_key='categories', col_key='id')
+
+        if config.get('img_attrs', False):
+            required = config.get('img_attrs', False) == 'error'
+            _check_attrs(dset, table_key='images', col_key='width', required=required)
+            _check_attrs(dset, table_key='images', col_key='height', required=required)
+            _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary', 'auxillary'], col_key='width', required=required)
+            _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary', 'auxillary'], col_key='height', required=required)
 
         if config.get('channels', True):
             for img in self.dataset.get('images', []):

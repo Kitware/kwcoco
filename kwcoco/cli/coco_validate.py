@@ -3,6 +3,37 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
+# Code to help generate the CLI from keyword arugments to CocoDataset.validate
+__autogen_cli_args__ = r"""
+import kwcoco
+from xdoctest.docstr import docscrape_google
+blocks = docscrape_google.split_google_docblocks(kwcoco.CocoDataset.validate.__doc__)
+argblock = dict(blocks)['Args'][0]
+found = None
+for arg in list(docscrape_google.parse_google_argblock(argblock, clean_desc=False)):
+    if arg['name'].startswith('**'):
+        found = arg
+        break
+subdesc = ub.codeblock(found['desc'])
+# Sub parsing of kwargs
+sub_parts = list(docscrape_google.parse_google_argblock(subdesc))
+from vimtk._dirty import format_multiple_paragraph_sentences
+for part in sub_parts:
+    default = part['type'].split('=')[1]
+    line1 = f"'{part['name']}': scfg.Value({default}, help=ub.paragraph("
+    kwargs = {}
+    wrapped_desc = format_multiple_paragraph_sentences(part['desc'], **kwargs)
+    sq = chr(39)
+    tsq = sq * 3
+    line2 = f'    {tsq}'
+    line3 = ub.indent(wrapped_desc)
+    line4 = f'    {tsq})),'
+    lines = [line1, line2, line3, line4]
+    print('\n'.join(lines))
+    print('')
+"""
+
+
 class CocoValidateCLI:
     name = 'validate'
 
@@ -13,12 +44,66 @@ class CocoValidateCLI:
         """
         default = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to datasets', position=1),
-            'schema': scfg.Value(True, help='If True check the json schema'),
 
-            'missing': scfg.Value(True, help='If True check if all assets (e.g. images) exist'),
-            'corrupted': scfg.Value(False, help='If True check the assets can be read'),
+            # 'schema': scfg.Value(True, help='If True check the json schema'),
+            # 'missing': scfg.Value(True, help='If True check if all assets (e.g. images) exist'),
+            # 'corrupted': scfg.Value(False, help='If True check the assets can be read'),
+            # 'require_relative': scfg.Value(False, help='If 1, requires all assets are relative to the bundle dpath. If 2, then they must be inside the bundle dpath'),
 
-            'require_relative': scfg.Value(False, help='If 1, requires all assets are relative to the bundle dpath. If 2, then they must be inside the bundle dpath'),
+            'schema': scfg.Value(True, help=ub.paragraph(
+                '''
+                if True, validate the json-schema
+                ''')),
+
+            'unique': scfg.Value(True, help=ub.paragraph(
+                '''
+                if True, validate unique secondary keys
+                ''')),
+
+            'missing': scfg.Value(True, help=ub.paragraph(
+                '''
+                if True, validate registered files exist
+                ''')),
+
+            'corrupted': scfg.Value(False, help=ub.paragraph(
+                '''
+                if True, validate data in registered files
+                ''')),
+
+            'channels': scfg.Value(True, help=ub.paragraph(
+                '''
+                if True, validate that channels in auxiliary/asset items are all
+                  unique.
+                ''')),
+
+            'require_relative': scfg.Value(False, help=ub.paragraph(
+                '''
+                if True, causes validation to fail if paths are non-portable, i.e.
+                all paths must be relative to the bundle directory.
+                if>0, paths must be relative to bundle root.
+                if>1, paths must be inside bundle root.
+                ''')),
+
+            'img_attrs': scfg.Value('warn', help=ub.paragraph(
+                '''
+                if truthy, check that image attributes contain width and height
+                  entries.
+                If 'warn', then warn if they do not exist.
+                If 'error', then fail.
+                ''')),
+
+            'verbose': scfg.Value(1, help=ub.paragraph(
+                '''
+                verbosity flag
+                ''')),
+
+            'fastfail': scfg.Value(False, help=ub.paragraph(
+                '''
+                if True raise errors immediately
+                ''')),
+
+            # TODO: Move these to a different tool. This should only validate,
+            # not fix anything.
 
             'fix': scfg.Value(None, help=ub.paragraph(
                 '''
