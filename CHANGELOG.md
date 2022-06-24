@@ -316,7 +316,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * CocoSQLDataset.coerce
 * `kwcoco subset` CLI now has a `--select_images` and `--select_videos` option that takes a json query.
-* Add initial implementation of `DelayedChannelConcat.take_channels`, returns nans if the channel is not available.
+* Add initial implementation of `DelayedChannelStack.take_channels`, returns nans if the channel is not available.
 
 ### Changed
 

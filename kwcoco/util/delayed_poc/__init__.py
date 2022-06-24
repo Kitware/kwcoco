@@ -71,19 +71,19 @@ Example:
     >>> # Note: the images never actually enter this space we transform through it
     >>> f1_dsize = np.array((3, 3))
     >>> f2_dsize = np.array((2, 2))
-    >>> f1_img = DelayedChannelConcat([
+    >>> f1_img = DelayedChannelStack([
     >>>     f1_chan1.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan1.dsize), dsize=f1_dsize),
     >>>     f1_chan2.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan2.dsize), dsize=f1_dsize),
     >>>     f1_chan3.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan3.dsize), dsize=f1_dsize),
     >>> ])
-    >>> f2_img = DelayedChannelConcat([
+    >>> f2_img = DelayedChannelStack([
     >>>     f2_chan1.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan1.dsize), dsize=f2_dsize),
     >>>     f2_chan2.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan2.dsize), dsize=f2_dsize),
     >>>     f2_chan3.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan3.dsize), dsize=f2_dsize),
     >>> ])
     >>> # Combine frames into a video
     >>> vid_dsize = np.array((280, 280))
-    >>> vid = DelayedFrameConcat([
+    >>> vid = DelayedFrameStack([
     >>>     f1_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f1_img.dsize), dsize=vid_dsize),
     >>>     f2_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f2_img.dsize), dsize=vid_dsize),
     >>> ])
@@ -155,7 +155,7 @@ Example:
     >>> part1 = aux1.delayed_warp(np.eye(3), dsize=img_dsize)
     >>> part2 = aux2.delayed_warp(transform2, dsize=img_dsize)
     >>> part3 = aux3.delayed_warp(transform3, dsize=img_dsize)
-    >>> delayed = DelayedChannelConcat([part1, part2, part3])
+    >>> delayed = DelayedChannelStack([part1, part2, part3])
     >>> #
     >>> delayed_crop = delayed.crop((slice(0, 10), slice(0, 10)))
     >>> delayed_final = delayed_crop.finalize()
@@ -209,18 +209,18 @@ from kwcoco.util.delayed_poc import delayed_base
 from kwcoco.util.delayed_poc import delayed_leafs
 from kwcoco.util.delayed_poc import delayed_nodes
 
-from kwcoco.util.delayed_poc.delayed_base import (DelayedImageOperation,
-                                                  DelayedVideoOperation,
-                                                  DelayedVisionOperation,)
+from kwcoco.util.delayed_poc.delayed_base import (DelayedImage,
+                                                  DelayedVideo,
+                                                  DelayedVisionMixin,)
 from kwcoco.util.delayed_poc.delayed_leafs import (DelayedLoad, DelayedNans,
                                                    DelayedIdentity, dequantize)
-from kwcoco.util.delayed_poc.delayed_nodes import (DelayedChannelConcat,
+from kwcoco.util.delayed_poc.delayed_nodes import (DelayedChannelStack,
                                                    DelayedCrop,
-                                                   DelayedFrameConcat,
+                                                   DelayedFrameStack,
                                                    DelayedWarp, JaggedArray,)
 
-__all__ = ['DelayedChannelConcat', 'DelayedCrop', 'DelayedFrameConcat',
-           'DelayedImageOperation', 'DelayedLoad', 'DelayedNans',
-           'DelayedVideoOperation', 'DelayedVisionOperation', 'DelayedWarp',
+__all__ = ['DelayedChannelStack', 'DelayedCrop', 'DelayedFrameStack',
+           'DelayedImage', 'DelayedLoad', 'DelayedNans',
+           'DelayedVideo', 'DelayedVisionMixin', 'DelayedWarp',
            'JaggedArray', 'delayed_base', 'delayed_leafs', 'delayed_nodes',
            'dequantize', 'DelayedIdentity']

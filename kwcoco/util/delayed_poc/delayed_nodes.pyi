@@ -8,13 +8,13 @@ import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
 from kwcoco import channel_spec
-from kwcoco.util.delayed_poc.delayed_base import DelayedImageOperation, DelayedVideoOperation, DelayedVisionOperation as DelayedVisionOperation
+from kwcoco.util.delayed_poc.delayed_base import DelayedImage, DelayedVideo, DelayedVisionMixin as DelayedVisionMixin
 from typing import Any
 
 profile: Incomplete
 
 
-class DelayedFrameConcat(DelayedVideoOperation):
+class DelayedFrameStack(DelayedVideo):
     frames: Incomplete
     dsize: Incomplete
     num_bands: Incomplete
@@ -62,7 +62,7 @@ class JaggedArray(ub.NiceRepr):
         ...
 
 
-class DelayedChannelConcat(DelayedImageOperation):
+class DelayedChannelStack(DelayedImage):
     components: Incomplete
     jagged: Incomplete
     dsize: Incomplete
@@ -105,11 +105,11 @@ class DelayedChannelConcat(DelayedImageOperation):
 
     def take_channels(
         self, channels: Union[List[int], slice, channel_spec.FusedChannelSpec]
-    ) -> DelayedVisionOperation:
+    ) -> DelayedVisionMixin:
         ...
 
 
-class DelayedWarp(DelayedImageOperation):
+class DelayedWarp(DelayedImage):
     bounds: Incomplete
     sub_data: Incomplete
     meta: Incomplete
@@ -160,7 +160,7 @@ class DelayedWarp(DelayedImageOperation):
         ...
 
 
-class DelayedCrop(DelayedImageOperation):
+class DelayedCrop(DelayedImage):
     __hack_dont_optimize__: bool
     sub_data: Incomplete
     sub_slices: Incomplete

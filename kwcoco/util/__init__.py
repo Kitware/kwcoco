@@ -24,11 +24,11 @@ from kwcoco.util.lazy_frame_backends import (LazyGDalFrameFile,
                                              LazyRasterIOFrameFile,
                                              LazySpectralFrameFile, )
 from kwcoco.util.util_archive import (Archive, unarchive_file,)
-from kwcoco.util.util_delayed_poc import (DelayedChannelConcat, DelayedCrop,
-                                          DelayedFrameConcat, DelayedIdentity,
-                                          DelayedImageOperation, DelayedLoad,
-                                          DelayedNans, DelayedVideoOperation,
-                                          DelayedVisionOperation, DelayedWarp)
+from kwcoco.util.util_delayed_poc import (DelayedChannelStack, DelayedCrop,
+                                          DelayedFrameStack, DelayedIdentity,
+                                          DelayedImage, DelayedLoad,
+                                          DelayedNans, DelayedVideo,
+                                          DelayedVisionMixin, DelayedWarp)
 from kwcoco.util.util_futures import (Executor, JobPool,)
 from kwcoco.util.util_json import (IndexableWalker, ensure_json_serializable,
                                    find_json_unserializable,
@@ -38,10 +38,10 @@ from kwcoco.util.util_sklearn import (StratifiedGroupKFold,)
 from kwcoco.util.util_truncate import (smart_truncate,)
 
 __all__ = ['ALLOF', 'ANY', 'ANYOF', 'ARRAY', 'Archive', 'BOOLEAN',
-           'ContainerElements', 'DelayedChannelConcat', 'DelayedCrop',
-           'DelayedFrameConcat', 'DelayedIdentity', 'DelayedImageOperation',
-           'DelayedLoad', 'DelayedNans', 'DelayedVideoOperation',
-           'DelayedVisionOperation', 'DelayedWarp', 'DictLike', 'Element',
+           'ContainerElements', 'DelayedChannelStack', 'DelayedCrop',
+           'DelayedFrameStack', 'DelayedIdentity', 'DelayedImage',
+           'DelayedLoad', 'DelayedNans', 'DelayedVideo',
+           'DelayedVisionMixin', 'DelayedWarp', 'DictLike', 'Element',
            'Executor', 'INTEGER', 'IndexableWalker', 'JobPool',
            'LazyGDalFrameFile', 'LazyRasterIOFrameFile',
            'LazySpectralFrameFile', 'NOT', 'NULL', 'NUMBER', 'OBJECT', 'ONEOF',

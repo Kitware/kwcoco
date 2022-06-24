@@ -6,7 +6,7 @@ import numpy as np
 import kwimage
 import kwarray
 from kwcoco import channel_spec
-from kwcoco.util.delayed_poc.delayed_base import DelayedImageOperation
+from kwcoco.util.delayed_poc.delayed_base import DelayedImage
 
 try:
     import xarray as xr
@@ -20,14 +20,14 @@ except Exception:
     profile = ub.identity
 
 
-class DelayedNans(DelayedImageOperation):
+class DelayedNans(DelayedImage):
     """
     Constructs nan channels as needed
 
     Example:
         self = DelayedNans((10, 10), channel_spec.FusedChannelSpec.coerce('rgb'))
         region_slices = (slice(5, 10), slice(1, 12))
-        delayed = self.delayed_crop(region_slices)
+        delayed = self.crop(region_slices)
 
     Example:
         >>> from kwcoco.util.delayed_poc.delayed_leafs import *  # NOQA
@@ -36,11 +36,11 @@ class DelayedNans(DelayedImageOperation):
         >>> dsize = (307, 311)
         >>> c1 = DelayedNans(dsize=dsize, channels=kwcoco.FusedChannelSpec.coerce('foo'))
         >>> c2 = DelayedLoad.demo('astro', dsize=dsize).load_shape(True)
-        >>> cat = DelayedChannelConcat([c1, c2])
-        >>> warped_cat = cat.delayed_warp(kwimage.Affine.scale(1.07), dsize=(328, 332))
+        >>> cat = DelayedChannelStack([c1, c2])
+        >>> warped_cat = cat.warp(kwimage.Affine.scale(1.07), dsize=(328, 332))
         >>> warped_cat.finalize()
 
-        #>>> cropped = warped_cat.delayed_crop((slice(0, 300), slice(0, 100)))
+        #>>> cropped = warped_cat.crop((slice(0, 300), slice(0, 100)))
         #>>> cropped.finalize().shape
     """
     def __init__(self, dsize=None, channels=None):
@@ -110,8 +110,8 @@ class DelayedNans(DelayedImageOperation):
             final = xr.DataArray(final, dims=('y', 'x', 'c'), coords=coords)
         return final
 
-    def delayed_crop(self, region_slices):
-        # DEBUG_PRINT('DelayedNans.delayed_crop')
+    def crop(self, region_slices):
+        # DEBUG_PRINT('DelayedNans.crop')
         channels = self.channels
         dsize = self.dsize
         data_dims = dsize[::-1]
@@ -124,12 +124,12 @@ class DelayedNans(DelayedImageOperation):
         new = self.__class__(new_dsize, channels=channels)
         return new
 
-    def delayed_warp(self, transform, dsize=None):
+    def warp(self, transform, dsize=None):
         new = self.__class__(dsize, channels=self.channels)
         return new
 
 
-class DelayedLoad(DelayedImageOperation):
+class DelayedLoad(DelayedImage):
     """
     A load operation for a specific sub-region and sub-bands in a specified
     image.
@@ -381,7 +381,7 @@ class DelayedLoad(DelayedImageOperation):
         return final
 
     @profile
-    def delayed_crop(self, region_slices):
+    def crop(self, region_slices):
         """
         Args:
             region_slices (Tuple[slice, slice]): y-slice and x-slice.
@@ -395,11 +395,11 @@ class DelayedLoad(DelayedImageOperation):
             >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
             >>> self = orig = DelayedLoad.demo('astro').load_shape()
             >>> region_slices = slices1 = (slice(0, 90), slice(30, 60))
-            >>> self = crop1 = orig.delayed_crop(slices1)
+            >>> self = crop1 = orig.crop(slices1)
             >>> region_slices = slices2 = (slice(10, 21), slice(10, 22))
-            >>> self = crop2 = crop1.delayed_crop(slices2)
+            >>> self = crop2 = crop1.crop(slices2)
             >>> region_slices = slices3 = (slice(3, 20), slice(5, 20))
-            >>> crop3 = crop2.delayed_crop(slices3)
+            >>> crop3 = crop2.crop(slices3)
             >>> # Spot check internals
             >>> print('orig = {}'.format(ub.repr2(orig.__json__(), nl=2)))
             >>> print('crop1 = {}'.format(ub.repr2(crop1.__json__(), nl=2)))
@@ -431,7 +431,7 @@ class DelayedLoad(DelayedImageOperation):
                  0123456789  <- absolute coordinates
                  ----------
         """
-        # DEBUG_PRINT('DelayedLoad.delayed_crop')
+        # DEBUG_PRINT('DelayedLoad.crop')
         # Check if there is already a delayed crop operation
         curr_slices = self._immediates['crop']
         if curr_slices is None:
@@ -610,7 +610,7 @@ def dequantize(quant_data, quantization):
     return dequant
 
 
-class DelayedIdentity(DelayedImageOperation):
+class DelayedIdentity(DelayedImage):
     """
     Noop leaf that does nothing. Can be used to hold raw data.
 
@@ -702,7 +702,7 @@ class DelayedIdentity(DelayedImageOperation):
         """
         yield from []
 
-    # def delayed_crop(self, region_slices):
+    # def crop(self, region_slices):
     #     return DelayedCrop(self, region_slices)
 
     def _optimize_paths(self, **kwargs):

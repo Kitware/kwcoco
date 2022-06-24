@@ -11,7 +11,7 @@ from typing import Any
 profile: Incomplete
 
 
-class DelayedVisionOperation(ub.NiceRepr):
+class DelayedVisionMixin(ub.NiceRepr):
 
     def __nice__(self):
         ...
@@ -19,7 +19,7 @@ class DelayedVisionOperation(ub.NiceRepr):
     def finalize(self, **kwargs) -> None:
         ...
 
-    def children(self) -> Generator[DelayedVisionOperation, None, None]:
+    def children(self) -> Generator[DelayedVisionMixin, None, None]:
         ...
 
     def __json__(self):
@@ -35,14 +35,14 @@ class DelayedVisionOperation(ub.NiceRepr):
         ...
 
 
-class DelayedVideoOperation(DelayedVisionOperation):
+class DelayedVideo(DelayedVisionMixin):
     ...
 
 
-class DelayedImageOperation(DelayedVisionOperation):
+class DelayedImage(DelayedVisionMixin):
 
     def delayed_crop(
-            self, region_slices: Tuple[slice, slice]) -> DelayedImageOperation:
+            self, region_slices: Tuple[slice, slice]) -> DelayedImage:
         ...
 
     def delayed_warp(
@@ -52,5 +52,5 @@ class DelayedImageOperation(DelayedVisionOperation):
     ) -> kwcoco.util.delayed_poc.delayed_nodes.DelayedWarp:
         ...
 
-    def take_channels(self, channels: Any) -> DelayedVisionOperation:
+    def take_channels(self, channels: Any) -> DelayedVisionMixin:
         ...

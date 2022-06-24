@@ -7,9 +7,11 @@ import kwimage
 import kwarray
 from kwcoco import channel_spec
 from kwcoco import exceptions
-from kwcoco.util.delayed_poc.delayed_base import DelayedImageOperation
-from kwcoco.util.delayed_poc.delayed_base import DelayedVideoOperation
-from kwcoco.util.delayed_poc.delayed_base import DelayedVisionOperation  # NOQA
+from kwcoco.util.delayed_poc.delayed_base import DelayedImage
+from kwcoco.util.delayed_poc.delayed_base import DelayedVideo
+# from kwcoco.util.delayed_poc.delayed_base import DelayedArrayOperation
+from kwcoco.util.delayed_poc.delayed_base import DelayedVisionMixin  # NOQA
+from kwcoco.util.delayed_poc.delayed_base import DelayedArray  # NOQA
 
 try:
     import xarray as xr
@@ -23,9 +25,98 @@ except Exception:
     profile = ub.identity
 
 
-class DelayedFrameConcat(DelayedVideoOperation):
+class JaggedArray(ub.NiceRepr):
+    """
+    The result of an unaligned concatenate
+    """
+    def __init__(self, parts, axis):
+        self.parts = parts
+        self.axis = axis
+
+    def __nice__(self):
+        return '{}, axis={}'.format(self.shape, self.axis)
+
+    @property
+    def shape(self):
+        shapes = [p.shape for p in self.parts]
+        return shapes
+
+
+class StackMixin:
+    def __init__(self, parts, axis):
+        self.parts = parts
+        self.axis = axis
+
+    def children(self):
+        """
+        Yields:
+            Any:
+        """
+        yield from self.parts
+
+    @property
+    def shape(self):
+        stack_dims = [part.shape for part in self.parts]
+        n = len(self.parts)
+        axis = self.axis
+        common_shape = [max(stack_dim) for stack_dim in zip(*stack_dims)]
+        shape = tuple([*common_shape[0:axis], n, *common_shape[axis:]])
+        return shape
+
+    @profile
+    def finalize(self, **kwargs):
+        """
+        Execute the final transform
+        """
+        # Add in the video axis
+        # as_xarray = kwargs.get('as_xarray', False)
+        stack = [part.finalize(**kwargs) for part in self.parts]
+        stack_dims = np.array([s.shape for s in stack])
+        max_dims = stack_dims.max(axis=0)
+        delta_dims = max_dims - stack_dims
+        if np.any(delta_dims):
+            padded_stack = []
+            for delta, item in zip(delta_dims, stack):
+                pad_width = list(zip([0] * len(delta), delta))
+                item = np.pad(item, pad_width=pad_width)
+                padded_stack.append(item)
+            final = np.stack(padded_stack, axis=self.axis)
+        else:
+            final = np.stack(stack, axis=self.axis)
+        return final
+
+
+class DelayedStack(StackMixin, DelayedArray):
+    """
+    Generalize stacking. Its like concat, but in a new dimension.
+
+    Example:
+        >>> from kwcoco.util import delayed_poc as delayarr
+        >>> arr1 = delayarr.DelayedIdentity.demo(dsize=(32, 32), chan=[0, 2])
+        >>> arr2 = delayarr.DelayedIdentity.demo(dsize=(32, 32), chan=[1, 0])
+        >>> self = DelayedStack([arr1, arr2], axis=0)
+        >>> print(f'self={self}')
+        >>> final = self.finalize()
+        >>> print(f'final.shape={final.shape}')
+
+        >>> from kwcoco.util import delayed_poc as delayarr
+        >>> arr1 = delayarr.DelayedIdentity.demo(dsize=(32, 32), chan=[0, 2])
+        >>> arr2 = delayarr.DelayedIdentity.demo(dsize=(8, 32), chan=[1, 0])
+        >>> arr3 = delayarr.DelayedIdentity.demo(dsize=(16, 42), chan=[1, 0])
+        >>> arr4 = delayarr.DelayedIdentity.demo(dsize=(64, 8), chan=[1, 0])
+        >>> self = DelayedStack([arr1, arr2, arr3, arr4], axis=0)
+        >>> print(f'self={self}')
+        >>> final = self.finalize()
+        >>> print(f'final.shape={final.shape}')
+    """
+
+
+class DelayedFrameStack(StackMixin, DelayedVideo):
     """
     Represents multiple frames in a video
+
+    TODO:
+        rename to DelayedFrameStack
 
     Note:
 
@@ -46,7 +137,9 @@ class DelayedFrameConcat(DelayedVideoOperation):
 
     Example:
         >>> # Simpler case with fewer nesting levels
+        >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
         >>> from kwcoco.util.delayed_poc.delayed_leafs import DelayedLoad
+        >>> import kwarray
         >>> rng = kwarray.ensure_rng(None)
         >>> # Delayed warp each channel into its "image" space
         >>> # Note: the images never enter the space we transform through
@@ -54,9 +147,9 @@ class DelayedFrameConcat(DelayedVideoOperation):
         >>> f2_img = DelayedLoad.demo('carl', (256, 256))
         >>> # Combine frames into a video
         >>> vid_dsize = np.array((100, 100))
-        >>> self = vid = DelayedFrameConcat([
-        >>>     f1_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f1_img.dsize)),
-        >>>     f2_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f2_img.dsize)),
+        >>> self = vid = DelayedFrameStack([
+        >>>     f1_img.warp(kwimage.Affine.scale(vid_dsize / f1_img.dsize)),
+        >>>     f2_img.warp(kwimage.Affine.scale(vid_dsize / f2_img.dsize)),
         >>> ], dsize=vid_dsize)
         >>> print(ub.repr2(vid.nesting(), nl=-1, sort=0))
         >>> final = vid.finalize(interpolation='nearest', dsize=(32, 32))
@@ -68,13 +161,14 @@ class DelayedFrameConcat(DelayedVideoOperation):
         >>> region_slices = (slice(0, 90), slice(30, 60))
     """
     def __init__(self, frames, dsize=None):
-        self.frames = frames
+        self.parts = frames
+        self.axis = 0
         if dsize is None:
-            dsize_cands = [frame.dsize for frame in self.frames]
+            dsize_cands = [frame.dsize for frame in self.parts]
             dsize = _largest_shape(dsize_cands)
 
         self.dsize = dsize
-        nband_cands = [frame.num_bands for frame in self.frames]
+        nband_cands = [frame.num_bands for frame in self.parts]
         if any(c is None for c in nband_cands):
             num_bands = None
         if ub.allsame(nband_cands):
@@ -83,19 +177,23 @@ class DelayedFrameConcat(DelayedVideoOperation):
             raise exceptions.CoordinateCompatibilityError(
                 'components must all have the same delayed size: got {}'.format(nband_cands))
         self.num_bands = num_bands
-        self.num_frames = len(self.frames)
+        self.num_frames = len(self.parts)
         self.meta = {
             'num_bands': self.num_bands,
             'num_frames': self.num_frames,
             'shape': self.shape,
         }
 
+    @property
+    def frames(self):
+        return self.parts
+
     def children(self):
         """
         Yields:
             Any:
         """
-        yield from self.frames
+        yield from self.parts
 
     @property
     def channels(self):
@@ -107,32 +205,7 @@ class DelayedFrameConcat(DelayedVideoOperation):
         w, h = self.dsize
         return (self.num_frames, h, w, self.num_bands)
 
-    @profile
-    def finalize(self, **kwargs):
-        """
-        Execute the final transform
-        """
-        # Add in the video axis
-        # as_xarray = kwargs.get('as_xarray', False)
-
-        stack = [frame.finalize(**kwargs)[None, :]
-                 for frame in self.frames]
-        stack_shapes = np.array([s.shape for s in stack])
-
-        stack_whc = stack_shapes[:, 1:4]
-        max_whc = stack_whc.max(axis=0)
-        delta_whc = max_whc - stack_whc
-
-        stack2 = []
-        for delta, item in zip(delta_whc, stack):
-            pad_width = [(0, 0)] + list(zip([0] * len(delta), delta))
-            item = np.pad(item, pad_width=pad_width,)
-            stack2.append(item)
-
-        final = np.concatenate(stack2, axis=0)
-        return final
-
-    def delayed_crop(self, region_slices):
+    def crop(self, region_slices):
         """
         Example:
             >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
@@ -146,28 +219,28 @@ class DelayedFrameConcat(DelayedVideoOperation):
             >>> #
             >>> f1_dsize = np.array(f1_chan1.dsize)
             >>> f2_dsize = np.array(f2_chan1.dsize)
-            >>> f1_img = DelayedChannelConcat([
-            >>>     f1_chan1.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan1.dsize), dsize=f1_dsize),
-            >>>     f1_chan2.delayed_warp(kwimage.Affine.scale(f1_dsize / f1_chan2.dsize), dsize=f1_dsize),
+            >>> f1_img = DelayedChannelStack([
+            >>>     f1_chan1.warp(kwimage.Affine.scale(f1_dsize / f1_chan1.dsize), dsize=f1_dsize),
+            >>>     f1_chan2.warp(kwimage.Affine.scale(f1_dsize / f1_chan2.dsize), dsize=f1_dsize),
             >>> ])
-            >>> f2_img = DelayedChannelConcat([
-            >>>     f2_chan1.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan1.dsize), dsize=f2_dsize),
-            >>>     f2_chan2.delayed_warp(kwimage.Affine.scale(f2_dsize / f2_chan2.dsize), dsize=f2_dsize),
+            >>> f2_img = DelayedChannelStack([
+            >>>     f2_chan1.warp(kwimage.Affine.scale(f2_dsize / f2_chan1.dsize), dsize=f2_dsize),
+            >>>     f2_chan2.warp(kwimage.Affine.scale(f2_dsize / f2_chan2.dsize), dsize=f2_dsize),
             >>> ])
             >>> vid_dsize = np.array((280, 280))
-            >>> full_vid = DelayedFrameConcat([
-            >>>     f1_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f1_img.dsize), dsize=vid_dsize),
-            >>>     f2_img.delayed_warp(kwimage.Affine.scale(vid_dsize / f2_img.dsize), dsize=vid_dsize),
+            >>> full_vid = DelayedFrameStack([
+            >>>     f1_img.warp(kwimage.Affine.scale(vid_dsize / f1_img.dsize), dsize=vid_dsize),
+            >>>     f2_img.warp(kwimage.Affine.scale(vid_dsize / f2_img.dsize), dsize=vid_dsize),
             >>> ])
             >>> region_slices = (slice(80, 200), slice(80, 200))
             >>> print(ub.repr2(full_vid.nesting(), nl=-1, sort=0))
-            >>> crop_vid = full_vid.delayed_crop(region_slices)
+            >>> crop_vid = full_vid.crop(region_slices)
             >>> final_full = full_vid.finalize(interpolation='nearest')
             >>> final_crop = crop_vid.finalize(interpolation='nearest')
             >>> import pytest
             >>> with pytest.raises(ValueError):
             >>>     # should not be able to crop a crop yet
-            >>>     crop_vid.delayed_crop(region_slices)
+            >>>     crop_vid.crop(region_slices)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -176,15 +249,15 @@ class DelayedFrameConcat(DelayedVideoOperation):
             >>> kwplot.imshow(final_crop[0], pnum=(2, 2, 3), fnum=1)
             >>> kwplot.imshow(final_crop[1], pnum=(2, 2, 4), fnum=1)
         """
-        # DEBUG_PRINT('DelayedFrameConcat.delayed_crop')
+        # DEBUG_PRINT('DelayedFrameStack.crop')
         new_frames = []
         for frame in self.frames:
-            new_frame = frame.delayed_crop(region_slices)
+            new_frame = frame.crop(region_slices)
             new_frames.append(new_frame)
-        new = DelayedFrameConcat(new_frames)
+        new = DelayedFrameStack(new_frames)
         return new
 
-    def delayed_warp(self, transform, dsize=None):
+    def warp(self, transform, dsize=None):
         """
         Delayed transform the underlying data.
 
@@ -205,30 +278,13 @@ class DelayedFrameConcat(DelayedVideoOperation):
                 dsize = _auto_dsize(transform, self.dsize)
         new_frames = []
         for frame in self.frames:
-            new_frame = frame.delayed_warp(transform, dsize=dsize)
+            new_frame = frame.warp(transform, dsize=dsize)
             new_frames.append(new_frame)
-        new = DelayedFrameConcat(new_frames)
+        new = DelayedFrameStack(new_frames)
         return new
 
 
-class JaggedArray(ub.NiceRepr):
-    """
-    The result of an unaligned concatenate
-    """
-    def __init__(self, parts, axis):
-        self.parts = parts
-        self.axis = axis
-
-    def __nice__(self):
-        return '{}, axis={}'.format(self.shape, self.axis)
-
-    @property
-    def shape(self):
-        shapes = [p.shape for p in self.parts]
-        return shapes
-
-
-class DelayedChannelConcat(DelayedImageOperation):
+class DelayedChannelStack(StackMixin, DelayedImage):
     """
     Represents multiple channels in an image that could be concatenated
 
@@ -237,7 +293,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             component may be comprised of multiple channels.
 
     TODO:
-        - [ ] can this be generalized into a delayed concat and combined with DelayedFrameConcat?
+        - [ ] can this be generalized into a delayed concat and combined with DelayedFrameStack?
         - [ ] can all concats be delayed until the very end?
 
     Example:
@@ -251,12 +307,12 @@ class DelayedChannelConcat(DelayedImageOperation):
         >>>     dsize=(7, 11)
         >>> )
         >>> components = [comp1, comp2, comp3]
-        >>> chans = DelayedChannelConcat(components)
+        >>> chans = DelayedChannelStack(components)
         >>> final = chans.finalize()
         >>> assert final.shape == chans.shape
         >>> assert final.shape == (11, 7, 6)
 
-        >>> # We should be able to nest DelayedChannelConcat inside virutal images
+        >>> # We should be able to nest DelayedChannelStack inside virutal images
         >>> frame1 = DelayedWarp(
         >>>     chans, transform=kwimage.Affine.affine(scale=2.2).matrix,
         >>>     dsize=(20, 26))
@@ -267,7 +323,7 @@ class DelayedChannelConcat(DelayedImageOperation):
 
         >>> print(ub.repr2(frame1.nesting(), nl=-1, sort=False))
         >>> frame1.finalize()
-        >>> vid = DelayedFrameConcat([frame1, frame2, frame3])
+        >>> vid = DelayedFrameStack([frame1, frame2, frame3])
         >>> print(ub.repr2(vid.nesting(), nl=-1, sort=False))
 
     Example:
@@ -278,7 +334,7 @@ class DelayedChannelConcat(DelayedImageOperation):
         >>> comp2 = DelayedWarp.random(dsize=(8, 8), nesting=(1, 5), channels=1)
         >>> comp3 = DelayedWarp.random(dsize=(64, 64), nesting=(1, 5), channels=1)
         >>> components = [comp1, comp2, comp3]
-        >>> self = DelayedChannelConcat(components, jagged=True)
+        >>> self = DelayedChannelStack(components, jagged=True)
         >>> final = self.finalize()
         >>> print('final = {!r}'.format(final))
     """
@@ -318,7 +374,7 @@ class DelayedChannelConcat(DelayedImageOperation):
     def random(cls, num_parts=3, rng=None):
         """
         Example:
-            >>> self = DelayedChannelConcat.random()
+            >>> self = DelayedChannelStack.random()
             >>> print('self = {!r}'.format(self))
             >>> print(ub.repr2(self.nesting(), nl=-1, sort=0))
         """
@@ -329,9 +385,9 @@ class DelayedChannelConcat(DelayedImageOperation):
         for _ in range(num_parts):
             subcomp = DelayedWarp.random(rng=rng)
             tf = kwimage.Affine.random(rng=rng).matrix
-            comp = subcomp.delayed_warp(tf, dsize=(self_w, self_h))
+            comp = subcomp.warp(tf, dsize=(self_w, self_h))
             components.append(comp)
-        self = DelayedChannelConcat(components)
+        self = DelayedChannelStack(components)
         return self
 
     @property
@@ -373,7 +429,7 @@ class DelayedChannelConcat(DelayedImageOperation):
                     final = np.concatenate(stack, axis=2)
         return final
 
-    def delayed_warp(self, transform, dsize=None):
+    def warp(self, transform, dsize=None):
         """
         Delayed transform the underlying data.
 
@@ -391,9 +447,9 @@ class DelayedChannelConcat(DelayedImageOperation):
                 dsize = _auto_dsize(transform, self.dsize)
         new_parts = []
         for part in self.components:
-            new_frame = part.delayed_warp(transform, dsize=dsize)
+            new_frame = part.warp(transform, dsize=dsize)
             new_parts.append(new_frame)
-        new = DelayedChannelConcat(new_parts)
+        new = DelayedChannelStack(new_parts)
         return new
 
     @profile
@@ -409,7 +465,7 @@ class DelayedChannelConcat(DelayedImageOperation):
                 kwcoco.ChannelSpec for more detials.
 
         Returns:
-            DelayedVisionOperation:
+            DelayedArray:
                 a delayed vision operation that only operates on the following
                 channels.
 
@@ -430,7 +486,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> delayed = dset.delayed_load(1)
             >>> astro = DelayedLoad.demo('astro').load_shape(use_channel_heuristic=True)
             >>> aligned = astro.warp(kwimage.Affine.scale(600 / 512), dsize='auto')
-            >>> self = combo = DelayedChannelConcat(delayed.components + [aligned])
+            >>> self = combo = DelayedChannelStack(delayed.components + [aligned])
             >>> channels = 'B1|r|B8|g'
             >>> new = self.take_channels(channels)
             >>> new_cropped = new.crop((slice(10, 200), slice(12, 350)))
@@ -443,7 +499,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> kwplot.imshow(stacked)
 
         CommandLine:
-            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/delayed_poc.delayed_nodes.py DelayedChannelConcat.take_channels:2 --profile
+            xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/delayed_poc.delayed_nodes.py DelayedChannelStack.take_channels:2 --profile
 
         Example:
             >>> # Test case where requested channel does not exist
@@ -547,11 +603,11 @@ class DelayedChannelConcat(DelayedImageOperation):
                     sub_comp = comp.take_channels(sub_idxs)
                     new_components.append(sub_comp)
 
-        new = DelayedChannelConcat(new_components, jagged=self.jagged)
+        new = DelayedChannelStack(new_components, jagged=self.jagged)
         return new
 
 
-class DelayedWarp(DelayedImageOperation):
+class DelayedWarp(DelayedImage):
     """
     POC for chainable transforms
 
@@ -582,23 +638,23 @@ class DelayedWarp(DelayedImageOperation):
         >>> #
         >>> # Execute a crop in a one-level transformed space
         >>> region_slices = (slice(5, 10), slice(0, 12))
-        >>> delayed_crop = band2.delayed_crop(region_slices)
-        >>> final_crop = delayed_crop.finalize()
+        >>> crop = band2.crop(region_slices)
+        >>> final_crop = crop.finalize()
         >>> #
         >>> # Execute a crop in a nested transformed space
         >>> tf4 = np.array([[1.5, 0, 0], [0, 1.5, 0], [0, 0, 1]])
         >>> chained = DelayedWarp(band2, tf4, (18, 18))
-        >>> delayed_crop = chained.delayed_crop(region_slices)
-        >>> final_crop = delayed_crop.finalize()
+        >>> crop = chained.crop(region_slices)
+        >>> final_crop = crop.finalize()
         >>> #
         >>> tf4 = np.array([[.5, 0, 0], [0, .5, 0], [0, 0, 1]])
         >>> chained = DelayedWarp(band2, tf4, (6, 6))
-        >>> delayed_crop = chained.delayed_crop(region_slices)
-        >>> final_crop = delayed_crop.finalize()
+        >>> crop = chained.crop(region_slices)
+        >>> final_crop = crop.finalize()
         >>> #
         >>> region_slices = (slice(1, 5), slice(2, 4))
-        >>> delayed_crop = chained.delayed_crop(region_slices)
-        >>> final_crop = delayed_crop.finalize()
+        >>> crop = chained.crop(region_slices)
+        >>> final_crop = crop.finalize()
 
     Example:
         >>> dsize = (17, 12)
@@ -606,6 +662,9 @@ class DelayedWarp(DelayedImageOperation):
         >>> self = DelayedWarp(np.random.rand(3, 5, 13), tf, dsize=dsize)
         >>> self.finalize().shape
     """
+
+    _DEFAULT_AUTO_OVERVIEW = 0
+
     def __init__(self, sub_data, transform=None, dsize=None):
         transform = kwimage.Affine.coerce(transform)
 
@@ -859,8 +918,8 @@ class DelayedWarp(DelayedImageOperation):
             >>> from kwcoco.util.delayed_poc.delayed_leafs import DelayedIdentity
             >>> s = DelayedIdentity.demo()
             >>> s = DelayedIdentity.demo('checkerboard')
-            >>> a = s.delayed_warp(kwimage.Affine.scale(0.05), dsize='auto')
-            >>> b = s.delayed_warp(kwimage.Affine.scale(3), dsize='auto')
+            >>> a = s.warp(kwimage.Affine.scale(0.05), dsize='auto')
+            >>> b = s.warp(kwimage.Affine.scale(3), dsize='auto')
 
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
@@ -886,15 +945,36 @@ class DelayedWarp(DelayedImageOperation):
             >>> fpath = ub.grabdata('https://ipfs.io/ipfs/QmaFcb565HM9FV8f41jrfCZcu1CXsZZMXEosjmbgeBhFQr', fname='PXL_20210411_150641385.jpg')
             >>> data0 = kwimage.imread(fpath, overview=0, backend='gdal')
             >>> data1 = kwimage.imread(fpath, overview=1, backend='gdal')
+            >>> transform1 = kwimage.Affine.affine(scale=0.1)
+            >>> transform2 = kwimage.Affine.affine(scale=2.0)
             >>> delayed_load = DelayedLoad(fpath=fpath)
             >>> delayed_load._ensure_dsize()
-            >>> self = delayed_load.warp(kwimage.Affine.affine(scale=0.1), dsize='auto')
-            >>> transform = kwimage.Affine.affine(scale=2.0)
-            >>> imdata = self.finalize(transform=transform)
+            >>> self = delayed_load.warp(transform1, dsize='auto')
+            >>> orig_imdata1 = delayed_load.finalize(auto_overview=0)
+            >>> shrunk_imdata1 = self.finalize(auto_overview=0)
+            >>> rescale_imdata1 = self.finalize(transform=transform2, auto_overview=0)
+            >>> #
+            >>> orig_imdata2 = delayed_load.finalize(auto_overview=1)
+            >>> shrunk_imdata2 = self.finalize(auto_overview=1)
+            >>> rescale_imdata2 = self.finalize(transform=transform2, auto_overview=1)
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
-            >>> kwplot.imshow(imdata)
+            >>> kwplot.imshow(orig_imdata1, pnum=(2, 3, 1), title='orig')
+            >>> kwplot.imshow(shrunk_imdata1, pnum=(2, 3, 2), title='shrunk')
+            >>> kwplot.imshow(rescale_imdata1, pnum=(2, 3, 3), title='rescaled')
+            >>> kwplot.imshow(orig_imdata2, pnum=(2, 3, 4), title='orig')
+            >>> kwplot.imshow(shrunk_imdata2, pnum=(2, 3, 5), title='shrunk')
+            >>> kwplot.imshow(rescale_imdata2, pnum=(2, 3, 6), title='rescaled')
+
+        Ignore:
+            # benchmark
+            import timerit
+            ti = timerit.Timerit(3, verbose=1)
+            ti.reset('auto-overview=0').call(self.finalize, auto_overview=0)
+            ti.reset('auto-overview=0 + tf').call(self.finalize, transform=transform2, auto_overview=0)
+            ti.reset('auto-overview=1').call(delayed_load.finalize, auto_overview=1)
+            ti.reset('auto-overview=1 + tf').call(delayed_load.finalize, transform=transform2, auto_overview=1)
         """
         # todo: needs to be extended for the case where the sub_data is a
         # nested chain of transforms.
@@ -915,7 +995,7 @@ class DelayedWarp(DelayedImageOperation):
             subkw = ub.dict_diff(kwargs, {'as_xarray'})
 
             # Auto overview support
-            AUTO_OVERVIEWS = 0
+            AUTO_OVERVIEWS = kwargs.get('auto_overview', self._DEFAULT_AUTO_OVERVIEW)
             if AUTO_OVERVIEWS:
                 params = transform.decompose()
                 sx, sy = params['scale']
@@ -923,7 +1003,7 @@ class DelayedWarp(DelayedImageOperation):
                     num_downs, residual_sx, residual_sy = kwimage.im_cv2._prepare_scale_residual(sx, sy, fudge=0)
                     rest_warp = transform @ kwimage.Affine.scale((residual_sx, residual_sy))
                     transform = rest_warp
-                subkw['overview'] = num_downs
+                    subkw['overview'] = num_downs
 
             sub_data = sub_data.finalize(**subkw)
 
@@ -973,7 +1053,7 @@ class DelayedWarp(DelayedImageOperation):
         return new
 
 
-class DelayedCrop(DelayedImageOperation):
+class DelayedCrop(DelayedImage):
     """
     Represent a delayed crop operation
 
@@ -1000,7 +1080,7 @@ class DelayedCrop(DelayedImageOperation):
     __hack_dont_optimize__ = True
 
     def __init__(self, sub_data, sub_slices):
-        if isinstance(sub_data, (DelayedCrop, DelayedWarp, DelayedChannelConcat)):
+        if isinstance(sub_data, (DelayedCrop, DelayedWarp, DelayedChannelStack)):
             raise ValueError('cant crop generally yet')
 
         self.sub_data = sub_data

@@ -7,13 +7,13 @@ from typing import Dict
 from _typeshed import Incomplete
 from collections.abc import Generator
 from kwcoco import channel_spec
-from kwcoco.util.delayed_poc.delayed_base import DelayedImageOperation
+from kwcoco.util.delayed_poc.delayed_base import DelayedImage
 from typing import Any
 
 profile: Incomplete
 
 
-class DelayedNans(DelayedImageOperation):
+class DelayedNans(DelayedImage):
     meta: Incomplete
 
     def __init__(self,
@@ -50,7 +50,7 @@ class DelayedNans(DelayedImageOperation):
         ...
 
 
-class DelayedLoad(DelayedImageOperation):
+class DelayedLoad(DelayedImage):
     __hack_dont_optimize__: bool
     meta: Incomplete
     cache: Incomplete
@@ -120,7 +120,7 @@ def dequantize(quant_data: ndarray, quantization: Dict[str, Any]) -> ndarray:
     ...
 
 
-class DelayedIdentity(DelayedImageOperation):
+class DelayedIdentity(DelayedImage):
     __hack_dont_optimize__: bool
     sub_data: Incomplete
     meta: Incomplete

@@ -665,7 +665,7 @@ class CocoImage(ub.NiceRepr):
             >>> aux_delayed3 = coco_img.delay(fused_channels, space='asset', jagged=True)
             >>> aux_delayed3.finalize()
         """
-        from kwcoco.util.util_delayed_poc import DelayedChannelConcat
+        from kwcoco.util.util_delayed_poc import DelayedChannelStack
         from kwcoco.util.util_delayed_poc import DelayedNans
         from kwimage.transform import Affine
         from kwcoco.channel_spec import FusedChannelSpec
@@ -722,7 +722,7 @@ class CocoImage(ub.NiceRepr):
             else:
                 raise ValueError('no data registered in kwcoco image')
         else:
-            delayed = DelayedChannelConcat(chan_list, jagged=jagged)
+            delayed = DelayedChannelStack(chan_list, jagged=jagged)
 
         # Reorder channels in the requested order
         if requested is not None:

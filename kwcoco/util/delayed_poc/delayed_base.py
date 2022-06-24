@@ -4,6 +4,8 @@ Base classes for delayed operations
 import ubelt as ub
 import numpy as np
 import kwimage
+# from abc import ABC, abstractmethod
+
 
 try:
     import xarray as xr
@@ -21,24 +23,26 @@ except Exception:
 # DEBUG_PRINT = print
 
 
-class DelayedVisionOperation(ub.NiceRepr):
+class DelayedArray(ub.NiceRepr):
     """
-    Base class for nodes in a tree of delayed computer-vision operations
+    Generalized ndoperations
     """
-    def __nice__(self):
-        channels = self.channels
-        return '{}, {}'.format(self.shape, channels)
 
+    def __nice__(self):
+        return '{}'.format(self.shape)
+
+    # @abstractmethod
     def finalize(self, **kwargs):
         raise NotImplementedError
 
+    # @abstractmethod
     def children(self):
         """
         Abstract method, which should generate all of the direct children of a
         node in the operation tree.
 
         Yields:
-            DelayedVisionOperation:
+            DelayedVisionMixin:
         """
         raise NotImplementedError
 
@@ -49,7 +53,7 @@ class DelayedVisionOperation(ub.NiceRepr):
 
         This returns some sort of hueristically optimized leaf repr wrt warps.
         """
-        # DEBUG_PRINT('DelayedVisionOperation._optimize_paths {}'.format(type(self)))
+        # DEBUG_PRINT('DelayedVisionMixin._optimize_paths {}'.format(type(self)))
         for child in self.children():
             yield from child._optimize_paths(**kwargs)
 
@@ -76,26 +80,47 @@ class DelayedVisionOperation(ub.NiceRepr):
             item['children'] = children
         return item
 
+
+class DelayedVisionMixin:
+    """
+    Specific case of array operations pertaining to vision use-cases
+
+    Base class for nodes in a tree of delayed computer-vision operations
+    """
+    def __nice__(self):
+        channels = self.channels
+        return '{}, {}'.format(self.shape, channels)
+
+    # @abstractmethod
     def warp(self, *args, **kwargs):
-        """ alias for delayed_warp, might change to this API in the future """
-        return self.delayed_warp(*args, **kwargs)
+        raise NotImplementedError
 
+    # @abstractmethod
     def crop(self, *args, **kwargs):
-        """ alias for delayed_crop, might change to this API in the future """
-        return self.delayed_crop(*args, **kwargs)
+        raise NotImplementedError
+
+    # Backwards compatibility
+    def delayed_warp(self, *args, **kwargs):
+        return self.warp(*args, **kwargs)
+
+    def delayed_crop(self, *args, **kwargs):
+        return self.crop(*args, **kwargs)
 
 
-class DelayedVideoOperation(DelayedVisionOperation):
+class DelayedVideo(DelayedArray, DelayedVisionMixin):
+    """
+    Specific vision use case for stacked 2D images in over time as a 3D tube
+    """
     pass
 
 
-class DelayedImageOperation(DelayedVisionOperation):
+class DelayedImage(DelayedArray, DelayedVisionMixin):
     """
-    Operations that pertain only to images
+    Specific vision use case for 2D images with some number of channels
     """
 
     @profile
-    def delayed_crop(self, region_slices):
+    def crop(self, region_slices):
         """
         Create a new delayed image that performs a crop in the transformed
         "self" space.
@@ -110,7 +135,7 @@ class DelayedImageOperation(DelayedVisionOperation):
             in the middle.
 
         Returns:
-            DelayedImageOperation: lazy executed delayed transform
+            DelayedImage: lazy executed delayed transform
 
         Example:
             >>> from kwcoco.util.delayed_poc.delayed_nodes import DelayedWarp
@@ -118,24 +143,24 @@ class DelayedImageOperation(DelayedVisionOperation):
             >>> tf2 = kwimage.Affine.affine(scale=3).matrix
             >>> self = DelayedWarp(np.random.rand(33, 33), tf2, dsize)
             >>> region_slices = (slice(5, 10), slice(1, 12))
-            >>> delayed_crop = self.delayed_crop(region_slices)
-            >>> print(ub.repr2(delayed_crop.nesting(), nl=-1, sort=0))
-            >>> delayed_crop.finalize()
+            >>> crop = self.crop(region_slices)
+            >>> print(ub.repr2(crop.nesting(), nl=-1, sort=0))
+            >>> crop.finalize()
 
         Example:
             >>> from kwcoco.util.delayed_poc.delayed_leafs import DelayedLoad
             >>> chan1 = DelayedLoad.demo('astro')
             >>> chan2 = DelayedLoad.demo('carl')
-            >>> warped1a = chan1.delayed_warp(kwimage.Affine.scale(1.2).matrix)
-            >>> warped2a = chan2.delayed_warp(kwimage.Affine.scale(1.5))
-            >>> warped1b = warped1a.delayed_warp(kwimage.Affine.scale(1.2).matrix)
-            >>> warped2b = warped2a.delayed_warp(kwimage.Affine.scale(1.5))
+            >>> warped1a = chan1.warp(kwimage.Affine.scale(1.2).matrix)
+            >>> warped2a = chan2.warp(kwimage.Affine.scale(1.5))
+            >>> warped1b = warped1a.warp(kwimage.Affine.scale(1.2).matrix)
+            >>> warped2b = warped2a.warp(kwimage.Affine.scale(1.5))
             >>> #
             >>> region_slices = (slice(97, 677), slice(5, 691))
             >>> self = warped2b
             >>> #
-            >>> crop1 = warped1b.delayed_crop(region_slices)
-            >>> crop2 = warped2b.delayed_crop(region_slices)
+            >>> crop1 = warped1b.crop(region_slices)
+            >>> crop2 = warped2b.crop(region_slices)
             >>> print(ub.repr2(warped1b.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(warped2b.nesting(), nl=-1, sort=0))
             >>> # Notice how the crop merges the two nesting layers
@@ -153,11 +178,11 @@ class DelayedImageOperation(DelayedVisionOperation):
         """
         from kwcoco.util.delayed_poc.delayed_nodes import DelayedWarp
         from kwcoco.util.delayed_poc.delayed_nodes import DelayedCrop
-        from kwcoco.util.delayed_poc.delayed_nodes import DelayedChannelConcat
-        from kwcoco.util.delayed_poc.delayed_nodes import _compute_leaf_subcrop
+        from kwcoco.util.delayed_poc.delayed_nodes import DelayedChannelStack
         from kwcoco.util.delayed_poc.delayed_leafs import DelayedLoad
         from kwcoco.util.delayed_poc.delayed_leafs import DelayedNans
-        # DEBUG_PRINT('DelayedImageOperation.delayed_crop: {}'.format(type(self)))
+        from kwcoco.util.delayed_poc.delayed_nodes import _compute_leaf_subcrop
+        # DEBUG_PRINT('DelayedImage.crop: {}'.format(type(self)))
         if region_slices is None:
             return self
         components = []
@@ -183,9 +208,9 @@ class DelayedImageOperation(DelayedVisionOperation):
             delayed_leaf.sub_data
 
             if isinstance(delayed_leaf.sub_data, (DelayedLoad, DelayedNans)):
-                # if hasattr(delayed_leaf.sub_data, 'delayed_crop'):
+                # if hasattr(delayed_leaf.sub_data, 'crop'):
                 # Hack
-                crop = delayed_leaf.sub_data.delayed_crop(leaf_crop_slices)
+                crop = delayed_leaf.sub_data.crop(leaf_crop_slices)
             else:
                 crop = DelayedCrop(delayed_leaf.sub_data, leaf_crop_slices)
 
@@ -198,9 +223,9 @@ class DelayedImageOperation(DelayedVisionOperation):
         if len(components) == 1:
             return components[0]
         else:
-            return DelayedChannelConcat(components)
+            return DelayedChannelStack(components)
 
-    def delayed_warp(self, transform, dsize=None):
+    def warp(self, transform, dsize=None):
         """
         Delayed transform the underlying data.
 
@@ -219,13 +244,14 @@ class DelayedImageOperation(DelayedVisionOperation):
         warped = DelayedWarp(self, transform=transform, dsize=dsize)
         return warped
 
+    # @abstractmethod
     def take_channels(self, channels):
         """
         Args:
             channels (Any):
 
         Returns:
-            DelayedVisionOperation :
+            DelayedVisionMixin :
                 delayed operation only on specified channels
         """
         raise NotImplementedError
