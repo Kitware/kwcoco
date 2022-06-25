@@ -125,6 +125,7 @@ class DelayedNans(DelayedImage):
         return new
 
     def warp(self, transform, dsize=None):
+        # Warping does nothing to nans, except maybe changing the dsize
         new = self.__class__(dsize, channels=self.channels)
         return new
 
@@ -188,7 +189,9 @@ class DelayedLoad(DelayedImage):
                  immediate_crop=None,
                  immediate_chan_idxs=None,
                  immediate_dsize=None,
-                 quantization=None):
+                 quantization=None,
+                 num_overviews=None):
+
         # self.data = {}
         self.meta = {}
         self.cache = {}
@@ -199,6 +202,7 @@ class DelayedLoad(DelayedImage):
         self.meta['fpath'] = fpath
         self.meta['dsize'] = dsize
         self.meta['channels'] = channels
+        self.meta['num_overviews'] = num_overviews
 
         self._immediates = {
             'crop': immediate_crop,
@@ -260,9 +264,12 @@ class DelayedLoad(DelayedImage):
         if self.meta.get('dsize', None) is None:
             h, w = disk_shape[0:2]
             self.meta['dsize'] = (w, h)
-        if self.meta.get('channels', None) is None:
-            if self.meta['num_bands'] == 3:
-                self.meta['channels'] = channel_spec.FusedChannelSpec.coerce('r|g|b')
+
+        # This is not robust. This should be removed.
+        # if self.meta.get('channels', None) is None:
+        #     if self.meta['num_bands'] == 3:
+        #         self.meta['channels'] = channel_spec.FusedChannelSpec.coerce('r|g|b')
+
         self.meta['_raw_shape'] = disk_shape
         return self
 
@@ -272,6 +279,22 @@ class DelayedLoad(DelayedImage):
             self.load_shape()
             dsize = self.dsize
         return dsize
+
+    def _ensure_num_overviews(self):
+        # Try and find the number of overviews
+        num_overviews = self.num_overviews
+        if num_overviews is None:
+            # Hack that requires a separate load of the data. Can we reuse some
+            # cache here?
+            from kwcoco.util import lazy_frame_backends
+            using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()
+            if using_gdal:
+                pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath)
+                num_overviews = pre_final.num_overviews
+            else:
+                num_overviews = 0
+            self.meta['num_overviews'] = num_overviews
+        return self.num_overviews
 
     @property
     def shape(self):
@@ -299,6 +322,10 @@ class DelayedLoad(DelayedImage):
     @property
     def fpath(self):
         return self.meta.get('fpath', None)
+
+    @property
+    def num_overviews(self):
+        return self.meta.get('num_overviews', None)
 
     @profile
     def finalize(self, **kwargs):
@@ -444,15 +471,11 @@ class DelayedLoad(DelayedImage):
         # Apply the new relative slice to the current absolute slice
         new_xstart = min(curr_xsl.start + rel_xsl.start, curr_xsl.stop)
         new_xstop = min(curr_xsl.start + rel_xsl.stop, curr_xsl.stop)
-
         new_ystart = min(curr_ysl.start + rel_ysl.start, curr_ysl.stop)
         new_ystop = min(curr_ysl.start + rel_ysl.stop, curr_ysl.stop)
 
-        new_crop = (slice(new_ystart, new_ystop),
-                    slice(new_xstart, new_xstop))
-
-        new_dsize = (new_xstop - new_xstart,
-                     new_ystop - new_ystart)
+        new_crop = (slice(new_ystart, new_ystop), slice(new_xstart, new_xstop))
+        new_dsize = (new_xstop - new_xstart, new_ystop - new_ystart)
 
         # TODO: it might be ok to remove this line
         assert self._immediates['dsize'] is None, 'does not handle'
@@ -461,6 +484,7 @@ class DelayedLoad(DelayedImage):
             fpath=self.meta['fpath'],
             num_bands=self.meta['num_bands'],
             channels=self.meta['channels'],
+            num_overviews=self.meta['num_overviews'],
             dsize=new_dsize,
             immediate_crop=new_crop,
             immediate_chan_idxs=self._immediates['chan_idxs'],
@@ -537,6 +561,7 @@ class DelayedLoad(DelayedImage):
             num_bands=num_bands,
             channels=channels,
             dsize=self.dsize,
+            num_overviews=self.meta['num_overviews'],
             immediate_dsize=self._immediates['dsize'],
             immediate_crop=self._immediates['crop'],
             immediate_chan_idxs=new_chan_ixs,

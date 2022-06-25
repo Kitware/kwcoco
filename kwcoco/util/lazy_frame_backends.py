@@ -346,7 +346,9 @@ class LazyGDalFrameFile(ub.NiceRepr):
         >>> # kwplot.imshow(self[:])
 
     Args:
-        nodata
+        fpath (str): the path to the file to load
+        nodata (None | int | str): the nodata value
+        overview (int): The overview level to load (zero is no overview)
 
     Example:
         >>> # See if we can reproduce the INTERLEAVE bug
@@ -439,16 +441,25 @@ class LazyGDalFrameFile(ub.NiceRepr):
         return len(self.shape)
 
     @ub.memoize_property
+    def num_overviews(self):
+        ds = self._ds
+        default_band0 = ds.GetRasterBand(1)
+        num_overviews = default_band0.GetOverviewCount()
+        return num_overviews
+
+    @ub.memoize_property
     def shape(self):
         ds = self._ds
         default_band0 = ds.GetRasterBand(1)
 
         if self.overview:
-            self.num_overviews = default_band0.GetOverviewCount()
-            self.load_overview = min(self.overview, self.num_overviews)
+            num_overviews = default_band0.GetOverviewCount()
+            self.load_overview = min(self.overview, num_overviews)
             if self.load_overview:
                 self.post_overview = self.overview - self.load_overview
-                assert self.post_overview == 0, 'unhandled'
+                if self.post_overview != 0:
+                    raise ValueError('unhandled: overview does not exist')
+                # Overviews are zero indexed in gdal, inconsistent, I know
                 band0 = default_band0.GetOverview(self.load_overview - 1)
             else:
                 band0 = default_band0
@@ -518,6 +529,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> import kwimage
             >>> from kwcoco.util.lazy_frame_backends import *  # NOQA
             >>> fpath = ub.grabdata('https://ipfs.io/ipfs/QmaFcb565HM9FV8f41jrfCZcu1CXsZZMXEosjmbgeBhFQr', fname='PXL_20210411_150641385.jpg')
+            >>> self = LazyGDalFrameFile(fpath, overview=2)
             >>> print(LazyGDalFrameFile(fpath, overview=0).shape)
             >>> print(LazyGDalFrameFile(fpath, overview=1).shape)
             >>> print(LazyGDalFrameFile(fpath, overview=2).shape)

@@ -42,7 +42,7 @@ class DelayedArray(ub.NiceRepr):
         node in the operation tree.
 
         Yields:
-            DelayedVisionMixin:
+            DelayedArray:
         """
         raise NotImplementedError
 
@@ -53,7 +53,7 @@ class DelayedArray(ub.NiceRepr):
 
         This returns some sort of hueristically optimized leaf repr wrt warps.
         """
-        # DEBUG_PRINT('DelayedVisionMixin._optimize_paths {}'.format(type(self)))
+        # DEBUG_PRINT('DelayedArray._optimize_paths {}'.format(type(self)))
         for child in self.children():
             yield from child._optimize_paths(**kwargs)
 
@@ -251,7 +251,7 @@ class DelayedImage(DelayedArray, DelayedVisionMixin):
             channels (Any):
 
         Returns:
-            DelayedVisionMixin :
+            DelayedArray :
                 delayed operation only on specified channels
         """
         raise NotImplementedError

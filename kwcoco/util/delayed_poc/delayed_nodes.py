@@ -484,7 +484,8 @@ class DelayedChannelStack(StackMixin, DelayedImage):
             >>> from kwcoco.util.delayed_poc.delayed_leafs import DelayedLoad
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> delayed = dset.delayed_load(1)
-            >>> astro = DelayedLoad.demo('astro').load_shape(use_channel_heuristic=True)
+            >>> astro = DelayedLoad.demo('astro').load_shape()
+            >>> astro.meta['channels'] = kwcoco.FusedChannelSpec.coerce('r|g|b')
             >>> aligned = astro.warp(kwimage.Affine.scale(600 / 512), dsize='auto')
             >>> self = combo = DelayedChannelStack(delayed.components + [aligned])
             >>> channels = 'B1|r|B8|g'
@@ -663,7 +664,7 @@ class DelayedWarp(DelayedImage):
         >>> self.finalize().shape
     """
 
-    _DEFAULT_AUTO_OVERVIEW = 0
+    _DEFAULT_AUTO_OVERVIEW = 1
 
     def __init__(self, sub_data, transform=None, dsize=None):
         transform = kwimage.Affine.coerce(transform)
@@ -960,12 +961,12 @@ class DelayedWarp(DelayedImage):
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
-            >>> kwplot.imshow(orig_imdata1, pnum=(2, 3, 1), title='orig')
-            >>> kwplot.imshow(shrunk_imdata1, pnum=(2, 3, 2), title='shrunk')
-            >>> kwplot.imshow(rescale_imdata1, pnum=(2, 3, 3), title='rescaled')
-            >>> kwplot.imshow(orig_imdata2, pnum=(2, 3, 4), title='orig')
-            >>> kwplot.imshow(shrunk_imdata2, pnum=(2, 3, 5), title='shrunk')
-            >>> kwplot.imshow(rescale_imdata2, pnum=(2, 3, 6), title='rescaled')
+            >>> kwplot.imshow(orig_imdata1, pnum=(2, 3, 1), title=f'orig, auto_overview=0: {orig_imdata1.shape}')
+            >>> kwplot.imshow(shrunk_imdata1, pnum=(2, 3, 2), title=f'shrunk, auto_overview=0: {shrunk_imdata1.shape}')
+            >>> kwplot.imshow(rescale_imdata1, pnum=(2, 3, 3), title=f'rescaled, auto_overview=0: {rescale_imdata1.shape}')
+            >>> kwplot.imshow(orig_imdata2, pnum=(2, 3, 4), title=f'orig, auto_overview=1: {orig_imdata2.shape}')
+            >>> kwplot.imshow(shrunk_imdata2, pnum=(2, 3, 5), title=f'shrunk, auto_overview=1: {shrunk_imdata2.shape}')
+            >>> kwplot.imshow(rescale_imdata2, pnum=(2, 3, 6), title=f'rescaled, auto_overview=1: {rescale_imdata2.shape}')
 
         Ignore:
             # benchmark
@@ -997,13 +998,39 @@ class DelayedWarp(DelayedImage):
             # Auto overview support
             AUTO_OVERVIEWS = kwargs.get('auto_overview', self._DEFAULT_AUTO_OVERVIEW)
             if AUTO_OVERVIEWS:
+                try:
+                    num_overviews = sub_data._ensure_num_overviews()
+                except AttributeError:
+                    num_overviews = 0
+            else:
+                num_overviews = 0
+
+            if num_overviews:
+                num_overviews = 2
                 params = transform.decompose()
                 sx, sy = params['scale']
                 if sx < 1 and sy < 1:
+                    # Note: we don't know how many overviews the underlying
+                    # image will have, if any, we we can't assume this will get
+                    # us anywhere.
                     num_downs, residual_sx, residual_sy = kwimage.im_cv2._prepare_scale_residual(sx, sy, fudge=0)
-                    rest_warp = transform @ kwimage.Affine.scale((residual_sx, residual_sy))
-                    transform = rest_warp
-                    subkw['overview'] = num_downs
+                    # Only use as many downs as we have overviews
+                    can_do = min(num_overviews, num_downs)
+                    overview_transform = kwimage.Affine.scale(1 / (2 ** can_do))
+                    # This is the transform that is implicit in using an overview
+                    # Let T be the original tranform we want
+                    # Let O be our implicit overview transform
+                    # Let R be the residual that we would need to apply to get
+                    # our full transform if we started from a pre-scaled
+                    # overview.
+                    # T = R @ O
+                    # ...
+                    # T @ O.inv = R @ O @ O.inv
+                    # T @ O.inv = R
+                    residual_transform = transform @ overview_transform.inv()
+                    transform = residual_transform
+                    # subkw['overview'] = subkw.get('overview', 0) + can_do
+                    subkw['overview'] = can_do
 
             sub_data = sub_data.finalize(**subkw)
 
@@ -1030,6 +1057,7 @@ class DelayedWarp(DelayedImage):
 
             # TODO: Use overviews here.
 
+            print(f'M={M}')
             final = kwimage.warp_affine(sub_data_, M, dsize=dsize,
                                         interpolation=interpolation,
                                         antialias=antialias)

@@ -2634,11 +2634,12 @@ class MixinCocoStats(object):
                 # hack for asset/auxiliary
                 _ = ub.dict_isect(obj, subtable_keys)
                 sub_objs = ub.peek(_.values()) if _ else None
-                for sub_obj in sub_objs:
-                    num_subobjs += 1
-                    value = sub_obj.get(col_key, None)
-                    if value is None:
-                        num_unset += 1
+                if sub_objs:
+                    for sub_obj in sub_objs:
+                        num_subobjs += 1
+                        value = sub_obj.get(col_key, None)
+                        if value is None:
+                            num_unset += 1
             if num_unset > 0:
                 msg = ub.paragraph(
                     '''
@@ -2664,10 +2665,11 @@ class MixinCocoStats(object):
 
         if config.get('img_attrs', False):
             required = config.get('img_attrs', False) == 'error'
+            # Refine this?
             _check_attrs(dset, table_key='images', col_key='width', required=required)
             _check_attrs(dset, table_key='images', col_key='height', required=required)
-            _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary', 'auxillary'], col_key='width', required=required)
-            _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary', 'auxillary'], col_key='height', required=required)
+            _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary'], col_key='width', required=required)
+            _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary'], col_key='height', required=required)
 
         if config.get('channels', True):
             for img in self.dataset.get('images', []):
