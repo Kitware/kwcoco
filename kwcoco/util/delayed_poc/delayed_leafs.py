@@ -375,8 +375,17 @@ class DelayedLoad(DelayedImage):
                 chan_slice = tuple([chan_idxs])
             if space_slice is None:
                 space_slice = tuple([slice(None), slice(None)])
-            sl = space_slice + chan_slice
 
+            if overview is not None:
+                # Modify the crop if an overview is present
+                # (need to handle this in the crop node itself too)
+                from kwcoco.util.delayed_poc.delayed_nodes import _compute_leaf_subcrop
+                slice_poly = kwimage.Boxes.from_slice(space_slice, shape=self.shape[0:2], clip=False).to_polygons()[0]
+                tf_undo_overview = kwimage.Affine.scale(2 ** overview)
+                leaf_crop_slices, _newroot = _compute_leaf_subcrop(slice_poly, tf_undo_overview)
+                space_slice = leaf_crop_slices
+
+            sl = space_slice + chan_slice
             final = pre_final[sl]
 
             # Handle nan
@@ -391,6 +400,7 @@ class DelayedLoad(DelayedImage):
                 # Note: this is very inefficient on crop
                 final = dequantize(final, self.quantization)
 
+            # This probably should be removed
             dsize = self._immediates.get('dsize', None)
             if dsize is not None:
                 final = kwimage.imresize(final, dsize=dsize, antialias=True)

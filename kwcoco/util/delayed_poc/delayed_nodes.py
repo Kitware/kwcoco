@@ -946,11 +946,13 @@ class DelayedWarp(DelayedImage):
             >>> fpath = ub.grabdata('https://ipfs.io/ipfs/QmaFcb565HM9FV8f41jrfCZcu1CXsZZMXEosjmbgeBhFQr', fname='PXL_20210411_150641385.jpg')
             >>> data0 = kwimage.imread(fpath, overview=0, backend='gdal')
             >>> data1 = kwimage.imread(fpath, overview=1, backend='gdal')
-            >>> transform1 = kwimage.Affine.affine(scale=0.1)
+            >>> #transform1 = kwimage.Affine.affine(scale=0.1)
+            >>> transform1 = kwimage.Affine.affine(scale=0.1, theta=-np.pi / 8, about=(300, 300))
             >>> transform2 = kwimage.Affine.affine(scale=2.0)
             >>> delayed_load = DelayedLoad(fpath=fpath)
             >>> delayed_load._ensure_dsize()
             >>> self = delayed_load.warp(transform1, dsize='auto')
+            >>> #
             >>> orig_imdata1 = delayed_load.finalize(auto_overview=0)
             >>> shrunk_imdata1 = self.finalize(auto_overview=0)
             >>> rescale_imdata1 = self.finalize(transform=transform2, auto_overview=0)
@@ -958,15 +960,28 @@ class DelayedWarp(DelayedImage):
             >>> orig_imdata2 = delayed_load.finalize(auto_overview=1)
             >>> shrunk_imdata2 = self.finalize(auto_overview=1)
             >>> rescale_imdata2 = self.finalize(transform=transform2, auto_overview=1)
+            >>> # With a crop
+            >>> crop = self.crop((slice(10, 60), slice(10, 60)))
+            >>> crop_imdata1 = crop.finalize(auto_overview=0)
+            >>> rescale_crop_imdata1 = crop.finalize(transform=transform2, auto_overview=0)
+            >>> #
+            >>> crop_imdata2 = crop.finalize(auto_overview=1)
+            >>> rescale_crop_imdata2 = crop.finalize(transform=transform2, auto_overview=1)
+
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
-            >>> kwplot.imshow(orig_imdata1, pnum=(2, 3, 1), title=f'orig, auto_overview=0: {orig_imdata1.shape}')
-            >>> kwplot.imshow(shrunk_imdata1, pnum=(2, 3, 2), title=f'shrunk, auto_overview=0: {shrunk_imdata1.shape}')
-            >>> kwplot.imshow(rescale_imdata1, pnum=(2, 3, 3), title=f'rescaled, auto_overview=0: {rescale_imdata1.shape}')
-            >>> kwplot.imshow(orig_imdata2, pnum=(2, 3, 4), title=f'orig, auto_overview=1: {orig_imdata2.shape}')
-            >>> kwplot.imshow(shrunk_imdata2, pnum=(2, 3, 5), title=f'shrunk, auto_overview=1: {shrunk_imdata2.shape}')
-            >>> kwplot.imshow(rescale_imdata2, pnum=(2, 3, 6), title=f'rescaled, auto_overview=1: {rescale_imdata2.shape}')
+            >>> pnum_ = kwplot.PlotNums(nRows=2, nCols=5)
+            >>> kwplot.imshow(orig_imdata1, pnum=pnum_(), title=f'orig, auto_overview=0: {orig_imdata1.shape}')
+            >>> kwplot.imshow(shrunk_imdata1, pnum=pnum_(), title=f'shrunk, auto_overview=0: {shrunk_imdata1.shape}')
+            >>> kwplot.imshow(rescale_imdata1, pnum=pnum_(), title=f'rescaled, auto_overview=0: {rescale_imdata1.shape}')
+            >>> kwplot.imshow(crop_imdata1, pnum=pnum_(), title=f'rescaled, auto_overview=0: {crop_imdata1.shape}')
+            >>> kwplot.imshow(rescale_crop_imdata1, pnum=pnum_(), title=f'rescaled, auto_overview=0: {rescale_crop_imdata1.shape}')
+            >>> kwplot.imshow(orig_imdata2, pnum=pnum_(), title=f'orig, auto_overview=1: {orig_imdata2.shape}')
+            >>> kwplot.imshow(shrunk_imdata2, pnum=pnum_(), title=f'shrunk, auto_overview=1: {shrunk_imdata2.shape}')
+            >>> kwplot.imshow(rescale_imdata2, pnum=pnum_(), title=f'rescaled, auto_overview=1: {rescale_imdata2.shape}')
+            >>> kwplot.imshow(crop_imdata2, pnum=pnum_(), title=f'crop, auto_overview=1: {crop_imdata2.shape}')
+            >>> kwplot.imshow(rescale_crop_imdata2, pnum=pnum_(), title=f'crop-rescaled, auto_overview=1: {rescale_crop_imdata2.shape}')
 
         Ignore:
             # benchmark
@@ -1055,9 +1070,6 @@ class DelayedWarp(DelayedImage):
             M = np.asarray(transform)
             antialias = kwargs.get('antialias', True)
 
-            # TODO: Use overviews here.
-
-            print(f'M={M}')
             final = kwimage.warp_affine(sub_data_, M, dsize=dsize,
                                         interpolation=interpolation,
                                         antialias=antialias)
@@ -1146,7 +1158,9 @@ class DelayedCrop(DelayedImage):
     @profile
     def finalize(self, **kwargs):
         if hasattr(self.sub_data, 'finalize'):
-            return self.sub_data.finalize(**kwargs)[self.sub_slices]
+            assert not kwargs.get('overview', None), 'overview is not handled in crop logic yet'
+            final = self.sub_data.finalize(**kwargs)
+            return final[self.sub_slices]
         else:
             return self.sub_data[self.sub_slices]
 
@@ -1160,6 +1174,10 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
     Given a region in a "root" image and a trasnform between that "root" and
     some "leaf" image, compute the appropriate quantized region in the "leaf"
     image and the adjusted transformation between that root and leaf.
+
+    Args:
+        root_region_bounds (kwimage.Polygon):
+        tf_leaf_to_root (kwimage.Affine):
 
     Example:
         >>> region_slices = (slice(33, 100), slice(22, 62))
