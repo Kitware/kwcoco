@@ -12,6 +12,9 @@ from kwcoco.util.delayed_poc.delayed_base import DelayedVideo
 # from kwcoco.util.delayed_poc.delayed_base import DelayedArrayOperation
 from kwcoco.util.delayed_poc.delayed_base import DelayedVisionMixin  # NOQA
 from kwcoco.util.delayed_poc.delayed_base import DelayedArray  # NOQA
+from kwcoco.util.delayed_poc.helpers import _auto_dsize
+from kwcoco.util.delayed_poc.helpers import _largest_shape
+from kwcoco.util.delayed_poc.helpers import _compute_leaf_subcrop  # NOQA
 
 try:
     import xarray as xr
@@ -664,7 +667,7 @@ class DelayedWarp(DelayedImage):
         >>> self.finalize().shape
     """
 
-    _DEFAULT_AUTO_OVERVIEW = 1
+    _DEFAULT_AUTO_OVERVIEW = 0
 
     def __init__(self, sub_data, transform=None, dsize=None):
         transform = kwimage.Affine.coerce(transform)
@@ -947,7 +950,7 @@ class DelayedWarp(DelayedImage):
             >>> data0 = kwimage.imread(fpath, overview=0, backend='gdal')
             >>> data1 = kwimage.imread(fpath, overview=1, backend='gdal')
             >>> #transform1 = kwimage.Affine.affine(scale=0.1)
-            >>> transform1 = kwimage.Affine.affine(scale=0.1, theta=-np.pi / 8, about=(300, 300))
+            >>> transform1 = kwimage.Affine.affine(scale=0.1, theta=-np.pi / 16, about=(0, 0))
             >>> transform2 = kwimage.Affine.affine(scale=2.0)
             >>> delayed_load = DelayedLoad(fpath=fpath)
             >>> delayed_load._ensure_dsize()
@@ -1021,7 +1024,6 @@ class DelayedWarp(DelayedImage):
                 num_overviews = 0
 
             if num_overviews:
-                num_overviews = 2
                 params = transform.decompose()
                 sx, sy = params['scale']
                 if sx < 1 and sy < 1:
@@ -1166,104 +1168,3 @@ class DelayedCrop(DelayedImage):
 
     def _optimize_paths(self, **kwargs):
         raise NotImplementedError('cant look at leafs through crop atm')
-
-
-@profile
-def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
-    r"""
-    Given a region in a "root" image and a trasnform between that "root" and
-    some "leaf" image, compute the appropriate quantized region in the "leaf"
-    image and the adjusted transformation between that root and leaf.
-
-    Args:
-        root_region_bounds (kwimage.Polygon):
-        tf_leaf_to_root (kwimage.Affine):
-
-    Example:
-        >>> region_slices = (slice(33, 100), slice(22, 62))
-        >>> region_shape = (100, 100, 1)
-        >>> root_region_box = kwimage.Boxes.from_slice(region_slices, shape=region_shape)
-        >>> root_region_bounds = root_region_box.to_polygons()[0]
-        >>> tf_leaf_to_root = kwimage.Affine.affine(scale=7).matrix
-        >>> slices, tf_new = _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root)
-        >>> print('tf_new =\n{!r}'.format(tf_new))
-        >>> print('slices = {!r}'.format(slices))
-    """
-    # Transform the region bounds into the sub-image space
-    tf_leaf_to_root = kwimage.Affine.coerce(tf_leaf_to_root)
-    tf_root_to_leaf = tf_leaf_to_root.inv()
-    tf_root_to_leaf = tf_root_to_leaf.__array__()
-    leaf_region_bounds = root_region_bounds.warp(tf_root_to_leaf)
-    leaf_region_box = leaf_region_bounds.bounding_box().to_ltrb()
-
-    # Quantize to a region that is possible to sample from
-    leaf_crop_box = leaf_region_box.quantize()
-
-    # is this ok?
-    leaf_crop_box = leaf_crop_box.clip(0, 0, None, None)
-
-    # Because we sampled a large quantized region, we need to modify the
-    # transform to nudge it a bit to the left, undoing the quantization,
-    # which has a bit of extra padding on the left, before applying the
-    # final transform.
-    # subpixel_offset = leaf_region_box.data[0, 0:2]
-    crop_offset = leaf_crop_box.data[0, 0:2]
-    root_offset = root_region_bounds.exterior.data.min(axis=0)
-
-    tf_root_to_newroot = kwimage.Affine.affine(offset=-root_offset).matrix
-    tf_newleaf_to_leaf = kwimage.Affine.affine(offset=crop_offset).matrix
-
-    # Resample the smaller region to align it with the root region
-    # Note: The right most transform is applied first
-    tf_newleaf_to_newroot = (
-        tf_root_to_newroot @
-        tf_leaf_to_root @
-        tf_newleaf_to_leaf
-    )
-
-    lt_x, lt_y, rb_x, rb_y = leaf_crop_box.data[0, 0:4]
-    leaf_crop_slices = (slice(lt_y, rb_y), slice(lt_x, rb_x))
-
-    return leaf_crop_slices, tf_newleaf_to_newroot
-
-
-def _largest_shape(shapes):
-    """
-    Finds maximum over all shapes
-
-    Example:
-        >>> shapes = [
-        >>>     (10, 20), None, (None, 30), (40, 50, 60, None), (100,)
-        >>> ]
-        >>> largest = _largest_shape(shapes)
-        >>> print('largest = {!r}'.format(largest))
-        >>> assert largest == (100, 50, 60, None)
-    """
-    def _nonemax(a, b):
-        if a is None or b is None:
-            return a or b
-        return max(a, b)
-    import itertools as it
-    largest = []
-    for shape in shapes:
-        if shape is not None:
-            largest = [
-                _nonemax(c1, c2)
-                for c1, c2 in it.zip_longest(largest, shape, fillvalue=None)
-            ]
-    largest = tuple(largest)
-    return largest
-
-
-def _auto_dsize(transform, sub_dsize):
-    sub_w, sub_h = sub_dsize
-    sub_bounds = kwimage.Coords(
-        np.array([[0,     0], [sub_w, 0],
-                  [0, sub_h], [sub_w, sub_h]])
-    )
-    bounds = sub_bounds.warp(transform.matrix)
-    max_xy = np.ceil(bounds.data.max(axis=0))
-    max_x = int(max_xy[0])
-    max_y = int(max_xy[1])
-    dsize = (max_x, max_y)
-    return dsize

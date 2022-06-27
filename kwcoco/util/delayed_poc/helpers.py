@@ -1,0 +1,233 @@
+import kwimage
+import ubelt as ub
+import numpy as np
+
+
+try:
+    import xdev
+    profile = xdev.profile
+except Exception:
+    profile = ub.identity
+
+
+def _auto_dsize(transform, sub_dsize):
+    sub_w, sub_h = sub_dsize
+    sub_bounds = kwimage.Coords(
+        np.array([[0,     0], [sub_w, 0],
+                  [0, sub_h], [sub_w, sub_h]])
+    )
+    bounds = sub_bounds.warp(transform.matrix)
+    max_xy = np.ceil(bounds.data.max(axis=0))
+    max_x = int(max_xy[0])
+    max_y = int(max_xy[1])
+    dsize = (max_x, max_y)
+    return dsize
+
+
+def _largest_shape(shapes):
+    """
+    Finds maximum over all shapes
+
+    Example:
+        >>> shapes = [
+        >>>     (10, 20), None, (None, 30), (40, 50, 60, None), (100,)
+        >>> ]
+        >>> largest = _largest_shape(shapes)
+        >>> print('largest = {!r}'.format(largest))
+        >>> assert largest == (100, 50, 60, None)
+    """
+    def _nonemax(a, b):
+        if a is None or b is None:
+            return a or b
+        return max(a, b)
+    import itertools as it
+    largest = []
+    for shape in shapes:
+        if shape is not None:
+            largest = [
+                _nonemax(c1, c2)
+                for c1, c2 in it.zip_longest(largest, shape, fillvalue=None)
+            ]
+    largest = tuple(largest)
+    return largest
+
+
+@profile
+def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
+    r"""
+    Swaps a warp -> crop into the corresponding crop -> warp
+
+    Given a region in a "root" image and a trasnform between that "root" and
+    some "leaf" image, compute the appropriate quantized region in the "leaf"
+    image and the adjusted transformation between that root and leaf.
+
+    Args:
+        root_region_bounds (kwimage.Polygon):
+        tf_leaf_to_root (kwimage.Affine):
+
+    Example:
+        >>> region_slices = (slice(33, 100), slice(22, 62))
+        >>> region_shape = (100, 100, 1)
+        >>> root_region_box = kwimage.Boxes.from_slice(region_slices, shape=region_shape)
+        >>> root_region_bounds = root_region_box.to_polygons()[0]
+        >>> tf_leaf_to_root = kwimage.Affine.affine(scale=7).matrix
+        >>> slices, tf_new = _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root)
+        >>> print('tf_new =\n{!r}'.format(tf_new))
+        >>> print('slices = {!r}'.format(slices))
+    """
+    # Transform the region bounds into the sub-image space
+    tf_leaf_to_root = kwimage.Affine.coerce(tf_leaf_to_root)
+    tf_root_to_leaf = tf_leaf_to_root.inv()
+    tf_root_to_leaf = tf_root_to_leaf.__array__()
+    leaf_region_bounds = root_region_bounds.warp(tf_root_to_leaf)
+    leaf_region_box = leaf_region_bounds.bounding_box().to_ltrb()
+
+    # Quantize to a region that is possible to sample from
+    leaf_crop_box = leaf_region_box.quantize()
+
+    # is this ok?
+    leaf_crop_box = leaf_crop_box.clip(0, 0, None, None)
+
+    # Because we sampled a large quantized region, we need to modify the
+    # transform to nudge it a bit to the left, undoing the quantization,
+    # which has a bit of extra padding on the left, before applying the
+    # final transform.
+    # subpixel_offset = leaf_region_box.data[0, 0:2]
+    crop_offset = leaf_crop_box.data[0, 0:2]
+    root_offset = root_region_bounds.exterior.data.min(axis=0)
+
+    tf_root_to_newroot = kwimage.Affine.affine(offset=-root_offset).matrix
+    tf_newleaf_to_leaf = kwimage.Affine.affine(offset=crop_offset).matrix
+
+    # Resample the smaller region to align it with the root region
+    # Note: The right most transform is applied first
+    tf_newleaf_to_newroot = (
+        tf_root_to_newroot @
+        tf_leaf_to_root @
+        tf_newleaf_to_leaf
+    )
+
+    lt_x, lt_y, rb_x, rb_y = leaf_crop_box.data[0, 0:4]
+    leaf_crop_slices = (slice(lt_y, rb_y), slice(lt_x, rb_x))
+
+    return leaf_crop_slices, tf_newleaf_to_newroot
+
+
+@profile
+def _swap_crop_transform2(inner_region, outer_transform):
+    r"""
+    Swaps a crop -> warp into the corresponding warp -> crop -> (maybe warp?)
+
+    This is used for moving overviews to the inside.
+
+    Args:
+        inner_region (kwimage.Polygon):
+        outer_transform (kwimage.Affine):
+
+    Example:
+        >>> region_slices = (slice(33, 100), slice(22, 62))
+        >>> region_shape = (100, 100, 1)
+        >>> inner_region = kwimage.Boxes.from_slice(region_slices)
+        >>> inner_region = inner_region.to_polygons()[0]
+        >>> outer_transform = kwimage.Affine.affine(scale=1/4)
+        >>> new_inner_warp, outer_crop, new_outer_warp = _swap_crop_transform2(inner_region, outer_transform)
+        >>> print('new_inner_warp = {}'.format(ub.repr2(new_inner_warp, nl=1)))
+        >>> print('outer_crop = {}'.format(ub.repr2(outer_crop, nl=1)))
+        >>> print('new_outer_warp = {}'.format(ub.repr2(new_outer_warp, nl=1)))
+    """
+    # Find where the inner region maps to after the transform is applied
+    outer_region = inner_region.warp(outer_transform)
+
+    # Transform the region bounds into the sub-image space
+    outer_box = outer_region.bounding_box().to_ltrb()
+
+    # Quantize to a region that is possible to sample from
+    outer_crop_box = outer_box.quantize()
+
+    # is this ok?
+    outer_crop_box = outer_crop_box.clip(0, 0, None, None)
+
+    # Because the new crop might not be perfectly aligned, we might need to
+    # nudge it a bit after we crop out its bounds.
+    crop_offset = outer_crop_box.data[0, 0:2]
+    outer_offset = outer_region.exterior.data.min(axis=0)
+
+    # Compute the extra transform that will realign the quantized croped data
+    # with the original warped inner crop.
+    tf_crop_to_box = kwimage.Affine.affine(
+        offset=crop_offset - outer_offset
+    )
+
+    lt_x, lt_y, rb_x, rb_y = outer_crop_box.data[0, 0:4]
+    outer_crop = (slice(lt_y, rb_y), slice(lt_x, rb_x))
+    new_outer_warp = tf_crop_to_box
+
+    # The inner warp will be the same as the original outer warp.
+    new_inner_warp = outer_transform
+
+    return new_inner_warp, outer_crop, new_outer_warp
+
+
+def dequantize(quant_data, quantization):
+    """
+    Helper for dequantization
+
+    Args:
+        quant_data (ndarray):
+            data to dequantize
+
+        quantization (Dict[str, Any]):
+            quantization information dictionary to undo.
+            Expected keys are:
+            orig_type (str)
+            orig_min (float)
+            orig_max (float)
+            quant_min (float)
+            quant_max (float)
+            nodata (None | int)
+
+    Returns:
+        ndarray : dequantized data
+
+    Example:
+        >>> quant_data = (np.random.rand(4, 4) * 256).astype(np.uint8)
+        >>> quantization = {
+        >>>     'orig_dtype': 'float32',
+        >>>     'orig_min': 0,
+        >>>     'orig_max': 1,
+        >>>     'quant_min': 0,
+        >>>     'quant_max': 255,
+        >>>     'nodata': None,
+        >>> }
+        >>> dequantize(quant_data, quantization)
+
+    Example:
+        >>> quant_data = np.ones((4, 4), dtype=np.uint8)
+        >>> quantization = {
+        >>>     'orig_dtype': 'float32',
+        >>>     'orig_min': 0,
+        >>>     'orig_max': 1,
+        >>>     'quant_min': 1,
+        >>>     'quant_max': 1,
+        >>>     'nodata': None,
+        >>> }
+        >>> dequantize(quant_data, quantization)
+    """
+    orig_dtype = quantization.get('orig_dtype', 'float32')
+    orig_min = quantization.get('orig_min', 0)
+    orig_max = quantization.get('orig_max', 1)
+    quant_min = quantization.get('quant_min', 0)
+    quant_max = quantization['quant_max']
+    nodata = quantization.get('nodata', None)
+    orig_extent = orig_max - orig_min
+    quant_extent = quant_max - quant_min
+    if quant_extent == 0:
+        scale = 0
+    else:
+        scale = (orig_extent / quant_extent)
+    dequant = quant_data.astype(orig_dtype)
+    dequant = (dequant - quant_min) * scale + orig_min
+    if nodata is not None:
+        mask = quant_data == nodata
+        dequant[mask] = np.nan
+    return dequant

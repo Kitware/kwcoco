@@ -411,6 +411,12 @@ class LazyGDalFrameFile(ub.NiceRepr):
             if GLOBAL_GDAL_CACHE is not None:
                 GLOBAL_GDAL_CACHE[_fpath] = ds
 
+    def get_overview(self, overview):
+        new = self.__class__(self.fpath, nodata=self.nodata,
+                             overview=overview)
+        new._ds_cache = self._ds_cache
+        return new
+
     @property
     def _ds(self):
         if self._ds_cache is None:

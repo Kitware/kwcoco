@@ -4,6 +4,7 @@ Base classes for delayed operations
 import ubelt as ub
 import numpy as np
 import kwimage
+from kwcoco.util.delayed_poc.helpers import _compute_leaf_subcrop
 # from abc import ABC, abstractmethod
 
 
@@ -181,7 +182,6 @@ class DelayedImage(DelayedArray, DelayedVisionMixin):
         from kwcoco.util.delayed_poc.delayed_nodes import DelayedChannelStack
         from kwcoco.util.delayed_poc.delayed_leafs import DelayedLoad
         from kwcoco.util.delayed_poc.delayed_leafs import DelayedNans
-        from kwcoco.util.delayed_poc.delayed_nodes import _compute_leaf_subcrop
         # DEBUG_PRINT('DelayedImage.crop: {}'.format(type(self)))
         if region_slices is None:
             return self

@@ -7,6 +7,7 @@ import kwimage
 import kwarray
 from kwcoco import channel_spec
 from kwcoco.util.delayed_poc.delayed_base import DelayedImage
+from kwcoco.util.delayed_poc.helpers import dequantize  # NOQA
 
 try:
     import xarray as xr
@@ -578,71 +579,6 @@ class DelayedLoad(DelayedImage):
             quantization=self.quantization,
         )
         return new
-
-
-def dequantize(quant_data, quantization):
-    """
-    Helper for dequantization
-
-    Args:
-        quant_data (ndarray):
-            data to dequantize
-
-        quantization (Dict[str, Any]):
-            quantization information dictionary to undo.
-            Expected keys are:
-            orig_type (str)
-            orig_min (float)
-            orig_max (float)
-            quant_min (float)
-            quant_max (float)
-            nodata (None | int)
-
-    Returns:
-        ndarray : dequantized data
-
-    Example:
-        >>> quant_data = (np.random.rand(4, 4) * 256).astype(np.uint8)
-        >>> quantization = {
-        >>>     'orig_dtype': 'float32',
-        >>>     'orig_min': 0,
-        >>>     'orig_max': 1,
-        >>>     'quant_min': 0,
-        >>>     'quant_max': 255,
-        >>>     'nodata': None,
-        >>> }
-        >>> dequantize(quant_data, quantization)
-
-    Example:
-        >>> quant_data = np.ones((4, 4), dtype=np.uint8)
-        >>> quantization = {
-        >>>     'orig_dtype': 'float32',
-        >>>     'orig_min': 0,
-        >>>     'orig_max': 1,
-        >>>     'quant_min': 1,
-        >>>     'quant_max': 1,
-        >>>     'nodata': None,
-        >>> }
-        >>> dequantize(quant_data, quantization)
-    """
-    orig_dtype = quantization.get('orig_dtype', 'float32')
-    orig_min = quantization.get('orig_min', 0)
-    orig_max = quantization.get('orig_max', 1)
-    quant_min = quantization.get('quant_min', 0)
-    quant_max = quantization['quant_max']
-    nodata = quantization.get('nodata', None)
-    orig_extent = orig_max - orig_min
-    quant_extent = quant_max - quant_min
-    if quant_extent == 0:
-        scale = 0
-    else:
-        scale = (orig_extent / quant_extent)
-    dequant = quant_data.astype(orig_dtype)
-    dequant = (dequant - quant_min) * scale + orig_min
-    if nodata is not None:
-        mask = quant_data == nodata
-        dequant[mask] = np.nan
-    return dequant
 
 
 class DelayedIdentity(DelayedImage):
