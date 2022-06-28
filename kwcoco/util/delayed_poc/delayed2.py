@@ -370,6 +370,13 @@ class DelayedDequantize2(DelayedImage2):
             final = dequantize(final, quantization)
         return final
 
+    def _bubble_down(self):
+        DEBUG('bubble down')
+        quantization = self.meta['quantization']
+        new = copy.copy(self.subdata)
+        new.subdata = new.subdata.dequantize(quantization)
+        return new
+
     def optimize(self):
         DEBUG(f'Optimize {self.__class__.__name__}')
         new = copy.copy(self)
@@ -377,16 +384,15 @@ class DelayedDequantize2(DelayedImage2):
 
         if isinstance(new.subdata, DelayedWarp2):
             # Swap order so quantize is inside the warp
-            new = copy.copy(new.subdata)
-            new.subdata = new.subdata.dequantize(self.meta['quantization'])
+            new = new._bubble_down()
             new = new.optimize()
 
         if isinstance(new.subdata, DelayedOverview2):
             # Swap order so quantize is inside the warp
-            new = copy.copy(new.subdata)
-            new.subdata = new.subdata.dequantize(self.meta['quantization'])
+            new = new._bubble_down()
             new = new.optimize()
-        return self
+
+        return new
 
 
 class DelayedCrop2(DelayedImage2):
@@ -696,6 +702,12 @@ class DelayedOverview2(DelayedImage2):
         if isinstance(new.subdata, DelayedWarp2):
             new = new.optimize_overview_warp()
             new = new.optimize()
+
+        if isinstance(new.subdata, DelayedDequantize2):
+            # Swap order so dequantize is after the overview
+            quantization = new.subdata.meta['quantization']
+            new.subdata = new.subdata.subdata
+            new = new.dequantize(quantization)
         return new
 
 
