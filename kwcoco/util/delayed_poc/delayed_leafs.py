@@ -380,10 +380,10 @@ class DelayedLoad(DelayedImage):
             if overview is not None:
                 # Modify the crop if an overview is present
                 # (need to handle this in the crop node itself too)
-                from kwcoco.util.delayed_poc.delayed_nodes import _compute_leaf_subcrop
+                from kwcoco.util.delayed_poc.delayed_nodes import _swap_warp_after_crop
                 slice_poly = kwimage.Boxes.from_slice(space_slice, shape=self.shape[0:2], clip=False).to_polygons()[0]
                 tf_undo_overview = kwimage.Affine.scale(2 ** overview)
-                leaf_crop_slices, _newroot = _compute_leaf_subcrop(slice_poly, tf_undo_overview)
+                leaf_crop_slices, _newroot = _swap_warp_after_crop(slice_poly, tf_undo_overview)
                 space_slice = leaf_crop_slices
 
             sl = space_slice + chan_slice

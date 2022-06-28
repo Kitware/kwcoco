@@ -14,7 +14,7 @@ from kwcoco.util.delayed_poc.delayed_base import DelayedVisionMixin  # NOQA
 from kwcoco.util.delayed_poc.delayed_base import DelayedArray  # NOQA
 from kwcoco.util.delayed_poc.helpers import _auto_dsize
 from kwcoco.util.delayed_poc.helpers import _largest_shape
-from kwcoco.util.delayed_poc.helpers import _compute_leaf_subcrop  # NOQA
+from kwcoco.util.delayed_poc.helpers import _swap_warp_after_crop  # NOQA
 
 try:
     import xarray as xr

@@ -4,7 +4,7 @@ Base classes for delayed operations
 import ubelt as ub
 import numpy as np
 import kwimage
-from kwcoco.util.delayed_poc.helpers import _compute_leaf_subcrop
+from kwcoco.util.delayed_poc.helpers import _swap_warp_after_crop
 # from abc import ABC, abstractmethod
 
 
@@ -202,7 +202,7 @@ class DelayedImage(DelayedArray, DelayedVisionMixin):
             h = root_region_box.height.ravel()[0]
             root_dsize = (w, h)
 
-            leaf_crop_slices, tf_newleaf_to_newroot = _compute_leaf_subcrop(
+            leaf_crop_slices, tf_newleaf_to_newroot = _swap_warp_after_crop(
                 root_region_bounds, tf_leaf_to_root)
 
             delayed_leaf.sub_data

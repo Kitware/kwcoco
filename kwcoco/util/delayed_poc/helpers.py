@@ -53,9 +53,10 @@ def _largest_shape(shapes):
 
 
 @profile
-def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
+def _swap_warp_after_crop(root_region_bounds, tf_leaf_to_root):
     r"""
-    Swaps a warp -> crop into the corresponding crop -> warp
+    Given a warp followed by a crop, compute the corresponding crop followed by
+    a warp.
 
     Given a region in a "root" image and a trasnform between that "root" and
     some "leaf" image, compute the appropriate quantized region in the "leaf"
@@ -63,7 +64,15 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
 
     Args:
         root_region_bounds (kwimage.Polygon):
+            region representing the crop that happens after the warp
+
         tf_leaf_to_root (kwimage.Affine):
+            the warp that happens before the input crop
+
+    Returns:
+        Tuple[Tuple[slice, slice], kwimage.Affine]:
+            leaf_crop_slices - the crop that happens before the warp
+            tf_newleaf_to_newroot - warp that happens after the crop.
 
     Example:
         >>> region_slices = (slice(33, 100), slice(22, 62))
@@ -71,7 +80,7 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
         >>> root_region_box = kwimage.Boxes.from_slice(region_slices, shape=region_shape)
         >>> root_region_bounds = root_region_box.to_polygons()[0]
         >>> tf_leaf_to_root = kwimage.Affine.affine(scale=7).matrix
-        >>> slices, tf_new = _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root)
+        >>> slices, tf_new = _swap_warp_after_crop(root_region_bounds, tf_leaf_to_root)
         >>> print('tf_new =\n{!r}'.format(tf_new))
         >>> print('slices = {!r}'.format(slices))
     """
@@ -114,23 +123,42 @@ def _compute_leaf_subcrop(root_region_bounds, tf_leaf_to_root):
 
 
 @profile
-def _swap_crop_transform2(inner_region, outer_transform):
+def _swap_crop_after_warp(inner_region, outer_transform):
     r"""
-    Swaps a crop -> warp into the corresponding warp -> crop -> (maybe warp?)
+    Given a crop followed by a warp (usually an overview), compute the
+    corresponding warp followed by a crop followed by a small correction warp.
 
-    This is used for moving overviews to the inside.
+    Note that in general it is not possible to ensure the crop is the last
+    operation, there may need to be a small warp after it.
+
+    However, this is generally only useful when the warp being pushed early in
+    the operation chain corresponds to an overview, and often - but not always
+    - the final warp will simply be the identity.
 
     Args:
         inner_region (kwimage.Polygon):
+            region representing the crop that happens before the warp
+
         outer_transform (kwimage.Affine):
+            the warp that happens after the input crop
+
+    Returns:
+        Tuple[kwimage.Affine, Tuple[slice, slice], kwimage.Affine]:
+
+            new_inner_warp - the new warp to happen before the crop
+
+            outer_crop - the new crop after the main warp
+
+            new_outer_warp - a small subpixel alignment warp to happen last
 
     Example:
+        >>> from kwcoco.util.delayed_poc.helpers import *  # NOQA
         >>> region_slices = (slice(33, 100), slice(22, 62))
         >>> region_shape = (100, 100, 1)
         >>> inner_region = kwimage.Boxes.from_slice(region_slices)
         >>> inner_region = inner_region.to_polygons()[0]
         >>> outer_transform = kwimage.Affine.affine(scale=1/4)
-        >>> new_inner_warp, outer_crop, new_outer_warp = _swap_crop_transform2(inner_region, outer_transform)
+        >>> new_inner_warp, outer_crop, new_outer_warp = _swap_crop_after_warp(inner_region, outer_transform)
         >>> print('new_inner_warp = {}'.format(ub.repr2(new_inner_warp, nl=1)))
         >>> print('outer_crop = {}'.format(ub.repr2(outer_crop, nl=1)))
         >>> print('new_outer_warp = {}'.format(ub.repr2(new_outer_warp, nl=1)))

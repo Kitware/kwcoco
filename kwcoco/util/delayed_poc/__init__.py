@@ -12,7 +12,7 @@ This is similar to GDAL's virtual raster table, but it works in memory and I
 think it is easier to chain operations.
 
 SeeAlso:
-    ../../dev/symbolic_delayed.py
+    ../../../dev/symbolic_delayed.py
 
 
 WARNING:
