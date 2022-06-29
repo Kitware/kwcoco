@@ -389,7 +389,7 @@ class FusedChannelSpec(BaseChannelSpec):
     def spec(self):
         return '|'.join(self.parsed)
 
-    @ub.memoize
+    @ub.memoize_method
     def unique(self):
         return set(self.parsed)
 

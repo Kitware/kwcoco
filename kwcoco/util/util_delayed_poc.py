@@ -96,7 +96,7 @@ Example:
 Example:
     >>> import kwcoco
     >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-    >>> delayed = dset.delayed_load(1)
+    >>> delayed = dset.coco_image(1).delay(mode=0)
     >>> from kwcoco.util.util_delayed_poc import *  # NOQA
     >>> astro = DelayedLoad.demo('astro')
     >>> print('MSI = ' + ub.repr2(delayed.__json__(), nl=-3, sort=0))
@@ -1485,7 +1485,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-            >>> self = delayed = dset.delayed_load(1)
+            >>> self = delayed = dset.coco_image(1).delay(mode=0)
             >>> channels = 'B11|B8|B1|B10'
             >>> new = self.take_channels(channels)
 
@@ -1494,7 +1494,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> import kwcoco
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-            >>> delayed = dset.delayed_load(1)
+            >>> delayed = dset.coco_image(1).delay(mode=0)
             >>> astro = DelayedLoad.demo('astro').load_shape(use_channel_heuristic=True)
             >>> aligned = astro.warp(kwimage.Affine.scale(600 / 512), dsize='auto')
             >>> self = combo = DelayedChannelConcat(delayed.components + [aligned])
@@ -1517,7 +1517,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> import kwcoco
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral', use_cache=1, verbose=100)
-            >>> self = dset.delayed_load(1)
+            >>> self = dset.coco_image(1).delay(mode=0)
             >>> channels = 'B1|foobar|bazbiz|B8'
             >>> new = self.take_channels(channels)
             >>> new_cropped = new.crop((slice(10, 200), slice(12, 350)))
