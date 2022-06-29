@@ -533,7 +533,7 @@ class CocoImage(ub.NiceRepr):
 
     @profile
     def delay(self, channels=None, space='image', bundle_dpath=None,
-              jagged=False):
+              jagged=False, mode=0):
         """
         Perform a delayed load on the data in this image.
 
@@ -626,6 +626,12 @@ class CocoImage(ub.NiceRepr):
             >>> final = delayed.finalize()
             >>> assert final.shape == (512, 512, 3)
 
+            >>> delayed = coco_img.delay(mode=1)
+            >>> final = delayed.finalize()
+            >>> print('final.shape = {}'.format(ub.repr2(final.shape, nl=1)))
+            >>> assert final.shape == (512, 512, 3)
+
+
         Example:
             >>> # Test that delay works when imdata is stored in the image
             >>> # dictionary itself.
@@ -637,7 +643,7 @@ class CocoImage(ub.NiceRepr):
             >>> imdata[:] = np.arange(5)[None, None, :]
             >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
             >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
-            >>> delayed = coco_img.delay(channels='B1|Aux:2:4')
+            >>> delayed = coco_img.delay(channels='B1|Aux:2:4', mode=1)
             >>> final = delayed.finalize()
 
         Example:
@@ -665,7 +671,7 @@ class CocoImage(ub.NiceRepr):
             >>> aux_delayed3 = coco_img.delay(fused_channels, space='asset', jagged=True)
             >>> aux_delayed3.finalize()
         """
-        from kwcoco.util.util_delayed_poc import DelayedChannelStack
+        from kwcoco.util.util_delayed_poc import DelayedChannelConcat
         from kwcoco.util.util_delayed_poc import DelayedNans
         from kwimage.transform import Affine
         from kwcoco.channel_spec import FusedChannelSpec
@@ -679,11 +685,11 @@ class CocoImage(ub.NiceRepr):
 
         # Get info about the primary image and check if its channels are
         # requested (if it even has any)
-        img_info = _delay_load_imglike(bundle_dpath, img)
+        img_info = _delay_load_imglike(bundle_dpath, img, mode=mode)
         obj_info_list = [(img_info, img)]
         auxlist = img.get('auxiliary', img.get('assets', []))
         for aux in auxlist:
-            info = _delay_load_imglike(bundle_dpath, aux)
+            info = _delay_load_imglike(bundle_dpath, aux, mode=mode)
             obj_info_list.append((info, aux))
 
         chan_list = []
@@ -696,9 +702,13 @@ class CocoImage(ub.NiceRepr):
                 if include_flag:
                     chncls, chnkw = info['chan_construct']
                     chan = chncls(**chnkw)
+                    if mode == 1:
+                        quant = info.get('quantization', None)
+                        if quant is not None:
+                            chan = chan.dequantize(quant)
                     if space not in {'auxiliary', 'asset'}:
                         aux_to_img = Affine.coerce(obj.get('warp_aux_to_img', None))
-                        chan = chan.delayed_warp(
+                        chan = chan.warp(
                             aux_to_img, dsize=img_info['dsize'])
                     chan_list.append(chan)
 
@@ -722,7 +732,11 @@ class CocoImage(ub.NiceRepr):
             else:
                 raise ValueError('no data registered in kwcoco image')
         else:
-            delayed = DelayedChannelStack(chan_list, jagged=jagged)
+            if mode == 1:
+                from kwcoco.util.delayed_ops import DelayedChannelConcat2
+                delayed = DelayedChannelConcat2(chan_list, jagged=jagged)
+            else:
+                delayed = DelayedChannelConcat(chan_list, jagged=jagged)
 
         # Reorder channels in the requested order
         if requested is not None:
@@ -737,7 +751,7 @@ class CocoImage(ub.NiceRepr):
         elif space == 'video':
             img_to_vid = self.warp_vid_from_img
             # img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
-            delayed = delayed.delayed_warp(img_to_vid, dsize=dsize)
+            delayed = delayed.warp(img_to_vid, dsize=dsize)
         else:
             raise KeyError('space = {}'.format(space))
         return delayed
@@ -835,7 +849,7 @@ class CocoAsset(object):
             return self.obj.get(key, default)
 
 
-def _delay_load_imglike(bundle_dpath, obj):
+def _delay_load_imglike(bundle_dpath, obj, mode=0):
     from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedIdentity
     from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
@@ -853,15 +867,30 @@ def _delay_load_imglike(bundle_dpath, obj):
         info['dsize'] = dsize = (width, height)
     else:
         info['dsize'] = dsize = (None, None)
-    quantization = obj.get('quantization', None)
-    if imdata is not None:
-        info['chan_construct'] = (DelayedIdentity, dict(
-            sub_data=imdata, channels=channels_, dsize=dsize,
-            quantization=quantization))
-    elif fname is not None:
-        info['fpath'] = fpath = join(bundle_dpath, fname)
-        # Delaying this gives us a small speed boost
-        info['chan_construct'] = (DelayedLoad, dict(
-            fpath=fpath, channels=channels_, dsize=dsize,
-            quantization=quantization))
+
+    if mode == 0:
+        quantization = obj.get('quantization', None)
+        if imdata is not None:
+            info['chan_construct'] = (DelayedIdentity, dict(
+                sub_data=imdata, channels=channels_, dsize=dsize,
+                quantization=quantization))
+        elif fname is not None:
+            info['fpath'] = fpath = join(bundle_dpath, fname)
+            # Delaying this gives us a small speed boost
+            info['chan_construct'] = (DelayedLoad, dict(
+                fpath=fpath, channels=channels_, dsize=dsize,
+                quantization=quantization))
+    elif mode == 1:
+        from kwcoco.util.delayed_ops import DelayedLoad2, DelayedIdentity2
+        quantization = obj.get('quantization', None)
+        if imdata is not None:
+            info['chan_construct'] = (DelayedIdentity2, dict(
+                data=imdata, channels=channels_, dsize=dsize))
+        elif fname is not None:
+            info['fpath'] = fpath = join(bundle_dpath, fname)
+            info['chan_construct'] = (
+                DelayedLoad2,
+                dict(fpath=fpath, channels=channels_, dsize=dsize))
+        info['quantization'] = quantization
+
     return info

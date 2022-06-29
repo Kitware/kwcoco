@@ -233,7 +233,7 @@ if __name__ == '__main__':
                 'data/*.pyi',
                 'examples/*.pyi',
                 'metrics/*.pyi',
-                'util/delayed_poc/*.pyi',
+                'util/delayed_ops/*.pyi',
             ],
         },
         packages=find_packages('.'),

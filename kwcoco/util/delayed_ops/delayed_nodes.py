@@ -1,168 +1,21 @@
 """
-A rewrite of the delayed operations
-
-TODO:
-    The optimize logic could likley be better expressed as some sort of
-    AST transformer.
-
-Example:
-    >>> # Make a complex chain of operations and optimize it
-    >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
-    >>> import kwimage
-    >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-    >>> dimg = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
-    >>> quantization = {'quant_max': 255, 'nodata': 0}
-    >>> dimg = dimg.dequantize(quantization)
-    >>> dimg = dimg.warp({'scale': 1.1})
-    >>> dimg = dimg.warp({'scale': 1.1})
-    >>> dimg = dimg[0:400, 1:400]
-    >>> dimg = dimg.warp({'scale': 0.5})
-    >>> dimg = dimg[0:800, 1:800]
-    >>> dimg = dimg.warp({'scale': 0.5})
-    >>> dimg = dimg[0:800, 1:800]
-    >>> dimg = dimg.warp({'scale': 0.5})
-    >>> dimg = dimg.warp({'scale': 1.1})
-    >>> dimg = dimg.warp({'scale': 1.1})
-    >>> dimg = dimg.warp({'scale': 2.1})
-    >>> dimg = dimg[0:200, 1:200]
-    >>> dimg = dimg[1:200, 2:200]
-    >>> dopt = dimg.optimize()
-    >>> if 1:
-    >>>     import networkx as nx
-    >>>     dimg.write_network_text()
-    >>>     dopt.write_network_text()
-    >>> final0 = dimg.finalize()
-    >>> final1 = dopt.finalize()
-    >>> # xdoctest: +REQUIRES(--show)
-    >>> import kwplot
-    >>> kwplot.autompl()
-    >>> kwplot.imshow(final0, pnum=(1, 2, 1), fnum=1, title='raw')
-    >>> kwplot.imshow(final1, pnum=(1, 2, 2), fnum=1, title='optimized')
+Intermediate operations
 """
-import ubelt as ub
-import numpy as np
-import kwimage
 import kwarray
+import kwimage
 import copy
+import numpy as np
+import ubelt as ub
 import warnings
 from kwcoco import exceptions
 from kwcoco import channel_spec
-from kwcoco.util.util_monkey import Reloadable  # NOQA
+from kwcoco.util.delayed_ops.delayed_base import DelayedNaryOperation2, DelayedUnaryOperation2
 
 
 try:
     from xdev import profile
 except Exception:
     from ubelt import identity as profile
-
-DEBUG = ub.identity
-# DEBUG = print
-
-
-# ----------------
-# Abstract Classes
-# ----------------
-
-
-# @Reloadable.developing
-class DelayedOperation2(ub.NiceRepr):
-
-    def __init__(self):
-        self.meta = {}
-
-    def __nice__(self):
-        return '{}'.format(self.shape)
-
-    def nesting(self):
-        def _child_nesting(child):
-            if hasattr(child, 'nesting'):
-                return child.nesting()
-            elif isinstance(child, np.ndarray):
-                return {
-                    'type': 'ndarray',
-                    'shape': self.subdata.shape,
-                }
-        item = {
-            'type': self.__class__.__name__,
-            'meta': self.meta,
-        }
-        child_nodes = list(self.children())
-        if child_nodes:
-            child_nestings = [_child_nesting(child) for child in child_nodes]
-            item['children'] = child_nestings
-        return item
-
-    def as_graph(self):
-        """
-        """
-        import networkx as nx
-        graph = nx.DiGraph()
-        stack = [self]
-        while stack:
-            item = stack.pop()
-            node_id = id(item)
-            graph.add_node(node_id)
-            sub_meta = {k: v for k, v in item.meta.items() if v is not None}
-            if 'transform' in sub_meta:
-                sub_meta['transform'] = sub_meta['transform'].concise()
-                sub_meta['transform'].pop('type')
-            param_key = ub.repr2(sub_meta, sort=0, compact=1, nl=0)
-            name = item.__class__.__name__.replace('Delayed', '')
-            node_data = graph.nodes[node_id]
-            node_data['label'] = f'{name} {param_key}'
-            node_data['name'] = name
-            node_data['meta'] = sub_meta
-            for child in item.children():
-                child_id = id(child)
-                graph.add_edge(node_id, child_id)
-                stack.append(child)
-        return graph
-
-    def write_network_text(self, with_labels=True):
-        from cmd_queue.util import graph_str
-        graph = self.as_graph()
-        # import networkx as nx
-        # nx.write_network_text(graph)
-        print(graph_str(graph, with_labels=with_labels))
-
-    @property
-    def shape(self):
-        raise NotImplementedError
-
-    def children(self):
-        raise NotImplementedError
-
-    def finalize(self):
-        raise NotImplementedError
-
-    def optimize(self):
-        raise NotImplementedError
-
-
-class DelayedNaryOperation2(DelayedOperation2):
-    """
-    For operations that have multiple input arrays
-    """
-    def __init__(self, parts):
-        super().__init__()
-        self.parts = parts
-
-    def children(self):
-        yield from iter(self.parts)
-
-
-class DelayedUnaryOperation2(DelayedOperation2):
-    """
-    For operations that have a single input array
-    """
-    def __init__(self, subdata):
-        super().__init__()
-        self.subdata = subdata
-
-    def children(self):
-        if self.subdata is not None:
-            yield self.subdata
-
 
 # --------
 # Stacking
@@ -240,7 +93,7 @@ class DelayedChannelConcat2(DelayedConcat2):
     Stacks multiple arrays together.
 
     Example:
-        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwcoco
         >>> dsize = (307, 311)
         >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
@@ -328,7 +181,7 @@ class DelayedChannelConcat2(DelayedConcat2):
                 channels.
 
         Example:
-            >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> self = delayed = dset.delayed_load(1)
@@ -338,8 +191,8 @@ class DelayedChannelConcat2(DelayedConcat2):
         Example:
             >>> # Complex case
             >>> import kwcoco
-            >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_poc.delayed_leafs import DelayedLoad
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> delayed = dset.delayed_load(1)
             >>> astro = DelayedLoad.demo('astro').load_shape()
@@ -360,7 +213,7 @@ class DelayedChannelConcat2(DelayedConcat2):
         Example:
             >>> # Test case where requested channel does not exist
             >>> import kwcoco
-            >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral', use_cache=1, verbose=100)
             >>> self = dset.delayed_load(1)
             >>> channels = 'B1|foobar|bazbiz|B8'
@@ -372,7 +225,7 @@ class DelayedChannelConcat2(DelayedConcat2):
             >>> assert not np.any(np.isnan(fused[..., 0]))
             >>> assert not np.any(np.isnan(fused[..., 3]))
         """
-        from kwcoco.util.delayed_poc.delayed_leafs import DelayedNans
+        from kwcoco.util.delayed_ops.delayed_leafs import DelayedNans
         if isinstance(channels, list):
             top_idx_mapping = channels
             top_codes = self.channels.as_list()
@@ -563,6 +416,65 @@ class DelayedImage2(DelayedArray2):
 
     def take_channels(self, channels):
         raise NotImplementedError
+        # TODO: This should create a DelayedCrop2 operation that only takes
+        # bands.
+        """
+        This method returns a subset of the vision data with only the
+        specified bands / channels.
+
+        Args:
+            channels (List[int] | slice | channel_spec.FusedChannelSpec):
+                List of integers indexes, a slice, or a channel spec, which is
+                typically a pipe (`|`) delimited list of channel codes. See
+                kwcoco.ChannelSpec for more detials.
+
+        Returns:
+            DelayedLoad:
+                a new delayed load with a fused take channel operation
+
+        Note:
+            The channel subset must exist here or it will raise an error.
+            A better implementation (via pymbolic) might be able to do better
+
+        Example:
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> import kwcoco
+            >>> self = DelayedLoad.demo('astro').load_shape()
+            >>> channels = [2, 0]
+            >>> new = self.take_channels(channels)
+            >>> new3 = new.take_channels([1, 0])
+
+            >>> final1 = self.finalize()
+            >>> final2 = new.finalize()
+            >>> final3 = new3.finalize()
+            >>> assert np.all(final1[..., 2] == final2[..., 0])
+            >>> assert np.all(final1[..., 0] == final2[..., 1])
+            >>> assert final2.shape[2] == 2
+
+            >>> assert np.all(final1[..., 2] == final3[..., 1])
+            >>> assert np.all(final1[..., 0] == final3[..., 0])
+            >>> assert final3.shape[2] == 2
+        """
+        if isinstance(channels, list):
+            top_idx_mapping = channels
+        else:
+            channels = channel_spec.FusedChannelSpec.coerce(channels)
+            # Computer subindex integer mapping
+            request_codes = channels.as_list()
+            top_codes = self.channels.as_oset()
+            top_idx_mapping = [
+                top_codes.index(code)
+                for code in request_codes
+            ]
+        new_chan_ixs = top_idx_mapping
+        channels = self.meta['channels']
+        if channels is not None:
+            new_chan_parsed = list(ub.take(channels.parsed, top_idx_mapping))
+            channels = channel_spec.FusedChannelSpec(new_chan_parsed)
+
+        num_bands = len(new_chan_ixs)
+        num_bands
 
     def crop(self, space_slice):
         """
@@ -608,7 +520,7 @@ class DelayedImage2(DelayedArray2):
 
         Args:
             quantization (Dict):
-                see :func:`kwcoco.util.delayed_poc.helpers.dequantize`
+                see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
         """
         new = DelayedDequantize2(self, quantization)
         return new
@@ -629,7 +541,7 @@ class DelayedWarp2(DelayedImage2):
     Applies an affine transform to an image.
 
     Example:
-        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> self = DelayedLoad2.demo(dsize=(16, 16))._load_metadata()
         >>> warp1 = self.warp({'scale': 3})
         >>> warp2 = warp1.warp({'theta': 0.1})
@@ -665,7 +577,7 @@ class DelayedWarp2(DelayedImage2):
         super().__init__(subdata)
         transform = kwimage.Affine.coerce(transform)
         if dsize == 'auto':
-            from kwcoco.util.delayed_poc.helpers import _auto_dsize
+            from kwcoco.util.delayed_ops.helpers import _auto_dsize
             dsize = _auto_dsize(transform, self.subdata.dsize)
         self.meta['transform'] = transform
         self.meta['antialias'] = antialias
@@ -694,7 +606,6 @@ class DelayedWarp2(DelayedImage2):
 
     @profile
     def optimize(self):
-        DEBUG(f'Optimize {self.__class__.__name__}')
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedWarp2):
@@ -709,7 +620,6 @@ class DelayedWarp2(DelayedImage2):
         """
         Combine two consecutive warps into a single operation.
         """
-        DEBUG('Optimize _opt_fuse_warps')
         assert isinstance(self.subdata, DelayedWarp2)
         inner_data = self.subdata.subdata
         tf1 = self.subdata.meta['transform']
@@ -729,7 +639,7 @@ class DelayedWarp2(DelayedImage2):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:gdal)
-            >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> import kwimage
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> self = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
@@ -744,7 +654,7 @@ class DelayedWarp2(DelayedImage2):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:gdal)
-            >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> import kwimage
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> self = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
@@ -753,7 +663,6 @@ class DelayedWarp2(DelayedImage2):
             >>> print(ub.repr2(warp0.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(opt.nesting(), nl=-1, sort=0))
         """
-        DEBUG('Optimize _opt_split_warp_overview')
         inner_data = self.subdata
         num_overviews = inner_data.num_overviews
         if not num_overviews:
@@ -805,14 +714,14 @@ class DelayedDequantize2(DelayedImage2):
         Args:
             subdata (DelayedArray): data to operate on
             quantization (Dict):
-                see :func:`kwcoco.util.delayed_poc.helpers.dequantize`
+                see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
         """
         super().__init__(subdata)
         self.meta['quantization'] = quantization
         self.meta['dsize'] = subdata.dsize
 
     def finalize(self):
-        from kwcoco.util.delayed_poc.helpers import dequantize
+        from kwcoco.util.delayed_ops.helpers import dequantize
         quantization = self.meta['quantization']
         final = self.subdata.finalize()
         final = kwarray.atleast_nd(final, 3, front=False)
@@ -825,7 +734,7 @@ class DelayedDequantize2(DelayedImage2):
         """
         Example:
             >>> # Test a case that caused an error in development
-            >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath()
             >>> base = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
             >>> quantization = {'quant_max': 255, 'nodata': 0}
@@ -833,7 +742,6 @@ class DelayedDequantize2(DelayedImage2):
             >>> self.write_network_text()
             >>> opt = self.optimize()
         """
-        DEBUG(f'Optimize {self.__class__.__name__}')
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
 
@@ -848,7 +756,6 @@ class DelayedDequantize2(DelayedImage2):
         return new
 
     def _opt_dequant_before_other(self):
-        DEBUG('Optimize _opt_dequant_before_other')
         quantization = self.meta['quantization']
         new = copy.copy(self.subdata)
         new.subdata = new.subdata.dequantize(quantization)
@@ -860,7 +767,7 @@ class DelayedCrop2(DelayedImage2):
     Crops an image along integer pixel coordinates.
 
     Example:
-        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> self = DelayedLoad2.demo(dsize=(16, 16))._load_metadata()
         >>> crop1 = self[4:12, 0:16]
         >>> crop2 = crop1[2:6, 0:8]
@@ -894,7 +801,6 @@ class DelayedCrop2(DelayedImage2):
 
     @profile
     def optimize(self):
-        DEBUG(f'Optimize {self.__class__.__name__}')
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedCrop2):
@@ -912,7 +818,6 @@ class DelayedCrop2(DelayedImage2):
         """
         Combine two consecutive crops into a single operation.
         """
-        DEBUG('Optimize _opt_fuse_crops')
         assert isinstance(self.subdata, DelayedCrop2)
         # Inner is the data closer to the leaf (disk), outer is the data closer
         # to the user (output).
@@ -942,7 +847,7 @@ class DelayedCrop2(DelayedImage2):
             2. we are warping with less data.
 
         Example:
-            >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath()
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
             >>> node1 = node0.warp({'scale': 0.432, 'theta': np.pi / 3, 'about': (80, 80), 'shearx': .3, 'offset': (-50, -50)})
@@ -961,7 +866,7 @@ class DelayedCrop2(DelayedImage2):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:gdal)
-            >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
             >>> node1 = node0.warp({'scale': 1000 / 512})
@@ -971,7 +876,6 @@ class DelayedCrop2(DelayedImage2):
             >>> print(ub.repr2(node2.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(new_outer.nesting(), nl=-1, sort=0))
         """
-        DEBUG('Optimize _opt_warp_after_crop')
         assert isinstance(self.subdata, DelayedWarp2)
         # Inner is the data closer to the leaf (disk), outer is the data closer
         # to the user (output).
@@ -981,7 +885,7 @@ class DelayedCrop2(DelayedImage2):
         outer_region = kwimage.Boxes.from_slice(outer_slices)
         outer_region = outer_region.to_polygons()[0]
 
-        from kwcoco.util.delayed_poc.helpers import _swap_warp_after_crop
+        from kwcoco.util.delayed_ops.helpers import _swap_warp_after_crop
         inner_slice, outer_transform = _swap_warp_after_crop(
             outer_region, inner_transform)
 
@@ -1012,7 +916,7 @@ class DelayedOverview2(DelayedImage2):
 
     Example:
         >>> # Make a complex chain of operations and optimize it
-        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage
         >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
         >>> dimg = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
@@ -1084,7 +988,6 @@ class DelayedOverview2(DelayedImage2):
 
     @profile
     def optimize(self):
-        DEBUG(f'Optimize {self.__class__.__name__}')
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedOverview2):
@@ -1108,7 +1011,7 @@ class DelayedOverview2(DelayedImage2):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:gdal)
-            >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
             >>> node1 = node0[100:400, 120:450]
@@ -1125,7 +1028,7 @@ class DelayedOverview2(DelayedImage2):
             >>> kwplot.imshow(final0, pnum=(1, 2, 1), fnum=1, title='raw')
             >>> kwplot.imshow(final1, pnum=(1, 2, 2), fnum=1, title='optimized')
         """
-        from kwcoco.util.delayed_poc.helpers import _swap_crop_after_warp
+        from kwcoco.util.delayed_ops.helpers import _swap_crop_after_warp
         assert isinstance(self.subdata, DelayedCrop2)
         # Inner is the data closer to the leaf (disk), outer is the data closer
         # to the user (output).
@@ -1176,7 +1079,7 @@ class DelayedOverview2(DelayedImage2):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:gdal)
-            >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
             >>> node1 = node0.warp({'scale': (2.1, .7), 'offset': (20, 40)})
@@ -1212,272 +1115,3 @@ class DelayedOverview2(DelayedImage2):
         new = self.subdata.subdata.get_overview(new_inner_overview)
         new = new.warp(new_outer)
         return new
-
-
-# -----
-# Leafs
-# -----
-
-class DelayedImageLeaf2(DelayedImage2):
-
-    @profile
-    def optimize(self):
-        DEBUG(f'Optimize {self.__class__.__name__}')
-        return self
-
-
-class DelayedLoad2(DelayedImageLeaf2):
-    """
-    Reads an image from disk.
-
-    If a gdal backend is available, and the underlying image is in the
-    appropriate formate (e.g. COG) this will return a lazy reference that
-    enables fast overviews and crops.
-
-    Example:
-        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
-        >>> self = DelayedLoad2.demo(dsize=(16, 16))._load_metadata()
-        >>> data1 = self.finalize()
-
-    Example:
-        >>> # xdoctest: +REQUIRES(module:gdal)
-        >>> # Demo code to develop support for overviews
-        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
-        >>> import kwimage
-        >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-        >>> self = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
-        >>> print(f'self={self}')
-        >>> print('self.meta = {}'.format(ub.repr2(self.meta, nl=1)))
-        >>> quantization = {
-        >>>     'quant_max': 255,
-        >>>     'nodata': 0,
-        >>> }
-        >>> node0 = self
-        >>> node1 = node0.get_overview(2)
-        >>> node2 = node1[13:900, 11:700]
-        >>> node3 = node2.dequantize(quantization)
-        >>> node4 = node3.warp({'scale': 0.05})
-        >>> #
-        >>> data0 = node0.finalize()
-        >>> data1 = node1.finalize()
-        >>> data2 = node2.finalize()
-        >>> data3 = node3.finalize()
-        >>> data4 = node4.finalize()
-        >>> print(ub.repr2(node4.nesting(), nl=-1, sort=0))
-        >>> print(f'{data0.shape=} {data0.dtype=}')
-        >>> print(f'{data1.shape=} {data1.dtype=}')
-        >>> print(f'{data2.shape=} {data2.dtype=}')
-        >>> print(f'{data3.shape=} {data3.dtype=}')
-        >>> print(f'{data4.shape=} {data4.dtype=}')
-    """
-    def __init__(self, fpath, channels=None, dsize=None):
-        """
-        Args:
-            fpath (str | PathLike):
-                URI pointing at the image data to load
-
-            channels (int | str | kwcoco.FusedChannelSpec | None):
-                the underlying channels of the image if known a-priori
-
-            dsize (Tuple[int, int]):
-                The width / height of the image if known a-priori
-        """
-        super().__init__(channels=channels, dsize=dsize)
-        self.meta['fpath'] = fpath
-        self.lazy_ref = None
-
-    @property
-    def fpath(self):
-        return self.meta['fpath']
-
-    @classmethod
-    def demo(DelayedLoad2, key='astro', dsize=None, channels=None):
-        fpath = kwimage.grab_test_image_fpath(key, dsize=dsize)
-        self = DelayedLoad2(fpath, channels=channels)
-        return self
-
-    def _load_reference(self):
-        if self.lazy_ref is None:
-            from kwcoco.util import lazy_frame_backends
-            using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()
-            if using_gdal:
-                self.lazy_ref = lazy_frame_backends.LazyGDalFrameFile(self.fpath)
-            else:
-                self.lazy_ref = NotImplemented
-        return self
-
-    def prepare(self):
-        return self._load_metadata()
-
-    def _load_metadata(self):
-        self._load_reference()
-        if self.lazy_ref is NotImplemented:
-            shape = kwimage.load_image_shape(self.fpath)
-            if len(shape) == 2:
-                shape = shape + (1,)
-            num_overviews = 0
-        else:
-            shape = self.lazy_ref.shape
-            num_overviews = self.lazy_ref.num_overviews
-        h, w, c = shape
-        if self.dsize is None:
-            self.meta['dsize'] = (w, h)
-        if self.num_bands is None:
-            self.meta['num_bands'] = c
-        self.meta['num_overviews'] = num_overviews
-        return self
-
-    def finalize(self):
-        self._load_reference()
-        if self.lazy_ref is NotImplemented:
-            warnings.warn('DelayedLoad2 may not be efficient without gdal')
-            pre_final = kwimage.imread(self.fpath)
-            pre_final = kwarray.atleast_nd(pre_final, 3)
-        else:
-            return self.lazy_ref
-
-
-class DelayedNans2(DelayedImageLeaf2):
-    """
-    Constructs nan channels as needed
-
-    Example:
-        self = DelayedNans((10, 10), channel_spec.FusedChannelSpec.coerce('rgb'))
-        region_slices = (slice(5, 10), slice(1, 12))
-        delayed = self.crop(region_slices)
-
-    Example:
-        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
-        >>> import kwcoco
-        >>> dsize = (307, 311)
-        >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
-        >>> c2 = DelayedLoad2.demo('astro', dsize=dsize, channels='R|G|B').prepare()
-        >>> cat = DelayedChannelConcat2([c1, c2])
-        >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
-        >>> warp.optimize().finalize()
-
-        #>>> cropped = warped_cat.crop((slice(0, 300), slice(0, 100)))
-        #>>> cropped.finalize().shape
-    """
-    def __init__(self, dsize=None, channels=None):
-        super().__init__(channels=channels, dsize=dsize)
-
-    def finalize(self):
-        shape = self.shape
-        final = np.full(shape, fill_value=np.nan)
-        return final
-
-    def crop(self, region_slices):
-        channels = self.channels
-        dsize = self.dsize
-        data_dims = dsize[::-1]
-        data_slice, extra_pad = kwarray.embed_slice(region_slices, data_dims)
-        box = kwimage.Boxes.from_slice(data_slice)
-        new_width = box.width.ravel()[0]
-        new_height = box.height.ravel()[0]
-        new_dsize = (new_width, new_height)
-        new = self.__class__(new_dsize, channels=channels)
-        return new
-
-    def warp(self, transform, dsize=None, antialias=True, interpolation='linear'):
-        # Warping does nothing to nans, except maybe changing the dsize
-        new = self.__class__(dsize, channels=self.channels)
-        return new
-
-
-class DelayedIdentity(DelayedImageLeaf2):
-    """
-    Returns an ndarray as-is
-
-    Example:
-        self = DelayedNans((10, 10), channel_spec.FusedChannelSpec.coerce('rgb'))
-        region_slices = (slice(5, 10), slice(1, 12))
-        delayed = self.crop(region_slices)
-
-    Example:
-        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
-        >>> import kwcoco
-        >>> arr = kwimage.checkerboard()
-        >>> self = DelayedIdentity(arr, channels='gray')
-        >>> warp = self.warp({'scale': 1.07})
-        >>> warp.optimize().finalize()
-    """
-    def __init__(self, data, channels=None):
-        super().__init__(channels=channels)
-        self.data = data
-        self.meta['num_bands'] = kwimage.num_channels(data)
-        self.meta['dsize'] = data.shape[0:2][::-1]
-
-    def finalize(self):
-        return self.data
-
-
-# -----
-# Tests
-# -----
-
-
-@profile
-def shuffle_operations_test():
-    """
-    CommandLine:
-        XDEV_PROFILE=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/delayed_poc/delayed2.py shuffle_operations_test
-    """
-    # Try putting operations in differnet orders and ensure optimize always
-    # fixes it.
-
-    fpath = kwimage.grab_test_image_fpath(overviews=3)
-    base = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
-    quantization = {'quant_max': 255, 'nodata': 0}
-    base.get_overview(1).dequantize(quantization).optimize()
-
-    operations = [
-        ('warp', {'scale': 1}),
-        ('crop', (slice(None), slice(None))),
-        ('get_overview', 1),
-        ('dequantize', quantization),
-    ]
-
-    dequant_idx = [t[0] for t in operations].index('dequantize')
-
-    rng = kwarray.ensure_rng(None)
-
-    # Repeat the test multiple times.
-    num_times = 10
-    for _ in range(num_times):
-
-        num_ops = rng.randint(1, 30)
-        op_idxs = rng.randint(0, len(operations), size=num_ops)
-
-        # Don't allow dequantize more than once
-        keep_flags = op_idxs != dequant_idx
-        if not np.all(keep_flags):
-            keeper = rng.choice(np.where(~keep_flags)[0])
-            keep_flags[keeper] = True
-        op_idxs = op_idxs[keep_flags]
-
-        delayed = base
-        for idx in op_idxs:
-            name, args = operations[idx]
-            func = getattr(delayed, name)
-            delayed = func(args)
-
-        # delayed.write_network_text(with_labels="name")
-        opt = delayed.optimize()
-        # opt.write_network_text(with_labels="name")
-
-        # We always expect that we will get a sequence in the form
-        expected_sequence = ['Warp2', 'Dequantize2', 'Crop2', 'Overview2', 'Load2']
-        # But we are allowed to skip steps
-        import networkx as nx
-        graph = opt.as_graph()
-        node_order = list(nx.topological_sort(graph))
-        opname_order = [graph.nodes[n]['name'] for n in node_order]
-        if opname_order[-1] != expected_sequence[-1]:
-            raise AssertionError('Unexpected sequence')
-        prev_idx = -1
-        for opname in opname_order:
-            this_idx = expected_sequence.index(opname)
-            if this_idx <= prev_idx:
-                raise AssertionError('Unexpected sequence')
-            prev_idx = this_idx

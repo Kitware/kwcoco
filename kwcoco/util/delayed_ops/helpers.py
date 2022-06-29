@@ -152,7 +152,7 @@ def _swap_crop_after_warp(inner_region, outer_transform):
             new_outer_warp - a small subpixel alignment warp to happen last
 
     Example:
-        >>> from kwcoco.util.delayed_poc.helpers import *  # NOQA
+        >>> from kwcoco.util.delayed_ops.helpers import *  # NOQA
         >>> region_slices = (slice(33, 100), slice(22, 62))
         >>> region_shape = (100, 100, 1)
         >>> inner_region = kwimage.Boxes.from_slice(region_slices)

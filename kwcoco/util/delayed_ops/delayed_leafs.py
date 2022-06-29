@@ -1,0 +1,209 @@
+"""
+Terminal nodes
+"""
+
+import kwarray
+import kwimage
+import numpy as np
+import warnings
+from kwcoco.util.delayed_ops.delayed_nodes import DelayedImage2
+
+try:
+    from xdev import profile
+except ImportError:
+    from ubelt import identity as profile
+
+
+class DelayedImageLeaf2(DelayedImage2):
+
+    @profile
+    def optimize(self):
+        return self
+
+
+class DelayedLoad2(DelayedImageLeaf2):
+    """
+    Reads an image from disk.
+
+    If a gdal backend is available, and the underlying image is in the
+    appropriate formate (e.g. COG) this will return a lazy reference that
+    enables fast overviews and crops.
+
+    Example:
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> self = DelayedLoad2.demo(dsize=(16, 16))._load_metadata()
+        >>> data1 = self.finalize()
+
+    Example:
+        >>> # xdoctest: +REQUIRES(module:gdal)
+        >>> # Demo code to develop support for overviews
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> import kwimage
+        >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
+        >>> self = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
+        >>> print(f'self={self}')
+        >>> print('self.meta = {}'.format(ub.repr2(self.meta, nl=1)))
+        >>> quantization = {
+        >>>     'quant_max': 255,
+        >>>     'nodata': 0,
+        >>> }
+        >>> node0 = self
+        >>> node1 = node0.get_overview(2)
+        >>> node2 = node1[13:900, 11:700]
+        >>> node3 = node2.dequantize(quantization)
+        >>> node4 = node3.warp({'scale': 0.05})
+        >>> #
+        >>> data0 = node0.finalize()
+        >>> data1 = node1.finalize()
+        >>> data2 = node2.finalize()
+        >>> data3 = node3.finalize()
+        >>> data4 = node4.finalize()
+        >>> print(ub.repr2(node4.nesting(), nl=-1, sort=0))
+        >>> print(f'{data0.shape=} {data0.dtype=}')
+        >>> print(f'{data1.shape=} {data1.dtype=}')
+        >>> print(f'{data2.shape=} {data2.dtype=}')
+        >>> print(f'{data3.shape=} {data3.dtype=}')
+        >>> print(f'{data4.shape=} {data4.dtype=}')
+    """
+    def __init__(self, fpath, channels=None, dsize=None):
+        """
+        Args:
+            fpath (str | PathLike):
+                URI pointing at the image data to load
+
+            channels (int | str | kwcoco.FusedChannelSpec | None):
+                the underlying channels of the image if known a-priori
+
+            dsize (Tuple[int, int]):
+                The width / height of the image if known a-priori
+        """
+        super().__init__(channels=channels, dsize=dsize)
+        self.meta['fpath'] = fpath
+        self.lazy_ref = None
+
+    @property
+    def fpath(self):
+        return self.meta['fpath']
+
+    @classmethod
+    def demo(DelayedLoad2, key='astro', dsize=None, channels=None):
+        fpath = kwimage.grab_test_image_fpath(key, dsize=dsize)
+        self = DelayedLoad2(fpath, channels=channels)
+        return self
+
+    def _load_reference(self):
+        if self.lazy_ref is None:
+            from kwcoco.util import lazy_frame_backends
+            using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()
+            if using_gdal:
+                self.lazy_ref = lazy_frame_backends.LazyGDalFrameFile(self.fpath)
+            else:
+                self.lazy_ref = NotImplemented
+        return self
+
+    def prepare(self):
+        return self._load_metadata()
+
+    def _load_metadata(self):
+        self._load_reference()
+        if self.lazy_ref is NotImplemented:
+            shape = kwimage.load_image_shape(self.fpath)
+            if len(shape) == 2:
+                shape = shape + (1,)
+            num_overviews = 0
+        else:
+            shape = self.lazy_ref.shape
+            num_overviews = self.lazy_ref.num_overviews
+        h, w, c = shape
+        if self.dsize is None:
+            self.meta['dsize'] = (w, h)
+        if self.num_bands is None:
+            self.meta['num_bands'] = c
+        self.meta['num_overviews'] = num_overviews
+        return self
+
+    def finalize(self):
+        self._load_reference()
+        if self.lazy_ref is NotImplemented:
+            warnings.warn('DelayedLoad2 may not be efficient without gdal')
+            pre_final = kwimage.imread(self.fpath)
+            pre_final = kwarray.atleast_nd(pre_final, 3)
+        else:
+            return self.lazy_ref
+
+
+class DelayedNans2(DelayedImageLeaf2):
+    """
+    Constructs nan channels as needed
+
+    Example:
+        self = DelayedNans((10, 10), channel_spec.FusedChannelSpec.coerce('rgb'))
+        region_slices = (slice(5, 10), slice(1, 12))
+        delayed = self.crop(region_slices)
+
+    Example:
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> import kwcoco
+        >>> dsize = (307, 311)
+        >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
+        >>> c2 = DelayedLoad2.demo('astro', dsize=dsize, channels='R|G|B').prepare()
+        >>> cat = DelayedChannelConcat2([c1, c2])
+        >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
+        >>> warp.optimize().finalize()
+
+        #>>> cropped = warped_cat.crop((slice(0, 300), slice(0, 100)))
+        #>>> cropped.finalize().shape
+    """
+    def __init__(self, dsize=None, channels=None):
+        super().__init__(channels=channels, dsize=dsize)
+
+    def finalize(self):
+        shape = self.shape
+        final = np.full(shape, fill_value=np.nan)
+        return final
+
+    def crop(self, region_slices):
+        channels = self.channels
+        dsize = self.dsize
+        data_dims = dsize[::-1]
+        data_slice, extra_pad = kwarray.embed_slice(region_slices, data_dims)
+        box = kwimage.Boxes.from_slice(data_slice)
+        new_width = box.width.ravel()[0]
+        new_height = box.height.ravel()[0]
+        new_dsize = (new_width, new_height)
+        new = self.__class__(new_dsize, channels=channels)
+        return new
+
+    def warp(self, transform, dsize=None, antialias=True, interpolation='linear'):
+        # Warping does nothing to nans, except maybe changing the dsize
+        new = self.__class__(dsize, channels=self.channels)
+        return new
+
+
+class DelayedIdentity2(DelayedImageLeaf2):
+    """
+    Returns an ndarray as-is
+
+    Example:
+        self = DelayedNans((10, 10), channel_spec.FusedChannelSpec.coerce('rgb'))
+        region_slices = (slice(5, 10), slice(1, 12))
+        delayed = self.crop(region_slices)
+
+    Example:
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> import kwcoco
+        >>> arr = kwimage.checkerboard()
+        >>> self = DelayedIdentity2(arr, channels='gray')
+        >>> warp = self.warp({'scale': 1.07})
+        >>> warp.optimize().finalize()
+    """
+    def __init__(self, data, channels=None, dsize=None):
+        super().__init__(channels=channels)
+        self.data = data
+        self.meta['num_bands'] = kwimage.num_channels(data)
+        if dsize is None:
+            dsize = data.shape[0:2][::-1]
+        self.meta['dsize'] = dsize
+
+    def finalize(self):
+        return self.data
