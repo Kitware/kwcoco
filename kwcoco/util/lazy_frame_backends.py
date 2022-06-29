@@ -594,11 +594,28 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
         if not ub.iterable(index):
             index = [index]
+        else:
+            index = list(index)
 
-        index = list(index)
-        if len(index) < 3:
-            n = (3 - len(index))
-            index = index + [None] * n
+        TOTAL_DIMS = 3  # (always H, W, C)
+
+        # Handle ellipsis
+        num_ellipsis = index.count(Ellipsis)
+        if num_ellipsis > 1:
+            raise Exception('an index can only have a single ellipsis')
+        elif num_ellipsis == 1:
+            # Expand the ellipsis
+            ell_idx = index.index(Ellipsis)
+            n = (1 + TOTAL_DIMS - len(index))
+            if n > 0:
+                index = index[:ell_idx] + ([slice(None, None)] * n) + index[ell_idx + 1:]
+                # index = index[:ell_idx] + ([None] * n) + index[ell_idx + 1:]
+        else:
+            # Expand trailing dims
+            if len(index) < TOTAL_DIMS:
+                n = (TOTAL_DIMS - len(index))
+                index = index + [slice(None, None)] * n
+                # index = index + [None] * n
 
         ypart = _rectify_slice_dim(index[0], height)
         xpart = _rectify_slice_dim(index[1], width)

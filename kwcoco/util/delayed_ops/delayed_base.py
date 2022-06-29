@@ -39,12 +39,19 @@ class DelayedOperation2(ub.NiceRepr):
         """
         """
         import networkx as nx
+        import itertools as it
+        counter = it.count(0)
         graph = nx.DiGraph()
-        stack = [self]
+        stack = [(None, self)]
         while stack:
-            item = stack.pop()
-            node_id = id(item)
+            parent_id, item = stack.pop()
+            # There might be copies of the same node in concat graphs so, we
+            # cant assume the id will be unique. We can assert a forest
+            # structure though.
+            node_id = f'{next(counter):03d}_{id(item)}'
             graph.add_node(node_id)
+            if parent_id is not None:
+                graph.add_edge(parent_id, node_id)
             sub_meta = {k: v for k, v in item.meta.items() if v is not None}
             if 'transform' in sub_meta:
                 sub_meta['transform'] = sub_meta['transform'].concise()
@@ -56,9 +63,7 @@ class DelayedOperation2(ub.NiceRepr):
             node_data['name'] = name
             node_data['meta'] = sub_meta
             for child in item.children():
-                child_id = id(child)
-                graph.add_edge(node_id, child_id)
-                stack.append(child)
+                stack.append((node_id, child))
         return graph
 
     def write_network_text(self, with_labels=True):

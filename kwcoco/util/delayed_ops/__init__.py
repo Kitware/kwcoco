@@ -47,14 +47,18 @@ mkinit -m kwcoco.util.delayed_ops
 
 
 __private__ = [
-    'delayed_tests',
+    '_tests',
+]
+
+
+__protected__ = [
+    'helpers',
 ]
 
 
 from kwcoco.util.delayed_ops import delayed_base
 from kwcoco.util.delayed_ops import delayed_leafs
 from kwcoco.util.delayed_ops import delayed_nodes
-from kwcoco.util.delayed_ops import delayed_tests
 from kwcoco.util.delayed_ops import helpers
 
 from kwcoco.util.delayed_ops.delayed_base import (DelayedNaryOperation2,
@@ -73,7 +77,6 @@ from kwcoco.util.delayed_ops.delayed_nodes import (DelayedArray2,
                                                    DelayedOverview2,
                                                    DelayedStack2, DelayedWarp2,
                                                    JaggedArray2,)
-from kwcoco.util.delayed_ops.helpers import (dequantize, profile,)
 
 __all__ = ['DelayedArray2', 'DelayedChannelConcat2', 'DelayedConcat2',
            'DelayedCrop2', 'DelayedDequantize2', 'DelayedFrameStack2',
@@ -81,5 +84,4 @@ __all__ = ['DelayedArray2', 'DelayedChannelConcat2', 'DelayedConcat2',
            'DelayedLoad2', 'DelayedNans2', 'DelayedNaryOperation2',
            'DelayedOperation2', 'DelayedOverview2', 'DelayedStack2',
            'DelayedUnaryOperation2', 'DelayedWarp2', 'JaggedArray2',
-           'delayed_base', 'delayed_leafs', 'delayed_nodes',
-           'delayed_tests', 'dequantize', 'helpers', 'profile']
+           'delayed_base', 'delayed_leafs', 'delayed_nodes', 'helpers']

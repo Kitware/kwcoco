@@ -117,8 +117,8 @@ class DelayedLoad2(DelayedImageLeaf2):
         h, w, c = shape
         if self.dsize is None:
             self.meta['dsize'] = (w, h)
-        if self.num_bands is None:
-            self.meta['num_bands'] = c
+        if self.num_channels is None:
+            self.meta['num_channels'] = c
         self.meta['num_overviews'] = num_overviews
         return self
 
@@ -148,8 +148,8 @@ class DelayedNans2(DelayedImageLeaf2):
         >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
         >>> c2 = DelayedLoad2.demo('astro', dsize=dsize, channels='R|G|B').prepare()
         >>> cat = DelayedChannelConcat2([c1, c2])
-        >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
-        >>> warp.optimize().finalize()
+        >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))._validate()
+        >>> warped_cat._validate().optimize().finalize()
 
         #>>> cropped = warped_cat.crop((slice(0, 300), slice(0, 100)))
         #>>> cropped.finalize().shape
@@ -162,8 +162,11 @@ class DelayedNans2(DelayedImageLeaf2):
         final = np.full(shape, fill_value=np.nan)
         return final
 
-    def crop(self, region_slices):
-        channels = self.channels
+    def crop(self, region_slices, chan_idxs=None):
+        if chan_idxs is None:
+            channels = self.channels
+        else:
+            channels = self.channels[chan_idxs]
         dsize = self.dsize
         data_dims = dsize[::-1]
         data_slice, extra_pad = kwarray.embed_slice(region_slices, data_dims)
@@ -200,7 +203,7 @@ class DelayedIdentity2(DelayedImageLeaf2):
     def __init__(self, data, channels=None, dsize=None):
         super().__init__(channels=channels)
         self.data = data
-        self.meta['num_bands'] = kwimage.num_channels(data)
+        self.meta['num_channels'] = kwimage.num_channels(data)
         if dsize is None:
             dsize = data.shape[0:2][::-1]
         self.meta['dsize'] = dsize

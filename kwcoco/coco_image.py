@@ -671,8 +671,6 @@ class CocoImage(ub.NiceRepr):
             >>> aux_delayed3 = coco_img.delay(fused_channels, space='asset', jagged=True)
             >>> aux_delayed3.finalize()
         """
-        from kwcoco.util.util_delayed_poc import DelayedChannelConcat
-        from kwcoco.util.util_delayed_poc import DelayedNans
         from kwimage.transform import Affine
         from kwcoco.channel_spec import FusedChannelSpec
         if bundle_dpath is None:
@@ -727,16 +725,26 @@ class CocoImage(ub.NiceRepr):
             if requested is not None:
                 # Handle case where the image doesnt have the requested
                 # channels.
-                delayed = DelayedNans(dsize=dsize, channels=requested)
+                if mode == 0:
+                    from kwcoco.util.util_delayed_poc import DelayedNans
+                    delayed = DelayedNans(dsize=dsize, channels=requested)
+                elif mode == 1:
+                    from kwcoco.util.delayed_ops import DelayedNans2
+                    delayed = DelayedNans2(dsize=dsize, channels=requested)
+                else:
+                    raise KeyError(mode)
                 return delayed
             else:
                 raise ValueError('no data registered in kwcoco image')
         else:
-            if mode == 1:
+            if mode == 0:
+                from kwcoco.util.util_delayed_poc import DelayedChannelConcat
+                delayed = DelayedChannelConcat(chan_list, jagged=jagged)
+            elif mode == 1:
                 from kwcoco.util.delayed_ops import DelayedChannelConcat2
                 delayed = DelayedChannelConcat2(chan_list, jagged=jagged)
             else:
-                delayed = DelayedChannelConcat(chan_list, jagged=jagged)
+                raise KeyError(mode)
 
         # Reorder channels in the requested order
         if requested is not None:
@@ -850,7 +858,6 @@ class CocoAsset(object):
 
 
 def _delay_load_imglike(bundle_dpath, obj, mode=0):
-    from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedIdentity
     from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
     info = {}
@@ -869,6 +876,7 @@ def _delay_load_imglike(bundle_dpath, obj, mode=0):
         info['dsize'] = dsize = (None, None)
 
     if mode == 0:
+        from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedIdentity
         quantization = obj.get('quantization', None)
         if imdata is not None:
             info['chan_construct'] = (DelayedIdentity, dict(

@@ -401,6 +401,9 @@ class FusedChannelSpec(BaseChannelSpec):
             self = cls(spec.split('|'))
         return self
 
+    def __eq__(self, other):
+        return self.parsed == other.parsed
+
     @classmethod
     def coerce(cls, data):
         """
