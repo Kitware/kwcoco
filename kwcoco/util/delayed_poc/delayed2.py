@@ -45,78 +45,33 @@ import kwimage
 import kwarray
 import copy
 import warnings
+from kwcoco import exceptions
+from kwcoco import channel_spec
+from kwcoco.util.util_monkey import Reloadable  # NOQA
 
+
+try:
+    from xdev import profile
+except Exception:
+    from ubelt import identity as profile
 
 DEBUG = ub.identity
 # DEBUG = print
 
 
-class Reloadable(type):
-    """
-    This is a metaclass that overrides the behavior of isinstance and
-    issubclass when invoked on classes derived from this such that they only
-    check that the module and class names agree, which are preserved through
-    module reloads, whereas class instances are not.
-
-    This is useful for interactive develoment, but should be removed in
-    production.
-    """
-
-    def __subclasscheck__(cls, sub):
-        """
-        Is ``sub`` a subclass of ``cls``
-        """
-        cls_mod_name = (cls.__module__, cls.__name__)
-        for b in sub.__mro__:
-            b_mod_name = (b.__module__, b.__name__)
-            if cls_mod_name == b_mod_name:
-                return True
-
-    def __instancecheck__(cls, inst):
-        """
-        Is ``inst`` an instance of ``cls``
-        """
-        return cls.__subclasscheck__(inst.__class__)
+# ----------------
+# Abstract Classes
+# ----------------
 
 
-def add_metaclass(metaclass):
-    """
-    Class decorator for creating a class with a metaclass.
-    But only if we are running in IPython.
-    """
-    def wrapper(cls):
-        orig_vars = cls.__dict__.copy()
-        slots = orig_vars.get('__slots__')
-        if slots is not None:
-            if isinstance(slots, str):
-                slots = [slots]
-            for slots_var in slots:
-                orig_vars.pop(slots_var)
-        orig_vars.pop('__dict__', None)
-        orig_vars.pop('__weakref__', None)
-        if hasattr(cls, '__qualname__'):
-            orig_vars['__qualname__'] = cls.__qualname__
-        return metaclass(cls.__name__, cls.__bases__, orig_vars)
-    return wrapper
+# @Reloadable.developing
+class DelayedOperation2(ub.NiceRepr):
 
-
-# @add_metaclass(Reloadable)
-class DelayedArray2(ub.NiceRepr):
-    def __init__(self, subdata=None):
-        self.subdata = subdata
+    def __init__(self):
         self.meta = {}
 
     def __nice__(self):
         return '{}'.format(self.shape)
-
-    @property
-    def shape(self):
-        shape = self.subdata.shape
-        return shape
-
-    def children(self):
-        if self.subdata is not None:
-            yield self.subdata
 
     def nesting(self):
         def _child_nesting(child):
@@ -170,6 +125,13 @@ class DelayedArray2(ub.NiceRepr):
         # nx.write_network_text(graph)
         print(graph_str(graph, with_labels=with_labels))
 
+    @property
+    def shape(self):
+        raise NotImplementedError
+
+    def children(self):
+        raise NotImplementedError
+
     def finalize(self):
         raise NotImplementedError
 
@@ -177,7 +139,362 @@ class DelayedArray2(ub.NiceRepr):
         raise NotImplementedError
 
 
+class DelayedNaryOperation2(DelayedOperation2):
+    """
+    For operations that have multiple input arrays
+    """
+    def __init__(self, parts):
+        super().__init__()
+        self.parts = parts
+
+    def children(self):
+        yield from iter(self.parts)
+
+
+class DelayedUnaryOperation2(DelayedOperation2):
+    """
+    For operations that have a single input array
+    """
+    def __init__(self, subdata):
+        super().__init__()
+        self.subdata = subdata
+
+    def children(self):
+        if self.subdata is not None:
+            yield self.subdata
+
+
+# --------
+# Stacking
+# --------
+
+
+class DelayedStack2(DelayedNaryOperation2):
+    """
+    Stacks multiple arrays together.
+    """
+
+    def __init__(self, parts, axis):
+        super().__init__(parts=parts)
+        self.meta['axis'] = axis
+
+    def __nice__(self):
+        return '{}'.format(self.shape)
+
+    @property
+    def shape(self):
+        shape = self.subdata.shape
+        return shape
+
+
+class DelayedConcat2(DelayedNaryOperation2):
+    """
+    Stacks multiple arrays together.
+    """
+
+    def __init__(self, parts, axis):
+        super().__init__(parts=parts)
+        self.meta['axis'] = axis
+
+    def __nice__(self):
+        return '{}'.format(self.shape)
+
+    @property
+    def shape(self):
+        shape = self.subdata.shape
+        return shape
+
+
+class DelayedFrameStack2(DelayedStack2):
+    """
+    Stacks multiple arrays together.
+    """
+
+    def __init__(self, parts):
+        super().__init__(parts=parts, axis=0)
+
+# ------
+# Images
+# ------
+
+
+class JaggedArray2(ub.NiceRepr):
+    """
+    The result of an unaligned concatenate
+    """
+    def __init__(self, parts, axis):
+        self.parts = parts
+        self.axis = axis
+
+    def __nice__(self):
+        return '{}, axis={}'.format(self.shape, self.axis)
+
+    @property
+    def shape(self):
+        shapes = [p.shape for p in self.parts]
+        return shapes
+
+
+class DelayedChannelConcat2(DelayedConcat2):
+    """
+    Stacks multiple arrays together.
+
+    Example:
+        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+        >>> import kwcoco
+        >>> dsize = (307, 311)
+        >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
+        >>> c2 = DelayedLoad2.demo('astro', dsize=dsize, channels='R|G|B').prepare()
+        >>> cat = DelayedChannelConcat2([c1, c2])
+        >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
+        >>> warp.optimize().finalize()
+
+        >>> dsize = (307, 311)
+        >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
+        >>> c2 = DelayedLoad2.demo('astro', channels='R|G|B').prepare()
+        >>> cat = DelayedChannelConcat2([c1, c2], jagged=True)
+        >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
+        >>> warp.optimize().finalize()
+    """
+
+    def __init__(self, parts, dsize=None, jagged=False):
+        super().__init__(parts=parts, axis=2)
+        self.meta['jagged'] = jagged
+        if dsize is None and not jagged:
+            dsize_cands = [comp.dsize for comp in self.parts]
+            if not ub.allsame(dsize_cands):
+                raise exceptions.CoordinateCompatibilityError(
+                    # 'parts must all have the same delayed size')
+                    'parts must all have the same delayed size: got {}'.format(dsize_cands))
+            dsize = dsize_cands[0]
+        self.dsize = dsize
+        try:
+            self.num_bands = sum(comp.num_bands for comp in self.parts)
+        except TypeError:
+            if any(comp.num_bands is None for comp in self.parts):
+                self.num_bands = None
+            else:
+                raise
+
+    @property
+    def channels(self):
+        import kwcoco
+        sub_channs = []
+        for comp in self.parts:
+            comp_channels = comp.channels
+            if comp_channels is None:
+                return None
+            sub_channs.append(comp_channels)
+        channs = kwcoco.FusedChannelSpec.concat(sub_channs)
+        return channs
+
+    @property
+    def shape(self):
+        if self.meta['jagged']:
+            w = h = None
+        else:
+            w, h = self.dsize
+        return (h, w, self.num_bands)
+
+    def finalize(self):
+        """
+        Execute the final transform
+        """
+        stack = [comp.finalize() for comp in self.parts]
+        if len(stack) == 1:
+            final = stack[0]
+        else:
+            if self.meta['jagged']:
+                final = JaggedArray2(stack, axis=2)
+            else:
+                final = np.concatenate(stack, axis=2)
+        return final
+
+    @profile
+    def take_channels(self, channels):
+        """
+        This method returns a subset of the vision data with only the
+        specified bands / channels.
+
+        Args:
+            channels (List[int] | slice | channel_spec.FusedChannelSpec):
+                List of integers indexes, a slice, or a channel spec, which is
+                typically a pipe (`|`) delimited list of channel codes. See
+                kwcoco.ChannelSpec for more detials.
+
+        Returns:
+            DelayedArray2:
+                a delayed vision operation that only operates on the following
+                channels.
+
+        Example:
+            >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> self = delayed = dset.delayed_load(1)
+            >>> channels = 'B11|B8|B1|B10'
+            >>> new = self.take_channels(channels)
+
+        Example:
+            >>> # Complex case
+            >>> import kwcoco
+            >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_poc.delayed_leafs import DelayedLoad
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> delayed = dset.delayed_load(1)
+            >>> astro = DelayedLoad.demo('astro').load_shape()
+            >>> astro.meta['channels'] = kwcoco.FusedChannelSpec.coerce('r|g|b')
+            >>> aligned = astro.warp(kwimage.Affine.scale(600 / 512), dsize='auto')
+            >>> self = combo = DelayedChannelStack(delayed.parts + [aligned])
+            >>> channels = 'B1|r|B8|g'
+            >>> new = self.take_channels(channels)
+            >>> new_cropped = new.crop((slice(10, 200), slice(12, 350)))
+            >>> datas = new_cropped.finalize()
+            >>> vizable = kwimage.normalize_intensity(datas, axis=2)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> stacked = kwimage.stack_images(vizable.transpose(2, 0, 1))
+            >>> kwplot.imshow(stacked)
+
+        Example:
+            >>> # Test case where requested channel does not exist
+            >>> import kwcoco
+            >>> from kwcoco.util.delayed_poc.delayed_nodes import *  # NOQA
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral', use_cache=1, verbose=100)
+            >>> self = dset.delayed_load(1)
+            >>> channels = 'B1|foobar|bazbiz|B8'
+            >>> new = self.take_channels(channels)
+            >>> new_cropped = new.crop((slice(10, 200), slice(12, 350)))
+            >>> fused = new_cropped.finalize()
+            >>> assert fused.shape == (190, 338, 4)
+            >>> assert np.all(np.isnan(fused[..., 1:3]))
+            >>> assert not np.any(np.isnan(fused[..., 0]))
+            >>> assert not np.any(np.isnan(fused[..., 3]))
+        """
+        from kwcoco.util.delayed_poc.delayed_leafs import DelayedNans
+        if isinstance(channels, list):
+            top_idx_mapping = channels
+            top_codes = self.channels.as_list()
+            request_codes = None
+        else:
+            channels = channel_spec.FusedChannelSpec.coerce(channels)
+            # Computer subindex integer mapping
+            request_codes = channels.as_list()
+            top_codes = self.channels.as_oset()
+            top_idx_mapping = []
+            for code in request_codes:
+                try:
+                    top_idx_mapping.append(top_codes.index(code))
+                except KeyError:
+                    top_idx_mapping.append(None)
+
+        # Rearange subcomponents into the specified channel representation
+        # I am not confident that this logic is the best way to do this.
+        # This may be a bottleneck
+        subindexer = kwarray.FlatIndexer([
+            comp.num_bands for comp in self.parts])
+
+        accum = []
+        class ContiguousSegment(object):
+            def __init__(self, comp, start):
+                self.comp = comp
+                self.start = start
+                self.stop = start + 1
+                self.codes = []
+
+        curr = None
+        for request_idx, idx in enumerate(top_idx_mapping):
+            if idx is None:
+                # Requested channel does not exist in our data stack
+                comp = None
+                inner = 0
+                if curr is not None and curr.comp is None:
+                    inner = curr.stop
+            else:
+                # Requested channel exists in our data stack
+                outer, inner = subindexer.unravel(idx)
+                comp = self.parts[outer]
+            if curr is None:
+                curr = ContiguousSegment(comp, inner)
+            else:
+                is_contiguous = curr.comp is comp and (inner == curr.stop)
+                if is_contiguous:
+                    # extend the previous contiguous segment
+                    curr.stop = inner + 1
+                else:
+                    # accept previous segment and start a new one
+                    accum.append(curr)
+                    curr = ContiguousSegment(comp, inner)
+
+            # Hack for nans
+            if request_codes is not None:
+                curr.codes.append(request_codes[request_idx])
+
+        # Accumulate final segment
+        if curr is not None:
+            accum.append(curr)
+
+        # Execute the delayed operation
+        new_components = []
+        for curr in accum:
+            comp = curr.comp
+            if comp is None:
+                # Requested component did not exist, return nans
+                if request_codes is not None:
+                    nan_chan = channel_spec.FusedChannelSpec(curr.codes)
+                else:
+                    nan_chan = None
+                comp = DelayedNans(self.dsize, channels=nan_chan)
+                new_components.append(comp)
+            else:
+                if curr.start == 0 and curr.stop == comp.num_bands:
+                    # Entire component is valid, no need for sub-operation
+                    new_components.append(comp)
+                else:
+                    # Only part of the component is taken, need to sub-operate
+                    # It would be nice if we only loaded the file once if we need
+                    # multiple parts discontiguously.
+                    sub_idxs = list(range(curr.start, curr.stop))
+                    sub_comp = comp.take_channels(sub_idxs)
+                    new_components.append(sub_comp)
+
+        new = DelayedChannelConcat2(new_components, jagged=self.meta['jagged'])
+        return new
+
+    def crop(self, space_slice):
+        return self.__class__([c.crop(space_slice) for c in self.parts])
+
+    def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
+        return self.__class__([c.warp(transform, dsize, antialias, interpolation) for c in self.parts])
+
+    def dequantize(self, quantization):
+        return self.__class__([c.dequantize(quantization) for c in self.parts])
+
+    def get_overview(self, overview):
+        return self.__class__([c.get_overview(overview) for c in self.parts])
+
+
+class DelayedArray2(DelayedUnaryOperation2):
+    """
+    A generic NDArray.
+    """
+    def __init__(self, subdata=None):
+        super().__init__(subdata=subdata)
+
+    def __nice__(self):
+        return '{}'.format(self.shape)
+
+    @property
+    def shape(self):
+        shape = self.subdata.shape
+        return shape
+
+
 class DelayedImage2(DelayedArray2):
+    """
+    For the case where an array represents a 2D image with multiple channels
+    """
     def __init__(self, subdata=None, dsize=None, channels=None):
         super().__init__(subdata)
         self.channels = channels
@@ -375,6 +692,7 @@ class DelayedWarp2(DelayedImage2):
         final = kwarray.atleast_nd(final, 3, front=False)
         return final
 
+    @profile
     def optimize(self):
         DEBUG(f'Optimize {self.__class__.__name__}')
         new = copy.copy(self)
@@ -502,6 +820,7 @@ class DelayedDequantize2(DelayedImage2):
             final = dequantize(final, quantization)
         return final
 
+    @profile
     def optimize(self):
         """
         Example:
@@ -573,6 +892,7 @@ class DelayedCrop2(DelayedImage2):
         final = sub_final[space_slice]
         return final
 
+    @profile
     def optimize(self):
         DEBUG(f'Optimize {self.__class__.__name__}')
         new = copy.copy(self)
@@ -762,6 +1082,7 @@ class DelayedOverview2(DelayedImage2):
             final = sub_final.get_overview(self.meta['overview'])
         return final
 
+    @profile
     def optimize(self):
         DEBUG(f'Optimize {self.__class__.__name__}')
         new = copy.copy(self)
@@ -893,7 +1214,19 @@ class DelayedOverview2(DelayedImage2):
         return new
 
 
-class DelayedLoad2(DelayedImage2):
+# -----
+# Leafs
+# -----
+
+class DelayedImageLeaf2(DelayedImage2):
+
+    @profile
+    def optimize(self):
+        DEBUG(f'Optimize {self.__class__.__name__}')
+        return self
+
+
+class DelayedLoad2(DelayedImageLeaf2):
     """
     Reads an image from disk.
 
@@ -950,13 +1283,17 @@ class DelayedLoad2(DelayedImage2):
                 The width / height of the image if known a-priori
         """
         super().__init__(channels=channels, dsize=dsize)
-        self.fpath = fpath
+        self.meta['fpath'] = fpath
         self.lazy_ref = None
 
+    @property
+    def fpath(self):
+        return self.meta['fpath']
+
     @classmethod
-    def demo(DelayedLoad2, key='astro', dsize=None):
+    def demo(DelayedLoad2, key='astro', dsize=None, channels=None):
         fpath = kwimage.grab_test_image_fpath(key, dsize=dsize)
-        self = DelayedLoad2(fpath)
+        self = DelayedLoad2(fpath, channels=channels)
         return self
 
     def _load_reference(self):
@@ -968,6 +1305,9 @@ class DelayedLoad2(DelayedImage2):
             else:
                 self.lazy_ref = NotImplemented
         return self
+
+    def prepare(self):
+        return self._load_metadata()
 
     def _load_metadata(self):
         self._load_reference()
@@ -996,12 +1336,93 @@ class DelayedLoad2(DelayedImage2):
         else:
             return self.lazy_ref
 
-    def optimize(self):
-        DEBUG(f'Optimize {self.__class__.__name__}')
-        return self
+
+class DelayedNans2(DelayedImageLeaf2):
+    """
+    Constructs nan channels as needed
+
+    Example:
+        self = DelayedNans((10, 10), channel_spec.FusedChannelSpec.coerce('rgb'))
+        region_slices = (slice(5, 10), slice(1, 12))
+        delayed = self.crop(region_slices)
+
+    Example:
+        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+        >>> import kwcoco
+        >>> dsize = (307, 311)
+        >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
+        >>> c2 = DelayedLoad2.demo('astro', dsize=dsize, channels='R|G|B').prepare()
+        >>> cat = DelayedChannelConcat2([c1, c2])
+        >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
+        >>> warp.optimize().finalize()
+
+        #>>> cropped = warped_cat.crop((slice(0, 300), slice(0, 100)))
+        #>>> cropped.finalize().shape
+    """
+    def __init__(self, dsize=None, channels=None):
+        super().__init__(channels=channels, dsize=dsize)
+
+    def finalize(self):
+        shape = self.shape
+        final = np.full(shape, fill_value=np.nan)
+        return final
+
+    def crop(self, region_slices):
+        channels = self.channels
+        dsize = self.dsize
+        data_dims = dsize[::-1]
+        data_slice, extra_pad = kwarray.embed_slice(region_slices, data_dims)
+        box = kwimage.Boxes.from_slice(data_slice)
+        new_width = box.width.ravel()[0]
+        new_height = box.height.ravel()[0]
+        new_dsize = (new_width, new_height)
+        new = self.__class__(new_dsize, channels=channels)
+        return new
+
+    def warp(self, transform, dsize=None, antialias=True, interpolation='linear'):
+        # Warping does nothing to nans, except maybe changing the dsize
+        new = self.__class__(dsize, channels=self.channels)
+        return new
 
 
+class DelayedIdentity(DelayedImageLeaf2):
+    """
+    Returns an ndarray as-is
+
+    Example:
+        self = DelayedNans((10, 10), channel_spec.FusedChannelSpec.coerce('rgb'))
+        region_slices = (slice(5, 10), slice(1, 12))
+        delayed = self.crop(region_slices)
+
+    Example:
+        >>> from kwcoco.util.delayed_poc.delayed2 import *  # NOQA
+        >>> import kwcoco
+        >>> arr = kwimage.checkerboard()
+        >>> self = DelayedIdentity(arr, channels='gray')
+        >>> warp = self.warp({'scale': 1.07})
+        >>> warp.optimize().finalize()
+    """
+    def __init__(self, data, channels=None):
+        super().__init__(channels=channels)
+        self.data = data
+        self.meta['num_bands'] = kwimage.num_channels(data)
+        self.meta['dsize'] = data.shape[0:2][::-1]
+
+    def finalize(self):
+        return self.data
+
+
+# -----
+# Tests
+# -----
+
+
+@profile
 def shuffle_operations_test():
+    """
+    CommandLine:
+        XDEV_PROFILE=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/delayed_poc/delayed2.py shuffle_operations_test
+    """
     # Try putting operations in differnet orders and ensure optimize always
     # fixes it.
 
