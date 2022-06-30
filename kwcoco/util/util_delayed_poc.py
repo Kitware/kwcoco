@@ -874,7 +874,7 @@ class DelayedLoad(DelayedImageOperation):
             if lazy_frame_backends.LazyGDalFrameFile.available():
                 # TODO: warn if we dont have a COG.
                 pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath,
-                                                                  nodata=nodata,
+                                                                  nodata_method=nodata,
                                                                   overview=overview)
                 pre_final._ds
                 # pre_final = LazyGDalFrameFile(self.fpath)

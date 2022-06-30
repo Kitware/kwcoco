@@ -350,6 +350,9 @@ class DelayedChannelConcat2(DelayedConcat2):
     def get_overview(self, overview):
         return self.__class__([c.get_overview(overview) for c in self.parts])
 
+    def as_xarray(self):
+        return DelayedAsXarray2(self)
+
     def _validate(self):
         """
         Check that the delayed metadata corresponds with the finalized data
@@ -421,7 +424,11 @@ class DelayedImage2(DelayedArray2):
 
     @property
     def dsize(self):
-        return self.meta.get('dsize', None)
+        # return self.meta.get('dsize', None)
+        dsize = self.meta.get('dsize', None)
+        if dsize is None and self.subdata is not None:
+            dsize = self.subdata.dsize
+        return dsize
 
     @property
     def channels(self):
@@ -597,6 +604,9 @@ class DelayedImage2(DelayedArray2):
         new = DelayedOverview2(self, overview)
         return new
 
+    def as_xarray(self):
+        return DelayedAsXarray2(self)
+
     def _validate(self):
         """
         Check that the delayed metadata corresponds with the finalized data
@@ -622,6 +632,38 @@ class DelayedImage2(DelayedArray2):
                 raise AssertionError(
                     f'final and meta {k} does not agree {v1!r} != {v2!r}')
         return self
+
+
+class DelayedAsXarray2(DelayedImage2):
+    """
+    Example;
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> # without channels
+        >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
+        >>> self = base.as_xarray()
+        >>> final = self._validate().finalize()
+        >>> assert len(final.coords) == 0
+        >>> assert final.dims == ('y', 'x', 'c')
+        >>> # with channels
+        >>> base = DelayedLoad2.demo(dsize=(16, 16), channels='r|g|b').prepare()
+        >>> self = base.as_xarray()
+        >>> final = self._validate().finalize()
+        >>> assert final.coords.indexes['c'].tolist() == ['r', 'g', 'b']
+        >>> assert final.dims == ('y', 'x', 'c')
+    """
+
+    def finalize(self):
+        import xarray as xr
+        subfinal = np.asarray(self.subdata.finalize())
+        channels = self.subdata.channels
+        coords = {}
+        if channels is not None:
+            coords['c'] = channels.code_list()
+        final = xr.DataArray(subfinal, dims=('y', 'x', 'c'), coords=coords)
+        return final
+
+    def optimize(self):
+        return self.subdata.optimize().as_xarray()
 
 
 class DelayedWarp2(DelayedImage2):
@@ -703,6 +745,9 @@ class DelayedWarp2(DelayedImage2):
         if new is not split:
             new = split
             new.subdata = new.subdata.optimize()
+            new = new.optimize()
+        else:
+            new = new._opt_absorb_overview()
         return new
 
     def _opt_fuse_warps(self):
@@ -720,6 +765,139 @@ class DelayedWarp2(DelayedImage2):
         new_transform = tf2 @ tf1
         new = self.__class__(inner_data, new_transform, dsize=dsize,
                              **common_meta)
+        return new
+
+    def _opt_absorb_overview(self):
+        """
+        Remove the overview if we can get a higher resolution without it
+
+        Example:
+            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> import kwimage
+            >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
+            >>> base = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> # Case without any operations between the overview and warp
+            >>> self = base.get_overview(1).warp({'scale': 4})
+            >>> self.write_network_text()
+            >>> opt = self._opt_absorb_overview()._validate()
+            >>> opt.write_network_text()
+            >>> opt_data = [d for n, d in opt.as_graph().nodes(data=True)]
+            >>> assert 'DelayedOverview2' not in [d['type'] for d in opt_data]
+            >>> # Case with a chain of operations between overview and warp
+            >>> self = base.get_overview(1)[0:101, 0:100].warp({'scale': 4})
+            >>> self.write_network_text()
+            >>> opt = self._opt_absorb_overview()._validate()
+            >>> opt.write_network_text()
+            >>> opt_data = [d for n, d in opt.as_graph().nodes(data=True)]
+            >>> assert opt_data[1]['meta']['space_slice'] == (slice(0, 202, None), slice(0, 200, None))
+            >>> # Any sort of complex chain does prevents this optimization
+            >>> # from running.
+            >>> self = base.get_overview(1)[0:101, 0:100][0:50, 0:50].warp({'scale': 4})
+            >>> opt = self._opt_absorb_overview()._validate()
+            >>> opt.write_network_text()
+            >>> opt_data = [d for n, d in opt.as_graph().nodes(data=True)]
+            >>> assert 'DelayedOverview2' in [d['type'] for d in opt_data]
+        """
+        # Check if there is a strict downsampling component
+        transform = self.meta['transform']
+        params = transform.decompose()
+        sx, sy = params['scale']
+        if sx < 2 and sy < 2:
+            return self
+
+        # Lookahead to see if there is a nearby overview operation that can be
+        # absorbed, remember the chain of operations between the warp and the
+        # overview, as it will need to be modified.
+        parent = self
+        subdata = None
+        chain = []
+        num_dc = 0
+        for i in range(4):
+            subdata = parent.subdata
+            if subdata is None:
+                break
+            elif isinstance(subdata, DelayedWarp2):
+                subdata = None
+                break
+            elif isinstance(subdata, DelayedOverview2):
+                # We found an overview node
+                overview = subdata
+                break
+            elif isinstance(subdata, DelayedDequantize2):
+                pass
+            elif isinstance(subdata, DelayedCrop2):
+                num_dc += 1
+            else:
+                subdata = None
+                break
+            chain.append(subdata)
+            parent = subdata
+        else:
+            subdata = None
+
+        if subdata is None:
+            return self
+
+        if num_dc > 1:
+            return self
+
+        # Replace the overview node with a warp node that mimics it.
+        # This has no impact on the function of the operation stack.
+        scale = 1 / 2 ** overview.meta['overview']
+        mimic_overview = overview.subdata.warp({'scale': scale})
+        tf1 = mimic_overview.meta['transform']
+
+        # Handle any nodes between the warp and the overview.
+        # This should be at most one quantization and one crop operation,
+        # but we may generalize that in the future.
+        if not chain:
+            # The overview is directly after this warp
+            new_head = mimic_overview.subdata
+        else:
+            # Copy the chain so this does not mutate the input
+            chain = [copy.copy(n) for n in chain]
+            for u, v in ub.iter_window(chain, 2):
+                u.subdata = v
+            tail = chain[-1]
+            tail.subdata = mimic_overview
+            # Check if the tail of the chain is a crop.
+            if hasattr(tail, '_opt_warp_after_crop'):
+                # This modifies the tail so it is now a warp followed by a
+                # crop. Note that the warp may be different than the mimiced
+                # overview, so use this new transform instead.
+                # (Actually, I think this can't make the new crop non integral,
+                # so it probably wont matter)
+                modified_tail = tail._opt_warp_after_crop()
+                new_chain_dsize = modified_tail.meta['dsize']
+                tf1 = modified_tail.meta['transform']
+                # Remove the modified warp
+                tail_parent = chain[-2] if len(chain) > 1 else self
+                new_tail = modified_tail.subdata
+                tail_parent.subdata = new_tail
+                chain[-1] = new_tail
+                for notcrop in chain[:-1]:
+                    notcrop.meta['dsize'] = new_chain_dsize
+            else:
+                # The chain does not contain a crop operation, we can safely
+                # remove it.
+                # Finally remove the overview transform entirely
+                tail.subdata = mimic_overview.subdata
+                new_chain_dsize = mimic_overview.subdata.meta['dsize']
+
+            # The dsize within the chain might be wrong due to our
+            # modification. I **think** its ok to just directly set it to the
+            # new dsize as it should only be operations that do not change the
+            # dsize, but it would be nice to find a more ellegant
+            # implementation.
+            for notcrop in chain[:-1]:
+                notcrop.meta['dsize'] = new_chain_dsize
+            new_head = chain[0]
+
+        warp_meta = ub.dict_isect(self.meta, {'antialias', 'interpolation'})
+        tf2 = self.meta['transform']
+        dsize = self.meta['dsize']
+        new_transform = tf2 @ tf1
+        new = self.__class__(new_head, new_transform, dsize=dsize, **warp_meta)
         return new
 
     def _opt_split_warp_overview(self):
@@ -761,7 +939,7 @@ class DelayedWarp2(DelayedImage2):
         transform = self.meta['transform']
         params = transform.decompose()
         sx, sy = params['scale']
-        if sx >= 1 or sy >= 1:
+        if sx > 0.5 or sy > 0.5:
             return self
 
         # Check how many pyramid downs we could replace downsampling with

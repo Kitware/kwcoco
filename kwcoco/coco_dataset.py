@@ -414,17 +414,14 @@ class MixinCocoAccessors(object):
             >>> delayed = self.delayed_load(gid)
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
             >>> #
             >>> self = kwcoco.CocoDataset.demo('shapes8')
             >>> delayed = self.delayed_load(gid)
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
 
-            >>> crop = delayed.delayed_crop((slice(0, 3), slice(0, 3)))
+            >>> crop = delayed.crop((slice(0, 3), slice(0, 3)))
             >>> crop.finalize()
-            >>> crop.finalize(as_xarray=True)
 
             >>> # TODO: should only select the "red" channel
             >>> self = kwcoco.CocoDataset.demo('shapes8')
@@ -436,17 +433,13 @@ class MixinCocoAccessors(object):
             >>> self = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> delayed = self.delayed_load(gid, channels='B1|B2', space='image')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
             >>> delayed = self.delayed_load(gid, channels='B1|B2|B11', space='image')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
             >>> delayed = self.delayed_load(gid, channels='B8|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
 
             >>> delayed = self.delayed_load(gid, channels='B8|foo|bar|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
         """
         coco_img = self.coco_image(gid)
         delayed = coco_img.delay(channels=channels, space=space)

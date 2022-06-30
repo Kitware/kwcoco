@@ -31,7 +31,7 @@ class DelayedLoad2(DelayedImageLeaf2):
 
     Example:
         >>> from kwcoco.util.delayed_ops import *  # NOQA
-        >>> self = DelayedLoad2.demo(dsize=(16, 16))._load_metadata()
+        >>> self = DelayedLoad2.demo(dsize=(16, 16)).prepare()
         >>> data1 = self.finalize()
 
     Example:
@@ -40,7 +40,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage
         >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-        >>> self = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
+        >>> self = DelayedLoad2(fpath, channels='r|g|b').prepare()
         >>> print(f'self={self}')
         >>> print('self.meta = {}'.format(ub.repr2(self.meta, nl=1)))
         >>> quantization = {
@@ -53,19 +53,55 @@ class DelayedLoad2(DelayedImageLeaf2):
         >>> node3 = node2.dequantize(quantization)
         >>> node4 = node3.warp({'scale': 0.05})
         >>> #
-        >>> data0 = node0.finalize()
-        >>> data1 = node1.finalize()
-        >>> data2 = node2.finalize()
-        >>> data3 = node3.finalize()
-        >>> data4 = node4.finalize()
-        >>> print(ub.repr2(node4.nesting(), nl=-1, sort=0))
-        >>> print(f'{data0.shape=} {data0.dtype=}')
-        >>> print(f'{data1.shape=} {data1.dtype=}')
-        >>> print(f'{data2.shape=} {data2.dtype=}')
-        >>> print(f'{data3.shape=} {data3.dtype=}')
-        >>> print(f'{data4.shape=} {data4.dtype=}')
+        >>> data0 = node0._validate().finalize()
+        >>> data1 = node1._validate().finalize()
+        >>> data2 = node2._validate().finalize()
+        >>> data3 = node3._validate().finalize()
+        >>> data4 = node4._validate().finalize()
+        >>> node4.write_network_text()
+
+    Example:
+        >>> # xdoctest: +REQUIRES(module:gdal)
+        >>> # Test delayed ops with int16 and nodata values
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> import kwimage
+        >>> from kwcoco.util.delayed_ops.helpers import quantize_float01
+        >>> dpath = ub.Path.appdir('kwcoco/tests/test_delay_nodata').ensuredir()
+        >>> fpath = dpath / 'data.tif'
+        >>> data = kwimage.ensure_float01(kwimage.grab_test_image())
+        >>> poly = kwimage.Polygon.random(rng=321032).scale(data.shape[0])
+        >>> poly.fill(data, np.nan)
+        >>> data_uint16, quantization = quantize_float01(data)
+        >>> nodata = quantization['nodata']
+        >>> kwimage.imwrite(fpath, data_uint16, nodata=nodata, backend='gdal', overviews=3)
+        >>> # Test loading the data
+        >>> self = DelayedLoad2(fpath, channels='r|g|b', nodata_method='float').prepare()
+        >>> node0 = self
+        >>> node1 = node0.dequantize(quantization)
+        >>> node2 = node1.warp({'scale': 0.51}, interpolation='lanczos')
+        >>> node3 = node2[13:900, 11:700]
+        >>> node4 = node3.warp({'scale': 0.9}, interpolation='lanczos')
+        >>> node4.write_network_text()
+        >>> node5 = node4.optimize()
+        >>> node5.write_network_text()
+        >>> node6 = node5.warp({'scale': 8}, interpolation='lanczos').optimize()
+        >>> node6.write_network_text()
+        >>> #
+        >>> data0 = node0._validate().finalize()
+        >>> data1 = node1._validate().finalize()
+        >>> data2 = node2._validate().finalize()
+        >>> data3 = node3._validate().finalize()
+        >>> data4 = node4._validate().finalize()
+        >>> data5 = node5._validate().finalize()
+        >>> data6 = node6._validate().finalize()
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> stack1 = kwimage.stack_images([data1, data2, data3, data4, data5])
+        >>> stack2 = kwimage.stack_images([stack1, data6], axis=1)
+        >>> kwplot.imshow(stack2)
     """
-    def __init__(self, fpath, channels=None, dsize=None):
+    def __init__(self, fpath, channels=None, dsize=None, nodata_method=None):
         """
         Args:
             fpath (str | PathLike):
@@ -76,9 +112,15 @@ class DelayedLoad2(DelayedImageLeaf2):
 
             dsize (Tuple[int, int]):
                 The width / height of the image if known a-priori
+
+            nodata_method (str | None):
+                How to handle nodata values in the file itself.
+                Can be "auto", "float", or "ma".
+
         """
         super().__init__(channels=channels, dsize=dsize)
         self.meta['fpath'] = fpath
+        self.meta['nodata_method'] = nodata_method
         self.lazy_ref = None
 
     @property
@@ -92,12 +134,17 @@ class DelayedLoad2(DelayedImageLeaf2):
         return self
 
     def _load_reference(self):
+        nodata_method = self.meta.get('nodata_method', None)
         if self.lazy_ref is None:
             from kwcoco.util import lazy_frame_backends
             using_gdal = lazy_frame_backends.LazyGDalFrameFile.available()
             if using_gdal:
-                self.lazy_ref = lazy_frame_backends.LazyGDalFrameFile(self.fpath)
+                # the nodata arg here isn't named that great
+                self.lazy_ref = lazy_frame_backends.LazyGDalFrameFile(
+                    self.fpath, nodata_method=nodata_method)
             else:
+                if nodata_method == 'auto':
+                    raise Exception('need gdal for auto no-data')
                 self.lazy_ref = NotImplemented
         return self
 

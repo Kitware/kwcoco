@@ -533,7 +533,8 @@ class CocoImage(ub.NiceRepr):
 
     @profile
     def delay(self, channels=None, space='image', bundle_dpath=None,
-              jagged=False, mode=0):
+              interpolation='linear', antialias=True, nodata_method=None,
+              jagged=False, mode=1):
         """
         Perform a delayed load on the data in this image.
 
@@ -562,7 +563,7 @@ class CocoImage(ub.NiceRepr):
 
         TODO:
             - [X] Currently can only take all or none of the channels from each
-                base-image / auxiliary dict. For instance if the main image is
+     1          base-image / auxiliary dict. For instance if the main image is
                 r|g|b you can't just select g|b at the moment.
 
             - [X] The order of the channels in the delayed load should
@@ -583,17 +584,16 @@ class CocoImage(ub.NiceRepr):
             >>> delayed = self.delay()
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
             >>> #
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
-            >>> delayed = dset.delayed_load(gid)
+            >>> delayed = dset.coco_image(gid).delay()
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
 
-            >>> crop = delayed.delayed_crop((slice(0, 3), slice(0, 3)))
+            >>> crop = delayed.crop((slice(0, 3), slice(0, 3)))
             >>> crop.finalize()
-            >>> crop.finalize(as_xarray=True)
 
             >>> # TODO: should only select the "red" channel
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
@@ -603,19 +603,19 @@ class CocoImage(ub.NiceRepr):
             >>> gid = 1
             >>> #
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-            >>> delayed = dset.delayed_load(gid, channels='B1|B2', space='image')
+            >>> delayed = dset.coco_image(gid).delay(channels='B1|B2', space='image')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
-            >>> delayed = dset.delayed_load(gid, channels='B1|B2|B11', space='image')
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
+            >>> delayed = dset.coco_image(gid).delay(channels='B1|B2|B11', space='image')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
-            >>> delayed = dset.delayed_load(gid, channels='B8|B1', space='video')
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
+            >>> delayed = dset.coco_image(gid).delay(channels='B8|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
 
-            >>> delayed = dset.delayed_load(gid, channels='B8|foo|bar|B1', space='video')
+            >>> delayed = dset.coco_image(gid).delay(channels='B8|foo|bar|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
+            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
 
         Example:
             >>> import kwcoco
@@ -658,8 +658,8 @@ class CocoImage(ub.NiceRepr):
             >>> img_delayed = coco_img.delay(stream1, space='image')
             >>> vid_delayed = coco_img.delay(stream1, space='video')
             >>> #
-            >>> aux_imdata = aux_delayed.finalize()
-            >>> img_imdata = img_delayed.finalize()
+            >>> aux_imdata = aux_delayed.as_xarray().finalize()
+            >>> img_imdata = img_delayed.as_xarray().finalize()
             >>> assert aux_imdata.shape != img_imdata.shape
             >>> # Cannot load multiple asset items at the same time in
             >>> # asset space
@@ -683,11 +683,13 @@ class CocoImage(ub.NiceRepr):
 
         # Get info about the primary image and check if its channels are
         # requested (if it even has any)
-        img_info = _delay_load_imglike(bundle_dpath, img, mode=mode)
+        img_info = _delay_load_imglike(bundle_dpath, img, mode=mode,
+                                       nodata_method=nodata_method)
         obj_info_list = [(img_info, img)]
         auxlist = img.get('auxiliary', img.get('assets', []))
         for aux in auxlist:
-            info = _delay_load_imglike(bundle_dpath, aux, mode=mode)
+            info = _delay_load_imglike(bundle_dpath, aux, mode=mode,
+                                       nodata_method=nodata_method)
             obj_info_list.append((info, aux))
 
         chan_list = []
@@ -759,9 +761,18 @@ class CocoImage(ub.NiceRepr):
         elif space == 'video':
             img_to_vid = self.warp_vid_from_img
             # img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
-            delayed = delayed.warp(img_to_vid, dsize=dsize)
+            if mode == 1:
+                delayed = delayed.warp(img_to_vid, dsize=dsize,
+                                       interpolation=interpolation,
+                                       antialias=antialias)
+            else:
+                delayed = delayed.warp(img_to_vid, dsize=dsize)
         else:
             raise KeyError('space = {}'.format(space))
+
+        if mode == 1:
+            delayed = delayed.optimize()
+
         return delayed
 
     @ub.memoize_method
@@ -857,7 +868,7 @@ class CocoAsset(object):
             return self.obj.get(key, default)
 
 
-def _delay_load_imglike(bundle_dpath, obj, mode=0):
+def _delay_load_imglike(bundle_dpath, obj, mode=0, nodata_method=None):
     from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
     info = {}
@@ -898,7 +909,8 @@ def _delay_load_imglike(bundle_dpath, obj, mode=0):
             info['fpath'] = fpath = join(bundle_dpath, fname)
             info['chan_construct'] = (
                 DelayedLoad2,
-                dict(fpath=fpath, channels=channels_, dsize=dsize))
+                dict(fpath=fpath, channels=channels_, dsize=dsize,
+                     nodata_method=nodata_method))
         info['quantization'] = quantization
 
     return info
