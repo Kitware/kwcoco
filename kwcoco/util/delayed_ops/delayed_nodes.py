@@ -501,6 +501,7 @@ class DelayedImage2(DelayedArray2):
         Example:
             >>> #
             >>> # Test Channel Select Via Code
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> from kwcoco.util.delayed_ops import DelayedLoad2
             >>> self = DelayedLoad2.demo(dsize=(16, 16), channels='r|g|b').prepare()
             >>> channels = 'r|b'
@@ -643,8 +644,11 @@ class DelayedImage2(DelayedArray2):
 
 class DelayedAsXarray2(DelayedImage2):
     """
+    Casts the data to an xarray object in the finalize step
+
     Example;
-        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+        >>> from kwcoco.util.delayed_ops import DelayedLoad2
         >>> # without channels
         >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
         >>> self = base.as_xarray()
@@ -678,7 +682,8 @@ class DelayedWarp2(DelayedImage2):
     Applies an affine transform to an image.
 
     Example:
-        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+        >>> from kwcoco.util.delayed_ops import DelayedLoad2
         >>> self = DelayedLoad2.demo(dsize=(16, 16)).prepare()
         >>> warp1 = self.warp({'scale': 3})
         >>> warp2 = warp1.warp({'theta': 0.1})
@@ -779,7 +784,9 @@ class DelayedWarp2(DelayedImage2):
         Remove the overview if we can get a higher resolution without it
 
         Example:
-            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> # xdoctest: +REQUIRES(module:gdal)
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import DelayedLoad2
             >>> import kwimage
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> base = DelayedLoad2(fpath, channels='r|g|b').prepare()
@@ -913,7 +920,8 @@ class DelayedWarp2(DelayedImage2):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:gdal)
-            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import DelayedLoad2
             >>> import kwimage
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> self = DelayedLoad2(fpath, channels='r|g|b').prepare()
@@ -928,7 +936,8 @@ class DelayedWarp2(DelayedImage2):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:gdal)
-            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import DelayedLoad2
             >>> import kwimage
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> self = DelayedLoad2(fpath, channels='r|g|b').prepare()
@@ -1008,7 +1017,8 @@ class DelayedDequantize2(DelayedImage2):
         """
         Example:
             >>> # Test a case that caused an error in development
-            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import DelayedLoad2
             >>> fpath = kwimage.grab_test_image_fpath()
             >>> base = DelayedLoad2(fpath, channels='r|g|b').prepare()
             >>> quantization = {'quant_max': 255, 'nodata': 0}
@@ -1041,7 +1051,8 @@ class DelayedCrop2(DelayedImage2):
     Crops an image along integer pixel coordinates.
 
     Example:
-        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+        >>> from kwcoco.util.delayed_ops import DelayedLoad2
         >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
         >>> # Test Fuse Crops Space Only
         >>> crop1 = base[4:12, 0:16]
@@ -1128,7 +1139,7 @@ class DelayedCrop2(DelayedImage2):
         Combine two consecutive crops into a single operation.
 
         Example:
-            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
             >>> # Test Fuse Crops Space Only
             >>> crop1 = base[4:12, 0:16]
@@ -1141,7 +1152,7 @@ class DelayedCrop2(DelayedImage2):
 
         Example:
             >>> # Test Fuse Crops Channels Only
-            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
             >>> crop1 = base.crop(chan_idxs=[0, 2, 1])
             >>> crop2 = crop1.crop(chan_idxs=[1, 2])
@@ -1159,7 +1170,7 @@ class DelayedCrop2(DelayedImage2):
 
         Example:
             >>> # Test Fuse Crops Space  And Channels
-            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
             >>> crop1 = base[4:12, 0:16, [1, 2]]
             >>> self = crop1[2:6, 0:8, [1]]
@@ -1210,7 +1221,7 @@ class DelayedCrop2(DelayedImage2):
             2. we are warping with less data.
 
         Example:
-            >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath()
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
             >>> node1 = node0.warp({'scale': 0.432, 'theta': np.pi / 3, 'about': (80, 80), 'shearx': .3, 'offset': (-50, -50)})
@@ -1279,6 +1290,7 @@ class DelayedOverview2(DelayedImage2):
     efficient.
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:gdal)
         >>> # Make a complex chain of operations and optimize it
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage

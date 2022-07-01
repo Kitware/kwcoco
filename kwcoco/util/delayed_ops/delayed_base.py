@@ -68,11 +68,10 @@ class DelayedOperation2(ub.NiceRepr):
         return graph
 
     def write_network_text(self, with_labels=True):
-        from cmd_queue.util import graph_str
+        from kwcoco.util.delayed_ops.helpers import write_network_text
         graph = self.as_graph()
-        # import networkx as nx
-        # nx.write_network_text(graph)
-        print(graph_str(graph, with_labels=with_labels))
+        # TODO: remove once this is merged into networkx itself
+        write_network_text(graph, with_labels=with_labels)
 
     @property
     def shape(self):
