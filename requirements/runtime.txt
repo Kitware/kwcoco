@@ -52,7 +52,7 @@ scipy>=1.0.0     ; python_version < '3.4' and python_version >= '2.7'    # Pytho
 
 scriptconfig >= 0.5.8
 sortedcontainers >= 2.3.0
-ubelt >= 1.0.0
+ubelt >= 1.1.2
 uritools >= 3.0.0
 xarray >= 0.16.0
 
