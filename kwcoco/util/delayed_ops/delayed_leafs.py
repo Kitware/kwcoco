@@ -209,7 +209,14 @@ class DelayedNans2(DelayedImageLeaf2):
         final = np.full(shape, fill_value=np.nan)
         return final
 
-    def crop(self, region_slices, chan_idxs=None):
+    def crop(self, region_slices=None, chan_idxs=None):
+        """
+        Crops an image along integer pixel coordinates.
+
+        Args:
+            space_slice (Tuple[slice, slice]): y-slice and x-slice.
+            chan_idxs (List[int]): indexes of bands to take
+        """
         if chan_idxs is None:
             channels = self.channels
         else:

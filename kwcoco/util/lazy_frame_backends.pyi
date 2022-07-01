@@ -81,17 +81,20 @@ class LazyRasterIOFrameFile(ub.NiceRepr):
 
 class LazyGDalFrameFile(ub.NiceRepr):
     fpath: Incomplete
-    nodata: Incomplete
+    nodata_method: Incomplete
     overview: Incomplete
 
     def __init__(self,
                  fpath,
-                 nodata: Incomplete | None = ...,
+                 nodata_method: Incomplete | None = ...,
                  overview: Incomplete | None = ...) -> None:
         ...
 
     @classmethod
     def available(self):
+        ...
+
+    def get_overview(self, overview):
         ...
 
     @classmethod
@@ -102,7 +105,9 @@ class LazyGDalFrameFile(ub.NiceRepr):
     def ndim(self):
         ...
 
-    num_overviews: Incomplete
+    def num_overviews(self):
+        ...
+
     load_overview: Incomplete
     post_overview: Incomplete
     num_channels: Incomplete

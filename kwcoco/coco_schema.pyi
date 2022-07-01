@@ -30,6 +30,7 @@ ORIG_COCO_KEYPOINTS: Incomplete
 KWCOCO_KEYPOINTS: Incomplete
 KEYPOINTS: Incomplete
 ORIG_COCO_POLYGON: Incomplete
+ORIG_COCO_MULTI_POLYGON: Incomplete
 POLYGON: Incomplete
 RUN_LENGTH_ENCODING: Incomplete
 BBOX: Incomplete

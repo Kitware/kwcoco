@@ -231,7 +231,7 @@ class DelayedVisionOperation(ub.NiceRepr):
         node in the operation tree.
 
         Yields:
-            DelayedVisionOperation:
+            Any:
         """
         raise NotImplementedError
 
@@ -303,7 +303,7 @@ class DelayedImageOperation(DelayedVisionOperation):
             in the middle.
 
         Returns:
-            DelayedCrop: lazy executed delayed transform
+            DelayedImageOperation: lazy executed delayed transform
 
         Example:
             >>> dsize = (100, 100)
@@ -394,7 +394,7 @@ class DelayedImageOperation(DelayedVisionOperation):
             "output_dims" (specified in c-style shape) we specify dsize (w, h).
 
         Returns:
-            DelayedCrop : new delayed transform a chained transform
+            DelayedImageOperation : new delayed transform a chained transform
         """
         warped = DelayedWarp(self, transform=transform, dsize=dsize)
         return warped
@@ -664,6 +664,10 @@ class DelayedNans(DelayedImageOperation):
         return final
 
     def delayed_crop(self, region_slices):
+        """
+        Returns:
+            DelayedNans:
+        """
         # DEBUG_PRINT('DelayedNans.delayed_crop')
         channels = self.channels
         dsize = self.dsize
@@ -678,6 +682,10 @@ class DelayedNans(DelayedImageOperation):
         return new
 
     def delayed_warp(self, transform, dsize=None):
+        """
+        Returns:
+            DelayedNans:
+        """
         new = self.__class__(dsize, channels=self.channels)
         return new
 
@@ -1203,6 +1211,9 @@ class DelayedFrameConcat(DelayedVideoOperation):
 
     def delayed_crop(self, region_slices):
         """
+        Returns:
+            DelayedFrameConcat
+
         Example:
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> # Create raw channels in some "native" resolution for frame 1
@@ -1476,10 +1487,10 @@ class DelayedChannelConcat(DelayedImageOperation):
                 typically a pipe (`|`) delimited list of channel codes. See
                 kwcoco.ChannelSpec for more detials.
 
-        Returns:
-            DelayedVisionOperation:
-                a delayed vision operation that only operates on the following
-                channels.
+        # Returns:
+        #     DelayedVisionOperation:
+        #         a delayed vision operation that only operates on the following
+        #         channels.
 
         Example:
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA

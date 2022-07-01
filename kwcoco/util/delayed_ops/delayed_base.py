@@ -6,8 +6,8 @@ import numpy as np
 import ubelt as ub
 
 
-from kwcoco.util.util_monkey import Reloadable  # NOQA
-@Reloadable.developing  # NOQA
+# from kwcoco.util.util_monkey import Reloadable  # NOQA
+# @Reloadable.developing  # NOQA
 class DelayedOperation2(ub.NiceRepr):
 
     def __init__(self):
@@ -79,7 +79,12 @@ class DelayedOperation2(ub.NiceRepr):
         raise NotImplementedError
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         raise NotImplementedError
+        yield None
 
     def finalize(self):
         raise NotImplementedError
@@ -97,6 +102,10 @@ class DelayedNaryOperation2(DelayedOperation2):
         self.parts = parts
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         yield from iter(self.parts)
 
 
@@ -109,5 +118,9 @@ class DelayedUnaryOperation2(DelayedOperation2):
         self.subdata = subdata
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         if self.subdata is not None:
             yield self.subdata

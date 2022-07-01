@@ -98,10 +98,14 @@ class CocoImage(ub.NiceRepr):
     add_asset: Incomplete
 
     def delay(self,
-              channels: kwcoco.FusedChannelSpec = None,
-              space: str = 'image',
+              channels: Incomplete | None = ...,
+              space: str = ...,
               bundle_dpath: Incomplete | None = ...,
-              jagged: bool = False):
+              interpolation: str = ...,
+              antialias: bool = ...,
+              nodata_method: Incomplete | None = ...,
+              jagged: bool = ...,
+              mode: int = ...):
         ...
 
     def valid_region(self, space: str = ...):

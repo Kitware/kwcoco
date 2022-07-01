@@ -6,7 +6,6 @@ import ubelt as ub
 from typing import Dict
 import ubelt as ub
 from _typeshed import Incomplete
-from kwcoco.metrics.confusion_vectors import ConfusionVectors
 
 
 class DetectionMetrics(ub.NiceRepr):
@@ -59,7 +58,8 @@ class DetectionMetrics(ub.NiceRepr):
         workers: int = 0,
         track_probs: str = 'try',
         max_dets: Incomplete | None = ...
-    ) -> ConfusionVectors | Dict[float, ConfusionVectors]:
+    ) -> kwcoco.metrics.confusion_vectors.ConfusionVectors | Dict[
+            float, kwcoco.metrics.confusion_vectors.ConfusionVectors]:
         ...
 
     def score_kwant(dmet, iou_thresh: float = ...):

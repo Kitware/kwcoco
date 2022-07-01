@@ -1,3 +1,6 @@
+[build-system]
+requires = [ "setuptools>=41.0.1",]
+
 [tool.xcookie]
 tags = [ "gitlab", "kitware", "purepy", "cv2", "gdal"]
 mod_name = "kwcoco"

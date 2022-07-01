@@ -5,7 +5,8 @@ from typing import Dict
 from typing import Any
 import kwimage
 import ubelt as ub
-from typing import Any, TypeVar
+from typing import TypeVar
+
 
 ObjT = TypeVar('ObjT')
 

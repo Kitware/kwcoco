@@ -339,6 +339,13 @@ class DelayedChannelConcat2(DelayedConcat2):
         return new
 
     def crop(self, space_slice=None, chan_idxs=None):
+        """
+        Crops an image along integer pixel coordinates.
+
+        Args:
+            space_slice (Tuple[slice, slice]): y-slice and x-slice.
+            chan_idxs (List[int]): indexes of bands to take
+        """
         return self.__class__([c.crop(space_slice, chan_idxs) for c in self.parts])
 
     def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
@@ -484,7 +491,7 @@ class DelayedImage2(DelayedArray2):
                 kwcoco.ChannelSpec for more detials.
 
         Returns:
-            DelayedLoad:
+            DelayedCrop2:
                 a new delayed load with a fused take channel operation
 
         Note:
@@ -684,7 +691,7 @@ class DelayedWarp2(DelayedImage2):
                  interpolation='linear'):
         """
         Args:
-            subdata (DelayedArray): data to operate on
+            subdata (DelayedArray2): data to operate on
 
             transform (ndarray | dict | kwimage.Affine):
                 a coercable affine matrix.  See :class:`kwimage.Affine` for
@@ -979,7 +986,7 @@ class DelayedDequantize2(DelayedImage2):
     def __init__(self, subdata, quantization):
         """
         Args:
-            subdata (DelayedArray): data to operate on
+            subdata (DelayedArray2): data to operate on
             quantization (Dict):
                 see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
         """
@@ -1054,7 +1061,7 @@ class DelayedCrop2(DelayedImage2):
     def __init__(self, subdata, space_slice=None, chan_idxs=None):
         """
         Args:
-            subdata (DelayedArray): data to operate on
+            subdata (DelayedArray2): data to operate on
 
             space_slice (Tuple[slice, slice]):
                 if speficied, take this y-slice and x-slice.
@@ -1297,7 +1304,7 @@ class DelayedOverview2(DelayedImage2):
     def __init__(self, subdata, overview):
         """
         Args:
-            subdata (DelayedArray): data to operate on
+            subdata (DelayedArray2): data to operate on
             overview (int): the overview to use (assuming it exists)
         """
         super().__init__(subdata)

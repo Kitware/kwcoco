@@ -96,6 +96,9 @@ class FusedChannelSpec(BaseChannelSpec):
     def parse(cls, spec):
         ...
 
+    def __eq__(self, other):
+        ...
+
     @classmethod
     def coerce(cls, data):
         ...

@@ -198,7 +198,7 @@ class DetectionMetrics(ub.NiceRepr):
                 available.
 
         Returns:
-            ConfusionVectors | Dict[float, ConfusionVectors]
+            kwcoco.metrics.confusion_vectors.ConfusionVectors | Dict[float, kwcoco.metrics.confusion_vectors.ConfusionVectors]
 
         Example:
             >>> dmet = DetectionMetrics.demo(nimgs=30, classes=3,
