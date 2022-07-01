@@ -1,6 +1,10 @@
 """
 A rewrite of the delayed operations
 
+Note:
+    The classes in this submodule will have their names changed when the old
+    POC delayed operations are deprecated.
+
 TODO:
     The optimize logic could likley be better expressed as some sort of
     AST transformer.
