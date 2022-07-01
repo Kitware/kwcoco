@@ -287,7 +287,6 @@ def quantize_float01(imdata, old_min=0, old_max=1, quantize_dtype=np.int16):
 
     Example:
         >>> # Test dequantize with uint8
-        >>> from watch.tasks.fusion.predict import *  # NOQA
         >>> from kwcoco.util.util_delayed_poc import dequantize
         >>> imdata = np.random.randn(32, 32, 3)
         >>> quant1, quantization1 = quantize_float01(imdata, old_min=0, old_max=1, quantize_dtype=np.uint8)
@@ -297,7 +296,6 @@ def quantize_float01(imdata, old_min=0, old_max=1, quantize_dtype=np.int16):
 
     Example:
         >>> # Test quantization with different signed / unsigned combos
-        >>> from watch.tasks.fusion.predict import *  # NOQA
         >>> print(quantize_float01(None, 0, 1, np.int16))
         >>> print(quantize_float01(None, 0, 1, np.int8))
         >>> print(quantize_float01(None, 0, 1, np.uint8))
