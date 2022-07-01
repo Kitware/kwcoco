@@ -28,10 +28,19 @@ class DelayedStack2(DelayedNaryOperation2):
     """
 
     def __init__(self, parts, axis):
+        """
+        Args:
+            parts (List[DelayedArray2]): data to stack
+            axis (int): axes to stack on
+        """
         super().__init__(parts=parts)
         self.meta['axis'] = axis
 
     def __nice__(self):
+        """
+        Returns:
+            str
+        """
         return '{}'.format(self.shape)
 
     @property
@@ -50,6 +59,11 @@ class DelayedConcat2(DelayedNaryOperation2):
     """
 
     def __init__(self, parts, axis):
+        """
+        Args:
+            parts (List[DelayedArray2]): data to concat
+            axis (int): axes to concat on
+        """
         super().__init__(parts=parts)
         self.meta['axis'] = axis
 
@@ -72,6 +86,10 @@ class DelayedFrameStack2(DelayedStack2):
     """
 
     def __init__(self, parts):
+        """
+        Args:
+            parts (List[DelayedArray2]): data to stack
+        """
         super().__init__(parts=parts, axis=0)
 
 # ------
@@ -84,14 +102,27 @@ class JaggedArray2(ub.NiceRepr):
     The result of an unaligned concatenate
     """
     def __init__(self, parts, axis):
+        """
+        Args:
+            parts (List[ArrayLike]): jagged stacked data
+            axis (List[DelayedArray2]): axis of the stack
+        """
         self.parts = parts
         self.axis = axis
 
     def __nice__(self):
+        """
+        Returns:
+            str
+        """
         return '{}, axis={}'.format(self.shape, self.axis)
 
     @property
     def shape(self):
+        """
+        Returns:
+            List[None | Tuple[int | None, ...]]:
+        """
         shapes = [p.shape for p in self.parts]
         return shapes
 
@@ -122,6 +153,11 @@ class DelayedChannelConcat2(DelayedConcat2):
     """
 
     def __init__(self, parts, dsize=None, jagged=False):
+        """
+        Args:
+            parts (List[DelayedArray2]): data to concat
+            dsize (Tuple[int, int] | None): size if known a-priori
+        """
         super().__init__(parts=parts, axis=2)
         self.meta['jagged'] = jagged
         if dsize is None and not jagged:
@@ -141,6 +177,10 @@ class DelayedChannelConcat2(DelayedConcat2):
                 raise
 
     def __nice__(self):
+        """
+        Returns:
+            str
+        """
         if self.channels is None:
             return '{}'.format(self.shape)
         else:
@@ -296,7 +336,7 @@ class DelayedChannelConcat2(DelayedConcat2):
             comp.num_channels for comp in self.parts])
 
         accum = []
-        class ContiguousSegment(object):
+        class _ContiguousSegment(object):
             def __init__(self, comp, start):
                 self.comp = comp
                 self.start = start
@@ -316,7 +356,7 @@ class DelayedChannelConcat2(DelayedConcat2):
                 outer, inner = subindexer.unravel(idx)
                 comp = self.parts[outer]
             if curr is None:
-                curr = ContiguousSegment(comp, inner)
+                curr = _ContiguousSegment(comp, inner)
             else:
                 is_contiguous = curr.comp is comp and (inner == curr.stop)
                 if is_contiguous:
@@ -325,7 +365,7 @@ class DelayedChannelConcat2(DelayedConcat2):
                 else:
                     # accept previous segment and start a new one
                     accum.append(curr)
-                    curr = ContiguousSegment(comp, inner)
+                    curr = _ContiguousSegment(comp, inner)
 
             # Hack for nans
             if request_codes is not None:
@@ -377,6 +417,28 @@ class DelayedChannelConcat2(DelayedConcat2):
 
     def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
         """
+        Applys an affine transformation to the image
+
+        Args:
+            transform (ndarray | dict | kwimage.Affine):
+                a coercable affine matrix.  See :class:`kwimage.Affine` for
+                details on what can be coerced.
+
+            dsize (Tuple[int, int] | str):
+                The width / height of the output canvas. If 'auto', dsize is
+                computed such that the positive coordinates of the warped image
+                will fit in the new canvas. In this case, any pixel that maps
+                to a negative coordinate will be clipped.  This has the
+                property that the input transformation is not modified.
+
+            antialias (bool):
+                if True determines if the transform is downsampling and applies
+                antialiasing via gaussian a blur. Defaults to False
+
+            interpolation (str):
+                interpolation code or cv2 integer. Interpolation codes are linear,
+                nearest, cubic, lancsoz, and area. Defaults to "linear".
+
         Returns:
             DelayedArray2
         """
@@ -384,6 +446,12 @@ class DelayedChannelConcat2(DelayedConcat2):
 
     def dequantize(self, quantization):
         """
+        Rescales image intensities from int to floats.
+
+        Args:
+            quantization (Dict[str, Any]):
+                see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
+
         Returns:
             DelayedArray2
         """
@@ -391,6 +459,11 @@ class DelayedChannelConcat2(DelayedConcat2):
 
     def get_overview(self, overview):
         """
+        Downsamples an image by a factor of two.
+
+        Args:
+            overview (int): the overview to use (assuming it exists)
+
         Returns:
             DelayedArray2
         """
@@ -430,9 +503,17 @@ class DelayedArray2(DelayedUnaryOperation2):
     A generic NDArray.
     """
     def __init__(self, subdata=None):
+        """
+        Args:
+            subdata (DelayedArray2):
+        """
         super().__init__(subdata=subdata)
 
     def __nice__(self):
+        """
+        Returns:
+            str
+        """
         return '{}'.format(self.shape)
 
     @property
@@ -450,11 +531,21 @@ class DelayedImage2(DelayedArray2):
     For the case where an array represents a 2D image with multiple channels
     """
     def __init__(self, subdata=None, dsize=None, channels=None):
+        """
+        Args:
+            subdata (DelayedArray2):
+            dsize (None | Tuple[int | None, int | None]): overrides subdata dsize
+            channels (None | int | kwcoco.FusedChannelSpec): overrides subdata channels
+        """
         super().__init__(subdata)
         self.channels = channels
         self.meta['dsize'] = dsize
 
     def __nice__(self):
+        """
+        Returns:
+            str
+        """
         if self.channels is None:
             return '{}'.format(self.shape)
         else:
@@ -524,6 +615,10 @@ class DelayedImage2(DelayedArray2):
 
     @property
     def num_overviews(self):
+        """
+        Returns:
+            int
+        """
         num_overviews = self.meta.get('num_overviews', None)
         if num_overviews is None and self.subdata is not None:
             num_overviews = self.subdata.num_overviews
@@ -665,7 +760,7 @@ class DelayedImage2(DelayedArray2):
         Rescales image intensities from int to floats.
 
         Args:
-            quantization (Dict):
+            quantization (Dict[str, Any]):
                 see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
 
         Returns:
@@ -1455,6 +1550,10 @@ class DelayedOverview2(DelayedImage2):
 
     @property
     def num_overviews(self):
+        """
+        Returns:
+            int
+        """
         # This operation reduces the number of available overviews
         num_remain = self.subdata.num_overviews - self.meta['overview']
         return num_remain

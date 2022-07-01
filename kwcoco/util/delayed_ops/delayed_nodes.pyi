@@ -1,24 +1,26 @@
+from typing import List
 from typing import Union
 from typing import Tuple
-import kwcoco
 from numpy.typing import ArrayLike
-from typing import List
+import kwcoco
 import kwimage
 from numpy import ndarray
 from typing import Dict
+from typing import Any
 import kwimage
 import ubelt as ub
 from _typeshed import Incomplete
 from kwcoco import channel_spec
 from kwcoco.util.delayed_ops.delayed_base import DelayedNaryOperation2, DelayedUnaryOperation2
+from typing import Any
 
 
 class DelayedStack2(DelayedNaryOperation2):
 
-    def __init__(self, parts, axis) -> None:
+    def __init__(self, parts: List[DelayedArray2], axis: int) -> None:
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
     @property
@@ -28,7 +30,7 @@ class DelayedStack2(DelayedNaryOperation2):
 
 class DelayedConcat2(DelayedNaryOperation2):
 
-    def __init__(self, parts, axis) -> None:
+    def __init__(self, parts: List[DelayedArray2], axis: int) -> None:
         ...
 
     def __nice__(self):
@@ -41,7 +43,7 @@ class DelayedConcat2(DelayedNaryOperation2):
 
 class DelayedFrameStack2(DelayedStack2):
 
-    def __init__(self, parts) -> None:
+    def __init__(self, parts: List[DelayedArray2]) -> None:
         ...
 
 
@@ -49,14 +51,15 @@ class JaggedArray2(ub.NiceRepr):
     parts: Incomplete
     axis: Incomplete
 
-    def __init__(self, parts, axis) -> None:
+    def __init__(self, parts: List[ArrayLike],
+                 axis: List[DelayedArray2]) -> None:
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
     @property
-    def shape(self):
+    def shape(self) -> List[None | Tuple[int | None, ...]]:
         ...
 
 
@@ -65,12 +68,12 @@ class DelayedChannelConcat2(DelayedConcat2):
     num_channels: Incomplete
 
     def __init__(self,
-                 parts,
-                 dsize: Incomplete | None = ...,
+                 parts: List[DelayedArray2],
+                 dsize: Union[Tuple[int, int], None] = None,
                  jagged: bool = ...) -> None:
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
     @property
@@ -103,16 +106,16 @@ class DelayedChannelConcat2(DelayedConcat2):
         ...
 
     def warp(self,
-             transform,
-             dsize: str = ...,
-             antialias: bool = ...,
-             interpolation: str = ...) -> DelayedArray2:
+             transform: Union[ndarray, dict, kwimage.Affine],
+             dsize: Union[Tuple[int, int], str] = 'auto',
+             antialias: bool = True,
+             interpolation: str = 'linear') -> DelayedArray2:
         ...
 
-    def dequantize(self, quantization) -> DelayedArray2:
+    def dequantize(self, quantization: Dict[str, Any]) -> DelayedArray2:
         ...
 
-    def get_overview(self, overview) -> DelayedArray2:
+    def get_overview(self, overview: int) -> DelayedArray2:
         ...
 
     def as_xarray(self) -> DelayedAsXarray2:
@@ -121,10 +124,10 @@ class DelayedChannelConcat2(DelayedConcat2):
 
 class DelayedArray2(DelayedUnaryOperation2):
 
-    def __init__(self, subdata: Incomplete | None = ...) -> None:
+    def __init__(self, subdata: DelayedArray2 = None) -> None:
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
     @property
@@ -134,13 +137,16 @@ class DelayedArray2(DelayedUnaryOperation2):
 
 class DelayedImage2(DelayedArray2):
 
-    def __init__(self,
-                 subdata: Incomplete | None = ...,
-                 dsize: Incomplete | None = ...,
-                 channels: Incomplete | None = ...) -> None:
+    def __init__(
+            self,
+            subdata: DelayedArray2 = None,
+            dsize: Union[None, Tuple[Union[int, None], Union[int,
+                                                             None]]] = None,
+            channels: Union[None, int,
+                            kwcoco.FusedChannelSpec] = None) -> None:
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
     @property
@@ -164,7 +170,7 @@ class DelayedImage2(DelayedArray2):
         ...
 
     @property
-    def num_overviews(self):
+    def num_overviews(self) -> int:
         ...
 
     def __getitem__(self, sl):
@@ -187,7 +193,7 @@ class DelayedImage2(DelayedArray2):
              interpolation: str = 'linear') -> DelayedImage2:
         ...
 
-    def dequantize(self, quantization: Dict) -> DelayedDequantize2:
+    def dequantize(self, quantization: Dict[str, Any]) -> DelayedDequantize2:
         ...
 
     def get_overview(self, overview: int) -> DelayedOverview2:
@@ -257,7 +263,7 @@ class DelayedOverview2(DelayedImage2):
         ...
 
     @property
-    def num_overviews(self):
+    def num_overviews(self) -> int:
         ...
 
     def finalize(self) -> ArrayLike:

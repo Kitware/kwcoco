@@ -15,7 +15,7 @@ class DelayedOperation2(ub.NiceRepr):
     def __init__(self) -> None:
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
     def nesting(self) -> Dict[str, dict]:
