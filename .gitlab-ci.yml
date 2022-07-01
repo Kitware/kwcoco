@@ -133,7 +133,7 @@ stages:
         - *_setup_virtualenv_template
         # - pip install .[all-strict]                   # xcookie: +COMMENT_IF(cv2)
         - pip install .[all-strict,headless-strict]  # xcookie: +UNCOMMENT_IF(cv2)
-        - pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U  # xcookie: +UNCOMMENT_IF(gdal)
+        - pip install GDAL==3.3.3 --find-links https://girder.github.io/large_image_wheels -U  # xcookie: +UNCOMMENT_IF(gdal)
 
 .test_minimal_loose_template: &test_minimal_loose_template
     # Tags define which runners will accept which jobs
@@ -155,7 +155,7 @@ stages:
         - *_setup_virtualenv_template
         # - pip install .[all]            # xcookie: +COMMENT_IF(cv2)
         - pip install .[all,headless]  # xcookie: +UNCOMMENT_IF(cv2)
-        - pip install GDAL>=3.3.1 --find-links https://girder.github.io/large_image_wheels -U  # xcookie: +UNCOMMENT_IF(gdal)
+        - pip install GDAL>=3.3.3 --find-links https://girder.github.io/large_image_wheels -U  # xcookie: +UNCOMMENT_IF(gdal)
 
 
 
