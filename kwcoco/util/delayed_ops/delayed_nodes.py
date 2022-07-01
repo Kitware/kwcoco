@@ -1284,10 +1284,14 @@ class DelayedCrop2(DelayedImage2):
         in_w, in_h = subdata.dsize
         if space_slice is not None:
             space_dims = (in_h, in_w)
-            space_slice, _pad = kwarray.embed_slice(space_slice, space_dims)
-            sl_y, sl_x = space_slice[0:2]
-            width = sl_x.stop - sl_x.start
-            height = sl_y.stop - sl_y.start
+            bounds = kwimage.Boxes.from_slice(
+                space_slice, space_dims, wrap=True, clip=True)
+            width = bounds.width.ravel()[0]
+            height = bounds.height.ravel()[0]
+            # space_slice, _pad = kwarray.embed_slice(space_slice, space_dims)
+            # sl_y, sl_x = space_slice[0:2]
+            # width = sl_x.stop - sl_x.start
+            # height = sl_y.stop - sl_y.start
             self.meta['dsize'] = (width, height)
         else:
             space_slice = (slice(0, in_h), slice(0, in_w))

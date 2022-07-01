@@ -10,13 +10,14 @@ TODO:
     AST transformer.
 
 Example:
-    >>> # Make a complex chain of operations and optimize it
     >>> # xdoctest: +REQUIRES(module:gdal)
     >>> from kwcoco.util.delayed_ops import *  # NOQA
     >>> import kwimage
     >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
     >>> dimg = DelayedLoad2(fpath, channels='r|g|b')._load_metadata()
     >>> quantization = {'quant_max': 255, 'nodata': 0}
+    >>> #
+    >>> # Make a complex chain of operations
     >>> dimg = dimg.dequantize(quantization)
     >>> dimg = dimg.warp({'scale': 1.1})
     >>> dimg = dimg.warp({'scale': 1.1})
@@ -31,11 +32,29 @@ Example:
     >>> dimg = dimg.warp({'scale': 2.1})
     >>> dimg = dimg[0:200, 1:200]
     >>> dimg = dimg[1:200, 2:200]
+    >>> dimg.write_network_text()
+    ╙── Crop dsize=(128,130),space_slice=(slice(1,200,None),slice(2,200,None))
+        └─╼ Crop dsize=(130,131),space_slice=(slice(0,200,None),slice(1,200,None))
+            └─╼ Warp dsize=(131,131),transform={scale=2.1},antialias=True,interpolation=linear
+                └─╼ Warp dsize=(62,62),transform={scale=1.1},antialias=True,interpolation=linear
+                    └─╼ Warp dsize=(56,56),transform={scale=1.1},antialias=True,interpolation=linear
+                        └─╼ Warp dsize=(50,50),transform={scale=0.5},antialias=True,interpolation=linear
+                            └─╼ Crop dsize=(99,100),space_slice=(slice(0,800,None),slice(1,800,None))
+                                └─╼ Warp dsize=(100,100),transform={scale=0.5},antialias=True,interpolation=linear
+                                    └─╼ Crop dsize=(199,200),space_slice=(slice(0,800,None),slice(1,800,None))
+                                        └─╼ Warp dsize=(200,200),transform={scale=0.5},antialias=True,interpolation=linear
+                                            └─╼ Crop dsize=(399,400),space_slice=(slice(0,400,None),slice(1,400,None))
+                                                └─╼ Warp dsize=(621,621),transform={scale=1.1},antialias=True,interpolation=linear
+                                                    └─╼ Warp dsize=(564,564),transform={scale=1.1},antialias=True,interpolation=linear
+                                                        └─╼ Dequantize dsize=(512,512),quantization={quant_max=255,nodata=0}
+                                                            └─╼ Load channels=<FusedChannelSpec(r|g|b)>,num_channels=3,dsize=(512,512),fpath=.../demodata/astro_overviews=3.tif,num_overviews=0
+    >>> # Optimize the chain
     >>> dopt = dimg.optimize()
-    >>> if 1:
-    >>>     import networkx as nx
-    >>>     dimg.write_network_text()
-    >>>     dopt.write_network_text()
+    >>> dopt.write_network_text()
+    ╙── Warp dsize=(128,130),transform={offset=(-0.227133...,-0.231347...),scale=0.384326...},antialias=True,interpolation=linear
+        └─╼ Dequantize dsize=(318,329),quantization={quant_max=255,nodata=0}
+            └─╼ Crop dsize=(318,329),space_slice=(slice(2,331,None),slice(13,331,None))
+                └─╼ Load channels=<FusedChannelSpec(r|g|b)>,num_channels=3,dsize=(512,512),fpath=.../demodata/astro_overviews=3.tif,num_overviews=0
     >>> final0 = dimg.finalize()
     >>> final1 = dopt.finalize()
     >>> # xdoctest: +REQUIRES(--show)
