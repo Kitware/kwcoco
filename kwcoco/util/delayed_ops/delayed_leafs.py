@@ -7,6 +7,7 @@ import kwimage
 import numpy as np
 import warnings
 from kwcoco.util.delayed_ops.delayed_nodes import DelayedImage2
+# from kwcoco.util.delayed_ops.delayed_nodes import DelayedArray2
 
 try:
     from xdev import profile
@@ -170,11 +171,16 @@ class DelayedLoad2(DelayedImageLeaf2):
         return self
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         self._load_reference()
         if self.lazy_ref is NotImplemented:
             warnings.warn('DelayedLoad2 may not be efficient without gdal')
             pre_final = kwimage.imread(self.fpath)
             pre_final = kwarray.atleast_nd(pre_final, 3)
+            return pre_final
         else:
             return self.lazy_ref
 
@@ -197,14 +203,15 @@ class DelayedNans2(DelayedImageLeaf2):
         >>> cat = DelayedChannelConcat2([c1, c2])
         >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))._validate()
         >>> warped_cat._validate().optimize().finalize()
-
-        #>>> cropped = warped_cat.crop((slice(0, 300), slice(0, 100)))
-        #>>> cropped.finalize().shape
     """
     def __init__(self, dsize=None, channels=None):
         super().__init__(channels=channels, dsize=dsize)
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         shape = self.shape
         final = np.full(shape, fill_value=np.nan)
         return final
@@ -216,6 +223,9 @@ class DelayedNans2(DelayedImageLeaf2):
         Args:
             space_slice (Tuple[slice, slice]): y-slice and x-slice.
             chan_idxs (List[int]): indexes of bands to take
+
+        Returns:
+            DelayedImage2
         """
         if chan_idxs is None:
             channels = self.channels
@@ -232,6 +242,10 @@ class DelayedNans2(DelayedImageLeaf2):
         return new
 
     def warp(self, transform, dsize=None, antialias=True, interpolation='linear'):
+        """
+        Returns:
+            DelayedImage2
+        """
         # Warping does nothing to nans, except maybe changing the dsize
         new = self.__class__(dsize, channels=self.channels)
         return new
@@ -263,4 +277,8 @@ class DelayedIdentity2(DelayedImageLeaf2):
         self.meta['dsize'] = dsize
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         return self.data

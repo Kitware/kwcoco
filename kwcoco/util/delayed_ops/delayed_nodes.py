@@ -36,6 +36,10 @@ class DelayedStack2(DelayedNaryOperation2):
 
     @property
     def shape(self):
+        """
+        Returns:
+            None | Tuple[int | None, ...]
+        """
         shape = self.subdata.shape
         return shape
 
@@ -54,6 +58,10 @@ class DelayedConcat2(DelayedNaryOperation2):
 
     @property
     def shape(self):
+        """
+        Returns:
+            None | Tuple[int | None, ...]
+        """
         shape = self.subdata.shape
         return shape
 
@@ -94,6 +102,7 @@ class DelayedChannelConcat2(DelayedConcat2):
 
     Example:
         >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
         >>> import kwcoco
         >>> dsize = (307, 311)
         >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
@@ -139,6 +148,10 @@ class DelayedChannelConcat2(DelayedConcat2):
 
     @property
     def channels(self):
+        """
+        Returns:
+            None | kwcoco.FusedChannelSpec
+        """
         import kwcoco
         sub_channs = []
         for comp in self.parts:
@@ -151,6 +164,10 @@ class DelayedChannelConcat2(DelayedConcat2):
 
     @property
     def shape(self):
+        """
+        Returns:
+            Tuple[int | None, int | None, int | None]
+        """
         if self.meta['jagged']:
             w = h = None
         else:
@@ -160,6 +177,9 @@ class DelayedChannelConcat2(DelayedConcat2):
     def finalize(self):
         """
         Execute the final transform
+
+        Returns:
+            ArrayLike
         """
         stack = [comp.finalize() for comp in self.parts]
         if len(stack) == 1:
@@ -172,6 +192,10 @@ class DelayedChannelConcat2(DelayedConcat2):
         return final
 
     def optimize(self):
+        """
+        Returns:
+            DelayedImage2
+        """
         new_parts = [part.optimize() for part in self.parts]
         kw = ub.dict_isect(self.meta, ['dsize', 'jagged'])
         new = self.__class__(new_parts, **kw)
@@ -345,19 +369,38 @@ class DelayedChannelConcat2(DelayedConcat2):
         Args:
             space_slice (Tuple[slice, slice]): y-slice and x-slice.
             chan_idxs (List[int]): indexes of bands to take
+
+        Returns:
+            DelayedArray2
         """
         return self.__class__([c.crop(space_slice, chan_idxs) for c in self.parts])
 
     def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
+        """
+        Returns:
+            DelayedArray2
+        """
         return self.__class__([c.warp(transform, dsize, antialias, interpolation) for c in self.parts])
 
     def dequantize(self, quantization):
+        """
+        Returns:
+            DelayedArray2
+        """
         return self.__class__([c.dequantize(quantization) for c in self.parts])
 
     def get_overview(self, overview):
+        """
+        Returns:
+            DelayedArray2
+        """
         return self.__class__([c.get_overview(overview) for c in self.parts])
 
     def as_xarray(self):
+        """
+        Returns:
+            DelayedAsXarray2
+        """
         return DelayedAsXarray2(self)
 
     def _validate(self):
@@ -394,6 +437,10 @@ class DelayedArray2(DelayedUnaryOperation2):
 
     @property
     def shape(self):
+        """
+        Returns:
+            None | Tuple[int | None, ...]
+        """
         shape = self.subdata.shape
         return shape
 
@@ -415,6 +462,10 @@ class DelayedImage2(DelayedArray2):
 
     @property
     def shape(self):
+        """
+        Returns:
+            None | Tuple[int | None, int | None, int | None]
+        """
         dsize = self.dsize
         if dsize is None:
             dsize = (None, None)
@@ -424,6 +475,10 @@ class DelayedImage2(DelayedArray2):
 
     @property
     def num_channels(self):
+        """
+        Returns:
+            None | int
+        """
         num_channels = self.meta.get('num_channels', None)
         if num_channels is None and self.subdata is not None:
             num_channels = self.subdata.num_channels
@@ -431,6 +486,10 @@ class DelayedImage2(DelayedArray2):
 
     @property
     def dsize(self):
+        """
+        Returns:
+            None | Tuple[int | None, int | None]
+        """
         # return self.meta.get('dsize', None)
         dsize = self.meta.get('dsize', None)
         if dsize is None and self.subdata is not None:
@@ -439,6 +498,10 @@ class DelayedImage2(DelayedArray2):
 
     @property
     def channels(self):
+        """
+        Returns:
+            None | kwcoco.FusedChannelSpec
+        """
         channels = self.meta.get('channels', None)
         if channels is None and self.subdata is not None:
             channels = self.subdata.channels
@@ -559,6 +622,9 @@ class DelayedImage2(DelayedArray2):
         Args:
             space_slice (Tuple[slice, slice]): y-slice and x-slice.
             chan_idxs (List[int]): indexes of bands to take
+
+        Returns:
+            DelayedImage2
         """
         new = DelayedCrop2(self, space_slice, chan_idxs)
         return new
@@ -586,6 +652,9 @@ class DelayedImage2(DelayedArray2):
             interpolation (str):
                 interpolation code or cv2 integer. Interpolation codes are linear,
                 nearest, cubic, lancsoz, and area. Defaults to "linear".
+
+        Returns:
+            DelayedImage2
         """
         new = DelayedWarp2(self, transform, dsize=dsize, antialias=antialias,
                            interpolation=interpolation)
@@ -598,6 +667,9 @@ class DelayedImage2(DelayedArray2):
         Args:
             quantization (Dict):
                 see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
+
+        Returns:
+            DelayedDequantize2
         """
         new = DelayedDequantize2(self, quantization)
         return new
@@ -608,11 +680,18 @@ class DelayedImage2(DelayedArray2):
 
         Args:
             overview (int): the overview to use (assuming it exists)
+
+        Returns:
+            DelayedOverview2
         """
         new = DelayedOverview2(self, overview)
         return new
 
     def as_xarray(self):
+        """
+        Returns:
+            DelayedAsXarray2
+        """
         return DelayedAsXarray2(self)
 
     def _validate(self):
@@ -664,6 +743,10 @@ class DelayedAsXarray2(DelayedImage2):
     """
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         import xarray as xr
         subfinal = np.asarray(self.subdata.finalize())
         channels = self.subdata.channels
@@ -674,6 +757,10 @@ class DelayedAsXarray2(DelayedImage2):
         return final
 
     def optimize(self):
+        """
+        Returns:
+            DelayedImage2
+        """
         return self.subdata.optimize().as_xarray()
 
 
@@ -728,6 +815,10 @@ class DelayedWarp2(DelayedImage2):
         self.meta['dsize'] = dsize
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         dsize = self.dsize
         if dsize == (None, None):
             dsize = None
@@ -749,6 +840,10 @@ class DelayedWarp2(DelayedImage2):
 
     @profile
     def optimize(self):
+        """
+        Returns:
+            DelayedImage2
+        """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedWarp2):
@@ -1004,6 +1099,10 @@ class DelayedDequantize2(DelayedImage2):
         self.meta['dsize'] = subdata.dsize
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         from kwcoco.util.delayed_ops.helpers import dequantize
         quantization = self.meta['quantization']
         final = self.subdata.finalize()
@@ -1015,6 +1114,10 @@ class DelayedDequantize2(DelayedImage2):
     @profile
     def optimize(self):
         """
+
+        Returns:
+            DelayedImage2
+
         Example:
             >>> # Test a case that caused an error in development
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
@@ -1107,6 +1210,10 @@ class DelayedCrop2(DelayedImage2):
         self.meta['chan_idxs'] = chan_idxs
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         space_slice = self.meta['space_slice']
         chan_idxs = self.meta['chan_idxs']
         sub_final = self.subdata.finalize()
@@ -1121,6 +1228,10 @@ class DelayedCrop2(DelayedImage2):
 
     @profile
     def optimize(self):
+        """
+        Returns:
+            DelayedImage2
+        """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedCrop2):
@@ -1140,6 +1251,7 @@ class DelayedCrop2(DelayedImage2):
 
         Example:
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
             >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
             >>> # Test Fuse Crops Space Only
             >>> crop1 = base[4:12, 0:16]
@@ -1153,6 +1265,7 @@ class DelayedCrop2(DelayedImage2):
         Example:
             >>> # Test Fuse Crops Channels Only
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
             >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
             >>> crop1 = base.crop(chan_idxs=[0, 2, 1])
             >>> crop2 = crop1.crop(chan_idxs=[1, 2])
@@ -1171,6 +1284,7 @@ class DelayedCrop2(DelayedImage2):
         Example:
             >>> # Test Fuse Crops Space  And Channels
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
             >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
             >>> crop1 = base[4:12, 0:16, [1, 2]]
             >>> self = crop1[2:6, 0:8, [1]]
@@ -1222,6 +1336,7 @@ class DelayedCrop2(DelayedImage2):
 
         Example:
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
             >>> fpath = kwimage.grab_test_image_fpath()
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
             >>> node1 = node0.warp({'scale': 0.432, 'theta': np.pi / 3, 'about': (80, 80), 'shearx': .3, 'offset': (-50, -50)})
@@ -1241,6 +1356,7 @@ class DelayedCrop2(DelayedImage2):
         Example:
             >>> # xdoctest: +REQUIRES(module:gdal)
             >>> from kwcoco.util.delayed_ops import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
             >>> node1 = node0.warp({'scale': 1000 / 512})
@@ -1344,6 +1460,10 @@ class DelayedOverview2(DelayedImage2):
         return num_remain
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         sub_final = self.subdata.finalize()
         if not hasattr(sub_final, 'get_overview'):
             warnings.warn(ub.paragraph(
@@ -1364,6 +1484,10 @@ class DelayedOverview2(DelayedImage2):
 
     @profile
     def optimize(self):
+        """
+        Returns:
+            DelayedImage2
+        """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedOverview2):

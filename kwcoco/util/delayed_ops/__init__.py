@@ -7,6 +7,7 @@ TODO:
 
 Example:
     >>> # Make a complex chain of operations and optimize it
+    >>> # xdoctest: +REQUIRES(module:gdal)
     >>> from kwcoco.util.delayed_ops import *  # NOQA
     >>> import kwimage
     >>> fpath = kwimage.grab_test_image_fpath(overviews=3)

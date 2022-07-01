@@ -14,9 +14,17 @@ class DelayedOperation2(ub.NiceRepr):
         self.meta = {}
 
     def __nice__(self):
+        """
+        Returns:
+            str
+        """
         return '{}'.format(self.shape)
 
     def nesting(self):
+        """
+        Returns:
+            Dict[str, dict]
+        """
         def _child_nesting(child):
             if hasattr(child, 'nesting'):
                 return child.nesting()
@@ -37,6 +45,8 @@ class DelayedOperation2(ub.NiceRepr):
 
     def as_graph(self):
         """
+        Returns:
+            networkx.DiGraph
         """
         import networkx as nx
         import itertools as it
@@ -75,6 +85,10 @@ class DelayedOperation2(ub.NiceRepr):
 
     @property
     def shape(self):
+        """
+        Returns:
+            None | Tuple[int | None, ...]
+        """
         raise NotImplementedError
 
     def children(self):
@@ -86,9 +100,17 @@ class DelayedOperation2(ub.NiceRepr):
         yield None
 
     def finalize(self):
+        """
+        Returns:
+            ArrayLike
+        """
         raise NotImplementedError
 
     def optimize(self):
+        """
+        Returns:
+            DelayedOperation2
+        """
         raise NotImplementedError
 
 

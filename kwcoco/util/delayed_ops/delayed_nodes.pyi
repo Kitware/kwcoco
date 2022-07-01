@@ -1,6 +1,8 @@
 from typing import Union
-from typing import List
 from typing import Tuple
+import kwcoco
+from numpy.typing import ArrayLike
+from typing import List
 import kwimage
 from numpy import ndarray
 from typing import Dict
@@ -20,7 +22,7 @@ class DelayedStack2(DelayedNaryOperation2):
         ...
 
     @property
-    def shape(self):
+    def shape(self) -> None | Tuple[int | None, ...]:
         ...
 
 
@@ -33,7 +35,7 @@ class DelayedConcat2(DelayedNaryOperation2):
         ...
 
     @property
-    def shape(self):
+    def shape(self) -> None | Tuple[int | None, ...]:
         ...
 
 
@@ -72,17 +74,17 @@ class DelayedChannelConcat2(DelayedConcat2):
         ...
 
     @property
-    def channels(self):
+    def channels(self) -> None | kwcoco.FusedChannelSpec:
         ...
 
     @property
-    def shape(self):
+    def shape(self) -> Tuple[int | None, int | None, int | None]:
         ...
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
 
-    def optimize(self):
+    def optimize(self) -> DelayedImage2:
         ...
 
     comp: Incomplete
@@ -97,23 +99,23 @@ class DelayedChannelConcat2(DelayedConcat2):
 
     def crop(self,
              space_slice: Tuple[slice, slice] = None,
-             chan_idxs: List[int] = None):
+             chan_idxs: List[int] = None) -> DelayedArray2:
         ...
 
     def warp(self,
              transform,
              dsize: str = ...,
              antialias: bool = ...,
-             interpolation: str = ...):
+             interpolation: str = ...) -> DelayedArray2:
         ...
 
-    def dequantize(self, quantization):
+    def dequantize(self, quantization) -> DelayedArray2:
         ...
 
-    def get_overview(self, overview):
+    def get_overview(self, overview) -> DelayedArray2:
         ...
 
-    def as_xarray(self):
+    def as_xarray(self) -> DelayedAsXarray2:
         ...
 
 
@@ -126,7 +128,7 @@ class DelayedArray2(DelayedUnaryOperation2):
         ...
 
     @property
-    def shape(self):
+    def shape(self) -> None | Tuple[int | None, ...]:
         ...
 
 
@@ -142,23 +144,23 @@ class DelayedImage2(DelayedArray2):
         ...
 
     @property
-    def shape(self):
+    def shape(self) -> None | Tuple[int | None, int | None, int | None]:
         ...
 
     @property
-    def num_channels(self):
+    def num_channels(self) -> None | int:
         ...
 
     @property
-    def dsize(self):
+    def dsize(self) -> None | Tuple[int | None, int | None]:
         ...
 
     @property
-    def channels(self):
+    def channels(self) -> None | kwcoco.FusedChannelSpec:
         ...
 
     @channels.setter
-    def channels(self, channels) -> None:
+    def channels(self, channels) -> None | kwcoco.FusedChannelSpec:
         ...
 
     @property
@@ -175,32 +177,32 @@ class DelayedImage2(DelayedArray2):
 
     def crop(self,
              space_slice: Tuple[slice, slice] = None,
-             chan_idxs: List[int] = None):
+             chan_idxs: List[int] = None) -> DelayedImage2:
         ...
 
     def warp(self,
              transform: Union[ndarray, dict, kwimage.Affine],
              dsize: Union[Tuple[int, int], str] = 'auto',
              antialias: bool = True,
-             interpolation: str = 'linear'):
+             interpolation: str = 'linear') -> DelayedImage2:
         ...
 
-    def dequantize(self, quantization: Dict):
+    def dequantize(self, quantization: Dict) -> DelayedDequantize2:
         ...
 
-    def get_overview(self, overview: int):
+    def get_overview(self, overview: int) -> DelayedOverview2:
         ...
 
-    def as_xarray(self):
+    def as_xarray(self) -> DelayedAsXarray2:
         ...
 
 
 class DelayedAsXarray2(DelayedImage2):
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
 
-    def optimize(self):
+    def optimize(self) -> DelayedImage2:
         ...
 
 
@@ -214,10 +216,10 @@ class DelayedWarp2(DelayedImage2):
                  interpolation: str = 'linear') -> None:
         ...
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
 
-    def optimize(self):
+    def optimize(self) -> DelayedImage2:
         ...
 
 
@@ -226,10 +228,10 @@ class DelayedDequantize2(DelayedImage2):
     def __init__(self, subdata: DelayedArray2, quantization: Dict) -> None:
         ...
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
 
-    def optimize(self):
+    def optimize(self) -> DelayedImage2:
         ...
 
 
@@ -242,10 +244,10 @@ class DelayedCrop2(DelayedImage2):
                  chan_idxs: Union[List[int], None] = None) -> None:
         ...
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
 
-    def optimize(self):
+    def optimize(self) -> DelayedImage2:
         ...
 
 
@@ -258,8 +260,8 @@ class DelayedOverview2(DelayedImage2):
     def num_overviews(self):
         ...
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
 
-    def optimize(self):
+    def optimize(self) -> DelayedImage2:
         ...

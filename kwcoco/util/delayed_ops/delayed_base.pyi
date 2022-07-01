@@ -1,4 +1,8 @@
+from typing import Dict
+import networkx
+from typing import Tuple
 from typing import Any
+from numpy.typing import ArrayLike
 import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
@@ -14,26 +18,26 @@ class DelayedOperation2(ub.NiceRepr):
     def __nice__(self):
         ...
 
-    def nesting(self):
+    def nesting(self) -> Dict[str, dict]:
         ...
 
-    def as_graph(self):
+    def as_graph(self) -> networkx.DiGraph:
         ...
 
     def write_network_text(self, with_labels: bool = ...) -> None:
         ...
 
     @property
-    def shape(self) -> None:
+    def shape(self) -> None | Tuple[int | None, ...]:
         ...
 
     def children(self) -> Generator[Any, None, None]:
         ...
 
-    def finalize(self) -> None:
+    def finalize(self) -> ArrayLike:
         ...
 
-    def optimize(self) -> None:
+    def optimize(self) -> DelayedOperation2:
         ...
 
 

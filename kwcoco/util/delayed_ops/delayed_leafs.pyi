@@ -2,6 +2,7 @@ from typing import Union
 from os import PathLike
 import kwcoco
 from typing import Tuple
+from numpy.typing import ArrayLike
 from typing import List
 from _typeshed import Incomplete
 from kwcoco.util.delayed_ops.delayed_nodes import DelayedImage2
@@ -38,7 +39,7 @@ class DelayedLoad2(DelayedImageLeaf2):
     def prepare(self):
         ...
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
 
 
@@ -49,19 +50,19 @@ class DelayedNans2(DelayedImageLeaf2):
                  channels: Incomplete | None = ...) -> None:
         ...
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
 
     def crop(self,
              region_slices: Incomplete | None = ...,
-             chan_idxs: List[int] = None):
+             chan_idxs: List[int] = None) -> DelayedImage2:
         ...
 
     def warp(self,
              transform,
              dsize: Incomplete | None = ...,
              antialias: bool = ...,
-             interpolation: str = ...):
+             interpolation: str = ...) -> DelayedImage2:
         ...
 
 
@@ -74,5 +75,5 @@ class DelayedIdentity2(DelayedImageLeaf2):
                  dsize: Incomplete | None = ...) -> None:
         ...
 
-    def finalize(self):
+    def finalize(self) -> ArrayLike:
         ...
