@@ -45,7 +45,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         >>> data1 = self.finalize()
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:gdal)
+        >>> # xdoctest: +REQUIRES(module:osgeo)
         >>> # Demo code to develop support for overviews
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage
@@ -71,7 +71,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         >>> node4.write_network_text()
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:gdal)
+        >>> # xdoctest: +REQUIRES(module:osgeo)
         >>> # Test delayed ops with int16 and nodata values
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage

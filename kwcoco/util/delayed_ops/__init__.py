@@ -10,7 +10,7 @@ TODO:
     AST transformer.
 
 Example:
-    >>> # xdoctest: +REQUIRES(module:gdal)
+    >>> # xdoctest: +REQUIRES(module:osgeo)
     >>> from kwcoco.util.delayed_ops import *  # NOQA
     >>> import kwimage
     >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
@@ -64,8 +64,9 @@ Example:
     >>> kwplot.imshow(final1, pnum=(1, 2, 2), fnum=1, title='optimized')
 
 Example:
-    >>> # xdoctest: +REQUIRES(module:gdal)
+    >>> # xdoctest: +REQUIRES(module:osgeo)
     >>> from kwcoco.util.delayed_ops import *  # NOQA
+    >>> import ubelt as ub
     >>> import kwimage
     >>> # Sometimes we want to manipulate data in a space, but then remove all
     >>> # warps in order to get a sample without any data artifacts.  This is
@@ -110,36 +111,46 @@ Example:
 
 
 Example:
-    >>> # xdoctest: +REQUIRES(module:gdal)
+    >>> # xdoctest: +REQUIRES(module:osgeo)
     >>> from kwcoco.util.delayed_ops import *  # NOQA
+    >>> import ubelt as ub
     >>> import kwimage
     >>> # Demo case where we have different channels at different resolutions
     >>> fpath = kwimage.grab_test_image_fpath()
-    >>> base = DelayedLoad2.demo(dsize=(600, 600), channels='r|g|b').prepare()
-    >>> bandR = DelayedLoad2.demo(dsize=(100, 100), channels='r|g|b').prepare()[:, :, 0]
-    >>> bandG = DelayedLoad2.demo(dsize=(300, 300), channels='r|g|b').prepare()[:, :, 1]
-    >>> bandB = DelayedLoad2.demo(dsize=(600, 600), channels='r|g|b').prepare()[:, :, 2]
-    >>> chan1 = bandR.warp({'scale': 6})
-    >>> chan2 = bandG.warp({'scale': 2})
-    >>> chan3 = bandB
-    >>> orig = DelayedChannelConcat2([chan1, chan2, chan3]).warp({'scale': 0.35})[10:80, 50:135].warp({'scale': 3})
-    >>> delayed = orig.optimize()
-    >>> print('Orig')
-    >>> orig.write_network_text()
-    >>> print('Delayed')
-    >>> delayed.write_network_text()
+    >>> base = DelayedLoad2.demo(channels='r|g|b').prepare()
+    >>> bandR = base[:, :, 0].scale(100 / 512).evaluate()
+    >>> bandG = base[:, :, 1].scale(300 / 512).evaluate()
+    >>> bandB = base[:, :, 2].scale(600 / 512).evaluate()
+    >>> # Align the bands in "video" space
+    >>> orig_vidspace = DelayedChannelConcat2([
+    >>>     bandR.scale(6),
+    >>>     bandG.scale(2),
+    >>>     bandB.scale(1),
+    >>> ]).warp({'scale': 0.35})
+    >>> vidspace_box = kwimage.Boxes([[50, 10, 135, 80]], 'ltrb')
+    >>> vidspace_slice = vidspace_box.to_slices()[0]
+    >>> crop_vidspace = orig_vidspace[vidspace_slice]
+    >>> # .warp({'scale': 3})
+    >>> opt_crop_vidspace = crop_vidspace.optimize()
+    >>> print('Original: Video Space')
+    >>> orig_vidspace.write_network_text()
+    >>> print('Original Crop: Video Space')
+    >>> crop_vidspace.write_network_text()
+    >>> print('Optimized Crop: Video Space')
+    >>> opt_crop_vidspace.write_network_text()
     >>> row0 = []
     >>> row1 = []
     >>> row2 = []
-    >>> row0.append(base.finalize())
-    >>> row1.append(orig.finalize())
-    >>> row1.append(delayed.finalize())
+    >>> row0.append(base.finalize()[:])
+    >>> row1.append(vidspace_box.draw_on(orig_vidspace.finalize()))
+    >>> row1.append(crop_vidspace.finalize())
+    >>> row1.append(opt_crop_vidspace.finalize())
     >>> row2.append(bandR.finalize())
     >>> row2.append(bandG.finalize())
     >>> row2.append(bandB.finalize())
     >>> row3 = []
     >>> # Get the transform that would bring us back to the leaf
-    >>> for chosen_band in delayed.parts:
+    >>> for chosen_band in opt_crop_vidspace.parts:
     >>>     spec = chosen_band.channels.spec
     >>>     lut = {c[0]: c for c in ['red', 'green', 'blue']}
     >>>     color = lut[spec]
@@ -160,13 +171,12 @@ Example:
     >>>     print('Undone Scale')
     >>>     undone_scale = chosen_band.warp(undo_scale).optimize()
     >>>     undone_scale.write_network_text()
-    >>>     undone_scale.write_network_text()
     >>>     row3.append(undone_all.finalize())
     >>>     row3.append(undone_scale.finalize())
     >>>     print(ub.color_text('============', color))
     >>> #
+    >>> # xdoctest: +REQUIRES(--show)
     >>> import kwplot
-    >>> kwplot.autompl()
     >>> kwplot.autompl()
     >>> stack0 = kwimage.stack_images(row0, axis=1, bg_value=(5, 100, 10), pad=10)
     >>> stack1 = kwimage.stack_images(row1, axis=1, bg_value=(5, 100, 10), pad=10)

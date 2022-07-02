@@ -415,6 +415,9 @@ class DelayedChannelConcat2(DelayedConcat2):
         space_slice = (sl_y, sl_x)
         return self.crop(space_slice, chan_idxs)
 
+    def scale(self, scale, antialias=True, interpolation='linear'):
+        return self.warp({'scale': scale})
+
     def crop(self, space_slice=None, chan_idxs=None):
         """
         Crops an image along integer pixel coordinates.
@@ -723,6 +726,9 @@ class DelayedImage2(DelayedArray2):
         new = self.crop(None, new_chan_ixs)
         return new
 
+    def scale(self, scale, antialias=True, interpolation='linear'):
+        return self.warp({'scale': scale})
+
     def crop(self, space_slice=None, chan_idxs=None):
         """
         Crops an image along integer pixel coordinates.
@@ -839,6 +845,18 @@ class DelayedImage2(DelayedArray2):
         self_from_subdata = self._transform_from_subdata()
         self_from_leaf = self_from_subdata @ subdata_from_leaf
         return self_from_leaf
+
+    def evaluate(self):
+        """
+        Evaluate this node and return the data as an identity.
+
+        Returns:
+            DelayedIdentity2
+        """
+        from kwcoco.util.delayed_ops.delayed_leafs import DelayedIdentity2
+        final = self.finalize()
+        new = DelayedIdentity2(final, dsize=self.dsize, channels=self.channels)
+        return new
 
 
 class DelayedAsXarray2(DelayedImage2):
@@ -1010,7 +1028,7 @@ class DelayedWarp2(DelayedImage2):
         Remove the overview if we can get a higher resolution without it
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:gdal)
+            >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> from kwcoco.util.delayed_ops import DelayedLoad2
             >>> import kwimage
@@ -1144,7 +1162,7 @@ class DelayedWarp2(DelayedImage2):
         Split this node into a warp and an overview if possible
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:gdal)
+            >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> from kwcoco.util.delayed_ops import DelayedLoad2
             >>> import kwimage
@@ -1160,7 +1178,7 @@ class DelayedWarp2(DelayedImage2):
             >>> print(ub.repr2(warp2.nesting(), nl=-1, sort=0))
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:gdal)
+            >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
             >>> from kwcoco.util.delayed_ops import DelayedLoad2
             >>> import kwimage
@@ -1495,7 +1513,7 @@ class DelayedCrop2(DelayedImage2):
             >>> kwplot.imshow(final1, pnum=(2, 2, 2), fnum=1, title='optimized')
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:gdal)
+            >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
@@ -1547,7 +1565,7 @@ class DelayedOverview2(DelayedImage2):
     efficient.
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:gdal)
+        >>> # xdoctest: +REQUIRES(module:osgeo)
         >>> # Make a complex chain of operations and optimize it
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage
@@ -1669,7 +1687,7 @@ class DelayedOverview2(DelayedImage2):
         overview to be as close to the load as possible.
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:gdal)
+            >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
@@ -1737,7 +1755,7 @@ class DelayedOverview2(DelayedImage2):
         such that the overview is first.
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:gdal)
+            >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
             >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
