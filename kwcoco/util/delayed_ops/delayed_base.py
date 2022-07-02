@@ -6,8 +6,8 @@ import numpy as np
 import ubelt as ub
 
 
-# from kwcoco.util.util_monkey import Reloadable  # NOQA
-# @Reloadable.developing  # NOQA
+from kwcoco.util.util_monkey import Reloadable  # NOQA
+@Reloadable.developing  # NOQA
 class DelayedOperation2(ub.NiceRepr):
 
     def __init__(self):
@@ -66,7 +66,10 @@ class DelayedOperation2(ub.NiceRepr):
             if 'transform' in sub_meta:
                 sub_meta['transform'] = sub_meta['transform'].concise()
                 sub_meta['transform'].pop('type')
-            param_key = ub.repr2(sub_meta, sort=0, compact=1, nl=0)
+            if 'channels' in sub_meta:
+                sub_meta['channels'] = str(sub_meta['channels'].spec)
+            sub_meta.pop('jagged', None)
+            param_key = ub.repr2(sub_meta, sort=0, compact=1, nl=0, precision=4)
             short_type = item.__class__.__name__.replace('Delayed', '').replace('2', '')
             node_data = graph.nodes[node_id]
             node_data['label'] = f'{short_type} {param_key}'

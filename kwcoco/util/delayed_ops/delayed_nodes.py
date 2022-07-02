@@ -402,6 +402,19 @@ class DelayedChannelConcat2(DelayedConcat2):
         new = DelayedChannelConcat2(new_components, jagged=self.meta['jagged'])
         return new
 
+    def __getitem__(self, sl):
+        if not isinstance(sl, tuple):
+            raise TypeError('slice must be given as tuple')
+        if len(sl) == 2:
+            sl_y, sl_x = sl
+            chan_idxs = None
+        elif len(sl) == 3:
+            sl_y, sl_x, chan_idxs = sl
+        else:
+            raise ValueError('Slice must have 2 or 3 dims')
+        space_slice = (sl_y, sl_x)
+        return self.crop(space_slice, chan_idxs)
+
     def crop(self, space_slice=None, chan_idxs=None):
         """
         Crops an image along integer pixel coordinates.
@@ -815,6 +828,18 @@ class DelayedImage2(DelayedArray2):
                     f'final and meta {k} does not agree {v1!r} != {v2!r}')
         return self
 
+    def _transform_from_subdata(self):
+        return kwimage.Affine.eye()
+
+    def get_transform_from_leaf(self):
+        """
+        Returns the transformation that would align data with the leaf
+        """
+        subdata_from_leaf = self.subdata.get_transform_from_leaf()
+        self_from_subdata = self._transform_from_subdata()
+        self_from_leaf = self_from_subdata @ subdata_from_leaf
+        return self_from_leaf
+
 
 class DelayedAsXarray2(DelayedImage2):
     """
@@ -909,6 +934,14 @@ class DelayedWarp2(DelayedImage2):
         self.meta['interpolation'] = interpolation
         self.meta['dsize'] = dsize
 
+    @property
+    def transform(self):
+        """
+        Returns:
+            kwimage.Affine
+        """
+        return self.meta['transform']
+
     def finalize(self):
         """
         Returns:
@@ -951,6 +984,9 @@ class DelayedWarp2(DelayedImage2):
         else:
             new = new._opt_absorb_overview()
         return new
+
+    def _transform_from_subdata(self):
+        return self.transform
 
     def _opt_fuse_warps(self):
         """
@@ -1047,8 +1083,7 @@ class DelayedWarp2(DelayedImage2):
 
         # Replace the overview node with a warp node that mimics it.
         # This has no impact on the function of the operation stack.
-        scale = 1 / 2 ** overview.meta['overview']
-        mimic_overview = overview.subdata.warp({'scale': scale})
+        mimic_overview = overview._opt_overview_as_warp()
         tf1 = mimic_overview.meta['transform']
 
         # Handle any nodes between the warp and the overview.
@@ -1345,6 +1380,12 @@ class DelayedCrop2(DelayedImage2):
             new = new.optimize()
         return new
 
+    def _transform_from_subdata(self):
+        sl_y, sl_x = self.meta['space_slice']
+        offset = -sl_x.start, -sl_y.start
+        self_from_subdata = kwimage.Affine.translate(offset)
+        return self_from_subdata
+
     def _opt_fuse_crops(self):
         """
         Combine two consecutive crops into a single operation.
@@ -1608,6 +1649,20 @@ class DelayedOverview2(DelayedImage2):
             new = new.optimize()
         return new
 
+    def _transform_from_subdata(self):
+        scale = 1 / 2 ** self.meta['overview']
+        return kwimage.Affine.scale(scale)
+
+    def _opt_overview_as_warp(self):
+        """
+        Sometimes it is beneficial to replace an overview with a warp as an
+        intermediate optimization step.
+        """
+        transform = self._transform_from_subdata()
+        dsize = self.meta['dsize']
+        new = self.subdata.warp(transform, dsize=dsize)
+        return new
+
     def _opt_crop_after_overview(self):
         """
         Given an outer overview and an inner crop, switch places. We want the
@@ -1703,10 +1758,7 @@ class DelayedOverview2(DelayedImage2):
         assert isinstance(self.subdata, DelayedWarp2)
         outer_overview = self.meta['overview']
         inner_transform = self.subdata.meta['transform']
-
-        sf = 1 / 2 ** outer_overview
-        outer_transform = kwimage.Affine.scale(sf)
-
+        outer_transform = self._transform_from_subdata()
         A = outer_transform
         B = inner_transform
         # We have: A @ B, and we want that to equal C @ A

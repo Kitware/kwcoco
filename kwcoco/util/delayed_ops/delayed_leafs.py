@@ -17,6 +17,15 @@ except ImportError:
 
 class DelayedImageLeaf2(DelayedImage2):
 
+    def get_transform_from_leaf(self):
+        """
+        Returns the transformation that would align data with the leaf
+
+        Returns:
+            kwimage.Affine
+        """
+        return kwimage.Affine.eye()
+
     @profile
     def optimize(self):
         return self
