@@ -33,9 +33,19 @@ class DelayedOperation2(ub.NiceRepr):
                     'type': 'ndarray',
                     'shape': self.subdata.shape,
                 }
+        # from kwcoco.util import ensure_json_serializable
+        meta = self.meta.copy()
+        try:
+            meta['transform'] = meta['transform'].concise()
+        except (AttributeError, KeyError):
+            pass
+        try:
+            meta['channels'] = meta['channels'].concise().spec
+        except (AttributeError, KeyError):
+            pass
         item = {
             'type': self.__class__.__name__,
-            'meta': self.meta,
+            'meta': meta,
         }
         child_nodes = list(self.children())
         if child_nodes:
@@ -76,6 +86,7 @@ class DelayedOperation2(ub.NiceRepr):
             node_data['short_type'] = short_type
             node_data['type'] = item.__class__.__name__
             node_data['meta'] = sub_meta
+            node_data['obj'] = item
             for child in item.children():
                 stack.append((node_id, child))
         return graph
@@ -115,6 +126,17 @@ class DelayedOperation2(ub.NiceRepr):
             DelayedOperation2
         """
         raise NotImplementedError
+
+    def _set_nested_params(self, **kwargs):
+        """
+        Hack to override nested params on all warps for things like
+        interplation / antialias
+        """
+        graph = self.as_graph()
+        for node_id, node_data in graph.nodes(data=True):
+            obj = node_data['obj']
+            common = ub.dict_isect(kwargs, obj.meta)
+            obj.meta.update(common)
 
 
 class DelayedNaryOperation2(DelayedOperation2):

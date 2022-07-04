@@ -97,6 +97,88 @@ class DelayedFrameStack2(DelayedStack2):
 # ------
 
 
+class ImageOpsMixin:
+
+    def crop(self, space_slice=None, chan_idxs=None):
+        """
+        Crops an image along integer pixel coordinates.
+
+        Args:
+            space_slice (Tuple[slice, slice]): y-slice and x-slice.
+            chan_idxs (List[int]): indexes of bands to take
+
+        Returns:
+            DelayedImage2
+        """
+        new = DelayedCrop2(self, space_slice, chan_idxs)
+        return new
+
+    def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
+        """
+        Applys an affine transformation to the image
+
+        Args:
+            transform (ndarray | dict | kwimage.Affine):
+                a coercable affine matrix.  See :class:`kwimage.Affine` for
+                details on what can be coerced.
+
+            dsize (Tuple[int, int] | str):
+                The width / height of the output canvas. If 'auto', dsize is
+                computed such that the positive coordinates of the warped image
+                will fit in the new canvas. In this case, any pixel that maps
+                to a negative coordinate will be clipped.  This has the
+                property that the input transformation is not modified.
+
+            antialias (bool):
+                if True determines if the transform is downsampling and applies
+                antialiasing via gaussian a blur. Defaults to False
+
+            interpolation (str):
+                interpolation code or cv2 integer. Interpolation codes are linear,
+                nearest, cubic, lancsoz, and area. Defaults to "linear".
+
+        Returns:
+            DelayedImage2
+        """
+        new = DelayedWarp2(self, transform, dsize=dsize, antialias=antialias,
+                           interpolation=interpolation)
+        return new
+
+    def dequantize(self, quantization):
+        """
+        Rescales image intensities from int to floats.
+
+        Args:
+            quantization (Dict[str, Any]):
+                see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
+
+        Returns:
+            DelayedDequantize2
+        """
+        new = DelayedDequantize2(self, quantization)
+        return new
+
+    def get_overview(self, overview):
+        """
+        Downsamples an image by a factor of two.
+
+        Args:
+            overview (int): the overview to use (assuming it exists)
+
+        Returns:
+            DelayedOverview2
+        """
+        new = DelayedOverview2(self, overview)
+        return new
+
+    def as_xarray(self):
+        """
+        Returns:
+            DelayedAsXarray2
+        """
+        return DelayedAsXarray2(self)
+
+
 class JaggedArray2(ub.NiceRepr):
     """
     The result of an unaligned concatenate
@@ -127,7 +209,7 @@ class JaggedArray2(ub.NiceRepr):
         return shapes
 
 
-class DelayedChannelConcat2(DelayedConcat2):
+class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
     """
     Stacks multiple arrays together.
 
@@ -415,75 +497,72 @@ class DelayedChannelConcat2(DelayedConcat2):
         space_slice = (sl_y, sl_x)
         return self.crop(space_slice, chan_idxs)
 
-    def scale(self, scale, antialias=True, interpolation='linear'):
-        return self.warp({'scale': scale})
+    # def crop(self, space_slice=None, chan_idxs=None):
+    #     """
+    #     Crops an image along integer pixel coordinates.
 
-    def crop(self, space_slice=None, chan_idxs=None):
-        """
-        Crops an image along integer pixel coordinates.
+    #     Args:
+    #         space_slice (Tuple[slice, slice]): y-slice and x-slice.
+    #         chan_idxs (List[int]): indexes of bands to take
 
-        Args:
-            space_slice (Tuple[slice, slice]): y-slice and x-slice.
-            chan_idxs (List[int]): indexes of bands to take
+    #     Returns:
+    #         DelayedArray2
+    #     """
+    #     return self.__class__([c.crop(space_slice, chan_idxs) for c in self.parts])
 
-        Returns:
-            DelayedArray2
-        """
-        return self.__class__([c.crop(space_slice, chan_idxs) for c in self.parts])
+    # def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
+    #     """
+    #     Applys an affine transformation to the image
 
-    def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
-        """
-        Applys an affine transformation to the image
+    #     Args:
+    #         transform (ndarray | dict | kwimage.Affine):
+    #             a coercable affine matrix.  See :class:`kwimage.Affine` for
+    #             details on what can be coerced.
 
-        Args:
-            transform (ndarray | dict | kwimage.Affine):
-                a coercable affine matrix.  See :class:`kwimage.Affine` for
-                details on what can be coerced.
+    #         dsize (Tuple[int, int] | str):
+    #             The width / height of the output canvas. If 'auto', dsize is
+    #             computed such that the positive coordinates of the warped image
+    #             will fit in the new canvas. In this case, any pixel that maps
+    #             to a negative coordinate will be clipped.  This has the
+    #             property that the input transformation is not modified.
 
-            dsize (Tuple[int, int] | str):
-                The width / height of the output canvas. If 'auto', dsize is
-                computed such that the positive coordinates of the warped image
-                will fit in the new canvas. In this case, any pixel that maps
-                to a negative coordinate will be clipped.  This has the
-                property that the input transformation is not modified.
+    #         antialias (bool):
+    #             if True determines if the transform is downsampling and applies
+    #             antialiasing via gaussian a blur. Defaults to False
 
-            antialias (bool):
-                if True determines if the transform is downsampling and applies
-                antialiasing via gaussian a blur. Defaults to False
+    #         interpolation (str):
+    #             interpolation code or cv2 integer. Interpolation codes are linear,
+    #             nearest, cubic, lancsoz, and area. Defaults to "linear".
 
-            interpolation (str):
-                interpolation code or cv2 integer. Interpolation codes are linear,
-                nearest, cubic, lancsoz, and area. Defaults to "linear".
+    #     Returns:
+    #         DelayedArray2
+    #     """
+    #     return self.__class__([c.warp(transform, dsize, antialias, interpolation) for c in self.parts])
 
-        Returns:
-            DelayedArray2
-        """
-        return self.__class__([c.warp(transform, dsize, antialias, interpolation) for c in self.parts])
+    # def dequantize(self, quantization):
+    #     """
+    #     Rescales image intensities from int to floats.
 
-    def dequantize(self, quantization):
-        """
-        Rescales image intensities from int to floats.
+    #     Args:
+    #         quantization (Dict[str, Any]):
+    #             see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
 
-        Args:
-            quantization (Dict[str, Any]):
-                see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
+    #     Returns:
+    #         DelayedArray2
+    #     """
+    #     return self.__class__([c.dequantize(quantization) for c in self.parts])
 
-        Returns:
-            DelayedArray2
-        """
-        return self.__class__([c.dequantize(quantization) for c in self.parts])
+    # def get_overview(self, overview):
+    #     """
+    #     Downsamples an image by a factor of two.
 
-    def get_overview(self, overview):
-        """
-        Downsamples an image by a factor of two.
+    #     Args:
+    #         overview (int): the overview to use (assuming it exists)
 
-        Args:
-            overview (int): the overview to use (assuming it exists)
-
-        Returns:
-            DelayedArray2
-        """
-        return self.__class__([c.get_overview(overview) for c in self.parts])
+    #     Returns:
+    #         DelayedArray2
+    #     """
+    #     return self.__class__([c.get_overview(overview) for c in self.parts])
 
     def as_xarray(self):
         """
@@ -491,6 +570,9 @@ class DelayedChannelConcat2(DelayedConcat2):
             DelayedAsXarray2
         """
         return DelayedAsXarray2(self)
+
+    def _push_operation_under(self, op, kwargs):
+        return self.__class__([op(p, **kwargs) for p in self.parts])
 
     def _validate(self):
         """
@@ -542,7 +624,7 @@ class DelayedArray2(DelayedUnaryOperation2):
         return shape
 
 
-class DelayedImage2(DelayedArray2):
+class DelayedImage2(ImageOpsMixin, DelayedArray2):
     """
     For the case where an array represents a 2D image with multiple channels
     """
@@ -726,87 +808,8 @@ class DelayedImage2(DelayedArray2):
         new = self.crop(None, new_chan_ixs)
         return new
 
-    def scale(self, scale, antialias=True, interpolation='linear'):
-        return self.warp({'scale': scale})
-
-    def crop(self, space_slice=None, chan_idxs=None):
-        """
-        Crops an image along integer pixel coordinates.
-
-        Args:
-            space_slice (Tuple[slice, slice]): y-slice and x-slice.
-            chan_idxs (List[int]): indexes of bands to take
-
-        Returns:
-            DelayedImage2
-        """
-        new = DelayedCrop2(self, space_slice, chan_idxs)
-        return new
-
-    def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
-        """
-        Applys an affine transformation to the image
-
-        Args:
-            transform (ndarray | dict | kwimage.Affine):
-                a coercable affine matrix.  See :class:`kwimage.Affine` for
-                details on what can be coerced.
-
-            dsize (Tuple[int, int] | str):
-                The width / height of the output canvas. If 'auto', dsize is
-                computed such that the positive coordinates of the warped image
-                will fit in the new canvas. In this case, any pixel that maps
-                to a negative coordinate will be clipped.  This has the
-                property that the input transformation is not modified.
-
-            antialias (bool):
-                if True determines if the transform is downsampling and applies
-                antialiasing via gaussian a blur. Defaults to False
-
-            interpolation (str):
-                interpolation code or cv2 integer. Interpolation codes are linear,
-                nearest, cubic, lancsoz, and area. Defaults to "linear".
-
-        Returns:
-            DelayedImage2
-        """
-        new = DelayedWarp2(self, transform, dsize=dsize, antialias=antialias,
-                           interpolation=interpolation)
-        return new
-
-    def dequantize(self, quantization):
-        """
-        Rescales image intensities from int to floats.
-
-        Args:
-            quantization (Dict[str, Any]):
-                see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
-
-        Returns:
-            DelayedDequantize2
-        """
-        new = DelayedDequantize2(self, quantization)
-        return new
-
-    def get_overview(self, overview):
-        """
-        Downsamples an image by a factor of two.
-
-        Args:
-            overview (int): the overview to use (assuming it exists)
-
-        Returns:
-            DelayedOverview2
-        """
-        new = DelayedOverview2(self, overview)
-        return new
-
-    def as_xarray(self):
-        """
-        Returns:
-            DelayedAsXarray2
-        """
-        return DelayedAsXarray2(self)
+    def scale(self, scale, dsize='auto', antialias=True, interpolation='linear'):
+        return self.warp({'scale': scale}, dsize=dsize)
 
     def _validate(self):
         """
@@ -835,7 +838,7 @@ class DelayedImage2(DelayedArray2):
         return self
 
     def _transform_from_subdata(self):
-        return kwimage.Affine.eye()
+        raise NotImplementedError
 
     def get_transform_from_leaf(self):
         """
@@ -856,6 +859,12 @@ class DelayedImage2(DelayedArray2):
         from kwcoco.util.delayed_ops.delayed_leafs import DelayedIdentity2
         final = self.finalize()
         new = DelayedIdentity2(final, dsize=self.dsize, channels=self.channels)
+        return new
+
+    def _opt_push_under_concat(self):
+        assert isinstance(self.subdata, DelayedChannelConcat2)
+        kwargs = ub.compatible(self.meta, self.__class__.__init__)
+        new = self.subdata._push_operation_under(self.__class__, kwargs)
         return new
 
 
@@ -994,13 +1003,17 @@ class DelayedWarp2(DelayedImage2):
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedWarp2):
             new = new._opt_fuse_warps()
-        split = new._opt_split_warp_overview()
-        if new is not split:
-            new = split
-            new.subdata = new.subdata.optimize()
-            new = new.optimize()
+
+        if isinstance(new.subdata, DelayedChannelConcat2):
+            new = new._opt_push_under_concat().optimize()
         else:
-            new = new._opt_absorb_overview()
+            split = new._opt_split_warp_overview()
+            if new is not split:
+                new = split
+                new.subdata = new.subdata.optimize()
+                new = new.optimize()
+            else:
+                new = new._opt_absorb_overview()
         return new
 
     def _transform_from_subdata(self):
@@ -1288,6 +1301,8 @@ class DelayedDequantize2(DelayedImage2):
             new = new._opt_dequant_before_other()
             new = new.optimize()
 
+        if isinstance(new.subdata, DelayedChannelConcat2):
+            new = new._opt_push_under_concat().optimize()
         return new
 
     def _opt_dequant_before_other(self):
@@ -1295,6 +1310,9 @@ class DelayedDequantize2(DelayedImage2):
         new = copy.copy(self.subdata)
         new.subdata = new.subdata.dequantize(quantization)
         return new
+
+    def _transform_from_subdata(self):
+        return kwimage.Affine.eye()
 
 
 class DelayedCrop2(DelayedImage2):
@@ -1396,6 +1414,9 @@ class DelayedCrop2(DelayedImage2):
         elif isinstance(new.subdata, DelayedDequantize2):
             new = new._opt_dequant_after_crop()
             new = new.optimize()
+
+        if isinstance(new.subdata, DelayedChannelConcat2):
+            new = new._opt_push_under_concat().optimize()
         return new
 
     def _transform_from_subdata(self):
@@ -1539,8 +1560,9 @@ class DelayedCrop2(DelayedImage2):
         inner_slice, outer_transform = _swap_warp_after_crop(
             outer_region, inner_transform)
 
-        warp_meta = ub.dict_isect(self.meta, {
-            'dsize', 'antialias', 'interpolation'})
+        warp_meta = ub.dict_isect(self.meta, {'dsize'})
+        warp_meta.update(ub.dict_isect(
+            self.subdata.meta, {'antialias', 'interpolation'}))
 
         new_inner = self.subdata.subdata.crop(inner_slice, outer_chan_idxs)
         new_outer = new_inner.warp(outer_transform, **warp_meta)
@@ -1665,6 +1687,8 @@ class DelayedOverview2(DelayedImage2):
         elif isinstance(new.subdata, DelayedDequantize2):
             new = new._opt_dequant_after_overview()
             new = new.optimize()
+        if isinstance(new.subdata, DelayedChannelConcat2):
+            new = new._opt_push_under_concat().optimize()
         return new
 
     def _transform_from_subdata(self):
