@@ -121,12 +121,12 @@ Example:
     >>> base = DelayedLoad2.demo(channels='r|g|b').prepare()
     >>> bandR = base[:, :, 0].scale(100 / 512)[:, :-50].evaluate()
     >>> bandG = base[:, :, 1].scale(300 / 512).warp({'theta': np.pi / 8, 'about': (150, 150)}).evaluate()
-    >>> bandB = base[:, :, 2].scale(600 / 512)[:200, :].evaluate()
+    >>> bandB = base[:, :, 2].scale(600 / 512)[:150, :].evaluate()
     >>> # Align the bands in "video" space
     >>> delayed_vidspace = DelayedChannelConcat2([
-    >>>     bandR.scale(6, dsize=(600, 600)),
-    >>>     bandG.warp({'theta': -np.pi / 8, 'about': (150, 150)}).scale(2, dsize=(600, 600)),
-    >>>     bandB.scale(1, dsize=(600, 600)),
+    >>>     bandR.scale(6, dsize=(600, 600)).optimize(),
+    >>>     bandG.warp({'theta': -np.pi / 8, 'about': (150, 150)}).scale(2, dsize=(600, 600)).optimize(),
+    >>>     bandB.scale(1, dsize=(600, 600)).optimize(),
     >>> ]).warp(
     >>>   #{'scale': 0.35, 'theta': 0.3, 'about': (30, 50), 'offset': (-10, -80)}
     >>>   {'scale': 0.7}
