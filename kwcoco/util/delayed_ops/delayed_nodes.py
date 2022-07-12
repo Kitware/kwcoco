@@ -213,6 +213,9 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
     """
     Stacks multiple arrays together.
 
+    CommandLine:
+        xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/delayed_ops/delayed_nodes.py DelayedChannelConcat2:1
+
     Example:
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
@@ -232,6 +235,24 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
         >>> warped_cat._validate()
         >>> warped_cat.optimize().finalize()
+
+    Example:
+        >>> # Test case that failed in initial implementation
+        >>> # Due to incorrectly pushing channel selection under the concat
+        >>> from kwcoco.util.delayed_ops import *  # NOQA
+        >>> import kwimage
+        >>> fpath = kwimage.grab_test_image_fpath()
+        >>> base1 = DelayedLoad2(fpath, channels='r|g|b').prepare()
+        >>> base2 = DelayedLoad2(fpath, channels='x|y|z').prepare().scale(2)
+        >>> base3 = DelayedLoad2(fpath, channels='i|j|k').prepare().scale(2)
+        >>> bands = [base2, base1[:, :, 0].scale(2).evaluate(),
+        >>>          base1[:, :, 1].evaluate().scale(2),
+        >>>          base1[:, :, 2].evaluate().scale(2), base3]
+        >>> delayed = DelayedChannelConcat2(bands)
+        >>> delayed = delayed.warp({'scale': 2})
+        >>> delayed = delayed[0:100, 0:55, [0, 2, 4]]
+        >>> delayed.write_network_text()
+        >>> delayed.optimize()
     """
 
     def __init__(self, parts, dsize=None, jagged=False):
@@ -296,13 +317,18 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
             w, h = self.dsize
         return (h, w, self.num_channels)
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
-        Execute the final transform
-
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
+
         stack = [comp.finalize() for comp in self.parts]
         if len(stack) == 1:
             final = stack[0]
@@ -497,72 +523,22 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         space_slice = (sl_y, sl_x)
         return self.crop(space_slice, chan_idxs)
 
-    # def crop(self, space_slice=None, chan_idxs=None):
-    #     """
-    #     Crops an image along integer pixel coordinates.
-
-    #     Args:
-    #         space_slice (Tuple[slice, slice]): y-slice and x-slice.
-    #         chan_idxs (List[int]): indexes of bands to take
-
-    #     Returns:
-    #         DelayedArray2
-    #     """
-    #     return self.__class__([c.crop(space_slice, chan_idxs) for c in self.parts])
-
-    # def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
-    #     """
-    #     Applys an affine transformation to the image
-
-    #     Args:
-    #         transform (ndarray | dict | kwimage.Affine):
-    #             a coercable affine matrix.  See :class:`kwimage.Affine` for
-    #             details on what can be coerced.
-
-    #         dsize (Tuple[int, int] | str):
-    #             The width / height of the output canvas. If 'auto', dsize is
-    #             computed such that the positive coordinates of the warped image
-    #             will fit in the new canvas. In this case, any pixel that maps
-    #             to a negative coordinate will be clipped.  This has the
-    #             property that the input transformation is not modified.
-
-    #         antialias (bool):
-    #             if True determines if the transform is downsampling and applies
-    #             antialiasing via gaussian a blur. Defaults to False
-
-    #         interpolation (str):
-    #             interpolation code or cv2 integer. Interpolation codes are linear,
-    #             nearest, cubic, lancsoz, and area. Defaults to "linear".
-
-    #     Returns:
-    #         DelayedArray2
-    #     """
-    #     return self.__class__([c.warp(transform, dsize, antialias, interpolation) for c in self.parts])
-
-    # def dequantize(self, quantization):
-    #     """
-    #     Rescales image intensities from int to floats.
-
-    #     Args:
-    #         quantization (Dict[str, Any]):
-    #             see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
-
-    #     Returns:
-    #         DelayedArray2
-    #     """
-    #     return self.__class__([c.dequantize(quantization) for c in self.parts])
-
-    # def get_overview(self, overview):
-    #     """
-    #     Downsamples an image by a factor of two.
-
-    #     Args:
-    #         overview (int): the overview to use (assuming it exists)
-
-    #     Returns:
-    #         DelayedArray2
-    #     """
-    #     return self.__class__([c.get_overview(overview) for c in self.parts])
+    @property
+    def num_overviews(self):
+        """
+        Returns:
+            int
+        """
+        num_overviews = self.meta.get('num_overviews', None)
+        if num_overviews is None and self.parts is not None:
+            cand = [p.num_overviews for p in self.parts]
+            if ub.allsame(cand):
+                num_overviews = cand[0]
+            else:
+                import warnings
+                warnings.warn('inconsistent overviews')
+                num_overviews = None
+        return num_overviews
 
     def as_xarray(self):
         """
@@ -572,6 +548,8 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         return DelayedAsXarray2(self)
 
     def _push_operation_under(self, op, kwargs):
+        # Note: we can't do this with a crop that has band selection
+        # But spatial operations should be ok.
         return self.__class__([op(p, **kwargs) for p in self.parts])
 
     def _validate(self):
@@ -889,11 +867,17 @@ class DelayedAsXarray2(DelayedImage2):
         >>> assert final.dims == ('y', 'x', 'c')
     """
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
         import xarray as xr
         subfinal = np.asarray(self.subdata.finalize())
         channels = self.subdata.channels
@@ -969,11 +953,17 @@ class DelayedWarp2(DelayedImage2):
         """
         return self.meta['transform']
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
         dsize = self.dsize
         if dsize == (None, None):
             dsize = None
@@ -1259,11 +1249,17 @@ class DelayedDequantize2(DelayedImage2):
         self.meta['quantization'] = quantization
         self.meta['dsize'] = subdata.dsize
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
         from kwcoco.util.delayed_ops.helpers import dequantize
         quantization = self.meta['quantization']
         final = self.subdata.finalize()
@@ -1380,11 +1376,17 @@ class DelayedCrop2(DelayedImage2):
         self.meta['space_slice'] = space_slice
         self.meta['chan_idxs'] = chan_idxs
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
         space_slice = self.meta['space_slice']
         chan_idxs = self.meta['chan_idxs']
         sub_final = self.subdata.finalize()
@@ -1416,7 +1418,18 @@ class DelayedCrop2(DelayedImage2):
             new = new.optimize()
 
         if isinstance(new.subdata, DelayedChannelConcat2):
-            new = new._opt_push_under_concat().optimize()
+            if isinstance(new, DelayedCrop2):
+                # We have to be careful if there we have band selection
+                chan_idxs = new.meta.get('chan_idxs', None)
+                space_slice = new.meta.get('space_slice', None)
+                taken = new.subdata
+                if chan_idxs is not None:
+                    taken = new.subdata.take_channels(chan_idxs).optimize()
+                if space_slice is not None:
+                    taken = taken.crop(space_slice)._opt_push_under_concat().optimize()
+                new = taken
+            else:
+                new = new._opt_push_under_concat().optimize()
         return new
 
     def _transform_from_subdata(self):
@@ -1644,11 +1657,17 @@ class DelayedOverview2(DelayedImage2):
         num_remain = self.subdata.num_overviews - self.meta['overview']
         return num_remain
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
         sub_final = self.subdata.finalize()
         if not hasattr(sub_final, 'get_overview'):
             warnings.warn(ub.paragraph(

@@ -117,7 +117,6 @@ Example:
     >>> import kwimage
     >>> import kwarray
     >>> # Demo case where we have different channels at different resolutions
-    >>> fpath = kwimage.grab_test_image_fpath()
     >>> base = DelayedLoad2.demo(channels='r|g|b').prepare()
     >>> bandR = base[:, :, 0].scale(100 / 512)[:, :-50].evaluate()
     >>> bandG = base[:, :, 1].scale(300 / 512).warp({'theta': np.pi / 8, 'about': (150, 150)}).evaluate()

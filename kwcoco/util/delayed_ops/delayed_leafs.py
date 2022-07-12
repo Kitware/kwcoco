@@ -159,7 +159,16 @@ class DelayedLoad2(DelayedImageLeaf2):
         return self
 
     def prepare(self):
-        return self._load_metadata()
+        """
+        If metadata is missing, perform minimal IO operations in order to
+        prepopulate metadata that could help us better optimize the operation
+        tree.
+
+        Returns:
+            DelayedLoad2
+        """
+        self._load_metadata()
+        return self
 
     def _load_metadata(self):
         self._load_reference()
@@ -179,11 +188,17 @@ class DelayedLoad2(DelayedImageLeaf2):
         self.meta['num_overviews'] = num_overviews
         return self
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
         self._load_reference()
         if self.lazy_ref is NotImplemented:
             warnings.warn('DelayedLoad2 may not be efficient without gdal')
@@ -216,11 +231,17 @@ class DelayedNans2(DelayedImageLeaf2):
     def __init__(self, dsize=None, channels=None):
         super().__init__(channels=channels, dsize=dsize)
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
         shape = self.shape
         final = np.full(shape, fill_value=np.nan)
         return final
@@ -285,9 +306,15 @@ class DelayedIdentity2(DelayedImageLeaf2):
             dsize = data.shape[0:2][::-1]
         self.meta['dsize'] = dsize
 
-    def finalize(self):
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
+        self._prefinalize(**kwargs)
         return self.data

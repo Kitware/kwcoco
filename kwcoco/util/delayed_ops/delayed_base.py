@@ -6,8 +6,8 @@ import numpy as np
 import ubelt as ub
 
 
-from kwcoco.util.util_monkey import Reloadable  # NOQA
-@Reloadable.developing  # NOQA
+# from kwcoco.util.util_monkey import Reloadable  # NOQA
+# @Reloadable.developing  # NOQA
 class DelayedOperation2(ub.NiceRepr):
 
     def __init__(self):
@@ -113,10 +113,28 @@ class DelayedOperation2(ub.NiceRepr):
         raise NotImplementedError
         yield None
 
-    def finalize(self):
+    def prepare(self):
+        """
+        If metadata is missing, perform minimal IO operations in order to
+        prepopulate metadata that could help us better optimize the operation
+        tree.
+
+        Returns:
+            DelayedOperation2
+        """
+        for child in self.children():
+            child.prepare()
+        return self
+
+    def finalize(self, **kwargs):
         """
         Returns:
             ArrayLike
+
+        Args:
+            **kwargs: for backwards compatibility, these will allow for
+                in-place modification of select nested parameters.
+                In general these should not be used, and may be deprecated.
         """
         raise NotImplementedError
 
@@ -126,6 +144,22 @@ class DelayedOperation2(ub.NiceRepr):
             DelayedOperation2
         """
         raise NotImplementedError
+
+    def _prefinalize(self, **kwargs):
+        if kwargs:
+            """
+            show dep warnings
+
+            import warnings
+            for item in list(warnings.filters):
+                if item[0] == 'ignore' and item[2] is DeprecationWarning:
+                    warnings.filters.remove(to_remove)
+            """
+            ub.schedule_deprecation(
+                'kwcoco', 'kwargs', type='passed to DelayedOperation2.finalize',
+                migration='setup the desired state beforhand',
+                deprecate='0.2.32', error='0.3.0', remove='0.3.1')
+            self._set_nested_params(**kwargs)
 
     def _set_nested_params(self, **kwargs):
         """

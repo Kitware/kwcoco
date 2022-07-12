@@ -866,11 +866,11 @@ class DelayedLoad(DelayedImageOperation):
 
         Args:
             **kwargs:
-                nodata : if specified this data item is treated as nodata, the
+                nodata_method : if specified this data item is treated as nodata, the
                     data is then converted to floats and the nodata value is
                     replaced with nan.
         """
-        nodata = kwargs.get('nodata', None)
+        nodata_method = kwargs.get('nodata_method', kwargs.get('nodata', None))
         overview = kwargs.get('overview', None)
 
         # Probably should not use a cache here?
@@ -882,7 +882,7 @@ class DelayedLoad(DelayedImageOperation):
             if lazy_frame_backends.LazyGDalFrameFile.available():
                 # TODO: warn if we dont have a COG.
                 pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath,
-                                                                  nodata_method=nodata,
+                                                                  nodata_method=nodata_method,
                                                                   overview=overview)
                 pre_final._ds
                 # pre_final = LazyGDalFrameFile(self.fpath)
@@ -890,7 +890,7 @@ class DelayedLoad(DelayedImageOperation):
                 # pre_final = lazy_frame_backends.LazyRasterIOFrameFile(self.fpath)  # which is faster?
                 # pre_final = lazy_frame_backends.LazySpectralFrameFile(self.fpath)  # which is faster?
             else:
-                if nodata == 'auto':
+                if nodata_method == 'auto':
                     raise Exception('need gdal for auto no-data')
                 import warnings
                 warnings.warn('DelayedLoad may not be efficient without gdal')
@@ -912,10 +912,10 @@ class DelayedLoad(DelayedImageOperation):
 
             # Handle nan
             if not using_gdal:
-                if nodata is not None and isinstance(nodata, int):
+                if nodata_method is not None and isinstance(nodata_method, int):
                     if final.dtype.kind != 'f':
                         final = final.astype(np.float32)
-                    final[final == nodata] = np.nan
+                    final[final == nodata_method] = np.nan
 
             dequantize_ = kwargs.get('dequantize', True)
             if self.quantization is not None and dequantize_:

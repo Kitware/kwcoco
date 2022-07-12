@@ -563,12 +563,12 @@ class CocoImage(ub.NiceRepr):
 
         TODO:
             - [X] Currently can only take all or none of the channels from each
-     1          base-image / auxiliary dict. For instance if the main image is
+                base-image / auxiliary dict. For instance if the main image is
                 r|g|b you can't just select g|b at the moment.
 
             - [X] The order of the channels in the delayed load should
                 match the requested channel order.
-
+wc
             - [X] TODO: add nans to bands that don't exist or throw an error
 
             - [ ] This function could stand to have a better name. Maybe imread
