@@ -3600,18 +3600,13 @@ class MixinCocoAddRemove(object):
             **kw : stores arbitrary key/value pairs in this new image,
                 Common respected key/values include but are not limited to the
                 following:
-
                 track_id (int | str): some value used to associate annotations
-                    that belong to the same "track".
-
+                that belong to the same "track".
                 score : float
-
                 prob : List[float]
-
                 weight (float): a weight, usually used to indicate if a ground
-                    truth annotation is difficult / important. This generalizes
-                    standard "is_hard" or "ignore" attributes in other formats.
-
+                truth annotation is difficult / important. This generalizes
+                standard "is_hard" or "ignore" attributes in other formats.
                 caption (str): a text caption for this annotation
 
         Returns:
