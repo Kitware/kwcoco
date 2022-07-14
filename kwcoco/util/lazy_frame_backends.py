@@ -408,8 +408,17 @@ class LazyGDalFrameFile(ub.NiceRepr):
                 GLOBAL_GDAL_CACHE[_fpath] = ds
 
     def get_overview(self, overview):
+        """
+        Returns the overview relative to this one.
+        """
+        return self.get_absolute_overview(overview + self.overview)
+
+    def get_absolute_overview(self, overview):
+        """
+        Returns the overview relative to the base
+        """
         new = self.__class__(self.fpath, nodata_method=self.nodata_method,
-                             overview=overview + self.overview)
+                             overview=overview)
         new._ds_cache = self._ds_cache
         return new
 
@@ -444,6 +453,10 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
     @ub.memoize_property
     def num_overviews(self):
+        return self.num_absolute_overviews - self.overview
+
+    @ub.memoize_property
+    def num_absolute_overviews(self):
         ds = self._ds
         default_band0 = ds.GetRasterBand(1)
         num_overviews = default_band0.GetOverviewCount()
