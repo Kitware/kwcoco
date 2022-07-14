@@ -336,6 +336,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
             if self.meta['jagged']:
                 final = JaggedArray2(stack, axis=2)
             else:
+                stack = [kwarray.atleast_nd(s, 3) for s in stack]
                 final = np.concatenate(stack, axis=2)
         return final
 
@@ -988,13 +989,27 @@ class DelayedWarp2(DelayedImage2):
         """
         Returns:
             DelayedImage2
+
+        Example:
+            >>> # Demo optimization that removes a noop warp
+            >>> from kwcoco.util.delayed_ops import DelayedLoad2
+            >>> import kwimage
+            >>> base = DelayedLoad2.demo(channels='r|g|b').prepare()
+            >>> self = base.warp(kwimage.Affine.eye())
+            >>> new = self.optimize()
+            >>> assert len(self.as_graph().nodes) == 2
+            >>> assert len(new.as_graph().nodes) == 1
         """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedWarp2):
             new = new._opt_fuse_warps()
 
-        if isinstance(new.subdata, DelayedChannelConcat2):
+        ### The tolerance should be very strict by default, but
+        ### we also might want to be able to parameterize it
+        if new.transform.isclose_identity(rtol=0, atol=0) and new.dsize == new.subdata.dsize:
+            new = new.subdata
+        elif isinstance(new.subdata, DelayedChannelConcat2):
             new = new._opt_push_under_concat().optimize()
         else:
             split = new._opt_split_warp_overview()
