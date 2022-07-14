@@ -133,10 +133,10 @@ An informal spec is as follows:
     }
 
     Polygon:
-        A flattned list of xy coordinates.
+        A flattened list of xy coordinates.
         [x1, y1, x2, y2, ..., xn, yn]
 
-        or a list of flattned list of xy coordinates if the CCs are disjoint
+        or a list of flattened list of xy coordinates if the CCs are disjoint
         [[x1, y1, x2, y2, ..., xn, yn], [x1, y1, ..., xm, ym],]
 
         Note: the original coco spec does not allow for holes in polygons.
