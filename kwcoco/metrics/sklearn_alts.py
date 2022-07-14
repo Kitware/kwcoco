@@ -34,19 +34,18 @@ def confusion_matrix(y_true, y_pred, n_labels=None, labels=None,
         >>> confusion_matrix(y_true, y_pred, 2).ravel()
         array([4, 2, 3, 1])
 
-    Benchmarks:
-        import ubelt as ub
-        y_true = np.random.randint(0, 2, 10000)
-        y_pred = np.random.randint(0, 2, 10000)
-
-        n = 1000
-        for timer in ub.Timerit(n, bestof=10, label='py-time'):
-            sample_weight = [1] * len(y_true)
-            confusion_matrix(y_true, y_pred, 2, sample_weight=sample_weight)
-
-        for timer in ub.Timerit(n, bestof=10, label='np-time'):
-            sample_weight = np.ones(len(y_true), dtype=int)
-            confusion_matrix(y_true, y_pred, 2, sample_weight=sample_weight)
+    Benchmark:
+        >>> # xdoctest: +SKIP
+        >>> import ubelt as ub
+        >>> y_true = np.random.randint(0, 2, 10000)
+        >>> y_pred = np.random.randint(0, 2, 10000)
+        >>> n = 1000
+        >>> for timer in ub.Timerit(n, bestof=10, label='py-time'):
+        >>>     sample_weight = [1] * len(y_true)
+        >>>     confusion_matrix(y_true, y_pred, 2, sample_weight=sample_weight)
+        >>> for timer in ub.Timerit(n, bestof=10, label='np-time'):
+        >>>     sample_weight = np.ones(len(y_true), dtype=int)
+        >>>     confusion_matrix(y_true, y_pred, 2, sample_weight=sample_weight)
     """
     if sample_weight is None:
         sample_weight = np.ones(len(y_true), dtype=int)

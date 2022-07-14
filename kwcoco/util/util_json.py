@@ -16,9 +16,9 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
     Convert numpy and tuples into lists
 
     Args:
-        normalize_containers (bool, default=False):
+        normalize_containers (bool):
             if True, normalizes dict containers to be standard python
-            structures.
+            structures. Defaults to False.
 
     Example:
         >>> data = ub.ddict(lambda: int)
@@ -94,11 +94,13 @@ def find_json_unserializable(data, quickcheck=False):
 
     Returns:
         List[Dict]: list of "bad part" dictionaries containing items
+
             'value' - the value that caused the serialization error
+
             'loc' - which contains a list of key/indexes that can be used
-                    to lookup the location of the unserializable value.
-                    If the "loc" is a list, then it indicates a rare case where
-                    a key in a dictionary is causing the serialization error.
+            to lookup the location of the unserializable value.
+            If the "loc" is a list, then it indicates a rare case where
+            a key in a dictionary is causing the serialization error.
 
     Example:
         >>> from kwcoco.util.util_json import *  # NOQA

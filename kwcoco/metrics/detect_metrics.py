@@ -695,22 +695,37 @@ class DetectionMetrics(ub.NiceRepr):
         offset from the truth.
 
         Kwargs:
-            classes (int, default=1): class list or the number of foreground
-                classes.
-            nimgs (int, default=1): number of images in the coco datasts.
-            nboxes (int, default=1): boxes per image.
-            n_fp (int, default=0): number of false positives.
-            n_fn (int, default=0): number of false negatives.
-            box_noise (float, default=0): std of a normal distribution used to
-                perterb both box location and box size.
-            cls_noise (float, default=0): probability that a class label will
-                change. Must be within 0 and 1.
-            anchors (ndarray, default=None): used to create random boxes
-            null_pred (bool, default=0):
+            classes (int):
+                class list or the number of foreground classes.
+                Defaults to 1.
+
+            nimgs (int): number of images in the coco datasts. Defaults to 1.
+
+            nboxes (int): boxes per image. Defaults to 1.
+
+            n_fp (int): number of false positives. Defaults to 0.
+
+            n_fn (int):
+                number of false negatives. Defaults to 0.
+
+            box_noise (float):
+                std of a normal distribution used to perterb both box location
+                and box size. Defaults to 0.
+
+            cls_noise (float):
+                probability that a class label will change. Must be within 0
+                and 1. Defaults to 0.
+
+            anchors (ndarray):
+                used to create random boxes. Defaults to None.
+
+            null_pred (bool):
                 if True, predicted classes are returned as null, which means
-                only localization scoring is suitable.
-            with_probs (bool, default=1):
+                only localization scoring is suitable. Defaults to 0.
+
+            with_probs (bool):
                 if True, includes per-class probabilities with predictions
+                Defaults to 1.
 
         CommandLine:
             xdoctest -m kwcoco.metrics.detect_metrics DetectionMetrics.demo:2 --show

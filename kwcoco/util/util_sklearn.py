@@ -16,7 +16,7 @@ class StratifiedGroupKFold(_BaseKFold):
     stratified folds. The folds are made by preserving the percentage of
     samples for each class.
 
-    Read more in the :ref:`User Guide <cross_validation>`.
+    This is an old interface and should likely be refactored and modernized.
 
     Parameters
     ----------

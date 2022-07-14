@@ -1048,7 +1048,7 @@ class MixinCocoExtras(object):
                 (3) vidshapes8-msi - msi is an alias for multispectral.
                 (4) vidshapes8-frames5 - generate 8 videos with 5 frames each.
                 (4) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
-                    frames where the objects move with with a speed of 0.1.
+                frames where the objects move with with a speed of 0.1.
 
             **kwargs : if key is shapes, these arguments are passed to toydata
                 generation. The Kwargs section of this docstring documents a
@@ -2393,11 +2393,15 @@ class MixinCocoStats(object):
 
         KWArgs:
             **config :
+
                 pycocotools_info (default=True): returns info required by pycocotools
+
                 ensure_imgsize (default=True): ensure image size is populated
+
                 legacy (default=False): if true tries to convert data
-                    structures to items compatible with the original
-                    pycocotools spec
+                structures to items compatible with the original
+                pycocotools spec
+
                 workers (int): number of parallel jobs for IO tasks
 
         Example:
@@ -2492,22 +2496,30 @@ class MixinCocoStats(object):
         Args:
             **config :
                 schema (default=True): if True, validate the json-schema
+
                 unique (default=True): if True, validate unique secondary keys
+
                 missing (default=True): if True, validate registered files exist
+
                 corrupted (default=False): if True, validate data in registered files
+
                 channels (default=True):
-                    if True, validate that channels in auxiliary/asset items
-                    are all unique.
+                if True, validate that channels in auxiliary/asset items
+                are all unique.
+
                 require_relative (default=False):
-                    if True, causes validation to fail if paths are
-                    non-portable, i.e.  all paths must be relative to the
-                    bundle directory. if>0, paths must be relative to bundle
-                    root.  if>1, paths must be inside bundle root.
+                if True, causes validation to fail if paths are
+                non-portable, i.e.  all paths must be relative to the
+                bundle directory. if>0, paths must be relative to bundle
+                root.  if>1, paths must be inside bundle root.
+
                 img_attrs (default='warn'):
-                    if truthy, check that image attributes contain width and
-                    height entries. If 'warn', then warn if they do not exist.
-                    If 'error', then fail.
+                if truthy, check that image attributes contain width and
+                height entries. If 'warn', then warn if they do not exist.
+                If 'error', then fail.
+
                 verbose (default=1): verbosity flag
+
                 fastfail (default=False): if True raise errors immediately
 
         Returns:
@@ -3545,7 +3557,7 @@ class MixinCocoAddRemove(object):
                 this image (this is not checked).
 
             **kwargs:
-                See :method:`CocoImage.add_auxiliary_item` for more details
+                See :func:`CocoImage.add_auxiliary_item` for more details
 
         Example:
             >>> import kwcoco
