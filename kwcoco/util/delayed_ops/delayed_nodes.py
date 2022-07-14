@@ -228,13 +228,13 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         >>> warped_cat._validate()
         >>> warped_cat.optimize().finalize()
 
-        >>> dsize = (307, 311)
-        >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
-        >>> c2 = DelayedLoad2.demo('astro', channels='R|G|B').prepare()
-        >>> cat = DelayedChannelConcat2([c1, c2], jagged=True)
-        >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
-        >>> warped_cat._validate()
-        >>> warped_cat.optimize().finalize()
+        # >>> dsize = (307, 311)
+        # >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
+        # >>> c2 = DelayedLoad2.demo('astro', channels='R|G|B').prepare()
+        # >>> cat = DelayedChannelConcat2([c1, c2], jagged=True)
+        # >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
+        # >>> warped_cat._validate()
+        # >>> warped_cat.optimize().finalize()
 
     Example:
         >>> # Test case that failed in initial implementation
@@ -262,6 +262,8 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
             dsize (Tuple[int, int] | None): size if known a-priori
         """
         super().__init__(parts=parts, axis=2)
+        if jagged:
+            raise NotImplementedError
         self.meta['jagged'] = jagged
         if dsize is None and not jagged:
             dsize_cands = [comp.dsize for comp in self.parts]
@@ -1189,8 +1191,8 @@ class DelayedWarp2(DelayedImage2):
             >>> print(f'self={self}')
             >>> print('self.meta = {}'.format(ub.repr2(self.meta, nl=1)))
             >>> warp0 = self.warp({'scale': 0.2})
-            >>> warp1 = warp0.optimize_warp_overview()
-            >>> warp2 = self.warp({'scale': 0.25}).optimize_warp_overview()
+            >>> warp1 = warp0._opt_split_warp_overview()
+            >>> warp2 = self.warp({'scale': 0.25})._opt_split_warp_overview()
             >>> print(ub.repr2(warp0.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(warp1.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(warp2.nesting(), nl=-1, sort=0))
@@ -1685,21 +1687,26 @@ class DelayedOverview2(DelayedImage2):
         """
         self._prefinalize(**kwargs)
         sub_final = self.subdata.finalize()
-        if not hasattr(sub_final, 'get_overview'):
-            warnings.warn(ub.paragraph(
-                '''
-                The underlying data does not have overviews.
-                Simulating the overview using a imresize operation.
-                '''
-            ))
-            final = kwimage.imresize(
-                sub_final,
-                scale=1 / 2 ** self.meta['overview'],
-                interpolation='nearest',
-                # antialias=True
-            )
-        else:
-            final = sub_final.get_overview(self.meta['overview'])
+        overview = self.meta['overview']
+        if hasattr(sub_final, 'get_overview'):
+            # This should be a lazy gdal frame
+            if sub_final.num_overviews >= overview:
+                final = sub_final.get_overview(overview)
+                return final
+
+        warnings.warn(ub.paragraph(
+            '''
+            The underlying data does not have overviews.
+            Simulating the overview using a imresize operation.
+            '''
+        ))
+        sub_final = np.asarray(sub_final)
+        final = kwimage.imresize(
+            sub_final,
+            scale=1 / 2 ** overview,
+            interpolation='nearest',
+            # antialias=True
+        )
         return final
 
     @profile
@@ -1713,7 +1720,9 @@ class DelayedOverview2(DelayedImage2):
         if isinstance(new.subdata, DelayedOverview2):
             new = new._opt_fuse_overview()
 
-        if isinstance(new.subdata, DelayedCrop2):
+        if new.meta['overview'] == 0:
+            new = new.subdata
+        elif isinstance(new.subdata, DelayedCrop2):
             new = new._opt_crop_after_overview()
             new = new.optimize()
         elif isinstance(new.subdata, DelayedWarp2):

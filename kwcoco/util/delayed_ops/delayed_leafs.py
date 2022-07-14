@@ -49,6 +49,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         >>> # Demo code to develop support for overviews
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage
+        >>> import ubelt as ub
         >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
         >>> self = DelayedLoad2(fpath, channels='r|g|b').prepare()
         >>> print(f'self={self}')
@@ -76,6 +77,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage
         >>> from kwcoco.util.delayed_ops.helpers import quantize_float01
+        >>> import ubelt as ub
         >>> dpath = ub.Path.appdir('kwcoco/tests/test_delay_nodata').ensuredir()
         >>> fpath = dpath / 'data.tif'
         >>> data = kwimage.ensure_float01(kwimage.grab_test_image())

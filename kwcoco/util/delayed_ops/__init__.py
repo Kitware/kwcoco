@@ -33,30 +33,32 @@ Example:
     >>> dimg = dimg[0:200, 1:200]
     >>> dimg = dimg[1:200, 2:200]
     >>> dimg.write_network_text()
-    ╙── Crop dsize=(128,130),space_slice=(slice(1,200,None),slice(2,200,None))
-        └─╼ Crop dsize=(130,131),space_slice=(slice(0,200,None),slice(1,200,None))
-            └─╼ Warp dsize=(131,131),transform={scale=2.1},antialias=True,interpolation=linear
-                └─╼ Warp dsize=(62,62),transform={scale=1.1},antialias=True,interpolation=linear
-                    └─╼ Warp dsize=(56,56),transform={scale=1.1},antialias=True,interpolation=linear
-                        └─╼ Warp dsize=(50,50),transform={scale=0.5},antialias=True,interpolation=linear
-                            └─╼ Crop dsize=(99,100),space_slice=(slice(0,800,None),slice(1,800,None))
-                                └─╼ Warp dsize=(100,100),transform={scale=0.5},antialias=True,interpolation=linear
-                                    └─╼ Crop dsize=(199,200),space_slice=(slice(0,800,None),slice(1,800,None))
-                                        └─╼ Warp dsize=(200,200),transform={scale=0.5},antialias=True,interpolation=linear
+    ╙── Crop dsize=(128,130),space_slice=(slice(1,131,None),slice(2,130,None))
+        └─╼ Crop dsize=(130,131),space_slice=(slice(0,131,None),slice(1,131,None))
+            └─╼ Warp dsize=(131,131),transform={scale=2.1000},antialias=True,interpolation=linear
+                └─╼ Warp dsize=(62,62),transform={scale=1.1000},antialias=True,interpolation=linear
+                    └─╼ Warp dsize=(56,56),transform={scale=1.1000},antialias=True,interpolation=linear
+                        └─╼ Warp dsize=(50,50),transform={scale=0.5000},antialias=True,interpolation=linear
+                            └─╼ Crop dsize=(99,100),space_slice=(slice(0,100,None),slice(1,100,None))
+                                └─╼ Warp dsize=(100,100),transform={scale=0.5000},antialias=True,interpolation=linear
+                                    └─╼ Crop dsize=(199,200),space_slice=(slice(0,200,None),slice(1,200,None))
+                                        └─╼ Warp dsize=(200,200),transform={scale=0.5000},antialias=True,interpolation=linear
                                             └─╼ Crop dsize=(399,400),space_slice=(slice(0,400,None),slice(1,400,None))
-                                                └─╼ Warp dsize=(621,621),transform={scale=1.1},antialias=True,interpolation=linear
-                                                    └─╼ Warp dsize=(564,564),transform={scale=1.1},antialias=True,interpolation=linear
+                                                └─╼ Warp dsize=(621,621),transform={scale=1.1000},antialias=True,interpolation=linear
+                                                    └─╼ Warp dsize=(564,564),transform={scale=1.1000},antialias=True,interpolation=linear
                                                         └─╼ Dequantize dsize=(512,512),quantization={quant_max=255,nodata=0}
-                                                            └─╼ Load channels=<FusedChannelSpec(r|g|b)>,num_channels=3,dsize=(512,512),fpath=.../demodata/astro_overviews=3.tif,num_overviews=0
+                                                            └─╼ Load channels=r|g|b,num_channels=3,dsize=(512,512),fpath=...astro_overviews=3.tif,num_overviews=3
     >>> # Optimize the chain
     >>> dopt = dimg.optimize()
     >>> dopt.write_network_text()
-    ╙── Warp dsize=(128,130),transform={offset=(-0.227133...,-0.231347...),scale=0.384326...},antialias=True,interpolation=linear
-        └─╼ Dequantize dsize=(318,329),quantization={quant_max=255,nodata=0}
-            └─╼ Crop dsize=(318,329),space_slice=(slice(2,331,None),slice(13,331,None))
-                └─╼ Load channels=<FusedChannelSpec(r|g|b)>,num_channels=3,dsize=(512,512),fpath=.../demodata/astro_overviews=3.tif,num_overviews=0
+    ╙── Warp dsize=(128,130),transform={offset=(-0.6...,-1...),scale=1...},antialias=True,interpolation=linear
+        └─╼ Dequantize dsize=(80,83),quantization={quant_max=255,nodata=0}
+            └─╼ Crop dsize=(80,83),space_slice=(slice(0,83,None),slice(3,83,None))
+                └─╼ Overview dsize=(128,128),overview=2
+                    └─╼ Load channels=r|g|b,num_channels=3,dsize=(512,512),fpath=...astro_overviews=3.tif,num_overviews=3
     >>> final0 = dimg.finalize()
     >>> final1 = dopt.finalize()
+    >>> assert final0.shape == final1.shape
     >>> # xdoctest: +REQUIRES(--show)
     >>> import kwplot
     >>> kwplot.autompl()
@@ -100,7 +102,7 @@ Example:
     >>> import kwplot
     >>> kwplot.autompl()
     >>> to_stack = []
-    >>> to_stack.append(base.finalize())
+    >>> to_stack.append(base.finalize()[:])
     >>> to_stack.append(orig.finalize())
     >>> to_stack.append(delayed.finalize())
     >>> to_stack.append(undone_all.finalize())
@@ -116,6 +118,7 @@ Example:
     >>> import ubelt as ub
     >>> import kwimage
     >>> import kwarray
+    >>> import numpy as np
     >>> # Demo case where we have different channels at different resolutions
     >>> base = DelayedLoad2.demo(channels='r|g|b').prepare()
     >>> bandR = base[:, :, 0].scale(100 / 512)[:, :-50].evaluate()
