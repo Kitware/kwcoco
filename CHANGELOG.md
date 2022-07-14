@@ -5,12 +5,12 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.32 - Unreleased
+## Version 0.3.0 - Unreleased
 
 ### Added
 * Initial non-experimental version of SensorChanSpec with limited functionality
-* Basic jagged support for delayed load of data at native asset dimensions. 
 * Updated `kwcoco validate` cli tool with full options (and added checks for img attrs)
+* New Delayed operations with a more scalable design 
 
 ### Fixed
 * Fix compatibility issue with datasets that do not contain an annotations list
