@@ -263,7 +263,7 @@ The logic of this init is generated via:
     mkinit ~/code/kwcoco/kwcoco/__init__.py --lazy
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 
 __submodules__ = {
