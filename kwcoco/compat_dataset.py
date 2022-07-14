@@ -47,7 +47,6 @@ class COCO(CocoDataset):
     def info(self):
         """
         Print information about the annotation file.
-        :return:
         """
         for key, value in self.dataset.get('info', {}).items():
             print('{}: {}'.format(key, value))
@@ -79,11 +78,16 @@ class COCO(CocoDataset):
     def getAnnIds(self, imgIds=[], catIds=[], areaRng=[], iscrowd=None):
         """
         Get ann ids that satisfy given filter conditions. default skips that filter
-        :param imgIds  (int array)     : get anns for given imgs
-               catIds  (int array)     : get anns for given cats
-               areaRng (float array)   : get anns for given area range (e.g. [0 inf])
-               iscrowd (boolean)       : get anns for given crowd label (False or True)
-        :return: ids (int array)       : integer array of ann ids
+
+        Args:
+
+            imgIds  (List[int]): get anns for given imgs
+            catIds  (List[int]): get anns for given cats
+            areaRng (List[float]): get anns for given area range (e.g. [0 inf])
+            iscrowd (bool): get anns for given crowd label (False or True)
+
+        Returns:
+            List[int]: integer array of ann ids
 
         Example:
             >>> from kwcoco.compat_dataset import *  # NOQA
@@ -119,10 +123,14 @@ class COCO(CocoDataset):
     def getCatIds(self, catNms=[], supNms=[], catIds=[]):
         """
         filtering parameters. default skips that filter.
-        :param catNms (str array)  : get cats for given cat names
-        :param supNms (str array)  : get cats for given supercategory names
-        :param catIds (int array)  : get cats for given cat ids
-        :return: ids (int array)   : integer array of cat ids
+
+        Args:
+            catNms (List[str]): get cats for given cat names
+            supNms (List[str]): get cats for given supercategory names
+            catIds (List[int]): get cats for given cat ids
+
+        Returns:
+            List[int]: integer array of cat ids
 
         Example:
             >>> from kwcoco.compat_dataset import *  # NOQA
@@ -156,9 +164,13 @@ class COCO(CocoDataset):
     def getImgIds(self, imgIds=[], catIds=[]):
         '''
         Get img ids that satisfy given filter conditions.
-        :param imgIds (int array) : get imgs for given ids
-        :param catIds (int array) : get imgs with all given cats
-        :return: ids (int array)  : integer array of img ids
+
+        Args:
+            imgIds (List[int]) : get imgs for given ids
+            catIds (List[int]) : get imgs with all given cats
+
+        Returns:
+            List[int]: integer array of img ids
 
         Example:
             >>> from kwcoco.compat_dataset import *  # NOQA
@@ -187,8 +199,12 @@ class COCO(CocoDataset):
     def loadAnns(self, ids=[]):
         """
         Load anns with the specified ids.
-        :param ids (int array)       : integer ids specifying anns
-        :return: anns (object array) : loaded ann objects
+
+        Args:
+            ids (List[int]) : integer ids specifying anns
+
+        Returns:
+            List[dict]: loaded ann objects
         """
         if isinstance(ids, int):
             return self.anns[ids]
@@ -197,8 +213,12 @@ class COCO(CocoDataset):
     def loadCats(self, ids=[]):
         """
         Load cats with the specified ids.
-        :param ids (int array)       : integer ids specifying cats
-        :return: cats (object array) : loaded cat objects
+
+        Args:
+            ids (List[int]) : integer ids specifying cats
+
+        Returns:
+            List[dict]: loaded cat objects
         """
         if isinstance(ids, int):
             return self.cats[ids]
@@ -207,8 +227,12 @@ class COCO(CocoDataset):
     def loadImgs(self, ids=[]):
         """
         Load anns with the specified ids.
-        :param ids (int array)       : integer ids specifying img
-        :return: imgs (object array) : loaded img objects
+
+        Args:
+            ids (List[int]) : integer ids specifying img
+
+        Returns:
+            List[dict]: loaded img objects
         """
         if isinstance(ids, int):
             return self.imgs[ids]
@@ -217,8 +241,9 @@ class COCO(CocoDataset):
     def showAnns(self, anns, draw_bbox=False):
         """
         Display the specified annotations.
-        :param anns (array of object): annotations to display
-        :return: None
+
+        Args:
+            anns (List[Dict]): annotations to display
         """
         aids = [ann['id'] for ann in anns]
         self.show_image(aids=aids, show_boxes=draw_bbox)
@@ -227,8 +252,12 @@ class COCO(CocoDataset):
     def loadRes(self, resFile):
         """
         Load result file and return a result api object.
-        :param   resFile (str)     : file name of result file
-        :return: res (obj)         : result api object
+
+        Args:
+            resFile (str): file name of result file
+
+        Returns:
+            object: res result api object
         """
         import json
         import time
@@ -299,9 +328,10 @@ class COCO(CocoDataset):
     def download(self, tarDir=None, imgIds=[]):
         '''
         Download COCO images from mscoco.org server.
-        :param tarDir (str): COCO results directory name
-               imgIds (list): images to be downloaded
-        :return:
+
+        Args:
+            tarDir (str): COCO results directory name
+            imgIds (list): images to be downloaded
         '''
         if tarDir is not None:
             self.reroot(tarDir)
@@ -312,8 +342,12 @@ class COCO(CocoDataset):
     def loadNumpyAnnotations(self, data):
         """
         Convert result data from a numpy array [Nx7] where each row contains {imageID,x1,y1,w,h,score,class}
-        :param  data (numpy.ndarray)
-        :return: annotations (python nested list)
+
+        Args:
+            data (numpy.ndarray)
+
+        Returns:
+            List[Dict]: annotations (python nested list)
         """
         print('Converting ndarray to lists...')
         assert isinstance(data, np.ndarray)
@@ -332,7 +366,9 @@ class COCO(CocoDataset):
     def annToRLE(self, ann):
         """
         Convert annotation which can be polygons, uncompressed RLE to RLE.
-        :return: binary mask (numpy 2D array)
+
+        Returns:
+            kwimage.Mask
 
         Note:
             * This requires the C-extensions for kwimage to be installed
@@ -374,7 +410,8 @@ class COCO(CocoDataset):
         Convert annotation which can be polygons, uncompressed RLE, or RLE to
         binary mask.
 
-        :return: binary mask (numpy 2D array)
+        Returns:
+            ndarray: binary mask (numpy 2D array)
 
         Note:
             The mask is returned as a fortran (F-style) array with the same

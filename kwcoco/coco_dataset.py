@@ -1,5 +1,5 @@
 """
-An implementation and extension of the original MS-COCO API [1]_.
+An implementation and extension of the original MS-COCO API [CocoFormat]_.
 
 Extends the format to also include line annotations.
 
@@ -133,10 +133,10 @@ An informal spec is as follows:
     }
 
     Polygon:
-        A flattned list of xy coordinates.
+        A flattened list of xy coordinates.
         [x1, y1, x2, y2, ..., xn, yn]
 
-        or a list of flattned list of xy coordinates if the CCs are disjoint
+        or a list of flattened list of xy coordinates if the CCs are disjoint
         [[x1, y1, x2, y2, ..., xn, yn], [x1, y1, ..., xm, ym],]
 
         Note: the original coco spec does not allow for holes in polygons.
@@ -149,9 +149,9 @@ An informal spec is as follows:
 
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
-        encoding. We reuse the original C functions are in [2]_ in
-        ``kwimage.structs.Mask`` to provide a convinient way to abstract this
-        rather esoteric bytes encoding.
+        encoding. We reuse the original C functions are in [PyCocoToolsMask]_
+        in ``kwimage.structs.Mask`` to provide a convinient way to abstract
+        this rather esoteric bytes encoding.
 
         For pure python implementations see kwimage:
             Converting from an image to RLE can be done via kwimage.run_length_encoding
@@ -307,10 +307,9 @@ TODO:
 
 
 References:
-    .. [1] http://cocodataset.org/#format-data
-    .. [2] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
-    .. [3] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
-
+    .. [CocoFormat] http://cocodataset.org/#format-data
+    .. [PyCocoToolsMask] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
+    .. [CocoTutorial] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
 """
 import copy
 import itertools as it
@@ -390,7 +389,7 @@ class MixinCocoAccessors(object):
         Args:
             gid (int): image id to load
 
-            channels (FusedChannelSpec): specific channels to load.
+            channels (kwcoco.FusedChannelSpec): specific channels to load.
                 if unspecified, all channels are loaded.
 
             space (str):
@@ -415,17 +414,14 @@ class MixinCocoAccessors(object):
             >>> delayed = self.delayed_load(gid)
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
             >>> #
             >>> self = kwcoco.CocoDataset.demo('shapes8')
             >>> delayed = self.delayed_load(gid)
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
 
-            >>> crop = delayed.delayed_crop((slice(0, 3), slice(0, 3)))
+            >>> crop = delayed.crop((slice(0, 3), slice(0, 3)))
             >>> crop.finalize()
-            >>> crop.finalize(as_xarray=True)
 
             >>> # TODO: should only select the "red" channel
             >>> self = kwcoco.CocoDataset.demo('shapes8')
@@ -437,17 +433,13 @@ class MixinCocoAccessors(object):
             >>> self = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> delayed = self.delayed_load(gid, channels='B1|B2', space='image')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
             >>> delayed = self.delayed_load(gid, channels='B1|B2|B11', space='image')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
             >>> delayed = self.delayed_load(gid, channels='B8|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
 
             >>> delayed = self.delayed_load(gid, channels='B8|foo|bar|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
-            >>> print('delayed.finalize() = {!r}'.format(delayed.finalize(as_xarray=True)))
         """
         coco_img = self.coco_image(gid)
         delayed = coco_img.delay(channels=channels, space=space)
@@ -458,7 +450,7 @@ class MixinCocoAccessors(object):
         Reads an image from disk and
 
         Args:
-            gid_or_img (int or dict): image id or image dict
+            gid_or_img (int | dict): image id or image dict
             channels (str | None): if specified, load data from auxiliary
                 channels instead
 
@@ -485,7 +477,7 @@ class MixinCocoAccessors(object):
         Returns the full path to the image
 
         Args:
-            gid_or_img (int or dict): image id or image dict
+            gid_or_img (int | dict): image id or image dict
             channels (str, default=None): if specified, return a path to data
                 containing auxiliary channels instead
 
@@ -543,7 +535,7 @@ class MixinCocoAccessors(object):
         Maybe depricate?
 
         Args:
-            aid_or_int (int or dict): annot id or dict
+            aid_or_int (int | dict): annot id or dict
             image (ArrayLike, default=None): preloaded image
                 (note: this process is inefficient unless image is specified)
 
@@ -904,7 +896,8 @@ class MixinCocoAccessors(object):
         Uses new-style if possible, otherwise this falls back on old-style.
 
         Returns:
-            List[str]: names: list of keypoint category names
+            List[str]:
+                names - list of keypoint category names
 
         Example:
             >>> self = CocoDataset.demo()
@@ -1055,7 +1048,7 @@ class MixinCocoExtras(object):
                 (3) vidshapes8-msi - msi is an alias for multispectral.
                 (4) vidshapes8-frames5 - generate 8 videos with 5 frames each.
                 (4) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
-                    frames where the objects move with with a speed of 0.1.
+                frames where the objects move with with a speed of 0.1.
 
             **kwargs : if key is shapes, these arguments are passed to toydata
                 generation. The Kwargs section of this docstring documents a
@@ -1739,7 +1732,7 @@ class MixinCocoExtras(object):
         Rename categories with a potentially coarser categorization.
 
         Args:
-            mapper (dict or Function): maps old names to new names.
+            mapper (dict | Callable): maps old names to new names.
                 If multiple names are mapped to the same category, those
                 categories will be merged.
 
@@ -2154,7 +2147,7 @@ class MixinCocoObjects(object):
                  mutually exclusive with other arguments.
 
         Returns:
-            Annots: vectorized annotation object
+            kwcoco.coco_objects1d.Annots: vectorized annotation object
 
         Example:
             >>> import kwcoco
@@ -2198,7 +2191,7 @@ class MixinCocoObjects(object):
                 lookup images by their names.
 
         Returns:
-            Images: vectorized image object
+            kwcoco.coco_objects1d.Images: vectorized image object
 
         Example:
             >>> import kwcoco
@@ -2234,7 +2227,7 @@ class MixinCocoObjects(object):
                  all categories are returned.
 
         Returns:
-            Categories: vectorized category object
+            kwcoco.coco_objects1d.Categories: vectorized category object
 
         Example:
             >>> import kwcoco
@@ -2259,7 +2252,7 @@ class MixinCocoObjects(object):
                 lookup videos by their name.
 
         Returns:
-            Videos: vectorized video object
+            kwcoco.coco_objects1d.Videos: vectorized video object
 
         TODO:
             - [ ] This conflicts with what should be the property that
@@ -2292,17 +2285,17 @@ class MixinCocoStats(object):
     @property
     def n_annots(self):
         """ The number of annotations in the dataset """
-        return len(self.dataset['annotations'])
+        return len(self.dataset.get('annotations', []))
 
     @property
     def n_images(self):
         """ The number of images in the dataset """
-        return len(self.dataset['images'])
+        return len(self.dataset.get('images', []))
 
     @property
     def n_cats(self):
         """ The number of categories in the dataset """
-        return len(self.dataset['categories'])
+        return len(self.dataset.get('categories', []))
 
     @property
     def n_videos(self):
@@ -2400,11 +2393,15 @@ class MixinCocoStats(object):
 
         KWArgs:
             **config :
+
                 pycocotools_info (default=True): returns info required by pycocotools
+
                 ensure_imgsize (default=True): ensure image size is populated
+
                 legacy (default=False): if true tries to convert data
-                    structures to items compatible with the original
-                    pycocotools spec
+                structures to items compatible with the original
+                pycocotools spec
+
                 workers (int): number of parallel jobs for IO tasks
 
         Example:
@@ -2457,8 +2454,16 @@ class MixinCocoStats(object):
                                 segmentation
                                 '''))
                     else:
-                        x, y, w, h = ann['bbox']
-                        ann['area'] = w * h
+                        try:
+                            x, y, w, h = ann['bbox']
+                        except KeyError:
+                            warnings.warn(ub.paragraph(
+                                '''
+                                Unable to add "area" key because an annotation
+                                is missing or has a malformed "bbox" entry
+                                '''))
+                        else:
+                            ann['area'] = w * h
 
         if config.get('legacy', False):
             try:
@@ -2488,26 +2493,37 @@ class MixinCocoStats(object):
 
         Corresponds to the ``kwcoco validate`` CLI tool.
 
-        KWArgs:
+        Args:
             **config :
-                schema (default=True): validates the json-schema
-                unique (default=True): validates unique secondary keys
-                missing (default=True): validates registered files exist
-                corrupted (default=False): validates data in registered files
+                schema (default=True): if True, validate the json-schema
+
+                unique (default=True): if True, validate unique secondary keys
+
+                missing (default=True): if True, validate registered files exist
+
+                corrupted (default=False): if True, validate data in registered files
+
                 channels (default=True):
-                    validates that channels in auxiliary/asset items are all
-                    unique.
+                if True, validate that channels in auxiliary/asset items
+                are all unique.
+
                 require_relative (default=False):
-                    Causes validation to fail if paths are non-portable, i.e.
-                    all paths must be relative to the bundle directory.
+                if True, causes validation to fail if paths are
+                non-portable, i.e.  all paths must be relative to the
+                bundle directory. if>0, paths must be relative to bundle
+                root.  if>1, paths must be inside bundle root.
+
+                img_attrs (default='warn'):
+                if truthy, check that image attributes contain width and
+                height entries. If 'warn', then warn if they do not exist.
+                If 'error', then fail.
+
                 verbose (default=1): verbosity flag
+
                 fastfail (default=False): if True raise errors immediately
-                require_relative (default=False):
-                    if>0, paths must be relative to bundle root.
-                    if>1, paths must be inside bundle root.
 
         Returns:
-            dict: result containing keys:
+            dict: result containing keys -
                 status (bool): False if any errors occurred
                 errors (List[str]): list of all error messages
                 missing (List): List of any missing images
@@ -2555,38 +2571,92 @@ class MixinCocoStats(object):
             try:
                 COCO_SCHEMA.validate(dset.dataset)
             except jsonschema.exceptions.ValidationError as ex:
-                msg = 'Failed to validate schema: {}'.format(str(ex))
+                err = ex
+                print(f'err.absolute_path={err.absolute_path}')
+                import xdev
+                xdev.embed()
+                msg = 'Failed to validate schema: {}'.format(str(err))
                 _error(msg)
 
-        if config.get('unique', True):
-            def _check_unique(dset, table_key, col_key, required=True):
-                if verbose:
-                    print('Check {!r} has unique {!r}'.format(
-                        table_key, col_key))
-                items = dset.dataset.get(table_key, [])
-                seen = set()
-                num_unset = 0
-                for obj in items:
-                    value = obj.get(col_key, None)
-                    if value is None:
-                        num_unset += 1
-                    else:
-                        if value in seen:
-                            msg = 'Duplicate {} {} = {!r}'.format(
-                                table_key, col_key, value)
-                            _error(msg)
-                        else:
-                            seen.add(value)
-                if num_unset > 0:
-                    msg = ub.paragraph(
-                        '''
-                        Table {!r} is missing {} / {} values for column {!r}
-                        '''
-                    ).format(table_key, num_unset, len(items), col_key)
-                    if required:
+        def _check_unique(dset, table_key, col_key, required=True):
+            if verbose:
+                print('Check table {!r} has unique {!r}'.format(
+                    table_key, col_key))
+            items = dset.dataset.get(table_key, [])
+            seen = set()
+            num_unset = 0
+            for obj in items:
+                value = obj.get(col_key, None)
+                if value is None:
+                    num_unset += 1
+                else:
+                    if value in seen:
+                        msg = 'Duplicate {} {} = {!r}'.format(
+                            table_key, col_key, value)
                         _error(msg)
                     else:
-                        _warn(msg)
+                        seen.add(value)
+            if num_unset > 0:
+                msg = ub.paragraph(
+                    '''
+                    Table {!r} is missing {} / {} values for column {!r}
+                    '''
+                ).format(table_key, num_unset, len(items), col_key)
+                if required:
+                    _error(msg)
+                else:
+                    _warn(msg)
+
+        def _check_attrs(dset, table_key, col_key, required=True):
+            if verbose:
+                print('Check table {!r} entries have attr {!r}'.format(
+                    table_key, col_key))
+            items = dset.dataset.get(table_key, [])
+            num_unset = 0
+            for obj in items:
+                value = obj.get(col_key, None)
+                if value is None:
+                    num_unset += 1
+            if num_unset > 0:
+                msg = ub.paragraph(
+                    '''
+                    Table {!r} is missing {} / {} values for column {!r}
+                    '''
+                ).format(table_key, num_unset, len(items), col_key)
+                if required:
+                    _error(msg)
+                else:
+                    _warn(msg)
+
+        def _check_subtable_attrs(dset, table_key, subtable_keys, col_key, required=True):
+            if verbose:
+                print('Check subtable {!r} / {!r} entries have attr {!r}'.format(
+                    table_key, subtable_keys, col_key))
+            items = dset.dataset.get(table_key, [])
+            num_unset = 0
+            num_subobjs = 0
+            for obj in items:
+                # hack for asset/auxiliary
+                _ = ub.dict_isect(obj, subtable_keys)
+                sub_objs = ub.peek(_.values()) if _ else None
+                if sub_objs:
+                    for sub_obj in sub_objs:
+                        num_subobjs += 1
+                        value = sub_obj.get(col_key, None)
+                        if value is None:
+                            num_unset += 1
+            if num_unset > 0:
+                msg = ub.paragraph(
+                    '''
+                    Subtable {!r}/{!r} is missing {} / {} values for column {!r}
+                    '''
+                ).format(table_key, subtable_keys, num_unset, num_subobjs, col_key)
+                if required:
+                    _error(msg)
+                else:
+                    _warn(msg)
+
+        if config.get('unique', True):
 
             _check_unique(dset, table_key='categories', col_key='name')
             _check_unique(dset, table_key='videos', col_key='name')
@@ -2597,6 +2667,14 @@ class MixinCocoStats(object):
             _check_unique(dset, table_key='videos', col_key='id')
             _check_unique(dset, table_key='annotations', col_key='id')
             _check_unique(dset, table_key='categories', col_key='id')
+
+        if config.get('img_attrs', False):
+            required = config.get('img_attrs', False) == 'error'
+            # Refine this?
+            _check_attrs(dset, table_key='images', col_key='width', required=required)
+            _check_attrs(dset, table_key='images', col_key='height', required=required)
+            _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary'], col_key='width', required=required)
+            _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary'], col_key='height', required=required)
 
         if config.get('channels', True):
             for img in self.dataset.get('images', []):
@@ -2801,20 +2879,26 @@ class MixinCocoStats(object):
 
         Args:
             anchors (int): if specified also computes box anchors
-                via
-                KMeans clustering
+                via KMeans clustering
+
             perclass (bool): if True also computes stats for each category
+
             gids (List[int], default=None):
                 if specified only compute stats for these image ids.
+
             aids (List[int], default=None):
                 if specified only compute stats for these annotation ids.
+
             verbose (int): verbosity level
-            clusterkw (dict): kwargs for :class:`sklearn.cluster.KMeans` used
+
+            clusterkw (dict):
+                kwargs for :class:`sklearn.cluster.KMeans` used
                 if computing anchors.
+
             statskw (dict): kwargs for :func:`kwarray.stats_dict`
 
         Returns:
-            Dict[str, Dict[str, Dict | ndarray]:
+            Dict[str, Dict[str, Dict | ndarray]]:
                 Stats are returned in width-height format.
 
         Example:
@@ -2837,7 +2921,7 @@ class MixinCocoStats(object):
         if aids is not None:
             anns = ub.take(self.anns, aids)
         else:
-            anns = self.dataset['annotations']
+            anns = self.dataset.get('annotations', [])
 
         for ann in anns:
             if 'bbox' in ann:
@@ -2996,7 +3080,7 @@ class MixinCocoDraw(object):
 
         Args:
             gid (int): image id to draw
-            channels (ChannelSpec): the channel to draw on
+            channels (kwcoco.ChannelSpec): the channel to draw on
 
         Returns:
             ndarray: canvas
@@ -3360,7 +3444,7 @@ class MixinCocoAddRemove(object):
 
         Args:
             name (str): Unique name for this video.
-            id (None or int): ADVANCED. Force using this image id.
+            id (None | int): ADVANCED. Force using this image id.
             **kw : stores arbitrary key/value pairs in this new video
 
         Returns:
@@ -3410,7 +3494,7 @@ class MixinCocoAddRemove(object):
             file_name (str | None): relative or absolute path to image.
                  if not given, then "name" must be specified and we will
                  exepect that "auxiliary" assets are eventually added.
-            id (None or int): ADVANCED. Force using this image id.
+            id (None | int): ADVANCED. Force using this image id.
             name (str): a unique key to identify this image
             width (int): base width of the image
             height (int): base height of the image
@@ -3473,7 +3557,7 @@ class MixinCocoAddRemove(object):
                 this image (this is not checked).
 
             **kwargs:
-                See :method:`CocoImage.add_auxiliary_item` for more details
+                See :func:`CocoImage.add_auxiliary_item` for more details
 
         Example:
             >>> import kwcoco
@@ -3500,12 +3584,14 @@ class MixinCocoAddRemove(object):
 
             bbox (list | kwimage.Boxes): bounding box in xywh format
 
-            segmentation (MaskLike | MultiPolygonLike): keypoints in some
+            segmentation (Dict | List | Any): keypoints in some
                 accepted format, see :func:`kwimage.Mask.to_coco` and
                 :func:`kwimage.MultiPolygon.to_coco`.
+                Extended types: `MaskLike | MultiPolygonLike`.
 
-            keypoints (KeypointsLike): keypoints in some accepted
+            keypoints (Any): keypoints in some accepted
                 format, see :func:`kwimage.Keypoints.to_coco`.
+                Extended types: `KeypointsLike`.
 
             id (None | int): Force using this annotation id. Typically you
                 should NOT specify this. A new unused id will be chosen and
@@ -3514,18 +3600,13 @@ class MixinCocoAddRemove(object):
             **kw : stores arbitrary key/value pairs in this new image,
                 Common respected key/values include but are not limited to the
                 following:
-
                 track_id (int | str): some value used to associate annotations
-                    that belong to the same "track".
-
+                that belong to the same "track".
                 score : float
-
                 prob : List[float]
-
                 weight (float): a weight, usually used to indicate if a ground
-                    truth annotation is difficult / important. This generalizes
-                    standard "is_hard" or "ignore" attributes in other formats.
-
+                truth annotation is difficult / important. This generalizes
+                standard "is_hard" or "ignore" attributes in other formats.
                 caption (str): a text caption for this annotation
 
         Returns:
@@ -3656,8 +3737,8 @@ class MixinCocoAddRemove(object):
 
         Args:
             name (str): name of the new category
-            supercategory (str, optional): parent of this category
-            id (int, optional): use this category id, if it was not taken
+            supercategory (str | None): parent of this category
+            id (int | None): use this category id, if it was not taken
             **kw : stores arbitrary key/value pairs in this new image
 
         Returns:
@@ -3711,7 +3792,7 @@ class MixinCocoAddRemove(object):
 
         Args:
             file_name (str): relative or absolute path to image
-            id (None or int): ADVANCED. Force using this image id.
+            id (None | int): ADVANCED. Force using this image id.
             **kw : stores arbitrary key/value pairs in this new image
 
         Returns:
@@ -4549,7 +4630,7 @@ class CocoIndex(object):
         Build all id-to-obj reverse indexes from scratch.
 
         Args:
-            parent (CocoDataset): the dataset to index
+            parent (kwcoco.CocoDataset): the dataset to index
 
         Notation:
             aid - Annotation ID
@@ -5332,7 +5413,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         Writes the dataset out to the json format
 
         Args:
-            file (PathLike | FileLike):
+            file (PathLike | IO):
                 Where to write the data.  Can either be a path to a file or an
                 open file pointer / stream.
 
@@ -5539,7 +5620,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             **kwargs : constructor options for the new merged CocoDataset
 
         Returns:
-            CocoDataset: a new merged coco dataset
+            kwcoco.CocoDataset: a new merged coco dataset
 
         CommandLine:
             xdoctest -m kwcoco.coco_dataset CocoDataset.union

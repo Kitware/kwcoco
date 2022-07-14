@@ -31,7 +31,7 @@ Concepts:
 
 
 TODO:
-    - [ ] Need to handle masks / nodata values when warping. Might need to
+    - [x] Need to handle masks / nodata values when warping. Might need to
           rely more on gdal / rasterio for this.
 
 
@@ -96,7 +96,7 @@ Example:
 Example:
     >>> import kwcoco
     >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-    >>> delayed = dset.delayed_load(1)
+    >>> delayed = dset.coco_image(1).delay(mode=0)
     >>> from kwcoco.util.util_delayed_poc import *  # NOQA
     >>> astro = DelayedLoad.demo('astro')
     >>> print('MSI = ' + ub.repr2(delayed.__json__(), nl=-3, sort=0))
@@ -122,7 +122,7 @@ Example:
     >>> from kwcoco.util.util_delayed_poc import *  # NOQA
     >>> import kwimage
     >>> from os.path import join
-    >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/delayed_poc')
+    >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/delayed_ops')
     >>> chan1_fpath = join(dpath, 'chan1.tiff')
     >>> chan2_fpath = join(dpath, 'chan2.tiff')
     >>> chan3_fpath = join(dpath, 'chan2.tiff')
@@ -229,6 +229,9 @@ class DelayedVisionOperation(ub.NiceRepr):
         """
         Abstract method, which should generate all of the direct children of a
         node in the operation tree.
+
+        Yields:
+            Any:
         """
         raise NotImplementedError
 
@@ -300,7 +303,7 @@ class DelayedImageOperation(DelayedVisionOperation):
             in the middle.
 
         Returns:
-            DelayedWarp: lazy executed delayed transform
+            DelayedImageOperation: lazy executed delayed transform
 
         Example:
             >>> dsize = (100, 100)
@@ -391,12 +394,16 @@ class DelayedImageOperation(DelayedVisionOperation):
             "output_dims" (specified in c-style shape) we specify dsize (w, h).
 
         Returns:
-            DelayedWarp : new delayed transform a chained transform
+            DelayedImageOperation : new delayed transform a chained transform
         """
         warped = DelayedWarp(self, transform=transform, dsize=dsize)
         return warped
 
     def take_channels(self, channels):
+        """
+        Returns:
+            DelayedVisionOperation
+        """
         raise NotImplementedError
 
 
@@ -486,6 +493,10 @@ class DelayedIdentity(DelayedImageOperation):
         return self
 
     def children(self):
+        """
+        Yields:
+            Any
+        """
         yield from []
 
     # def delayed_crop(self, region_slices):
@@ -507,6 +518,10 @@ class DelayedIdentity(DelayedImageOperation):
         return final
 
     def take_channels(self, channels):
+        """
+        Returns:
+            DelayedIdentity
+        """
         if not isinstance(self.sub_data, np.ndarray):
             return super().take_channels(channels)
 
@@ -616,6 +631,10 @@ class DelayedNans(DelayedImageOperation):
         return self.meta.get('channels', None)
 
     def children(self):
+        """
+        Yields:
+            Any
+        """
         yield from []
 
     def _optimize_paths(self, **kwargs):
@@ -645,6 +664,10 @@ class DelayedNans(DelayedImageOperation):
         return final
 
     def delayed_crop(self, region_slices):
+        """
+        Returns:
+            DelayedNans:
+        """
         # DEBUG_PRINT('DelayedNans.delayed_crop')
         channels = self.channels
         dsize = self.dsize
@@ -659,6 +682,10 @@ class DelayedNans(DelayedImageOperation):
         return new
 
     def delayed_warp(self, transform, dsize=None):
+        """
+        Returns:
+            DelayedNans:
+        """
         new = self.__class__(dsize, channels=self.channels)
         return new
 
@@ -759,6 +786,10 @@ class DelayedLoad(DelayedImageOperation):
         raise NotImplementedError
 
     def children(self):
+        """
+        Yields:
+            Any
+        """
         yield from []
 
     def nesting(self):
@@ -835,11 +866,11 @@ class DelayedLoad(DelayedImageOperation):
 
         Args:
             **kwargs:
-                nodata : if specified this data item is treated as nodata, the
+                nodata_method : if specified this data item is treated as nodata, the
                     data is then converted to floats and the nodata value is
                     replaced with nan.
         """
-        nodata = kwargs.get('nodata', None)
+        nodata_method = kwargs.get('nodata_method', kwargs.get('nodata', None))
         overview = kwargs.get('overview', None)
 
         # Probably should not use a cache here?
@@ -851,7 +882,7 @@ class DelayedLoad(DelayedImageOperation):
             if lazy_frame_backends.LazyGDalFrameFile.available():
                 # TODO: warn if we dont have a COG.
                 pre_final = lazy_frame_backends.LazyGDalFrameFile(self.fpath,
-                                                                  nodata=nodata,
+                                                                  nodata_method=nodata_method,
                                                                   overview=overview)
                 pre_final._ds
                 # pre_final = LazyGDalFrameFile(self.fpath)
@@ -859,7 +890,7 @@ class DelayedLoad(DelayedImageOperation):
                 # pre_final = lazy_frame_backends.LazyRasterIOFrameFile(self.fpath)  # which is faster?
                 # pre_final = lazy_frame_backends.LazySpectralFrameFile(self.fpath)  # which is faster?
             else:
-                if nodata == 'auto':
+                if nodata_method == 'auto':
                     raise Exception('need gdal for auto no-data')
                 import warnings
                 warnings.warn('DelayedLoad may not be efficient without gdal')
@@ -881,10 +912,10 @@ class DelayedLoad(DelayedImageOperation):
 
             # Handle nan
             if not using_gdal:
-                if nodata is not None and isinstance(nodata, int):
+                if nodata_method is not None and isinstance(nodata_method, int):
                     if final.dtype.kind != 'f':
                         final = final.astype(np.float32)
-                    final[final == nodata] = np.nan
+                    final[final == nodata_method] = np.nan
 
             dequantize_ = kwargs.get('dequantize', True)
             if self.quantization is not None and dequantize_:
@@ -1137,6 +1168,10 @@ class DelayedFrameConcat(DelayedVideoOperation):
         }
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         yield from self.frames
 
     @property
@@ -1176,6 +1211,9 @@ class DelayedFrameConcat(DelayedVideoOperation):
 
     def delayed_crop(self, region_slices):
         """
+        Returns:
+            DelayedFrameConcat
+
         Example:
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> # Create raw channels in some "native" resolution for frame 1
@@ -1252,6 +1290,23 @@ class DelayedFrameConcat(DelayedVideoOperation):
         return new
 
 
+class JaggedArray(ub.NiceRepr):
+    """
+    The result of an unaligned concatenate
+    """
+    def __init__(self, parts, axis):
+        self.parts = parts
+        self.axis = axis
+
+    def __nice__(self):
+        return '{}, axis={}'.format(self.shape, self.axis)
+
+    @property
+    def shape(self):
+        shapes = [p.shape for p in self.parts]
+        return shapes
+
+
 class DelayedChannelConcat(DelayedImageOperation):
     """
     Represents multiple channels in an image that could be concatenated
@@ -1261,10 +1316,12 @@ class DelayedChannelConcat(DelayedImageOperation):
             component may be comprised of multiple channels.
 
     TODO:
-        - [ ] can this be generalized into a delayed concat?
+        - [ ] can this be generalized into a delayed concat and combined with DelayedFrameConcat?
         - [ ] can all concats be delayed until the very end?
 
     Example:
+        >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+        >>> # Create 3 delayed operations to concatenate
         >>> comp1 = DelayedWarp(np.random.rand(11, 7))
         >>> comp2 = DelayedWarp(np.random.rand(11, 7, 3))
         >>> comp3 = DelayedWarp(
@@ -1291,12 +1348,25 @@ class DelayedChannelConcat(DelayedImageOperation):
         >>> frame1.finalize()
         >>> vid = DelayedFrameConcat([frame1, frame2, frame3])
         >>> print(ub.repr2(vid.nesting(), nl=-1, sort=False))
+
+    Example:
+        >>> from kwcoco.util.util_delayed_poc import *  # NOQA
+        >>> # If requested, we can return arrays of the different sizes.
+        >>> # but usually this will raise an error.
+        >>> comp1 = DelayedWarp.random(dsize=(32, 32), nesting=(1, 5), channels=1)
+        >>> comp2 = DelayedWarp.random(dsize=(8, 8), nesting=(1, 5), channels=1)
+        >>> comp3 = DelayedWarp.random(dsize=(64, 64), nesting=(1, 5), channels=1)
+        >>> components = [comp1, comp2, comp3]
+        >>> self = DelayedChannelConcat(components, jagged=True)
+        >>> final = self.finalize()
+        >>> print('final = {!r}'.format(final))
     """
-    def __init__(self, components, dsize=None):
+    def __init__(self, components, dsize=None, jagged=False):
         if len(components) == 0:
             raise ValueError('No components to concatenate')
         self.components = components
-        if dsize is None:
+        self.jagged = jagged
+        if dsize is None and not jagged:
             dsize_cands = [comp.dsize for comp in self.components]
             if not ub.allsame(dsize_cands):
                 raise exceptions.CoordinateCompatibilityError(
@@ -1317,6 +1387,10 @@ class DelayedChannelConcat(DelayedImageOperation):
         }
 
     def children(self):
+        """
+        Yields:
+            Any
+        """
         yield from self.components
 
     @classmethod
@@ -1343,13 +1417,19 @@ class DelayedChannelConcat(DelayedImageOperation):
     def channels(self):
         sub_channs = []
         for comp in self.components:
-            sub_channs.append(comp.channels)
+            comp_channels = comp.channels
+            if comp_channels is None:
+                return None
+            sub_channs.append(comp_channels)
         channs = channel_spec.FusedChannelSpec.concat(sub_channs)
         return channs
 
     @property
     def shape(self):
-        w, h = self.dsize
+        if self.jagged:
+            w = h = None
+        else:
+            w, h = self.dsize
         return (h, w, self.num_bands)
 
     @profile
@@ -1362,11 +1442,14 @@ class DelayedChannelConcat(DelayedImageOperation):
         if len(stack) == 1:
             final = stack[0]
         else:
-            if as_xarray:
-                import xarray as xr
-                final = xr.concat(stack, dim='c')
+            if self.jagged:
+                final = JaggedArray(stack, axis=2)
             else:
-                final = np.concatenate(stack, axis=2)
+                if as_xarray:
+                    import xarray as xr
+                    final = xr.concat(stack, dim='c')
+                else:
+                    final = np.concatenate(stack, axis=2)
         return final
 
     def delayed_warp(self, transform, dsize=None):
@@ -1404,16 +1487,16 @@ class DelayedChannelConcat(DelayedImageOperation):
                 typically a pipe (`|`) delimited list of channel codes. See
                 kwcoco.ChannelSpec for more detials.
 
-        Returns:
-            DelayedVisionOperation:
-                a delayed vision operation that only operates on the following
-                channels.
+        # Returns:
+        #     DelayedVisionOperation:
+        #         a delayed vision operation that only operates on the following
+        #         channels.
 
         Example:
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-            >>> self = delayed = dset.delayed_load(1)
+            >>> self = delayed = dset.coco_image(1).delay(mode=0)
             >>> channels = 'B11|B8|B1|B10'
             >>> new = self.take_channels(channels)
 
@@ -1422,7 +1505,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> import kwcoco
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-            >>> delayed = dset.delayed_load(1)
+            >>> delayed = dset.coco_image(1).delay(mode=0)
             >>> astro = DelayedLoad.demo('astro').load_shape(use_channel_heuristic=True)
             >>> aligned = astro.warp(kwimage.Affine.scale(600 / 512), dsize='auto')
             >>> self = combo = DelayedChannelConcat(delayed.components + [aligned])
@@ -1445,7 +1528,7 @@ class DelayedChannelConcat(DelayedImageOperation):
             >>> import kwcoco
             >>> from kwcoco.util.util_delayed_poc import *  # NOQA
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral', use_cache=1, verbose=100)
-            >>> self = dset.delayed_load(1)
+            >>> self = dset.coco_image(1).delay(mode=0)
             >>> channels = 'B1|foobar|bazbiz|B8'
             >>> new = self.take_channels(channels)
             >>> new_cropped = new.crop((slice(10, 200), slice(12, 350)))
@@ -1541,7 +1624,7 @@ class DelayedChannelConcat(DelayedImageOperation):
                     sub_comp = comp.take_channels(sub_idxs)
                     new_components.append(sub_comp)
 
-        new = DelayedChannelConcat(new_components)
+        new = DelayedChannelConcat(new_components, jagged=self.jagged)
         return new
 
 
@@ -1561,7 +1644,7 @@ class DelayedWarp(DelayedImageOperation):
         sub_data (DelayedWarp | ArrayLike):
             array-like image data at a naitive resolution
 
-        transform (Transform):
+        transform (kwimage.Transform):
             transforms data from native "sub"-image-space to
             "self"-image-space.
 
@@ -1656,28 +1739,94 @@ class DelayedWarp(DelayedImageOperation):
         }
 
     @classmethod
-    def random(cls, nesting=(2, 5), rng=None):
+    def random(cls,
+               dsize=None,
+               raw_width=(8, 64),
+               raw_height=(8, 64),
+               channels=(1, 5),
+               nesting=(2, 5),
+               rng=None):
         """
+        Create a random delayed warp operation for testing / demo
+
+        Args:
+            dsize (Tuple[int, int] | None):
+                The width and height of the finalized data.
+                If unspecified, it will be a function of the random warps.
+
+            raw_width (int | Tuple[int, int]):
+                The exact or min / max width of the random raw data
+
+            raw_height (int | Tuple[int, int]):
+                The exact or min / max height of the random raw data
+
+            nesting (Tuple[int, int]):
+                The exact or min / max random depth of warp nestings
+
+            channels (int | Tuple[int, int]):
+                The exact or min / max number of random channels.
+
+        Returns:
+            DelayedWarp
+
         Example:
             >>> self = DelayedWarp.random(nesting=(4, 7))
             >>> print('self = {!r}'.format(self))
             >>> print(ub.repr2(self.nesting(), nl=-1, sort=0))
+
+        Ignore:
+            import kwplot
+            kwplot.autompl()
+            self = DelayedWarp.random(dsize=(32, 32), nesting=(1, 5), channels=3)
+            data = self.finalize()
+            kwplot.imshow(data)
         """
-        from kwarray.distributions import DiscreteUniform, Uniform
+        from kwarray.distributions import DiscreteUniform, Uniform, Constant
         rng = kwarray.ensure_rng(rng)
-        chan_distri = DiscreteUniform.coerce((1, 5), rng=rng)
-        nest_distri = DiscreteUniform.coerce(nesting, rng=rng)
-        size_distri = DiscreteUniform.coerce((8, 64), rng=rng)
+
+        def distribution_coercion_rules(scalar, pair):
+            # The rules for how to coerce a kwarray distribution are ambiguous
+            # but perhaps we can define a nice way to define what they are on a
+            # per-case basis, where domain knowledge can break the ambiguity?
+            def coerce(arg, rng=None):
+                # Choose the class to coerce into based on the rules
+                cls = None
+                if not ub.iterable(arg):
+                    cls = scalar
+                    arg = [arg]
+                else:
+                    if len(arg) == 2:
+                        cls = pair
+                if cls is None:
+                    raise TypeError(type(arg))
+                return cls.coerce(arg, rng=rng)
+            return coerce
+
+        coercer = distribution_coercion_rules(scalar=Constant, pair=DiscreteUniform)
+
+        chan_distri = coercer(channels, rng=rng)
+        nest_distri = coercer(nesting, rng=rng)
+        rw_distri = coercer(raw_width, rng=rng)
+        rh_distri = coercer(raw_height, rng=rng)
         raw_distri = Uniform(rng=rng)
         leaf_c = chan_distri.sample()
-        leaf_w = size_distri.sample()
-        leaf_h = size_distri.sample()
-        raw = raw_distri.sample(leaf_h, leaf_w, leaf_c)
+        leaf_w = rw_distri.sample()
+        leaf_h = rh_distri.sample()
+
+        raw = raw_distri.sample(leaf_h, leaf_w, leaf_c).astype(np.float32)
         layer = raw
         depth = nest_distri.sample()
         for _ in range(depth):
             tf = kwimage.Affine.random(rng=rng).matrix
             layer = DelayedWarp(layer, tf, dsize='auto')
+
+        # Final warp to the desired output size
+        if dsize is not None:
+            ow, oh = dsize
+            w, h = layer.dsize
+            tf = kwimage.Affine.scale((h / oh, w / ow))
+            layer = DelayedWarp(layer, tf, dsize=dsize)
+
         self = layer
         return self
 
@@ -1689,6 +1838,10 @@ class DelayedWarp(DelayedImageOperation):
             return None
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         yield self.sub_data
 
     @property
@@ -1745,7 +1898,7 @@ class DelayedWarp(DelayedImageOperation):
         Can pass a parent transform to augment this underlying transform.
 
         Args:
-            transform (Transform): an additional transform to perform
+            transform (kwimage.Transform): an additional transform to perform
             dsize (Tuple[int, int]): overrides destination canvas size
 
         Example:
@@ -1949,6 +2102,10 @@ class DelayedCrop(DelayedImageOperation):
             return None
 
     def children(self):
+        """
+        Yields:
+            Any:
+        """
         yield self.sub_data
 
     @profile

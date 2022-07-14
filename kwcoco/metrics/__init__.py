@@ -15,8 +15,8 @@ from . import confusion_vectors
 
 from .detect_metrics import (DetectionMetrics, eval_detections_cli,)
 from .confusion_vectors import (BinaryConfusionVectors, ConfusionVectors,
-                                Measures, OneVsRestConfusionVectors,
-                                PerClass_Measures,)
+                                OneVsRestConfusionVectors,)
+from .confusion_measures import (Measures, PerClass_Measures,)
 
 __all__ = ['BinaryConfusionVectors', 'ConfusionVectors', 'DetectionMetrics',
            'Measures', 'OneVsRestConfusionVectors', 'PerClass_Measures',

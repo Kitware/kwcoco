@@ -25,6 +25,7 @@ For notes about warping and spaces see :doc:`warping_and_spaces <warping_and_spa
 
 
 .. toctree::
-   :titlesonly:
+   :maxdepth: 8
+   :caption: Package Layout
 
-   /autoapi/kwcoco/index
+   modules

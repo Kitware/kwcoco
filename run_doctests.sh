@@ -1,2 +1,2 @@
 #!/bin/bash
-xdoctest kwcoco --style=google all --verbose=1
+xdoctest kwcoco --style=google all

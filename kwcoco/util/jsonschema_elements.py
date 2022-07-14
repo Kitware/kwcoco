@@ -75,7 +75,7 @@ class Element(dict):
         """
         Args:
             base (dict): the keys / values this schema must contain
-            options (options): the keys / values this schema may contain
+            options (dict): the keys / values this schema may contain
             _magic (callable): called when creating an instance of this schema
                 element. Allows convinience attributes to be converted to the
                 formal jsonschema specs. TODO: _magic is a terrible name, we

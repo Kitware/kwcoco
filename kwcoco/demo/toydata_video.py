@@ -82,6 +82,7 @@ def random_video_dset(
         dset._tree()
         dset.imgs[1]
 
+    Ignore:
         dset = random_single_video_dset()
         dset._tree()
         dset.imgs[1]
@@ -222,7 +223,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         max_speed (float):
             max speed of movers
 
-        channels (str | None | ChannelSpec):
+        channels (str | None | kwcoco.ChannelSpec):
             if specified generates multispectral images with dummy channels
 
         multisensor (bool):
@@ -711,7 +712,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     Create toydata_video renderings for a preconstructed coco dataset.
 
     Args:
-        dset (CocoDataset):
+        dset (kwcoco.CocoDataset):
             A dataset that contains special "renderable" annotations. (e.g.
             the demo shapes). Each image can contain special fields that
             influence how an image will be rendered.
@@ -830,7 +831,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     the image dictionary.
 
     Args:
-        dset (CocoDataset): coco dataset with renderable anotations / images
+        dset (kwcoco.CocoDataset): coco dataset with renderable anotations / images
         gid (int): image to render
         rng (int | None | RandomState): random state
         renderkw (dict): rendering config

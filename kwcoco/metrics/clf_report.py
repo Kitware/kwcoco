@@ -24,24 +24,33 @@ def classification_report(y_true, y_pred, target_names=None,
     instead act on final decisions. See ovr_classification_report for a
     probability based report function using a one-vs-rest strategy.
 
-    This emulates the bm(cm) Matlab script written by David Powers that is used
-    for computing bookmaker, markedness, and various other scores.
+    This emulates the bm(cm) Matlab script [MatlabBM]_ written by David Powers
+    that is used for computing bookmaker, markedness, and various other scores
+    and is based on the paper [PowersMetrics]_.
 
     References:
-        https://csem.flinders.edu.au/research/techreps/SIE07001.pdf
-        https://www.mathworks.com/matlabcentral/fileexchange/5648-bm-cm-?requestedDomain=www.mathworks.com
-        Jurman, Riccadonna, Furlanello, (2012). A Comparison of MCC and CEN
-            Error Measures in MultiClass Prediction
+        .. [PowersMetrics] https://csem.flinders.edu.au/research/techreps/SIE07001.pdf
+
+        .. [MatlabBM] https://www.mathworks.com/matlabcentral/fileexchange/5648-bm-cm-?requestedDomain=www.mathworks.com
+
+        .. [MulticlassMCC] Jurman, Riccadonna, Furlanello, (2012). A Comparison of MCC and CEN Error Measures in MultiClass Prediction
 
     Args:
         y_true (array): true labels for each item
+
         y_pred (array): predicted labels for each item
+
         target_names (List): mapping from label to category name
+
         sample_weight (ndarray): weight for each item
+
         verbose (False): print if True
+
         log (callable): print or logging function
+
         remove_unsupported (bool, default=False): removes categories that have
             no support.
+
         ascii_only (bool, default=False): if True dont use unicode characters.
             if the environ ASCII_ONLY is present this is forced to True and
             cannot be undone.
@@ -407,13 +416,13 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     One-vs-rest classification report
 
     Args:
-        mc_y_true (ndarray[int]): multiclass truth labels (integer label
+        mc_y_true (ndarray[Any, Int]): multiclass truth labels (integer label
             format). Shape [N].
 
         mc_probs (ndarray): multiclass probabilities for each class.
             Shape [N x C].
 
-        target_names (Dict[int, str] : mapping from int label to string name
+        target_names (Dict[int, str]): mapping from int label to string name
 
         sample_weight (ndarray): weight for each item. Shape [N].
 

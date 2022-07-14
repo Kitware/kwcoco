@@ -19,7 +19,7 @@ def perterb_coco(coco_dset, **kwargs):
         >>> from kwcoco.demo.perterb import *  # NOQA
         >>> from kwcoco.demo.perterb import _demo_construct_probs
         >>> import kwcoco
-        >>> coco_dset = true_dset = kwcoco.CocoDataset.demo('shapes8')
+        >>> coco_dset = true_dset = kwcoco.CocoDataset.demo('shapes2')
         >>> kwargs = {
         >>>     'box_noise': 0.5,
         >>>     'n_fp': 3,

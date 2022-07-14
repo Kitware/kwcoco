@@ -44,14 +44,16 @@ def parse_description():
     return ''
 
 
-def parse_requirements(fname='requirements.txt', with_version=False):
+def parse_requirements(fname='requirements.txt', versions=False):
     """
     Parse the package dependencies listed in a requirements file but strips
     specific versioning information.
 
     Args:
         fname (str): path to requirements file
-        with_version (bool, default=False): if true include version specs
+        versions (bool | str, default=False):
+            If true include version specs.
+            If strict, then pin to the minimum version.
 
     Returns:
         List[str]: list of requirements items
@@ -119,8 +121,15 @@ def parse_requirements(fname='requirements.txt', with_version=False):
         if exists(require_fpath):
             for info in parse_require_file(require_fpath):
                 parts = [info['package']]
-                if with_version and 'version' in info:
-                    parts.extend(info['version'])
+                if versions and 'version' in info:
+                    if versions == 'strict':
+                        # In strict mode, we pin to the minimum version
+                        if info['version']:
+                            # Only replace the first >= instance
+                            verstr = ''.join(info['version']).replace('>=', '==', 1)
+                            parts.append(verstr)
+                    else:
+                        parts.extend(info['version'])
                 if not sys.version.startswith('3.4'):
                     # apparently package_deps are broken in 3.4
                     plat_deps = info.get('platform_deps')
@@ -163,8 +172,8 @@ def native_mb_python_tag(plat_impl=None, version_info=None):
             else:
                 abi = 'm'
         else:
-            if ver == '38':
-                # no abi in 38?
+            if sys.version_info[:2] >= (3, 8):
+                # bpo-36707: 3.8 dropped the m flag
                 abi = ''
             else:
                 abi = 'm'
@@ -197,17 +206,34 @@ if __name__ == '__main__':
         extras_require={
             'all': parse_requirements('requirements.txt'),
             'tests': parse_requirements('requirements/tests.txt'),
-            'optional': parse_requirements('requirements/optional.txt', with_version=True),
-            # Really annoying that this is the best we can do
-            # The user *must* choose either headless or graphics
-            # to get a complete working install.
+            'optional': parse_requirements('requirements/optional.txt'),
             'headless': parse_requirements('requirements/headless.txt'),
             'graphics': parse_requirements('requirements/graphics.txt'),
+            # Strict versions
+            'headless-strict': parse_requirements('requirements/headless.txt', versions='strict'),
+            'graphics-strict': parse_requirements('requirements/graphics.txt', versions='strict'),
+            'all-strict': parse_requirements('requirements.txt', versions='strict'),
+            'runtime-strict': parse_requirements('requirements/runtime.txt', versions='strict'),
+            'tests-strict': parse_requirements('requirements/tests.txt', versions='strict'),
+            'optional-strict': parse_requirements('requirements/optional.txt', versions='strict'),
         },
         license='Apache 2',
         entry_points={
             'console_scripts': [
                 'kwcoco = kwcoco.cli.__main__:main',
+            ],
+        },
+        package_data={
+            'kwcoco': [
+                'py.typed',
+                '*.pyi',
+                'cli/*.pyi',
+                'util/*.pyi',
+                'demo/*.pyi',
+                'data/*.pyi',
+                'examples/*.pyi',
+                'metrics/*.pyi',
+                'util/delayed_ops/*.pyi',
             ],
         },
         packages=find_packages('.'),

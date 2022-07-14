@@ -1298,7 +1298,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
             table_name (str): name of the table
 
         Returns:
-            DataFrame
+            pandas.DataFrame
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)

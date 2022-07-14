@@ -7,7 +7,7 @@ def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
                       fp_axis='count', **kw):
     """
     Args:
-        cx_to_info (PerClass_Measures | Dict):
+        cx_to_info (kwcoco.metrics.confusion_measures.PerClass_Measures | Dict):
 
         fp_axis (str): can be count or rate
     """
@@ -195,7 +195,7 @@ def _realpos_label_suffix(info):
 def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
     """
     Args:
-        cx_to_info (PerClass_Measures | Dict):
+        cx_to_info (kwcoco.metrics.confusion_measures.PerClass_Measures | Dict):
 
     Example:
         >>> # xdoctest: +REQUIRES(module:kwplot)
@@ -318,7 +318,7 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
 def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnum=1, **kw):
     """
     Args:
-        cx_to_info (PerClass_Measures | Dict):
+        cx_to_info (kwcoco.metrics.confusion_measures.PerClass_Measures | Dict):
 
     Note:
         Each category is inspected independently of one another, there is no

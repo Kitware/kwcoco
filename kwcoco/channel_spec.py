@@ -51,7 +51,9 @@ The ChannelSpec has these simple rules:
 
         slices after the "." work like python slices
 
-The detailed grammar for the spec is:
+The detailed grammar for the spec is
+
+.. code::
 
     ?start: stream
 
@@ -100,32 +102,8 @@ TODO:
     - [x]: Handle special slice suffix for length calculations
 
 
-TODO:
-
-    Sensor Codes
-    ------------
-    Let S1 = sensor 1
-    Let S2 = sensor 2
-    Let S3 = sensor 3
-
-    Using a <sensor>:<pure_fused_channel_spec> indicates that the fused
-    channels belong to that sensor.
-
-    For example:
-
-        S1:red|green|blue
-        S1:B.0:3 = S1:C.0|C.1|C.2
-
-    To specify that R|G|B channels exist in sensor 1 and sensor 2 you could do:
-
-        S1:R|G|B,S2:R|G|B
-
-        or the more concise syntax allows for a distributive law
-
-        (S1,S2):R|G|B
-
-        Notice, how the "R|G|B" channel code is distributed over the ","
-        in the parenthesis.
+SeeAlso:
+    :module:kwcoco.sensorchan_spec - The generalized sensor / channel specification
 
 Note:
     * do not specify the same channel in FusedChannelSpec twice
@@ -389,7 +367,7 @@ class FusedChannelSpec(BaseChannelSpec):
     def spec(self):
         return '|'.join(self.parsed)
 
-    @ub.memoize
+    @ub.memoize_method
     def unique(self):
         return set(self.parsed)
 
@@ -400,6 +378,9 @@ class FusedChannelSpec(BaseChannelSpec):
         else:
             self = cls(spec.split('|'))
         return self
+
+    def __eq__(self, other):
+        return self.parsed == other.parsed
 
     @classmethod
     def coerce(cls, data):

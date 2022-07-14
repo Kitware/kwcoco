@@ -9,15 +9,17 @@ def fast_confusion_matrix(y_true, y_pred, n_labels, sample_weight=None):
     expensive checks and label rectification
 
     Args:
-        y_true (ndarray[int]): ground truth class label for each sample
-        y_pred (ndarray[int]): predicted class label for each sample
+        y_true (ndarray[Any, Int]): ground truth class label for each sample
+        y_pred (ndarray[Any, Int]): predicted class label for each sample
         n_labels (int): number of labels
-        sample_weight (ndarray[int|float]): weight of each sample
+        sample_weight (ndarray): weight of each sample
+            Extended typing ``ndarray[Any, Int | Float]``
 
     Returns:
-        ndarray[int64|float64, dim=2]:
+        ndarray:
             matrix where rows represent real and cols represent pred and the
             value at each cell is the total amount of weight
+            Extended typing ``ndarray[Shape['*, *'], Int64 | Float64]``
 
     Example:
         >>> y_true = np.array([0, 0, 0, 0, 1, 1, 1, 0,  0, 1])

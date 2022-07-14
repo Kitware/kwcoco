@@ -5,18 +5,29 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.2.31 - Unreleased
+## Version 0.3.0 - Unreleased
 
+### Added
+* Initial non-experimental version of SensorChanSpec with limited functionality
+* Updated `kwcoco validate` cli tool with full options (and added checks for img attrs)
+* New Delayed operations with a more scalable design 
+
+### Fixed
+* Fix compatibility issue with datasets that do not contain an annotations list
+* Issue where the original coco polygons did not validate correctly in the schema.
+
+### Changed
+* FusedChannelSpec now has an `__eq__` method that returns True if the parsed reprs are the same.
+
+
+## Version 0.2.31 - Released 2022-05-06
 
 ### Changed
 * kwcoco subset can now accept dst as the second positional argument
 
-
 ### Fixed
 * Fix issue in kwcoco subset where paths were invalid if written outside of
   the source kwcoco bundle.
-* Remove the gdal cache, which caused issues in read/write cases.
-
 
 ## Version 0.2.30 - Released 2022-04-19
 
@@ -311,7 +322,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * CocoSQLDataset.coerce
 * `kwcoco subset` CLI now has a `--select_images` and `--select_videos` option that takes a json query.
-* Add initial implementation of `DelayedChannelConcat.take_channels`, returns nans if the channel is not available.
+* Add initial implementation of `DelayedChannelStack.take_channels`, returns nans if the channel is not available.
 
 ### Changed
 

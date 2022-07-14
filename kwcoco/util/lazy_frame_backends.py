@@ -346,7 +346,9 @@ class LazyGDalFrameFile(ub.NiceRepr):
         >>> # kwplot.imshow(self[:])
 
     Args:
-        nodata
+        fpath (str): the path to the file to load
+        nodata_method (None | int | str): how to handle nodata
+        overview (int): The overview level to load (zero is no overview)
 
     Example:
         >>> # See if we can reproduce the INTERLEAVE bug
@@ -365,14 +367,10 @@ class LazyGDalFrameFile(ub.NiceRepr):
         self.shape
         self[:]
     """
-    def __init__(self, fpath, nodata=None, overview=None):
+    def __init__(self, fpath, nodata_method=None, overview=None):
         self.fpath = fpath
-        self.nodata = nodata
+        self.nodata_method = nodata_method
         self.overview = overview
-        # if nodata == 'auto':
-        #     self.masking_method = 'float'
-        # else:
-        #     self.masking_method = nodata
         if self.overview is None:
             self.overview = 0
         self._ds_cache = None
@@ -409,6 +407,21 @@ class LazyGDalFrameFile(ub.NiceRepr):
             if GLOBAL_GDAL_CACHE is not None:
                 GLOBAL_GDAL_CACHE[_fpath] = ds
 
+    def get_overview(self, overview):
+        """
+        Returns the overview relative to this one.
+        """
+        return self.get_absolute_overview(overview + self.overview)
+
+    def get_absolute_overview(self, overview):
+        """
+        Returns the overview relative to the base
+        """
+        new = self.__class__(self.fpath, nodata_method=self.nodata_method,
+                             overview=overview)
+        new._ds_cache = self._ds_cache
+        return new
+
     @property
     def _ds(self):
         if self._ds_cache is None:
@@ -439,16 +452,29 @@ class LazyGDalFrameFile(ub.NiceRepr):
         return len(self.shape)
 
     @ub.memoize_property
+    def num_overviews(self):
+        return self.num_absolute_overviews - self.overview
+
+    @ub.memoize_property
+    def num_absolute_overviews(self):
+        ds = self._ds
+        default_band0 = ds.GetRasterBand(1)
+        num_overviews = default_band0.GetOverviewCount()
+        return num_overviews
+
+    @ub.memoize_property
     def shape(self):
         ds = self._ds
         default_band0 = ds.GetRasterBand(1)
 
         if self.overview:
-            self.num_overviews = default_band0.GetOverviewCount()
-            self.load_overview = min(self.overview, self.num_overviews)
+            num_overviews = default_band0.GetOverviewCount()
+            self.load_overview = min(self.overview, num_overviews)
             if self.load_overview:
                 self.post_overview = self.overview - self.load_overview
-                assert self.post_overview == 0, 'unhandled'
+                if self.post_overview != 0:
+                    raise ValueError('unhandled: overview does not exist')
+                # Overviews are zero indexed in gdal, inconsistent, I know
                 band0 = default_band0.GetOverview(self.load_overview - 1)
             else:
                 band0 = default_band0
@@ -488,7 +514,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> kwplot.imshow(img_part)
 
             >>> self = LazyGDalFrameFile.demo(dsize=(6600, 4400))
-            >>> self.nodata = 0
+            >>> self.nodata_method = 0
             >>> index = [slice(2100, 2508, None), slice(4916, 5324, None), None]
             >>> img_part = self[index]
             >>> # xdoctest: +REQUIRES(--show)
@@ -502,7 +528,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> from kwcoco.util.lazy_frame_backends import *  # NOQA
             >>> from kwcoco.util.lazy_frame_backends import _demo_geoimg_with_nodata
             >>> fpath = _demo_geoimg_with_nodata()
-            >>> self = LazyGDalFrameFile(fpath, nodata='auto')
+            >>> self = LazyGDalFrameFile(fpath, nodata_method='auto')
             >>> imdata = self[:]
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
@@ -518,6 +544,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
             >>> import kwimage
             >>> from kwcoco.util.lazy_frame_backends import *  # NOQA
             >>> fpath = ub.grabdata('https://ipfs.io/ipfs/QmaFcb565HM9FV8f41jrfCZcu1CXsZZMXEosjmbgeBhFQr', fname='PXL_20210411_150641385.jpg')
+            >>> self = LazyGDalFrameFile(fpath, overview=2)
             >>> print(LazyGDalFrameFile(fpath, overview=0).shape)
             >>> print(LazyGDalFrameFile(fpath, overview=1).shape)
             >>> print(LazyGDalFrameFile(fpath, overview=2).shape)
@@ -576,11 +603,28 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
         if not ub.iterable(index):
             index = [index]
+        else:
+            index = list(index)
 
-        index = list(index)
-        if len(index) < 3:
-            n = (3 - len(index))
-            index = index + [None] * n
+        TOTAL_DIMS = 3  # (always H, W, C)
+
+        # Handle ellipsis
+        num_ellipsis = index.count(Ellipsis)
+        if num_ellipsis > 1:
+            raise Exception('an index can only have a single ellipsis')
+        elif num_ellipsis == 1:
+            # Expand the ellipsis
+            ell_idx = index.index(Ellipsis)
+            n = (1 + TOTAL_DIMS - len(index))
+            if n > 0:
+                index = index[:ell_idx] + ([slice(None, None)] * n) + index[ell_idx + 1:]
+                # index = index[:ell_idx] + ([None] * n) + index[ell_idx + 1:]
+        else:
+            # Expand trailing dims
+            if len(index) < TOTAL_DIMS:
+                n = (TOTAL_DIMS - len(index))
+                index = index + [slice(None, None)] * n
+                # index = index + [None] * n
 
         ypart = _rectify_slice_dim(index[0], height)
         xpart = _rectify_slice_dim(index[1], width)
@@ -608,13 +652,16 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
         from kwimage.im_io import _gdal_read
         gdal_dset = ds
-        nodata = self.nodata
-        if nodata == 'auto':
-            nodata = 'float'  # just use floats
+        nodata_method = self.nodata_method
+        if nodata_method == 'auto':
+            nodata_method = 'float'  # just use floats
         ignore_color_table = True
         overview = self.overview
-        imdata, _ = _gdal_read(gdal_dset, overview, nodata, ignore_color_table,
-                               band_indices, gdalkw)
+        imdata, _ = _gdal_read(gdal_dset=gdal_dset, overview=overview,
+                               nodata_method=nodata_method,
+                               nodata_value=None,
+                               ignore_color_table=ignore_color_table,
+                               band_indices=band_indices, gdalkw=gdalkw)
         return imdata
 
     def __array__(self):

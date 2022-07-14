@@ -698,6 +698,7 @@ class CocoEvaluator(object):
         for iou_thresh in iou_thresholds:
             cfsn_vecs = iou_to_cfsn_vecs[iou_thresh]
             print('cfsn_vecs = {!r}'.format(cfsn_vecs))
+            print(cfsn_vecs.data.pandas())
 
             # NOTE: translating to classless confusion vectors only works when
             # compat='all', otherwise we would need to redo confusion vector

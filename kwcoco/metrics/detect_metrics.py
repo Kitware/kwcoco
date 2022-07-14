@@ -113,9 +113,9 @@ class DetectionMetrics(ub.NiceRepr):
         Register/Add predicted detections for an image
 
         Args:
-            pred_dets (Detections): predicted detections
+            pred_dets (kwimage.Detections): predicted detections
             imgname (str): a unique string to identify the image
-            gid (int, optional): the integer image id if known
+            gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
         dmet.gid_to_pred_dets[gid] = pred_dets
@@ -125,9 +125,9 @@ class DetectionMetrics(ub.NiceRepr):
         Register/Add groundtruth detections for an image
 
         Args:
-            true_dets (Detections): groundtruth
+            true_dets (kwimage.Detections): groundtruth
             imgname (str): a unique string to identify the image
-            gid (int, optional): the integer image id if known
+            gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
         dmet.gid_to_true_dets[gid] = true_dets
@@ -179,7 +179,7 @@ class DetectionMetrics(ub.NiceRepr):
                 preferred over descendents of the true class, over unreleated
                 classes.
 
-            ignore_classes (set, default={'ignore'}):
+            ignore_classes (set | str, default={'ignore'}):
                 class names indicating ignore regions
 
             background_class (str, default=ub.NoParam):
@@ -187,7 +187,7 @@ class DetectionMetrics(ub.NiceRepr):
                 determine it with heuristics. A value of None means there is no
                 background class.
 
-            verbose (int, default='auto'): verbosity flag. In auto mode,
+            verbose (int | str, default='auto'): verbosity flag. In auto mode,
                 verbose=1 if len(gids) > 1000.
 
             workers (int, default=0):
@@ -198,7 +198,7 @@ class DetectionMetrics(ub.NiceRepr):
                 available.
 
         Returns:
-            ConfusionVectors | Dict[float, ConfusionVectors]
+            kwcoco.metrics.confusion_vectors.ConfusionVectors | Dict[float, kwcoco.metrics.confusion_vectors.ConfusionVectors]
 
         Example:
             >>> dmet = DetectionMetrics.demo(nimgs=30, classes=3,
@@ -695,22 +695,37 @@ class DetectionMetrics(ub.NiceRepr):
         offset from the truth.
 
         Kwargs:
-            classes (int, default=1): class list or the number of foreground
-                classes.
-            nimgs (int, default=1): number of images in the coco datasts.
-            nboxes (int, default=1): boxes per image.
-            n_fp (int, default=0): number of false positives.
-            n_fn (int, default=0): number of false negatives.
-            box_noise (float, default=0): std of a normal distribution used to
-                perterb both box location and box size.
-            cls_noise (float, default=0): probability that a class label will
-                change. Must be within 0 and 1.
-            anchors (ndarray, default=None): used to create random boxes
-            null_pred (bool, default=0):
+            classes (int):
+                class list or the number of foreground classes.
+                Defaults to 1.
+
+            nimgs (int): number of images in the coco datasts. Defaults to 1.
+
+            nboxes (int): boxes per image. Defaults to 1.
+
+            n_fp (int): number of false positives. Defaults to 0.
+
+            n_fn (int):
+                number of false negatives. Defaults to 0.
+
+            box_noise (float):
+                std of a normal distribution used to perterb both box location
+                and box size. Defaults to 0.
+
+            cls_noise (float):
+                probability that a class label will change. Must be within 0
+                and 1. Defaults to 0.
+
+            anchors (ndarray):
+                used to create random boxes. Defaults to None.
+
+            null_pred (bool):
                 if True, predicted classes are returned as null, which means
-                only localization scoring is suitable.
-            with_probs (bool, default=1):
+                only localization scoring is suitable. Defaults to 0.
+
+            with_probs (bool):
                 if True, includes per-class probabilities with predictions
+                Defaults to 1.
 
         CommandLine:
             xdoctest -m kwcoco.metrics.detect_metrics DetectionMetrics.demo:2 --show

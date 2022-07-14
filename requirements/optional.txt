@@ -1,10 +1,26 @@
 kwplot>=0.4.11
 seaborn>=0.9.0
-sqlalchemy>=1.3.22
 affine>=2.3.0
 # gdal  # not a robust requirement
 
-jq>=1.1.3
+# python ~/local/tools/supported_python_versions_pip.py sqlalchemy
+sqlalchemy>=1.4.26    ;                            python_version >= '3.10'    # Python 3.10+
+sqlalchemy>=1.4.0     ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
+sqlalchemy>=1.4.0     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
+sqlalchemy>=1.4.0     ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
+sqlalchemy>=1.4.0     ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
+sqlalchemy>=1.4.0     ; python_version < '3.6' and python_version >= '3.5'    # Python 3.5
+
+
+# python ~/local/tools/supported_python_versions_pip.py jq --request_min=1.1.3
+jq>=1.2.2     ;                            python_version >= '3.10'    # Python 3.10+
+jq>=1.2.2     ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
+jq>=1.2.2     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
+jq>=1.2.2     ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
+jq>=1.2.2     ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
+jq>=1.1.3     ; python_version < '3.6' and python_version >= '3.5'    # Python 3.5
+jq>=1.1.3     ; python_version < '3.5' and python_version >= '2.7'    # Python 2.7
+
 
 lark>=1.1.2
 lark_cython>=0.0.11

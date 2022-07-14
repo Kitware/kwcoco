@@ -226,7 +226,7 @@ class ObjectList1D(ub.NiceRepr):
 
         Args:
             key (str): the annotation property to modify
-            values (Iterable | scalar): an iterable of values to set for each
+            values (Iterable | Any): an iterable of values to set for each
                 annot in the dataset. If the item is not iterable, it is
                 assigned to all objects.
 

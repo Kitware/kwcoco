@@ -263,7 +263,7 @@ The logic of this init is generated via:
     mkinit ~/code/kwcoco/kwcoco/__init__.py --lazy
 """
 
-__version__ = '0.2.31'
+__version__ = '0.3.0'
 
 
 __submodules__ = {
@@ -278,6 +278,7 @@ __submodules__ = {
 __lazy_submodules__ = {
     # TODO: always lazy submodules
     'coco_sql_dataset': ['CocoSqlDatabase'],
+    'sensorchan_spec': ['SensorChanSpec'],
 }
 
 from kwcoco import abstract_coco_dataset
