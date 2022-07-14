@@ -1627,11 +1627,12 @@ class DelayedOverview2(DelayedImage2):
         >>> dopt = dimg.optimize()
         >>> if 1:
         >>>     import networkx as nx
-        >>>     nx.write_network_text(dimg.as_graph())
-        >>>     nx.write_network_text(dopt.as_graph())
+        >>>     dimg.write_network_text()
+        >>>     dopt.write_network_text()
         >>> print(ub.repr2(dopt.nesting(), nl=-1, sort=0))
-        >>> final0 = dimg.finalize()
-        >>> final1 = dopt.finalize()
+        >>> final0 = dimg.finalize()[:]
+        >>> final1 = dopt.finalize()[:]
+        >>> assert final0.shape == final1.shape
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> kwplot.autompl()

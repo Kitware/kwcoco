@@ -409,7 +409,7 @@ class LazyGDalFrameFile(ub.NiceRepr):
 
     def get_overview(self, overview):
         new = self.__class__(self.fpath, nodata_method=self.nodata_method,
-                             overview=overview)
+                             overview=overview + self.overview)
         new._ds_cache = self._ds_cache
         return new
 
