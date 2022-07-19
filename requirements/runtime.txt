@@ -15,9 +15,6 @@ numpy>=1.19.3    ; python_version < '3.10' and python_version >= '3.9'    # Pyth
 numpy>=1.19.2    ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
 numpy>=1.19.2    ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
 numpy>=1.19.2    ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
-numpy>=1.16.0    ; python_version < '3.6' and python_version >= '3.5'    # Python 3.5
-numpy>=1.15.0    ; python_version < '3.5' and python_version >= '3.4'    # Python 3.4
-numpy>=1.16.0    ; python_version < '3.4' and python_version >= '2.7'    # Python 2.7
 #numpy >= 1.20.0
 
 # python ~/local/tools/supported_python_versions_pip.py pandas --request_min=1.1.4
@@ -32,7 +29,7 @@ pandas>=1.1.4     ; python_version < '3.6.1' and python_version >= '3.6'    # Py
 parse >= 1.12.0
 
 # python ~/local/tools/supported_python_versions_pip.py scikit-learn --request_min=0.24.0
-scikit-learn>=1.0.2     ;                            python_version >= '3.10'    # Python 3.10+
+scikit-learn>=1.1.0     ;                            python_version >= '3.10'    # Python 3.10+
 scikit-learn>=1.0.2     ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
 scikit-learn>=1.0.2     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
 scikit-learn>=0.24.1    ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7

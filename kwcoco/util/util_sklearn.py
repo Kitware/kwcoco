@@ -137,11 +137,3 @@ class StratifiedGroupKFold(_BaseKFold):
         """
         y = check_array(y, ensure_2d=False, dtype=None)
         return super(StratifiedGroupKFold, self).split(X, y, groups)
-
-if __name__ == '__main__':
-    """
-    CommandLine:
-        python ~/code/kwcoco/kwcoco/util/util_sklearn.py all
-    """
-    import xdoctest
-    xdoctest.doctest_module(__file__)

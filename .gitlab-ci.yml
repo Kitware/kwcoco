@@ -1,12 +1,12 @@
 # Abuse YAML notation to make a heredoc. This will be ignored by the CI.
-.__heredoc__: &__heredoc__
+.__doc__: &__doc__
     - | 
 
         NOTE: INSTRUCTION HAVE BEEN MOVED TO ./dev/setup_secrets.sh
         This file should need minimal modification.
 
         Template for this files is from
-        ~/code/xcookie/.gitlab-ci.yml
+        ~/code/xcookie/xcookie/rc/gitlab-ci.purepy.yml.in
 
         Templates used in:
 
@@ -16,7 +16,6 @@
         ~/code/kwcoco/.gitlab-ci.yml
 
         ~/code/ndsampler/.gitlab-ci.yml
-
 
         Enable the opencv-hack if needed, and turn on/off the desired versions
         of Python.
@@ -66,11 +65,13 @@ stages:
 
     script: 
         #- python setup.py bdist_wheel --universal
-        - python setup.py bdist_wheel 
+        - python -m pip install pip -U
+        - python -m pip install setuptools>=0.8 wheel build
+        - python -m build --wheel --outdir wheelhouse
 
     artifacts:
         paths:
-            - dist/*.whl
+            - wheelhouse/*.whl
 
 
 .common_test_template: &common_test_template
@@ -103,147 +104,180 @@ stages:
 
 # Define anchors to be used in "before_script" parts
 ._setup_virtualenv_template: &_setup_virtualenv_template |-
-    python -V  # Print out python version for debugging
+    # Setup the correct version of python (which should be the same as this instance)
+    python --version  # Print out python version for debugging
     export PYVER=$(python -c "import sys; print('{}{}'.format(*sys.version_info[0:2]))")
-    pip install virtualenv
-    virtualenv venv$PYVER
+    python -m pip install virtualenv
+    python -m virtualenv venv$PYVER
     source venv$PYVER/bin/activate
     pip install pip -U
     pip install pip setuptools -U
-    python -V  # Print out python version for debugging
+    pip install pygments
+    python --version  # Print out python version for debugging
+        
+        
+._run_tests_in_sandboxed_dir: &_run_tests_in_sandboxed_dir |-
+    # Hack to test the installed wheel. TODO: make run_tests work better in this case.
+    MOD_NAME=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb')['tool']['xcookie']['mod_name'])")
+    mkdir -p sandbox && cd sandbox && pytest --xdoctest-verbose=3 -s --cov-config ../pyproject.toml --cov-report html --cov-report term --cov="$MOD_NAME" --xdoc $(python -c "import ubelt; print(ubelt.modname_to_modpath('${MOD_NAME}'))") ../tests
+
+    
+    
+.test_full_loose_template: &test_full_loose_template
+    <<: 
+        - *common_test_template
+
+    before_script:
+        - *_setup_virtualenv_template
+
+    script: 
+      - ls wheelhouse || echo "wheelhouse does not exist"
+      - pip install tomli
+      - MOD_NAME=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['xcookie']['mod_name'])")
+      # - pip install "${MOD_NAME}"[all] -f wheelhouse  # xcookie: +COMMENT_IF(cv2)
+      - pip install "${MOD_NAME}"[all,headless] -f wheelhouse  # xcookie: +UNCOMMENT_IF(cv2)
+      - *_run_tests_in_sandboxed_dir
+
+
+.test_minimal_loose_template: &test_minimal_loose_template
+    <<: 
+        - *common_test_template
+
+    before_script:
+        - *_setup_virtualenv_template
+
+    script:
+      - ls wheelhouse || echo "wheelhouse does not exist"
+      - pip install tomli
+      - MOD_NAME=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['xcookie']['mod_name'])")
+      # - pip install "${MOD_NAME}"[tests] -f wheelhouse  # xcookie: +COMMENT_IF(cv2)
+      - pip install "${MOD_NAME}"[tests,headless] -f wheelhouse  # xcookie: +UNCOMMENT_IF(cv2)
+      - *_run_tests_in_sandboxed_dir
+
+.test_full_strict_template: &test_full_strict_template
+    <<: 
+        - *common_test_template
+
+    before_script:
+        - *_setup_virtualenv_template
+
+    script: 
+      - ls wheelhouse || echo "wheelhouse does not exist"
+      - pip install tomli
+      - MOD_NAME=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['xcookie']['mod_name'])")
+      # - pip install "${MOD_NAME}"[all-strict] -f wheelhouse  # xcookie: +COMMENT_IF(cv2)
+      - pip install "${MOD_NAME}"[all-strict,headless-strict] -f wheelhouse  # xcookie: +UNCOMMENT_IF(cv2)
+      - pip install GDAL==3.3.3 --find-links https://girder.github.io/large_image_wheels -U  # xcookie: +UNCOMMENT_IF(gdal)
+      - *_run_tests_in_sandboxed_dir
 
 
 .test_minimal_strict_template: &test_minimal_strict_template
-    # Tags define which runners will accept which jobs
     <<: 
         - *common_test_template
 
     before_script:
         - *_setup_virtualenv_template
-        # - pip install .[tests-strict]                   # xcookie: +COMMENT_IF(cv2)
-        - pip install .[tests-strict,headless-strict]  # xcookie: +UNCOMMENT_IF(cv2)
 
-
-.test_full_strict_template: &test_full_strict_template
-    # Tags define which runners will accept which jobs
-    <<: 
-        - *common_test_template
-
-    before_script:
-        - *_setup_virtualenv_template
-        # - pip install .[all-strict]                   # xcookie: +COMMENT_IF(cv2)
-        - pip install .[all-strict,headless-strict]  # xcookie: +UNCOMMENT_IF(cv2)
-        - pip install GDAL==3.3.3 --find-links https://girder.github.io/large_image_wheels -U  # xcookie: +UNCOMMENT_IF(gdal)
-
-.test_minimal_loose_template: &test_minimal_loose_template
-    # Tags define which runners will accept which jobs
-    <<: 
-        - *common_test_template
-
-    before_script:
-        - *_setup_virtualenv_template
-        # - pip install .[tests]            # xcookie: +COMMENT_IF(cv2)
-        - pip install .[tests,headless]  # xcookie: +UNCOMMENT_IF(cv2)
-
-
-.test_full_loose_template: &test_full_loose_template
-    # Tags define which runners will accept which jobs
-    <<: 
-        - *common_test_template
-
-    before_script:
-        - *_setup_virtualenv_template
-        # - pip install .[all]            # xcookie: +COMMENT_IF(cv2)
-        - pip install .[all,headless]  # xcookie: +UNCOMMENT_IF(cv2)
-        - pip install GDAL>=3.3.3 --find-links https://girder.github.io/large_image_wheels -U  # xcookie: +UNCOMMENT_IF(gdal)
+    script:
+      - ls wheelhouse || echo "wheelhouse does not exist"
+      - pip install tomli
+      - MOD_NAME=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['xcookie']['mod_name'])")
+      # - pip install "${MOD_NAME}"[runtime-strict,tests-strict] -f wheelhouse  # xcookie: +COMMENT_IF(cv2)
+      - pip install "${MOD_NAME}"[runtime-strict,tests-strict,headless-strict] -f wheelhouse  # xcookie: +UNCOMMENT_IF(cv2)
+      - pip install GDAL>=3.3.3 --find-links https://girder.github.io/large_image_wheels -U  # xcookie: +UNCOMMENT_IF(gdal)
+      - *_run_tests_in_sandboxed_dir
 
 
 
-.gpgsign_template: &gpgsign_template
+gpgsign/wheels:
     <<: 
         - *common_template
+
+    image:
+        python:3.8
 
     stage: 
         gpgsign
 
     script: 
+        - ls wheelhouse
+        - export GPG_EXECUTABLE=gpg
+        - export GPG_KEYID=$(cat dev/public_gpg_key)
+        - echo "GPG_KEYID = $GPG_KEYID"
+        # Decrypt and import GPG Keys / trust
+        # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on master and release branch
+        - source dev/secrets_configuration.sh
+        - CI_SECRET=${!VARNAME_CI_SECRET}
+        - $GPG_EXECUTABLE --version
+        - openssl version
+        - $GPG_EXECUTABLE --list-keys
+        # note CI_KITWARE_SECRET is a protected variables only available on master and release branch
+        - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
+        - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
+        - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
+        - GPG_SIGN_CMD="$GPG_EXECUTABLE --batch --yes --detach-sign --armor --local-user $GPG_KEYID"
+
         - |
-          export GNUPGHOME=$(mktemp -d)
-          export GPG_EXECUTABLE=gpg
-          export GPG_KEYID=$(cat dev/public_gpg_key)
-          echo "GPG_KEYID = $GPG_KEYID"
-          source dev/secrets_configuration.sh
-          # note the variable pointed to by VARNAME_CI_SECRET is a protected variables only available on main and release branch
-          CI_SECRET=${!VARNAME_CI_SECRET}
-          $GPG_EXECUTABLE --version
-          openssl version
-          $GPG_EXECUTABLE --list-keys
-          $GPG_EXECUTABLE --list-keys
-          # Decrypt and import GPG Keys / trust
-          GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
-          GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
-          GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
-          $GPG_EXECUTABLE --list-keys  || echo "first one fails for some reason"
-          $GPG_EXECUTABLE --list-keys  
-          # The publish script only builds wheels and does gpg signing if DO_UPLOAD is no
-          pip install requests[security] twine 
-          DO_GPG=True GPG_KEYID=$GPG_KEYID TWINE_PASSWORD=$TWINE_PASSWORD TWINE_USERNAME=$TWINE_USERNAME GPG_EXECUTABLE=$GPG_EXECUTABLE DEPLOY_BRANCH=release DO_TAG=False DO_UPLOAD=False ./publish.sh
+            WHEEL_PATHS=(wheelhouse/*.whl)
+            WHEEL_PATHS_STR=$(printf '"%s" ' "${WHEEL_PATHS[@]}")
+            echo "$WHEEL_PATHS_STR"
+            for WHEEL_PATH in "${WHEEL_PATHS[@]}"
+            do
+                echo "------"
+                echo "WHEEL_PATH = $WHEEL_PATH"
+                $GPG_SIGN_CMD --output $WHEEL_PATH.asc $WHEEL_PATH
+                $GPG_EXECUTABLE --verify $WHEEL_PATH.asc $WHEEL_PATH  || echo "hack, the first run of gpg very fails"
+                $GPG_EXECUTABLE --verify $WHEEL_PATH.asc $WHEEL_PATH 
+            done
+        - ls wheelhouse
 
     artifacts:
         paths:
-            - dist/*.asc
-            - dist/*.tar.gz
-            - dist/*.whl
+            - wheelhouse/*.asc
 
     only:
         refs:
             # Gitlab will only expose protected variables on protected branches
-            # (which I've set to be main and release), so only run this stage
+            # (which I've set to be master and release), so only run this stage
             # there.
-            - main
             - master
+            - main
             - release
 
 
-.deploy_template: &deploy_template
+deploy/wheels:
     <<: 
         - *common_template
+
+    image:
+        python:3.8
 
     stage: 
         deploy
 
     script: 
+        - pip install six pyopenssl ndg-httpsclient pyasn1 requests[security] twine -U 
+        - ls wheelhouse
         - |
-            export GNUPGHOME=$(mktemp -d)
-            export GPG_EXECUTABLE=gpg
-            export GPG_KEYID=$(cat dev/public_gpg_key)
-            echo "GPG_KEYID = $GPG_KEYID"
-            # VARNAME_CI_SECRET points to a protected variable only available on main and release branch
+            WHEEL_PATHS=(wheelhouse/*.whl)
+            WHEEL_PATHS_STR=$(printf '"%s" ' "${WHEEL_PATHS[@]}")
+            source dev/secrets_configuration.sh
+            TWINE_PASSWORD=${!VARNAME_TWINE_PASSWORD}
+            TWINE_USERNAME=${!VARNAME_TWINE_USERNAME}
+            echo "$WHEEL_PATHS_STR"
+            for WHEEL_PATH in "${WHEEL_PATHS[@]}"
+            do
+                twine check $WHEEL_PATH.asc $WHEEL_PATH
+                twine upload --username $TWINE_USERNAME --password $TWINE_PASSWORD $WHEEL_PATH.asc $WHEEL_PATH || echo "upload already exists"
+            done
+        - | 
+            # Have the server git-tag the release and push the tags
+            export VERSION=$(python -c "import setup; print(setup.VERSION)")
+            # do sed twice to handle the case of https clone with and without a read token
+            URL_HOST=$(git remote get-url origin | sed -e 's|https\?://.*@||g' | sed -e 's|https\?://||g' | sed -e 's|git@||g' | sed -e 's|:|/|g')
             source dev/secrets_configuration.sh
             CI_SECRET=${!VARNAME_CI_SECRET}
             PUSH_TOKEN=${!VARNAME_PUSH_TOKEN}
-            TWINE_PASSWORD=${!VARNAME_TWINE_PASSWORD}
-            TWINE_USERNAME=${!VARNAME_TWINE_USERNAME}
-            $GPG_EXECUTABLE --version
-            openssl version
-            $GPG_EXECUTABLE --list-keys
-            $GPG_EXECUTABLE --list-keys
-            # Decrypt and import GPG Keys / trust
-            GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import 
-            GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
-            GLKWS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:GLKWS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import 
-            $GPG_EXECUTABLE --list-keys  || echo "first one fails for some reason"
-            $GPG_EXECUTABLE --list-keys  
-            # Install twine
-            pip install six pyopenssl ndg-httpsclient pyasn1 -U 
-            pip install requests[security] twine 
-            # Execute the publish script for real this time
-            TWINE_REPOSITORY_URL=https://upload.pypi.org/legacy/ DO_GPG=True GPG_KEYID=$GPG_KEYID TWINE_PASSWORD=$TWINE_PASSWORD TWINE_USERNAME=$TWINE_USERNAME GPG_EXECUTABLE=$GPG_EXECUTABLE CURRENT_BRANCH=release DEPLOY_BRANCH=release DO_TAG=True DO_UPLOAD=True ./publish.sh || echo "upload already exists"
-            # Have the server git-tag the release and push the tags
-            VERSION=$(python -c "import setup; print(setup.VERSION)")
-        # do sed twice to handle the case of https clone with and without a read token
-        - | 
-            URL_HOST=$(git remote get-url origin | sed -e 's|https\?://.*@||g' | sed -e 's|https\?://||g' | sed -e 's|git@||g' | sed -e 's|:|/|g')
             echo "URL_HOST = $URL_HOST"
             # A git config user name and email is required. Set if needed.
             if [[ "$(git config user.email)" == "" ]]; then
@@ -261,7 +295,7 @@ stages:
                 git tag $TAG_NAME -m "tarball tag $VERSION"
                 git push --tags "https://git-push-token:${PUSH_TOKEN}@${URL_HOST}"
             fi
-
+            
     only:
         refs:
             - release
@@ -420,20 +454,6 @@ test_minimal_strict/cp38-cp38-linux:
         *image_python38
     needs: 
         -  build/cp38-cp38-linux
-
-# for universal builds we only need to gpg sign once
-gpgsign/cp38-cp38-linux:
-    <<: 
-        - *gpgsign_template
-    image:
-        *image_python38
-
-deploy/cp38-cp38-linux:
-    <<: 
-        - *deploy_template
-    image:
-        *image_python38
-      
 
 # ---------------
 # Python 3.7 Jobs
