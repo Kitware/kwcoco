@@ -2059,7 +2059,9 @@ class MixinCocoExtras(object):
                             aux_fname.append(_reroot_path(aux['file_name']))
                     gid_to_new[gid] = new
                 except Exception:
-                    raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
+                    # img_repr = ub.repr2(img)
+                    asset_fpaths = list(self.coco_image(img['id']).iter_image_filepaths())
+                    raise Exception('Failed to reroot gid={} with fpaths={}'.format(img['id'], asset_fpaths))
 
             # Overwrite old values
             for gid, new in gid_to_new.items():
@@ -2082,7 +2084,10 @@ class MixinCocoExtras(object):
                     for aux in img.get('assets', []):
                         aux['file_name'] = _reroot_path(aux['file_name'])
                 except Exception:
-                    raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
+                    # img_repr = ub.repr2(img)
+                    # raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
+                    asset_fpaths = list(self.coco_image(img['id']).iter_image_filepaths())
+                    raise Exception('Failed to reroot gid={} with fpaths={}'.format(img['id'], asset_fpaths))
 
         if self.index:
             # Only need to recompute the self.index.file_name_to_img

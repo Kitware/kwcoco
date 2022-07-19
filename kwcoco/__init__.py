@@ -258,12 +258,18 @@ Some of the above docs were generated via:
     ~/code/kwcoco/dev/coco_dataset_api_introspect.py
 
 The logic of this init is generated via:
-    mkinit ~/code/kwcoco/kwcoco/__init__.py
+    mkinit -m kwcoco --diff
 
-    mkinit ~/code/kwcoco/kwcoco/__init__.py --lazy
+    mkinit kwcoco --lazy
+
+Testing:
+
+    EAGER_IMPORT=1 python -c "import kwcoco"
+    python -c "import kwcoco; print(kwcoco.CocoSqlDatabase)"
+
 """
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 
 __submodules__ = {
@@ -293,6 +299,8 @@ from kwcoco.coco_dataset import (CocoDataset,)
 from kwcoco.coco_image import (CocoImage,)
 from kwcoco.category_tree import (CategoryTree,)
 from kwcoco.channel_spec import (ChannelSpec, FusedChannelSpec,)
+
+####
 
 
 def lazy_import(module_name, submodules, submod_attrs):
@@ -324,7 +332,7 @@ def lazy_import(module_name, submodules, submod_attrs):
         return attr
 
     if os.environ.get('EAGER_IMPORT', ''):
-        for name in name_to_submod.values():
+        for name in submodules:
             __getattr__(name)
 
         for attrs in submod_attrs.values():
@@ -344,6 +352,6 @@ def __dir__():
     return __all__
 
 __all__ = ['AbstractCocoDataset', 'CategoryTree', 'ChannelSpec', 'CocoDataset',
-           'CocoImage', 'CocoSqlDatabase', 'FusedChannelSpec',
-           'abstract_coco_dataset', 'category_tree', 'channel_spec',
-           'coco_dataset', 'coco_image', 'coco_sql_dataset', 'exceptions']
+           'CocoImage', 'FusedChannelSpec', 'abstract_coco_dataset',
+           'category_tree', 'channel_spec', 'coco_dataset', 'coco_image',
+           'exceptions']
