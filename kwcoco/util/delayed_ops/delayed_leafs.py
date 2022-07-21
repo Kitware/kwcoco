@@ -205,7 +205,7 @@ class DelayedLoad2(DelayedImageLeaf2):
             >>> if self.lazy_ref is not NotImplemented:
             >>>     assert not isinstance(final_ref, np.ndarray), (
             >>>         'A pure load with gdal should return a reference that is '
-            >>>         'similiar to but not quite an array'
+            >>>         'similiar to but not quite an array')
         """
         self._load_reference()
         if self.lazy_ref is NotImplemented:
