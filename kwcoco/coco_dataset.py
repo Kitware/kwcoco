@@ -1120,7 +1120,7 @@ class MixinCocoExtras(object):
 
         if key.startswith('shapes'):
             from kwcoco.demo import toydata_image
-            res = parse.parse('{prefix}{num_imgs:d}', key)
+            res = parse.parse('shapes{num_imgs:d}', key)
             if res:
                 kwargs['n_imgs'] = int(res.named['num_imgs'])
             if 'rng' not in kwargs and 'n_imgs' in kwargs:
@@ -1130,9 +1130,9 @@ class MixinCocoExtras(object):
         elif key.startswith('vidshapes'):
             from kwcoco.demo import toydata_video
             verbose = kwargs.get('verbose', 1)
-            res = parse.parse('{prefix}{num_videos:d}', key)
+            res = parse.parse('vidshapes{num_videos:d}', key)
             if res is None:
-                res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
+                res = parse.parse('vidshapes{num_videos:d}{suffix}', key)
             """
             The rule is that the suffix will be split by the '-' character
             and any registered pattern or alias will impact the kwargs
@@ -1164,6 +1164,7 @@ class MixinCocoExtras(object):
             }
             vidkw_aliases = {
                 'num_frames': {'frames'},
+                'num_tracks': {'tracks'},
                 'num_videos': {'videos'},
                 'max_speed': {'speed'},
                 'image_size': {'gsize'},
@@ -1181,7 +1182,17 @@ class MixinCocoExtras(object):
                     key = part[:match.span()[0]]
                     value = part[match.span()[0]:]
                 key = alias_to_key.get(key, key)
+                if key == 'image_size':
+                    if isinstance(value, str):
+                        s = int(value)
+                        value = (s, s)
+                    if isinstance(value, (float, int)):
+                        s = int(value)
+                        value = (s, s)
+                    value = value
                 if key == 'num_frames':
+                    value = int(value)
+                if key == 'num_tracks':
                     value = int(value)
                 if key == 'num_videos':
                     value = int(value)
@@ -1213,8 +1224,9 @@ class MixinCocoExtras(object):
             depends_items.pop('verbose', None)
             depends = ub.hash_data(sorted(depends_items.items()), base='abc')[0:14]
 
+            if verbose > 0:
+                print('vidkw = {}'.format(ub.repr2(vidkw, nl=1)))
             if verbose > 3:
-                print('vidkw = {!r}'.format(vidkw))
                 print('depends = {!r}'.format(depends))
 
             tag = key + '_' + depends

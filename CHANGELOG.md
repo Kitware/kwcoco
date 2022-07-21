@@ -32,6 +32,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 * Fix compatibility issue with datasets that do not contain an annotations list
 * Issue where the original coco polygons did not validate correctly in the schema.
+* The new delayed operations now always return an arraylike
 
 ### Changed
 * FusedChannelSpec now has an `__eq__` method that returns True if the parsed reprs are the same.

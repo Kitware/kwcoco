@@ -126,8 +126,24 @@ class DelayedOperation2(ub.NiceRepr):
             child.prepare()
         return self
 
+    def _finalize(self):
+        """
+        This is the method that new nodes should overload.
+
+        Conceptually this works just like the finalize method with the
+        exception that it happens at every node in the tree, whereas the public
+        facing method only happens once, calls this, and is able to do one-time
+        pre and post operations.
+
+        Returns:
+            ArrayLike
+        """
+        raise NotImplementedError
+
     def finalize(self, **kwargs):
         """
+        Evaluate the operation tree in full.
+
         Returns:
             ArrayLike
 
@@ -135,17 +151,11 @@ class DelayedOperation2(ub.NiceRepr):
             **kwargs: for backwards compatibility, these will allow for
                 in-place modification of select nested parameters.
                 In general these should not be used, and may be deprecated.
-        """
-        raise NotImplementedError
 
-    def optimize(self):
+        Notes:
+            Do not overload this method. Overload
+            :func:`DelayedOperation2._finalize` instead.
         """
-        Returns:
-            DelayedOperation2
-        """
-        raise NotImplementedError
-
-    def _prefinalize(self, **kwargs):
         if kwargs:
             """
             show dep warnings
@@ -160,6 +170,21 @@ class DelayedOperation2(ub.NiceRepr):
                 migration='setup the desired state beforhand',
                 deprecate='0.3.2', error='0.4.0', remove='0.4.1')
             self._set_nested_params(**kwargs)
+        # The protected version of this method does all the work, this function
+        # just sits at the user-level and ensures correct final output whereas
+        # the protected function can return optimized representations that
+        # other _finalize methods can utilize.
+        final = self._finalize()
+        # Ensure we are array like
+        final = final[:]
+        return final
+
+    def optimize(self):
+        """
+        Returns:
+            DelayedOperation2
+        """
+        raise NotImplementedError
 
     def _set_nested_params(self, **kwargs):
         """

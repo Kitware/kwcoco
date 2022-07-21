@@ -226,7 +226,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         >>> cat = DelayedChannelConcat2([c1, c2])
         >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
         >>> warped_cat._validate()
-        >>> warped_cat.optimize().finalize()
+        >>> warped_cat.optimize()._finalize()
 
         # >>> dsize = (307, 311)
         # >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
@@ -234,7 +234,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         # >>> cat = DelayedChannelConcat2([c1, c2], jagged=True)
         # >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
         # >>> warped_cat._validate()
-        # >>> warped_cat.optimize().finalize()
+        # >>> warped_cat.optimize()._finalize()
 
     Example:
         >>> # Test case that failed in initial implementation
@@ -271,7 +271,10 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
                 raise exceptions.CoordinateCompatibilityError(
                     # 'parts must all have the same delayed size')
                     'parts must all have the same delayed size: got {}'.format(dsize_cands))
-            dsize = dsize_cands[0]
+            if len(dsize_cands) == 0:
+                dsize = None
+            else:
+                dsize = dsize_cands[0]
         self.dsize = dsize
         try:
             self.num_channels = sum(comp.num_channels for comp in self.parts)
@@ -319,19 +322,12 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
             w, h = self.dsize
         return (h, w, self.num_channels)
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
-
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
         """
-        self._prefinalize(**kwargs)
-
-        stack = [comp.finalize() for comp in self.parts]
+        stack = [comp._finalize() for comp in self.parts]
         if len(stack) == 1:
             final = stack[0]
         else:
@@ -421,6 +417,8 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
             >>> assert not np.any(np.isnan(fused[..., 0]))
             >>> assert not np.any(np.isnan(fused[..., 3]))
         """
+        if channels is None:
+            return self
         from kwcoco.util.delayed_ops.delayed_leafs import DelayedNans2
         current_channels = self.channels
 
@@ -870,19 +868,13 @@ class DelayedAsXarray2(DelayedImage2):
         >>> assert final.dims == ('y', 'x', 'c')
     """
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
-
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
         """
-        self._prefinalize(**kwargs)
         import xarray as xr
-        subfinal = np.asarray(self.subdata.finalize())
+        subfinal = np.asarray(self.subdata._finalize())
         channels = self.subdata.channels
         coords = {}
         if channels is not None:
@@ -956,17 +948,11 @@ class DelayedWarp2(DelayedImage2):
         """
         return self.meta['transform']
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
-
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
         """
-        self._prefinalize(**kwargs)
         dsize = self.dsize
         if dsize == (None, None):
             dsize = None
@@ -974,7 +960,7 @@ class DelayedWarp2(DelayedImage2):
         transform = self.meta['transform']
         interpolation = self.meta['interpolation']
 
-        prewarp = self.subdata.finalize()
+        prewarp = self.subdata._finalize()
         prewarp = np.asarray(prewarp)
 
         M = np.asarray(transform)
@@ -1266,20 +1252,14 @@ class DelayedDequantize2(DelayedImage2):
         self.meta['quantization'] = quantization
         self.meta['dsize'] = subdata.dsize
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
-
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
         """
-        self._prefinalize(**kwargs)
         from kwcoco.util.delayed_ops.helpers import dequantize
         quantization = self.meta['quantization']
-        final = self.subdata.finalize()
+        final = self.subdata._finalize()
         final = kwarray.atleast_nd(final, 3, front=False)
         if quantization is not None:
             final = dequantize(final, quantization)
@@ -1346,7 +1326,7 @@ class DelayedCrop2(DelayedImage2):
         >>> # Test Channel Select Via Index
         >>> self = base[:, :, [0]]
         >>> self.write_network_text()
-        >>> final = self.finalize()
+        >>> final = self._finalize()
         >>> assert final.shape == (16, 16, 1)
         >>> assert base[:, :, [0, 1]].finalize().shape == (16, 16, 2)
         >>> assert base[:, :, [2, 0, 1]].finalize().shape == (16, 16, 3)
@@ -1393,20 +1373,14 @@ class DelayedCrop2(DelayedImage2):
         self.meta['space_slice'] = space_slice
         self.meta['chan_idxs'] = chan_idxs
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
-
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
         """
-        self._prefinalize(**kwargs)
         space_slice = self.meta['space_slice']
         chan_idxs = self.meta['chan_idxs']
-        sub_final = self.subdata.finalize()
+        sub_final = self.subdata._finalize()
         if chan_idxs is None:
             full_slice = space_slice
         else:
@@ -1483,9 +1457,9 @@ class DelayedCrop2(DelayedImage2):
             >>> opt = self._opt_fuse_crops()._opt_fuse_crops()
             >>> self.write_network_text()
             >>> opt.write_network_text()
-            >>> finalB = base._validate().finalize()
-            >>> final1 = opt._validate().finalize()
-            >>> final2 = self._validate().finalize()
+            >>> finalB = base._validate()._finalize()
+            >>> final1 = opt._validate()._finalize()
+            >>> final2 = self._validate()._finalize()
             >>> assert np.all(final2[..., 0] == finalB[..., 2])
             >>> assert np.all(final2[..., 1] == finalB[..., 1])
             >>> assert np.all(final2[..., 0] == final1[..., 0])
@@ -1555,8 +1529,8 @@ class DelayedCrop2(DelayedImage2):
             >>> new_outer = node2._opt_warp_after_crop()
             >>> print(ub.repr2(node2.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(new_outer.nesting(), nl=-1, sort=0))
-            >>> final0 = self.finalize()
-            >>> final1 = new_outer.finalize()
+            >>> final0 = self._finalize()
+            >>> final1 = new_outer._finalize()
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -1632,8 +1606,8 @@ class DelayedOverview2(DelayedImage2):
         >>>     dimg.write_network_text()
         >>>     dopt.write_network_text()
         >>> print(ub.repr2(dopt.nesting(), nl=-1, sort=0))
-        >>> final0 = dimg.finalize()[:]
-        >>> final1 = dopt.finalize()[:]
+        >>> final0 = dimg._finalize()[:]
+        >>> final1 = dopt._finalize()[:]
         >>> assert final0.shape == final1.shape
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
@@ -1675,18 +1649,12 @@ class DelayedOverview2(DelayedImage2):
         num_remain = self.subdata.num_overviews - self.meta['overview']
         return num_remain
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
-
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
         """
-        self._prefinalize(**kwargs)
-        sub_final = self.subdata.finalize()
+        sub_final = self.subdata._finalize()
         overview = self.meta['overview']
         if hasattr(sub_final, 'get_overview'):
             # This should be a lazy gdal frame
@@ -1765,8 +1733,8 @@ class DelayedOverview2(DelayedImage2):
             >>> new_outer = node2.optimize()
             >>> print(ub.repr2(node2.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(new_outer.nesting(), nl=-1, sort=0))
-            >>> final0 = self.finalize()
-            >>> final1 = new_outer.finalize()
+            >>> final0 = self._finalize()
+            >>> final1 = new_outer._finalize()
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -1833,8 +1801,8 @@ class DelayedOverview2(DelayedImage2):
             >>> new_outer = node2.optimize()
             >>> print(ub.repr2(node2.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(new_outer.nesting(), nl=-1, sort=0))
-            >>> final0 = self.finalize()
-            >>> final1 = new_outer.finalize()
+            >>> final0 = self._finalize()
+            >>> final1 = new_outer._finalize()
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()

@@ -64,7 +64,7 @@ class CocoToyDataCLI(object):
             kwcoco toydata --key=shapes8 --bundle_dpath=my_test_bundle_v1
 
             kwcoco toydata \
-                --key=vidshapes8 \
+                --key=vidshapes1-frames32 \
                 --dst=./mytoybundle/dataset.kwcoco.json
 
         TODO:
