@@ -7,8 +7,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.3.2 - Unreleased
 
+### Added
+* `with_bundle` flag to `iter_image_filepaths`
+
 ### Fixed
 * Bug in sensorchan spec
+* Issue in reroot and toydata generation that used incorrect bundle-dpaths
+* Fixed issue in key parsing where numbers greater than 10 failed.
+
+### Changed
+* Added `fpath` as an option to `CocoDataset.demo`, which is currently semi-stable.
 
 
 ## Version 0.3.1 - Released 2022-07-18

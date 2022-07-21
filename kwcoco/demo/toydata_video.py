@@ -6,6 +6,7 @@ the loose image version in toydata_image.
 
 """
 from os.path import join
+import os
 import numpy as np
 import ubelt as ub
 import kwarray
@@ -770,7 +771,8 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     else:
         bundle_dpath = dpath
 
-    img_dpath = ub.ensuredir((bundle_dpath, '_assets/images'))
+    rel_img_dpath = '_assets/images'
+    img_dpath = ub.ensuredir((bundle_dpath, rel_img_dpath))
 
     imwrite_kw = {}
     imwrite_ops = {'compress', 'blocksize', 'interleave', 'options'}
@@ -791,9 +793,9 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
         fname = 'img_{:05d}.png'.format(gid)
         imdata = img.pop('imdata', None)
         if imdata is not None:
-            img_fpath = join(img_dpath, fname)
+            img_fpath = ub.Path(join(img_dpath, fname))
             img.update({
-                'file_name': img_fpath,
+                'file_name': os.fspath(img_fpath.relative_to(bundle_dpath)),
                 'channels': 'r|g|b',
             })
             kwimage.imwrite(img_fpath, imdata)
@@ -806,7 +808,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
                     (bundle_dpath, '_assets', 'aux', 'aux_' + chan_part))
                 aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
                 ub.ensuredir(aux_dpath)
-                auxdict['file_name'] = aux_fpath
+                auxdict['file_name'] = os.fspath(ub.Path(aux_fpath).relative_to(bundle_dpath))
                 auxdata = auxdict.pop('imdata', None)
                 try:
                     from osgeo import gdal  # NOQA

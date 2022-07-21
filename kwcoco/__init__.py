@@ -75,7 +75,7 @@ Python, this data structure is reasonably efficient.
 
         >>> gid = 1
         >>> self.imgs[gid]
-        {'id': 1, 'file_name': 'astro.png', 'url': 'https://i.imgur.com/KXhKM72.png'}
+        {'id': 1, 'file_name': '...astro.png', 'url': 'https://i.imgur.com/KXhKM72.png'}
 
         >>> aid = 3
         >>> self.anns[aid]
@@ -111,7 +111,7 @@ Python, this data structure is reasonably efficient.
         images = <Images(num=3)>
 
         >>> images.lookup('file_name')
-        ['astro.png', 'carl.png', 'stars.png']
+        ['...astro.png', '...carl.png', '...stars.png']
 
         >>> print('images.annots = {}'.format(images.annots))
         images.annots = <AnnotGroups(n=3, m=3.7, s=3.9)>

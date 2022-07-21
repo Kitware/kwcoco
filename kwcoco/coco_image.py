@@ -314,8 +314,15 @@ class CocoImage(ub.NiceRepr):
         obj = candidates[idx]['obj']
         return obj
 
-    def iter_image_filepaths(self):
+    def iter_image_filepaths(self, with_bundle=True):
         """
+        Could rename to iter_asset_filepaths
+
+        Args:
+            with_bundle (bool):
+                If True, prepends the bundle dpath to fully specify the path.
+                Otherwise, just returns the registered string in the file_name
+                attribute of each asset.  Defaults to True.
         """
         dpath = self.bundle_dpath
         for obj in self.iter_asset_objs():

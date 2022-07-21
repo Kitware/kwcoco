@@ -672,7 +672,7 @@ def write_network_text(
     -------
     >>> import networkx as nx
     >>> graph = nx.balanced_tree(r=2, h=2, create_using=nx.DiGraph)
-    >>> nx.write_network_text(graph)
+    >>> write_network_text(graph)
     ╙── 0
         ├─╼ 1
         │   ├─╼ 3
@@ -683,7 +683,7 @@ def write_network_text(
 
     >>> # A near tree with one non-tree edge
     >>> graph.add_edge(5, 1)
-    >>> nx.write_network_text(graph)
+    >>> write_network_text(graph)
     ╙── 0
         ├─╼ 1 ╾ 5
         │   ├─╼ 3
@@ -694,7 +694,7 @@ def write_network_text(
             └─╼ 6
 
     >>> graph = nx.cycle_graph(5)
-    >>> nx.write_network_text(graph)
+    >>> write_network_text(graph)
     ╙── 0
         ├── 1
         │   └── 2
@@ -703,7 +703,7 @@ def write_network_text(
         └──  ...
 
     >>> graph = nx.generators.barbell_graph(4, 2)
-    >>> nx.write_network_text(graph)
+    >>> write_network_text(graph)
     ╙── 4
         ├── 5
         │   └── 6
@@ -720,7 +720,7 @@ def write_network_text(
             └──  ...
 
     >>> graph = nx.complete_graph(5, create_using=nx.Graph)
-    >>> nx.write_network_text(graph)
+    >>> write_network_text(graph)
     ╙── 0
         ├── 1
         │   ├── 2 ─ 0
@@ -731,7 +731,7 @@ def write_network_text(
         └──  ...
 
     >>> graph = nx.complete_graph(3, create_using=nx.DiGraph)
-    >>> nx.write_network_text(graph)
+    >>> write_network_text(graph)
     ╙── 0 ╾ 1, 2
         ├─╼ 1 ╾ 2
         │   ├─╼ 2 ╾ 0

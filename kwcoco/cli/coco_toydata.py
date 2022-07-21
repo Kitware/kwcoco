@@ -56,7 +56,7 @@ class CocoToyDataCLI(object):
             'verbose': scfg.Value(False, help=ub.paragraph(
                 ''' Verbosity ''')),
         }
-        epilog = """
+        epilog = r"""
         Example Usage:
             kwcoco toydata --key=shapes8 --dst=toydata.kwcoco.json
 
@@ -64,8 +64,8 @@ class CocoToyDataCLI(object):
             kwcoco toydata --key=shapes8 --bundle_dpath=my_test_bundle_v1
 
             kwcoco toydata \
-                --key=shapes8 \
-                --dst=./shapes8.kwcoco/dataset.kwcoco.json
+                --key=vidshapes8 \
+                --dst=./mytoybundle/dataset.kwcoco.json
 
         TODO:
             - [ ] allow specification of images directory
@@ -101,16 +101,16 @@ class CocoToyDataCLI(object):
         else:
             if config['dst'] is not None:
                 fpath = config['dst']
-                from os.path import dirname
-                dpath = dirname(fpath)
+                dpath = ub.Path(fpath).parent
                 dset = kwcoco.CocoDataset.demo(config['key'],
                                                dpath=dpath,
+                                               fpath=fpath,
                                                **demo_kwargs)
                 dset.fpath = fpath
             else:
                 dset = kwcoco.CocoDataset.demo(config['key'],
                                                **demo_kwargs)
-            dset.reroot(absolute=True)
+            dset.reroot(absolute=True, verbose=config['verbose'])
 
         if config['dst'] is not None:
             print('dset.fpath = {!r}'.format(dset.fpath))
