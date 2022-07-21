@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.3.2 - Unreleased
 
+### Fixed
+* Bug in sensorchan spec
+
 
 ## Version 0.3.1 - Released 2022-07-18
 
