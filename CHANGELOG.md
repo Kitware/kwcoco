@@ -5,7 +5,24 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.3.1 - Unreleased
+## Version 0.3.2 - Unreleased
+
+### Added
+* `with_bundle` flag to `iter_image_filepaths`
+
+### Fixed
+* Bug in sensorchan spec
+* Issue in reroot and toydata generation that used incorrect bundle-dpaths
+* Fixed issue in key parsing where numbers greater than 10 failed.
+
+### Changed
+* Added `fpath` as an option to `CocoDataset.demo`, which is currently semi-stable.
+* The `finalize` method for a DelayedOperation2 now calls prepare and optimize
+  beforehand by default, and also always returns an ndarray.
+* DelayedWarp2 will now default to nan fill values when warping floats
+
+
+## Version 0.3.1 - Released 2022-07-18
 
 
 ## Version 0.3.0 - Released 2022-07-14
@@ -18,6 +35,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 * Fix compatibility issue with datasets that do not contain an annotations list
 * Issue where the original coco polygons did not validate correctly in the schema.
+* The new delayed operations now always return an arraylike
 
 ### Changed
 * FusedChannelSpec now has an `__eq__` method that returns True if the parsed reprs are the same.

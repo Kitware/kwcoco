@@ -79,6 +79,7 @@ class DelayedOperation2(ub.NiceRepr):
             if 'channels' in sub_meta:
                 sub_meta['channels'] = str(sub_meta['channels'].spec)
             sub_meta.pop('jagged', None)
+            sub_meta.pop('border_value', None)
             param_key = ub.repr2(sub_meta, sort=0, compact=1, nl=0, precision=4)
             short_type = item.__class__.__name__.replace('Delayed', '').replace('2', '')
             node_data = graph.nodes[node_id]
@@ -90,6 +91,18 @@ class DelayedOperation2(ub.NiceRepr):
             for child in item.children():
                 stack.append((node_id, child))
         return graph
+
+    def _all_nodes(self):
+        """
+        """
+        # Might be useful in _set_nested_params or other functions that
+        # need to touch all descendants. This will be faster than recursion
+        stack = [(None, self)]
+        while stack:
+            _, item = stack.pop()
+            yield item
+            for child in item.children():
+                stack.append((None, child))
 
     def write_network_text(self, with_labels=True):
         from kwcoco.util.delayed_ops.helpers import write_network_text
@@ -126,26 +139,41 @@ class DelayedOperation2(ub.NiceRepr):
             child.prepare()
         return self
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
+        This is the method that new nodes should overload.
+
+        Conceptually this works just like the finalize method with the
+        exception that it happens at every node in the tree, whereas the public
+        facing method only happens once, calls this, and is able to do one-time
+        pre and post operations.
+
         Returns:
             ArrayLike
+        """
+        raise NotImplementedError
+
+    def finalize(self, prepare=True, optimize=True, **kwargs):
+        """
+        Evaluate the operation tree in full.
 
         Args:
+            prepare (bool):
+                ensure prepare is called to ensure metadata exists if possible
+                before optimizing.  Defaults to True.
+            optimize (bool):
+                ensure the graph is optimized before loading.  Default to True.
             **kwargs: for backwards compatibility, these will allow for
                 in-place modification of select nested parameters.
                 In general these should not be used, and may be deprecated.
-        """
-        raise NotImplementedError
 
-    def optimize(self):
-        """
         Returns:
-            DelayedOperation2
-        """
-        raise NotImplementedError
+            ArrayLike
 
-    def _prefinalize(self, **kwargs):
+        Notes:
+            Do not overload this method. Overload
+            :func:`DelayedOperation2._finalize` instead.
+        """
         if kwargs:
             """
             show dep warnings
@@ -158,8 +186,28 @@ class DelayedOperation2(ub.NiceRepr):
             ub.schedule_deprecation(
                 'kwcoco', 'kwargs', type='passed to DelayedOperation2.finalize',
                 migration='setup the desired state beforhand',
-                deprecate='0.3.1', error='0.4.0', remove='0.4.1')
+                deprecate='0.3.2', error='0.4.0', remove='0.4.1')
             self._set_nested_params(**kwargs)
+        if prepare:
+            self = self.prepare()
+        if optimize:
+            self = self.optimize()
+        # The protected version of this method does all the work, this function
+        # just sits at the user-level and ensures correct final output whereas
+        # the protected function can return optimized representations that
+        # other _finalize methods can utilize.
+        final = self._finalize()
+        # Ensure we are array like
+        final = final[:]
+        # final = np.asanyarray(final) # does not work with xarray
+        return final
+
+    def optimize(self):
+        """
+        Returns:
+            DelayedOperation2
+        """
+        raise NotImplementedError
 
     def _set_nested_params(self, **kwargs):
         """

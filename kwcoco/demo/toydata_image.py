@@ -35,6 +35,7 @@ def demodata_toy_dset(image_size=(600, 600),
                       rng=0,
                       newstyle=True,
                       dpath=None,
+                      fpath=None,
                       bundle_dpath=None,
                       aux=None,
                       use_cache=True,
@@ -55,6 +56,10 @@ def demodata_toy_dset(image_size=(600, 600),
         dpath (str): path to the directory that will contain the bundle,
             (defaults to a kwcoco cache dir). Ignored if `bundle_dpath` is
             given.
+
+        fpath (str): path to the kwcoco file. The parent will be the bundle
+            if it is not specified. Should be a descendant of the dpath if
+            specified.
 
         bundle_dpath (str): path to the directory that will store images.
             If specified, dpath is ignored. If unspecified, a bundle
@@ -124,7 +129,7 @@ def demodata_toy_dset(image_size=(600, 600),
             warnings.warn('gsize is deprecated. Use image_size param instead',
                           DeprecationWarning)
         image_size = kwargs.pop('gsize')
-    assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
+    assert len(kwargs) == 0, 'unknown kwargs={}'.format(kwargs)
 
     if bundle_dpath is None:
         if dpath is None:
@@ -176,10 +181,13 @@ def demodata_toy_dset(image_size=(600, 600),
     from os.path import abspath
     bundle_dpath = abspath(bundle_dpath)
 
+    if fpath is None:
+        fpath = join(bundle_dpath, 'data.kwcoco.json')
+
     cache_dpath = ub.ensuredir((bundle_dpath, '_cache'))
     assets_dpath = ub.ensuredir((bundle_dpath, '_assets'))
     img_dpath = ub.ensuredir((assets_dpath, 'images'))
-    dset_fpath = join(bundle_dpath, 'data.kwcoco.json')
+    dset_fpath = fpath
 
     img_dpath = ub.ensuredir(img_dpath)
     cache_dpath = ub.ensuredir(cache_dpath)

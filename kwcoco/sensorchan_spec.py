@@ -2,6 +2,15 @@
 This is an extension of :mod:`kwcoco.channel_spec`, which augments channel
 information with an associated sensor attribute. Eventually, this will entirely
 replace the channel spec.
+
+Example:
+    >>> # xdoctest: +REQUIRES(module:lark)
+    >>> # hack for 3.6
+    >>> from kwcoco import sensorchan_spec
+    >>> import kwcoco
+    >>> kwcoco.SensorChanSpec = sensorchan_spec.SensorChanSpec
+    >>> self = kwcoco.SensorChanSpec.coerce('sensor0:B1|B8|B8a|B10|B11,sensor1:B11|X.2|Y:2:6,sensor2:r|g|b|disparity|gauss|B8|B11,sensor3:r|g|b|flowx|flowy|distri|B10|B11')
+    >>> self.normalize()
 """
 
 import ubelt as ub
@@ -31,7 +40,7 @@ SENSOR_CHAN_GRAMMAR = ub.codeblock(
     chan_single : IDEN
     chan_getitem : IDEN "." INT
     chan_getslice_0b : IDEN ":" INT
-    chan_getslice_ab : IDEN "." INT ":" INT
+    chan_getslice_ab : (IDEN "." INT ":" INT) | (IDEN ":" INT ":" INT)
 
     // A channel code can just be an ID, or it can have a getitem
     // style syntax with a scalar or slice as an argument
@@ -51,7 +60,7 @@ SENSOR_CHAN_GRAMMAR = ub.codeblock(
 
     sensor_lhs : (IDEN ":") | (sensor_seq)
 
-    sensor_chan : sensor_lhs channel_rhs
+    sensor_chan : sensor_lhs channel_rhs?
 
     nosensor_chan : channel_rhs
 
@@ -68,6 +77,18 @@ SENSOR_CHAN_GRAMMAR = ub.codeblock(
     ''')
 
 
+class SensorSpec(ub.NiceRepr):
+    """
+    A simple wrapper for sensors in case we want to do anything fancy with them
+    later. For now they are just a string.
+    """
+    def __init__(self, spec):
+        self.spec = spec
+
+    def __nice__(self):
+        return self.spec
+
+
 class SensorChanSpec(ub.NiceRepr):
     """
     The public facing API for the sensor / channel specification
@@ -82,16 +103,15 @@ class SensorChanSpec(ub.NiceRepr):
         >>> print(s1)
         >>> print(s2)
         >>> print('streams = {}'.format(ub.repr2(streams, sv=1, nl=1)))
-        <SensorChanSpec(L8:BGR,S2:BGR,WV:BGR,S2:nir,L8:land.0|land.1|land.2|land.3)>
-        <SensorChanSpec((L8,S2,WV):BGR,L8:land:4,S2:nir)>
+        L8:BGR,S2:BGR,WV:BGR,S2:nir,L8:land.0|land.1|land.2|land.3
+        (L8,S2,WV):BGR,L8:land:4,S2:nir
         streams = [
-            <SensorChanSpec(L8:BGR)>,
-            <SensorChanSpec(S2:BGR)>,
-            <SensorChanSpec(WV:BGR)>,
-            <SensorChanSpec(S2:nir)>,
-            <SensorChanSpec(L8:land.0|land.1|land.2|land.3)>,
+            L8:BGR,
+            S2:BGR,
+            WV:BGR,
+            S2:nir,
+            L8:land.0|land.1|land.2|land.3,
         ]
-
 
     Example:
         >>> # Check with generic sensors
@@ -104,19 +124,36 @@ class SensorChanSpec(ub.NiceRepr):
         >>> s2 = self.concise()
         >>> print(s1)
         >>> print(s2)
-        <SensorChanSpec(*:BGR,*:BGR,*:nir,*:land.0|land.1|land.2|land.3)>
-        <SensorChanSpec((*,*):BGR,*:(nir,land:4))>
+        *:BGR,*:BGR,*:nir,*:land.0|land.1|land.2|land.3
+        (*,*):BGR,*:(nir,land:4)
         >>> import kwcoco
         >>> c = kwcoco.ChannelSpec.coerce('BGR,BGR,nir,land.0:8')
         >>> c1 = c.normalize()
         >>> c2 = c.concise()
         >>> print(c1)
         >>> print(c2)
+
+    Example:
+        >>> # Check empty channels
+        >>> # xdoctest: +REQUIRES(module:lark)
+        >>> from kwcoco.sensorchan_spec import SensorChanSpec
+        >>> import kwcoco
+        >>> print(SensorChanSpec('*:').normalize())
+        *:
+        >>> print(SensorChanSpec('sen:').normalize())
+        sen:
+        >>> print(SensorChanSpec('sen:').normalize().concise())
+        sen:
+        >>> print(SensorChanSpec('sen:').concise().normalize().concise())
+        sen:
     """
     def __init__(self, spec: str):
         self.spec: str = spec
 
     def __nice__(self):
+        return self.spec
+
+    def __str__(self):
         return self.spec
 
     @classmethod
@@ -170,13 +207,159 @@ class SensorChanSpec(ub.NiceRepr):
         return new
 
     def streams(self):
+        """
+        Returns:
+            List[FusedSensorChanSpec]:
+                List of sensor-names and fused channel specs
+        """
         parts = sensorchan_normalized_parts(self.spec)
-        streams = [SensorChanSpec(str(part)) for part in parts]
+        streams = [
+            FusedSensorChanSpec(SensorSpec(part.sensor), part.chan.data)
+            for part in parts]
         return streams
+
+    def late_fuse(self, other):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:lark)
+            >>> import kwcoco
+            >>> a = kwcoco.SensorChanSpec.coerce('A|B|C,edf')
+            >>> b = kwcoco.SensorChanSpec.coerce('A12')
+            >>> c = kwcoco.SensorChanSpec.coerce('')
+            >>> d = kwcoco.SensorChanSpec.coerce('rgb')
+            >>> print(a.late_fuse(b).spec)
+            >>> print((a + b).spec)
+            >>> print((b + a).spec)
+            >>> print((a + b + c).spec)
+            >>> print(sum([a, b, c, d]).spec)
+            A|B|C,edf,A12
+            A|B|C,edf,A12
+            A12,A|B|C,edf
+            A|B|C,edf,A12
+            A|B|C,edf,A12,rgb
+            >>> import kwcoco
+            >>> a = kwcoco.SensorChanSpec.coerce('A|B|C,edf').normalize()
+            >>> b = kwcoco.SensorChanSpec.coerce('A12').normalize()
+            >>> c = kwcoco.SensorChanSpec.coerce('').normalize()
+            >>> d = kwcoco.SensorChanSpec.coerce('rgb').normalize()
+            >>> print(a.late_fuse(b).spec)
+            >>> print((a + b).spec)
+            >>> print((b + a).spec)
+            >>> print((a + b + c).spec)
+            >>> print(sum([a, b, c, d]).spec)
+            *:A|B|C,*:edf,*:A12
+            *:A|B|C,*:edf,*:A12
+            *:A12,*:A|B|C,*:edf
+            *:A|B|C,*:edf,*:A12,*:
+            *:A|B|C,*:edf,*:A12,*:,*:rgb
+            >>> print((a.late_fuse(b)).concise())
+            >>> print(((a + b)).concise())
+            >>> print(((b + a)).concise())
+            >>> print(((a + b + c)).concise())
+            >>> print((sum([a, b, c, d])).concise())
+            *:(A|B|C,edf,A12)
+            *:(A|B|C,edf,A12)
+            *:(A12,A|B|C,edf)
+            *:(A|B|C,edf,A12,)
+            *:(A|B|C,edf,A12,,r|g|b)
+        """
+        if not self.spec:
+            return other
+        if not other.spec:
+            return self
+        return SensorChanSpec.coerce(self.spec + ',' + other.spec)
+
+    def __add__(self, other):
+        """
+        Late fusion combination
+        """
+        return self.late_fuse(other)
+
+    def __radd__(self, other):
+        """
+        Late fusion combination
+        """
+        if other == 0:
+            return self
+        return other.late_fuse(self)
+
+    def matching_sensor(self, sensor):
+        """
+        Get the components corresponding to a specific sensor
+
+        Args:
+            sensor (str): the name of the sensor to match
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:lark)
+            >>> import kwcoco
+            >>> self = kwcoco.SensorChanSpec.coerce('(S1,S2):(a|b|c),S2:c|d|e')
+            >>> sensor = 'S2'
+            >>> new = self.matching_sensor(sensor)
+            >>> print(f'new={new}')
+            new=S2:a|b|c,S2:c|d|e
+            >>> print(self.matching_sensor('S1'))
+            S1:a|b|c
+            >>> print(self.matching_sensor('S3'))
+            S3:
+        """
+        matching_streams = []
+        for s in self.streams():
+            if s.sensor.spec == sensor:
+                matching_streams.append(s)
+        new = sum(matching_streams)
+        if new == 0:
+            import kwcoco
+            new = FusedSensorChanSpec(SensorSpec(sensor), kwcoco.FusedChannelSpec.coerce(''))
+        return new
+
+    @property
+    def chans(self):
+        """
+        Returns the channel-only spec, ONLY if all of the sensors are the same
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:lark)
+            >>> import kwcoco
+            >>> self = kwcoco.SensorChanSpec.coerce('(S1,S2):(a|b|c),S2:c|d|e')
+            >>> import pytest
+            >>> with pytest.raises(Exception):
+            >>>     self.chans
+            >>> print(self.matching_sensor('S1').chans.spec)
+            >>> print(self.matching_sensor('S2').chans.spec)
+            a|b|c
+            a|b|c,c|d|e
+        """
+        channel_specs = []
+        sensor_specs = []
+        for s in self.streams():
+            sensor_specs.append(s.sensor.spec)
+            channel_specs.append(s.chans)
+        if not ub.allsame(sensor_specs):
+            raise Exception('Can only take pure channel specs when all sensors are the same')
+        return sum(channel_specs)
+
+
+class FusedSensorChanSpec(SensorChanSpec):
+    """
+    A single sensor a corresponding fused channels.
+    """
+    def __init__(self, sensor, chans):
+        self.sensor = sensor
+        self._chans = chans
+
+    @property
+    def chans(self):
+        return self._chans
+
+    @property
+    def spec(self):
+        return '{}:{}'.format(self.sensor.spec, self.chans.spec)
 
 
 class SensorChanNode:
     """
+    TODO: just replace this with the spec class itself?
     """
     def __init__(self, sensor, chan):
         self.sensor = sensor
@@ -188,15 +371,15 @@ class SensorChanNode:
 
     def __repr__(self):
         return self.spec
-        # return f'SensorChanNode({self.sensor}:{self.chan})'
 
     def __str__(self):
         return self.spec
-        # return f'SensorChanNode({self.sensor}:{self.chan})'
 
 
 class FusedChanNode:
     """
+    TODO: just replace this with the spec class itself?
+
     Example:
         s = FusedChanNode('a|b|c.0|c.1|c.2')
         c = s.concise()
@@ -322,6 +505,9 @@ class SensorChanTransformer(Transformer):
         return [SensorChanNode('*', c) for c in item]
 
     def sensor_chan(self, items):
+        if len(items) == 1:
+            # handle empty channels
+            items = [items[0], ['']]
         assert len(items) == 2
         lhs, rhs = items
         new = []
@@ -391,10 +577,16 @@ def normalize_sensor_chan(spec):
         >>> print(f'r2={r2}')
         r1=L8:mat.0|mat.1|mat.2|mat.3,L8:red,S2:red,S2:forest|brush,S2:mat.0|mat.1|mat.2|mat.3
         r2=L8:r|g|b,L8:r|g|b
+
+    Ignore:
+        >>> # TODO: fix bug or disallow behavior
+        >>> from kwcoco.sensorchan_spec import *  # NOQA
+        >>> spec = '*:(rgb,,cde)'
+        >>> concise_spec = normalize_sensor_chan(spec)
     """
-    sensor_channel_parser = _global_sensor_chan_parser()
-    tree = sensor_channel_parser.parse(spec)
-    transformed = SensorChanTransformer(concise_sensors=0, concise_channels=0).transform(tree)
+    if spec == '':
+        spec = '*:'
+    transformed = sensorchan_normalized_parts(spec)
     new_spec = ','.join([n.spec for n in transformed])
     return new_spec
 
@@ -413,9 +605,7 @@ def concise_sensor_chan(spec):
         >>> print(concise_spec)
         (L8,S2):(mat:4,red),S2:forest|brush
     """
-    sensor_channel_parser = _global_sensor_chan_parser()
-    tree = sensor_channel_parser.parse(spec)
-    transformed = SensorChanTransformer(concise_sensors=1, concise_channels=1).transform(tree)
+    transformed = sensorchan_concise_parts(spec)
     new_spec = ','.join([str(n) for n in transformed])
     return new_spec
 
@@ -428,9 +618,13 @@ def sensorchan_concise_parts(spec):
         >>> spec = 'L8:mat.0|mat.1|mat.2|mat.3,L8:red,(MODIS,S2):a|b|c,S2:red,S2:forest|brush|bare_ground,S2:mat.0|mat.1|mat.2|mat.3'
         >>> parts = sensorchan_concise_parts(spec)
     """
-    sensor_channel_parser = _global_sensor_chan_parser()
-    tree = sensor_channel_parser.parse(spec)
-    transformed = SensorChanTransformer(concise_sensors=1, concise_channels=1).transform(tree)
+    try:
+        sensor_channel_parser = _global_sensor_chan_parser()
+        tree = sensor_channel_parser.parse(spec)
+        transformed = SensorChanTransformer(concise_sensors=1, concise_channels=1).transform(tree)
+    except Exception:
+        print(f'ERROR: Failed to condense spec={spec}')
+        raise
     return transformed
 
 
@@ -441,7 +635,11 @@ def sensorchan_normalized_parts(spec):
         >>> spec = 'L8:mat.0|mat.1|mat.2|mat.3,L8:red,(MODIS,S2):a|b|c,S2:red,S2:forest|brush|bare_ground|built_up|cropland|wetland|water|snow_or_ice_field,S2:mat.0|mat.1|mat.2|mat.3'
         >>> parts = sensorchan_normalized_parts(spec)
     """
-    sensor_channel_parser = _global_sensor_chan_parser()
-    tree = sensor_channel_parser.parse(spec)
-    transformed = SensorChanTransformer(concise_sensors=0, concise_channels=0).transform(tree)
+    try:
+        sensor_channel_parser = _global_sensor_chan_parser()
+        tree = sensor_channel_parser.parse(spec)
+        transformed = SensorChanTransformer(concise_sensors=0, concise_channels=0).transform(tree)
+    except Exception:
+        print(f'ERROR: Failed to normalize spec={spec}')
+        raise
     return transformed

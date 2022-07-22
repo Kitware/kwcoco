@@ -56,7 +56,7 @@ Example:
             └─╼ Crop dsize=(80,83),space_slice=(slice(0,83,None),slice(3,83,None))
                 └─╼ Overview dsize=(128,128),overview=2
                     └─╼ Load channels=r|g|b,num_channels=3,dsize=(512,512),fpath=...astro_overviews=3.tif,num_overviews=3
-    >>> final0 = dimg.finalize()
+    >>> final0 = dimg.finalize(optimize=False)
     >>> final1 = dopt.finalize()
     >>> assert final0.shape == final1.shape
     >>> # xdoctest: +REQUIRES(--show)
@@ -98,19 +98,21 @@ Example:
     >>> print('Undone Scale')
     >>> undone_scale = delayed.warp(undo_scale).optimize()
     >>> undone_scale.write_network_text()
-
+    >>> # xdoctest: +REQUIRES(--show)
     >>> import kwplot
     >>> kwplot.autompl()
     >>> to_stack = []
-    >>> to_stack.append(base.finalize()[:])
-    >>> to_stack.append(orig.finalize())
-    >>> to_stack.append(delayed.finalize())
-    >>> to_stack.append(undone_all.finalize())
-    >>> to_stack.append(undone_scale.finalize())
+    >>> to_stack.append(base.finalize(optimize=False))
+    >>> to_stack.append(orig.finalize(optimize=False))
+    >>> to_stack.append(delayed.finalize(optimize=False))
+    >>> to_stack.append(undone_all.finalize(optimize=False))
+    >>> to_stack.append(undone_scale.finalize(optimize=False))
     >>> kwplot.autompl()
     >>> stack = kwimage.stack_images(to_stack, axis=1, bg_value=(5, 100, 10), pad=10)
     >>> kwplot.imshow(stack)
 
+CommandLine:
+    xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/delayed_ops/__init__.py __doc__:2
 
 Example:
     >>> # xdoctest: +REQUIRES(module:osgeo)
@@ -132,7 +134,8 @@ Example:
     >>> ]).warp(
     >>>   #{'scale': 0.35, 'theta': 0.3, 'about': (30, 50), 'offset': (-10, -80)}
     >>>   {'scale': 0.7}
-    >>> )
+    >>> ).dequantize({'quant_max': 255})
+    >>> #delayed_vidspace._set_nested_params(border_value=0)
     >>> vidspace_box = kwimage.Boxes([[100, 10, 270, 160]], 'ltrb')
     >>> vidspace_poly = vidspace_box.to_polygons()[0]
     >>> vidspace_slice = vidspace_box.to_slices()[0]
@@ -170,13 +173,17 @@ Example:
     >>> tostack_grid.append([]); row = tostack_grid[-1]
     >>> row.append(kwimage.draw_text_on_image(None, text='A Box in Virtual Video Space (This space is conceptually easy to work in)'))
     >>> tostack_grid.append([]); row = tostack_grid[-1]
-    >>> row.append(kwimage.draw_header_text(vidspace_box.draw_on(delayed_vidspace.finalize()), 'vidspace'))
+    >>> def _tocanvas(img):
+    ...     if img.dtype.kind == 'u':
+    ...         return img
+    ...     return kwimage.ensure_uint255(kwimage.fill_nans_with_checkers(img))
+    >>> row.append(kwimage.draw_header_text(vidspace_box.draw_on(_tocanvas(delayed_vidspace.finalize())), 'vidspace'))
     >>> # Draw finalized aligned crops
     >>> tostack_grid.append([]); row = tostack_grid[-1]
     >>> row.append(kwimage.draw_text_on_image(None, text='Finalized delayed warp/crop. Left-to-Right: Original, Optimized, Difference'))
     >>> tostack_grid.append([]); row = tostack_grid[-1]
     >>> crop_opt_final = opt_crop_vidspace.finalize()
-    >>> crop_raw_final = crop_vidspace.finalize()
+    >>> crop_raw_final = crop_vidspace.finalize(optimize=False)
     >>> row.append(crop_raw_final)
     >>> row.append(crop_opt_final)
     >>> row.append(kwimage.ensure_uint255(kwarray.normalize(np.linalg.norm(kwimage.ensure_float01(crop_opt_final) - kwimage.ensure_float01(crop_raw_final), axis=2))))
@@ -220,9 +227,11 @@ Example:
     >>> # xdoctest: +REQUIRES(--show)
     >>> import kwplot
     >>> kwplot.autompl()
+    >>> tostack_grid = [[_tocanvas(c) for c in cols] for cols in tostack_grid]
     >>> tostack_rows  = [kwimage.stack_images(cols, axis=1, bg_value=(5, 100, 10), pad=10) for cols in tostack_grid if cols]
     >>> stack = kwimage.stack_images(tostack_rows, axis=0, bg_value=(5, 100, 10), pad=10)
     >>> kwplot.imshow(stack, title='notice how the "undone all" crops are shifted to the right such that they align with the original image')
+    >>> kwplot.show_if_requested()
 
 """
 

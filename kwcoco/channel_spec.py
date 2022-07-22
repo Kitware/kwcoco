@@ -223,7 +223,49 @@ class BaseChannelSpec(ub.NiceRepr):
         return self.intersection(other)
 
     def __or__(self, other):
+        """
+        Union operator is overloaded to early fusion
+        """
         return self.union(other)
+
+    def late_fuse(self, other):
+        """
+        Example:
+            >>> import kwcoco
+            >>> a = kwcoco.ChannelSpec.coerce('A|B|C,edf')
+            >>> b = kwcoco.ChannelSpec.coerce('A12')
+            >>> c = kwcoco.ChannelSpec.coerce('')
+            >>> d = kwcoco.ChannelSpec.coerce('rgb')
+            >>> print(a.late_fuse(b).spec)
+            >>> print((a + b).spec)
+            >>> print((b + a).spec)
+            >>> print((a + b + c).spec)
+            >>> print(sum([a, b, c, d]).spec)
+            A|B|C,edf,A12
+            A|B|C,edf,A12
+            A12,A|B|C,edf
+            A|B|C,edf,A12
+            A|B|C,edf,A12,rgb
+        """
+        if not self.spec:
+            return other
+        if not other.spec:
+            return self
+        return ChannelSpec.coerce(self.spec + ',' + other.spec)
+
+    def __add__(self, other):
+        """
+        Addition operator is overloaded to late fusion
+        """
+        return self.late_fuse(other)
+
+    def __radd__(self, other):
+        """
+        Addition operator is overloaded to late fusion
+        """
+        if other == 0:
+            return self
+        return other + self
 
     def path_sanitize(self, maxlen=None):
         """

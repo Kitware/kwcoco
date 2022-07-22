@@ -190,17 +190,23 @@ class DelayedLoad2(DelayedImageLeaf2):
         self.meta['num_overviews'] = num_overviews
         return self
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
 
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
+        Example:
+            >>> # Check difference between finalize and _finalize
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import *  # NOQA
+            >>> self = DelayedLoad2.demo().prepare()
+            >>> final_arr = self.finalize()
+            >>> assert isinstance(final_arr, np.ndarray), 'finalize should always return an array'
+            >>> final_ref = self._finalize()
+            >>> if self.lazy_ref is not NotImplemented:
+            >>>     assert not isinstance(final_ref, np.ndarray), (
+            >>>         'A pure load with gdal should return a reference that is '
+            >>>         'similiar to but not quite an array')
         """
-        self._prefinalize(**kwargs)
         self._load_reference()
         if self.lazy_ref is NotImplemented:
             warnings.warn('DelayedLoad2 may not be efficient without gdal')
@@ -233,17 +239,11 @@ class DelayedNans2(DelayedImageLeaf2):
     def __init__(self, dsize=None, channels=None):
         super().__init__(channels=channels, dsize=dsize)
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
-
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
         """
-        self._prefinalize(**kwargs)
         shape = self.shape
         final = np.full(shape, fill_value=np.nan)
         return final
@@ -308,15 +308,9 @@ class DelayedIdentity2(DelayedImageLeaf2):
             dsize = data.shape[0:2][::-1]
         self.meta['dsize'] = dsize
 
-    def finalize(self, **kwargs):
+    def _finalize(self):
         """
         Returns:
             ArrayLike
-
-        Args:
-            **kwargs: for backwards compatibility, these will allow for
-                in-place modification of select nested parameters.
-                In general these should not be used, and may be deprecated.
         """
-        self._prefinalize(**kwargs)
         return self.data

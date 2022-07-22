@@ -1120,7 +1120,7 @@ class MixinCocoExtras(object):
 
         if key.startswith('shapes'):
             from kwcoco.demo import toydata_image
-            res = parse.parse('{prefix}{num_imgs:d}', key)
+            res = parse.parse('shapes{num_imgs:d}', key)
             if res:
                 kwargs['n_imgs'] = int(res.named['num_imgs'])
             if 'rng' not in kwargs and 'n_imgs' in kwargs:
@@ -1130,10 +1130,9 @@ class MixinCocoExtras(object):
         elif key.startswith('vidshapes'):
             from kwcoco.demo import toydata_video
             verbose = kwargs.get('verbose', 1)
-            res = parse.parse('{prefix}{num_videos:d}{suffix}', key)
+            res = parse.parse('vidshapes{num_videos:d}', key)
             if res is None:
-                res = parse.parse('{prefix}{num_videos:d}', key)
-
+                res = parse.parse('vidshapes{num_videos:d}{suffix}', key)
             """
             The rule is that the suffix will be split by the '-' character
             and any registered pattern or alias will impact the kwargs
@@ -1165,6 +1164,7 @@ class MixinCocoExtras(object):
             }
             vidkw_aliases = {
                 'num_frames': {'frames'},
+                'num_tracks': {'tracks'},
                 'num_videos': {'videos'},
                 'max_speed': {'speed'},
                 'image_size': {'gsize'},
@@ -1182,7 +1182,17 @@ class MixinCocoExtras(object):
                     key = part[:match.span()[0]]
                     value = part[match.span()[0]:]
                 key = alias_to_key.get(key, key)
+                if key == 'image_size':
+                    if isinstance(value, str):
+                        s = int(value)
+                        value = (s, s)
+                    if isinstance(value, (float, int)):
+                        s = int(value)
+                        value = (s, s)
+                    value = value
                 if key == 'num_frames':
+                    value = int(value)
+                if key == 'num_tracks':
                     value = int(value)
                 if key == 'num_videos':
                     value = int(value)
@@ -1214,14 +1224,18 @@ class MixinCocoExtras(object):
             depends_items.pop('verbose', None)
             depends = ub.hash_data(sorted(depends_items.items()), base='abc')[0:14]
 
+            if verbose > 0:
+                print('vidkw = {}'.format(ub.repr2(vidkw, nl=1)))
             if verbose > 3:
-                print('vidkw = {!r}'.format(vidkw))
                 print('depends = {!r}'.format(depends))
 
             tag = key + '_' + depends
             dpath = vidkw.pop('dpath', None)
+            fpath = vidkw.pop('fpath', None)
             bundle_dpath = vidkw.get('bundle_dpath', None)
-            if dpath is not None:
+            if fpath is not None:
+                bundle_dpath = ub.Path(fpath).parent
+            elif dpath is not None:
                 bundle_dpath = dpath
 
             if bundle_dpath is None:
@@ -1232,7 +1246,8 @@ class MixinCocoExtras(object):
                 bundle_dpath = vidkw['bundle_dpath'] = join(dpath, tag)
 
             cache_dpath = join(bundle_dpath, '_cache')
-            fpath = join(bundle_dpath, 'data.kwcoco.json')
+            if fpath is None:
+                fpath = join(bundle_dpath, 'data.kwcoco.json')
 
             stamp = ub.CacheStamp(
                 'vidshape_stamp_v{:03d}'.format(toydata_video.TOYDATA_VIDEO_VERSION),
@@ -1541,6 +1556,8 @@ class MixinCocoExtras(object):
             >>> print(self._dataset_id())
         """
         hashid = self._cached_hashid()
+        if self.fpath is None:
+            raise Exception('Dataset doesnt have a fpath')
         coco_fpath = ub.Path(self.fpath)
         dset_id = '_'.join([coco_fpath.parent.stem, coco_fpath.stem, hashid[0:8]])
         return dset_id
@@ -1906,36 +1923,43 @@ class MixinCocoExtras(object):
                new_prefix=None,
                absolute=False,
                check=True,
-               safe=True):
+               safe=True,
+               verbose=0):
         """
         Modify the prefix of the image/data paths onto a new image/data root.
 
         Args:
-            new_root (str, default=None):
+            new_root (str | None):
                 New image root. If unspecified the current ``self.bundle_dpath`` is
                 used. If old_prefix and new_prefix are unspecified, they will
                 attempt to be determined based on the current root (which
                 assumes the file paths exist at that root) and this new root.
+                Defaults to None.
 
-            old_prefix (str, default=None):
+            old_prefix (str | None):
                 If specified, removes this prefix from file names.
                 This also prevents any inferences that might be made via
-                "new_root".
+                "new_root". Defaults to None.
 
-            new_prefix (str, default=None):
+            new_prefix (str | None):
                 If specified, adds this prefix to the file names.
                 This also prevents any inferences that might be made via
-                "new_root".
+                "new_root". Defaults to None.
 
-            absolute (bool, default=False):
+            absolute (bool):
                 if True, file names are stored as absolute paths, otherwise
-                they are relative to the new image root.
+                they are relative to the new image root. Defaults to False.
 
-            check (bool, default=True):
+            check (bool):
                 if True, checks that the images all exist.
+                Defaults to True.
 
-            safe (bool, default=True):
-                if True, does not overwrite values until all checks pass
+            safe (bool):
+                if True, does not overwrite values until all checks pass.
+                Defaults to True.
+
+            verbose (int):
+                verbosity level, default=0.
 
         CommandLine:
             xdoctest -m kwcoco.coco_dataset MixinCocoExtras.reroot
@@ -1988,10 +2012,30 @@ class MixinCocoExtras(object):
         Ignore:
             See ~/code/kwcoco/dev/devcheck_reroot.py
         """
-        new_img_root = new_root
-        cur_img_root = self.bundle_dpath
-        if new_img_root is None:
-            new_img_root = self.bundle_dpath
+        cur_bundle_dpath = self.bundle_dpath
+        new_bundle_dpath = self.bundle_dpath if new_root is None else new_root
+
+        if absolute:
+            new_bundle_dpath = os.fspath(ub.Path(new_bundle_dpath).absolute())
+
+        if verbose:
+            print('kwcoco.reroot')
+            print(' * new_bundle_dpath = {}'.format(ub.repr2(new_bundle_dpath, nl=1)))
+            print(' * cur_bundle_dpath = {}'.format(ub.repr2(cur_bundle_dpath, nl=1)))
+            print(f' * old_prefix={old_prefix}')
+            print(f' * new_prefix={new_prefix}')
+            print(f' * absolute={absolute}')
+            print(f' * safe={safe}')
+            print(f' * check={check}')
+            if verbose > 1:
+                # First assets
+                if len(self.dataset['images']):
+                    from kwcoco.coco_image import CocoImage
+                    first_image = CocoImage(self.dataset['images'][0], dset=self)
+                    first_image_filepaths = list(first_image.iter_image_filepaths(with_bundle=False))
+                    print(' * first_image_filepaths = {}'.format(ub.repr2(first_image_filepaths, nl=1)))
+                else:
+                    print('No images to reroot')
 
         def _reroot_path(file_name):
             """ Reroot a single file """
@@ -2001,7 +2045,7 @@ class MixinCocoExtras(object):
             # the images based on the new root, unless we are explicitly given
             # information about new and old prefixes. Can we do better than
             # this?
-            cur_gpath = join(cur_img_root, file_name)
+            cur_gpath = join(cur_bundle_dpath, file_name)
 
             if old_prefix is not None:
                 if file_name.startswith(old_prefix):
@@ -2016,25 +2060,27 @@ class MixinCocoExtras(object):
             if old_prefix is None and new_prefix is None:
                 # This is not a good check, fails if we want to
                 # do a relative reroot outside of the original dataset
-                if new_img_root is not None and cur_gpath.startswith(new_img_root):
-                    file_name = relpath(cur_gpath, new_img_root)
+                if new_bundle_dpath is not None and cur_gpath.startswith(new_bundle_dpath):
+                    file_name = relpath(cur_gpath, new_bundle_dpath)
 
             if new_prefix is not None:
                 file_name = join(new_prefix, file_name)
 
             if absolute:
-                new_file_name = join(new_img_root, file_name)
+                new_file_name = join(new_bundle_dpath, file_name)
             else:
                 new_file_name = file_name
 
             if check:
-                new_gpath = join(new_img_root, new_file_name)
+                new_gpath = join(new_bundle_dpath, new_file_name)
                 if not exists(new_gpath):
-                    print('cur_gpath = {!r}'.format(cur_gpath))
-                    print('file_name = {!r}'.format(file_name))
-                    print('cur_img_root = {!r}'.format(cur_img_root))
-                    print('new_file_name = {!r}'.format(new_file_name))
-                    print('new_img_root = {!r}'.format(new_img_root))
+                    print('ERROR')
+                    print(' * file_name = {!r}'.format(file_name))
+                    print(' * cur_gpath = {!r}'.format(cur_gpath))
+                    print(' * new_gpath = {!r}'.format(new_gpath))
+                    print(' * new_file_name = {!r}'.format(new_file_name))
+                    print(' * cur_bundle_dpath = {!r}'.format(cur_bundle_dpath))
+                    print(' * new_bundle_dpath = {!r}'.format(new_bundle_dpath))
                     raise Exception(
                         'Image does not exist: {!r}'.format(new_gpath))
             return new_file_name
@@ -2099,7 +2145,7 @@ class MixinCocoExtras(object):
                 if img.get('file_name', None) is not None
             }
 
-        self.bundle_dpath = new_img_root
+        self.bundle_dpath = new_bundle_dpath
         return self
 
     @property
