@@ -7,8 +7,8 @@ Example:
     >>> # xdoctest: +REQUIRES(module:lark)
     >>> # hack for 3.6
     >>> from kwcoco import sensorchan_spec
-    >>> kwcoco.SensorChanSpec = sensorchan_spec.SensorChanSpec
     >>> import kwcoco
+    >>> kwcoco.SensorChanSpec = sensorchan_spec.SensorChanSpec
     >>> self = kwcoco.SensorChanSpec.coerce('sensor0:B1|B8|B8a|B10|B11,sensor1:B11|X.2|Y:2:6,sensor2:r|g|b|disparity|gauss|B8|B11,sensor3:r|g|b|flowx|flowy|distri|B10|B11')
     >>> self.normalize()
 """
