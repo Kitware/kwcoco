@@ -118,7 +118,7 @@ stages:
         
 ._run_tests_in_sandboxed_dir: &_run_tests_in_sandboxed_dir |-
     # Hack to test the installed wheel. TODO: make run_tests work better in this case.
-    MOD_NAME=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb')['tool']['xcookie']['mod_name'])")
+    MOD_NAME=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['tool']['xcookie']['mod_name'])")
     mkdir -p sandbox && cd sandbox && pytest --xdoctest-verbose=3 -s --cov-config ../pyproject.toml --cov-report html --cov-report term --cov="$MOD_NAME" --xdoc $(python -c "import ubelt; print(ubelt.modname_to_modpath('${MOD_NAME}'))") ../tests
 
     

@@ -17,6 +17,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 * Added `fpath` as an option to `CocoDataset.demo`, which is currently semi-stable.
+* The `finalize` method for a DelayedOperation2 now calls prepare and optimize
+  beforehand by default, and also always returns an ndarray.
+* DelayedWarp2 will now default to nan fill values when warping floats
 
 
 ## Version 0.3.1 - Released 2022-07-18

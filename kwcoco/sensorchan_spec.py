@@ -215,12 +215,62 @@ class SensorChanSpec(ub.NiceRepr):
             for part in parts]
         return streams
 
+    def late_fuse(self, other):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:lark)
+            >>> import kwcoco
+            >>> a = kwcoco.SensorChanSpec.coerce('A|B|C,edf')
+            >>> b = kwcoco.SensorChanSpec.coerce('A12')
+            >>> c = kwcoco.SensorChanSpec.coerce('')
+            >>> d = kwcoco.SensorChanSpec.coerce('rgb')
+            >>> print(a.late_fuse(b).spec)
+            >>> print((a + b).spec)
+            >>> print((b + a).spec)
+            >>> print((a + b + c).spec)
+            >>> print(sum([a, b, c, d]).spec)
+            A|B|C,edf,A12
+            A|B|C,edf,A12
+            A12,A|B|C,edf
+            A|B|C,edf,A12
+            A|B|C,edf,A12,rgb
+            >>> import kwcoco
+            >>> a = kwcoco.SensorChanSpec.coerce('A|B|C,edf').normalize()
+            >>> b = kwcoco.SensorChanSpec.coerce('A12').normalize()
+            >>> c = kwcoco.SensorChanSpec.coerce('').normalize()
+            >>> d = kwcoco.SensorChanSpec.coerce('rgb').normalize()
+            >>> print(a.late_fuse(b).spec)
+            >>> print((a + b).spec)
+            >>> print((b + a).spec)
+            >>> print((a + b + c).spec)
+            >>> print(sum([a, b, c, d]).spec)
+            *:A|B|C,*:edf,*:A12
+            *:A|B|C,*:edf,*:A12
+            *:A12,*:A|B|C,*:edf
+            *:A|B|C,*:edf,*:A12,*:
+            *:A|B|C,*:edf,*:A12,*:,*:rgb
+            >>> print((a.late_fuse(b)).concise())
+            >>> print(((a + b)).concise())
+            >>> print(((b + a)).concise())
+            >>> print(((a + b + c)).concise())
+            >>> print((sum([a, b, c, d])).concise())
+            *:(A|B|C,edf,A12)
+            *:(A|B|C,edf,A12)
+            *:(A12,A|B|C,edf)
+            *:(A|B|C,edf,A12,)
+            *:(A|B|C,edf,A12,,r|g|b)
+        """
+        if not self.spec:
+            return other
+        if not other.spec:
+            return self
+        return SensorChanSpec.coerce(self.spec + ',' + other.spec)
+
     def __add__(self, other):
         """
         Late fusion combination
         """
-        new = SensorChanSpec(self.spec + ',' + other.spec)
-        return new
+        return self.late_fuse(other)
 
     def __radd__(self, other):
         """
@@ -228,8 +278,7 @@ class SensorChanSpec(ub.NiceRepr):
         """
         if other == 0:
             return self
-        new = SensorChanSpec(other.spec + ',' + self.spec)
-        return new
+        return other.late_fuse(self)
 
     def matching_sensor(self, sensor):
         """
@@ -261,6 +310,31 @@ class SensorChanSpec(ub.NiceRepr):
             new = FusedSensorChanSpec(SensorSpec(sensor), kwcoco.FusedChannelSpec.coerce(''))
         return new
 
+    @property
+    def chans(self):
+        """
+        Returns the channel-only spec, ONLY if all of the sensors are the same
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.SensorChanSpec.coerce('(S1,S2):(a|b|c),S2:c|d|e')
+            >>> import pytest
+            >>> with pytest.raises(Exception):
+            >>>     self.chans
+            >>> print(self.matching_sensor('S1').chans.spec)
+            >>> print(self.matching_sensor('S2').chans.spec)
+            a|b|c
+            a|b|c,c|d|e
+        """
+        channel_specs = []
+        sensor_specs = []
+        for s in self.streams():
+            sensor_specs.append(s.sensor.spec)
+            channel_specs.append(s.chans)
+        if not ub.allsame(sensor_specs):
+            raise Exception('Can only take pure channel specs when all sensors are the same')
+        return sum(channel_specs)
+
 
 class FusedSensorChanSpec(SensorChanSpec):
     """
@@ -268,7 +342,11 @@ class FusedSensorChanSpec(SensorChanSpec):
     """
     def __init__(self, sensor, chans):
         self.sensor = sensor
-        self.chans = chans
+        self._chans = chans
+
+    @property
+    def chans(self):
+        return self._chans
 
     @property
     def spec(self):
@@ -495,7 +573,15 @@ def normalize_sensor_chan(spec):
         >>> print(f'r2={r2}')
         r1=L8:mat.0|mat.1|mat.2|mat.3,L8:red,S2:red,S2:forest|brush,S2:mat.0|mat.1|mat.2|mat.3
         r2=L8:r|g|b,L8:r|g|b
+
+    Ignore:
+        >>> # TODO: fix bug or disallow behavior
+        >>> from kwcoco.sensorchan_spec import *  # NOQA
+        >>> spec = '*:(rgb,,cde)'
+        >>> concise_spec = normalize_sensor_chan(spec)
     """
+    if spec == '':
+        spec = '*:'
     transformed = sensorchan_normalized_parts(spec)
     new_spec = ','.join([n.spec for n in transformed])
     return new_spec

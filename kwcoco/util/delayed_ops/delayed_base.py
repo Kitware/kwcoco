@@ -91,6 +91,18 @@ class DelayedOperation2(ub.NiceRepr):
                 stack.append((node_id, child))
         return graph
 
+    def _all_nodes(self):
+        """
+        """
+        # Might be useful in _set_nested_params or other functions that
+        # need to touch all descendants. This will be faster than recursion
+        stack = [(None, self)]
+        while stack:
+            _, item = stack.pop()
+            yield item
+            for child in item.children():
+                stack.append((None, child))
+
     def write_network_text(self, with_labels=True):
         from kwcoco.util.delayed_ops.helpers import write_network_text
         graph = self.as_graph()
@@ -140,17 +152,22 @@ class DelayedOperation2(ub.NiceRepr):
         """
         raise NotImplementedError
 
-    def finalize(self, **kwargs):
+    def finalize(self, prepare=True, optimize=True, **kwargs):
         """
         Evaluate the operation tree in full.
 
-        Returns:
-            ArrayLike
-
         Args:
+            prepare (bool):
+                ensure prepare is called to ensure metadata exists if possible
+                before optimizing.  Defaults to True.
+            optimize (bool):
+                ensure the graph is optimized before loading.  Default to True.
             **kwargs: for backwards compatibility, these will allow for
                 in-place modification of select nested parameters.
                 In general these should not be used, and may be deprecated.
+
+        Returns:
+            ArrayLike
 
         Notes:
             Do not overload this method. Overload
@@ -170,6 +187,10 @@ class DelayedOperation2(ub.NiceRepr):
                 migration='setup the desired state beforhand',
                 deprecate='0.3.2', error='0.4.0', remove='0.4.1')
             self._set_nested_params(**kwargs)
+        if prepare:
+            self = self.prepare()
+        if optimize:
+            self = self.optimize()
         # The protected version of this method does all the work, this function
         # just sits at the user-level and ensures correct final output whereas
         # the protected function can return optimized representations that
@@ -177,6 +198,7 @@ class DelayedOperation2(ub.NiceRepr):
         final = self._finalize()
         # Ensure we are array like
         final = final[:]
+        # final = np.asanyarray(final) # does not work with xarray
         return final
 
     def optimize(self):

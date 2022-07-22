@@ -226,7 +226,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         >>> cat = DelayedChannelConcat2([c1, c2])
         >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
         >>> warped_cat._validate()
-        >>> warped_cat.optimize()._finalize()
+        >>> warped_cat.finalize()
 
         # >>> dsize = (307, 311)
         # >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
@@ -557,7 +557,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         """
         Check that the delayed metadata corresponds with the finalized data
         """
-        final = self.finalize()
+        final = self._finalize()
         if not self.meta['jagged']:
             # meta_dsize = self.dsize
             meta_shape = self.shape
@@ -797,7 +797,7 @@ class DelayedImage2(ImageOpsMixin, DelayedArray2):
         opt = self.optimize()
         opt_shape = opt.shape
 
-        final = self.finalize()
+        final = self._finalize()
         # meta_dsize = self.dsize
         meta_shape = self.shape
 
@@ -963,10 +963,20 @@ class DelayedWarp2(DelayedImage2):
         prewarp = self.subdata._finalize()
         prewarp = np.asarray(prewarp)
 
+        # TODO: we could configure this, but forcing nans on floats seems like
+        # a pretty nice default border behavior. It would be even nicer to have
+        # masked arrays for ints.
+        num_chan = kwimage.num_channels(prewarp)
+        if prewarp.dtype.kind == 'f':
+            border_value = (np.nan,) * num_chan
+        else:
+            border_value = (0,) * num_chan
+
         M = np.asarray(transform)
         final = kwimage.warp_affine(prewarp, M, dsize=dsize,
                                     interpolation=interpolation,
-                                    antialias=antialias)
+                                    antialias=antialias,
+                                    border_value=border_value)
         # final = cv2.warpPerspective(sub_data_, M, dsize=dsize, flags=flags)
         # Ensure that the last dimension is channels
         final = kwarray.atleast_nd(final, 3, front=False)

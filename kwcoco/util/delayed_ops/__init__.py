@@ -56,7 +56,7 @@ Example:
             └─╼ Crop dsize=(80,83),space_slice=(slice(0,83,None),slice(3,83,None))
                 └─╼ Overview dsize=(128,128),overview=2
                     └─╼ Load channels=r|g|b,num_channels=3,dsize=(512,512),fpath=...astro_overviews=3.tif,num_overviews=3
-    >>> final0 = dimg.finalize()
+    >>> final0 = dimg.finalize(optimize=False)
     >>> final1 = dopt.finalize()
     >>> assert final0.shape == final1.shape
     >>> # xdoctest: +REQUIRES(--show)
@@ -102,11 +102,11 @@ Example:
     >>> import kwplot
     >>> kwplot.autompl()
     >>> to_stack = []
-    >>> to_stack.append(base.finalize()[:])
-    >>> to_stack.append(orig.finalize())
-    >>> to_stack.append(delayed.finalize())
-    >>> to_stack.append(undone_all.finalize())
-    >>> to_stack.append(undone_scale.finalize())
+    >>> to_stack.append(base.finalize(optimize=False))
+    >>> to_stack.append(orig.finalize(optimize=False))
+    >>> to_stack.append(delayed.finalize(optimize=False))
+    >>> to_stack.append(undone_all.finalize(optimize=False))
+    >>> to_stack.append(undone_scale.finalize(optimize=False))
     >>> kwplot.autompl()
     >>> stack = kwimage.stack_images(to_stack, axis=1, bg_value=(5, 100, 10), pad=10)
     >>> kwplot.imshow(stack)
