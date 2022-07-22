@@ -113,7 +113,8 @@ class ImageOpsMixin:
         new = DelayedCrop2(self, space_slice, chan_idxs)
         return new
 
-    def warp(self, transform, dsize='auto', antialias=True, interpolation='linear'):
+    def warp(self, transform, dsize='auto', antialias=True,
+             interpolation='linear', border_value='auto'):
         """
         Applys an affine transformation to the image
 
@@ -136,6 +137,9 @@ class ImageOpsMixin:
             interpolation (str):
                 interpolation code or cv2 integer. Interpolation codes are linear,
                 nearest, cubic, lancsoz, and area. Defaults to "linear".
+
+            border_value (int | float | str):
+                if auto will be nan for float and 0 for int.
 
         Returns:
             DelayedImage2
@@ -906,7 +910,7 @@ class DelayedWarp2(DelayedImage2):
         >>> print(ub.repr2(warp3.nesting(), nl=-1, sort=0))
     """
     def __init__(self, subdata, transform, dsize='auto', antialias=True,
-                 interpolation='linear'):
+                 interpolation='linear', border_value='auto'):
         """
         Args:
             subdata (DelayedArray2): data to operate on
@@ -939,6 +943,7 @@ class DelayedWarp2(DelayedImage2):
         self.meta['antialias'] = antialias
         self.meta['interpolation'] = interpolation
         self.meta['dsize'] = dsize
+        self.meta['border_value'] = border_value
 
     @property
     def transform(self):
@@ -967,10 +972,20 @@ class DelayedWarp2(DelayedImage2):
         # a pretty nice default border behavior. It would be even nicer to have
         # masked arrays for ints.
         num_chan = kwimage.num_channels(prewarp)
-        if prewarp.dtype.kind == 'f':
-            border_value = (np.nan,) * num_chan
+        if self.meta['border_value'] == 'auto':
+            if prewarp.dtype.kind == 'f':
+                border_value = np.nan
+            else:
+                border_value = 0
         else:
-            border_value = (0,) * num_chan
+            border_value = self.meta['border_value']
+        if not ub.iterable(border_value):
+            border_value = (border_value,) * num_chan
+
+        # HACK:
+        # the border value only correctly applies to the first 4 channels for
+        # whatever reason.
+        border_value = border_value[0:4]
 
         M = np.asarray(transform)
         final = kwimage.warp_affine(prewarp, M, dsize=dsize,
@@ -1033,7 +1048,7 @@ class DelayedWarp2(DelayedImage2):
         # TODO: could ensure the metadata is compatable, for now just take the
         # most recent
         dsize = self.meta['dsize']
-        common_meta = ub.dict_isect(self.meta, {'antialias', 'interpolation'})
+        common_meta = ub.dict_isect(self.meta, {'antialias', 'interpolation', 'border_value'})
         new_transform = tf2 @ tf1
         new = self.__class__(inner_data, new_transform, dsize=dsize,
                              **common_meta)
@@ -1166,7 +1181,7 @@ class DelayedWarp2(DelayedImage2):
                 notcrop.meta['dsize'] = new_chain_dsize
             new_head = chain[0]
 
-        warp_meta = ub.dict_isect(self.meta, {'antialias', 'interpolation'})
+        warp_meta = ub.dict_isect(self.meta, {'antialias', 'interpolation', 'border_value'})
         tf2 = self.meta['transform']
         dsize = self.meta['dsize']
         new_transform = tf2 @ tf1
@@ -1239,7 +1254,7 @@ class DelayedWarp2(DelayedImage2):
             new = overview
         else:
             common_meta = ub.dict_isect(self.meta, {
-                'antialias', 'interpolation'})
+                'antialias', 'interpolation', 'border_value'})
             new = overview.warp(new_transform, dsize=dsize, **common_meta)
         return new
 
@@ -1576,7 +1591,7 @@ class DelayedCrop2(DelayedImage2):
 
         warp_meta = ub.dict_isect(self.meta, {'dsize'})
         warp_meta.update(ub.dict_isect(
-            self.subdata.meta, {'antialias', 'interpolation'}))
+            self.subdata.meta, {'antialias', 'interpolation', 'border_value'}))
 
         new_inner = self.subdata.subdata.crop(inner_slice, outer_chan_idxs)
         new_outer = new_inner.warp(outer_transform, **warp_meta)

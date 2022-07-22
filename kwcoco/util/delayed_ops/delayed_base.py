@@ -79,6 +79,7 @@ class DelayedOperation2(ub.NiceRepr):
             if 'channels' in sub_meta:
                 sub_meta['channels'] = str(sub_meta['channels'].spec)
             sub_meta.pop('jagged', None)
+            sub_meta.pop('border_value', None)
             param_key = ub.repr2(sub_meta, sort=0, compact=1, nl=0, precision=4)
             short_type = item.__class__.__name__.replace('Delayed', '').replace('2', '')
             node_data = graph.nodes[node_id]
