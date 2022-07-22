@@ -5,6 +5,9 @@ replace the channel spec.
 
 Example:
     >>> # xdoctest: +REQUIRES(module:lark)
+    >>> # hack for 3.6
+    >>> from kwcoco import sensorchan_spec
+    >>> kwcoco.SensorChanSpec = sensorchan_spec.SensorChanSpec
     >>> import kwcoco
     >>> self = kwcoco.SensorChanSpec.coerce('sensor0:B1|B8|B8a|B10|B11,sensor1:B11|X.2|Y:2:6,sensor2:r|g|b|disparity|gauss|B8|B11,sensor3:r|g|b|flowx|flowy|distri|B10|B11')
     >>> self.normalize()
@@ -316,6 +319,7 @@ class SensorChanSpec(ub.NiceRepr):
         Returns the channel-only spec, ONLY if all of the sensors are the same
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:lark)
             >>> import kwcoco
             >>> self = kwcoco.SensorChanSpec.coerce('(S1,S2):(a|b|c),S2:c|d|e')
             >>> import pytest
