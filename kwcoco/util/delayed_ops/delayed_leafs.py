@@ -273,7 +273,7 @@ class DelayedNans2(DelayedImageLeaf2):
         new = self.__class__(new_dsize, channels=channels)
         return new
 
-    def warp(self, transform, dsize=None, antialias=True, interpolation='linear'):
+    def warp(self, transform, dsize=None, antialias=True, interpolation='linear', border_value='auto'):
         """
         Returns:
             DelayedImage2

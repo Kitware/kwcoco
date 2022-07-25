@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.3.3 - Unreleased
 
+### Fixed
+* Bug where delayed nan did not have the right warp signature.
+* Bug in boids when speed was 0.
+
 
 ## Version 0.3.2 - Released 2022-07-22
 

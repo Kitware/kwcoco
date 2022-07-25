@@ -191,7 +191,7 @@ class Boids(ub.NiceRepr):
 
         # Compute speed and direction of every boid
         self.speeds = np.linalg.norm(self.vel, axis=1)
-        self.dirs = self.vel / self.speeds[:, None]
+        self.dirs = self.vel / np.maximum(self.speeds[:, None], 1e-9)
 
     def compute_forces(self):
         self.update_neighbors()

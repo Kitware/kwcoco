@@ -971,6 +971,8 @@ class DelayedWarp2(DelayedImage2):
         # TODO: we could configure this, but forcing nans on floats seems like
         # a pretty nice default border behavior. It would be even nicer to have
         # masked arrays for ints.
+        # The scalar / explicit functionality will be handled inside warp_affine
+        # in the future, so some of this can be removed.
         num_chan = kwimage.num_channels(prewarp)
         if self.meta['border_value'] == 'auto':
             if prewarp.dtype.kind == 'f':
@@ -980,7 +982,14 @@ class DelayedWarp2(DelayedImage2):
         else:
             border_value = self.meta['border_value']
         if not ub.iterable(border_value):
-            border_value = (border_value,) * num_chan
+            # Odd OpenCV behavior: https://github.com/opencv/opencv/issues/22283
+            # Can only have at most 4 components to border_value and
+            # then they start to wrap around. This is fine if we are only
+            # specifying a single number for all channels
+            border_value = (border_value,) * min(4, num_chan)
+        if len(border_value) > 4:
+            raise ValueError('borderValue cannot have more than 4 components. '
+                             'OpenCV #22283 describes why')
 
         # HACK:
         # the border value only correctly applies to the first 4 channels for
