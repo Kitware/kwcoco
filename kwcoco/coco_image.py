@@ -541,7 +541,7 @@ class CocoImage(ub.NiceRepr):
     @profile
     def delay(self, channels=None, space='image', bundle_dpath=None,
               interpolation='linear', antialias=True, nodata_method=None,
-              jagged=False, mode=1):
+              mode=1):
         """
         Perform a delayed load on the data in this image.
 
@@ -563,10 +563,6 @@ class CocoImage(ub.NiceRepr):
             space (str):
                 can either be "image" for loading in image space, or
                 "video" for loading in video space.
-
-            jagged (bool):
-                if True, then does not concatenate the channels and instead
-                returns a delayed jagged concatenate.
 
         TODO:
             - [X] Currently can only take all or none of the channels from each
@@ -674,9 +670,6 @@ wc
             >>> fused_channels = stream1 | stream2
             >>> with pytest.raises(kwcoco.exceptions.CoordinateCompatibilityError):
             >>>     aux_delayed2 = coco_img.delay(fused_channels, space='asset')
-            >>> # But we can if we allow jagged-ness
-            >>> aux_delayed3 = coco_img.delay(fused_channels, space='asset', jagged=True)
-            >>> aux_delayed3.finalize()
         """
         from kwimage.transform import Affine
         from kwcoco.channel_spec import FusedChannelSpec
@@ -739,7 +732,9 @@ wc
                     delayed = DelayedNans(dsize=dsize, channels=requested)
                 elif mode == 1:
                     from kwcoco.util.delayed_ops import DelayedNans2
+                    from kwcoco.util.delayed_ops import DelayedChannelConcat2
                     delayed = DelayedNans2(dsize=dsize, channels=requested)
+                    delayed = DelayedChannelConcat2([delayed])
                 else:
                     raise KeyError(mode)
                 return delayed
@@ -748,10 +743,10 @@ wc
         else:
             if mode == 0:
                 from kwcoco.util.util_delayed_poc import DelayedChannelConcat
-                delayed = DelayedChannelConcat(chan_list, jagged=jagged)
+                delayed = DelayedChannelConcat(chan_list)
             elif mode == 1:
                 from kwcoco.util.delayed_ops import DelayedChannelConcat2
-                delayed = DelayedChannelConcat2(chan_list, jagged=jagged)
+                delayed = DelayedChannelConcat2(chan_list)
             else:
                 raise KeyError(mode)
 
@@ -777,8 +772,8 @@ wc
         else:
             raise KeyError('space = {}'.format(space))
 
-        if mode == 1:
-            delayed = delayed.optimize()
+        # if mode == 1:
+        #     delayed = delayed.optimize()
 
         return delayed
 

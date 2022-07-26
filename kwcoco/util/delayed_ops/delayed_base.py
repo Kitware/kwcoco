@@ -58,51 +58,78 @@ class DelayedOperation2(ub.NiceRepr):
         Returns:
             networkx.DiGraph
         """
-        import networkx as nx
-        import itertools as it
-        counter = it.count(0)
-        graph = nx.DiGraph()
-        stack = [(None, self)]
-        while stack:
-            parent_id, item = stack.pop()
-            # There might be copies of the same node in concat graphs so, we
-            # cant assume the id will be unique. We can assert a forest
-            # structure though.
-            node_id = f'{next(counter):03d}_{id(item)}'
-            graph.add_node(node_id)
-            if parent_id is not None:
-                graph.add_edge(parent_id, node_id)
-            sub_meta = {k: v for k, v in item.meta.items() if v is not None}
+        graph = self._traversed_graph()
+        for node_id, node_data in graph.nodes(data=True):
+            item = node_data['obj']
+            sub_meta = node_data['meta']
+            # Add some concise labels to the graph
             if 'transform' in sub_meta:
                 sub_meta['transform'] = sub_meta['transform'].concise()
                 sub_meta['transform'].pop('type')
             if 'channels' in sub_meta:
                 sub_meta['channels'] = str(sub_meta['channels'].spec)
+                sub_meta.pop('num_channels', None)
             sub_meta.pop('jagged', None)
             sub_meta.pop('border_value', None)
+            sub_meta.pop('antialias', None)
+            sub_meta.pop('interpolation', None)
+            if 'fpath' in sub_meta:
+                sub_meta['fname'] = ub.Path(sub_meta.pop('fpath')).name
             param_key = ub.repr2(sub_meta, sort=0, compact=1, nl=0, precision=4)
             short_type = item.__class__.__name__.replace('Delayed', '').replace('2', '')
-            node_data = graph.nodes[node_id]
             node_data['label'] = f'{short_type} {param_key}'
-            node_data['short_type'] = short_type
-            node_data['type'] = item.__class__.__name__
-            node_data['meta'] = sub_meta
-            node_data['obj'] = item
-            for child in item.children():
-                stack.append((node_id, child))
         return graph
 
-    def _all_nodes(self):
+    def _traverse(self):
         """
+        A flat list of all descendent nodes and their parents
+
+        Yields:
+            Tuple[None | DelayedOperation2, DelayedOperation2] :
+                tules of parent / child nodes. Discarding the parents
+                will be a list of all nodes.
         """
         # Might be useful in _set_nested_params or other functions that
         # need to touch all descendants. This will be faster than recursion
         stack = [(None, self)]
         while stack:
-            _, item = stack.pop()
-            yield item
+            parent, item = stack.pop()
+            yield parent, item
             for child in item.children():
-                stack.append((None, child))
+                stack.append((item, child))
+
+    def _traversed_graph(self):
+        """
+        A flat list of all descendent nodes and their parents
+        """
+        import networkx as nx
+        import itertools as it
+        counter = it.count(0)
+        graph = nx.DiGraph()
+
+        # Can't reuse traverse unfortunately
+        stack = [(None, self)]
+        while stack:
+            parent_id, item = stack.pop()
+
+            # There might be copies of the same node in concat graphs so, we
+            # cant assume the id will be unique. We can assert a forest
+            # structure though.
+            node_id = f'{next(counter):03d}_{id(item)}'
+
+            graph.add_node(node_id)
+            if parent_id is not None:
+                graph.add_edge(parent_id, node_id)
+
+            sub_meta = {k: v for k, v in item.meta.items() if v is not None}
+            node_data = graph.nodes[node_id]
+            node_data['type'] = item.__class__.__name__
+            node_data['meta'] = sub_meta
+            node_data['obj'] = item
+
+            for child in item.children():
+                stack.append((node_id, child))
+        return graph
 
     def write_network_text(self, with_labels=True):
         from kwcoco.util.delayed_ops.helpers import write_network_text

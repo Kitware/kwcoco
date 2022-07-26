@@ -248,7 +248,7 @@ class DelayedNans2(DelayedImageLeaf2):
         final = np.full(shape, fill_value=np.nan)
         return final
 
-    def crop(self, region_slices=None, chan_idxs=None):
+    def _optimized_crop(self, space_slice=None, chan_idxs=None):
         """
         Crops an image along integer pixel coordinates.
 
@@ -265,7 +265,7 @@ class DelayedNans2(DelayedImageLeaf2):
             channels = self.channels[chan_idxs]
         dsize = self.dsize
         data_dims = dsize[::-1]
-        data_slice, extra_pad = kwarray.embed_slice(region_slices, data_dims)
+        data_slice, extra_pad = kwarray.embed_slice(space_slice, data_dims)
         box = kwimage.Boxes.from_slice(data_slice)
         new_width = box.width.ravel()[0]
         new_height = box.height.ravel()[0]
@@ -273,7 +273,7 @@ class DelayedNans2(DelayedImageLeaf2):
         new = self.__class__(new_dsize, channels=channels)
         return new
 
-    def warp(self, transform, dsize=None, antialias=True, interpolation='linear', border_value='auto'):
+    def _optimized_warp(self, transform, dsize=None, antialias=True, interpolation='linear', border_value='auto'):
         """
         Returns:
             DelayedImage2

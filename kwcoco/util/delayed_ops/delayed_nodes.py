@@ -10,6 +10,7 @@ import warnings
 from kwcoco import exceptions
 from kwcoco import channel_spec
 from kwcoco.util.delayed_ops.delayed_base import DelayedNaryOperation2, DelayedUnaryOperation2
+from kwcoco.util.delayed_ops import delayed_leafs
 
 
 try:
@@ -183,36 +184,6 @@ class ImageOpsMixin:
         return DelayedAsXarray2(self)
 
 
-class JaggedArray2(ub.NiceRepr):
-    """
-    The result of an unaligned concatenate
-    """
-    def __init__(self, parts, axis):
-        """
-        Args:
-            parts (List[ArrayLike]): jagged stacked data
-            axis (List[DelayedArray2]): axis of the stack
-        """
-        self.parts = parts
-        self.axis = axis
-
-    def __nice__(self):
-        """
-        Returns:
-            str
-        """
-        return '{}, axis={}'.format(self.shape, self.axis)
-
-    @property
-    def shape(self):
-        """
-        Returns:
-            List[None | Tuple[int | None, ...]]:
-        """
-        shapes = [p.shape for p in self.parts]
-        return shapes
-
-
 class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
     """
     Stacks multiple arrays together.
@@ -231,14 +202,6 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
         >>> warped_cat._validate()
         >>> warped_cat.finalize()
-
-        # >>> dsize = (307, 311)
-        # >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
-        # >>> c2 = DelayedLoad2.demo('astro', channels='R|G|B').prepare()
-        # >>> cat = DelayedChannelConcat2([c1, c2], jagged=True)
-        # >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
-        # >>> warped_cat._validate()
-        # >>> warped_cat.optimize()._finalize()
 
     Example:
         >>> # Test case that failed in initial implementation
@@ -259,17 +222,14 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         >>> delayed.optimize()
     """
 
-    def __init__(self, parts, dsize=None, jagged=False):
+    def __init__(self, parts, dsize=None):
         """
         Args:
             parts (List[DelayedArray2]): data to concat
             dsize (Tuple[int, int] | None): size if known a-priori
         """
         super().__init__(parts=parts, axis=2)
-        if jagged:
-            raise NotImplementedError
-        self.meta['jagged'] = jagged
-        if dsize is None and not jagged:
+        if dsize is None:
             dsize_cands = [comp.dsize for comp in self.parts]
             if not ub.allsame(dsize_cands):
                 raise exceptions.CoordinateCompatibilityError(
@@ -320,10 +280,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         Returns:
             Tuple[int | None, int | None, int | None]
         """
-        if self.meta['jagged']:
-            w = h = None
-        else:
-            w, h = self.dsize
+        w, h = self.dsize
         return (h, w, self.num_channels)
 
     def _finalize(self):
@@ -335,11 +292,8 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         if len(stack) == 1:
             final = stack[0]
         else:
-            if self.meta['jagged']:
-                final = JaggedArray2(stack, axis=2)
-            else:
-                stack = [kwarray.atleast_nd(s, 3) for s in stack]
-                final = np.concatenate(stack, axis=2)
+            stack = [kwarray.atleast_nd(s, 3) for s in stack]
+            final = np.concatenate(stack, axis=2)
         return final
 
     def optimize(self):
@@ -348,7 +302,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
             DelayedImage2
         """
         new_parts = [part.optimize() for part in self.parts]
-        kw = ub.dict_isect(self.meta, ['dsize', 'jagged'])
+        kw = ub.dict_isect(self.meta, ['dsize'])
         new = self.__class__(new_parts, **kw)
         return new
 
@@ -512,7 +466,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
                     sub_comp = comp.take_channels(sub_idxs)
                     new_components.append(sub_comp)
 
-        new = DelayedChannelConcat2(new_components, jagged=self.meta['jagged'])
+        new = DelayedChannelConcat2(new_components)
         return new
 
     def __getitem__(self, sl):
@@ -562,21 +516,134 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         Check that the delayed metadata corresponds with the finalized data
         """
         final = self._finalize()
-        if not self.meta['jagged']:
-            # meta_dsize = self.dsize
-            meta_shape = self.shape
+        # meta_dsize = self.dsize
+        meta_shape = self.shape
 
-            final_shape = final.shape
+        final_shape = final.shape
 
-            correspondences = {
-                'shape': (final_shape, meta_shape)
-            }
-            for k, tup in correspondences.items():
-                v1, v2 = tup
-                if v1 != v2:
-                    raise AssertionError(
-                        f'final and meta {k} does not agree {v1!r} != {v2!r}')
+        correspondences = {
+            'shape': (final_shape, meta_shape)
+        }
+        for k, tup in correspondences.items():
+            v1, v2 = tup
+            if v1 != v2:
+                raise AssertionError(
+                    f'final and meta {k} does not agree {v1!r} != {v2!r}')
         return self
+
+    def undo_warps(self, remove=None, retain=None, squash_nans=False, return_warps=False):
+        """
+        Attempts to "undo" warping for each concatenated channel and returns a
+        list of delayed operations that are cropped to the right regions.
+
+        Typically you will retrain offset, theta, and shear to remove scale.
+        This ensures the data is spatially aligned up to a scale factor.
+
+        Args:
+            remove (List[str]): if specified, list components of the warping to
+                remove. Can include: "offset", "scale", "shearx", "theta".
+                Typically set this to ["scale"].
+
+            retain (List[str]): if specified, list components of the warping to
+                retain. Can include: "offset", "scale", "shearx", "theta".
+                Mutually exclusive with "remove". If neither remove or retain
+                is specified, retain is set to ``[]``.
+
+            squash_nans (bool):
+                if True, pure nan channels are squashed into a 1x1 array as
+                they do not correspond to a real source.
+
+            return_warps (bool):
+                if True, return the transforms we applied.
+                This is useful when you need to warp objects in the original
+                space into the jagged space.
+
+        Example:
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedNans2
+            >>> import ubelt as ub
+            >>> import kwimage
+            >>> import kwarray
+            >>> import numpy as np
+            >>> # Demo case where we have different channels at different resolutions
+            >>> base = DelayedLoad2.demo(channels='r|g|b').prepare().dequantize({'quant_max': 255})
+            >>> bandR = base[:, :, 0].scale(100 / 512)[:, :-50].evaluate()
+            >>> bandG = base[:, :, 1].scale(300 / 512).warp({'theta': np.pi / 8, 'about': (150, 150)}).evaluate()
+            >>> bandB = base[:, :, 2].scale(600 / 512)[:150, :].evaluate()
+            >>> bandN = DelayedNans2((600, 600), channels='N')
+            >>> # Make a concatenation of images of different underlying native resolutions
+            >>> delayed_vidspace = DelayedChannelConcat2([
+            >>>     bandR.scale(6, dsize=(600, 600)).optimize(),
+            >>>     bandG.warp({'theta': -np.pi / 8, 'about': (150, 150)}).scale(2, dsize=(600, 600)).optimize(),
+            >>>     bandB.scale(1, dsize=(600, 600)).optimize(),
+            >>>     bandN,
+            >>> ]).warp({'scale': 0.7}).optimize()
+            >>> vidspace_box = kwimage.Boxes([[100, 10, 270, 160]], 'ltrb')
+            >>> vidspace_poly = vidspace_box.to_polygons()[0]
+            >>> vidspace_slice = vidspace_box.to_slices()[0]
+            >>> self = delayed_vidspace[vidspace_slice].optimize()
+            >>> print('--- Aligned --- ')
+            >>> self.write_network_text()
+            >>> squash_nans = True
+            >>> undone_all_parts, tfs1 = self.undo_warps(squash_nans=squash_nans, return_warps=True)
+            >>> undone_scale_parts, tfs2 = self.undo_warps(remove=['scale'], squash_nans=squash_nans, return_warps=True)
+            >>> stackable_aligned = self.finalize().transpose(2, 0, 1)
+            >>> stackable_undone_all = []
+            >>> stackable_undone_scale = []
+            >>> print('--- Undone All --- ')
+            >>> for undone in undone_all_parts:
+            ...     undone.write_network_text()
+            ...     stackable_undone_all.append(undone.finalize())
+            >>> print('--- Undone Scale --- ')
+            >>> for undone in undone_scale_parts:
+            ...     undone.write_network_text()
+            ...     stackable_undone_scale.append(undone.finalize())
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> canvas0 = kwimage.stack_images(stackable_aligned, axis=1)
+            >>> canvas1 = kwimage.stack_images(stackable_undone_all, axis=1)
+            >>> canvas2 = kwimage.stack_images(stackable_undone_scale, axis=1)
+            >>> canvas0 = kwimage.draw_header_text(canvas0, 'Rescaled Aligned Channels')
+            >>> canvas1 = kwimage.draw_header_text(canvas1, 'Unwarped Channels')
+            >>> canvas2 = kwimage.draw_header_text(canvas2, 'Unscaled Channels')
+            >>> canvas = kwimage.stack_images([canvas0, canvas1, canvas2], axis=0)
+            >>> canvas = kwimage.fill_nans_with_checkers(canvas)
+            >>> kwplot.imshow(canvas)
+        """
+        valid_keys = {"offset", "scale", "shearx", "theta"}
+        if remove is not None and retain is not None:
+            raise ValueError('Mutex')
+        if remove is not None:
+            retain = valid_keys - set(remove)
+        else:
+            if retain is None:
+                retain = set()
+        unwarped_parts = []
+        jagged_warps = []
+        for part in self.parts:
+            tf_root_from_leaf = part.get_transform_from_leaf()
+            tf_leaf_from_root = tf_root_from_leaf.inv()
+            undo_all = tf_leaf_from_root
+            all_undo_components = undo_all.concise()
+            undo_components = ub.dict_diff(all_undo_components, retain)
+            undo_warp = kwimage.Affine.coerce(undo_components)
+            undone_part = part.warp(undo_warp).optimize()
+            if squash_nans:
+                if return_warps:
+                    # hack the return undo_warp
+                    w, h = undone_part.dsize
+                    undo_warp = kwimage.Affine.scale((1 / w, 1 / h)) @ undo_warp
+                if isinstance(undone_part, delayed_leafs.DelayedNans2):
+                    undone_part = undone_part[0:1, 0:1].optimize()
+            unwarped_parts.append(undone_part)
+            if return_warps:
+                jagged_warps.append(undo_warp)
+        if return_warps:
+            return unwarped_parts, jagged_warps
+        else:
+            return unwarped_parts
 
 
 class DelayedArray2(DelayedUnaryOperation2):
@@ -1021,6 +1088,16 @@ class DelayedWarp2(DelayedImage2):
             >>> new = self.optimize()
             >>> assert len(self.as_graph().nodes) == 2
             >>> assert len(new.as_graph().nodes) == 1
+
+        Example:
+            >>> # Test optimize nans
+            >>> from kwcoco.util.delayed_ops import DelayedNans2
+            >>> import kwimage
+            >>> base = DelayedNans2(dsize=(100, 100), channels='a|b|c')
+            >>> self = base.warp(kwimage.Affine.scale(0.1))
+            >>> # Should simply return a new nan generator
+            >>> new = self.optimize()
+            >>> assert len(new.as_graph().nodes) == 1
         """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
@@ -1033,6 +1110,12 @@ class DelayedWarp2(DelayedImage2):
             new = new.subdata
         elif isinstance(new.subdata, DelayedChannelConcat2):
             new = new._opt_push_under_concat().optimize()
+        elif hasattr(new.subdata, '_optimized_warp'):
+            # The subdata knows how to optimize itself wrt a warp
+            warp_kwargs = ub.dict_isect(self.meta, {
+                'transform', 'dsize', 'antialias', 'interpolation',
+                'border_value'})
+            new = new.subdata._optimized_warp(**warp_kwargs).optimize()
         else:
             split = new._opt_split_warp_overview()
             if new is not split:
@@ -1429,12 +1512,28 @@ class DelayedCrop2(DelayedImage2):
         """
         Returns:
             DelayedImage2
+
+        Example:
+            >>> # Test optimize nans
+            >>> from kwcoco.util.delayed_ops import DelayedNans2
+            >>> import kwimage
+            >>> base = DelayedNans2(dsize=(100, 100), channels='a|b|c')
+            >>> self = base[0:10, 0:5]
+            >>> # Should simply return a new nan generator
+            >>> new = self.optimize()
+            >>> self.write_network_text()
+            >>> new.write_network_text()
+            >>> assert len(new.as_graph().nodes) == 1
         """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
         if isinstance(new.subdata, DelayedCrop2):
             new = new._opt_fuse_crops()
 
+        if hasattr(new.subdata, '_optimized_crop'):
+            # The subdata knows how to optimize itself wrt this node
+            crop_kwargs = ub.dict_isect(self.meta, {'space_slice', 'chan_idxs'})
+            new = new.subdata._optimized_crop(**crop_kwargs).optimize()
         if isinstance(new.subdata, DelayedWarp2):
             new = new._opt_warp_after_crop()
             new = new.optimize()
@@ -1455,6 +1554,7 @@ class DelayedCrop2(DelayedImage2):
                 new = taken
             else:
                 new = new._opt_push_under_concat().optimize()
+
         return new
 
     def _transform_from_subdata(self):
