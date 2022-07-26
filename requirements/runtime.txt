@@ -1,6 +1,6 @@
 jsonschema >= 3.2.0
 kwarray >= 0.6.0
-kwimage >= 0.9.2
+kwimage >= 0.9.3
 
 # python ~/local/tools/supported_python_versions_pip.py networkx --request_min=2.2.0
 # python ~/local/tools/supported_python_versions_pip.py imageio
