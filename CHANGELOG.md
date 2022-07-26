@@ -5,7 +5,21 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.3.2 - Unreleased
+## Version 0.3.3 - Unreleased
+
+### Added
+* Ability to "undo warps" from delayed ops.
+
+### Changed
+* Removed Jagged from `delayed_ops`
+* NaNs are now optimized like other leafs.
+
+### Fixed
+* Bug where delayed nan did not have the right warp signature.
+* Bug in boids when speed was 0.
+
+
+## Version 0.3.2 - Released 2022-07-22
 
 ### Added
 * `with_bundle` flag to `iter_image_filepaths`
