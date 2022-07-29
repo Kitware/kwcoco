@@ -21,71 +21,93 @@ class Archive(object):
         https://pypi.org/project/arlib/
 
     Example:
-        >>> from os.path import join
-        >>> dpath = ub.ensure_app_cache_dir('ubelt', 'tests', 'archive')
-        >>> ub.delete(dpath)
-        >>> dpath = ub.ensure_app_cache_dir(dpath)
-        >>> import pathlib
-        >>> dpath = pathlib.Path(dpath)
-        >>> #
-        >>> #
+        >>> from kwcoco.util.util_archive import Archive
+        >>> import ubelt as ub
+        >>> dpath = ub.Path.appdir('kwcoco', 'tests', 'util', 'archive')
+        >>> dpath.delete().ensuredir()
+        >>> # Test write mode
         >>> mode = 'w'
-        >>> self1 = Archive(str(dpath / 'demo.zip'), mode=mode)
-        >>> self2 = Archive(str(dpath / 'demo.tar.gz'), mode=mode)
-        >>> #
+        >>> arc_zip = Archive(str(dpath / 'demo.zip'), mode=mode)
+        >>> arc_tar = Archive(str(dpath / 'demo.tar.gz'), mode=mode)
         >>> open(dpath / 'data_1only.txt', 'w').write('bazbzzz')
         >>> open(dpath / 'data_2only.txt', 'w').write('buzzz')
         >>> open(dpath / 'data_both.txt', 'w').write('foobar')
         >>> #
-        >>> self1.add(dpath / 'data_both.txt')
-        >>> self1.add(dpath / 'data_1only.txt')
+        >>> arc_zip.add(dpath / 'data_both.txt')
+        >>> arc_zip.add(dpath / 'data_1only.txt')
         >>> #
-        >>> self2.add(dpath / 'data_both.txt')
-        >>> self2.add(dpath / 'data_2only.txt')
+        >>> arc_tar.add(dpath / 'data_both.txt')
+        >>> arc_tar.add(dpath / 'data_2only.txt')
         >>> #
-        >>> self1.close()
-        >>> self2.close()
+        >>> arc_zip.close()
+        >>> arc_tar.close()
         >>> #
-        >>> self1 = Archive(str(dpath / 'demo.zip'), mode='r')
-        >>> self2 = Archive(str(dpath / 'demo.tar.gz'), mode='r')
+        >>> # Test read mode
+        >>> arc_zip = Archive(str(dpath / 'demo.zip'), mode='r')
+        >>> arc_tar = Archive(str(dpath / 'demo.tar.gz'), mode='r')
+        >>> # Test names
+        >>> name = 'data_both.txt'
+        >>> assert name in arc_zip.names()
+        >>> assert name in arc_tar.names()
+        >>> # Test read
+        >>> assert arc_zip.read(name, mode='r') == 'foobar'
+        >>> assert arc_tar.read(name, mode='r') == 'foobar'
         >>> #
+        >>> # Test extractall
         >>> extract_dpath = ub.ensuredir(str(dpath / 'extracted'))
-        >>> extracted1 = self1.extractall(extract_dpath)
-        >>> extracted2 = self2.extractall(extract_dpath)
+        >>> extracted1 = arc_zip.extractall(extract_dpath)
+        >>> extracted2 = arc_tar.extractall(extract_dpath)
         >>> for fpath in extracted2:
         >>>     print(open(fpath, 'r').read())
         >>> for fpath in extracted1:
         >>>     print(open(fpath, 'r').read())
     """
-    def __init__(self, fpath=None, mode='r', backend=None, file=None):
+    _available_backends = {
+        'tarfile': tarfile,
+        'zipfile': zipfile,
+    }
 
+    def __init__(self, fpath=None, mode='r', backend=None, file=None):
+        """
+        Args:
+            fpath (str): path to open
+
+            mode (str): either r or w
+
+            backend (str | ModuleType):
+                either tarfile, zipfile string or module.
+
+            file (tarfile.TarFile | zipfile.ZipFile | None):
+                the open backend file if it already exists.
+                If not set, than fpath will open it.
+        """
         self.fpath = fpath
         self.mode = mode
         self.file = file
-        self.backend = backend
+        self.backend = self._available_backends.get(backend, backend)
 
         if file is None:
-            file, backend = self._open(fpath, mode)
+            file, backend = self._open(fpath, mode, backend)
             self.file = file
             self.backend = backend
 
     @classmethod
-    def _open(cls, fpath, mode):
-        if isinstance(fpath, os.PathLike):
-            fpath = str(fpath)
+    def _open(cls, fpath, mode, backend=None):
+        fpath = os.fspath(fpath)
         exist_flag = os.path.exists(fpath)
-        if fpath.endswith('.tar.gz'):
-            backend = tarfile
-        elif fpath.endswith('.zip'):
-            backend = zipfile
-        else:
-            if exist_flag and zipfile.is_zipfile(fpath):
-                backend = zipfile
-            elif exist_flag and tarfile.is_tarfile(fpath):
+        backend = cls._available_backends.get(backend, backend)
+        if backend is None:
+            if fpath.endswith('.tar.gz'):
                 backend = tarfile
+            elif fpath.endswith('.zip'):
+                backend = zipfile
             else:
-                raise NotImplementedError('no-exist case')
-
+                if exist_flag and zipfile.is_zipfile(fpath):
+                    backend = zipfile
+                elif exist_flag and tarfile.is_tarfile(fpath):
+                    backend = tarfile
+                else:
+                    raise NotImplementedError('no-exist case')
         if backend is zipfile:
             if exist_flag and not zipfile.is_zipfile(fpath):
                 raise Exception('corrupted zip?')
@@ -99,11 +121,60 @@ class Archive(object):
         return file, backend
 
     def __iter__(self):
+        return self.names()
+
+    def names(self):
         if self.backend is tarfile:
             return (mem.name for mem in self.file)
         elif self.backend is zipfile:
             # does zip have an iterable structure?
             return iter(self.file.namelist())
+
+    def read(self, name, mode='rb'):
+        """
+        Read data directly out of the archive.
+
+        Args:
+            name (str):
+                the name of the archive member to read
+
+            mode (str):
+                This is a conceptual parameter that emulates the usual
+                open mode. Defaults to "rb", which returns data as raw bytes.
+                If "r" will decode the bytes into utf8-text.
+        """
+        if self.backend is tarfile:
+            # a rework of makefile in tarfile.
+            import io
+            from tarfile import copyfileobj, ReadError
+            self.file._check("r")
+            tarinfo = self.file.getmember(name)
+            source = self.file.fileobj
+            source.seek(tarinfo.offset_data)
+            bufsize = self.file.copybufsize
+            target = io.BytesIO()
+            if tarinfo.sparse is not None:
+                for offset, size in tarinfo.sparse:
+                    target.seek(offset)
+                    copyfileobj(source, target, size, ReadError, bufsize)
+                target.seek(tarinfo.size)
+                target.truncate()
+            else:
+                copyfileobj(source, target, tarinfo.size, ReadError, bufsize)
+            target.seek(0)
+            data = target.read()
+        elif self.backend is zipfile:
+            # does zip have an iterable structure?
+            data = self.file.read(name)
+        else:
+            raise NotImplementedError
+
+        if mode == 'rb':
+            return data
+        elif mode == 'r':
+            return data.decode('utf8')
+        else:
+            raise KeyError(mode)
 
     @classmethod
     def coerce(cls, data):
@@ -117,7 +188,7 @@ class Archive(object):
             fpath = data.fp.name
             return cls(fpath, file=data, backend=zipfile)
         else:
-            pass
+            raise NotImplementedError
 
     def add(self, fpath, arcname=None):
         if arcname is None:

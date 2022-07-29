@@ -115,6 +115,13 @@ generated toy image with and without overlaid annotations.
    :align: left
 
 
+Video data, multispectral, and multi-sensor demo data is supported.
+
+
+.. image:: https://i.imgur.com/LNBkckz.mp4
+   :height: 100px
+   :align: left
+
 
 The CocoDataset object
 ----------------------
