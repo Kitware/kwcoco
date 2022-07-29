@@ -118,7 +118,7 @@ generated toy image with and without overlaid annotations.
 Video data, multispectral, and multi-sensor demo data is supported.
 
 
-.. image:: https://i.imgur.com/LNBkckz.mp4
+.. image:: https://i.imgur.com/LNBkckz.gif
    :height: 100px
    :align: left
 
