@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.3.4 - Unreleased
 
+### Changed
+* kwcoco will now use ujson to read json files by default if it is available.
+* Added runtime deprecation noticed to deprecated functions
+
 
 ## Version 0.3.3 - Released 2022-07-26
 

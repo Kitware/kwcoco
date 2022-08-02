@@ -1,4 +1,7 @@
 """
+THIS WILL BE DEPRECATED in favor of delayed_ops
+
+
 This module is ported from ndsampler, and will likely eventually move to
 kwimage and be refactored using pymbolic
 
@@ -872,6 +875,16 @@ class DelayedLoad(DelayedImageOperation):
         """
         nodata_method = kwargs.get('nodata_method', kwargs.get('nodata', None))
         overview = kwargs.get('overview', None)
+
+        # Tenative deprecation
+        ub.schedule_deprecation(
+            'kwcoco', name='kwcoco.util.util_delayed_poc', type='module',
+            deprecate='0.4.0', error='1.0.0', remove='1.1.0',
+            migration=(
+                'The util_delayed_poc will be replaced in favor of '
+                'delayed_ops at some point in the future.'
+            )
+        )
 
         # Probably should not use a cache here?
         # final = self.cache.get('final', None)
