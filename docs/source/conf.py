@@ -305,8 +305,8 @@ class PatchedPythonDomain(PythonDomain):
         return return_value
 
 
-def process(app, what_: str, name: str, obj: Any, options: Any, lines:
-            List[str]) -> None:
+def process_docstring(app, what_: str, name: str, obj: Any, options: Any,
+                      lines: List[str]) -> None:
     """
     Custom process to transform docstring lines Remove "Ignore" blocks
 
@@ -381,13 +381,20 @@ def process(app, what_: str, name: str, obj: Any, options: Any, lines:
     if lines and lines[-1]:
         lines.append('')
 
+    if 1:
+        # DEVELOPING
+        if any('REQUIRES(--show)' in line for line in lines):
+            # import xdev
+            # xdev.embed()
+            create_figure(app, obj, name, lines)
+
 
 def setup(app):
     app.add_domain(PatchedPythonDomain, override=True)
     if 1:
         # New Way
         # what = None
-        app.connect('autodoc-process-docstring', process)
+        app.connect('autodoc-process-docstring', process_docstring)
     else:
         # OLD WAY
         # https://stackoverflow.com/questions/26534184/can-sphinx-ignore-certain-tags-in-python-docstrings
@@ -397,3 +404,53 @@ def setup(app):
         # app.connect('autodoc-process-docstring', between('^ *Ignore:$', exclude=True))
         pass
     return app
+
+
+def create_figure(app, obj, name, lines):
+    """
+    The idea is that each doctest that produces a figure should generate that
+    and then that figure should be part of the docs.
+    """
+    import xdoctest
+    import sys
+    import types
+    if isinstance(obj, types.ModuleType):
+        module = obj
+    else:
+        module = sys.modules[obj.__module__]
+    sys.argv.append('--show')
+    sys.argv.append('--nointeract')
+    modpath = module.__file__
+
+    import kwplot
+    kwplot.autompl(force='agg')
+
+    docstr = '\n'.join(lines)
+
+    doctests = list(xdoctest.core.parse_docstr_examples(
+        docstr, modpath=modpath, callname=name))
+
+    # print(doctest.format_src())
+    import ubelt as ub
+    doc_outdir = ub.Path(app.outdir)
+    # fig_dpath = (doc_outdir / 'autofigs' / name).ensuredir()
+    fig_dpath = (doc_outdir / 'autofigs').ensuredir()
+
+    fig_num = 1
+    for doctest in doctests:
+        ...
+        from _pytest.outcomes import Skipped
+        try:
+            doctest.run(on_error='return')
+        except Skipped:
+            pass
+
+        figures = kwplot.all_figures()
+        for fig in figures:
+            fig_num += 1
+            # path_name = path_sanatize(name)
+            path_name = (name).replace('.', '_')
+            fig_fpath = fig_dpath / f'fig_{path_name}_{fig_num:03d}.jpg'
+            fig.savefig(fig_fpath)
+            print(f'Wrote figure: {fig_fpath}')
+        kwplot.close_figures(figures)

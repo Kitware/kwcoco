@@ -26,3 +26,4 @@ lark>=1.1.2
 lark_cython>=0.0.11
 
 ujson>=5.2.0 
+kwimage_ext >= 0.2.0
