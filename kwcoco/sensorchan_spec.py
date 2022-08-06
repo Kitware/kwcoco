@@ -271,7 +271,7 @@ class SensorChanSpec(ub.NiceRepr):
             >>> c = kwcoco.SensorChanSpec.coerce('')
             >>> d = kwcoco.SensorChanSpec.coerce('rgb')
             >>> others = [b, c, d]
-            >>> print(self.late_fuse(*others).spec)
+            >>> print(a.late_fuse(*others).spec)
             >>> print(kwcoco.SensorChanSpec.late_fuse(a, b, c, d).spec)
             A|B|C,edf,A12,rgb
             A|B|C,edf,A12,rgb
