@@ -505,7 +505,7 @@ class GoogleStyleDocstringProcessor:
         #     import xdev
         #     xdev.embed()
 
-        if 0:
+        if 1:
             # DEVELOPING
             if any('REQUIRES(--show)' in line for line in lines):
                 # import xdev
