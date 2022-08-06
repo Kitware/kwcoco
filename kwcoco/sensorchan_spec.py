@@ -223,6 +223,9 @@ class SensorChanSpec(ub.NiceRepr):
         Example:
             >>> # xdoctest: +REQUIRES(module:lark)
             >>> import kwcoco
+            >>> from kwcoco import sensorchan_spec
+            >>> import kwcoco
+            >>> kwcoco.SensorChanSpec = sensorchan_spec.SensorChanSpec  # hack for 3.6
             >>> a = kwcoco.SensorChanSpec.coerce('A|B|C,edf')
             >>> b = kwcoco.SensorChanSpec.coerce('A12')
             >>> c = kwcoco.SensorChanSpec.coerce('')
