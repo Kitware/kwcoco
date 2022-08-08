@@ -218,11 +218,14 @@ class SensorChanSpec(ub.NiceRepr):
             for part in parts]
         return streams
 
-    def late_fuse(self, other):
+    def late_fuse(self, *others):
         """
         Example:
             >>> # xdoctest: +REQUIRES(module:lark)
             >>> import kwcoco
+            >>> from kwcoco import sensorchan_spec
+            >>> import kwcoco
+            >>> kwcoco.SensorChanSpec = sensorchan_spec.SensorChanSpec  # hack for 3.6
             >>> a = kwcoco.SensorChanSpec.coerce('A|B|C,edf')
             >>> b = kwcoco.SensorChanSpec.coerce('A12')
             >>> c = kwcoco.SensorChanSpec.coerce('')
@@ -262,12 +265,25 @@ class SensorChanSpec(ub.NiceRepr):
             *:(A12,A|B|C,edf)
             *:(A|B|C,edf,A12,)
             *:(A|B|C,edf,A12,,r|g|b)
+
+        Example:
+            >>> # Test multi-arg case
+            >>> import kwcoco
+            >>> a = kwcoco.SensorChanSpec.coerce('A|B|C,edf')
+            >>> b = kwcoco.SensorChanSpec.coerce('A12')
+            >>> c = kwcoco.SensorChanSpec.coerce('')
+            >>> d = kwcoco.SensorChanSpec.coerce('rgb')
+            >>> others = [b, c, d]
+            >>> print(a.late_fuse(*others).spec)
+            >>> print(kwcoco.SensorChanSpec.late_fuse(a, b, c, d).spec)
+            A|B|C,edf,A12,rgb
+            A|B|C,edf,A12,rgb
         """
-        if not self.spec:
-            return other
-        if not other.spec:
-            return self
-        return SensorChanSpec.coerce(self.spec + ',' + other.spec)
+        import itertools as it
+        args = it.chain([self], others)
+        specs = [s.spec for s in args if s.spec]
+        new_spec = ','.join(specs)
+        return SensorChanSpec.coerce(new_spec)
 
     def __add__(self, other):
         """

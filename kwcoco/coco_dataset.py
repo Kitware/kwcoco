@@ -316,18 +316,7 @@ import itertools as it
 
 # We can use ujson as long as my patch is in it. It does seem faster.
 # See https://github.com/ultrajson/ultrajson/pull/514
-import json as pjson
-# try:
-#     raise ImportError
-#     import ujson
-# except ImportError:
-import json
-# else:
-#     # if ujson.__version__ > '5.1':
-#     if ujson.__version__ == '5.1.1.dev18':
-#         import ujson as json
-#     else:
-#         import json
+from packaging.version import parse as Version
 
 # import ujson as json  # TODO: can we improve speed with ujson?
 import numpy as np
@@ -350,6 +339,23 @@ from kwcoco._helpers import (
     SortedSetQuiet, UniqueNameRemapper, _ID_Remapper, _NextId,
     _delitems, _lut_frame_index
 )
+
+import json as pjson
+# The ujson library is faster than Python's json, but the API has some
+# limitations and requires a minimum version. Currently we only use it to read,
+# we have to wait for https://github.com/ultrajson/ultrajson/pull/518 to land
+# before we use it to write.
+try:
+    import ujson
+except ImportError:
+    ujson = None
+
+if ujson is not None and Version(ujson.__version__) >= Version('5.2.0'):
+    json_r = ujson
+    json_w = pjson
+else:
+    json_r = pjson
+    json_w = pjson
 
 # Does having __all__ prevent readthedocs from building mixins?
 # __all__ = [
@@ -672,7 +678,8 @@ class MixinCocoAccessors(object):
             Dict: keypoint category dictionary
 
         Example:
-            >>> self = CocoDataset.demo('shapes')
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('shapes')
             >>> kpcat1 = self._resolve_to_kpcat(1)
             >>> kpcat2 = self._resolve_to_kpcat('left_eye')
             >>> assert kpcat1 is kpcat2
@@ -725,7 +732,8 @@ class MixinCocoAccessors(object):
             If the index is not built, the method will work but may be slow.
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> cat = self._resolve_to_cat('human')
             >>> import pytest
             >>> assert self._resolve_to_cat(cat['id']) is cat
@@ -770,7 +778,8 @@ class MixinCocoAccessors(object):
             dict: coco category dictionary
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> cat = self._alias_to_cat('human')
             >>> import pytest
             >>> with pytest.raises(KeyError):
@@ -820,7 +829,8 @@ class MixinCocoAccessors(object):
                 (e.g. category id) are added as node properties.
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> graph = self.category_graph()
             >>> assert 'astronaut' in graph.nodes()
             >>> assert 'keypoints' in graph.nodes['human']
@@ -849,7 +859,8 @@ class MixinCocoAccessors(object):
             kwcoco.CategoryTree: category data structure
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> classes = self.object_categories()
             >>> print('classes = {}'.format(classes))
         """
@@ -866,7 +877,8 @@ class MixinCocoAccessors(object):
             kwcoco.CategoryTree: category data structure
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> classes = self.keypoint_categories()
             >>> print('classes = {}'.format(classes))
         """
@@ -900,7 +912,8 @@ class MixinCocoAccessors(object):
                 names - list of keypoint category names
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> names = self._keypoint_category_names()
             >>> print(names)
         """
@@ -1326,10 +1339,15 @@ class MixinCocoExtras(object):
         Construct a hash that uniquely identifies the state of this dataset.
 
         Args:
-            hash_pixels (bool, default=False): If False the image data is not
-                included in the hash, which can speed up computation, but is
-                not 100% robust.
+            hash_pixels (bool):
+                If False the image data is not included in the hash, which can
+                speed up computation, but is not 100% robust. Defaults to
+                False.
+
             verbose (int): verbosity level
+
+        Returns:
+            str: the hashid
 
         Example:
             >>> import kwcoco
@@ -1337,6 +1355,7 @@ class MixinCocoExtras(object):
             >>> self._build_hashid(hash_pixels=True, verbose=3)
             ...
             >>> # Shorten hashes for readability
+            >>> import ubelt as ub
             >>> walker = ub.IndexableWalker(self.hashid_parts)
             >>> for path, val in walker:
             >>>     if isinstance(val, str):
@@ -1361,8 +1380,9 @@ class MixinCocoExtras(object):
             }
             self.hashid = '77d445f0'
 
-        Doctest:
-            >>> self = CocoDataset.demo()
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> self._build_hashid(hash_pixels=True, verbose=3)
             >>> self.hashid_parts
             >>> # Test that when we modify the dataset only the relevant
@@ -1424,12 +1444,12 @@ class MixinCocoExtras(object):
                 _anns_ordered = (self.anns[aid] for aid in aids)
                 anns_ordered = [_ditems(ann) for ann in _anns_ordered]
                 try:
-                    anns_text = pjson.dumps(anns_ordered)
+                    anns_text = json_w.dumps(anns_ordered)
                 except TypeError:
                     if __debug__:
                         for ann in anns_ordered:
                             try:
-                                pjson.dumps(ann)
+                                json_w.dumps(ann)
                             except TypeError:
                                 print('FAILED TO ENCODE ann = {!r}'.format(ann))
                                 break
@@ -1445,7 +1465,7 @@ class MixinCocoExtras(object):
             if not hashid_parts['images'].get('json', None):
                 if gids is None:
                     gids = sorted(self.imgs.keys())
-                imgs_text = pjson.dumps(
+                imgs_text = json_w.dumps(
                     [_ditems(self.imgs[gid]) for gid in gids])
                 hashid_parts['images']['json'] = ub.hash_data(
                     imgs_text, hasher='sha512')
@@ -1456,7 +1476,7 @@ class MixinCocoExtras(object):
 
             if not hashid_parts['categories'].get('json', None):
                 cids = sorted(self.cats.keys())
-                cats_text = pjson.dumps(
+                cats_text = json_w.dumps(
                     [_ditems(self.cats[cid]) for cid in cids])
                 hashid_parts['categories']['json'] = ub.hash_data(
                     cats_text, hasher='sha512')
@@ -1521,7 +1541,7 @@ class MixinCocoExtras(object):
                 'st_mtime': fpath_stat.st_mtime
             }
             if hashid_sidecar_fpath.exists():
-                cached_data = json.loads(hashid_sidecar_fpath.read_text())
+                cached_data = json_r.loads(hashid_sidecar_fpath.read_text())
                 if cached_data['status_key'] == status_key:
                     self.hashid = cached_data['hashid']
                     self.hashid_parts = cached_data['hashid_parts']
@@ -1535,7 +1555,7 @@ class MixinCocoExtras(object):
                     'hashid_parts': self.hashid_parts,
                     'status_key': status_key,
                 }
-                hashid_sidecar_fpath.write_text(json.dumps(hashid_cache_data))
+                hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
         return self.hashid
 
     def _dataset_id(self):
@@ -1582,7 +1602,8 @@ class MixinCocoExtras(object):
 
         Example:
             >>> # Normal case
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> bad_imgs = self._ensure_imgsize()
             >>> assert len(bad_imgs) == 0
             >>> assert self.imgs[1]['width'] == 512
@@ -1590,7 +1611,7 @@ class MixinCocoExtras(object):
             >>> assert self.imgs[3]['width'] == 256
 
             >>> # Fail cases
-            >>> self = CocoDataset()
+            >>> self = kwcoco.CocoDataset()
             >>> self.add_image('does-not-exist.jpg')
             >>> bad_imgs = self._ensure_imgsize()
             >>> assert len(bad_imgs) == 1
@@ -2358,8 +2379,9 @@ class MixinCocoStats(object):
         DEPRECATED
 
         Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo('shapes', rng=0)
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> self = kwcoco.CocoDataset.demo('shapes', rng=0)
             >>> hist = self.keypoint_annotation_frequency()
             >>> hist = ub.odict(sorted(hist.items()))
             >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
@@ -2372,6 +2394,16 @@ class MixinCocoStats(object):
                 'top_tip': 6,
             }
         """
+        ub.schedule_deprecation(
+            'kwcoco', name='keypoint_annotation_frequency', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'Implement this functionality explicitly. '
+                'It is too niche for a the core API.'
+                'Or propose a better way on '
+                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
+            )
+        )
         ann_kpcids = [kp['keypoint_category_id']
                       for ann in self.dataset['annotations']
                       for kp in ann.get('keypoints', [])]
@@ -2387,8 +2419,8 @@ class MixinCocoStats(object):
         Reports the number of annotations of each category
 
         Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> hist = self.category_annotation_frequency()
             >>> print(ub.repr2(hist))
             {
@@ -2416,11 +2448,22 @@ class MixinCocoStats(object):
         Reports the number of annotations of each type for each category
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> hist = self.category_annotation_frequency()
             >>> print(ub.repr2(hist))
         """
         catname_to_nannot_types = {}
+        ub.schedule_deprecation(
+            'kwcoco', name='category_annotation_type_frequency', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'Implement this functionality explicitly. '
+                'It is too niche for a the core API.'
+                'Or propose a better way on '
+                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
+            )
+        )
 
         def _annot_type(ann):
             """
@@ -2584,8 +2627,8 @@ class MixinCocoStats(object):
             :func:`_check_integrity` - performs internal checks
 
         Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> import pytest
             >>> with pytest.warns(UserWarning):
             >>>     result = self.validate()
@@ -2883,7 +2926,8 @@ class MixinCocoStats(object):
             :func:`kwcoco.coco_dataset.MixinCocoStats.extended_stats`
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> print(ub.repr2(self.extended_stats()))
         """
         def mapping_stats(xid_to_yids):
@@ -3118,10 +3162,17 @@ class MixinCocoDraw(object):
 
     def imread(self, gid):
         """
-        DEPRECATE: use load_image or delayed_image
+        DEPRECATED: use load_image or delayed_image
 
         Loads a particular image
         """
+        ub.schedule_deprecation(
+            'kwcoco', name='imread', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'use `self.coco_image(gid).delay().finalize()`.'
+            )
+        )
         return self.load_image(gid)
 
     def draw_image(self, gid, channels=None):
@@ -3567,7 +3618,8 @@ class MixinCocoAddRemove(object):
             :func:`ensure_image`
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> import kwimage
             >>> gname = kwimage.grab_test_image_fpath('paraview')
             >>> gid = self.add_image(gname)
@@ -3800,7 +3852,8 @@ class MixinCocoAddRemove(object):
             :func:`kwcoco.coco_dataset.MixinCocoAddRemove.ensure_category`
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> prev_n_cats = self.n_cats
             >>> cid = self.add_category('dog', supercategory='object')
             >>> assert self.cats[cid]['name'] == 'dog'
@@ -3900,7 +3953,8 @@ class MixinCocoAddRemove(object):
             :func:`add_annotations`
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> anns = [self.anns[aid] for aid in [2, 3, 5, 7]]
             >>> self.remove_annotations(anns)
             >>> assert self.n_annots == 7 and self._check_index()
@@ -3934,8 +3988,9 @@ class MixinCocoAddRemove(object):
             :func:`kwcoco.coco_dataset.MixinCocoAddRemove.ensure_image`
 
         Example:
-            >>> imgs = CocoDataset.demo().dataset['images']
-            >>> self = CocoDataset()
+            >>> import kwcoco
+            >>> imgs = kwcoco.CocoDataset.demo().dataset['images']
+            >>> self = kwcoco.CocoDataset()
             >>> self.add_images(imgs)
             >>> assert self.n_images == 3 and self._check_index()
         """
@@ -3948,7 +4003,8 @@ class MixinCocoAddRemove(object):
         Removes all images and annotations (but not categories)
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> self.clear_images()
             >>> print(ub.repr2(self.basic_stats(), nobr=1, nl=0, si=1))
             n_anns: 0, n_imgs: 0, n_videos: 0, n_cats: 8
@@ -3965,7 +4021,8 @@ class MixinCocoAddRemove(object):
         Removes all annotations (but not images and categories)
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> self.clear_annotations()
             >>> print(ub.repr2(self.basic_stats(), nobr=1, nl=0, si=1))
             n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8
@@ -4066,7 +4123,8 @@ class MixinCocoAddRemove(object):
             Dict: num_removed: information on the number of items removed
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> cat_identifiers = [self.cats[1], 'rocket', 3]
             >>> self.remove_categories(cat_identifiers)
             >>> assert len(self.dataset['categories']) == 5
@@ -4135,8 +4193,8 @@ class MixinCocoAddRemove(object):
             Dict: num_removed: information on the number of items removed
 
         Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> assert len(self.dataset['images']) == 3
             >>> gids_or_imgs = [self.imgs[2], 'astro.png']
             >>> self.remove_images(gids_or_imgs)  # xdoc: +IGNORE_WANT
@@ -4197,8 +4255,8 @@ class MixinCocoAddRemove(object):
             Dict: num_removed: information on the number of items removed
 
         Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo('vidshapes8')
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8')
             >>> assert len(self.dataset['videos']) == 8
             >>> vidids_or_videos = [self.dataset['videos'][0]['id']]
             >>> self.remove_videos(vidids_or_videos)  # xdoc: +IGNORE_WANT
@@ -4278,7 +4336,8 @@ class MixinCocoAddRemove(object):
             Dict: num_removed: information on the number of items removed
 
         Example:
-            >>> self = CocoDataset.demo('shapes', rng=0)
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('shapes', rng=0)
             >>> kp_identifiers = ['left_eye', 'mid_tip']
             >>> remove_info = self.remove_keypoint_categories(kp_identifiers)
             >>> print('remove_info = {!r}'.format(remove_info))
@@ -5128,7 +5187,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             self._state['was_loaded'] = True
             with open(fpath, 'r') as file:
-                data = json.load(file)
+                data = json_r.load(file)
 
             # If data is a path it gives us the absolute location of the root
             if tag is None:
@@ -5241,7 +5300,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             gpaths (List[str]): list of image paths
 
         Example:
-            >>> coco_dset = CocoDataset.from_image_paths(['a.png', 'b.png'])
+            >>> import kwcoco
+            >>> coco_dset = kwcoco.CocoDataset.from_image_paths(['a.png', 'b.png'])
             >>> assert coco_dset.n_images == 2
         """
         coco_dset = CocoDataset(bundle_dpath=bundle_dpath, img_root=img_root)
@@ -5308,8 +5368,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         Deep copies this object
 
         Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> new = self.copy()
             >>> assert new.imgs[1] is new.dataset['images'][0]
             >>> assert new.imgs[1] == self.dataset['images'][0]
@@ -5346,23 +5406,24 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 ndarrays.
 
         Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> import json
+            >>> self = kwcoco.CocoDataset.demo()
             >>> text = self.dumps(newlines=True)
             >>> print(text)
-            >>> self2 = CocoDataset(json.loads(text), tag='demo2')
+            >>> self2 = kwcoco.CocoDataset(json.loads(text), tag='demo2')
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
 
             >>> text = self.dumps(newlines=True)
             >>> print(text)
-            >>> self2 = CocoDataset(json.loads(text), tag='demo2')
+            >>> self2 = kwcoco.CocoDataset(json.loads(text), tag='demo2')
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
 
         Example:
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.coerce('vidshapes1-msi-multisensor', verbose=3)
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.coerce('vidshapes1-msi-multisensor', verbose=3)
             >>> self.remove_annotations(self.annots())
             >>> text = self.dumps(newlines=True, indent='  ')
             >>> print(text)
@@ -5376,7 +5437,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 indent = 0
             fp = StringIO()
             try:
-                json.dump(data, fp, indent=indent, ensure_ascii=False)
+                json_w.dump(data, fp, indent=indent, ensure_ascii=False)
             except Exception as ex:
                 print('Failed to dump ex = {!r}'.format(ex))
                 self._check_json_serializable()
@@ -5477,8 +5538,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         Example:
             >>> import tempfile
-            >>> from kwcoco.coco_dataset import *
-            >>> self = CocoDataset.demo()
+            >>> import json
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> file = tempfile.NamedTemporaryFile('w')
             >>> self.dump(file)
             >>> file.seek(0)
@@ -5486,7 +5548,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> print(text)
             >>> file.seek(0)
             >>> dataset = json.load(open(file.name, 'r'))
-            >>> self2 = CocoDataset(dataset, tag='demo2')
+            >>> self2 = kwcoco.CocoDataset(dataset, tag='demo2')
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
 
@@ -5497,7 +5559,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> print(text)
             >>> file.seek(0)
             >>> dataset = json.load(open(file.name, 'r'))
-            >>> self2 = CocoDataset(dataset, tag='demo2')
+            >>> self2 = kwcoco.CocoDataset(dataset, tag='demo2')
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
         """
@@ -5513,7 +5575,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 file.write(self.dumps(indent=indent, newlines=newlines))
             else:
                 try:
-                    json.dump(self.dataset, file, indent=indent, ensure_ascii=False)
+                    json_w.dump(self.dataset, file, indent=indent, ensure_ascii=False)
                 except Exception as ex:
                     print('Failed to dump ex = {!r}'.format(ex))
                     self._check_json_serializable()
@@ -5677,12 +5739,13 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             xdoctest -m kwcoco.coco_dataset CocoDataset.union
 
         Example:
+            >>> import kwcoco
             >>> # Test union works with different keypoint categories
-            >>> dset1 = CocoDataset.demo('shapes1')
-            >>> dset2 = CocoDataset.demo('shapes2')
+            >>> dset1 = kwcoco.CocoDataset.demo('shapes1')
+            >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
             >>> dset1.remove_keypoint_categories(['bot_tip', 'mid_tip', 'right_eye'])
             >>> dset2.remove_keypoint_categories(['top_tip', 'left_eye'])
-            >>> dset_12a = CocoDataset.union(dset1, dset2)
+            >>> dset_12a = kwcoco.CocoDataset.union(dset1, dset2)
             >>> dset_12b = dset1.union(dset2)
             >>> dset_21 = dset2.union(dset1)
             >>> def add_hist(h1, h2):
@@ -5696,7 +5759,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert kpfreq_want == kpfreq_got2
 
             >>> # Test disjoint gid datasets
-            >>> import kwcoco
             >>> dset1 = kwcoco.CocoDataset.demo('shapes3')
             >>> for new_gid, img in enumerate(dset1.dataset['images'], start=10):
             >>>     for aid in dset1.gid_to_aids[img['id']]:
@@ -6046,7 +6108,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 build the fast lookup index.
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> gids = [1, 3]
             >>> sub_dset = self.subset(gids)
             >>> assert len(self.index.gid_to_aids) == 3
@@ -6061,12 +6124,13 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert len(self.index.videos) == 2
 
         Example:
-            >>> self = CocoDataset.demo()
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
             >>> sub1 = self.subset([1])
             >>> sub2 = self.subset([2])
             >>> sub3 = self.subset([3])
             >>> others = [sub1, sub2, sub3]
-            >>> rejoined = CocoDataset.union(*others)
+            >>> rejoined = kwcoco.CocoDataset.union(*others)
             >>> assert len(sub1.anns) == 9
             >>> assert len(sub2.anns) == 2
             >>> assert len(sub3.anns) == 0
@@ -6143,7 +6207,7 @@ def demo_coco_data():
         >>> # xdoctest: +REQUIRES(--show)
         >>> from kwcoco.coco_dataset import demo_coco_data, CocoDataset
         >>> dataset = demo_coco_data()
-        >>> self = CocoDataset(dataset, tag='demo')
+        >>> self = kwcoco.CocoDataset(dataset, tag='demo')
         >>> import kwplot
         >>> kwplot.autompl()
         >>> self.show_image(gid=1)

@@ -1214,6 +1214,15 @@ def eval_detections_cli(**kw):
     import scriptconfig as scfg
     import kwcoco
 
+    ub.schedule_deprecation(
+        'kwcoco', name='kwcoco.metrics.detect_metrics.eval_detections_cli',
+        type='method',
+        deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+        migration=(
+            'Use `kwcoco eval` in kwcoco.cli.coco_eval instead. '
+        )
+    )
+
     class EvalDetectionCLI(scfg.Config):
         default = {
             'true': scfg.Path(None, help='true coco dataset'),
