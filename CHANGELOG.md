@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.3.5 - Unreleased
+## Version 0.3.6 - Unreleased
+
+
+## Version 0.3.5 - Released 2022-08-08
 
 ### Changed
 * kwcoco will now use ujson to read json files by default if it is available.
