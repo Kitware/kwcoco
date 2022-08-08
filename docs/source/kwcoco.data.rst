@@ -13,7 +13,6 @@ Submodules
    kwcoco.data.grab_domainnet
    kwcoco.data.grab_spacenet
    kwcoco.data.grab_voc
-   kwcoco.data.grab_xview3
 
 Module contents
 ---------------

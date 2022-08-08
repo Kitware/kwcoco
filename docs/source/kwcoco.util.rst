@@ -1,6 +1,14 @@
 kwcoco.util package
 ===================
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   kwcoco.util.delayed_ops
+
 Submodules
 ----------
 
@@ -16,7 +24,6 @@ Submodules
    kwcoco.util.util_json
    kwcoco.util.util_monkey
    kwcoco.util.util_reroot
-   kwcoco.util.util_resources
    kwcoco.util.util_sklearn
    kwcoco.util.util_truncate
 

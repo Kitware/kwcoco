@@ -15,7 +15,7 @@ def classification_report(y_true, y_pred, target_names=None,
                           sample_weight=None, verbose=False,
                           remove_unsupported=False, log=None,
                           ascii_only=False):
-    """
+    r"""
     Computes a classification report which is a collection of various metrics
     commonly used to evaulate classification quality. This can handle binary
     and multiclass settings.

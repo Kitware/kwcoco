@@ -54,3 +54,5 @@ uritools >= 3.0.0
 xarray >= 0.16.0
 
 safer>=4.4.1
+
+packaging>=21.3
