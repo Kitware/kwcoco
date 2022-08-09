@@ -404,6 +404,8 @@ class Videos(ObjectList1D):
     @property
     def images(self):
         """
+        Access the groups of images related to each video
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('vidshapes8').videos()
@@ -454,6 +456,8 @@ class Images(ObjectList1D):
     @property
     def size(self):
         """
+        Access sizes of images.
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -466,6 +470,8 @@ class Images(ObjectList1D):
     @property
     def area(self):
         """
+        Access areas of images.
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -478,6 +484,8 @@ class Images(ObjectList1D):
     @property
     def n_annots(self):
         """
+        Access number of annotations in each image.
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -489,6 +497,8 @@ class Images(ObjectList1D):
     @property
     def aids(self):
         """
+        Access annotation ids for each image.
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -500,6 +510,8 @@ class Images(ObjectList1D):
     @property
     def annots(self):
         """
+        Access the actual annotations for each image.
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
