@@ -209,6 +209,7 @@ if __name__ == '__main__':
             'optional': parse_requirements('requirements/optional.txt'),
             'headless': parse_requirements('requirements/headless.txt'),
             'graphics': parse_requirements('requirements/graphics.txt'),
+            'gdal': parse_requirements('requirements/gdal.txt'),
             # Strict versions
             'headless-strict': parse_requirements('requirements/headless.txt', versions='strict'),
             'graphics-strict': parse_requirements('requirements/graphics.txt', versions='strict'),

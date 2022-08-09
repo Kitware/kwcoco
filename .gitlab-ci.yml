@@ -640,7 +640,8 @@ test_minimal_strict/cp36-cp36m-linux:
 
         # Use whatever image is defined for Python39 in this file and start a docker session
         IMAGE_NAME=$(cat .gitlab-ci.yml | yq -r '.".image_python3_10"')
-        docker run -v $PWD:/io:ro -v $HOME/.cache/pip:/pip_cache -it $IMAGE_NAME bash
+        docker run -v $PWD:/io:ro -v $HOME/.cache/pip:/pip_cache -it $IMAGE_NAME "echo hi && /bin/bash"
+        docker run -v $PWD:/io:ro -v $HOME/.cache/pip:/pip_cache -it $IMAGE_NAME /bin/bash -c "echo hi && /bin/bash"
 
         # Will need to chmod things afterwords
         export PIP_CACHE_DIR=/pip_cache
