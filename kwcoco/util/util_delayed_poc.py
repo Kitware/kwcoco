@@ -213,6 +213,13 @@ except Exception:
     profile = ub.identity
 
 
+ub.schedule_deprecation(
+    'kwcoco', 'util_delayed_poc', 'module',
+    migration='Use the "kwcoco.util.delayed_ops" module instead.',
+    deprecate='0.3.6', error='0.5.0', remove='0.5.1'
+)
+
+
 # DEBUG_PRINT = ub.identity
 # DEBUG_PRINT = print
 

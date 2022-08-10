@@ -8,7 +8,7 @@ import ubelt as ub
 
 # from kwcoco.util.util_monkey import Reloadable  # NOQA
 # @Reloadable.developing  # NOQA
-class DelayedOperation2(ub.NiceRepr):
+class DelayedOperation(ub.NiceRepr):
 
     def __init__(self):
         self.meta = {}
@@ -76,7 +76,7 @@ class DelayedOperation2(ub.NiceRepr):
             if 'fpath' in sub_meta:
                 sub_meta['fname'] = ub.Path(sub_meta.pop('fpath')).name
             param_key = ub.repr2(sub_meta, sort=0, compact=1, nl=0, precision=4)
-            short_type = item.__class__.__name__.replace('Delayed', '').replace('2', '')
+            short_type = item.__class__.__name__.replace('Delayed', '')
             node_data['label'] = f'{short_type} {param_key}'
         return graph
 
@@ -85,7 +85,7 @@ class DelayedOperation2(ub.NiceRepr):
         A flat list of all descendent nodes and their parents
 
         Yields:
-            Tuple[None | DelayedOperation2, DelayedOperation2] :
+            Tuple[None | DelayedOperation, DelayedOperation] :
                 tules of parent / child nodes. Discarding the parents
                 will be a list of all nodes.
         """
@@ -210,10 +210,11 @@ class DelayedOperation2(ub.NiceRepr):
                 if item[0] == 'ignore' and item[2] is DeprecationWarning:
                     warnings.filters.remove(to_remove)
             """
-            ub.schedule_deprecation(
-                'kwcoco', 'kwargs', type='passed to DelayedOperation2.finalize',
-                migration='setup the desired state beforhand',
-                deprecate='0.3.2', error='0.4.0', remove='0.4.1')
+            # Undeprecate, I think I actually like this, but maybe not inplace.
+            # ub.schedule_deprecation(
+            #     'kwcoco', 'kwargs', type='passed to DelayedOperation2.finalize',
+            #     migration='setup the desired state beforhand',
+            #     deprecate='0.3.2', error='0.4.0', remove='0.4.1')
             self._set_nested_params(**kwargs)
         if prepare:
             self = self.prepare()
@@ -248,7 +249,7 @@ class DelayedOperation2(ub.NiceRepr):
             obj.meta.update(common)
 
 
-class DelayedNaryOperation2(DelayedOperation2):
+class DelayedNaryOperation(DelayedOperation):
     """
     For operations that have multiple input arrays
     """
@@ -264,7 +265,7 @@ class DelayedNaryOperation2(DelayedOperation2):
         yield from iter(self.parts)
 
 
-class DelayedUnaryOperation2(DelayedOperation2):
+class DelayedUnaryOperation(DelayedOperation):
     """
     For operations that have a single input array
     """
@@ -279,3 +280,9 @@ class DelayedUnaryOperation2(DelayedOperation2):
         """
         if self.subdata is not None:
             yield self.subdata
+
+
+# backwards compat, will be deprecatd
+DelayedOperation2 = DelayedOperation
+DelayedUnaryOperation2 = DelayedUnaryOperation
+DelayedNaryOperation2 = DelayedNaryOperation

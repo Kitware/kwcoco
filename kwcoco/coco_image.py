@@ -731,10 +731,10 @@ wc
                     from kwcoco.util.util_delayed_poc import DelayedNans
                     delayed = DelayedNans(dsize=dsize, channels=requested)
                 elif mode == 1:
-                    from kwcoco.util.delayed_ops import DelayedNans2
-                    from kwcoco.util.delayed_ops import DelayedChannelConcat2
-                    delayed = DelayedNans2(dsize=dsize, channels=requested)
-                    delayed = DelayedChannelConcat2([delayed])
+                    from kwcoco.util.delayed_ops import DelayedNans
+                    from kwcoco.util.delayed_ops import DelayedChannelConcat
+                    delayed = DelayedNans(dsize=dsize, channels=requested)
+                    delayed = DelayedChannelConcat([delayed])
                 else:
                     raise KeyError(mode)
                 return delayed
@@ -745,8 +745,8 @@ wc
                 from kwcoco.util.util_delayed_poc import DelayedChannelConcat
                 delayed = DelayedChannelConcat(chan_list)
             elif mode == 1:
-                from kwcoco.util.delayed_ops import DelayedChannelConcat2
-                delayed = DelayedChannelConcat2(chan_list)
+                from kwcoco.util.delayed_ops import DelayedChannelConcat
+                delayed = DelayedChannelConcat(chan_list)
             else:
                 raise KeyError(mode)
 
@@ -889,6 +889,12 @@ def _delay_load_imglike(bundle_dpath, obj, mode=0, nodata_method=None):
         info['dsize'] = dsize = (None, None)
 
     if mode == 0:
+        ub.schedule_deprecation(
+            'kwcoco', 'mode=0', 'CocoImage.delay',
+            migration='Use the "mode=1" instead.',
+            deprecate='0.3.6', error='0.5.0', remove='0.5.1'
+        )
+
         from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedIdentity
         quantization = obj.get('quantization', None)
         if imdata is not None:
@@ -902,15 +908,15 @@ def _delay_load_imglike(bundle_dpath, obj, mode=0, nodata_method=None):
                 fpath=fpath, channels=channels_, dsize=dsize,
                 quantization=quantization))
     elif mode == 1:
-        from kwcoco.util.delayed_ops import DelayedLoad2, DelayedIdentity2
+        from kwcoco.util.delayed_ops import DelayedLoad, DelayedIdentity
         quantization = obj.get('quantization', None)
         if imdata is not None:
-            info['chan_construct'] = (DelayedIdentity2, dict(
+            info['chan_construct'] = (DelayedIdentity, dict(
                 data=imdata, channels=channels_, dsize=dsize))
         elif fname is not None:
             info['fpath'] = fpath = join(bundle_dpath, fname)
             info['chan_construct'] = (
-                DelayedLoad2,
+                DelayedLoad,
                 dict(fpath=fpath, channels=channels_, dsize=dsize,
                      nodata_method=nodata_method))
         info['quantization'] = quantization

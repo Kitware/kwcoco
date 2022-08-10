@@ -5,7 +5,11 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.3.6 - Unreleased
+## Version 0.4.0 - Unreleased
+
+### Changed 
+* Officially deprecate `kwcoco.util.util_delayed_poc`
+* Remove the 2 suffix on the official `delayed_ops` node names.
 
 
 ## Version 0.3.5 - Released 2022-08-08

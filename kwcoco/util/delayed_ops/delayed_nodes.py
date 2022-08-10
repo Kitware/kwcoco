@@ -9,7 +9,7 @@ import ubelt as ub
 import warnings
 from kwcoco import exceptions
 from kwcoco import channel_spec
-from kwcoco.util.delayed_ops.delayed_base import DelayedNaryOperation2, DelayedUnaryOperation2
+from kwcoco.util.delayed_ops.delayed_base import DelayedNaryOperation, DelayedUnaryOperation
 from kwcoco.util.delayed_ops import delayed_leafs
 
 
@@ -23,7 +23,7 @@ except Exception:
 # --------
 
 
-class DelayedStack2(DelayedNaryOperation2):
+class DelayedStack(DelayedNaryOperation):
     """
     Stacks multiple arrays together.
     """
@@ -31,7 +31,7 @@ class DelayedStack2(DelayedNaryOperation2):
     def __init__(self, parts, axis):
         """
         Args:
-            parts (List[DelayedArray2]): data to stack
+            parts (List[DelayedArray]): data to stack
             axis (int): axes to stack on
         """
         super().__init__(parts=parts)
@@ -54,7 +54,7 @@ class DelayedStack2(DelayedNaryOperation2):
         return shape
 
 
-class DelayedConcat2(DelayedNaryOperation2):
+class DelayedConcat(DelayedNaryOperation):
     """
     Stacks multiple arrays together.
     """
@@ -62,7 +62,7 @@ class DelayedConcat2(DelayedNaryOperation2):
     def __init__(self, parts, axis):
         """
         Args:
-            parts (List[DelayedArray2]): data to concat
+            parts (List[DelayedArray]): data to concat
             axis (int): axes to concat on
         """
         super().__init__(parts=parts)
@@ -81,7 +81,7 @@ class DelayedConcat2(DelayedNaryOperation2):
         return shape
 
 
-class DelayedFrameStack2(DelayedStack2):
+class DelayedFrameStack(DelayedStack):
     """
     Stacks multiple arrays together.
     """
@@ -89,7 +89,7 @@ class DelayedFrameStack2(DelayedStack2):
     def __init__(self, parts):
         """
         Args:
-            parts (List[DelayedArray2]): data to stack
+            parts (List[DelayedArray]): data to stack
         """
         super().__init__(parts=parts, axis=0)
 
@@ -100,18 +100,149 @@ class DelayedFrameStack2(DelayedStack2):
 
 class ImageOpsMixin:
 
-    def crop(self, space_slice=None, chan_idxs=None):
+    def crop(self, space_slice=None, chan_idxs=None, clip=True, wrap=True, pad=0):
         """
         Crops an image along integer pixel coordinates.
 
         Args:
-            space_slice (Tuple[slice, slice]): y-slice and x-slice.
-            chan_idxs (List[int]): indexes of bands to take
+            space_slice (Tuple[slice, slice]):
+                y-slice and x-slice.
+
+            chan_idxs (List[int]):
+                indexes of bands to take
+
+            clip (bool):
+                if True, the slice is interpreted normally, where it won't go
+                past the image extent, otherwise slicing into negative regions
+                or past the image bounds will result in padding.  Defaults to
+                True.
+
+            wrap (bool):
+                if True, negative indexes "wrap around", otherwise they are
+                treated as is. Defaults to True.
+
+            pad (int | List[Tuple[int, int]]):
+                if specified, applies extra padding
+
 
         Returns:
-            DelayedImage2
+            DelayedImage
+
+        Example:
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
+            >>> import kwimage
+            >>> self = DelayedLoad.demo().prepare()
+            >>> self = self.dequantize({'quant_max': 255})
+            >>> self = self.warp({'scale': 1 / 2})
+            >>> pad = 0
+            >>> h, w = space_dims = self.dsize[::-1]
+            >>> grid = list(ub.named_product({
+            >>>     'left': [0, -64], 'right': [0, 64],
+            >>>     'top': [0, -64], 'bot': [0, 64],}))
+            >>> grid += [
+            >>>     {'left': 64, 'right': -64, 'top': 0, 'bot': 0},
+            >>>     {'left': 64, 'right': 64, 'top': 0, 'bot': 0},
+            >>>     {'left': 0, 'right': 0, 'top': 64, 'bot': -64},
+            >>>     {'left': 64, 'right': -64, 'top': 64, 'bot': -64},
+            >>> ]
+            >>> crops = []
+            >>> for pads in grid:
+            >>>     space_slice = (slice(pads['top'], h + pads['bot']),
+            >>>                    slice(pads['left'], w + pads['right']))
+            >>>     delayed = self.crop(space_slice)
+            >>>     crop = delayed.finalize()
+            >>>     yyxx = kwimage.Boxes.from_slice(space_slice, wrap=False, clip=0).toformat('_yyxx').data[0]
+            >>>     title = '[{}:{}, {}:{}]'.format(*yyxx)
+            >>>     crop_canvas = kwimage.draw_header_text(crop, title, fit=True, bg_color='kw_darkgray')
+            >>>     crops.append(crop_canvas)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> canvas = kwimage.stack_images_grid(crops, pad=16, bg_value='kw_darkgreen')
+            >>> canvas = kwimage.fill_nans_with_checkers(canvas)
+            >>> kwplot.imshow(canvas, title='Normal Slicing: Cropped Images With Wrap+Clipped Slices', doclf=1, fnum=1)
+            >>> kwplot.show_if_requested()
+
+        Example:
+            >>> # Demo the case with pads / no-clips / no-wraps
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
+            >>> import kwimage
+            >>> self = DelayedLoad.demo().prepare()
+            >>> self = self.dequantize({'quant_max': 255})
+            >>> self = self.warp({'scale': 1 / 2})
+            >>> pad = [(64, 128), (32, 96)]
+            >>> pad = [(0, 20), (0, 0)]
+            >>> pad = 0
+            >>> pad = 8
+            >>> h, w = space_dims = self.dsize[::-1]
+            >>> grid = list(ub.named_product({
+            >>>     'left': [0, -64], 'right': [0, 64],
+            >>>     'top': [0, -64], 'bot': [0, 64],}))
+            >>> grid += [
+            >>>     {'left': 64, 'right': -64, 'top': 0, 'bot': 0},
+            >>>     {'left': 64, 'right': 64, 'top': 0, 'bot': 0},
+            >>>     {'left': 0, 'right': 0, 'top': 64, 'bot': -64},
+            >>>     {'left': 64, 'right': -64, 'top': 64, 'bot': -64},
+            >>> ]
+            >>> crops = []
+            >>> for pads in grid:
+            >>>     space_slice = (slice(pads['top'], h + pads['bot']),
+            >>>                    slice(pads['left'], w + pads['right']))
+            >>>     delayed = self._padded_crop(space_slice, pad=pad)
+            >>>     crop = delayed.finalize(optimize=1)
+            >>>     yyxx = kwimage.Boxes.from_slice(space_slice, wrap=False, clip=0).toformat('_yyxx').data[0]
+            >>>     title = '[{}:{}, {}:{}]'.format(*yyxx)
+            >>>     if pad:
+            >>>         title += f'{chr(10)}pad={pad}'
+            >>>     crop_canvas = kwimage.draw_header_text(crop, title, fit=True, bg_color='kw_darkgray')
+            >>>     crops.append(crop_canvas)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> canvas = kwimage.stack_images_grid(crops, pad=16, bg_value='kw_darkgreen', resize='smaller')
+            >>> canvas = kwimage.fill_nans_with_checkers(canvas)
+            >>> kwplot.imshow(canvas, title='Negative Slicing: Cropped Images With clip=False wrap=False', doclf=1, fnum=2)
+            >>> kwplot.show_if_requested()
         """
-        new = DelayedCrop2(self, space_slice, chan_idxs)
+        if not clip or not wrap or pad:
+            if clip or wrap:
+                raise NotImplementedError(
+                    ub.paragraph(
+                        '''
+                        Currently, in "negative slice mode" both clip and wrap
+                        params must be set to False if padding is given or
+                        either of clip or wrap is False.
+                        '''))
+            # Currently padding doesn't really work with crops, so its not
+            # efficient, but we can hack it to work with warps.
+            new = self._padded_crop(space_slice, pad=pad)
+        else:
+            # Normal efficient case
+            new = DelayedCrop(self, space_slice, chan_idxs)
+        return new
+
+    def _padded_crop(self, space_slice, pad=0):
+        """
+        Does the type of padded crop we want, but inefficiently using a warp.
+        Reimplementing would be good, but this is good enough for now.
+        """
+        if self.dsize is None:
+            raise Exception('dsize must be populated to do a padded crop')
+        data_dims = self.dsize[::-1]
+        _data_slice, _extra_padding = kwarray.embed_slice(
+            space_slice, data_dims, pad)
+        offset_d0, extra_d0 = _extra_padding[0]
+        offset_d1, extra_d1 = _extra_padding[1]
+        pad_warp = {'offset': (offset_d1, offset_d0)}
+        data_crop_box = kwimage.Boxes.from_slice(
+            _data_slice, clip=False, wrap=False)
+        dsize = (data_crop_box.width.ravel()[0] + offset_d1 + extra_d1,
+                 data_crop_box.height.ravel()[0] + offset_d0 + extra_d0)
+        new = self.crop(_data_slice)
+        if any([offset_d0, extra_d0, offset_d1, extra_d1]):
+            # Use a warp to accomplish padding.
+            # Having an explicit padding node would be better.
+            new = new.warp(pad_warp, dsize=dsize)
         return new
 
     def warp(self, transform, dsize='auto', antialias=True,
@@ -143,9 +274,9 @@ class ImageOpsMixin:
                 if auto will be nan for float and 0 for int.
 
         Returns:
-            DelayedImage2
+            DelayedImage
         """
-        new = DelayedWarp2(self, transform, dsize=dsize, antialias=antialias,
+        new = DelayedWarp(self, transform, dsize=dsize, antialias=antialias,
                            interpolation=interpolation)
         return new
 
@@ -158,9 +289,9 @@ class ImageOpsMixin:
                 see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
 
         Returns:
-            DelayedDequantize2
+            DelayedDequantize
         """
-        new = DelayedDequantize2(self, quantization)
+        new = DelayedDequantize(self, quantization)
         return new
 
     def get_overview(self, overview):
@@ -171,34 +302,34 @@ class ImageOpsMixin:
             overview (int): the overview to use (assuming it exists)
 
         Returns:
-            DelayedOverview2
+            DelayedOverview
         """
-        new = DelayedOverview2(self, overview)
+        new = DelayedOverview(self, overview)
         return new
 
     def as_xarray(self):
         """
         Returns:
-            DelayedAsXarray2
+            DelayedAsXarray
         """
-        return DelayedAsXarray2(self)
+        return DelayedAsXarray(self)
 
 
-class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
+class DelayedChannelConcat(ImageOpsMixin, DelayedConcat):
     """
     Stacks multiple arrays together.
 
     CommandLine:
-        xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/delayed_ops/delayed_nodes.py DelayedChannelConcat2:1
+        xdoctest -m /home/joncrall/code/kwcoco/kwcoco/util/delayed_ops/delayed_nodes.py DelayedChannelConcat:1
 
     Example:
         >>> from kwcoco.util.delayed_ops import *  # NOQA
-        >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
+        >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
         >>> import kwcoco
         >>> dsize = (307, 311)
-        >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
-        >>> c2 = DelayedLoad2.demo('astro', dsize=dsize, channels='R|G|B').prepare()
-        >>> cat = DelayedChannelConcat2([c1, c2])
+        >>> c1 = DelayedNans(dsize=dsize, channels='foo')
+        >>> c2 = DelayedLoad.demo('astro', dsize=dsize, channels='R|G|B').prepare()
+        >>> cat = DelayedChannelConcat([c1, c2])
         >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))
         >>> warped_cat._validate()
         >>> warped_cat.finalize()
@@ -209,13 +340,13 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage
         >>> fpath = kwimage.grab_test_image_fpath()
-        >>> base1 = DelayedLoad2(fpath, channels='r|g|b').prepare()
-        >>> base2 = DelayedLoad2(fpath, channels='x|y|z').prepare().scale(2)
-        >>> base3 = DelayedLoad2(fpath, channels='i|j|k').prepare().scale(2)
+        >>> base1 = DelayedLoad(fpath, channels='r|g|b').prepare()
+        >>> base2 = DelayedLoad(fpath, channels='x|y|z').prepare().scale(2)
+        >>> base3 = DelayedLoad(fpath, channels='i|j|k').prepare().scale(2)
         >>> bands = [base2, base1[:, :, 0].scale(2).evaluate(),
         >>>          base1[:, :, 1].evaluate().scale(2),
         >>>          base1[:, :, 2].evaluate().scale(2), base3]
-        >>> delayed = DelayedChannelConcat2(bands)
+        >>> delayed = DelayedChannelConcat(bands)
         >>> delayed = delayed.warp({'scale': 2})
         >>> delayed = delayed[0:100, 0:55, [0, 2, 4]]
         >>> delayed.write_network_text()
@@ -225,7 +356,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
     def __init__(self, parts, dsize=None):
         """
         Args:
-            parts (List[DelayedArray2]): data to concat
+            parts (List[DelayedArray]): data to concat
             dsize (Tuple[int, int] | None): size if known a-priori
         """
         super().__init__(parts=parts, axis=2)
@@ -299,7 +430,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
     def optimize(self):
         """
         Returns:
-            DelayedImage2
+            DelayedImage
         """
         new_parts = [part.optimize() for part in self.parts]
         kw = ub.dict_isect(self.meta, ['dsize'])
@@ -319,7 +450,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
                 :class:`kwcoco.ChannelSpec` for more detials.
 
         Returns:
-            DelayedArray2:
+            DelayedArray:
                 a delayed vision operation that only operates on the following
                 channels.
 
@@ -335,12 +466,12 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
             >>> # Complex case
             >>> import kwcoco
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> delayed = dset.coco_image(1).delay(mode=1)
-            >>> astro = DelayedLoad2.demo('astro', channels='r|g|b').prepare()
+            >>> astro = DelayedLoad.demo('astro', channels='r|g|b').prepare()
             >>> aligned = astro.warp(kwimage.Affine.scale(600 / 512), dsize='auto')
-            >>> self = combo = DelayedChannelConcat2(delayed.parts + [aligned])
+            >>> self = combo = DelayedChannelConcat(delayed.parts + [aligned])
             >>> channels = 'B1|r|B8|g'
             >>> new = self.take_channels(channels)
             >>> new_cropped = new.crop((slice(10, 200), slice(12, 350)))
@@ -377,7 +508,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
         """
         if channels is None:
             return self
-        from kwcoco.util.delayed_ops.delayed_leafs import DelayedNans2
+        from kwcoco.util.delayed_ops.delayed_leafs import DelayedNans
         current_channels = self.channels
 
         if isinstance(channels, list):
@@ -452,7 +583,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
                     nan_chan = channel_spec.FusedChannelSpec(curr.codes)
                 else:
                     nan_chan = None
-                comp = DelayedNans2(self.dsize, channels=nan_chan)
+                comp = DelayedNans(self.dsize, channels=nan_chan)
                 new_components.append(comp)
             else:
                 if curr.start == 0 and curr.stop == comp.num_channels:
@@ -466,7 +597,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
                     sub_comp = comp.take_channels(sub_idxs)
                     new_components.append(sub_comp)
 
-        new = DelayedChannelConcat2(new_components)
+        new = DelayedChannelConcat(new_components)
         return new
 
     def __getitem__(self, sl):
@@ -502,9 +633,9 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
     def as_xarray(self):
         """
         Returns:
-            DelayedAsXarray2
+            DelayedAsXarray
         """
-        return DelayedAsXarray2(self)
+        return DelayedAsXarray(self)
 
     def _push_operation_under(self, op, kwargs):
         # Note: we can't do this with a crop that has band selection
@@ -560,20 +691,20 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
 
         Example:
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
-            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedNans2
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedNans
             >>> import ubelt as ub
             >>> import kwimage
             >>> import kwarray
             >>> import numpy as np
             >>> # Demo case where we have different channels at different resolutions
-            >>> base = DelayedLoad2.demo(channels='r|g|b').prepare().dequantize({'quant_max': 255})
+            >>> base = DelayedLoad.demo(channels='r|g|b').prepare().dequantize({'quant_max': 255})
             >>> bandR = base[:, :, 0].scale(100 / 512)[:, :-50].evaluate()
             >>> bandG = base[:, :, 1].scale(300 / 512).warp({'theta': np.pi / 8, 'about': (150, 150)}).evaluate()
             >>> bandB = base[:, :, 2].scale(600 / 512)[:150, :].evaluate()
-            >>> bandN = DelayedNans2((600, 600), channels='N')
+            >>> bandN = DelayedNans((600, 600), channels='N')
             >>> # Make a concatenation of images of different underlying native resolutions
-            >>> delayed_vidspace = DelayedChannelConcat2([
+            >>> delayed_vidspace = DelayedChannelConcat([
             >>>     bandR.scale(6, dsize=(600, 600)).optimize(),
             >>>     bandG.warp({'theta': -np.pi / 8, 'about': (150, 150)}).scale(2, dsize=(600, 600)).optimize(),
             >>>     bandB.scale(1, dsize=(600, 600)).optimize(),
@@ -635,7 +766,7 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
                     # hack the return undo_warp
                     w, h = undone_part.dsize
                     undo_warp = kwimage.Affine.scale((1 / w, 1 / h)) @ undo_warp
-                if isinstance(undone_part, delayed_leafs.DelayedNans2):
+                if isinstance(undone_part, delayed_leafs.DelayedNans):
                     undone_part = undone_part[0:1, 0:1].optimize()
             unwarped_parts.append(undone_part)
             if return_warps:
@@ -646,14 +777,14 @@ class DelayedChannelConcat2(ImageOpsMixin, DelayedConcat2):
             return unwarped_parts
 
 
-class DelayedArray2(DelayedUnaryOperation2):
+class DelayedArray(DelayedUnaryOperation):
     """
     A generic NDArray.
     """
     def __init__(self, subdata=None):
         """
         Args:
-            subdata (DelayedArray2):
+            subdata (DelayedArray):
         """
         super().__init__(subdata=subdata)
 
@@ -674,14 +805,14 @@ class DelayedArray2(DelayedUnaryOperation2):
         return shape
 
 
-class DelayedImage2(ImageOpsMixin, DelayedArray2):
+class DelayedImage(ImageOpsMixin, DelayedArray):
     """
     For the case where an array represents a 2D image with multiple channels
     """
     def __init__(self, subdata=None, dsize=None, channels=None):
         """
         Args:
-            subdata (DelayedArray2):
+            subdata (DelayedArray):
             dsize (None | Tuple[int | None, int | None]): overrides subdata dsize
             channels (None | int | kwcoco.FusedChannelSpec): overrides subdata channels
         """
@@ -797,7 +928,7 @@ class DelayedImage2(ImageOpsMixin, DelayedArray2):
                 kwcoco.ChannelSpec for more detials.
 
         Returns:
-            DelayedCrop2:
+            DelayedCrop:
                 a new delayed load with a fused take channel operation
 
         Note:
@@ -808,8 +939,8 @@ class DelayedImage2(ImageOpsMixin, DelayedArray2):
             >>> #
             >>> # Test Channel Select Via Code
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops import DelayedLoad2
-            >>> self = DelayedLoad2.demo(dsize=(16, 16), channels='r|g|b').prepare()
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
+            >>> self = DelayedLoad.demo(dsize=(16, 16), channels='r|g|b').prepare()
             >>> channels = 'r|b'
             >>> new = self.take_channels(channels)._validate()
             >>> new2 = new[:, :, [1, 0]]._validate()
@@ -817,9 +948,9 @@ class DelayedImage2(ImageOpsMixin, DelayedArray2):
 
         Example:
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
             >>> import kwcoco
-            >>> self = DelayedLoad2.demo('astro').prepare()
+            >>> self = DelayedLoad.demo('astro').prepare()
             >>> channels = [2, 0]
             >>> new = self.take_channels(channels)
             >>> new3 = new.take_channels([1, 0])
@@ -904,35 +1035,35 @@ class DelayedImage2(ImageOpsMixin, DelayedArray2):
         Evaluate this node and return the data as an identity.
 
         Returns:
-            DelayedIdentity2
+            DelayedIdentity
         """
-        from kwcoco.util.delayed_ops.delayed_leafs import DelayedIdentity2
+        from kwcoco.util.delayed_ops.delayed_leafs import DelayedIdentity
         final = self.finalize()
-        new = DelayedIdentity2(final, dsize=self.dsize, channels=self.channels)
+        new = DelayedIdentity(final, dsize=self.dsize, channels=self.channels)
         return new
 
     def _opt_push_under_concat(self):
-        assert isinstance(self.subdata, DelayedChannelConcat2)
+        assert isinstance(self.subdata, DelayedChannelConcat)
         kwargs = ub.compatible(self.meta, self.__class__.__init__)
         new = self.subdata._push_operation_under(self.__class__, kwargs)
         return new
 
 
-class DelayedAsXarray2(DelayedImage2):
+class DelayedAsXarray(DelayedImage):
     """
     Casts the data to an xarray object in the finalize step
 
     Example;
         >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-        >>> from kwcoco.util.delayed_ops import DelayedLoad2
+        >>> from kwcoco.util.delayed_ops import DelayedLoad
         >>> # without channels
-        >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
+        >>> base = DelayedLoad.demo(dsize=(16, 16)).prepare()
         >>> self = base.as_xarray()
         >>> final = self._validate().finalize()
         >>> assert len(final.coords) == 0
         >>> assert final.dims == ('y', 'x', 'c')
         >>> # with channels
-        >>> base = DelayedLoad2.demo(dsize=(16, 16), channels='r|g|b').prepare()
+        >>> base = DelayedLoad.demo(dsize=(16, 16), channels='r|g|b').prepare()
         >>> self = base.as_xarray()
         >>> final = self._validate().finalize()
         >>> assert final.coords.indexes['c'].tolist() == ['r', 'g', 'b']
@@ -956,19 +1087,19 @@ class DelayedAsXarray2(DelayedImage2):
     def optimize(self):
         """
         Returns:
-            DelayedImage2
+            DelayedImage
         """
         return self.subdata.optimize().as_xarray()
 
 
-class DelayedWarp2(DelayedImage2):
+class DelayedWarp(DelayedImage):
     """
     Applies an affine transform to an image.
 
     Example:
         >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-        >>> from kwcoco.util.delayed_ops import DelayedLoad2
-        >>> self = DelayedLoad2.demo(dsize=(16, 16)).prepare()
+        >>> from kwcoco.util.delayed_ops import DelayedLoad
+        >>> self = DelayedLoad.demo(dsize=(16, 16)).prepare()
         >>> warp1 = self.warp({'scale': 3})
         >>> warp2 = warp1.warp({'theta': 0.1})
         >>> warp3 = warp2._opt_fuse_warps()
@@ -980,7 +1111,7 @@ class DelayedWarp2(DelayedImage2):
                  interpolation='linear', border_value='auto'):
         """
         Args:
-            subdata (DelayedArray2): data to operate on
+            subdata (DelayedArray): data to operate on
 
             transform (ndarray | dict | kwimage.Affine):
                 a coercable affine matrix.  See :class:`kwimage.Affine` for
@@ -1077,13 +1208,13 @@ class DelayedWarp2(DelayedImage2):
     def optimize(self):
         """
         Returns:
-            DelayedImage2
+            DelayedImage
 
         Example:
             >>> # Demo optimization that removes a noop warp
-            >>> from kwcoco.util.delayed_ops import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
             >>> import kwimage
-            >>> base = DelayedLoad2.demo(channels='r|g|b').prepare()
+            >>> base = DelayedLoad.demo(channels='r|g|b').prepare()
             >>> self = base.warp(kwimage.Affine.eye())
             >>> new = self.optimize()
             >>> assert len(self.as_graph().nodes) == 2
@@ -1091,9 +1222,9 @@ class DelayedWarp2(DelayedImage2):
 
         Example:
             >>> # Test optimize nans
-            >>> from kwcoco.util.delayed_ops import DelayedNans2
+            >>> from kwcoco.util.delayed_ops import DelayedNans
             >>> import kwimage
-            >>> base = DelayedNans2(dsize=(100, 100), channels='a|b|c')
+            >>> base = DelayedNans(dsize=(100, 100), channels='a|b|c')
             >>> self = base.warp(kwimage.Affine.scale(0.1))
             >>> # Should simply return a new nan generator
             >>> new = self.optimize()
@@ -1101,14 +1232,14 @@ class DelayedWarp2(DelayedImage2):
         """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
-        if isinstance(new.subdata, DelayedWarp2):
+        if isinstance(new.subdata, DelayedWarp):
             new = new._opt_fuse_warps()
 
         ### The tolerance should be very strict by default, but
         ### we also might want to be able to parameterize it
         if new.transform.isclose_identity(rtol=0, atol=0) and new.dsize == new.subdata.dsize:
             new = new.subdata
-        elif isinstance(new.subdata, DelayedChannelConcat2):
+        elif isinstance(new.subdata, DelayedChannelConcat):
             new = new._opt_push_under_concat().optimize()
         elif hasattr(new.subdata, '_optimized_warp'):
             # The subdata knows how to optimize itself wrt a warp
@@ -1133,7 +1264,7 @@ class DelayedWarp2(DelayedImage2):
         """
         Combine two consecutive warps into a single operation.
         """
-        assert isinstance(self.subdata, DelayedWarp2)
+        assert isinstance(self.subdata, DelayedWarp)
         inner_data = self.subdata.subdata
         tf1 = self.subdata.meta['transform']
         tf2 = self.meta['transform']
@@ -1153,17 +1284,17 @@ class DelayedWarp2(DelayedImage2):
         Example:
             >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
             >>> import kwimage
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-            >>> base = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> base = DelayedLoad(fpath, channels='r|g|b').prepare()
             >>> # Case without any operations between the overview and warp
             >>> self = base.get_overview(1).warp({'scale': 4})
             >>> self.write_network_text()
             >>> opt = self._opt_absorb_overview()._validate()
             >>> opt.write_network_text()
             >>> opt_data = [d for n, d in opt.as_graph().nodes(data=True)]
-            >>> assert 'DelayedOverview2' not in [d['type'] for d in opt_data]
+            >>> assert 'DelayedOverview' not in [d['type'] for d in opt_data]
             >>> # Case with a chain of operations between overview and warp
             >>> self = base.get_overview(1)[0:101, 0:100].warp({'scale': 4})
             >>> self.write_network_text()
@@ -1177,7 +1308,7 @@ class DelayedWarp2(DelayedImage2):
             >>> opt = self._opt_absorb_overview()._validate()
             >>> opt.write_network_text()
             >>> opt_data = [d for n, d in opt.as_graph().nodes(data=True)]
-            >>> assert 'DelayedOverview2' in [d['type'] for d in opt_data]
+            >>> assert 'DelayedOverview' in [d['type'] for d in opt_data]
         """
         # Check if there is a strict downsampling component
         transform = self.meta['transform']
@@ -1197,16 +1328,16 @@ class DelayedWarp2(DelayedImage2):
             subdata = parent.subdata
             if subdata is None:
                 break
-            elif isinstance(subdata, DelayedWarp2):
+            elif isinstance(subdata, DelayedWarp):
                 subdata = None
                 break
-            elif isinstance(subdata, DelayedOverview2):
+            elif isinstance(subdata, DelayedOverview):
                 # We found an overview node
                 overview = subdata
                 break
-            elif isinstance(subdata, DelayedDequantize2):
+            elif isinstance(subdata, DelayedDequantize):
                 pass
-            elif isinstance(subdata, DelayedCrop2):
+            elif isinstance(subdata, DelayedCrop):
                 num_dc += 1
             else:
                 subdata = None
@@ -1287,10 +1418,10 @@ class DelayedWarp2(DelayedImage2):
         Example:
             >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
             >>> import kwimage
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-            >>> self = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> self = DelayedLoad(fpath, channels='r|g|b').prepare()
             >>> print(f'self={self}')
             >>> print('self.meta = {}'.format(ub.repr2(self.meta, nl=1)))
             >>> warp0 = self.warp({'scale': 0.2})
@@ -1303,10 +1434,10 @@ class DelayedWarp2(DelayedImage2):
         Example:
             >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
             >>> import kwimage
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-            >>> self = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> self = DelayedLoad(fpath, channels='r|g|b').prepare()
             >>> warp0 = self.warp({'scale': 1 / 2 ** 6})
             >>> opt = warp0.optimize()
             >>> print(ub.repr2(warp0.nesting(), nl=-1, sort=0))
@@ -1351,7 +1482,7 @@ class DelayedWarp2(DelayedImage2):
         return new
 
 
-class DelayedDequantize2(DelayedImage2):
+class DelayedDequantize(DelayedImage):
     """
     Rescales image intensities from int to floats.
 
@@ -1361,7 +1492,7 @@ class DelayedDequantize2(DelayedImage2):
     def __init__(self, subdata, quantization):
         """
         Args:
-            subdata (DelayedArray2): data to operate on
+            subdata (DelayedArray): data to operate on
             quantization (Dict):
                 see :func:`kwcoco.util.delayed_ops.helpers.dequantize`
         """
@@ -1387,14 +1518,14 @@ class DelayedDequantize2(DelayedImage2):
         """
 
         Returns:
-            DelayedImage2
+            DelayedImage
 
         Example:
             >>> # Test a case that caused an error in development
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
             >>> fpath = kwimage.grab_test_image_fpath()
-            >>> base = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> base = DelayedLoad(fpath, channels='r|g|b').prepare()
             >>> quantization = {'quant_max': 255, 'nodata': 0}
             >>> self = base.get_overview(1).dequantize(quantization)
             >>> self.write_network_text()
@@ -1403,15 +1534,15 @@ class DelayedDequantize2(DelayedImage2):
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
 
-        if isinstance(new.subdata, DelayedDequantize2):
+        if isinstance(new.subdata, DelayedDequantize):
             raise AssertionError('Dequantization is only allowed once')
 
-        if isinstance(new.subdata, DelayedWarp2):
+        if isinstance(new.subdata, DelayedWarp):
             # Swap order so quantize is before the warp
             new = new._opt_dequant_before_other()
             new = new.optimize()
 
-        if isinstance(new.subdata, DelayedChannelConcat2):
+        if isinstance(new.subdata, DelayedChannelConcat):
             new = new._opt_push_under_concat().optimize()
         return new
 
@@ -1425,14 +1556,14 @@ class DelayedDequantize2(DelayedImage2):
         return kwimage.Affine.eye()
 
 
-class DelayedCrop2(DelayedImage2):
+class DelayedCrop(DelayedImage):
     """
     Crops an image along integer pixel coordinates.
 
     Example:
         >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-        >>> from kwcoco.util.delayed_ops import DelayedLoad2
-        >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
+        >>> from kwcoco.util.delayed_ops import DelayedLoad
+        >>> base = DelayedLoad.demo(dsize=(16, 16)).prepare()
         >>> # Test Fuse Crops Space Only
         >>> crop1 = base[4:12, 0:16]
         >>> self = crop1[2:6, 0:8]
@@ -1451,7 +1582,7 @@ class DelayedCrop2(DelayedImage2):
     def __init__(self, subdata, space_slice=None, chan_idxs=None):
         """
         Args:
-            subdata (DelayedArray2): data to operate on
+            subdata (DelayedArray): data to operate on
 
             space_slice (Tuple[slice, slice]):
                 if speficied, take this y-slice and x-slice.
@@ -1461,7 +1592,7 @@ class DelayedCrop2(DelayedImage2):
         """
         super().__init__(subdata)
         # TODO: are we doing infinite padding or clipping?
-        # This assumes infinite padding
+        # This assumes clipping
         in_w, in_h = subdata.dsize
         if space_slice is not None:
             space_dims = (in_h, in_w)
@@ -1507,17 +1638,23 @@ class DelayedCrop2(DelayedImage2):
         final = kwarray.atleast_nd(final, 3)
         return final
 
+    def _transform_from_subdata(self):
+        sl_y, sl_x = self.meta['space_slice']
+        offset = -sl_x.start, -sl_y.start
+        self_from_subdata = kwimage.Affine.translate(offset)
+        return self_from_subdata
+
     @profile
     def optimize(self):
         """
         Returns:
-            DelayedImage2
+            DelayedImage
 
         Example:
             >>> # Test optimize nans
-            >>> from kwcoco.util.delayed_ops import DelayedNans2
+            >>> from kwcoco.util.delayed_ops import DelayedNans
             >>> import kwimage
-            >>> base = DelayedNans2(dsize=(100, 100), channels='a|b|c')
+            >>> base = DelayedNans(dsize=(100, 100), channels='a|b|c')
             >>> self = base[0:10, 0:5]
             >>> # Should simply return a new nan generator
             >>> new = self.optimize()
@@ -1527,22 +1664,22 @@ class DelayedCrop2(DelayedImage2):
         """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
-        if isinstance(new.subdata, DelayedCrop2):
+        if isinstance(new.subdata, DelayedCrop):
             new = new._opt_fuse_crops()
 
         if hasattr(new.subdata, '_optimized_crop'):
             # The subdata knows how to optimize itself wrt this node
             crop_kwargs = ub.dict_isect(self.meta, {'space_slice', 'chan_idxs'})
             new = new.subdata._optimized_crop(**crop_kwargs).optimize()
-        if isinstance(new.subdata, DelayedWarp2):
+        if isinstance(new.subdata, DelayedWarp):
             new = new._opt_warp_after_crop()
             new = new.optimize()
-        elif isinstance(new.subdata, DelayedDequantize2):
+        elif isinstance(new.subdata, DelayedDequantize):
             new = new._opt_dequant_after_crop()
             new = new.optimize()
 
-        if isinstance(new.subdata, DelayedChannelConcat2):
-            if isinstance(new, DelayedCrop2):
+        if isinstance(new.subdata, DelayedChannelConcat):
+            if isinstance(new, DelayedCrop):
                 # We have to be careful if there we have band selection
                 chan_idxs = new.meta.get('chan_idxs', None)
                 space_slice = new.meta.get('space_slice', None)
@@ -1557,20 +1694,14 @@ class DelayedCrop2(DelayedImage2):
 
         return new
 
-    def _transform_from_subdata(self):
-        sl_y, sl_x = self.meta['space_slice']
-        offset = -sl_x.start, -sl_y.start
-        self_from_subdata = kwimage.Affine.translate(offset)
-        return self_from_subdata
-
     def _opt_fuse_crops(self):
         """
         Combine two consecutive crops into a single operation.
 
         Example:
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
-            >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
+            >>> base = DelayedLoad.demo(dsize=(16, 16)).prepare()
             >>> # Test Fuse Crops Space Only
             >>> crop1 = base[4:12, 0:16]
             >>> crop2 = self = crop1[2:6, 0:8]
@@ -1583,8 +1714,8 @@ class DelayedCrop2(DelayedImage2):
         Example:
             >>> # Test Fuse Crops Channels Only
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
-            >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
+            >>> base = DelayedLoad.demo(dsize=(16, 16)).prepare()
             >>> crop1 = base.crop(chan_idxs=[0, 2, 1])
             >>> crop2 = crop1.crop(chan_idxs=[1, 2])
             >>> crop3 = self = crop2.crop(chan_idxs=[0, 1])
@@ -1602,8 +1733,8 @@ class DelayedCrop2(DelayedImage2):
         Example:
             >>> # Test Fuse Crops Space  And Channels
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
-            >>> base = DelayedLoad2.demo(dsize=(16, 16)).prepare()
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
+            >>> base = DelayedLoad.demo(dsize=(16, 16)).prepare()
             >>> crop1 = base[4:12, 0:16, [1, 2]]
             >>> self = crop1[2:6, 0:8, [1]]
             >>> opt = self._opt_fuse_crops()
@@ -1612,7 +1743,7 @@ class DelayedCrop2(DelayedImage2):
             >>> self._validate()
             >>> crop1._validate()
         """
-        assert isinstance(self.subdata, DelayedCrop2)
+        assert isinstance(self.subdata, DelayedCrop)
         # Inner is the data closer to the leaf (disk), outer is the data closer
         # to the user (output).
         inner_data = self.subdata.subdata
@@ -1654,9 +1785,9 @@ class DelayedCrop2(DelayedImage2):
 
         Example:
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
-            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
             >>> fpath = kwimage.grab_test_image_fpath()
-            >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> node0 = DelayedLoad(fpath, channels='r|g|b').prepare()
             >>> node1 = node0.warp({'scale': 0.432, 'theta': np.pi / 3, 'about': (80, 80), 'shearx': .3, 'offset': (-50, -50)})
             >>> node2 = node1[10:50, 1:40]
             >>> self = node2
@@ -1674,9 +1805,9 @@ class DelayedCrop2(DelayedImage2):
         Example:
             >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops import *  # NOQA
-            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad2
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-            >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> node0 = DelayedLoad(fpath, channels='r|g|b').prepare()
             >>> node1 = node0.warp({'scale': 1000 / 512})
             >>> node2 = node1[250:750, 0:500]
             >>> self = node2
@@ -1684,7 +1815,7 @@ class DelayedCrop2(DelayedImage2):
             >>> print(ub.repr2(node2.nesting(), nl=-1, sort=0))
             >>> print(ub.repr2(new_outer.nesting(), nl=-1, sort=0))
         """
-        assert isinstance(self.subdata, DelayedWarp2)
+        assert isinstance(self.subdata, DelayedWarp)
         # Inner is the data closer to the leaf (disk), outer is the data closer
         # to the user (output).
         outer_slices = self.meta['space_slice']
@@ -1708,7 +1839,7 @@ class DelayedCrop2(DelayedImage2):
 
     def _opt_dequant_after_crop(self):
         # Swap order so dequantize is after the crop
-        assert isinstance(self.subdata, DelayedDequantize2)
+        assert isinstance(self.subdata, DelayedDequantize)
         quantization = self.subdata.meta['quantization']
         new = copy.copy(self)
         new.subdata = self.subdata.subdata  # Remove the dequantization
@@ -1716,7 +1847,7 @@ class DelayedCrop2(DelayedImage2):
         return new
 
 
-class DelayedOverview2(DelayedImage2):
+class DelayedOverview(DelayedImage):
     """
     Downsamples an image by a factor of two.
 
@@ -1730,7 +1861,7 @@ class DelayedOverview2(DelayedImage2):
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwimage
         >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-        >>> dimg = DelayedLoad2(fpath, channels='r|g|b').prepare()
+        >>> dimg = DelayedLoad(fpath, channels='r|g|b').prepare()
         >>> dimg = dimg.get_overview(1)
         >>> dimg = dimg.get_overview(1)
         >>> dimg = dimg.get_overview(1)
@@ -1752,7 +1883,7 @@ class DelayedOverview2(DelayedImage2):
     def __init__(self, subdata, overview):
         """
         Args:
-            subdata (DelayedArray2): data to operate on
+            subdata (DelayedArray): data to operate on
             overview (int): the overview to use (assuming it exists)
         """
         super().__init__(subdata)
@@ -1815,25 +1946,25 @@ class DelayedOverview2(DelayedImage2):
     def optimize(self):
         """
         Returns:
-            DelayedImage2
+            DelayedImage
         """
         new = copy.copy(self)
         new.subdata = self.subdata.optimize()
-        if isinstance(new.subdata, DelayedOverview2):
+        if isinstance(new.subdata, DelayedOverview):
             new = new._opt_fuse_overview()
 
         if new.meta['overview'] == 0:
             new = new.subdata
-        elif isinstance(new.subdata, DelayedCrop2):
+        elif isinstance(new.subdata, DelayedCrop):
             new = new._opt_crop_after_overview()
             new = new.optimize()
-        elif isinstance(new.subdata, DelayedWarp2):
+        elif isinstance(new.subdata, DelayedWarp):
             new = new._opt_warp_after_overview()
             new = new.optimize()
-        elif isinstance(new.subdata, DelayedDequantize2):
+        elif isinstance(new.subdata, DelayedDequantize):
             new = new._opt_dequant_after_overview()
             new = new.optimize()
-        if isinstance(new.subdata, DelayedChannelConcat2):
+        if isinstance(new.subdata, DelayedChannelConcat):
             new = new._opt_push_under_concat().optimize()
         return new
 
@@ -1860,7 +1991,7 @@ class DelayedOverview2(DelayedImage2):
             >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-            >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> node0 = DelayedLoad(fpath, channels='r|g|b').prepare()
             >>> node1 = node0[100:400, 120:450]
             >>> node2 = node1.get_overview(2)
             >>> self = node2
@@ -1876,7 +2007,7 @@ class DelayedOverview2(DelayedImage2):
             >>> kwplot.imshow(final1, pnum=(1, 2, 2), fnum=1, title='optimized')
         """
         from kwcoco.util.delayed_ops.helpers import _swap_crop_after_warp
-        assert isinstance(self.subdata, DelayedCrop2)
+        assert isinstance(self.subdata, DelayedCrop)
         # Inner is the data closer to the leaf (disk), outer is the data closer
         # to the user (output).
         outer_overview = self.meta['overview']
@@ -1903,7 +2034,7 @@ class DelayedOverview2(DelayedImage2):
         return new
 
     def _opt_fuse_overview(self):
-        assert isinstance(self.subdata, DelayedOverview2)
+        assert isinstance(self.subdata, DelayedOverview)
         outer_overview = self.meta['overview']
         inner_overrview = self.subdata.meta['overview']
         new_overview = inner_overrview + outer_overview
@@ -1912,7 +2043,7 @@ class DelayedOverview2(DelayedImage2):
 
     def _opt_dequant_after_overview(self):
         # Swap order so dequantize is after the crop
-        assert isinstance(self.subdata, DelayedDequantize2)
+        assert isinstance(self.subdata, DelayedDequantize)
         quantization = self.subdata.meta['quantization']
         new = copy.copy(self)
         new.subdata = self.subdata.subdata  # Remove the dequantization
@@ -1928,7 +2059,7 @@ class DelayedOverview2(DelayedImage2):
             >>> # xdoctest: +REQUIRES(module:osgeo)
             >>> from kwcoco.util.delayed_ops import *  # NOQA
             >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-            >>> node0 = DelayedLoad2(fpath, channels='r|g|b').prepare()
+            >>> node0 = DelayedLoad(fpath, channels='r|g|b').prepare()
             >>> node1 = node0.warp({'scale': (2.1, .7), 'offset': (20, 40)})
             >>> node2 = node1.get_overview(2)
             >>> self = node2
@@ -1943,7 +2074,7 @@ class DelayedOverview2(DelayedImage2):
             >>> kwplot.imshow(final0, pnum=(1, 2, 1), fnum=1, title='raw')
             >>> kwplot.imshow(final1, pnum=(1, 2, 2), fnum=1, title='optimized')
         """
-        assert isinstance(self.subdata, DelayedWarp2)
+        assert isinstance(self.subdata, DelayedWarp)
         outer_overview = self.meta['overview']
         inner_transform = self.subdata.meta['transform']
         outer_transform = self._transform_from_subdata()
@@ -1959,3 +2090,16 @@ class DelayedOverview2(DelayedImage2):
         new = self.subdata.subdata.get_overview(new_inner_overview)
         new = new.warp(new_outer)
         return new
+
+
+DelayedOverview2      = DelayedOverview
+DelayedCrop2          = DelayedCrop
+DelayedDequantize2    = DelayedDequantize
+DelayedWarp2          = DelayedWarp
+DelayedAsXarray2      = DelayedAsXarray
+DelayedImage2         = DelayedImage
+DelayedArray2         = DelayedArray
+DelayedChannelConcat2 = DelayedChannelConcat
+DelayedFrameStack2    = DelayedFrameStack
+DelayedConcat2        = DelayedConcat
+DelayedStack2         = DelayedStack
