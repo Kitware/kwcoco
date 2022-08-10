@@ -34,6 +34,7 @@ class DelayedStack(DelayedNaryOperation):
             parts (List[DelayedArray]): data to stack
             axis (int): axes to stack on
         """
+        raise NotImplementedError
         super().__init__(parts=parts)
         self.meta['axis'] = axis
 
@@ -91,6 +92,7 @@ class DelayedFrameStack(DelayedStack):
         Args:
             parts (List[DelayedArray]): data to stack
         """
+        raise NotImplementedError
         super().__init__(parts=parts, axis=0)
 
 # ------
@@ -279,6 +281,16 @@ class ImageOpsMixin:
         new = DelayedWarp(self, transform, dsize=dsize, antialias=antialias,
                            interpolation=interpolation)
         return new
+
+    def scale(self, scale, dsize='auto', antialias=True,
+              interpolation='linear', border_value='auto'):
+        """
+        An alias for self.warp({"scale": scale}, ...)
+        """
+        transform = {'scale': scale}
+        return self.warp(transform, dsize=dsize, antialias=antialias,
+                         interpolation=interpolation,
+                         border_value=border_value)
 
     def dequantize(self, quantization):
         """
@@ -743,37 +755,22 @@ class DelayedChannelConcat(ImageOpsMixin, DelayedConcat):
             >>> canvas = kwimage.fill_nans_with_checkers(canvas)
             >>> kwplot.imshow(canvas)
         """
-        valid_keys = {"offset", "scale", "shearx", "theta"}
-        if remove is not None and retain is not None:
-            raise ValueError('Mutex')
-        if remove is not None:
-            retain = valid_keys - set(remove)
-        else:
-            if retain is None:
-                retain = set()
+        retain = _rectify_retain(remove, retain)
         unwarped_parts = []
-        jagged_warps = []
-        for part in self.parts:
-            tf_root_from_leaf = part.get_transform_from_leaf()
-            tf_leaf_from_root = tf_root_from_leaf.inv()
-            undo_all = tf_leaf_from_root
-            all_undo_components = undo_all.concise()
-            undo_components = ub.dict_diff(all_undo_components, retain)
-            undo_warp = kwimage.Affine.coerce(undo_components)
-            undone_part = part.warp(undo_warp).optimize()
-            if squash_nans:
-                if return_warps:
-                    # hack the return undo_warp
-                    w, h = undone_part.dsize
-                    undo_warp = kwimage.Affine.scale((1 / w, 1 / h)) @ undo_warp
-                if isinstance(undone_part, delayed_leafs.DelayedNans):
-                    undone_part = undone_part[0:1, 0:1].optimize()
-            unwarped_parts.append(undone_part)
-            if return_warps:
-                jagged_warps.append(undo_warp)
         if return_warps:
+            jagged_warps = []
+            for part in self.parts:
+                undone_part, undo_warp = part.undo_warp(
+                    retain=retain, squash_nans=squash_nans,
+                    return_warp=return_warps)
+                unwarped_parts.append(undone_part)
+                jagged_warps.append(undo_warp)
             return unwarped_parts, jagged_warps
         else:
+            for part in self.parts:
+                undone_part = part.undo_warp(
+                    retain=retain, squash_nans=squash_nans)
+                unwarped_parts.append(undone_part)
             return unwarped_parts
 
 
@@ -989,9 +986,6 @@ class DelayedImage(ImageOpsMixin, DelayedArray):
         new = self.crop(None, new_chan_ixs)
         return new
 
-    def scale(self, scale, dsize='auto', antialias=True, interpolation='linear'):
-        return self.warp({'scale': scale}, dsize=dsize)
-
     def _validate(self):
         """
         Check that the delayed metadata corresponds with the finalized data
@@ -1047,6 +1041,106 @@ class DelayedImage(ImageOpsMixin, DelayedArray):
         kwargs = ub.compatible(self.meta, self.__class__.__init__)
         new = self.subdata._push_operation_under(self.__class__, kwargs)
         return new
+
+    def undo_warp(self, remove=None, retain=None, squash_nans=False, return_warp=False):
+        """
+        Attempts to "undo" warping for each concatenated channel and returns a
+        list of delayed operations that are cropped to the right regions.
+
+        Typically you will retrain offset, theta, and shear to remove scale.
+        This ensures the data is spatially aligned up to a scale factor.
+
+        Args:
+            remove (List[str]): if specified, list components of the warping to
+                remove. Can include: "offset", "scale", "shearx", "theta".
+                Typically set this to ["scale"].
+
+            retain (List[str]): if specified, list components of the warping to
+                retain. Can include: "offset", "scale", "shearx", "theta".
+                Mutually exclusive with "remove". If neither remove or retain
+                is specified, retain is set to ``[]``.
+
+            squash_nans (bool):
+                if True, pure nan channels are squashed into a 1x1 array as
+                they do not correspond to a real source.
+
+            return_warp (bool):
+                if True, return the transform we applied.
+                This is useful when you need to warp objects in the original
+                space into the jagged space.
+
+        SeeAlso:
+            DelayedChannelConcat.undo_warps
+
+        Example:
+            >>> # Test similar to undo_warps, but on each channel separately
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
+            >>> from kwcoco.util.delayed_ops.delayed_leafs import DelayedNans
+            >>> import ubelt as ub
+            >>> import kwimage
+            >>> import kwarray
+            >>> import numpy as np
+            >>> # Demo case where we have different channels at different resolutions
+            >>> base = DelayedLoad.demo(channels='r|g|b').prepare().dequantize({'quant_max': 255})
+            >>> bandR = base[:, :, 0].scale(100 / 512)[:, :-50].evaluate()
+            >>> bandG = base[:, :, 1].scale(300 / 512).warp({'theta': np.pi / 8, 'about': (150, 150)}).evaluate()
+            >>> bandB = base[:, :, 2].scale(600 / 512)[:150, :].evaluate()
+            >>> bandN = DelayedNans((600, 600), channels='N')
+            >>> B0 = bandR.scale(6, dsize=(600, 600)).optimize()
+            >>> B1 = bandG.warp({'theta': -np.pi / 8, 'about': (150, 150)}).scale(2, dsize=(600, 600)).optimize()
+            >>> B2 = bandB.scale(1, dsize=(600, 600)).optimize()
+            >>> vidspace_box = kwimage.Boxes([[-10, -10, 270, 160]], 'ltrb').scale(1 / .7).quantize()
+            >>> vidspace_poly = vidspace_box.to_polygons()[0]
+            >>> vidspace_slice = vidspace_box.to_slices()[0]
+            >>> # Test with the padded crop
+            >>> self0 = B0.crop(vidspace_slice, wrap=0, clip=0, pad=10).optimize()
+            >>> self1 = B1.crop(vidspace_slice, wrap=0, clip=0, pad=10).optimize()
+            >>> self2 = B2.crop(vidspace_slice, wrap=0, clip=0, pad=10).optimize()
+            >>> parts = [self0, self1, self2]
+            >>> # Run the undo on each channel
+            >>> undone_scale_parts = [d.undo_warp(remove=['scale']) for d in parts]
+            >>> print('--- Aligned --- ')
+            >>> stackable_aligned = []
+            >>> for d in parts:
+            >>>     d.write_network_text()
+            >>>     stackable_aligned.append(d.finalize())
+            >>> print('--- Undone Scale --- ')
+            >>> stackable_undone_scale = []
+            >>> for undone in undone_scale_parts:
+            ...     undone.write_network_text()
+            ...     stackable_undone_scale.append(undone.finalize())
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> canvas0 = kwimage.stack_images(stackable_aligned, axis=1, pad=5, bg_value='kw_darkgray')
+            >>> canvas2 = kwimage.stack_images(stackable_undone_scale, axis=1, pad=5, bg_value='kw_darkgray')
+            >>> canvas0 = kwimage.draw_header_text(canvas0, 'Rescaled Channels')
+            >>> canvas2 = kwimage.draw_header_text(canvas2, 'Native Scale Channels')
+            >>> canvas = kwimage.stack_images([canvas0, canvas2], axis=0, bg_value='kw_darkgray')
+            >>> canvas = kwimage.fill_nans_with_checkers(canvas)
+            >>> kwplot.imshow(canvas)
+        """
+        retain = _rectify_retain(remove, retain)
+        part = self
+        tf_root_from_leaf = part.get_transform_from_leaf()
+        tf_leaf_from_root = tf_root_from_leaf.inv()
+        undo_all = tf_leaf_from_root
+        all_undo_components = undo_all.concise()
+        undo_components = ub.dict_diff(all_undo_components, retain)
+        undo_warp = kwimage.Affine.coerce(undo_components)
+        undone_part = part.warp(undo_warp).optimize()
+        if squash_nans:
+            if return_warp:
+                # hack the return undo_warp
+                w, h = undone_part.dsize
+                undo_warp = kwimage.Affine.scale((1 / w, 1 / h)) @ undo_warp
+            if isinstance(undone_part, delayed_leafs.DelayedNans):
+                undone_part = undone_part[0:1, 0:1].optimize()
+        if return_warp:
+            return undone_part, undo_warp
+        else:
+            return undone_part
 
 
 class DelayedAsXarray(DelayedImage):
@@ -2090,6 +2184,19 @@ class DelayedOverview(DelayedImage):
         new = self.subdata.subdata.get_overview(new_inner_overview)
         new = new.warp(new_outer)
         return new
+
+
+def _rectify_retain(remove, retain):
+    if remove is not None or retain is None:
+        valid_keys = {"offset", "scale", "shearx", "theta"}
+        if remove is not None and retain is not None:
+            raise ValueError('retain and remove are mutually exclusive')
+        if remove is not None:
+            retain = valid_keys - set(remove)
+        else:
+            if retain is None:
+                retain = set()
+    return retain
 
 
 DelayedOverview2      = DelayedOverview

@@ -1662,7 +1662,7 @@ class DelayedWarp(DelayedImageOperation):
     Attributes:
 
         sub_data (DelayedWarp | ArrayLike):
-            array-like image data at a naitive resolution
+            array-like image data at a native resolution
 
         transform (kwimage.Transform):
             transforms data from native "sub"-image-space to
