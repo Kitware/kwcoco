@@ -287,6 +287,13 @@ __lazy_submodules__ = {
     'sensorchan_spec': ['SensorChanSpec'],
 }
 
+import sys
+if sys.version_info[0:2] < (3, 7):
+    # 3.6 does not have lazy imports
+    from kwcoco.sensorchan_spec import SensorChanSpec
+    from kwcoco.coco_sql_dataset import CocoSqlDatabase
+
+
 from kwcoco import abstract_coco_dataset
 from kwcoco import category_tree
 from kwcoco import channel_spec
@@ -354,4 +361,4 @@ def __dir__():
 __all__ = ['AbstractCocoDataset', 'CategoryTree', 'ChannelSpec', 'CocoDataset',
            'CocoImage', 'FusedChannelSpec', 'abstract_coco_dataset',
            'category_tree', 'channel_spec', 'coco_dataset', 'coco_image',
-           'exceptions']
+           'exceptions', 'SensorChanSpec', 'CocoSqlDatabase']
