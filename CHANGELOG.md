@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.4.0 - Unreleased
+## Version 0.4.1 - Unreleased
+
+
+## Version 0.4.0 - Released 2022-08-11
 
 ### Changed 
 * Officially deprecate `kwcoco.util.util_delayed_poc`
