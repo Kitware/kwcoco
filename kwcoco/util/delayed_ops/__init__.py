@@ -14,7 +14,7 @@ Example:
     >>> from kwcoco.util.delayed_ops import *  # NOQA
     >>> import kwimage
     >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-    >>> dimg = DelayedLoad2(fpath, channels='r|g|b').prepare()
+    >>> dimg = DelayedLoad(fpath, channels='r|g|b').prepare()
     >>> quantization = {'quant_max': 255, 'nodata': 0}
     >>> #
     >>> # Make a complex chain of operations
@@ -77,7 +77,7 @@ Example:
     >>> # handled by adding a new transform that inverts everything and optimizing
     >>> # it, which results in all warps canceling each other out.
     >>> fpath = kwimage.grab_test_image_fpath()
-    >>> base = DelayedLoad2(fpath, channels='r|g|b').prepare()
+    >>> base = DelayedLoad(fpath, channels='r|g|b').prepare()
     >>> warp = kwimage.Affine.random(rng=321, offset=0)
     >>> warp = kwimage.Affine.scale(0.5)
     >>> orig = base.get_overview(1).warp(warp)[16:96, 24:128]
@@ -124,12 +124,12 @@ Example:
     >>> import kwarray
     >>> import numpy as np
     >>> # Demo case where we have different channels at different resolutions
-    >>> base = DelayedLoad2.demo(channels='r|g|b').prepare().dequantize({'quant_max': 255})
+    >>> base = DelayedLoad.demo(channels='r|g|b').prepare().dequantize({'quant_max': 255})
     >>> bandR = base[:, :, 0].scale(100 / 512)[:, :-50].evaluate()
     >>> bandG = base[:, :, 1].scale(300 / 512).warp({'theta': np.pi / 8, 'about': (150, 150)}).evaluate()
     >>> bandB = base[:, :, 2].scale(600 / 512)[:150, :].evaluate()
     >>> # Align the bands in "video" space
-    >>> delayed_vidspace = DelayedChannelConcat2([
+    >>> delayed_vidspace = DelayedChannelConcat([
     >>>     bandR.scale(6, dsize=(600, 600)).optimize(),
     >>>     bandG.warp({'theta': -np.pi / 8, 'about': (150, 150)}).scale(2, dsize=(600, 600)).optimize(),
     >>>     bandB.scale(1, dsize=(600, 600)).optimize(),
@@ -258,27 +258,47 @@ from kwcoco.util.delayed_ops import delayed_leafs
 from kwcoco.util.delayed_ops import delayed_nodes
 from kwcoco.util.delayed_ops import helpers
 
-from kwcoco.util.delayed_ops.delayed_base import (DelayedNaryOperation2,
+from kwcoco.util.delayed_ops.delayed_base import (DelayedNaryOperation,
+                                                  DelayedNaryOperation2,
+                                                  DelayedOperation,
                                                   DelayedOperation2,
+                                                  DelayedUnaryOperation,
                                                   DelayedUnaryOperation2,)
-from kwcoco.util.delayed_ops.delayed_leafs import (DelayedIdentity2,
+from kwcoco.util.delayed_ops.delayed_leafs import (DelayedIdentity,
+                                                   DelayedIdentity2,
+                                                   DelayedImageLeaf,
                                                    DelayedImageLeaf2,
-                                                   DelayedLoad2, DelayedNans2,)
-from kwcoco.util.delayed_ops.delayed_nodes import (DelayedArray2,
+                                                   DelayedLoad, DelayedLoad2,
+                                                   DelayedNans, DelayedNans2,)
+from kwcoco.util.delayed_ops.delayed_nodes import (DelayedArray, DelayedArray2,
+                                                   DelayedAsXarray,
+                                                   DelayedAsXarray2,
+                                                   DelayedChannelConcat,
                                                    DelayedChannelConcat2,
-                                                   DelayedConcat2,
+                                                   DelayedConcat,
+                                                   DelayedConcat2, DelayedCrop,
                                                    DelayedCrop2,
+                                                   DelayedDequantize,
                                                    DelayedDequantize2,
+                                                   DelayedFrameStack,
                                                    DelayedFrameStack2,
-                                                   DelayedImage2,
+                                                   DelayedImage, DelayedImage2,
+                                                   DelayedOverview,
                                                    DelayedOverview2,
-                                                   DelayedStack2, DelayedWarp2,
-                                                   )
+                                                   DelayedStack, DelayedStack2,
+                                                   DelayedWarp, DelayedWarp2,
+                                                   ImageOpsMixin,)
 
-__all__ = ['DelayedArray2', 'DelayedChannelConcat2', 'DelayedConcat2',
-           'DelayedCrop2', 'DelayedDequantize2', 'DelayedFrameStack2',
-           'DelayedIdentity2', 'DelayedImage2', 'DelayedImageLeaf2',
-           'DelayedLoad2', 'DelayedNans2', 'DelayedNaryOperation2',
-           'DelayedOperation2', 'DelayedOverview2', 'DelayedStack2',
-           'DelayedUnaryOperation2', 'DelayedWarp2',
-           'delayed_base', 'delayed_leafs', 'delayed_nodes', 'helpers']
+__all__ = ['DelayedArray', 'DelayedArray2', 'DelayedAsXarray',
+           'DelayedAsXarray2', 'DelayedChannelConcat', 'DelayedChannelConcat2',
+           'DelayedConcat', 'DelayedConcat2', 'DelayedCrop', 'DelayedCrop2',
+           'DelayedDequantize', 'DelayedDequantize2', 'DelayedFrameStack',
+           'DelayedFrameStack2', 'DelayedIdentity', 'DelayedIdentity2',
+           'DelayedImage', 'DelayedImage2', 'DelayedImageLeaf',
+           'DelayedImageLeaf2', 'DelayedLoad', 'DelayedLoad2', 'DelayedNans',
+           'DelayedNans2', 'DelayedNaryOperation', 'DelayedNaryOperation2',
+           'DelayedOperation', 'DelayedOperation2', 'DelayedOverview',
+           'DelayedOverview2', 'DelayedStack', 'DelayedStack2',
+           'DelayedUnaryOperation', 'DelayedUnaryOperation2', 'DelayedWarp',
+           'DelayedWarp2', 'ImageOpsMixin', 'delayed_base', 'delayed_leafs',
+           'delayed_nodes', 'helpers']

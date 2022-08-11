@@ -6,8 +6,8 @@ import kwarray
 import kwimage
 import numpy as np
 import warnings
-from kwcoco.util.delayed_ops.delayed_nodes import DelayedImage2
-# from kwcoco.util.delayed_ops.delayed_nodes import DelayedArray2
+from kwcoco.util.delayed_ops.delayed_nodes import DelayedImage
+# from kwcoco.util.delayed_ops.delayed_nodes import DelayedArray
 
 try:
     from xdev import profile
@@ -15,7 +15,7 @@ except ImportError:
     from ubelt import identity as profile
 
 
-class DelayedImageLeaf2(DelayedImage2):
+class DelayedImageLeaf(DelayedImage):
 
     def get_transform_from_leaf(self):
         """
@@ -31,7 +31,7 @@ class DelayedImageLeaf2(DelayedImage2):
         return self
 
 
-class DelayedLoad2(DelayedImageLeaf2):
+class DelayedLoad(DelayedImageLeaf):
     """
     Reads an image from disk.
 
@@ -41,7 +41,7 @@ class DelayedLoad2(DelayedImageLeaf2):
 
     Example:
         >>> from kwcoco.util.delayed_ops import *  # NOQA
-        >>> self = DelayedLoad2.demo(dsize=(16, 16)).prepare()
+        >>> self = DelayedLoad.demo(dsize=(16, 16)).prepare()
         >>> data1 = self.finalize()
 
     Example:
@@ -51,7 +51,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         >>> import kwimage
         >>> import ubelt as ub
         >>> fpath = kwimage.grab_test_image_fpath(overviews=3)
-        >>> self = DelayedLoad2(fpath, channels='r|g|b').prepare()
+        >>> self = DelayedLoad(fpath, channels='r|g|b').prepare()
         >>> print(f'self={self}')
         >>> print('self.meta = {}'.format(ub.repr2(self.meta, nl=1)))
         >>> quantization = {
@@ -87,7 +87,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         >>> nodata = quantization['nodata']
         >>> kwimage.imwrite(fpath, data_uint16, nodata=nodata, backend='gdal', overviews=3)
         >>> # Test loading the data
-        >>> self = DelayedLoad2(fpath, channels='r|g|b', nodata_method='float').prepare()
+        >>> self = DelayedLoad(fpath, channels='r|g|b', nodata_method='float').prepare()
         >>> node0 = self
         >>> node1 = node0.dequantize(quantization)
         >>> node2 = node1.warp({'scale': 0.51}, interpolation='lanczos')
@@ -140,9 +140,9 @@ class DelayedLoad2(DelayedImageLeaf2):
         return self.meta['fpath']
 
     @classmethod
-    def demo(DelayedLoad2, key='astro', dsize=None, channels=None):
+    def demo(DelayedLoad, key='astro', dsize=None, channels=None):
         fpath = kwimage.grab_test_image_fpath(key, dsize=dsize)
-        self = DelayedLoad2(fpath, channels=channels)
+        self = DelayedLoad(fpath, channels=channels)
         return self
 
     def _load_reference(self):
@@ -167,7 +167,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         tree.
 
         Returns:
-            DelayedLoad2
+            DelayedLoad
         """
         self._load_metadata()
         return self
@@ -198,7 +198,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         Example:
             >>> # Check difference between finalize and _finalize
             >>> from kwcoco.util.delayed_ops.delayed_leafs import *  # NOQA
-            >>> self = DelayedLoad2.demo().prepare()
+            >>> self = DelayedLoad.demo().prepare()
             >>> final_arr = self.finalize()
             >>> assert isinstance(final_arr, np.ndarray), 'finalize should always return an array'
             >>> final_ref = self._finalize()
@@ -209,7 +209,7 @@ class DelayedLoad2(DelayedImageLeaf2):
         """
         self._load_reference()
         if self.lazy_ref is NotImplemented:
-            warnings.warn('DelayedLoad2 may not be efficient without gdal')
+            warnings.warn('DelayedLoad may not be efficient without gdal')
             pre_final = kwimage.imread(self.fpath)
             pre_final = kwarray.atleast_nd(pre_final, 3)
             return pre_final
@@ -217,7 +217,7 @@ class DelayedLoad2(DelayedImageLeaf2):
             return self.lazy_ref
 
 
-class DelayedNans2(DelayedImageLeaf2):
+class DelayedNans(DelayedImageLeaf):
     """
     Constructs nan channels as needed
 
@@ -230,9 +230,9 @@ class DelayedNans2(DelayedImageLeaf2):
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwcoco
         >>> dsize = (307, 311)
-        >>> c1 = DelayedNans2(dsize=dsize, channels='foo')
-        >>> c2 = DelayedLoad2.demo('astro', dsize=dsize, channels='R|G|B').prepare()
-        >>> cat = DelayedChannelConcat2([c1, c2])
+        >>> c1 = DelayedNans(dsize=dsize, channels='foo')
+        >>> c2 = DelayedLoad.demo('astro', dsize=dsize, channels='R|G|B').prepare()
+        >>> cat = DelayedChannelConcat([c1, c2])
         >>> warped_cat = cat.warp({'scale': 1.07}, dsize=(328, 332))._validate()
         >>> warped_cat._validate().optimize().finalize()
     """
@@ -257,7 +257,7 @@ class DelayedNans2(DelayedImageLeaf2):
             chan_idxs (List[int]): indexes of bands to take
 
         Returns:
-            DelayedImage2
+            DelayedImage
         """
         if chan_idxs is None:
             channels = self.channels
@@ -276,14 +276,14 @@ class DelayedNans2(DelayedImageLeaf2):
     def _optimized_warp(self, transform, dsize=None, antialias=True, interpolation='linear', border_value='auto'):
         """
         Returns:
-            DelayedImage2
+            DelayedImage
         """
         # Warping does nothing to nans, except maybe changing the dsize
         new = self.__class__(dsize, channels=self.channels)
         return new
 
 
-class DelayedIdentity2(DelayedImageLeaf2):
+class DelayedIdentity(DelayedImageLeaf):
     """
     Returns an ndarray as-is
 
@@ -296,7 +296,7 @@ class DelayedIdentity2(DelayedImageLeaf2):
         >>> from kwcoco.util.delayed_ops import *  # NOQA
         >>> import kwcoco
         >>> arr = kwimage.checkerboard()
-        >>> self = DelayedIdentity2(arr, channels='gray')
+        >>> self = DelayedIdentity(arr, channels='gray')
         >>> warp = self.warp({'scale': 1.07})
         >>> warp.optimize().finalize()
     """
@@ -314,3 +314,10 @@ class DelayedIdentity2(DelayedImageLeaf2):
             ArrayLike
         """
         return self.data
+
+
+# backwards compat, will be deprecatd
+DelayedIdentity2 = DelayedIdentity
+DelayedNans2 = DelayedNans
+DelayedLoad2 = DelayedLoad
+DelayedImageLeaf2 = DelayedImageLeaf

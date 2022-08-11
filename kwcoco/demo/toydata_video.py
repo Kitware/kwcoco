@@ -1002,7 +1002,8 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
         if imdata is None:
             chip = None
         else:
-            data_slice, padding = kwarray.embed_slice(chip_index, imdata.shape)
+            data_slice, padding = kwarray.embed_slice(
+                chip_index, imdata.shape[0:2])
             # TODO: could have a kwarray function to expose this inverse slice
             # functionality. Also having a top-level call to apply an embedded
             # slice would be good
