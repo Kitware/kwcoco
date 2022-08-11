@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed 
 * Officially deprecate `kwcoco.util.util_delayed_poc`
 * Remove the 2 suffix on the official `delayed_ops` node names.
+* The delayed crop method can now simulated a padded slice.
 
 
 ## Version 0.3.5 - Released 2022-08-08

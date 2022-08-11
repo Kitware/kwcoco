@@ -571,7 +571,7 @@ class CocoImage(ub.NiceRepr):
 
             - [X] The order of the channels in the delayed load should
                 match the requested channel order.
-wc
+
             - [X] TODO: add nans to bands that don't exist or throw an error
 
             - [ ] This function could stand to have a better name. Maybe imread

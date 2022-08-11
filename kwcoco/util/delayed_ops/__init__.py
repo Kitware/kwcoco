@@ -259,26 +259,46 @@ from kwcoco.util.delayed_ops import delayed_nodes
 from kwcoco.util.delayed_ops import helpers
 
 from kwcoco.util.delayed_ops.delayed_base import (DelayedNaryOperation,
+                                                  DelayedNaryOperation2,
                                                   DelayedOperation,
-                                                  DelayedUnaryOperation,)
+                                                  DelayedOperation2,
+                                                  DelayedUnaryOperation,
+                                                  DelayedUnaryOperation2,)
 from kwcoco.util.delayed_ops.delayed_leafs import (DelayedIdentity,
+                                                   DelayedIdentity2,
                                                    DelayedImageLeaf,
-                                                   DelayedLoad, DelayedNans,)
-from kwcoco.util.delayed_ops.delayed_nodes import (DelayedArray,
+                                                   DelayedImageLeaf2,
+                                                   DelayedLoad, DelayedLoad2,
+                                                   DelayedNans, DelayedNans2,)
+from kwcoco.util.delayed_ops.delayed_nodes import (DelayedArray, DelayedArray2,
+                                                   DelayedAsXarray,
+                                                   DelayedAsXarray2,
                                                    DelayedChannelConcat,
+                                                   DelayedChannelConcat2,
                                                    DelayedConcat,
-                                                   DelayedCrop,
+                                                   DelayedConcat2, DelayedCrop,
+                                                   DelayedCrop2,
                                                    DelayedDequantize,
+                                                   DelayedDequantize2,
                                                    DelayedFrameStack,
-                                                   DelayedImage,
+                                                   DelayedFrameStack2,
+                                                   DelayedImage, DelayedImage2,
                                                    DelayedOverview,
-                                                   DelayedStack, DelayedWarp,
-                                                   )
+                                                   DelayedOverview2,
+                                                   DelayedStack, DelayedStack2,
+                                                   DelayedWarp, DelayedWarp2,
+                                                   ImageOpsMixin,)
 
-__all__ = ['DelayedArray', 'DelayedChannelConcat', 'DelayedConcat',
-           'DelayedCrop', 'DelayedDequantize', 'DelayedFrameStack',
-           'DelayedIdentity', 'DelayedImage', 'DelayedImageLeaf',
-           'DelayedLoad', 'DelayedNans', 'DelayedNaryOperation',
-           'DelayedOperation', 'DelayedOverview', 'DelayedStack',
-           'DelayedUnaryOperation', 'DelayedWarp',
-           'delayed_base', 'delayed_leafs', 'delayed_nodes', 'helpers']
+__all__ = ['DelayedArray', 'DelayedArray2', 'DelayedAsXarray',
+           'DelayedAsXarray2', 'DelayedChannelConcat', 'DelayedChannelConcat2',
+           'DelayedConcat', 'DelayedConcat2', 'DelayedCrop', 'DelayedCrop2',
+           'DelayedDequantize', 'DelayedDequantize2', 'DelayedFrameStack',
+           'DelayedFrameStack2', 'DelayedIdentity', 'DelayedIdentity2',
+           'DelayedImage', 'DelayedImage2', 'DelayedImageLeaf',
+           'DelayedImageLeaf2', 'DelayedLoad', 'DelayedLoad2', 'DelayedNans',
+           'DelayedNans2', 'DelayedNaryOperation', 'DelayedNaryOperation2',
+           'DelayedOperation', 'DelayedOperation2', 'DelayedOverview',
+           'DelayedOverview2', 'DelayedStack', 'DelayedStack2',
+           'DelayedUnaryOperation', 'DelayedUnaryOperation2', 'DelayedWarp',
+           'DelayedWarp2', 'ImageOpsMixin', 'delayed_base', 'delayed_leafs',
+           'delayed_nodes', 'helpers']
