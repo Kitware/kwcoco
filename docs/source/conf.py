@@ -512,6 +512,15 @@ class GoogleStyleDocstringProcessor:
                 # xdev.embed()
                 create_doctest_figure(app, obj, name, lines)
 
+        FIX_EXAMPLE_FORMATTING = 1
+        if FIX_EXAMPLE_FORMATTING:
+            for idx, line in enumerate(lines):
+                if line == "Example:":
+                    lines[idx] = "**Example:**"
+                    lines.insert(idx+1, "")
+                    print(lines)
+
+
         REFORMAT_RETURNS = 0
         if REFORMAT_RETURNS:
             # FORMAT THE RETURNS SECTION A BIT NICER
