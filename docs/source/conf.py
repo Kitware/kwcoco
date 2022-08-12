@@ -518,7 +518,6 @@ class GoogleStyleDocstringProcessor:
                 if line == "Example:":
                     lines[idx] = "**Example:**"
                     lines.insert(idx+1, "")
-                    print(lines)
 
 
         REFORMAT_RETURNS = 0

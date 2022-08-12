@@ -404,8 +404,6 @@ class Videos(ObjectList1D):
     @property
     def images(self):
         """
-        Access the groups of images related to each video
-
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('vidshapes8').videos()
