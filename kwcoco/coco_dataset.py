@@ -303,8 +303,19 @@ TODO:
 
     - [ ] Document channel spec
 
-    - [X] remove videos
+    - [ ] Document sensor-channel spec
 
+    - [X] Add remove videos method
+
+    - [ ] Efficiency: Make video annotations more efficient by only tracking
+          keyframes, provide an API to obtain a dense or interpolated
+          annotation on an intermediate frame.
+
+    - [ ] Efficiency: Allow each section of the kwcoco file to be written as a
+          separate json file. Perhaps allow genric pointer support? Might get
+          messy.
+
+    - [ ] Reroot needs to be redesigned very carefully.
 
 References:
     .. [CocoFormat] http://cocodataset.org/#format-data
@@ -350,7 +361,9 @@ try:
 except ImportError:
     ujson = None
 
-if ujson is not None and Version(ujson.__version__) >= Version('5.2.0'):
+KWCOCO_NO_UJSON = bool(os.environ.get('KWCOCO_NO_UJSON'))
+
+if ujson is not None and Version(ujson.__version__) >= Version('5.2.0') and not KWCOCO_NO_UJSON:
     json_r = ujson
     json_w = pjson
 else:
