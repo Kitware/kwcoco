@@ -361,9 +361,9 @@ try:
 except ImportError:
     ujson = None
 
-KWCOCO_NO_UJSON = bool(os.environ.get('KWCOCO_NO_UJSON'))
+KWCOCO_USE_UJSON = bool(os.environ.get('KWCOCO_USE_UJSON'))
 
-if ujson is not None and Version(ujson.__version__) >= Version('5.2.0') and not KWCOCO_NO_UJSON:
+if ujson is not None and Version(ujson.__version__) >= Version('5.2.0') and KWCOCO_USE_UJSON:
     json_r = ujson
     json_w = pjson
 else:
