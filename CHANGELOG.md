@@ -14,6 +14,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * The multisensor data now contains a "sensor" key in the image dictionary.
 * Can now pass `kwcoco.CocoDataset.coerce` `sqlview=True` to attempt to grab an SQL view of the dataset.
 
+### Fixed
+* bug in coco subset when absolute=False
+
 
 ## Version 0.4.0 - Released 2022-08-11
 
