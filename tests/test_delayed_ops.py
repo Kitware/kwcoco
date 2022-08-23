@@ -19,7 +19,8 @@ def test_shuffle_delayed_operations():
 
     from kwcoco.util.delayed_ops.delayed_leafs import DelayedLoad
 
-    fpath = kwimage.grab_test_image_fpath(overviews=3)
+    fpath = kwimage.grab_test_image_fpath()
+    # overviews=3)
     base = DelayedLoad(fpath, channels='r|g|b')._load_metadata()
     quantization = {'quant_max': 255, 'nodata': 0}
     base.get_overview(1).dequantize(quantization).optimize()

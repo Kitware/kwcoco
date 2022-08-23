@@ -2277,7 +2277,7 @@ class MixinCocoObjects(object):
 
         return Annots(aids, self)
 
-    def images(self, gids=None, vidid=None, names=None):
+    def images(self, gids=None, video_id=None, names=None, vidid=None):
         """
         Return vectorized image objects
 
@@ -2285,7 +2285,7 @@ class MixinCocoObjects(object):
             gids (List[int]): image ids to reference, if unspecified
                  all images are returned.
 
-            vidid (int): returns all images that belong to this video id.
+            video_id (int): returns all images that belong to this video id.
                 mutually exclusive with `gids` arg.
 
             names (List[str]):
@@ -2302,14 +2302,17 @@ class MixinCocoObjects(object):
             <Images(num=3)>
 
             >>> self = kwcoco.CocoDataset.demo('vidshapes2')
-            >>> vidid = 1
-            >>> images = self.images(vidid=vidid)
-            >>> assert all(v == vidid for v in images.lookup('video_id'))
+            >>> video_id = 1
+            >>> images = self.images(video_id=video_id)
+            >>> assert all(v == video_id for v in images.lookup('video_id'))
             >>> print(images)
             <Images(num=2)>
         """
         if vidid is not None:
-            gids = self.index.vidid_to_gids[vidid]
+            video_id = vidid
+
+        if video_id is not None:
+            gids = self.index.vidid_to_gids[video_id]
 
         if names is not None:
             gids = [self.index.name_to_img[name]['id'] for name in names]
