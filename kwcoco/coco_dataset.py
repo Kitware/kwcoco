@@ -42,7 +42,7 @@ An informal spec is as follows:
     image = {
         'id': int,
 
-        'name': str,  # an encouraged but optional unique name
+        'name': str,  # an encouraged but optional unique name (ideally not larger than 256 characters)
         'file_name': str,  # relative path to the "base" image data (optional if auxiliary items are specified)
 
         'width': int,   # pixel width of "base" image
@@ -981,7 +981,7 @@ class MixinCocoExtras(object):
     """
 
     @classmethod
-    def coerce(cls, key, **kw):
+    def coerce(cls, key, sqlview=False, **kw):
         """
         Attempt to transform the input into the intended CocoDataset.
 
@@ -990,7 +990,15 @@ class MixinCocoExtras(object):
                string URI pointing to an on-disk dataset, or a special
                key for creating demodata.
 
+            sqlview (bool):
+                If True, will return the dataset as a cached sql view, which
+                can be quicker to load and use in some instances. Defaults to
+                False.
+
             **kw: passed to whatever constructor is chosen (if any)
+
+        Returns:
+            AbstractCocoDataset | kwcoco.CocoDataset | kwcoco.CocoSqlDatabase
 
         Example:
             >>> # test coerce for various input methods
@@ -1024,7 +1032,11 @@ class MixinCocoExtras(object):
                 from kwcoco.coco_sql_dataset import CocoSqlDatabase
                 self = CocoSqlDatabase(dset_fpath).connect()
             elif result.path.endswith('.json') or '.json' in result.path:
-                self = kwcoco.CocoDataset(dset_fpath, **kw)
+                if sqlview:
+                    from kwcoco.coco_sql_dataset import CocoSqlDatabase
+                    self = CocoSqlDatabase.coerce(dset_fpath, **kw)
+                else:
+                    self = kwcoco.CocoDataset(dset_fpath, **kw)
             elif result.scheme == 'special':
                 self = cls.demo(key=key, **kw)
             else:
@@ -1378,12 +1390,12 @@ class MixinCocoExtras(object):
             >>> print('self.hashid = {!r}'.format(self.hashid[0:8]))
             self.hashid_parts = {
                 'annotations': {
-                    'json': 'e573f49d',
+                    'json': 'c1d1b9c3',
                     'num': 11,
                 },
                 'images': {
-                    'pixels': '67d741fe',
-                    'json': '2221c714',
+                    'pixels': '88e37cc3',
+                    'json': '9b8e8be3',
                     'num': 3,
                 },
                 'categories': {
@@ -1391,7 +1403,7 @@ class MixinCocoExtras(object):
                     'num': 8,
                 },
             }
-            self.hashid = '77d445f0'
+            self.hashid = 'bf69bf15'
 
         Example:
             >>> import kwcoco
@@ -1546,7 +1558,9 @@ class MixinCocoExtras(object):
             enable_cache = coco_fpath.exists()
 
         if enable_cache:
-            hashid_sidecar_fpath = ub.Path(str(coco_fpath) + '.hashid.cache')
+            cache_dpath = (coco_fpath.parent / '_cache')
+            cache_fname = coco_fpath.name + '.hashid.cache'
+            hashid_sidecar_fpath = cache_dpath / cache_fname
             # Generate current lookup key
             fpath_stat = coco_fpath.stat()
             status_key = {
@@ -1568,6 +1582,7 @@ class MixinCocoExtras(object):
                     'hashid_parts': self.hashid_parts,
                     'status_key': status_key,
                 }
+                hashid_sidecar_fpath.parent.ensuredir()
                 hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
         return self.hashid
 
@@ -1620,7 +1635,7 @@ class MixinCocoExtras(object):
             >>> bad_imgs = self._ensure_imgsize()
             >>> assert len(bad_imgs) == 0
             >>> assert self.imgs[1]['width'] == 512
-            >>> assert self.imgs[2]['width'] == 300
+            >>> assert self.imgs[2]['width'] == 328
             >>> assert self.imgs[3]['width'] == 256
 
             >>> # Fail cases
@@ -1680,6 +1695,7 @@ class MixinCocoExtras(object):
                     yield img
 
         def _has_download_permission(_HAS_PREMISSION=[False]):
+            # TODO: use rich
             if not _HAS_PREMISSION[0] or ub.argflag(('-y', '--yes')):
                 ans = input('is it ok to download? (enter y for yes)')
                 if ans in ['yes', 'y']:
@@ -3272,10 +3288,16 @@ class MixinCocoDraw(object):
             print(ub.repr2(list(kwargs.keys()), nl=1, si=1))
 
         Example:
-            >>> # xdoctest: +REQUIRES(--show)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi')
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> # xdoctest: -REQUIRES(--show)
             >>> dset.show_image(gid=1, channels='B8')
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> kwplot.show_if_requested()
         """
         import matplotlib as mpl
         from matplotlib import pyplot as plt
@@ -6218,7 +6240,8 @@ def demo_coco_data():
 
     Example:
         >>> # xdoctest: +REQUIRES(--show)
-        >>> from kwcoco.coco_dataset import demo_coco_data, CocoDataset
+        >>> import kwcoco
+        >>> from kwcoco.coco_dataset import demo_coco_data
         >>> dataset = demo_coco_data()
         >>> self = kwcoco.CocoDataset(dataset, tag='demo')
         >>> import kwplot
@@ -6311,10 +6334,11 @@ def demo_coco_data():
              'keypoints': [2, 111, 1]},
             {'id': 9, 'image_id': 1, 'category_id': 5,
              'keypoints': [2, 60, 1]},
+
             {'id': 10, 'image_id': 2, 'category_id': 6,
              'bbox': [37, 6, 230, 240]},
             {'id': 11, 'image_id': 2, 'category_id': 4,
-             'bbox': [124, 96, 45, 18]}
+             'bbox': [156, 130, 45, 18]}
         ],
         'licenses': [],
         'info': [],

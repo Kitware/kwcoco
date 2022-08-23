@@ -397,6 +397,7 @@ class Videos(ObjectList1D):
         >>> ids = list(dset.index.videos.keys())
         >>> self = Videos(ids, dset)
         >>> print('self = {!r}'.format(self))
+        self = <Videos(num=5) at ...>
     """
     def __init__(self, ids, dset):
         super().__init__(ids, dset, 'videos')
@@ -418,6 +419,15 @@ class Videos(ObjectList1D):
 class Images(ObjectList1D):
     """
     Vectorized access to image attributes
+
+    Example:
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('photos')
+        >>> images = dset.images()
+        >>> print('images = {}'.format(images))
+        images = <Images(num=3)...>
+        >>> print('images.gname = {}'.format(images.gname))
+        images.gname = ['astro.png', 'carl.jpg', 'stars.png']
 
     SeeAlso:
         :func:`kwcoco.coco_dataset.MixinCocoObjects.images`
@@ -458,8 +468,9 @@ class Images(ObjectList1D):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
             >>> self._dset._ensure_imgsize()
+            ...
             >>> print(self.size)
-            [(512, 512), (300, 250), (256, 256)]
+            [(512, 512), (328, 448), (256, 256)]
         """
         return list(zip(self.lookup('width'), self.lookup('height')))
 
@@ -470,8 +481,9 @@ class Images(ObjectList1D):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
             >>> self._dset._ensure_imgsize()
+            ...
             >>> print(self.area)
-            [262144, 75000, 65536]
+            [262144, 146944, 65536]
         """
         return [w * h for w, h in zip(self.lookup('width'), self.lookup('height'))]
 
@@ -516,6 +528,16 @@ class Annots(ObjectList1D):
 
     SeeAlso:
         :func:`kwcoco.coco_dataset.MixinCocoObjects.annots`
+
+    Example:
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('photos')
+        >>> annots = dset.annots()
+        >>> print('annots = {}'.format(annots))
+        annots = <Annots(num=11)>
+        >>> image_ids = annots.lookup('image_id')
+        >>> print('image_ids = {}'.format(image_ids))
+        image_ids = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2]
     """
 
     def __init__(self, ids, dset):
@@ -622,6 +644,9 @@ class Annots(ObjectList1D):
         """
         Get the column of kwimage-style bounding boxes
 
+        Returns:
+            kwimage.Boxes
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().annots([1, 2, 11])
@@ -629,7 +654,7 @@ class Annots(ObjectList1D):
             <Boxes(xywh,
                 array([[ 10,  10, 360, 490],
                        [350,   5, 130, 290],
-                       [124,  96,  45,  18]]))>
+                       [156, 130,  45,  18]]))>
         """
         import kwimage
         xywh = self.lookup('bbox')
@@ -661,24 +686,115 @@ class Annots(ObjectList1D):
         """
         Returns raw boxes
 
+        DEPRECATED.
+
+        Returns:
+            List[List[int]]: raw boxes in xywh format
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().annots([1, 2, 11])
             >>> print(self.xywh)
         """
+        ub.schedule_deprecation(
+            'kwcoco', name='Annots.xywh', type='property',
+            deprecate='0.4.0', error='1.0.0', remove='1.1.0',
+            migration=(
+                'use `Annots.lookup("bbox")`.'
+            )
+        )
+
         xywh = self.lookup('bbox')
         return xywh
 
 
 class AnnotGroups(ObjectGroups):
+    """
+    Annotation groups are vectorized lists of lists.
+
+    Each item represents a set of annotations that corresopnds with something
+    (i.e.  belongs to a particular image).
+
+    Example:
+        >>> from kwcoco.coco_objects1d import ImageGroups
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('photos')
+        >>> images = dset.images()
+        >>> # Requesting the "annots" property from a Images object
+        >>> # will return an AnnotGroups object
+        >>> group: AnnotGroups = images.annots
+        >>> # Printing the group gives info on the mean/std of the number
+        >>> # of items per group.
+        >>> print(group)
+        <AnnotGroups(n=3, m=3.7, s=3.9)...>
+        >>> # Groups are fairly restrictive, they dont provide property level
+        >>> # access in many cases, but the lookup method is available
+        >>> print(group.lookup('id'))
+        [[1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 11], []]
+        >>> print(group.lookup('image_id'))
+        [[1, 1, 1, 1, 1, 1, 1, 1, 1], [2, 2], []]
+        >>> print(group.lookup('category_id'))
+        [[1, 2, 3, 4, 5, 5, 5, 5, 5], [6, 4], []]
+    """
     @property
     def cids(self):
+        """
+        Get the grouped category ids for annotations in this group
+
+        Returns:
+            List[List[id]]:
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('photos').images().annots
+            >>> print('self.cids = {}'.format(ub.repr2(self.cids, nl=0)))
+            self.cids = [[1, 2, 3, 4, 5, 5, 5, 5, 5], [6, 4], []]
+        """
         return self.lookup('category_id')
 
     @property
     def cnames(self):
-        return [getattr(group, 'cname') for group in self._groups]
+        """
+        Get the grouped category names for annotations in this group
+
+        Returns:
+            List[List[str]]:
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('photos').images().annots
+            >>> print('self.cnames = {}'.format(ub.repr2(self.cnames, nl=0)))
+            self.cnames = [['astronaut', 'rocket', 'helmet', 'mouth', 'star', 'star', 'star', 'star', 'star'], ['astronomer', 'mouth'], []]
+        """
+        return [getattr(group, 'cnames') for group in self._groups]
 
 
 class ImageGroups(ObjectGroups):
-    pass
+    """
+    Image groups are vectorized lists of other Image objects.
+
+    Each item represents a set of images that corresopnds with something (i.e.
+    belongs to a particular video).
+
+    Example:
+        >>> from kwcoco.coco_objects1d import ImageGroups
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+        >>> videos = dset.videos()
+        >>> # Requesting the "images" property from a Videos object
+        >>> # will return an ImageGroups object
+        >>> group: ImageGroups = videos.images
+        >>> # Printing the group gives info on the mean/std of the number
+        >>> # of items per group.
+        >>> print(group)
+        <ImageGroups(n=8, m=2.0, s=0.0)...>
+        >>> # Groups are fairly restrictive, they dont provide property level
+        >>> # access in many cases, but the lookup method is available
+        >>> print(group.lookup('id'))
+        [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16]]
+        >>> print(group.lookup('video_id'))
+        [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8]]
+        >>> print(group.lookup('frame_index'))
+        [[0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1]]
+    """
+    ...

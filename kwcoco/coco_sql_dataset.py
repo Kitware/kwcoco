@@ -72,6 +72,7 @@ http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 import json
 import numpy as np
 import ubelt as ub
+import os
 from os.path import exists, dirname
 
 from kwcoco.util.dict_like import DictLike  # NOQA
@@ -104,6 +105,13 @@ except ImportError:
         _decl_class_registry = {}
 
 
+# This is the column name for unstructured data that is not captured directly
+# in our sql schema. It will be stored as a json blob. The column names defined
+# in the alchemy tables must agree with this.
+UNSTRUCTURED = '__unstructured__'
+SCHEMA_VERSION = 'v008'
+
+
 class Category(CocoBase):
     __tablename__ = 'categories'
     id = Column(Integer, primary_key=True, doc='unique internal id')
@@ -111,7 +119,7 @@ class Category(CocoBase):
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
 
-    extra = Column(JSON, default=dict())
+    __unstructured__ = Column(JSON, default=dict())
 
 
 class KeypointCategory(CocoBase):
@@ -122,19 +130,19 @@ class KeypointCategory(CocoBase):
     supercategory = Column(String(256), doc='coarser category name')
     reflection_id = Column(Integer, doc='if augmentation reflects the image, change keypoint id to this')
 
-    extra = Column(JSON, default=dict())
+    __unstructured__ = Column(JSON, default=dict())
 
 
 class Video(CocoBase):
     __tablename__ = 'videos'
     id = Column(Integer, primary_key=True, doc='unique internal id')
     name = Column(String(256), nullable=False, index=True, unique=True)
-    caption = Column(String(256), nullable=True)
+    caption = Column(JSON)
 
     width = Column(Integer)
     height = Column(Integer)
 
-    extra = Column(JSON, default=dict())
+    __unstructured__ = Column(JSON, default=dict())
 
 
 class Image(CocoBase):
@@ -148,13 +156,15 @@ class Image(CocoBase):
     height = Column(Integer)
 
     video_id = Column(Integer, index=True, unique=False)
-    timestamp = Column(Float)  # FIXME, timestamp does not have to be a float
+    timestamp = Column(String(48), nullable=True)
     frame_index = Column(Integer)
 
-    channels = Column(JSON)
-    auxiliary = Column(JSON)
+    channels = Column(JSON, doc='See ChannelSpec')
+    warp_img_to_vid = Column(JSON, doc='See TransformSpec')
 
-    extra = Column(JSON, default=dict())
+    auxiliary = Column(JSON)  # TODO: change name to assets (or better yet make an assets table)
+
+    __unstructured__ = Column(JSON, default=dict())
 
 
 class Annotation(CocoBase):
@@ -181,7 +191,8 @@ class Annotation(CocoBase):
     iscrowd = Column(Integer)
     caption = Column(JSON)
 
-    extra = Column(JSON, default=dict())
+    __unstructured__ = Column(JSON, default=dict())
+
 
 # As long as the flavor of sql conforms to our raw sql commands set
 # this to 0, which uses the faster raw variant.
@@ -1252,7 +1263,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
                                     verbose=verbose):
                 item_ = ub.dict_isect(item, colnames)
                 # Everything else is a extra i.e. additional property
-                item_['extra'] = ub.dict_diff(item, item_)
+                item_[UNSTRUCTURED] = ub.dict_diff(item, item_)
                 if key == 'annotations':
                     # Need custom code to translate list-based properties
                     x, y, w, h = item_.get('bbox', [None, None, None, None])
@@ -1461,6 +1472,51 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def data_fpath(self, value):
         self.fpath = value
 
+    def _orig_coco_fpath(self):
+        """
+        Hack to reconstruct the original name. Makes assumptions about how
+        naming is handled elsewhere. There should be centralized logic about
+        how to construct side-car names that can be queried for inversed like
+        this.
+        """
+        view_fpath = ub.Path(self.fpath)
+        if '.view' not in view_fpath.name:
+            raise ValueError('We are assuming this is a view of an existing json file')
+        orig_fname = view_fpath.name[1:].split('.view')[0] + '.json'
+        coco_fpath = view_fpath.parent / orig_fname
+        return coco_fpath
+
+    def _cached_hashid(self):
+        """
+        Compatibility with the way the exiting cached hashid in the coco
+        dataset is used. Both of these functions are private and subject to
+        change (and need optimization).
+        """
+        coco_fpath = self._orig_coco_fpath()
+
+        # Logic to construct the cache name
+        cache_miss = True
+        cache_dpath = (coco_fpath.parent / '_cache')
+        cache_fname = coco_fpath.name + '.hashid.cache'
+        hashid_sidecar_fpath = cache_dpath / cache_fname
+        # Generate current lookup key
+        fpath_stat = coco_fpath.stat()
+        status_key = {
+            'st_size': fpath_stat.st_size,
+            'st_mtime': fpath_stat.st_mtime
+        }
+        if hashid_sidecar_fpath.exists():
+            import json
+            cached_data = json.loads(hashid_sidecar_fpath.read_text())
+            if cached_data['status_key'] == status_key:
+                self.hashid = cached_data['hashid']
+                self.hashid_parts = cached_data['hashid_parts']
+                cache_miss = False
+
+        if cache_miss:
+            raise AssertionError('The cache id should have been written already')
+        return self.hashid
+
 
 def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
                          force_rewrite=False):
@@ -1468,7 +1524,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     Attempts to load a cached SQL-View dataset, only loading and converting the
     json dataset if necessary.
     """
-    import os
+    # import os
     import kwcoco
 
     if dct_db_fpath is not None:
@@ -1487,29 +1543,57 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
 
     if sql_db_fpath is None:
         sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_',
-                                  ext='.view.v007.sqlite')
+                                  ext='.view.' + SCHEMA_VERSION + '.sqlite')
 
     self = CocoSqlDatabase(sql_db_fpath, img_root=bundle_dpath, tag=tag)
 
-    needs_rewrite = True
-    if not force_rewrite and exists(sql_db_fpath):
-        needs_rewrite = (
-            os.stat(dct_db_fpath).st_mtime > os.stat(sql_db_fpath).st_mtime
-        )
-    if needs_rewrite:
-        # Write to the SQL instance
+    _cache_dpath = (ub.Path(bundle_dpath) / '_cache').ensuredir()
 
+    enable_cache = not force_rewrite
+    if os.fspath(sql_db_fpath) == ':memory:':
+        enable_cache = False
+    print(f'enable_cache={enable_cache}')
+    stamp = ub.CacheStamp('kwcoco-sqlite-cache', dpath=_cache_dpath,
+                          product=[sql_db_fpath], enabled=enable_cache,
+                          hasher=None, ext='.json')
+    if stamp.expired():
         # TODO: use a CacheStamp instead
         self.delete()
         self.connect()
         if dset is None:
             print('Loading json dataset for SQL conversion')
             dset = kwcoco.CocoDataset(dct_db_fpath)
+
+        # Write the cacheid when making a view, so the view can access it
+        dset._cached_hashid()
+
         # Convert a coco file to an sql database
         print('Start SQL conversion')
         self.populate_from(dset, verbose=1)
+        if stamp.cacher.enabled:
+            stamp.renew()
     else:
         self.connect()
+
+    # needs_rewrite = True
+    # if not force_rewrite and exists(sql_db_fpath):
+    #     needs_rewrite = (
+    #         os.stat(dct_db_fpath).st_mtime > os.stat(sql_db_fpath).st_mtime
+    #     )
+    # if needs_rewrite:
+    #     # Write to the SQL instance
+
+    #     # TODO: use a CacheStamp instead
+    #     self.delete()
+    #     self.connect()
+    #     if dset is None:
+    #         print('Loading json dataset for SQL conversion')
+    #         dset = kwcoco.CocoDataset(dct_db_fpath)
+    #     # Convert a coco file to an sql database
+    #     print('Start SQL conversion')
+    #     self.populate_from(dset, verbose=1)
+    # else:
+    #     self.connect()
     return self
 
 
@@ -1590,8 +1674,8 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
         for key in keys:
             item1 = ub.dict_diff(lut1[key], special_cols)
             item2 = ub.dict_diff(lut2[key], special_cols)
-            item1.update(item1.pop('extra', {}))
-            item2.update(item2.pop('extra', {}))
+            item1.update(item1.pop(UNSTRUCTURED, {}))
+            item2.update(item2.pop(UNSTRUCTURED, {}))
             common1 = ub.dict_isect(item2, item1)
             common2 = ub.dict_isect(item1, item2)
             diff1 = ub.dict_diff(item1, common2)
