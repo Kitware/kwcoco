@@ -219,6 +219,15 @@ else:
 def orm_to_dict(obj):
     item = obj.__dict__.copy()
     item.pop('_sa_instance_state', None)
+    item = dict_restructure(item)
+    return item
+
+
+def dict_restructure(item):
+    """
+    Removes the unstructured field so the API is transparent to the user.
+    """
+    item.update(item.pop(UNSTRUCTURED, {}))
     return item
 
 
@@ -477,10 +486,10 @@ class SqlDictProxy(DictLike):
                 raise
         return flag
 
-    def __getitem__(proxy, key):
-        if proxy._cache is not None:
-            if key in proxy._cache:
-                return proxy._cache[key]
+    def _uncached_getitem(proxy, key):
+        """
+        The uncached getitem call
+        """
         if proxy.ignore_null and key is None:
             raise KeyError(key)
         try:
@@ -506,6 +515,24 @@ class SqlDictProxy(DictLike):
                 raise KeyError(key)
             else:
                 raise
+        return obj
+
+    def __getitem__(proxy, key):
+        """
+        Example:
+            >>> # Test unstructured keys
+            >>> import kwcoco
+            >>> # the msi-multisensor dataset has unstructured data
+            >>> dct_dset = kwcoco.CocoDataset.coerce('vidshapes3-msi-multisensor')
+            >>> sql_dset = dct_dset.view_sql()
+            >>> proxy = sql_dset.index.imgs
+            >>> key = 1
+            >>> item = proxy[key]
+        """
+        if proxy._cache is not None:
+            if key in proxy._cache:
+                return proxy._cache[key]
+        obj = proxy._uncached_getitem(key)
         item = orm_to_dict(obj)
         if proxy._cache is not None:
             proxy._cache[key] = item
@@ -589,6 +616,7 @@ class SqlDictProxy(DictLike):
                 cast_row = [f(x) for f, x in zip(proxy._casters, row)]
                 # Note: assert colnames == list(result.keys())
                 item = dict(zip(colnames, cast_row))
+                item = dict_restructure(item)
                 yield item
 
     def items(proxy):
@@ -680,11 +708,10 @@ class SqlIdGroupDictProxy(DictLike):
         query = proxy.session.query(proxy.parent_keyattr)
         return query.count()
 
-    def __getitem__(proxy, key):
-        if proxy._cache is not None:
-            if key in proxy._cache:
-                return proxy._cache[key]
-
+    def _uncached_getitem(proxy, key):
+        """
+        getitem without the caceh
+        """
         session = proxy.session
         keyattr = proxy.keyattr
         valattr = proxy.valattr
@@ -711,6 +738,13 @@ class SqlIdGroupDictProxy(DictLike):
             item = [row[0] for row in result.fetchall()]
         _set = set if proxy.group_order_attr is None else ub.oset
         item = _set(item)
+        return item
+
+    def __getitem__(proxy, key):
+        if proxy._cache is not None:
+            if key in proxy._cache:
+                return proxy._cache[key]
+        item = proxy._uncached_getitem(key)
         if proxy._cache is not None:
             proxy._cache[key] = item
         return item
@@ -1552,8 +1586,8 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     enable_cache = not force_rewrite
     if os.fspath(sql_db_fpath) == ':memory:':
         enable_cache = False
-    print(f'enable_cache={enable_cache}')
     stamp = ub.CacheStamp('kwcoco-sqlite-cache', dpath=_cache_dpath,
+                          depends=[dct_db_fpath],
                           product=[sql_db_fpath], enabled=enable_cache,
                           hasher=None, ext='.json')
     if stamp.expired():

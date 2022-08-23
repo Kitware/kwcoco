@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed 
 * Handle change in kwimage demo data, doctest hashes changed
+* The SQLView changed the "extra" key to "__unstructured__" and now implicitly
+  removes it before being passed to the user.
+* The multisensor data now contains a "sensor" key in the image dictionary.
+* Can now pass `kwcoco.CocoDataset.coerce` `sqlview=True` to attempt to grab an SQL view of the dataset.
 
 
 ## Version 0.4.0 - Released 2022-08-11

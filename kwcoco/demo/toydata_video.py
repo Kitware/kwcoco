@@ -483,6 +483,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
                 else:
                     auxitem['dtype'] = 'uint8'
                 img['auxiliary'].append(auxitem)
+                img['sensor'] = frame_sensor
 
         dset.add_image(**img)
 
