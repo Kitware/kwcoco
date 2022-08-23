@@ -520,6 +520,7 @@ class SqlDictProxy(DictLike):
     def __getitem__(proxy, key):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> # Test unstructured keys
             >>> import kwcoco
             >>> # the msi-multisensor dataset has unstructured data
