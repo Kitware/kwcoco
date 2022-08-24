@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.4.1 - Unreleased
+## Version 0.4.2 - Unreleased
+
+
+## Version 0.4.1 - Released 2022-08-24
 
 ### Changed 
 * Handle change in kwimage demo data, doctest hashes changed

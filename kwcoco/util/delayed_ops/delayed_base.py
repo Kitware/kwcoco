@@ -214,7 +214,7 @@ class DelayedOperation(ub.NiceRepr):
             # ub.schedule_deprecation(
             #     'kwcoco', 'kwargs', type='passed to DelayedOperation2.finalize',
             #     migration='setup the desired state beforhand',
-            #     deprecate='0.3.2', error='0.4.1', remove='0.4.1')
+            #     deprecate='0.3.2', error='0.4.2', remove='0.4.2')
             self._set_nested_params(**kwargs)
         if prepare:
             self = self.prepare()
