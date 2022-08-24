@@ -371,8 +371,9 @@ class COCO(CocoDataset):
             kwimage.Mask
 
         Note:
-            * This requires the C-extensions for kwimage to be installed
-              due to the need to interface with the bytes RLE format.
+            * This requires the C-extensions for kwimage to be installed (i.e.
+            ``pip install kwimage_ext``) due to the need to interface with the
+            bytes RLE format.
 
         Example:
             >>> from kwcoco.compat_dataset import *  # NOQA

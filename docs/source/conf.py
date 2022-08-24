@@ -1,6 +1,6 @@
 """
 Notes:
-    Based on template code in: ~/code/kwcoco/docs/source/conf.py
+    Based on template code in: ~/code/xcookie/docs/source/conf.py
 
     http://docs.readthedocs.io/en/latest/getting_started.html
 
@@ -517,8 +517,7 @@ class GoogleStyleDocstringProcessor:
             for idx, line in enumerate(lines):
                 if line == "Example:":
                     lines[idx] = "**Example:**"
-                    lines.insert(idx+1, "")
-
+                    lines.insert(idx + 1, "")
 
         REFORMAT_RETURNS = 0
         if REFORMAT_RETURNS:

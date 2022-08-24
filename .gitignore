@@ -96,3 +96,6 @@ _skbuild
 pip-wheel-metadata/
 
 docs/source/autoapi/
+
+docs/source/images
+docs/source/_static

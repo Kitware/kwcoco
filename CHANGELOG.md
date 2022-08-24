@@ -5,12 +5,26 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.4.0 - Unreleased
+## Version 0.4.1 - Unreleased
+
+### Changed 
+* Handle change in kwimage demo data, doctest hashes changed
+* The SQLView changed the "extra" key to "__unstructured__" and now implicitly
+  removes it before being passed to the user.
+* The multisensor data now contains a "sensor" key in the image dictionary.
+* Can now pass `kwcoco.CocoDataset.coerce` `sqlview=True` to attempt to grab an SQL view of the dataset.
+
+### Fixed
+* bug in coco subset when absolute=False
+
+
+## Version 0.4.0 - Released 2022-08-11
 
 ### Changed 
 * Officially deprecate `kwcoco.util.util_delayed_poc`
 * Remove the 2 suffix on the official `delayed_ops` node names.
 * The delayed crop method can now simulated a padded slice.
+* Changed ujson integration from opt-out to opt-in. Specify `KWCOCO_USE_UJSON` to use ujson.
 
 
 ## Version 0.3.5 - Released 2022-08-08

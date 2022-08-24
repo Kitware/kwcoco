@@ -134,9 +134,9 @@ class CocoSubsetCLI(object):
 
         print('reading fpath = {!r}'.format(config['src']))
         dset = kwcoco.CocoDataset.coerce(config['src'])
+        dst_fpath = ub.Path(config['dst'])
 
         if config['absolute'] == 'auto' and not config['copy_assets']:
-            dst_fpath = ub.Path(config['dst'])
             src_fpath = ub.Path(dset.fpath)
 
             src_bundle_dpath = src_fpath.absolute().parent
