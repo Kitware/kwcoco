@@ -3265,7 +3265,7 @@ class MixinCocoDraw(object):
         canvas = dets.draw_on(canvas)
         return canvas
 
-    def show_image(self, gid=None, aids=None, aid=None, channels=None, **kwargs):
+    def show_image(self, gid=None, aids=None, aid=None, channels=None, setlim=None, **kwargs):
         """
         Use matplotlib to show an image with annotations overlaid
 
@@ -3274,6 +3274,7 @@ class MixinCocoDraw(object):
             aids (list): aids to highlight within the image
             aid (int): a specific aid to focus on. If gid is not give,
                 look up gid based on this aid.
+            setlim (None | str): if 'image' sets the limit to the image extent
             **kwargs:
                 show_annots, show_aid, show_catname, show_kpname,
                 show_segmentation, title, show_gid, show_filename,
@@ -3568,6 +3569,16 @@ class MixinCocoDraw(object):
             if keypoints:
                 xs, ys = np.vstack(keypoints).T
                 ax.plot(xs, ys, 'bo')
+
+        if setlim:
+            if not isinstance(setlim, str):
+                setlim = 'image'
+
+            if setlim == 'image':
+                ax.set_xlim(0, img['width'])
+                ax.set_ylim(img['height'], 0)
+            else:
+                raise NotImplementedError(setlim)
 
         return ax
 
