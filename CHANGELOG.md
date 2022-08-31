@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.4.2 - Unreleased
 
+### Fixed
+* Fixed bug in vidshapes toydata code
+
 
 ## Version 0.4.1 - Released 2022-08-24
 

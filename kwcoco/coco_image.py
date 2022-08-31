@@ -246,6 +246,9 @@ class CocoImage(ub.NiceRepr):
                 list of attribute that must be non-None to consider an object
                 as the primary one.
 
+        Returns:
+            None | dict : the asset dict or None if it is not found
+
         TODO:
             - [ ] Add in primary heuristics
 

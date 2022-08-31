@@ -1170,7 +1170,9 @@ class MixinCocoExtras(object):
             verbose = kwargs.get('verbose', 1)
             res = parse.parse('vidshapes{num_videos:d}', key)
             if res is None:
-                res = parse.parse('vidshapes{num_videos:d}{suffix}', key)
+                res = parse.parse('vidshapes{num_videos:d}-{suffix}', key)
+            if res is None:
+                res = parse.parse('vidshapes-{suffix}', key)
             """
             The rule is that the suffix will be split by the '-' character
             and any registered pattern or alias will impact the kwargs
@@ -1180,7 +1182,8 @@ class MixinCocoExtras(object):
             if verbose > 3:
                 print('res = {!r}'.format(res))
             if res:
-                kwargs['num_videos'] = int(res.named['num_videos'])
+                if 'num_videos' in res.named:
+                    kwargs['num_videos'] = int(res.named['num_videos'])
                 if 'suffix' in res.named:
                     suff_parts = [p for p in res.named['suffix'].split('-') if p]
             if verbose > 3:
