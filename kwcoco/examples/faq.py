@@ -43,7 +43,7 @@ def get_all_channels_in_dataset():
         # dictionary) and then access the "channels" attribute.
         coco_img = dset.coco_image(gid)
         channels = coco_img.channels
-        print(f'{channels=}')
+        print(f'channels={channels}')
         all_channels.append(channels)
 
     # You can build a histogram if you want:
@@ -74,3 +74,4 @@ def whats_the_difference_between_Images_and_CocoImage():
     Similarly for the `Images` objects: `dset.images().objs`  returns a list of
     all of the image dictionaries in that set.
     """
+    ...
