@@ -24,7 +24,7 @@ class CocoGrabCLI:
             )),
 
             'dpath': scfg.Path(
-                ub.get_app_cache_dir('kwcoco', 'data'), help=ub.paragraph(
+                ub.Path.appdir('kwcoco', 'data', type='cache'), help=ub.paragraph(
                     '''
                     Download directory
                     '''))

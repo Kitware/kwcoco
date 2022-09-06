@@ -608,7 +608,7 @@ def main():
     # class GrabCamVid_Config(scfg.Config):
     #     default = {
     #         'dpath': scfg.Path(
-    #             ub.get_app_cache_dir('kwcoco', 'camvid'), help='download location')
+    #             ub.gPath.appdir('kwcoco', 'camvid'), help='download location')
     #     }
     # config = GrabCamVid_Config()
     coco_dset = grab_coco_camvid()
