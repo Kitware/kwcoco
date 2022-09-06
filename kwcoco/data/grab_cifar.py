@@ -125,7 +125,7 @@ def main():
         """
         default = {
             'dpath': scfg.Path(
-                ub.get_app_cache_dir('kwcoco/data'),
+                ub.Path.appdir('kwcoco/data'),
                 help='download location'),
             'with_10': scfg.Value(True, help='do cifar 10'),
             'with_100': scfg.Value(True, help='do cifar 100'),

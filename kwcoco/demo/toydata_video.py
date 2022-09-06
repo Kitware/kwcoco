@@ -239,35 +239,46 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         - [ ] Need better parameterized path generation
 
     Example:
-        >>> from kwcoco.demo.toydata_video import *  # NOQA
+        >>> import numpy as np
+        >>> from kwcoco.demo.toydata_video import random_single_video_dset
         >>> anchors = np.array([ [0.3, 0.3],  [0.1, 0.1]])
-        >>> dset = random_single_video_dset(render=True, num_frames=10, num_tracks=10, anchors=anchors, max_speed=0.2)
+        >>> dset = random_single_video_dset(render=True, num_frames=5,
+        >>>                                 num_tracks=3, anchors=anchors,
+        >>>                                 max_speed=0.2, rng=91237446)
         >>> # xdoctest: +REQUIRES(--show)
         >>> # Show the tracks in a single image
         >>> import kwplot
-        >>> kwplot.autompl()
-        >>> annots = dset.annots()
-        >>> tids = annots.lookup('track_id')
-        >>> tid_to_aids = ub.group_items(annots.aids, tids)
+        >>> import kwimage
+        >>> #kwplot.autosns()
+        >>> kwplot.autoplt()
+        >>> # Group track boxes and centroid locations
         >>> paths = []
         >>> track_boxes = []
-        >>> for tid, aids in tid_to_aids.items():
+        >>> for tid, aids in dset.index.trackid_to_aids.items():
         >>>     boxes = dset.annots(aids).boxes.to_cxywh()
         >>>     path = boxes.data[:, 0:2]
         >>>     paths.append(path)
         >>>     track_boxes.append(boxes)
-        >>> import kwplot
-        >>> plt = kwplot.autoplt()
-        >>> ax = plt.gca()
-        >>> ax.cla()
-        >>> #
-        >>> import kwimage
+        >>> # Plot the tracks over time
+        >>> ax = kwplot.figure(fnum=1, doclf=1).gca()
         >>> colors = kwimage.Color.distinct(len(track_boxes))
         >>> for i, boxes in enumerate(track_boxes):
         >>>     color = colors[i]
         >>>     path = boxes.data[:, 0:2]
-        >>>     boxes.draw(color=color, centers={'radius': 0.01}, alpha=0.5)
+        >>>     boxes.draw(color=color, centers={'radius': 0.01}, alpha=0.8)
         >>>     ax.plot(path.T[0], path.T[1], 'x-', color=color)
+        >>> ax.invert_yaxis()
+        >>> ax.set_title('Track locations flattened over time')
+        >>> # Plot the image sequence
+        >>> fig = kwplot.figure(fnum=2, doclf=1)
+        >>> gids = list(dset.imgs.keys())
+        >>> pnums = kwplot.PlotNums(nRows=1, nSubplots=len(gids))
+        >>> for gid in gids:
+        >>>     dset.show_image(gid, pnum=pnums(), fnum=2, title=f'Image {gid}', show_aid=0, setlim='image')
+        >>> fig.suptitle('Video Frames')
+        >>> fig.set_size_inches(15.4, 4.0)
+        >>> fig.tight_layout()
+        >>> kwplot.show_if_requested()
 
     Example:
         >>> from kwcoco.demo.toydata_video import *  # NOQA
@@ -284,8 +295,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         >>> gids = list(dset.imgs.keys())
         >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
         >>> for gid in gids:
-        >>>     dset.show_image(gid, pnum=pnums(), fnum=1, title=False)
-        >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
+        >>>     dset.show_image(gid, pnum=pnums(), fnum=1, title=f'Image {gid}')
+        >>> kwplot.show_if_requested()
 
     Example:
         >>> from kwcoco.demo.toydata_video import *  # NOQA
