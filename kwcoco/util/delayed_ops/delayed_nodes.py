@@ -1258,7 +1258,7 @@ class DelayedWarp(DelayedImage):
         interpolation = self.meta['interpolation']
 
         prewarp = self.subdata._finalize()
-        prewarp = np.asarray(prewarp)
+        prewarp = np.asanyarray(prewarp)
 
         # TODO: we could configure this, but forcing nans on floats seems like
         # a pretty nice default border behavior. It would be even nicer to have
@@ -1270,7 +1270,10 @@ class DelayedWarp(DelayedImage):
             if prewarp.dtype.kind == 'f':
                 border_value = np.nan
             else:
-                border_value = 0
+                if isinstance(prewarp, np.ma.MaskedArray):
+                    border_value = int(prewarp.fill_value)
+                else:
+                    border_value = 0
         else:
             border_value = self.meta['border_value']
         if not ub.iterable(border_value):

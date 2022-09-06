@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * Fixed bug in vidshapes toydata code
+* Respect masked arrays when doing delayed warp
 
 
 ## Version 0.4.1 - Released 2022-08-24
