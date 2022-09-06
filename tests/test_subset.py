@@ -59,7 +59,7 @@ def test_subset_cli_with_gids():
         'gids': subset_gids,
     }
     print('config1 = {}'.format(ub.repr2(config1, nl=1)))
-    coco_subset.CocoSubsetCLI.main(**config1)
+    coco_subset.CocoSubsetCLI.main(cmdline=False, **config1)
     dst_dset2 = kwcoco.CocoDataset(dst_fpath2)
     print('dst_dset2.dataset = {}'.format(ub.repr2(dst_dset2.dataset, nl=2)))
     assert len(dst_dset2.index.imgs) == 2
@@ -88,7 +88,7 @@ def test_subset_cli_with_jq():
         'select_images': '.id % 2 == 0'
     }
     print('config2 = {}'.format(ub.repr2(config2, nl=1)))
-    coco_subset.CocoSubsetCLI.main(**config2)
+    coco_subset.CocoSubsetCLI.main(cmdline=False, **config2)
     dst_dset1 = kwcoco.CocoDataset(dst_fpath1)
 
     assert len(dst_dset1.index.imgs) == 2
