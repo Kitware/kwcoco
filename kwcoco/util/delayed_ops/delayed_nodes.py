@@ -545,16 +545,91 @@ class DelayedChannelConcat(ImageOpsMixin, DelayedConcat):
         subindexer = kwarray.FlatIndexer([
             comp.num_channels for comp in self.parts])
 
-        accum = []
-        class _ContiguousSegment(object):
-            def __init__(self, comp, start):
-                self.comp = comp
-                self.start = start
-                self.stop = start + 1
-                self.codes = []
+        class _InnerAccumSegment(ub.NiceRepr):
+            """
+            Gather the indexes we need to take from an inner component
+            """
+            def __init__(curr, comp):
+                curr.comp = comp
+                curr.start = None
+                curr.stop = None
+                curr.codes = None
+                curr.indexes = []
+
+            def __nice__(curr):
+                return f'{curr.start}, {curr.stop}, {curr.indexes}, {curr.codes}'
+
+            def add_inner(curr, inner, code):
+                if curr.start is None:
+                    curr.start = inner
+                    curr.stop = inner + 1
+                    if code is not None:
+                        curr.codes = []
+                else:
+                    if code is None:
+                        curr.codes = None
+                    # Can we take a contiguous slice?
+                    if curr.stop is not None and curr.stop == inner:
+                        curr.stop = inner + 1
+                    else:
+                        # Contiguous input is broken, fallback to indexes only.
+                        curr.stop = None
+
+                # Accumulate the codes if we can
+                if curr.codes is not None:
+                    curr.codes.append(code)
+
+                # cast to int to prevent numpy types
+                curr.indexes.append(int(inner))
+
+            def get_indexer(curr):
+                """
+                Return an list of indexes into the subcomponent that will form
+                the new contiguous out-component
+                """
+                if curr.stop is not None:
+                    if curr.start == 0 and curr.stop == curr.comp.num_channels:
+                        # We can take the entire component
+                        sub_idxs = Ellipsis
+                        assert curr.indexes[0] == 0
+                        assert curr.indexes[-1] == curr.stop - 1
+                    else:
+                        # In this case we could take the parts as a contiguous
+                        # slice, but just return indexes for now
+                        sub_idxs = list(range(curr.start, curr.stop))
+                        assert sub_idxs == curr.indexes
+                else:
+                    sub_idxs = curr.indexes
+                return sub_idxs
+
+            def get_subcomponent(curr):
+                """
+                Finalize the subcomponent
+                """
+                comp = curr.comp
+                if comp is None:
+                    # There is no component to get a subcomponent from.
+                    # Instead, return nans that correspond to the requested
+                    # codes.
+                    if curr.codes is None:
+                        nan_chan = None
+                    else:
+                        nan_chan = channel_spec.FusedChannelSpec(curr.codes)
+                    sub_comp = DelayedNans(self.dsize, channels=nan_chan)
+                else:
+                    sub_idxs = curr.get_indexer()
+                    if sub_idxs is Ellipsis:
+                        # Entire component is valid, no need for sub-operation
+                        sub_comp = comp
+                    else:
+                        sub_comp = comp.take_channels(sub_idxs)
+                return sub_comp
 
         curr = None
+        outer_accum = []
         for request_idx, idx in enumerate(top_idx_mapping):
+            # If possible, keep track of the channel name this index represents
+            code = None if request_codes is None else request_codes[request_idx]
             if idx is None:
                 # Requested channel does not exist in our data stack
                 comp = None
@@ -565,50 +640,25 @@ class DelayedChannelConcat(ImageOpsMixin, DelayedConcat):
                 # Requested channel exists in our data stack
                 outer, inner = subindexer.unravel(idx)
                 comp = self.parts[outer]
-            if curr is None:
-                curr = _ContiguousSegment(comp, inner)
-            else:
-                is_contiguous = curr.comp is comp and (inner == curr.stop)
-                if is_contiguous:
-                    # extend the previous contiguous segment
-                    curr.stop = inner + 1
-                else:
-                    # accept previous segment and start a new one
-                    accum.append(curr)
-                    curr = _ContiguousSegment(comp, inner)
 
-            # Hack for nans
-            if request_codes is not None:
-                curr.codes.append(request_codes[request_idx])
+            # Do we extend the current inner accumulator or start a new one?
+            if curr is None:
+                # Start the first segment
+                curr = _InnerAccumSegment(comp)
+            elif curr.comp is not comp:
+                # accept previous segment and start a new one
+                outer_accum.append(curr)
+                curr = _InnerAccumSegment(comp)
+
+            # extend this inner segment
+            curr.add_inner(inner, code)
 
         # Accumulate final segment
         if curr is not None:
-            accum.append(curr)
+            outer_accum.append(curr)
 
-        # Execute the delayed operation
-        new_components = []
-        for curr in accum:
-            comp = curr.comp
-            if comp is None:
-                # Requested component did not exist, return nans
-                if request_codes is not None:
-                    nan_chan = channel_spec.FusedChannelSpec(curr.codes)
-                else:
-                    nan_chan = None
-                comp = DelayedNans(self.dsize, channels=nan_chan)
-                new_components.append(comp)
-            else:
-                if curr.start == 0 and curr.stop == comp.num_channels:
-                    # Entire component is valid, no need for sub-operation
-                    new_components.append(comp)
-                else:
-                    # Only part of the component is taken, need to sub-operate
-                    # It would be nice if we only loaded the file once if we need
-                    # multiple parts discontiguously.
-                    sub_idxs = list(range(curr.start, curr.stop))
-                    sub_comp = comp.take_channels(sub_idxs)
-                    new_components.append(sub_comp)
-
+        # Gather the subcomponents into a new delayed concat
+        new_components = [curr.get_subcomponent() for curr in outer_accum]
         new = DelayedChannelConcat(new_components)
         return new
 
@@ -964,6 +1014,16 @@ class DelayedImage(ImageOpsMixin, DelayedArray):
             >>> assert np.all(final1[..., 2] == final3[..., 1])
             >>> assert np.all(final1[..., 0] == final3[..., 0])
             >>> assert final3.shape[2] == 2
+
+        Example:
+            >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+            >>> from kwcoco.util.delayed_ops import DelayedLoad
+            >>> self = DelayedLoad.demo(dsize=(16, 16), channels='r|g|b').prepare()
+            >>> # Case where a channel doesn't exist
+            >>> channels = 'r|b|magic'
+            >>> new = self.take_channels(channels)
+            >>> assert len(new.parts) == 2
+            >>> new._validate()
         """
         if isinstance(channels, list):
             top_idx_mapping = channels
@@ -978,10 +1038,17 @@ class DelayedImage(ImageOpsMixin, DelayedArray):
             # Computer subindex integer mapping
             request_codes = channels.as_list()
             top_codes = current_channels.as_oset()
-            top_idx_mapping = [
-                top_codes.index(code)
-                for code in request_codes
-            ]
+            try:
+                top_idx_mapping = [
+                    top_codes.index(code)
+                    for code in request_codes
+                ]
+            except KeyError:
+                # If a requested channel doesn't exist we have to break this
+                # node up into a concat node with nans
+                wrp = DelayedChannelConcat([self], dsize=self.dsize)
+                new =  wrp.take_channels(channels)
+                return new
         new_chan_ixs = top_idx_mapping
         new = self.crop(None, new_chan_ixs)
         return new
@@ -1675,6 +1742,16 @@ class DelayedCrop(DelayedImage):
         >>> assert final.shape == (16, 16, 1)
         >>> assert base[:, :, [0, 1]].finalize().shape == (16, 16, 2)
         >>> assert base[:, :, [2, 0, 1]].finalize().shape == (16, 16, 3)
+
+    Example:
+        >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
+        >>> from kwcoco.util.delayed_ops import DelayedLoad
+        >>> base = DelayedLoad.demo(dsize=(16, 16)).prepare()
+        >>> # Test Discontiguous Channel Select Via Index
+        >>> self = base[:, :, [0, 2]]
+        >>> self.write_network_text()
+        >>> final = self._finalize()
+        >>> assert final.shape == (16, 16, 2)
     """
     def __init__(self, subdata, space_slice=None, chan_idxs=None):
         """
@@ -1731,6 +1808,7 @@ class DelayedCrop(DelayedImage):
         else:
             full_slice = space_slice + (chan_idxs,)
         # final = sub_final[space_slice]
+        print(f'full_slice={full_slice}')
         final = sub_final[full_slice]
         final = kwarray.atleast_nd(final, 3)
         return final

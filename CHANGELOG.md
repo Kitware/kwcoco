@@ -7,6 +7,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.4.3 - Unreleased
 
+### Fixed
+* Taking non-existing channels from a single-image delayed node returns a
+  concatenated node with existing and nan channels.
+
+### Changed
+* Taking subchannels from a concatenated delayed node now groups discontinuous
+  indices from the same underlying image.
+
 
 ## Version 0.4.2 - Released 2022-09-06
 
