@@ -238,8 +238,8 @@ class ImageOpsMixin:
         pad_warp = {'offset': (offset_d1, offset_d0)}
         data_crop_box = kwimage.Boxes.from_slice(
             _data_slice, clip=False, wrap=False)
-        dsize = (data_crop_box.width.ravel()[0] + offset_d1 + extra_d1,
-                 data_crop_box.height.ravel()[0] + offset_d0 + extra_d0)
+        dsize = (int(data_crop_box.width.ravel()[0] + offset_d1 + extra_d1),
+                 int(data_crop_box.height.ravel()[0] + offset_d0 + extra_d0))
         new = self.crop(_data_slice)
         if any([offset_d0, extra_d0, offset_d1, extra_d1]):
             # Use a warp to accomplish padding.
@@ -747,9 +747,15 @@ class DelayedChannelConcat(ImageOpsMixin, DelayedConcat):
                 they do not correspond to a real source.
 
             return_warps (bool):
-                if True, return the transforms we applied.
+                if True, return the transforms we applied. I.e. the transform
+                from the ``self`` to the returned ``parts``.
                 This is useful when you need to warp objects in the original
                 space into the jagged space.
+
+        Returns:
+            List[DelayedImage] | Tuple[List[DelayedImage] | List[Affine]]:
+                The List[DelayedImage] are the ``parts`` i.e. the new images with the warping undone.
+                The List[Affine]: is the transforms from ``self`` to each item in ``parts``
 
         Example:
             >>> from kwcoco.util.delayed_ops.delayed_nodes import *  # NOQA
@@ -1808,7 +1814,6 @@ class DelayedCrop(DelayedImage):
         else:
             full_slice = space_slice + (chan_idxs,)
         # final = sub_final[space_slice]
-        print(f'full_slice={full_slice}')
         final = sub_final[full_slice]
         final = kwarray.atleast_nd(final, 3)
         return final
