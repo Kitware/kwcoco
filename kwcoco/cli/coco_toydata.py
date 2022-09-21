@@ -46,7 +46,7 @@ class CocoToyDataCLI(object):
                 toydata config.
                 ''')),
 
-            'use_cache': scfg.Value(True, help=ub.paragraph(
+            'use_cache': scfg.Value(True, isflag=1, help=ub.paragraph(
                 '''
                 if False, this will force the dataset to be regenerated.
                 Otherwise, it will only regenerate the data if it doesn't

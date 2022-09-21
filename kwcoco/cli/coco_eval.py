@@ -13,7 +13,7 @@ class CocoEvalCLIConfig(scfg.Config):
     default = ub.dict_union(coco_evaluator.CocoEvalConfig.default, {
         # These should go into the CLI args, not the class config args
         'expt_title': scfg.Value('', type=str, help='title for plots'),
-        'draw': scfg.Value(True, help='draw metric plots'),
+        'draw': scfg.Value(True, isflag=1, help='draw metric plots'),
         'out_dpath': scfg.Value('./coco_metrics', type=str),
     })
 
