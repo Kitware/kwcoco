@@ -14,6 +14,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * Taking subchannels from a concatenated delayed node now groups discontinuous
   indices from the same underlying image.
+* `channel_spec`, `sensorchan_spec`, `util.lazy_frame_backends`, and
+  `util.delayed_ops` have all been ported to the new `delayed_image` package.
 
 
 ## Version 0.4.2 - Released 2022-09-06
