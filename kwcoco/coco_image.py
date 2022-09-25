@@ -679,6 +679,13 @@ class CocoImage(ub.NiceRepr):
         if bundle_dpath is None:
             bundle_dpath = self.bundle_dpath
 
+        if mode != 1:
+            ub.schedule_deprecation(
+                'kwcoco', 'mode=0', 'CocoImage.delay',
+                migration='Use "mode=1" instead.',
+                deprecate='0.3.6', error='0.4.3', remove='0.5.0'
+            )
+
         img = self.img
         requested = channels
         if requested is not None:
@@ -686,12 +693,12 @@ class CocoImage(ub.NiceRepr):
 
         # Get info about the primary image and check if its channels are
         # requested (if it even has any)
-        img_info = _delay_load_imglike(bundle_dpath, img, mode=mode,
+        img_info = _delay_load_imglike(bundle_dpath, img,
                                        nodata_method=nodata_method)
         obj_info_list = [(img_info, img)]
         auxlist = img.get('auxiliary', img.get('assets', []))
         for aux in auxlist:
-            info = _delay_load_imglike(bundle_dpath, aux, mode=mode,
+            info = _delay_load_imglike(bundle_dpath, aux,
                                        nodata_method=nodata_method)
             obj_info_list.append((info, aux))
 
@@ -705,10 +712,9 @@ class CocoImage(ub.NiceRepr):
                 if include_flag:
                     chncls, chnkw = info['chan_construct']
                     chan = chncls(**chnkw)
-                    if mode == 1:
-                        quant = info.get('quantization', None)
-                        if quant is not None:
-                            chan = chan.dequantize(quant)
+                    quant = info.get('quantization', None)
+                    if quant is not None:
+                        chan = chan.dequantize(quant)
                     if space not in {'auxiliary', 'asset'}:
                         aux_to_img = Affine.coerce(obj.get('warp_aux_to_img', None))
                         chan = chan.warp(
@@ -730,28 +736,16 @@ class CocoImage(ub.NiceRepr):
             if requested is not None:
                 # Handle case where the image doesnt have the requested
                 # channels.
-                if mode == 0:
-                    from kwcoco.util.util_delayed_poc import DelayedNans
-                    delayed = DelayedNans(dsize=dsize, channels=requested)
-                elif mode == 1:
-                    from kwcoco.util.delayed_ops import DelayedNans
-                    from kwcoco.util.delayed_ops import DelayedChannelConcat
-                    delayed = DelayedNans(dsize=dsize, channels=requested)
-                    delayed = DelayedChannelConcat([delayed])
-                else:
-                    raise KeyError(mode)
+                from delayed_image import DelayedNans
+                from delayed_image import DelayedChannelConcat
+                delayed = DelayedNans(dsize=dsize, channels=requested)
+                delayed = DelayedChannelConcat([delayed])
                 return delayed
             else:
                 raise ValueError('no data registered in kwcoco image')
         else:
-            if mode == 0:
-                from kwcoco.util.util_delayed_poc import DelayedChannelConcat
-                delayed = DelayedChannelConcat(chan_list)
-            elif mode == 1:
-                from kwcoco.util.delayed_ops import DelayedChannelConcat
-                delayed = DelayedChannelConcat(chan_list)
-            else:
-                raise KeyError(mode)
+            from delayed_image import DelayedChannelConcat
+            delayed = DelayedChannelConcat(chan_list)
 
         # Reorder channels in the requested order
         if requested is not None:
@@ -765,18 +759,11 @@ class CocoImage(ub.NiceRepr):
             pass
         elif space == 'video':
             img_to_vid = self.warp_vid_from_img
-            # img_to_vid = Affine.coerce(img.get('warp_img_to_vid', None))
-            if mode == 1:
-                delayed = delayed.warp(img_to_vid, dsize=dsize,
-                                       interpolation=interpolation,
-                                       antialias=antialias)
-            else:
-                delayed = delayed.warp(img_to_vid, dsize=dsize)
+            delayed = delayed.warp(img_to_vid, dsize=dsize,
+                                   interpolation=interpolation,
+                                   antialias=antialias)
         else:
             raise KeyError('space = {}'.format(space))
-
-        # if mode == 1:
-        #     delayed = delayed.optimize()
 
         return delayed
 
@@ -873,7 +860,7 @@ class CocoAsset(object):
             return self.obj.get(key, default)
 
 
-def _delay_load_imglike(bundle_dpath, obj, mode=0, nodata_method=None):
+def _delay_load_imglike(bundle_dpath, obj, mode=1, nodata_method=None):
     from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
     info = {}
@@ -895,23 +882,10 @@ def _delay_load_imglike(bundle_dpath, obj, mode=0, nodata_method=None):
         ub.schedule_deprecation(
             'kwcoco', 'mode=0', 'CocoImage.delay',
             migration='Use the "mode=1" instead.',
-            deprecate='0.3.6', error='0.5.0', remove='0.5.1'
+            deprecate='0.3.6', error='0.4.3', remove='0.5.0'
         )
-
-        from kwcoco.util.util_delayed_poc import DelayedLoad, DelayedIdentity
-        quantization = obj.get('quantization', None)
-        if imdata is not None:
-            info['chan_construct'] = (DelayedIdentity, dict(
-                sub_data=imdata, channels=channels_, dsize=dsize,
-                quantization=quantization))
-        elif fname is not None:
-            info['fpath'] = fpath = join(bundle_dpath, fname)
-            # Delaying this gives us a small speed boost
-            info['chan_construct'] = (DelayedLoad, dict(
-                fpath=fpath, channels=channels_, dsize=dsize,
-                quantization=quantization))
     elif mode == 1:
-        from kwcoco.util.delayed_ops import DelayedLoad, DelayedIdentity
+        from delayed_image import DelayedLoad, DelayedIdentity
         quantization = obj.get('quantization', None)
         if imdata is not None:
             info['chan_construct'] = (DelayedIdentity, dict(
