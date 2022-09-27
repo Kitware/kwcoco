@@ -34,7 +34,7 @@ class CocoEvalCLI:
             >>> from kwcoco.cli.coco_eval import *  # NOQA
             >>> from os.path import join
             >>> import kwcoco
-            >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/eval')
+            >>> dpath = ub.Path.appdir('kwcoco/tests/eval').ensuredir()
             >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
             >>> from kwcoco.demo.perterb import perterb_coco
             >>> kwargs = {

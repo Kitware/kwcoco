@@ -179,7 +179,7 @@ class KW18(kwarray.DataFrameArray):
             >>> import ubelt as ub
             >>> import kwimage
             >>> # Prep test data - autogen a demo kw18 and write it to disk
-            >>> dpath = ub.ensure_app_cache_dir('kwcoco/kw18')
+            >>> dpath = ub.Path.appdir('kwcoco/kw18').ensuredir()
             >>> kw18_fpath = join(dpath, 'test.kw18')
             >>> KW18.demo().dump(kw18_fpath)
             >>> #

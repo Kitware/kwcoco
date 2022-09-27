@@ -133,7 +133,7 @@ def demodata_toy_dset(image_size=(600, 600),
 
     if bundle_dpath is None:
         if dpath is None:
-            dpath = ub.ensure_app_cache_dir('kwcoco', 'demodata_bundles')
+            dpath = ub.Path.appdir('kwcoco', 'demodata_bundles').ensuredir()
         else:
             ub.ensuredir(dpath)
     else:

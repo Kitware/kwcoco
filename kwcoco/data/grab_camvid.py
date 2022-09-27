@@ -168,7 +168,7 @@ def grab_camvid_sampler():
     """
     import kwcoco
     dset = grab_coco_camvid()
-    workdir = ub.ensure_app_cache_dir('camvid')
+    workdir = ub.Path.appdir('camvid').ensuredir()
     sampler = kwcoco.CocoSampler(dset, workdir=workdir)
     return sampler
 
@@ -193,7 +193,7 @@ def grab_coco_camvid():
             xdev.InteractiveIter.draw()
     """
     import kwcoco
-    cache_dpath = ub.ensure_app_cache_dir('kwcoco', 'camvid')
+    cache_dpath = ub.Path.appdir('kwcoco', 'camvid').ensuredir()
     coco_fpath = join(cache_dpath, 'camvid.mscoco.json')
 
     # Need to manually bump this if you make a change to loading
@@ -237,7 +237,7 @@ def grab_raw_camvid():
     Grab the raw camvid data.
     """
     import zipfile
-    dpath = ub.ensure_app_cache_dir('kwcoco', 'camvid')
+    dpath = ub.Path.appdir('kwcoco', 'camvid').ensuredir()
 
     # url = 'http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/data/LabeledApproved_full.zip'
     # url = 'https://github.com/mostafaizz/camvid/archive/master.zip'

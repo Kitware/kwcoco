@@ -5,7 +5,6 @@ mkinit ~/code/kwcoco/kwcoco/util/__init__.py --lazy
 import sys
 
 __protected__ = [
-    'util_delayed_poc',
     'delayed_ops',
     'lazy_frame_backends',
     'util_monkey',
@@ -89,7 +88,6 @@ if sys.version_info[0:2] >= (3, 7):
             'jsonschema_elements',
             'lazy_frame_backends',
             'util_archive',
-            'util_delayed_poc',
             'util_futures',
             'util_json',
             'util_monkey',
@@ -148,9 +146,6 @@ if sys.version_info[0:2] >= (3, 7):
     def __dir__():
         return __all__
 
-else:
-    from kwcoco.util import util_delayed_poc
-
 
 __all__ = ['ALLOF', 'ANY', 'ANYOF', 'ARRAY', 'Archive', 'BOOLEAN',
            'ContainerElements', 'DictLike', 'Element', 'INTEGER',
@@ -161,5 +156,5 @@ __all__ = ['ALLOF', 'ANY', 'ANYOF', 'ARRAY', 'Archive', 'BOOLEAN',
            'indexable_allclose', 'jsonschema_elements', 'lazy_frame_backends',
            'resolve_directory_symlinks', 'resolve_relative_to',
            'smart_truncate', 'special_reroot_single', 'unarchive_file',
-           'util_archive', 'util_delayed_poc', 'util_futures', 'util_json',
+           'util_archive', 'util_futures', 'util_json',
            'util_monkey', 'util_reroot', 'util_sklearn', 'util_truncate']

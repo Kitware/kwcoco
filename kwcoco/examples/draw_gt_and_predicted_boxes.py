@@ -9,7 +9,7 @@ def draw_true_and_pred_boxes(true_fpath, pred_fpath, gid, viz_fpath):
         >>> from os.path import join
         >>> from kwcoco.demo.perterb import perterb_coco
         >>> # Create a working directory
-        >>> dpath = ub.ensure_app_cache_dir('kwcoco/examples/draw_true_and_pred_boxes')
+        >>> dpath = ub.Path.appdir('kwcoco/examples/draw_true_and_pred_boxes').ensuredir()
         >>> # Lets setup some dummy true data
         >>> true_dset = kwcoco.CocoDataset.demo('shapes2')
         >>> true_dset.fpath = join(dpath, 'true_dset.kwcoco.json')

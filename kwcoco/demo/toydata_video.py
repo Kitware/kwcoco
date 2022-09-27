@@ -160,7 +160,7 @@ def random_video_dset(
 
     if renderkw:
         if dpath is None:
-            dpath = ub.ensure_app_cache_dir('kwcoco', 'demo_vidshapes')
+            dpath = ub.Path.appdir('kwcoco', 'demo_vidshapes').ensuredir()
 
         if verbose > 2:
             print('rendering')
@@ -777,7 +777,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
 
     if dpath is None:
         dset_name = 'rendered_{}'.format(hashid)
-        bundle_dpath = ub.ensure_app_cache_dir('kwcoco', 'rendered', dset_name)
+        bundle_dpath = ub.Path.appdir('kwcoco', 'rendered', dset_name).ensuredir()
         dset.fpath = join(bundle_dpath, 'data.kwcoco.json')
         bundle_dpath = dset.bundle_dpath
     else:

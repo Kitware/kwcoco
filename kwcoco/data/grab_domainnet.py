@@ -88,7 +88,7 @@ def grab_domain_net():
         },
     }
 
-    dpath = ub.ensure_app_cache_dir('kwcoco', 'domain_net')
+    dpath = ub.Path.appdir('kwcoco', 'domain_net').ensuredir()
 
     # Assign a coco filepath to each dataset split
     for key, info in infos.items():

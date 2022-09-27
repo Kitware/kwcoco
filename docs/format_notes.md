@@ -66,7 +66,7 @@ The file structure looks like this:
 Naming conventions of path components
 
 
-dpath        = ub.ensure_app_cache_dir('kwcoco/demodata_bundles')  #
+dpath        = ub.Path.appdir('kwcoco/demodata_bundles')  #
 bundle_dname = f'MyDatasetName'                             # The name of the bundle
 bundle_dpath = f'{dpath}/{bundle_dname}'                    # This will be dset.bundle_dpath
 data_fpath   = f'{bundle_dpath}/data'                       # This will be dset.fpath (might symlink e.g. to data.kwcoco.json)

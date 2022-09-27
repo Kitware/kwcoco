@@ -12,7 +12,7 @@ def benchmark_large_hyperspectral():
     from osgeo import gdal
     gdal.UseExceptions()
 
-    base_dpath = ub.Path(ub.ensure_app_cache_dir('kwcoco/demo/bench_large_hyperspectral'))
+    base_dpath = ub.Path.appdir('kwcoco/demo/bench_large_hyperspectral').ensuredir()
 
     MB = (2.0 ** 20)
     H = W = 1024

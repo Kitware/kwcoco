@@ -11,7 +11,7 @@ def main():
     import kwcoco
     gname = 'images/foo.png'
     remote = '/remote/path'
-    host = ub.ensure_app_cache_dir('kwcoco/tests/reroot')
+    host = ub.Path.appdir('kwcoco/tests/reroot').ensuredir()
     fpath = join(host, gname)
     ub.ensuredir(dirname(fpath))
     # In this test the image exists on the host path
@@ -92,7 +92,7 @@ def demo_reroot_bug1():
     import ubelt as ub
     import kwimage
     dset = kwcoco.CocoDataset()
-    dpath = ub.Path(ub.ensure_app_cache_dir('kwcoco/tests/reroot'))
+    dpath = ub.Path.appdir('kwcoco/tests/reroot').ensuredir()
     dset.fpath = dpath / 'data/repos/my_bundle1/data.kwcoco.json'
     dset.add_image(file_name='assets/img1.jpg')
 
@@ -120,7 +120,7 @@ def demo_reroot_bug1():
         import ubelt as ub
         import kwimage
         dset1 = kwcoco.CocoDataset()
-        dpath = ub.Path(ub.ensure_app_cache_dir('kwcoco/tests/reroot'))
+        dpath = ub.Path.appdir('kwcoco/tests/reroot').ensuredir()
 
         # We want to modify a dataset in bundle1 and write it in bundle2
         # the new dataset should reference a relative path to bundle1
