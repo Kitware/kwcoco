@@ -543,8 +543,7 @@ class CocoImage(ub.NiceRepr):
 
     @profile
     def delay(self, channels=None, space='image', bundle_dpath=None,
-              interpolation='linear', antialias=True, nodata_method=None,
-              mode=1):
+              interpolation='linear', antialias=True, nodata_method=None):
         """
         Perform a delayed load on the data in this image.
 
@@ -632,7 +631,7 @@ class CocoImage(ub.NiceRepr):
             >>> final = delayed.finalize()
             >>> assert final.shape == (512, 512, 3)
 
-            >>> delayed = coco_img.delay(mode=1)
+            >>> delayed = coco_img.delay()
             >>> final = delayed.finalize()
             >>> print('final.shape = {}'.format(ub.repr2(final.shape, nl=1)))
             >>> assert final.shape == (512, 512, 3)
@@ -649,7 +648,7 @@ class CocoImage(ub.NiceRepr):
             >>> imdata[:] = np.arange(5)[None, None, :]
             >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
             >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
-            >>> delayed = coco_img.delay(channels='B1|Aux:2:4', mode=1)
+            >>> delayed = coco_img.delay(channels='B1|Aux:2:4')
             >>> final = delayed.finalize()
 
         Example:
@@ -678,13 +677,6 @@ class CocoImage(ub.NiceRepr):
         from kwcoco.channel_spec import FusedChannelSpec
         if bundle_dpath is None:
             bundle_dpath = self.bundle_dpath
-
-        if mode != 1:
-            ub.schedule_deprecation(
-                'kwcoco', 'mode=0', 'CocoImage.delay',
-                migration='Use "mode=1" instead.',
-                deprecate='0.3.6', error='0.4.3', remove='0.5.0'
-            )
 
         img = self.img
         requested = channels
@@ -860,7 +852,7 @@ class CocoAsset(object):
             return self.obj.get(key, default)
 
 
-def _delay_load_imglike(bundle_dpath, obj, mode=1, nodata_method=None):
+def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
     info = {}
@@ -878,24 +870,17 @@ def _delay_load_imglike(bundle_dpath, obj, mode=1, nodata_method=None):
     else:
         info['dsize'] = dsize = (None, None)
 
-    if mode == 0:
-        ub.schedule_deprecation(
-            'kwcoco', 'mode=0', 'CocoImage.delay',
-            migration='Use the "mode=1" instead.',
-            deprecate='0.3.6', error='0.4.3', remove='0.5.0'
-        )
-    elif mode == 1:
-        from delayed_image import DelayedLoad, DelayedIdentity
-        quantization = obj.get('quantization', None)
-        if imdata is not None:
-            info['chan_construct'] = (DelayedIdentity, dict(
-                data=imdata, channels=channels_, dsize=dsize))
-        elif fname is not None:
-            info['fpath'] = fpath = join(bundle_dpath, fname)
-            info['chan_construct'] = (
-                DelayedLoad,
-                dict(fpath=fpath, channels=channels_, dsize=dsize,
-                     nodata_method=nodata_method))
-        info['quantization'] = quantization
+    from delayed_image import DelayedLoad, DelayedIdentity
+    quantization = obj.get('quantization', None)
+    if imdata is not None:
+        info['chan_construct'] = (DelayedIdentity, dict(
+            data=imdata, channels=channels_, dsize=dsize))
+    elif fname is not None:
+        info['fpath'] = fpath = join(bundle_dpath, fname)
+        info['chan_construct'] = (
+            DelayedLoad,
+            dict(fpath=fpath, channels=channels_, dsize=dsize,
+                 nodata_method=nodata_method))
+    info['quantization'] = quantization
 
     return info

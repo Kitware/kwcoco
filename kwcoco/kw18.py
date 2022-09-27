@@ -91,7 +91,7 @@ class KW18(kwarray.DataFrameArray):
         raw = {col: None for col in KW18.DEFAULT_COLUMNS}
         anns = coco_dset.dataset['annotations']
         boxes = kwimage.Boxes(np.array([ann['bbox'] for ann in anns]), 'xywh')
-        tlbr = boxes.to_tlbr()
+        tlbr = boxes.to_ltrb()
         cxywh = tlbr.to_cxywh()
         tl_x, tl_y, br_x, br_y = tlbr.data.T
 

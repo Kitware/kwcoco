@@ -40,7 +40,7 @@ class VOC_Metrics(ub.NiceRepr):
         true_weights = true_dets.data.get('weights', None)
         if true_weights is None:
             true_weights = [1.0] * len(true_dets)
-        for bbox, cx, weight in zip(true_dets.boxes.to_tlbr().data,
+        for bbox, cx, weight in zip(true_dets.boxes.to_ltrb().data,
                                     true_dets.class_idxs,
                                     true_weights):
             self.recs[gid].append({
@@ -53,7 +53,7 @@ class VOC_Metrics(ub.NiceRepr):
         pred_scores = pred_dets.data.get('scores', None)
         if pred_scores is None:
             pred_scores = [1.0] * len(pred_dets)
-        for bbox, cx, score in zip(pred_dets.boxes.to_tlbr().data,
+        for bbox, cx, score in zip(pred_dets.boxes.to_ltrb().data,
                                    pred_dets.class_idxs,
                                    pred_scores):
             voc_line = [gid, score] + list(bbox)

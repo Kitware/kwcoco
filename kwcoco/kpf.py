@@ -34,7 +34,7 @@ def coco_to_kpf(coco_dset):
             }
         box = kwimage.Boxes([ann['bbox']], 'xywh')
         geom['id{}'.format(domain)] = ann['id']
-        geom['g{}'.format(domain)] = box.to_tlbr().data[0].tolist()
+        geom['g{}'.format(domain)] = box.to_ltrb().data[0].tolist()
         geom['ts{}'.format(domain)] = ann['image_id']
 
         packet = {'geom': geom}
