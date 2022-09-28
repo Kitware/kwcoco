@@ -196,7 +196,7 @@ class Annotation(CocoBase):
 
 # As long as the flavor of sql conforms to our raw sql commands set
 # this to 0, which uses the faster raw variant.
-ALCHEMY_MODE_DEFAULT = 0
+ALCHEMY_MODE_DEFAULT = 1
 
 # Global book keeping (It would be nice to find a way to avoid this)
 CocoBase.TBLNAME_TO_CLASS = {}
@@ -1012,6 +1012,7 @@ def _handle_sql_uri(uri):
         _handle_sql_uri('sqlite:///:memory:')
         _handle_sql_uri('/foo/bar')
         _handle_sql_uri('foo/bar')
+        _handle_sql_uri('postgresql:///tutorial.db')
     """
     import uritools
     uri_parsed = uritools.urisplit(uri)
@@ -1033,7 +1034,11 @@ def _handle_sql_uri(uri):
             path = file_prefix + path
         if authority is None:
             authority = ''
-    elif scheme != 'sqlite':
+    elif scheme == 'sqlite':
+        ...
+    elif scheme == 'postgresql':
+        ...
+    else:
         raise NotImplementedError(scheme)
 
     if path == '/:memory:':
@@ -1054,6 +1059,7 @@ def _handle_sql_uri(uri):
         'local_path': local_path,
         'parsed': uri_parsed,
         'parent': parent,
+        'scheme': scheme,
     }
     return uri_info
 
@@ -1220,6 +1226,14 @@ class CocoSqlDatabase(AbstractCocoDataset,
             https://github.com/sqlalchemy/sqlalchemy/blob/master/lib/sqlalchemy/dialects/sqlite/pysqlite.py#L71
             https://github.com/pudo/dataset/issues/136
             https://writeonly.wordpress.com/2009/07/16/simple-read-only-sqlalchemy-sessions/
+
+        Example:
+            >>> # xdoctest: +SKIP
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(module:psycopg2)
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> dset = CocoSqlDatabase('postgresql:///tutorial.db')
+            >>> dset.connect()
         """
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
@@ -1227,10 +1241,13 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
         _uri_info = _handle_sql_uri(self.uri)
         uri = _uri_info['normalized']
-        if readonly:
-            uri = uri + '?mode=ro&uri=true'
-        else:
-            uri = uri + '?uri=true'
+
+        if _uri_info['scheme'] == 'sqlite':
+            if readonly:
+                uri = uri + '?mode=ro&uri=true'
+            else:
+                uri = uri + '?uri=true'
+
         self.engine = create_engine(uri)
         # table_names = self.engine.table_names()
         table_names = sqlalchemy.inspect(self.engine).get_table_names()
@@ -1244,7 +1261,8 @@ class CocoSqlDatabase(AbstractCocoDataset,
         DBSession = sessionmaker(bind=self.engine)
         self.session = DBSession()
 
-        self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
+        if _uri_info['scheme'] == 'sqlite':
+            self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
 
         self.index = CocoSqlIndex()
         self.index.build(self)
@@ -1558,6 +1576,9 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     """
     Attempts to load a cached SQL-View dataset, only loading and converting the
     json dataset if necessary.
+
+    Ignore:
+        pass
     """
     # import os
     import kwcoco
