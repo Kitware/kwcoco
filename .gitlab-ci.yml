@@ -133,6 +133,29 @@ stages:
     -f wheelhouse
   - |-
     mkdir -p sandbox && cd sandbox && pytest -s --xdoc --xdoctest-verbose=3 --cov-config ../pyproject.toml --cov-report html --cov-report term --cov="$MOD_NAME" "$(python -c "import ubelt; print(ubelt.modname_to_modpath('${MOD_NAME}'))")" ../tests && cd ..
+build/cp36-linux-x86_64:
+  <<: *build_template
+  image: python:3.6
+test/minimal-loose/cp36-linux-x86_64:
+  <<: *test_minimal-loose_template
+  image: python:3.6
+  needs:
+  - build/cp36-linux-x86_64
+test/full-loose/cp36-linux-x86_64:
+  <<: *test_full-loose_template
+  image: python:3.6
+  needs:
+  - build/cp36-linux-x86_64
+test/minimal-strict/cp36-linux-x86_64:
+  <<: *test_minimal-strict_template
+  image: python:3.6
+  needs:
+  - build/cp36-linux-x86_64
+test/full-strict/cp36-linux-x86_64:
+  <<: *test_full-strict_template
+  image: python:3.6
+  needs:
+  - build/cp36-linux-x86_64
 build/cp37-linux-x86_64:
   <<: *build_template
   image: python:3.7
@@ -225,29 +248,6 @@ test/full-strict/cp310-linux-x86_64:
   image: python:3.10
   needs:
   - build/cp310-linux-x86_64
-build/cp311-linux-x86_64:
-  <<: *build_template
-  image: python:3.11.0rc2
-test/minimal-loose/cp311-linux-x86_64:
-  <<: *test_minimal-loose_template
-  image: python:3.11.0rc2
-  needs:
-  - build/cp311-linux-x86_64
-test/full-loose/cp311-linux-x86_64:
-  <<: *test_full-loose_template
-  image: python:3.11.0rc2
-  needs:
-  - build/cp311-linux-x86_64
-test/minimal-strict/cp311-linux-x86_64:
-  <<: *test_minimal-strict_template
-  image: python:3.11.0rc2
-  needs:
-  - build/cp311-linux-x86_64
-test/full-strict/cp311-linux-x86_64:
-  <<: *test_full-strict_template
-  image: python:3.11.0rc2
-  needs:
-  - build/cp311-linux-x86_64
 gpgsign/wheels:
   <<: *common_template
   image: python:3.8
@@ -265,6 +265,8 @@ gpgsign/wheels:
     - main
     - release
   needs:
+  - job: build/cp36-linux-x86_64
+    artifacts: true
   - job: build/cp37-linux-x86_64
     artifacts: true
   - job: build/cp38-linux-x86_64
@@ -272,8 +274,6 @@ gpgsign/wheels:
   - job: build/cp39-linux-x86_64
     artifacts: true
   - job: build/cp310-linux-x86_64
-    artifacts: true
-  - job: build/cp311-linux-x86_64
     artifacts: true
   script:
   - ls wheelhouse

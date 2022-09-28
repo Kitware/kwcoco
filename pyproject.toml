@@ -6,12 +6,20 @@ build-backend = "setuptools.build_meta"
 tags = [ "gitlab", "kitware", "purepy", "cv2", "gdal"]
 mod_name = "kwcoco"
 repo_name = "kwcoco"
+rel_mod_parent_dpath = "."
+os = [ "all", "win", "linux", "osx",]
+min_python = 3.6
+ci_cpython_versions = ["3.6", "3.7", "3.8", "3.9", "3.10"]
 extra_full_strict_lines = [
     "pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
 ]
 extra_full_loose_lines = [
     "pip install GDAL>=3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
 ]
+author = "Jon Crall"
+author_email = "jon.crall@kitware.com"
+license = "Apache 2"
+dev_status = "beta"
 
 [tool.pytest.ini_options]
 addopts = "-p no:doctest --xdoctest --xdoctest-style=google --ignore-glob=setup.py"
