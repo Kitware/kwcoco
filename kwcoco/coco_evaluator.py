@@ -42,7 +42,7 @@ Example:
     >>> coco_eval = CocoEvaluator(config)
     >>> results = coco_eval.evaluate()
     >>> # Now we can draw / serialize the results as we please
-    >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
+    >>> dpath = ub.Path.appdir('kwcoco/tests/test_out_dpath').ensuredir()
     >>> results_fpath = join(dpath, 'metrics.json')
     >>> print('results_fpath = {!r}'.format(results_fpath))
     >>> results.dump(results_fpath, indent='    ')
@@ -879,7 +879,7 @@ class CocoResults(ub.NiceRepr, DictProxy):
         >>> coco_eval = CocoEvaluator(config)
         >>> results = coco_eval.evaluate()
         >>> # Now we can draw / serialize the results as we please
-        >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/test_out_dpath')
+        >>> dpath = ub.Path.appdir('kwcoco/tests/test_out_dpath').ensuredir()
         >>> #
         >>> # test deserialization works
         >>> state = results.__json__()
@@ -1148,7 +1148,7 @@ def _load_dets(pred_fpaths, workers=0):
         >>> import ubelt as ub
         >>> import kwcoco
         >>> from os.path import join
-        >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/load_dets')
+        >>> dpath = ub.Path.appdir('kwcoco/tests/load_dets').ensuredir()
         >>> N = 4
         >>> pred_fpaths = []
         >>> for i in range(1, N + 1):
@@ -1181,7 +1181,7 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
         >>> import ubelt as ub
         >>> import kwcoco
         >>> from os.path import join
-        >>> dpath = ub.ensure_app_cache_dir('kwcoco/tests/load_dets')
+        >>> dpath = ub.Path.appdir('kwcoco/tests/load_dets').ensuredir()
         >>> dset = kwcoco.CocoDataset.demo('shapes8')
         >>> dset.fpath = join(dpath, 'shapes8.mscoco.json')
         >>> dset.dump(dset.fpath)

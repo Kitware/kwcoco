@@ -5,7 +5,23 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.4.2 - Unreleased
+## Version 0.5.0 - Unreleased
+
+### Fixed
+* Taking non-existing channels from a single-image delayed node returns a
+  concatenated node with existing and nan channels.
+
+### Changed
+* Taking subchannels from a concatenated delayed node now groups discontinuous
+  indices from the same underlying image.
+* `channel_spec`, `sensorchan_spec`, `util.lazy_frame_backends`, and
+  `util.delayed_ops` have all been ported to the new `delayed_image` package.
+
+### Removed
+* Removed old `util_delayed_ops`
+
+
+## Version 0.4.2 - Released 2022-09-06
 
 ### Fixed
 * Fixed bug in vidshapes toydata code

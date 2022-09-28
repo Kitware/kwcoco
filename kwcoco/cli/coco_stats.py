@@ -13,21 +13,21 @@ class CocoStatsCLI:
         """
         default = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to dataset', position=1),
-            'basic': scfg.Value(True, help='show basic stats'),
-            'extended': scfg.Value(True, help='show extended stats'),
-            'catfreq': scfg.Value(True, help='show category frequency stats'),
-            'boxes': scfg.Value(False, help=ub.paragraph(
+            'basic': scfg.Value(True, isflag=True, help='show basic stats'),
+            'extended': scfg.Value(True, isflag=True, help='show extended stats'),
+            'catfreq': scfg.Value(True, isflag=True, help='show category frequency stats'),
+            'boxes': scfg.Value(False, isflag=True, help=ub.paragraph(
                 '''
                 show bounding box stats in width-height format.
                 ''')),
 
-            'image_size': scfg.Value(False, help='show image size stats'),
+            'image_size': scfg.Value(False, isflag=True, help='show image size stats'),
 
-            'annot_attrs': scfg.Value(False, help='show annotation attribute information'),
-            'image_attrs': scfg.Value(False, help='show image attribute information'),
-            'video_attrs': scfg.Value(False, help='show video attribute information'),
+            'annot_attrs': scfg.Value(False, isflag=True, help='show annotation attribute information'),
+            'image_attrs': scfg.Value(False, isflag=True, help='show image attribute information'),
+            'video_attrs': scfg.Value(False, isflag=True, help='show video attribute information'),
 
-            'embed': scfg.Value(False, help='embed into interactive shell'),
+            'embed': scfg.Value(False, isflag=True, help='embed into interactive shell'),
         }
         epilog = """
         Example Usage:

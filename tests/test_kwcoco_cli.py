@@ -8,7 +8,7 @@ def test_kwcoco_cli():
     pytest.skip('disable for now')
 
     import ubelt as ub
-    dpath = ub.ensure_app_cache_dir('kwcoco/test/cli')
+    dpath = ub.Path.appdir('kwcoco/test/cli').ensuredir()
     ub.delete(dpath)
     ub.ensuredir(dpath)
 

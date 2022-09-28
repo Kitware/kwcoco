@@ -20,7 +20,7 @@ def _make_intmask_demodata(rng=None):
 
     rng = kwarray.ensure_rng(rng)  # seeded random number generator
 
-    dpath = ub.ensure_app_cache_dir('kwcoco/tests/masks')
+    dpath = ub.Path.appdir('kwcoco/tests/masks').ensuredir()
     shape = (128, 128)
     num_masks = 10
 

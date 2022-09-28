@@ -46,7 +46,7 @@ def test_subset_cli_with_gids():
     subset_gids = list(dset.imgs.keys())[::2]
 
     print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
-    dpath = ub.ensure_app_cache_dir('kwcoco/test/subset')
+    dpath = ub.Path.appdir('kwcoco/test/subset').ensuredir()
     dset.fpath = join(dpath, 'input.kwcoco.json')
     print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
     dset.dump(dset.fpath)
@@ -75,7 +75,7 @@ def test_subset_cli_with_jq():
     dset = _create_demo_dataset()
 
     print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
-    dpath = ub.ensure_app_cache_dir('kwcoco/test/subset')
+    dpath = ub.Path.appdir('kwcoco/test/subset').ensuredir()
     dset.fpath = join(dpath, 'input.kwcoco.json')
     print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
     dset.dump(dset.fpath)

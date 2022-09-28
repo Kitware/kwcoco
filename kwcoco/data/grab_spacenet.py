@@ -238,7 +238,7 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
 
 
 def main():
-    data_dpath = ub.ensure_app_cache_dir('kwcoco', 'data')
+    data_dpath = ub.Path.appdir('kwcoco', 'data').ensuredir()
     grab_spacenet7(data_dpath)
 
 

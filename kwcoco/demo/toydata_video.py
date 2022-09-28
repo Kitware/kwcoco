@@ -160,7 +160,7 @@ def random_video_dset(
 
     if renderkw:
         if dpath is None:
-            dpath = ub.ensure_app_cache_dir('kwcoco', 'demo_vidshapes')
+            dpath = ub.Path.appdir('kwcoco', 'demo_vidshapes').ensuredir()
 
         if verbose > 2:
             print('rendering')
@@ -534,7 +534,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
             >>> scaled = warp_within_bounds(self, x_min, y_min, x_max, y_max)
             >>> print('scaled = {!r}'.format(scaled))
         """
-        tlbr = self.to_tlbr()
+        tlbr = self.to_ltrb()
         tl_x, tl_y, br_x, br_y = tlbr.components
         tl_xy_min = np.c_[tl_x, tl_y].min(axis=0)
         br_xy_max = np.c_[br_x, br_y].max(axis=0)
@@ -592,7 +592,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
         # oob_pad = -20  # allow some out of bounds
         # oob_pad = 20  # allow some out of bounds
-        # video_boxes = video_boxes.to_tlbr()
+        # video_boxes = video_boxes.to_ltrb()
         # TODO: need better path distributions
         # video_boxes = warp_within_bounds(video_boxes, 0 - oob_pad, 0 - oob_pad, image_size[0] + oob_pad, image_size[1] + oob_pad)
         video_boxes = video_boxes.to_xywh()
@@ -777,7 +777,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
 
     if dpath is None:
         dset_name = 'rendered_{}'.format(hashid)
-        bundle_dpath = ub.ensure_app_cache_dir('kwcoco', 'rendered', dset_name)
+        bundle_dpath = ub.Path.appdir('kwcoco', 'rendered', dset_name).ensuredir()
         dset.fpath = join(bundle_dpath, 'data.kwcoco.json')
         bundle_dpath = dset.bundle_dpath
     else:
@@ -995,7 +995,7 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
     """
     boxes = annots.boxes
 
-    tlbr_boxes = boxes.to_tlbr().quantize().data.astype(int)
+    tlbr_boxes = boxes.to_ltrb().quantize().data.astype(int)
 
     # Render coco-style annotation dictionaries
     for ann, tlbr in zip(annots.objs, tlbr_boxes):

@@ -91,7 +91,7 @@ class KW18(kwarray.DataFrameArray):
         raw = {col: None for col in KW18.DEFAULT_COLUMNS}
         anns = coco_dset.dataset['annotations']
         boxes = kwimage.Boxes(np.array([ann['bbox'] for ann in anns]), 'xywh')
-        tlbr = boxes.to_tlbr()
+        tlbr = boxes.to_ltrb()
         cxywh = tlbr.to_cxywh()
         tl_x, tl_y, br_x, br_y = tlbr.data.T
 
@@ -179,7 +179,7 @@ class KW18(kwarray.DataFrameArray):
             >>> import ubelt as ub
             >>> import kwimage
             >>> # Prep test data - autogen a demo kw18 and write it to disk
-            >>> dpath = ub.ensure_app_cache_dir('kwcoco/kw18')
+            >>> dpath = ub.Path.appdir('kwcoco/kw18').ensuredir()
             >>> kw18_fpath = join(dpath, 'test.kw18')
             >>> KW18.demo().dump(kw18_fpath)
             >>> #

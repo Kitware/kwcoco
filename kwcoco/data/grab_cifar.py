@@ -66,7 +66,7 @@ def _convert_cifar_x(dpath, cifar_dset, cifar_name, classes):
 
 def convert_cifar10(dpath=None):
     if dpath is None:
-        dpath = ub.ensure_app_cache_dir('kwcoco/data')
+        dpath = ub.Path.appdir('kwcoco/data').ensuredir()
     # For some reason the torchvision objects dont have the label names
     # in the dataset. But the download directory will have them.
     # classes = [
@@ -86,7 +86,7 @@ def convert_cifar10(dpath=None):
 
 def convert_cifar100(dpath=None):
     if dpath is None:
-        dpath = ub.ensure_app_cache_dir('kwcoco/data')
+        dpath = ub.Path.appdir('kwcoco/data').ensuredir()
     # classes = [
     #     'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee',
     #     'beetle', 'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus',

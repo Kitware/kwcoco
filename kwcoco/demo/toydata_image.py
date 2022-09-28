@@ -133,7 +133,7 @@ def demodata_toy_dset(image_size=(600, 600),
 
     if bundle_dpath is None:
         if dpath is None:
-            dpath = ub.ensure_app_cache_dir('kwcoco', 'demodata_bundles')
+            dpath = ub.Path.appdir('kwcoco', 'demodata_bundles').ensuredir()
         else:
             ub.ensuredir(dpath)
     else:
@@ -468,7 +468,7 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
             # Force the first box to be in the center
             cxywh = boxes.to_cxywh()
             cxywh.data[0, 0:2] = np.array(image_size) / 2
-            boxes = cxywh.to_tlbr()
+            boxes = cxywh.to_ltrb()
 
     # Make sure the first box is always kept.
     box_priority = np.arange(boxes.shape[0])[::-1].astype(np.float32)
@@ -479,7 +479,7 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
     nms_impl = nms_impls[0]
 
     if len(boxes) > 1:
-        tlbr_data = boxes.to_tlbr().data
+        tlbr_data = boxes.to_ltrb().data
         keep = kwimage.non_max_supression(
             tlbr_data, scores=box_priority, thresh=0.0, impl=nms_impl)
         boxes = boxes[keep]
@@ -519,7 +519,7 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
 
     catnames = []
 
-    tlbr_boxes = boxes.to_tlbr().data
+    tlbr_boxes = boxes.to_ltrb().data
     xywh_boxes = boxes.to_xywh().data.tolist()
 
     # Construct coco-style annotation dictionaries

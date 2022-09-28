@@ -301,9 +301,9 @@ TODO:
 
     - [ ] Spec for video URI, and convert to frames @ framerate function.
 
-    - [ ] Document channel spec
+    - [x] Document channel spec
 
-    - [ ] Document sensor-channel spec
+    - [x] Document sensor-channel spec
 
     - [X] Add remove videos method
 
@@ -317,27 +317,25 @@ TODO:
 
     - [ ] Reroot needs to be redesigned very carefully.
 
+    - [ ] Allow parts of the kwcoco file to be references to other json files.
+
 References:
     .. [CocoFormat] http://cocodataset.org/#format-data
     .. [PyCocoToolsMask] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
     .. [CocoTutorial] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
 """
 import copy
+import sys
 import itertools as it
-
-# We can use ujson as long as my patch is in it. It does seem faster.
-# See https://github.com/ultrajson/ultrajson/pull/514
-from packaging.version import parse as Version
-
-# import ujson as json  # TODO: can we improve speed with ujson?
+import numbers
 import numpy as np
 import os
 import ubelt as ub
 import warnings
-import numbers
+
+from packaging.version import parse as Version
 from collections import OrderedDict, defaultdict
-from os.path import (dirname, basename, join, exists, isdir, relpath, normpath,
-                     commonprefix)
+from os.path import (dirname, basename, join, exists, isdir, relpath)
 from io import StringIO
 from functools import partial
 
@@ -370,12 +368,13 @@ else:
     json_r = pjson
     json_w = pjson
 
-# Does having __all__ prevent readthedocs from building mixins?
-# __all__ = [
-#     'CocoDataset',
-# ]
 
-_dict = OrderedDict
+if sys.version_info <= (3, 6):
+    _dict = OrderedDict
+else:
+    # TODO: Ensure that switching to dict in 3.7+ doesn't change anything
+    # _dict = dict
+    _dict = OrderedDict
 
 
 # These are the keys that are / should be supported by the API
@@ -1096,8 +1095,9 @@ class MixinCocoExtras(object):
         Kwargs:
             image_size (Tuple[int, int]): width / height size of the images
 
-            dpath (str): path to the output image directory, defaults to using
-                kwcoco cache dir.
+            dpath (str | PathLike):
+                path to the directory where any generated demo bundles will be
+                written to.  Defaults to using kwcoco cache dir.
 
             aux (bool): if True generates dummy auxiliary channels
 
@@ -1283,7 +1283,7 @@ class MixinCocoExtras(object):
                 # Even if the cache is off, we still will need this because it
                 # will write rendered data to disk. Perhaps we can make this
                 # optional in the future.
-                dpath = ub.ensure_app_cache_dir('kwcoco', 'demo_vidshapes')
+                dpath = ub.Path.appdir('kwcoco', 'demo_vidshapes').ensuredir()
                 bundle_dpath = vidkw['bundle_dpath'] = join(dpath, tag)
 
             cache_dpath = join(bundle_dpath, '_cache')
@@ -5451,6 +5451,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             newlines (bool) :
                 if True, each annotation, image, category gets its own line
 
+            indent (int | str): indentation for the json file. See
+                :func:`json.dump` for details.
+
+            newlines (bool):
+                if True, each annotation, image, category gets its own line.
+
         Note:
             Using newlines=True is similar to:
                 print(ub.repr2(dset.dataset, nl=2, trailsep=False))
@@ -5572,14 +5578,18 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         return text
 
-    def dump(self, file, indent=None, newlines=False, temp_file=True):
+    def dump(self, file=None, indent=None, newlines=False, temp_file=True):
         """
         Writes the dataset out to the json format
 
         Args:
-            file (PathLike | IO):
-                Where to write the data.  Can either be a path to a file or an
-                open file pointer / stream.
+            file (PathLike | IO | None):
+                Where to write the data. Can either be a path to a file or an
+                open file pointer / stream. If unspecified, it will be written
+                to the current ``fpath`` property.
+
+            indent (int | str): indentation for the json file. See
+                :func:`json.dump` for details.
 
             newlines (bool):
                 if True, each annotation, image, category gets its own line.
@@ -5615,8 +5625,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert self2.dataset == self.dataset
             >>> assert self2.dataset is not self.dataset
         """
+        if file is None:
+            file = self.fpath
+
         if indent is not None and isinstance(indent, str):
-            assert indent.count(' ') == len(indent), 'must be all spaces, got {!r}'.format(indent)
+            assert indent.count(' ') == len(indent), (
+                'must be all spaces, got {!r}'.format(indent))
             indent = len(indent)
         if indent is None:
             indent = 0
@@ -5627,7 +5641,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 file.write(self.dumps(indent=indent, newlines=newlines))
             else:
                 try:
-                    json_w.dump(self.dataset, file, indent=indent, ensure_ascii=False)
+                    json_w.dump(self.dataset, file, indent=indent,
+                                ensure_ascii=False)
                 except Exception as ex:
                     print('Failed to dump ex = {!r}'.format(ex))
                     self._check_json_serializable()
@@ -5871,6 +5886,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             - [x] disambiguate track-ids
             - [x] disambiguate video-ids
         """
+        from os.path import normpath
+
         # Dev Note:
         # See ~/misc/tests/python/test_multiarg_classmethod.py
         # for tests for how to correctly implement this method such that it can
@@ -6136,7 +6153,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                       for r in dset_roots]
         items = [join('.', p) for p in dset_roots]
         common_root = longest_common_prefix(items, sep=os.path.sep)
-        # common_root = normpath(common_root)
 
         relative_dsets = [(relpath(normpath(d.bundle_dpath), common_root),
                            d.dataset) for d in others]
@@ -6253,7 +6269,7 @@ def demo_coco_data():
 
     This contains several non-standard fields, which help ensure robustness of
     functions tested with this data. For more compliant demodata see the
-    ``kwcoco.demodata`` submodule
+    ``kwcoco.demodata`` submodule.
 
     Example:
         >>> # xdoctest: +REQUIRES(--show)
@@ -6268,6 +6284,7 @@ def demo_coco_data():
     """
     import kwimage
     from kwimage.im_demodata import _TEST_IMAGES
+    from os.path import commonprefix
 
     test_imgs_keys = ['astro', 'carl', 'stars']
     urls = {k: _TEST_IMAGES[k]['url'] for k in test_imgs_keys}
