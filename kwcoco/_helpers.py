@@ -147,7 +147,7 @@ def _lut_frame_index(imgs, gid):
     return imgs[gid]['frame_index']
 
 
-class SortedSetQuiet(sortedcontainers.SortedSet):
+class SortedSet(sortedcontainers.SortedSet):
     def __repr__(self):
         """Return string representation of sorted set.
 

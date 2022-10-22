@@ -345,7 +345,7 @@ from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco import exceptions
 
 from kwcoco._helpers import (
-    SortedSetQuiet, UniqueNameRemapper, _ID_Remapper, _NextId,
+    SortedSet, UniqueNameRemapper, _ID_Remapper, _NextId,
     _delitems, _lut_frame_index
 )
 
@@ -4518,7 +4518,7 @@ class CocoIndex(object):
         frame index.
         """
         # FIXME: likely need to do something to help this pickle nicely
-        return SortedSetQuiet(gids, key=partial(_lut_frame_index, index.imgs))
+        return SortedSet(gids, key=partial(_lut_frame_index, index.imgs))
         # This breaks in a different way
         # def _lut_frame_index2(gid):
         #     return index.imgs[gid]['frame_index']
