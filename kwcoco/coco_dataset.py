@@ -2312,6 +2312,11 @@ class MixinCocoObjects(object):
             <Images(num=2)>
         """
         if vidid is not None:
+            ub.schedule_deprecation(
+                'kwcoco', 'vidid', 'argument of CocoDataset.images',
+                migration='Use "video_id" instead.',
+                deprecate='0.5.0', error='1.0.0', remove='1.1.0',
+            )
             video_id = vidid
 
         if video_id is not None:
@@ -5392,8 +5397,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         jobs = ub.JobPool(mode, max_workers=max_workers)
         for fpath in ub.ProgIter(fpaths, desc='submit load coco jobs', verbose=verbose):
             jobs.submit(CocoDataset, fpath, autobuild=False)
-        results = [f.result() for f in ub.ProgIter(jobs.as_completed(),
-                   desc='collect load coco jobs', total=len(jobs), verbose=verbose)]
+
+        results = [f.result()
+                   for f in jobs.as_completed(desc='collect load coco jobs',
+                                              progkw=dict(verbose=verbose))]
 
         if union:
             try:
