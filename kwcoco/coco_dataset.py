@@ -391,8 +391,100 @@ SPEC_KEYS = [
 
 class MixinCocoDepricate(object):
     """
-    These functions are marked for deprication and may be removed at any time
+    These functions are marked for deprication and will be removed
     """
+
+    def keypoint_annotation_frequency(self):
+        """
+        DEPRECATED
+
+        Example:
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> self = kwcoco.CocoDataset.demo('shapes', rng=0)
+            >>> hist = self.keypoint_annotation_frequency()
+            >>> hist = ub.odict(sorted(hist.items()))
+            >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
+            >>> print(ub.repr2(hist))  # xdoc: +IGNORE_WANT
+            {
+                'bot_tip': 6,
+                'left_eye': 14,
+                'mid_tip': 6,
+                'right_eye': 14,
+                'top_tip': 6,
+            }
+        """
+        ub.schedule_deprecation(
+            'kwcoco', name='keypoint_annotation_frequency', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'Implement this functionality explicitly. '
+                'It is too niche for a the core API.'
+                'Or propose a better way on '
+                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
+            )
+        )
+        ann_kpcids = [kp['keypoint_category_id']
+                      for ann in self.dataset['annotations']
+                      for kp in ann.get('keypoints', [])]
+        kpcid_to_name = {kpcat['id']: kpcat['name']
+                         for kpcat in self.dataset['keypoint_categories']}
+        kpcid_to_num = ub.dict_hist(ann_kpcids,
+                                    labels=list(kpcid_to_name.keys()))
+        kpname_to_num = ub.map_keys(kpcid_to_name, kpcid_to_num)
+        return kpname_to_num
+
+    def category_annotation_type_frequency(self):
+        """
+        DEPRECATED
+
+        Reports the number of annotations of each type for each category
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> hist = self.category_annotation_frequency()
+            >>> print(ub.repr2(hist))
+        """
+        catname_to_nannot_types = {}
+        ub.schedule_deprecation(
+            'kwcoco', name='category_annotation_type_frequency', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'Implement this functionality explicitly. '
+                'It is too niche for a the core API.'
+                'Or propose a better way on '
+                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
+            )
+        )
+
+        def _annot_type(ann):
+            """
+            Returns what type of annotation ``ann`` is.
+            """
+            return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
+
+        for cid, aids in self.index.cid_to_aids.items():
+            name = self.cats[cid]['name']
+            hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))
+            catname_to_nannot_types[name] = ub.map_keys(
+                lambda k: k[0] if len(k) == 1 else k, hist)
+        return catname_to_nannot_types
+
+    def imread(self, gid):
+        """
+        DEPRECATED: use load_image or delayed_image
+
+        Loads a particular image
+        """
+        ub.schedule_deprecation(
+            'kwcoco', name='imread', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'use `self.coco_image(gid).delay().finalize()`.'
+            )
+        )
+        return self.load_image(gid)
 
 
 class MixinCocoAccessors(object):
@@ -2414,46 +2506,6 @@ class MixinCocoStats(object):
         """ The number of videos in the dataset """
         return len(self.dataset.get('videos', []))
 
-    def keypoint_annotation_frequency(self):
-        """
-        DEPRECATED
-
-        Example:
-            >>> import kwcoco
-            >>> import ubelt as ub
-            >>> self = kwcoco.CocoDataset.demo('shapes', rng=0)
-            >>> hist = self.keypoint_annotation_frequency()
-            >>> hist = ub.odict(sorted(hist.items()))
-            >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
-            >>> print(ub.repr2(hist))  # xdoc: +IGNORE_WANT
-            {
-                'bot_tip': 6,
-                'left_eye': 14,
-                'mid_tip': 6,
-                'right_eye': 14,
-                'top_tip': 6,
-            }
-        """
-        ub.schedule_deprecation(
-            'kwcoco', name='keypoint_annotation_frequency', type='method',
-            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
-            migration=(
-                'Implement this functionality explicitly. '
-                'It is too niche for a the core API.'
-                'Or propose a better way on '
-                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
-            )
-        )
-        ann_kpcids = [kp['keypoint_category_id']
-                      for ann in self.dataset['annotations']
-                      for kp in ann.get('keypoints', [])]
-        kpcid_to_name = {kpcat['id']: kpcat['name']
-                         for kpcat in self.dataset['keypoint_categories']}
-        kpcid_to_num = ub.dict_hist(ann_kpcids,
-                                    labels=list(kpcid_to_name.keys()))
-        kpname_to_num = ub.map_keys(kpcid_to_name, kpcid_to_num)
-        return kpname_to_num
-
     def category_annotation_frequency(self):
         """
         Reports the number of annotations of each category
@@ -2480,43 +2532,6 @@ class MixinCocoStats(object):
         catname_to_nannots = ub.odict(sorted(catname_to_nannots.items(),
                                              key=lambda kv: (kv[1], kv[0])))
         return catname_to_nannots
-
-    def category_annotation_type_frequency(self):
-        """
-        DEPRECATED
-
-        Reports the number of annotations of each type for each category
-
-        Example:
-            >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
-            >>> hist = self.category_annotation_frequency()
-            >>> print(ub.repr2(hist))
-        """
-        catname_to_nannot_types = {}
-        ub.schedule_deprecation(
-            'kwcoco', name='category_annotation_type_frequency', type='method',
-            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
-            migration=(
-                'Implement this functionality explicitly. '
-                'It is too niche for a the core API.'
-                'Or propose a better way on '
-                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
-            )
-        )
-
-        def _annot_type(ann):
-            """
-            Returns what type of annotation ``ann`` is.
-            """
-            return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
-
-        for cid, aids in self.index.cid_to_aids.items():
-            name = self.cats[cid]['name']
-            hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))
-            catname_to_nannot_types[name] = ub.map_keys(
-                lambda k: k[0] if len(k) == 1 else k, hist)
-        return catname_to_nannot_types
 
     def conform(self, **config):
         """
@@ -3199,21 +3214,6 @@ class MixinCocoDraw(object):
     """
     Matplotlib / display functionality
     """
-
-    def imread(self, gid):
-        """
-        DEPRECATED: use load_image or delayed_image
-
-        Loads a particular image
-        """
-        ub.schedule_deprecation(
-            'kwcoco', name='imread', type='method',
-            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
-            migration=(
-                'use `self.coco_image(gid).delay().finalize()`.'
-            )
-        )
-        return self.load_image(gid)
 
     def draw_image(self, gid, channels=None):
         """
