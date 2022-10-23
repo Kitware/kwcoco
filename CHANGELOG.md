@@ -8,6 +8,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.5.1 - Unreleased
 
 
+### Added
+* Initial support for PostgreSQL
+
+
+### Fixed
+* Lookup on SQL database now handles json columns
+
+
 ## Version 0.5.0 - Released 2022-09-28
 
 ### Fixed

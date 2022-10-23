@@ -346,7 +346,7 @@ class SqlListProxy(ub.NiceRepr):
     def __getitem__(proxy, index):
         query = proxy.session.query(proxy.cls)
         if isinstance(index, slice):
-            assert index.step in {None, 1}
+            assert index.step in {None, 1}, 'slice queries must be contiguous'
             objs = query.slice(index.start, index.stop).all()
             items = [orm_to_dict(obj) for obj in objs]
             return items
@@ -711,6 +711,7 @@ class SqlIdGroupDictProxy(DictLike):
         proxy.session = session
         proxy.parent_keyattr = parent_keyattr
         proxy.ALCHEMY_MODE = 0
+        proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
         proxy._cache = _new_proxy_cache()
 
         # if specified, the items within groups are ordered by this attr
@@ -799,7 +800,7 @@ class SqlIdGroupDictProxy(DictLike):
     def items(proxy):
         _set = set if proxy.group_order_attr is None else ub.oset
         if proxy.group_order_attr is not None:
-            print('proxy.group_order_attr = {!r}'.format(proxy.group_order_attr))
+            # print('proxy.group_order_attr = {!r}'.format(proxy.group_order_attr))
             # ALTERNATIVE MODE, EXPERIMENTAL MODE
             # groups based on post processing. this might be faster or more
             # robust than the group json array? Requires a hack to yield empty
@@ -1011,6 +1012,14 @@ class CocoSqlIndex(object):
             'annotations': index.anns,
             'videos': index.videos,
         }
+
+    def _set_alchemy_mode(index, mode):
+        for v in index.__dict__.values():
+            if hasattr(v, 'ALCHEMY_MODE'):
+                v.ALCHEMY_MODE = mode
+        for v in index.dataset.values():
+            if hasattr(v, 'ALCHEMY_MODE'):
+                v.ALCHEMY_MODE = mode
 
 
 def _handle_sql_uri(uri):
@@ -1482,6 +1491,15 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> cids2 = self.annots(rowids).get(key)
             >>> cids3 = dset.annots(rowids).get(key)
             >>> assert cids3 == cids2 == cids1
+            >>> # Test json columns work
+            >>> vals1 = self._column_lookup(tablename, 'bbox', rowids)
+            >>> vals2 = self.annots(rowids).lookup('bbox')
+            >>> vals3 = dset.annots(rowids).lookup('bbox')
+            >>> assert vals1 == vals2 == vals3
+            >>> vals1 = self._column_lookup(tablename, 'segmentation', rowids)
+            >>> vals2 = self.annots(rowids).lookup('segmentation')
+            >>> vals3 = dset.annots(rowids).lookup('segmentation')
+            >>> assert vals1 == vals2 == vals3
 
         Ignore:
             import timerit
@@ -1512,12 +1530,22 @@ class CocoSqlDatabase(AbstractCocoDataset,
             WHERE {tablename}.id = :rowid
             ''').format(tablename=tablename, key=key)
 
+        # TODO: memoize this check
+        table = CocoBase.TBLNAME_TO_CLASS[tablename]
+        needs_json_decode = (
+            table.__table__.columns[key].type.__class__.__name__ == 'JSON'
+        )
+
         values = [
             # self.anns[aid][key]
             # if aid in self.anns._cache else
             self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
             for rowid in rowids
         ]
+
+        if needs_json_decode:
+            values = [None if v is None else json.loads(v) for v in values]
+
         if keepid:
             if default is ub.NoParam:
                 attr_list = ub.dzip(rowids, values)
@@ -1715,7 +1743,10 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     enable_cache = not force_rewrite
     if os.fspath(sql_db_fpath) == ':memory:':
         enable_cache = False
-    stamp = ub.CacheStamp('kwcoco-sqlite-cache', dpath=_cache_dpath,
+
+    # Note: we don't have a way of comparing timestamps for postgresql
+    # databases, but that shouldn't matter too much
+    stamp = ub.CacheStamp('kwcoco-sql-cache', dpath=_cache_dpath,
                           depends=[dct_db_fpath],
                           product=cache_product, enabled=enable_cache,
                           hasher=None, ext='.json')
@@ -1731,32 +1762,12 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         dset._cached_hashid()
 
         # Convert a coco file to an sql database
-        print('Start SQL conversion')
+        print(f'Start SQL({backend}_ conversion')
         self.populate_from(dset, verbose=1)
         if stamp.cacher.enabled:
             stamp.renew()
     else:
         self.connect()
-
-    # needs_rewrite = True
-    # if not force_rewrite and exists(sql_db_fpath):
-    #     needs_rewrite = (
-    #         os.stat(dct_db_fpath).st_mtime > os.stat(sql_db_fpath).st_mtime
-    #     )
-    # if needs_rewrite:
-    #     # Write to the SQL instance
-
-    #     # TODO: use a CacheStamp instead
-    #     self.delete()
-    #     self.connect()
-    #     if dset is None:
-    #         print('Loading json dataset for SQL conversion')
-    #         dset = kwcoco.CocoDataset(dct_db_fpath)
-    #     # Convert a coco file to an sql database
-    #     print('Start SQL conversion')
-    #     self.populate_from(dset, verbose=1)
-    # else:
-    #     self.connect()
     return self
 
 
@@ -1851,97 +1862,149 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
     return True
 
 
-def _benchmark_dset_readtime(dset, tag='?'):
+def _benchmark_dset_readtime(dset, tag='?', n=4, post_iterate=False):
     """
     Helper for understanding the time differences between backends
 
+    Note:
+        post_iterate ensures that all of the returned data is looked at by the
+        python interpreter. Makes this a more fair comparison because python
+        can just return pointers to the data, but only in the case where most
+        of the data will touched. For one attribute lookups it is not a good
+        test.
+
+    Ignore:
+        # Try a RAM disk
+        sudo mkdir -p /mnt/ramdisk
+        sudo chmod -v 777 /mnt/ramdisk
+        sudo mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk
+
     Ignore:
         import kwcoco
-        dset = kwcoco.CocoDataset.demo('vidshapes-videos1-frames100-tracks512', render=False, verbose=3)
-        dset1 = dset.view_sql(backend='postgresql')
-        dset2 = dset.view_sql(backend='sqlite')
-        dset3 = dset.view_sql(backend='sqlite', memory=True)
-        dset4 = dset.view_sql(backend='sqlite', sql_db_fpath='/mnt/ramdisk/tmp_ramdisk2.sqlite3')
+        datasets = {}
+        dset = kwcoco.CocoDataset.demo('vidshapes-videos1-frames20-tracks128', render=False, verbose=3)
+        datasets['dictionary'] = dset
+
+        datasets['postgres_am0'] = dset.view_sql(backend='postgresql')
+        datasets['postgres_am0'].index._set_alchemy_mode(0)
+
+        datasets['postgres_am1'] = dset.view_sql(backend='postgresql')
+        datasets['postgres_am1'].index._set_alchemy_mode(1)
+
+        datasets['sqlite_am1'] = dset.view_sql(backend='sqlite')
+        datasets['sqlite_am1'].index._set_alchemy_mode(1)
+
+        datasets['sqlite_am0'] = dset.view_sql(backend='sqlite')
+        datasets['sqlite_am0'].index._set_alchemy_mode(0)
+
+        # datasets['sqlite_memory'] = dset.view_sql(backend='sqlite', memory=True)
+        # datasets['sqlite_ramdisk'] = dset.view_sql(backend='sqlite', sql_db_fpath='/mnt/ramdisk/tmp_ramdisk4.sqlite3')
+
+        post_iterate = 1
+        _bkw = dict(post_iterate=post_iterate, n=4)
 
         from kwcoco.coco_sql_dataset import _benchmark_dset_readtime  # NOQA
         print('--')
-        ti1 = _benchmark_dset_readtime(dset, 'dictionary')
-        print('--')
-        ti2 = _benchmark_dset_readtime(dset1, 'postgresql')
-        print('--')
-        ti3 = _benchmark_dset_readtime(dset2, 'sqlite')
-        print('--')
-        ti4 = _benchmark_dset_readtime(dset3, 'sqlite:memory')
-        print('--')
-        ti5 = _benchmark_dset_readtime(dset4, 'sqlite:ramfs')
+        tis = {}
+        for k, v in datasets.items():
+            print(f' --- {k} ---')
+            tis[k] = _benchmark_dset_readtime(v, k, **_bkw)
 
         import pandas as pd
-        tis = [ti1, ti2, ti3, ti4, ti5]
         rows = []
-        for ti in tis:
+        for ti in tis.values():
             for k in ti.measures['min'].keys():
                 v1 = ti.measures['min'][k]
                 v2 = ti.measures['mean'][k]
                 t, _, c = k.partition(' ')
                 rows.append({'label': t, 'test': c, 'min': v1, 'mean': v2})
 
+        tests = list(ub.unique([r['test'] for r in rows]))
+
         df = pd.DataFrame(rows)
-        piv = df.pivot('label', 'test', 'mean').T
+        piv = df.pivot('test', 'label', 'mean').loc[tests]
         import rich
         rich.print(piv.to_string())
-
-                pass
-
-
-        # Try a RAM disk
-        sudo mkdir -p /mnt/ramdisk
-        sudo chmod -v 777 /mnt/ramdisk
-        sudo mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk
-
-
     """
 
     import timerit
-    ti = timerit.Timerit(4, bestof=2, verbose=2)
+    ti = timerit.Timerit(n, bestof=2, verbose=2)
 
     for timer in ti.reset('{} dict(gid_to_aids)'.format(tag)):
         with timer:
-            dict(dset.index.gid_to_aids)
+            r = dict(dset.index.gid_to_aids)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(cid_to_aids)'.format(tag)):
         with timer:
-            dict(dset.index.cid_to_aids)
+            r = dict(dset.index.cid_to_aids)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(imgs)'.format(tag)):
         with timer:
-            dict(dset.index.imgs)
+            r = dict(dset.index.imgs)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(cats)'.format(tag)):
         with timer:
-            dict(dset.index.cats)
+            r = dict(dset.index.cats)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(anns)'.format(tag)):
         with timer:
-            dict(dset.index.anns)
+            r = dict(dset.index.anns)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(vidid_to_gids)'.format(tag)):
         with timer:
-            dict(dset.index.vidid_to_gids)
+            r = dict(dset.index.vidid_to_gids)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} ann list iteration'.format(tag)):
         with timer:
-            list(dset.dataset['annotations'])
+            r = list(dset.dataset['annotations'])
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} ann dict iteration'.format(tag)):
         with timer:
-            list(dset.index.anns.items())
+            r = list(dset.index.anns.items())
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} ann random lookup'.format(tag)):
         aids = list(dset.index.anns.keys())[0:10]
         with timer:
             for aid in aids:
-                dset.index.anns[aid]
+                r = dset.index.anns[aid]
+                if post_iterate:
+                    list(ub.IndexableWalker(r))
 
+    def _take_test(attr):
+        for timer in ti.reset('{} take ann.{}'.format(tag, attr)):
+            with timer:
+                r = [ann.get(attr, None) for ann in dset.dataset['annotations']]
+                if post_iterate:
+                    list(ub.IndexableWalker(r))
+
+    def _lookup_test(attr):
+        for timer in ti.reset('{} annots.lookup({})'.format(tag, attr)):
+            with timer:
+                r = dset.annots().lookup(attr, default=None)
+                if post_iterate:
+                    list(ub.IndexableWalker(r))
+    _take_test('image_id')
+    _lookup_test('image_id')
+    _take_test('bbox')
+    _lookup_test('bbox')
+    _take_test('segmentation')
+    _lookup_test('segmentation')
     return ti
 
 

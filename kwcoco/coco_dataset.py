@@ -6293,10 +6293,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             ub.udict(dct_dset.annots().objs[0]) - {'segmentation'}
         """
         from kwcoco.coco_sql_dataset import cached_sql_coco_view
-        if memory:
-            sql_db_fpath = ':memory:'
-        else:
-            sql_db_fpath = None
+        if sql_db_fpath is None:
+            if memory:
+                sql_db_fpath = ':memory:'
         sql_dset = cached_sql_coco_view(dset=self, sql_db_fpath=sql_db_fpath,
                                         force_rewrite=force_rewrite,
                                         backend=backend)
