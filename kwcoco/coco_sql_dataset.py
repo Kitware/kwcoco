@@ -84,6 +84,7 @@ from kwcoco.coco_dataset import (  # NOQA
 
 try:
     from sqlalchemy.sql.schema import Column
+    from sqlalchemy.sql.schema import Index
     from sqlalchemy.types import Float, Integer, String, JSON
     from sqlalchemy.ext.declarative import declarative_base
     import sqlalchemy
@@ -101,6 +102,7 @@ except ImportError:
     JSON = ub.identity
     Integer = ub.identity
     Column = ub.identity
+    Index = ub.identity
     class CocoBase:
         _decl_class_registry = {}
 
@@ -172,7 +174,10 @@ class Annotation(CocoBase):
     id = Column(Integer, primary_key=True)
     image_id = Column(Integer, doc='', index=True, unique=False)
     category_id = Column(Integer, doc='', index=True, unique=False)
-    track_id = Column(JSON, index=True, unique=False)
+
+    # track_id = Column(JSON, index=True, unique=False) # postgresql?
+    track_id = Column(Integer, index=True, unique=False)
+    track_id = Column(JSON)
 
     segmentation = Column(JSON)
     keypoints = Column(JSON)
@@ -193,6 +198,10 @@ class Annotation(CocoBase):
 
     __unstructured__ = Column(JSON, default=dict())
 
+    # __table_args__ =  (
+    #     # https://stackoverflow.com/questions/30885846/how-to-create-jsonb-index-using-gin-on-sqlalchemy
+    #     Index("index_Annotation_on_track_id_gin", track_id, postgresql_using="gin"),
+    # )
 
 # As long as the flavor of sql conforms to our raw sql commands set
 # this to 0, which uses the faster raw variant.
@@ -1013,6 +1022,7 @@ def _handle_sql_uri(uri):
         _handle_sql_uri('/foo/bar')
         _handle_sql_uri('foo/bar')
         _handle_sql_uri('postgresql:///tutorial.db')
+        _handle_sql_uri('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb')
     """
     import uritools
     uri_parsed = uritools.urisplit(uri)
@@ -1037,6 +1047,8 @@ def _handle_sql_uri(uri):
     elif scheme == 'sqlite':
         ...
     elif scheme == 'postgresql':
+        raise ValueError('use postgresql+psycopg2 instead')
+    elif scheme == 'postgresql+psycopg2':
         ...
     else:
         raise NotImplementedError(scheme)
@@ -1087,6 +1099,17 @@ class CocoSqlDatabase(AbstractCocoDataset,
         >>> dset1, dset2 = sql_dset, dct_dset
         >>> tag1, tag2 = 'dset1', 'dset2'
         >>> assert_dsets_allclose(sql_dset, dct_dset)
+
+    Example:
+        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+        >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
+        >>> # xdoctest: +REQUIRES(module:psycopg2)
+        >>> CocoSqlDatabase()
+        # >>> from kwcoco.coco_sql_dataset import *  # NOQA
+        # >>> sql_dset, dct_dset = demo()
+        # >>> dset1, dset2 = sql_dset, dct_dset
+        # >>> tag1, tag2 = 'dset1', 'dset2'
+        # >>> assert_dsets_allclose(sql_dset, dct_dset)
     """
 
     MEMORY_URI = 'sqlite:///:memory:'
@@ -1217,7 +1240,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         self.engine = None
         self.index = None
 
-    def connect(self, readonly=False):
+    def connect(self, readonly=False, verbose=0):
         """
         Connects this instance to the underlying database.
 
@@ -1227,19 +1250,26 @@ class CocoSqlDatabase(AbstractCocoDataset,
             https://github.com/pudo/dataset/issues/136
             https://writeonly.wordpress.com/2009/07/16/simple-read-only-sqlalchemy-sessions/
 
+        CommandLine:
+            KWCOCO_WITH_POSTGRESQL=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_sql_dataset.py CocoSqlDatabase.connect
+
         Example:
-            >>> # xdoctest: +SKIP
+            >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> # xdoctest: +REQUIRES(module:psycopg2)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
-            >>> dset = CocoSqlDatabase('postgresql:///tutorial.db')
-            >>> dset.connect()
+            >>> dset = CocoSqlDatabase('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb')
+            >>> self = dset
+            >>> dset.connect(verbose=1)
         """
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
         # Create an engine that stores data at a specific uri location
 
         _uri_info = _handle_sql_uri(self.uri)
+        if verbose:
+            print('connecting')
+            print('_uri_info = {}'.format(ub.repr2(_uri_info, nl=1)))
         uri = _uri_info['normalized']
 
         if _uri_info['scheme'] == 'sqlite':
@@ -1248,7 +1278,21 @@ class CocoSqlDatabase(AbstractCocoDataset,
             else:
                 uri = uri + '?uri=true'
 
+        if _uri_info['scheme'].startswith('postgresql'):
+            from sqlalchemy_utils import database_exists, create_database
+            did_exist = database_exists(uri)
+            if not did_exist:
+                if verbose:
+                    print('checking if database exists, no, creating')
+                create_database(uri)
+            else:
+                if verbose:
+                    print('checking if database exists, yes')
+
+        if verbose:
+            print('create_engine')
         self.engine = create_engine(uri)
+
         # table_names = self.engine.table_names()
         table_names = sqlalchemy.inspect(self.engine).get_table_names()
         if len(table_names) == 0:
@@ -1257,14 +1301,25 @@ class CocoSqlDatabase(AbstractCocoDataset,
             # This is equivalent to "Create Table" statements in raw SQL.
             # if readonly:
             #     raise AssertionError('must open existing table in readonly mode')
+            if verbose:
+                print('check for tables, none exist, making them')
             CocoBase.metadata.create_all(self.engine)
+        else:
+            if verbose:
+                print('check for tables, they exist')
+
         DBSession = sessionmaker(bind=self.engine)
         self.session = DBSession()
 
         if _uri_info['scheme'] == 'sqlite':
             self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
 
+        if verbose:
+            print('create CocoSQLIndex')
+
         self.index = CocoSqlIndex()
+        if verbose:
+            print('build CocoSQLIndex')
         self.index.build(self)
         return self
 
@@ -1272,10 +1327,26 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def fpath(self):
         return self.uri
 
-    def delete(self):
+    def delete(self, verbose=0):
+        if verbose:
+            print(f'delete {self.uri}')
         fpath = self.uri.split('///file:')[-1]
         if self.uri != self.MEMORY_URI and exists(fpath):
+            if verbose:
+                print('delete sqlite database')
             ub.delete(fpath)
+        if 'postgresql+psycopg2' in self.uri:
+            _uri_info = _handle_sql_uri(self.uri)
+            uri = _uri_info['normalized']
+            from sqlalchemy_utils import drop_database
+            from sqlalchemy_utils import database_exists
+            if database_exists(uri):
+                if verbose:
+                    print(f'deleting postgres database: {uri}')
+                drop_database(uri)
+            else:
+                if verbose:
+                    print('deleting postgres database, doesnt exist')
 
     def populate_from(self, dset, verbose=1):
         """
@@ -1295,6 +1366,21 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> ti_dct = _benchmark_dset_readtime(dset2, 'dct')
             >>> print('ti_sql.rankings = {}'.format(ub.repr2(ti_sql.rankings, nl=2, precision=6, align=':')))
             >>> print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
+
+        CommandLine:
+            KWCOCO_WITH_POSTGRESQL=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_sql_dataset.py CocoSqlDatabase.populate_from:1
+
+        Example:
+            >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(module:psycopg2)
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> import kwcoco
+            >>> dset = dset2 = kwcoco.CocoDataset.demo()
+            >>> self = dset1 = CocoSqlDatabase('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/test_populate')
+            >>> self.delete(verbose=1)
+            >>> self.connect(verbose=1)
+            >>> #self.populate_from(dset)
         """
         from sqlalchemy import inspect
         import itertools as it
@@ -1572,7 +1658,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
 
 def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
-                         force_rewrite=False):
+                         force_rewrite=False, backend=None):
     """
     Attempts to load a cached SQL-View dataset, only loading and converting the
     json dataset if necessary.
@@ -1597,9 +1683,25 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     else:
         raise AssertionError
 
+    if backend is None:
+        backend = 'sqlite'
+
     if sql_db_fpath is None:
-        sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_',
-                                  ext='.view.' + SCHEMA_VERSION + '.sqlite')
+
+        if backend == 'sqlite':
+            sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_',
+                                          ext='.view.' + SCHEMA_VERSION + '.sqlite')
+        elif backend == 'postgresql':
+            prefix = 'postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432'
+            sql_db_fpath = prefix + ub.augpath(dct_db_fpath, prefix='_',
+                                               ext='.view.' + SCHEMA_VERSION + '.postgres')
+        else:
+            raise KeyError(backend)
+
+    if backend == 'sqlite':
+        cache_product = [sql_db_fpath]
+    else:
+        cache_product = []
 
     self = CocoSqlDatabase(sql_db_fpath, img_root=bundle_dpath, tag=tag)
 
@@ -1610,7 +1712,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         enable_cache = False
     stamp = ub.CacheStamp('kwcoco-sqlite-cache', dpath=_cache_dpath,
                           depends=[dct_db_fpath],
-                          product=[sql_db_fpath], enabled=enable_cache,
+                          product=cache_product, enabled=enable_cache,
                           hasher=None, ext='.json')
     if stamp.expired():
         # TODO: use a CacheStamp instead
@@ -1653,7 +1755,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     return self
 
 
-def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
+def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False, backend=None):
     """
     Create a cached on-disk SQL view of an on-disk COCO dataset.
 
@@ -1662,7 +1764,7 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
         timestamps to determine if it needs to write the dataset.
     """
     return cached_sql_coco_view(dset=dset, sql_db_fpath=db_fpath,
-                                force_rewrite=force_rewrite)
+                                force_rewrite=force_rewrite, backend=backend)
 
 
 def demo(num=10):

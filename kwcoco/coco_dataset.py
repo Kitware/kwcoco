@@ -6242,7 +6242,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                autobuild=autobuild)
         return sub_dset
 
-    def view_sql(self, force_rewrite=False, memory=False):
+    def view_sql(self, force_rewrite=False, memory=False, backend='sqlite'):
         """
         Create a cached SQL interface to this dataset suitable for large scale
         multiprocessing use cases.
@@ -6257,6 +6257,33 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             This view cache is experimental and currently depends on the
             timestamp of the file pointed to by ``self.fpath``. In other words
             dont use this on in-memory datasets.
+
+        CommandLine:
+            KWCOCO_WITH_POSTGRESQL=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py CocoDataset.view_sql
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
+            >>> # xdoctest: +REQUIRES(module:psycopg2)
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> postgres_dset = dset.view_sql(backend='postgresql', force_rewrite=True)
+            >>> sqlite_dset = dset.view_sql(backend='sqlite', force_rewrite=True)
+            >>> list(dset.anns.keys())
+            >>> list(postgres_dset.anns.keys())
+            >>> list(sqlite_dset.anns.keys())
+
+            import timerit
+            ti = timerit.Timerit(100, bestof=10, verbose=2)
+            for timer in ti.reset('dct_dset'):
+                dset.annots().detections
+            for timer in ti.reset('postgresql'):
+                postgres_dset.annots().detections
+            for timer in ti.reset('sqlite'):
+                sqlite_dset.annots().detections
+
+            ub.udict(sql_dset.annots().objs[0]) - {'segmentation'}
+            ub.udict(dct_dset.annots().objs[0]) - {'segmentation'}
         """
         from kwcoco.coco_sql_dataset import ensure_sql_coco_view
         if memory:
@@ -6264,7 +6291,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         else:
             db_fpath = None
         sql_dset = ensure_sql_coco_view(self, db_fpath=db_fpath,
-                                        force_rewrite=force_rewrite)
+                                        force_rewrite=force_rewrite,
+                                        backend=backend)
         return sql_dset
 
 

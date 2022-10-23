@@ -6,6 +6,11 @@ Initialize the Global PostgreSQL database and server:
 
     # https://www.digitalocean.com/community/tutorials/how-to-install-and-use-postgresql-on-ubuntu-20-04
 
+    # https://www.liquidweb.com/kb/how-to-install-sqlalchemy/
+
+    pip install psycopg2-binary
+    pip install sqlalchemy_utils
+    pip install sqlalchemy
     sudo apt install postgresql postgresql-contrib
     sudo systemctl start postgresql.service
     sudo systemctl start postgresql.service
@@ -14,40 +19,46 @@ Initialize the Global PostgreSQL database and server:
     # TODO: all these commands need to run as the postgress user
     # sudo -i -u postgres
     # psql
+    # psql -U postgres
+    # sudo -u postgres dropuser joncrall
+    # sudo -u postgres psql -c "\du"
+    # psql
+    # sudo -u postgres createdb $USERNAME
 
     sudo -u postgres createuser --interactive
 
     sudo -u postgres createuser --superuser --no-password Admin
-    sudo -u postgres createuser --role=Admin admin -W
     sudo -u postgres createuser  --no-password --no-superuser --createdb --createrole --login --replication Maintainer
     sudo -u postgres createuser  --no-password --no-superuser --login Developer
     sudo -u postgres createuser --role=Maintainer $USERNAME
 
-    sudo -u postgres createdb sonia
+    sudo -u postgres createuser --role=Admin admin
+    sudo -u postgres psql -c "ALTER USER admin WITH PASSWORD 'admin';"
+
+    # This will be the kwcoco default user
+    sudo -u postgres createuser --role=Maintainer kwcoco
+    sudo -u postgres psql -c "ALTER USER kwcoco WITH PASSWORD 'kwcoco_pw';"
+    sudo -u postgres psql -c "ALTER USER kwcoco WITH CREATEDB;"
+
+    # https://dba.stackexchange.com/questions/37351/postgresql-exclude-using-error-data-type-integer-has-no-default-operator-class
+    sudo -u postgres psql -c "CREATE EXTENSION btree_gist;"
 
 
-    # Use password: sammy
-    sudo -u postgres createuser --role=Developer sammy -W
 
-    # Use password: badbeaf1024
-    sudo -u postgres createuser --role=Developer sonia -W
+    sudo -u postgres createuser --role=Developer kwcoco_rw
+    sudo -u postgres createuser --role=Developer kwcoco_ro
+    sudo -u postgres psql -c "ALTER USER kwcoco_rw WITH PASSWORD 'kwcoco_pw';"
+    sudo -u postgres psql -c "ALTER USER kwcoco_ro WITH PASSWORD 'kwcoco_pw';"
 
-    psql -U postgres
-    # sudo -u postgres dropuser Admin
-    # sudo -u postgres dropuser Maintainer
-    # sudo -u postgres dropuser Developer
-    # sudo -u postgres dropuser joncrall
+    sudo -u postgres createdb kwcocodb
+    python -c "from sqlalchemy import create_engine; create_engine('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/kwcocodb').connect()"
 
-    sudo -u postgres psql -c "\du"
-
-    sudo -u postgres createdb $USERNAME
-    psql
-
-    python -c "from sqlalchemy import create_engine; create_engine('postgresql+psycopg2://sonia:badbeaf1024@localhost/sonia').connect()"
+    python -c "from sqlalchemy import create_engine; create_engine('postgresql+psycopg2://admin:admin@localhost:5432/joncrall').connect()"
 
 
 Install
     pip install psycopg2-binary
+    pip install sqlalchemy_utils
 
 
 Ignore:
@@ -64,6 +75,15 @@ References:
     https://stackoverflow.com/questions/9353822/connecting-postgresql-with-sqlalchemy
 """
 from kwcoco.coco_sql_dataset import *  # NOQA
+
+
+def testit():
+    from sqlalchemy import create_engine
+    from sqlalchemy_utils import database_exists, create_database
+    engine = create_engine("postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb")
+    did_exist = database_exists(engine.url)
+    if not did_exist:
+        create_database(engine.url)
 
 
 def values(proxy):
