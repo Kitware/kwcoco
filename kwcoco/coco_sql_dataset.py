@@ -111,7 +111,7 @@ except ImportError:
 # in our sql schema. It will be stored as a json blob. The column names defined
 # in the alchemy tables must agree with this.
 UNSTRUCTURED = '__unstructured__'
-SCHEMA_VERSION = 'v008'
+SCHEMA_VERSION = 'v009rc1'
 
 
 class Category(CocoBase):
@@ -169,13 +169,18 @@ class Image(CocoBase):
     __unstructured__ = Column(JSON, default=dict())
 
 
+# TODO:
+# Track
+# SharedPolygon?
+
+
 class Annotation(CocoBase):
     __tablename__ = 'annotations'
     id = Column(Integer, primary_key=True)
     image_id = Column(Integer, doc='', index=True, unique=False)
     category_id = Column(Integer, doc='', index=True, unique=False)
 
-    # track_id = Column(JSON, index=True, unique=False) # postgresql?
+    # track_id = Column(JSON, index=True, unique=False) # fixme: via postgres gin index
     track_id = Column(Integer, index=True, unique=False)
     track_id = Column(JSON)
 
@@ -1759,6 +1764,8 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False, backend=None)
     """
     Create a cached on-disk SQL view of an on-disk COCO dataset.
 
+    # DEPREICATE, use cache function instead
+
     Note:
         This function is fragile. It depends on looking at file modified
         timestamps to determine if it needs to write the dataset.
@@ -1767,7 +1774,7 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False, backend=None)
                                 force_rewrite=force_rewrite, backend=backend)
 
 
-def demo(num=10):
+def demo(num=10, backend=None):
     import kwcoco
     dset = kwcoco.CocoDataset.demo(
         'vidshapes', num_videos=1, num_frames=num, image_size=(64, 64))
@@ -1782,7 +1789,7 @@ def demo(num=10):
         dset.fpath = ub.augpath(dset.fpath, suffix='_hack', multidot=True)
         if not exists(dset.fpath):
             dset.dump(dset.fpath, newlines=True)
-    self = ensure_sql_coco_view(dset)
+    self = dset.view_sql(backend=backend)
     return self, dset
 
 
@@ -1847,6 +1854,51 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
 def _benchmark_dset_readtime(dset, tag='?'):
     """
     Helper for understanding the time differences between backends
+
+    Ignore:
+        import kwcoco
+        dset = kwcoco.CocoDataset.demo('vidshapes-videos1-frames100-tracks512', render=False, verbose=3)
+        dset1 = dset.view_sql(backend='postgresql')
+        dset2 = dset.view_sql(backend='sqlite')
+        dset3 = dset.view_sql(backend='sqlite', memory=True)
+        dset4 = dset.view_sql(backend='sqlite', sql_db_fpath='/mnt/ramdisk/tmp_ramdisk2.sqlite3')
+
+        from kwcoco.coco_sql_dataset import _benchmark_dset_readtime  # NOQA
+        print('--')
+        ti1 = _benchmark_dset_readtime(dset, 'dictionary')
+        print('--')
+        ti2 = _benchmark_dset_readtime(dset1, 'postgresql')
+        print('--')
+        ti3 = _benchmark_dset_readtime(dset2, 'sqlite')
+        print('--')
+        ti4 = _benchmark_dset_readtime(dset3, 'sqlite:memory')
+        print('--')
+        ti5 = _benchmark_dset_readtime(dset4, 'sqlite:ramfs')
+
+        import pandas as pd
+        tis = [ti1, ti2, ti3, ti4, ti5]
+        rows = []
+        for ti in tis:
+            for k in ti.measures['min'].keys():
+                v1 = ti.measures['min'][k]
+                v2 = ti.measures['mean'][k]
+                t, _, c = k.partition(' ')
+                rows.append({'label': t, 'test': c, 'min': v1, 'mean': v2})
+
+        df = pd.DataFrame(rows)
+        piv = df.pivot('label', 'test', 'mean').T
+        import rich
+        rich.print(piv.to_string())
+
+                pass
+
+
+        # Try a RAM disk
+        sudo mkdir -p /mnt/ramdisk
+        sudo chmod -v 777 /mnt/ramdisk
+        sudo mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk
+
+
     """
 
     import timerit
@@ -1959,8 +2011,8 @@ def devcheck():
     from kwcoco.coco_sql_dataset import *  # NOQA
     self, dset = demo()
     """
-    # self = ensure_sql_coco_view(dset, db_fpath=':memory:')
-    self, dset = demo()
+    # self, dset = demo(backend='sqlite')
+    self, dset = demo(backend='postgresql')
 
     ti_sql = _benchmark_dset_readtime(self, 'sql')
     ti_dct = _benchmark_dset_readtime(dset, 'dct')
@@ -1993,7 +2045,7 @@ def devcheck():
     proxy = self.index.imgs
     gids = list(proxy.keys())
 
-    chosen_gids = gids[100:1000:4]
+    chosen_gids = gids[1:1000:4]
 
     query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
     print(query.statement)
@@ -2005,7 +2057,7 @@ def devcheck():
     with timerit.Timer('query with in hardcode'):
         query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)
         stmt = query.statement.compile(compile_kwargs={"literal_binds": True})
-        proxy.session.execute(str(stmt)).fetchall()
+        items0 = proxy.session.execute(str(stmt)).fetchall()  # NOQA
 
     with timerit.Timer('query with in'):
         query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)

@@ -1176,7 +1176,8 @@ class MixinCocoExtras(object):
                 (2) vidshapes8-multispectral - generate 8 multispectral videos.
                 (3) vidshapes8-msi - msi is an alias for multispectral.
                 (4) vidshapes8-frames5 - generate 8 videos with 5 frames each.
-                (4) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
+                (5) vidshapes2-tracks5 - generate 2 videos with 5 tracks each.
+                (6) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
                 frames where the objects move with with a speed of 0.1.
 
             **kwargs : if key is shapes, these arguments are passed to toydata
@@ -6242,7 +6243,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                autobuild=autobuild)
         return sub_dset
 
-    def view_sql(self, force_rewrite=False, memory=False, backend='sqlite'):
+    def view_sql(self, force_rewrite=False, memory=False, backend='sqlite',
+                 sql_db_fpath=None):
         """
         Create a cached SQL interface to this dataset suitable for large scale
         multiprocessing use cases.
@@ -6250,8 +6252,13 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         Args:
             force_rewrite (bool, default=False):
                 if True, forces an update to any existing cache file on disk
+
             memory (bool, default=False):
                 if True, the database is constructed in memory.
+
+            backend (str): sqlite or postgresql
+
+            sql_db_fpath (str): overrides the database uri
 
         Note:
             This view cache is experimental and currently depends on the
@@ -6266,7 +6273,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
             >>> # xdoctest: +REQUIRES(module:psycopg2)
             >>> import kwcoco
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes32')
             >>> postgres_dset = dset.view_sql(backend='postgresql', force_rewrite=True)
             >>> sqlite_dset = dset.view_sql(backend='sqlite', force_rewrite=True)
             >>> list(dset.anns.keys())
@@ -6285,12 +6292,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             ub.udict(sql_dset.annots().objs[0]) - {'segmentation'}
             ub.udict(dct_dset.annots().objs[0]) - {'segmentation'}
         """
-        from kwcoco.coco_sql_dataset import ensure_sql_coco_view
+        from kwcoco.coco_sql_dataset import cached_sql_coco_view
         if memory:
-            db_fpath = ':memory:'
+            sql_db_fpath = ':memory:'
         else:
-            db_fpath = None
-        sql_dset = ensure_sql_coco_view(self, db_fpath=db_fpath,
+            sql_db_fpath = None
+        sql_dset = cached_sql_coco_view(dset=self, sql_db_fpath=sql_db_fpath,
                                         force_rewrite=force_rewrite,
                                         backend=backend)
         return sql_dset
