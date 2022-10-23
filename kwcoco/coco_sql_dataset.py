@@ -1328,6 +1328,29 @@ class CocoSqlDatabase(AbstractCocoDataset,
         if _uri_info['scheme'] == 'sqlite':
             self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
 
+        if _uri_info['scheme'].startswith('postgresql'):
+            if 0:
+                # https://www.pgmustard.com/blog/max-parallel-workers-per-gather
+                postgres_knobs = [
+                    'max_parallel_workers_per_gather',
+                    'parallel_setup_cost',
+                    'parallel_tuple_cost',
+                    'min_parallel_table_scan_size',
+                    'min_parallel_index_scan_size',
+                ]
+                current = {}
+                for k in postgres_knobs:
+                    v = self.session.execute(f'SHOW {k};').fetchone()[0]
+                    current[k] = v
+                print('current = {}'.format(ub.repr2(current, nl=1)))
+                self.session.execute('SET max_parallel_workers_per_gather = 6;')
+                self.session.execute('select pg_reload_conf();')
+                current = {}
+                for k in postgres_knobs:
+                    v = self.session.execute(f'SHOW {k};').fetchone()[0]
+                    current[k] = v
+                print('current = {}'.format(ub.repr2(current, nl=1)))
+
         if verbose:
             print('create CocoSQLIndex')
 
@@ -1725,7 +1748,9 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
             sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_',
                                           ext='.view.' + SCHEMA_VERSION + '.sqlite')
         elif backend == 'postgresql':
-            prefix = 'postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432'
+            # TODO: better way of handling authentication
+            # prefix = 'postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432'
+            prefix = 'postgresql+psycopg2://admin:admin@localhost:5432'
             sql_db_fpath = prefix + ub.augpath(dct_db_fpath, prefix='_',
                                                ext='.view.' + SCHEMA_VERSION + '.postgres')
         else:

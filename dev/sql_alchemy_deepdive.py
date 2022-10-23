@@ -34,6 +34,12 @@ Initialize the Global PostgreSQL database and server:
 
     sudo -u postgres createuser --role=Admin admin
     sudo -u postgres psql -c "ALTER USER admin WITH PASSWORD 'admin';"
+    sudo -u postgres psql -c "ALTER USER admin WITH CREATEDB;"
+    sudo -u postgres psql -c "ALTER USER admin WITH LOGIN;"
+    sudo -u postgres psql -c "ALTER USER admin WITH SUPERUSER;"
+    sudo -u postgres psql -c "ALTER USER admin WITH REPLICATION;"
+    sudo -u postgres psql -c "ALTER USER admin WITH BYPASSRLS;"
+
 
     # This will be the kwcoco default user
     sudo -u postgres createuser --role=Maintainer kwcoco
