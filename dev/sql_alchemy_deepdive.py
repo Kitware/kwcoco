@@ -1,5 +1,67 @@
-"""
+r"""
 Notes about a deep dive into sqlalchemy picking appart some internals
+
+
+Initialize the Global PostgreSQL database and server:
+
+    # https://www.digitalocean.com/community/tutorials/how-to-install-and-use-postgresql-on-ubuntu-20-04
+
+    sudo apt install postgresql postgresql-contrib
+    sudo systemctl start postgresql.service
+    sudo systemctl start postgresql.service
+    sudo systemctl status postgresql.service
+
+    # TODO: all these commands need to run as the postgress user
+    # sudo -i -u postgres
+    # psql
+
+    sudo -u postgres createuser --interactive
+
+    sudo -u postgres createuser --superuser --no-password Admin
+    sudo -u postgres createuser --role=Admin admin -W
+    sudo -u postgres createuser  --no-password --no-superuser --createdb --createrole --login --replication Maintainer
+    sudo -u postgres createuser  --no-password --no-superuser --login Developer
+    sudo -u postgres createuser --role=Maintainer $USERNAME
+
+    sudo -u postgres createdb sonia
+
+
+    # Use password: sammy
+    sudo -u postgres createuser --role=Developer sammy -W
+
+    # Use password: badbeaf1024
+    sudo -u postgres createuser --role=Developer sonia -W
+
+    psql -U postgres
+    # sudo -u postgres dropuser Admin
+    # sudo -u postgres dropuser Maintainer
+    # sudo -u postgres dropuser Developer
+    # sudo -u postgres dropuser joncrall
+
+    sudo -u postgres psql -c "\du"
+
+    sudo -u postgres createdb $USERNAME
+    psql
+
+    python -c "from sqlalchemy import create_engine; create_engine('postgresql+psycopg2://sonia:badbeaf1024@localhost/sonia').connect()"
+
+
+Install
+    pip install psycopg2-binary
+
+
+Ignore:
+    from sqlalchemy import create_engine
+
+    postgresql://scott:tiger@localhost/mydatabase
+
+    from sqlalchemy import create_engine
+    engine = create_engine('postgresql+psycopg2://admin:admin@localhost/joncrall')
+    engine.connect()
+
+
+References:
+    https://stackoverflow.com/questions/9353822/connecting-postgresql-with-sqlalchemy
 """
 from kwcoco.coco_sql_dataset import *  # NOQA
 

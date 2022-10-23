@@ -175,6 +175,9 @@ def indexable_allclose(dct1, dct2, return_info=False):
     Walks through two nested data structures and ensures that everything is
     roughly the same.
 
+    NOTE:
+        Use the version in ubelt instead
+
     Args:
         dct1: a nested indexable item
         dct2: a nested indexable item

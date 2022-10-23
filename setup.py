@@ -142,52 +142,6 @@ def parse_requirements(fname='requirements.txt', versions=False):
     return packages
 
 
-def native_mb_python_tag(plat_impl=None, version_info=None):
-    """
-    Get the correct manylinux python version tag for this interpreter
-
-    Example:
-        >>> print(native_mb_python_tag())
-        >>> print(native_mb_python_tag('PyPy', (2, 7)))
-        >>> print(native_mb_python_tag('CPython', (3, 8)))
-    """
-    if plat_impl is None:
-        import platform
-        plat_impl = platform.python_implementation()
-
-    if version_info is None:
-        import sys
-        version_info = sys.version_info
-
-    major, minor = version_info[0:2]
-    ver = '{}{}'.format(major, minor)
-
-    if plat_impl == 'CPython':
-        # TODO: get if cp27m or cp27mu
-        impl = 'cp'
-        if ver == '27':
-            IS_27_BUILT_WITH_UNICODE = True  # how to determine this?
-            if IS_27_BUILT_WITH_UNICODE:
-                abi = 'mu'
-            else:
-                abi = 'm'
-        else:
-            if sys.version_info[:2] >= (3, 8):
-                # bpo-36707: 3.8 dropped the m flag
-                abi = ''
-            else:
-                abi = 'm'
-        mb_tag = '{impl}{ver}-{impl}{ver}{abi}'.format(**locals())
-    elif plat_impl == 'PyPy':
-        abi = ''
-        impl = 'pypy'
-        ver = '{}{}'.format(major, minor)
-        mb_tag = '{impl}-{ver}'.format(**locals())
-    else:
-        raise NotImplementedError(plat_impl)
-    return mb_tag
-
-
 NAME = 'kwcoco'
 VERSION = parse_version('kwcoco/__init__.py')
 
@@ -252,8 +206,6 @@ if __name__ == '__main__':
             # This should be interpreted as Apache License v2.0
             'License :: OSI Approved :: Apache Software License',
             # Supported Python versions
-            # 'Programming Language :: Python :: 2.7',
-            # 'Programming Language :: Python :: 3.5',
             'Programming Language :: Python :: 3.6',
             'Programming Language :: Python :: 3.7',
             'Programming Language :: Python :: 3.8',

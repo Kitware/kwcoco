@@ -4547,8 +4547,6 @@ class CocoIndex(object):
     def __bool__(index):
         return index.anns is not None
 
-    __nonzero__ = __bool__  # python 2 support
-
     # On-demand lookup tables
     @property
     def cid_to_gids(index):
