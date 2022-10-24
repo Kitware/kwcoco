@@ -32,13 +32,6 @@ Initialize the Global PostgreSQL database and server:
     sudo -u postgres createuser  --no-password --no-superuser --login Developer
     sudo -u postgres createuser --role=Maintainer $USERNAME
 
-    sudo -u postgres createuser --role=Admin admin
-    sudo -u postgres psql -c "ALTER USER admin WITH PASSWORD 'admin';"
-    sudo -u postgres psql -c "ALTER USER admin WITH CREATEDB;"
-    sudo -u postgres psql -c "ALTER USER admin WITH LOGIN;"
-    sudo -u postgres psql -c "ALTER USER admin WITH SUPERUSER;"
-    sudo -u postgres psql -c "ALTER USER admin WITH REPLICATION;"
-    sudo -u postgres psql -c "ALTER USER admin WITH BYPASSRLS;"
 
 
     # This will be the kwcoco default user
@@ -48,7 +41,6 @@ Initialize the Global PostgreSQL database and server:
 
     # https://dba.stackexchange.com/questions/37351/postgresql-exclude-using-error-data-type-integer-has-no-default-operator-class
     sudo -u postgres psql -c "CREATE EXTENSION btree_gist;"
-
 
 
     sudo -u postgres createuser --role=Developer kwcoco_rw

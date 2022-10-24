@@ -328,7 +328,6 @@ import copy
 import sys
 import itertools as it
 import numbers
-import numpy as np
 import os
 import ubelt as ub
 import warnings
@@ -660,6 +659,7 @@ class MixinCocoAccessors(object):
             >>> kwplot.show_if_requested()
         """
         import kwarray
+        import numpy as np
         ann = self._resolve_to_ann(aid_or_ann)
         if image is None:
             image = self.load_image(ann['image_id'])
@@ -3062,6 +3062,7 @@ class MixinCocoStats(object):
             >>> print(ub.repr2(infos, nl=-1, precision=2))
         """
         import kwarray
+        import numpy as np
         cname_to_box_sizes = defaultdict(list)
 
         if bool(gids) and bool(aids):
@@ -3316,6 +3317,7 @@ class MixinCocoDraw(object):
         from matplotlib import pyplot as plt
         import kwimage
         import kwplot
+        import numpy as np
 
         figkw = {k: kwargs[k] for k in ['fnum', 'pnum', 'doclf', 'docla']
                  if k in kwargs}
