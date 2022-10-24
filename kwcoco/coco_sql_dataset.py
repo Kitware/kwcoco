@@ -1675,7 +1675,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         how to construct side-car names that can be queried for inversed like
         this.
         """
-        view_fpath = ub.Path(self.fpath)
+        # view_fpath = ub.Path(self.fpath)
+        view_fpath = _handle_sql_uri(self.fpath)['parsed'].path
+        view_fpath = ub.Path(view_fpath)
         if '.view' not in view_fpath.name:
             raise ValueError('We are assuming this is a view of an existing json file')
         orig_fname = view_fpath.name[1:].split('.view')[0] + '.json'
