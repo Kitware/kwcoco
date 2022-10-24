@@ -90,3 +90,83 @@ def use_postgresql_with_python():
         create_database(engine.url)
     does_exist = database_exists(engine.url)
     print(f'does_exist={does_exist}')
+
+
+def simple_declarative_schema():
+    from sqlalchemy import create_engine
+    from sqlalchemy import inspect
+    from sqlalchemy.ext.declarative import declarative_base
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.sql.schema import Column
+    from sqlalchemy.types import Integer, JSON
+    from sqlalchemy_utils import database_exists, create_database
+
+    CustomBase = declarative_base()
+
+    from sqlalchemy.sql.schema import Index  # NOQA
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    class User(CustomBase):
+        __tablename__ = 'users'
+        id = Column(Integer, primary_key=True, doc='unique internal id')
+        name = Column(JSON)
+        loose_identifer = Column(JSON, index=True, unique=False)
+        # loose_identifer = Column(JSONB, index=True, unique=False)
+        # loose_identifer = Column(JSON, unique=False)
+        # __table_args__ =  (
+        #     # https://stackoverflow.com/questions/30885846/how-to-create-jsonb-index-using-gin-on-sqlalchemy
+        #     Index(
+        #         "ix_users_loose_identifer", loose_identifer,
+        #         postgresql_using="gist",
+        #     ),
+        # )
+
+    from sqlalchemy.schema import CreateTable
+    from sqlalchemy.schema import CreateIndex
+    print(CreateTable(User.__table__))
+    # print(CreateIndex(User))
+
+    # uri = 'sqlite:///test_sqlite_v7.sqlite'
+    uri = 'postgresql+psycopg2://admin:admin@localhost:5432/test_postgresql_v10.postgres'
+
+    engine = create_engine(uri)
+    DBSession = sessionmaker(bind=engine)
+    session = DBSession()
+
+    if 'postgresql' in uri:
+        if not database_exists(uri):
+            create_database(uri)
+
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    if len(table_names) == 0:
+        CustomBase.metadata.create_all(engine)
+
+    user_infos = [
+        {'name': 'user1', 'loose_identifer': "AA" },
+        {'name': 'user2', 'loose_identifer': "33" },
+        {'name': 'user3', 'loose_identifer': 33 },
+        {'name': 'user4', 'loose_identifer': 33 },
+        {'name': 'user5', 'loose_identifer': "AA" },
+        {'name': 'user6', 'loose_identifer': None},
+        {'name': 'user7', 'loose_identifer': [1, 'weird']},
+    ]
+    for row in user_infos:
+        user = User(**row)
+        session.add(user)
+
+    session.commit()
+
+    import pandas as pd
+    import json
+    table_df = pd.read_sql_table('users', con=engine)
+    table_df['loose_identifer'] = table_df['loose_identifer'].apply(repr)
+    print(table_df)
+
+    query = session.query(User.name, User.loose_identifer).filter(User.loose_identifer == json.dumps(33))
+    results = list(query.all())
+    print(f'results={results}')
+
+    query = session.query(User.name, User.loose_identifer).filter(User.loose_identifer == json.dumps('33'))
+    results = list(query.all())
+    print(f'results={results}')

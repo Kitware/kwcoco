@@ -1752,7 +1752,13 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         elif backend == 'postgresql':
             # TODO: better way of handling authentication
             # prefix = 'postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432'
-            prefix = 'postgresql+psycopg2://admin:admin@localhost:5432'
+
+            host = os.environ.get('KWCOCO_HOST', 'localhost')
+            port = os.environ.get('KWCOCO_PORT', '5432')
+            user = os.environ.get('KWCOCO_USER', 'admin')
+            passwd = os.environ.get('KWCOCO_PASSWD', 'admin')
+
+            prefix = f'postgresql+psycopg2://{user}:{passwd}@{host}:{port}'
             sql_db_fpath = prefix + ub.augpath(dct_db_fpath, prefix='_', ext=ext)
         else:
             raise KeyError(backend)
