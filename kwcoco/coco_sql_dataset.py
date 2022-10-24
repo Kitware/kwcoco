@@ -868,9 +868,12 @@ class SqlIdGroupDictProxy(DictLike):
 
                 grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
                 # Hack: have to cast to str because I don't know how to make
-                # the json type work
+                # the json type work.
+                # Update: New version of sqlalchemy needs an explicit cast to
+                # "text" to represent a text query.
+                grouped_vals = sqlalchemy.sql.text(str(grouped_vals))
                 query = (
-                    session.query(parent_keyattr, str(grouped_vals))
+                    session.query(parent_keyattr, grouped_vals)
                     .outerjoin(table, parent_keyattr == keyattr)
                     .group_by(parent_keyattr)
                     .order_by(parent_keyattr)
