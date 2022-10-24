@@ -107,11 +107,16 @@ except ImportError:
         _decl_class_registry = {}
 
 
+# TODO: is it possible to get sclalchemy to use JSON for sqlite and JSONB for
+# postgres?
+# from sqlalchemy.dialects.postgresql import JSONB
+# JSON = JSONB
+
 # This is the column name for unstructured data that is not captured directly
 # in our sql schema. It will be stored as a json blob. The column names defined
 # in the alchemy tables must agree with this.
 UNSTRUCTURED = '__unstructured__'
-SCHEMA_VERSION = 'v009rc1'
+SCHEMA_VERSION = 'v009rc2'
 
 
 class Category(CocoBase):
@@ -181,7 +186,7 @@ class Annotation(CocoBase):
     category_id = Column(Integer, doc='', index=True, unique=False)
 
     # track_id = Column(JSON, index=True, unique=False) # fixme: via postgres gin index
-    track_id = Column(Integer, index=True, unique=False)
+    # track_id = Column(Integer, index=True, unique=False)
     track_id = Column(JSON)
 
     segmentation = Column(JSON)
@@ -205,7 +210,10 @@ class Annotation(CocoBase):
 
     # __table_args__ =  (
     #     # https://stackoverflow.com/questions/30885846/how-to-create-jsonb-index-using-gin-on-sqlalchemy
-    #     Index("index_Annotation_on_track_id_gin", track_id, postgresql_using="gin"),
+    #     Index(
+    #         "index_Annotation_on_track_id_gin", track_id,
+    #         # postgresql_using="gin",
+    #     ),
     # )
 
 # As long as the flavor of sql conforms to our raw sql commands set
@@ -1116,17 +1124,6 @@ class CocoSqlDatabase(AbstractCocoDataset,
         >>> dset1, dset2 = sql_dset, dct_dset
         >>> tag1, tag2 = 'dset1', 'dset2'
         >>> assert_dsets_allclose(sql_dset, dct_dset)
-
-    Example:
-        >>> # xdoctest: +REQUIRES(module:sqlalchemy)
-        >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
-        >>> # xdoctest: +REQUIRES(module:psycopg2)
-        >>> CocoSqlDatabase()
-        # >>> from kwcoco.coco_sql_dataset import *  # NOQA
-        # >>> sql_dset, dct_dset = demo()
-        # >>> dset1, dset2 = sql_dset, dct_dset
-        # >>> tag1, tag2 = 'dset1', 'dset2'
-        # >>> assert_dsets_allclose(sql_dset, dct_dset)
     """
 
     MEMORY_URI = 'sqlite:///:memory:'
@@ -1746,16 +1743,14 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         backend = 'sqlite'
 
     if sql_db_fpath is None:
-
+        ext = '.view.' + SCHEMA_VERSION + '.' + backend
         if backend == 'sqlite':
-            sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_',
-                                          ext='.view.' + SCHEMA_VERSION + '.sqlite')
+            sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_', ext=ext)
         elif backend == 'postgresql':
             # TODO: better way of handling authentication
             # prefix = 'postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432'
             prefix = 'postgresql+psycopg2://admin:admin@localhost:5432'
-            sql_db_fpath = prefix + ub.augpath(dct_db_fpath, prefix='_',
-                                               ext='.view.' + SCHEMA_VERSION + '.postgres')
+            sql_db_fpath = prefix + ub.augpath(dct_db_fpath, prefix='_', ext=ext)
         else:
             raise KeyError(backend)
 
@@ -1774,8 +1769,8 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
 
     # Note: we don't have a way of comparing timestamps for postgresql
     # databases, but that shouldn't matter too much
-    stamp = ub.CacheStamp('kwcoco-sql-cache', dpath=_cache_dpath,
-                          depends=[dct_db_fpath],
+    stamp = ub.CacheStamp('kwcoco-sql-cache-' + SCHEMA_VERSION,
+                          dpath=_cache_dpath, depends=[dct_db_fpath],
                           product=cache_product, enabled=enable_cache,
                           hasher=None, ext='.json')
     if stamp.expired():
