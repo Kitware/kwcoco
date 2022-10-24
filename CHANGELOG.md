@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Initial support for PostgreSQL
+* In CocoDataset.coerce the arg `sqlview` can now be given as a string `sqlite` or `postgresql`.
 
 
 ### Fixed

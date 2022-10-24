@@ -108,7 +108,7 @@ except ImportError:
 
 
 # TODO: is it possible to get sclalchemy to use JSON for sqlite and JSONB for
-# postgres?
+# postgresql?
 # from sqlalchemy.dialects.postgresql import JSONB
 # JSON = JSONB
 
@@ -185,7 +185,7 @@ class Annotation(CocoBase):
     image_id = Column(Integer, doc='', index=True, unique=False)
     category_id = Column(Integer, doc='', index=True, unique=False)
 
-    # track_id = Column(JSON, index=True, unique=False) # fixme: via postgres gin index
+    # track_id = Column(JSON, index=True, unique=False) # fixme: via postgresql gin index
     # track_id = Column(Integer, index=True, unique=False)
     track_id = Column(JSON)
 
@@ -1155,7 +1155,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         return ', '.join(parts)
 
     @classmethod
-    def coerce(self, data):
+    def coerce(self, data, backend=None):
         """
         Create an SQL CocoDataset from the input pointer.
 
@@ -1186,11 +1186,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
             data = os.fspath(data)
             if data.endswith('.json'):
                 dct_db_fpath = data
-                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath)
+                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath,
+                                            backend=backend)
             else:
                 raise NotImplementedError
         elif isinstance(data, kwcoco.CocoDataset):
-            self = cached_sql_coco_view(dset=data)
+            self = cached_sql_coco_view(dset=data, backend=backend)
         else:
             raise NotImplementedError
         return self
@@ -1379,11 +1380,11 @@ class CocoSqlDatabase(AbstractCocoDataset,
             from sqlalchemy_utils import database_exists
             if database_exists(uri):
                 if verbose:
-                    print(f'deleting postgres database: {uri}')
+                    print(f'deleting postgresql database: {uri}')
                 drop_database(uri)
             else:
                 if verbose:
-                    print('deleting postgres database, doesnt exist')
+                    print('deleting postgresql database, doesnt exist')
 
     def populate_from(self, dset, verbose=1):
         """

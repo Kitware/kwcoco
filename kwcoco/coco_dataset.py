@@ -1081,10 +1081,11 @@ class MixinCocoExtras(object):
                string URI pointing to an on-disk dataset, or a special
                key for creating demodata.
 
-            sqlview (bool):
-                If True, will return the dataset as a cached sql view, which
-                can be quicker to load and use in some instances. Defaults to
-                False.
+            sqlview (bool | str):
+                If truthy, will return the dataset as a cached sql view, which
+                can be quicker to load and use in some instances. Can be given
+                as a string, which sets the backend that is used: either sqlite
+                or postgresql.  Defaults to False.
 
             **kw: passed to whatever constructor is chosen (if any)
 
@@ -1125,6 +1126,7 @@ class MixinCocoExtras(object):
             elif result.path.endswith('.json') or '.json' in result.path:
                 if sqlview:
                     from kwcoco.coco_sql_dataset import CocoSqlDatabase
+                    kw['backend'] = sqlview
                     self = CocoSqlDatabase.coerce(dset_fpath, **kw)
                 else:
                     self = kwcoco.CocoDataset(dset_fpath, **kw)
