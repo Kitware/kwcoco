@@ -291,6 +291,8 @@ class CocoImage(ub.NiceRepr):
         # Choose "best" auxiliary image based on a hueristic.
         eye = kwimage.Affine.eye().matrix
         asset_objs = img.get('auxiliary', img.get('assets', []))
+        if asset_objs is None:
+            asset_objs = []
         for idx, obj in enumerate(asset_objs):
             # Take frobenius norm to get "distance" between transform and
             # the identity. We want to find the auxiliary closest to the
@@ -347,9 +349,9 @@ class CocoImage(ub.NiceRepr):
             # cant remove auxiliary otherwise inplace modification doesnt work
             # obj = ub.dict_diff(img, {'auxiliary'})
             yield obj
-        for obj in img.get('auxiliary', []):
+        for obj in img.get('auxiliary', None) or []:
             yield obj
-        for obj in img.get('assets', []):
+        for obj in img.get('assets', None) or []:
             yield obj
 
     def find_asset_obj(self, channels):
