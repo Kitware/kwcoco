@@ -5,7 +5,19 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.5.0 - Unreleased
+## Version 0.5.1 - Unreleased
+
+
+### Added
+* Initial support for PostgreSQL
+* In CocoDataset.coerce the arg `sqlview` can now be given as a string `sqlite` or `postgresql`.
+
+
+### Fixed
+* Lookup on SQL database now handles json columns
+
+
+## Version 0.5.0 - Released 2022-09-28
 
 ### Fixed
 * Taking non-existing channels from a single-image delayed node returns a

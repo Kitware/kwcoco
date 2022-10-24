@@ -41,5 +41,5 @@ class UniqueNameRemapper:
         ...
 
 
-class SortedSetQuiet(sortedcontainers.SortedSet):
+class SortedSet(sortedcontainers.SortedSet):
     ...

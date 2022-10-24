@@ -84,6 +84,7 @@ from kwcoco.coco_dataset import (  # NOQA
 
 try:
     from sqlalchemy.sql.schema import Column
+    from sqlalchemy.sql.schema import Index
     from sqlalchemy.types import Float, Integer, String, JSON
     from sqlalchemy.ext.declarative import declarative_base
     import sqlalchemy
@@ -101,15 +102,21 @@ except ImportError:
     JSON = ub.identity
     Integer = ub.identity
     Column = ub.identity
+    Index = ub.identity
     class CocoBase:
         _decl_class_registry = {}
 
+
+# TODO: is it possible to get sclalchemy to use JSON for sqlite and JSONB for
+# postgresql?
+# from sqlalchemy.dialects.postgresql import JSONB
+# JSON = JSONB
 
 # This is the column name for unstructured data that is not captured directly
 # in our sql schema. It will be stored as a json blob. The column names defined
 # in the alchemy tables must agree with this.
 UNSTRUCTURED = '__unstructured__'
-SCHEMA_VERSION = 'v008'
+SCHEMA_VERSION = 'v009rc2'
 
 
 class Category(CocoBase):
@@ -167,12 +174,20 @@ class Image(CocoBase):
     __unstructured__ = Column(JSON, default=dict())
 
 
+# TODO:
+# Track
+# SharedPolygon?
+
+
 class Annotation(CocoBase):
     __tablename__ = 'annotations'
     id = Column(Integer, primary_key=True)
     image_id = Column(Integer, doc='', index=True, unique=False)
     category_id = Column(Integer, doc='', index=True, unique=False)
-    track_id = Column(JSON, index=True, unique=False)
+
+    # track_id = Column(JSON, index=True, unique=False) # fixme: via postgresql gin index
+    # track_id = Column(Integer, index=True, unique=False)
+    track_id = Column(JSON)
 
     segmentation = Column(JSON)
     keypoints = Column(JSON)
@@ -193,10 +208,17 @@ class Annotation(CocoBase):
 
     __unstructured__ = Column(JSON, default=dict())
 
+    # __table_args__ =  (
+    #     # https://stackoverflow.com/questions/30885846/how-to-create-jsonb-index-using-gin-on-sqlalchemy
+    #     Index(
+    #         "index_Annotation_on_track_id_gin", track_id,
+    #         # postgresql_using="gin",
+    #     ),
+    # )
 
 # As long as the flavor of sql conforms to our raw sql commands set
 # this to 0, which uses the faster raw variant.
-ALCHEMY_MODE_DEFAULT = 0
+ALCHEMY_MODE_DEFAULT = 1
 
 # Global book keeping (It would be nice to find a way to avoid this)
 CocoBase.TBLNAME_TO_CLASS = {}
@@ -332,7 +354,7 @@ class SqlListProxy(ub.NiceRepr):
     def __getitem__(proxy, index):
         query = proxy.session.query(proxy.cls)
         if isinstance(index, slice):
-            assert index.step in {None, 1}
+            assert index.step in {None, 1}, 'slice queries must be contiguous'
             objs = query.slice(index.start, index.stop).all()
             items = [orm_to_dict(obj) for obj in objs]
             return items
@@ -697,6 +719,7 @@ class SqlIdGroupDictProxy(DictLike):
         proxy.session = session
         proxy.parent_keyattr = parent_keyattr
         proxy.ALCHEMY_MODE = 0
+        proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
         proxy._cache = _new_proxy_cache()
 
         # if specified, the items within groups are ordered by this attr
@@ -785,7 +808,7 @@ class SqlIdGroupDictProxy(DictLike):
     def items(proxy):
         _set = set if proxy.group_order_attr is None else ub.oset
         if proxy.group_order_attr is not None:
-            print('proxy.group_order_attr = {!r}'.format(proxy.group_order_attr))
+            # print('proxy.group_order_attr = {!r}'.format(proxy.group_order_attr))
             # ALTERNATIVE MODE, EXPERIMENTAL MODE
             # groups based on post processing. this might be faster or more
             # robust than the group json array? Requires a hack to yield empty
@@ -853,9 +876,12 @@ class SqlIdGroupDictProxy(DictLike):
 
                 grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
                 # Hack: have to cast to str because I don't know how to make
-                # the json type work
+                # the json type work.
+                # Update: New version of sqlalchemy needs an explicit cast to
+                # "text" to represent a text query.
+                grouped_vals = sqlalchemy.sql.text(str(grouped_vals))
                 query = (
-                    session.query(parent_keyattr, str(grouped_vals))
+                    session.query(parent_keyattr, grouped_vals)
                     .outerjoin(table, parent_keyattr == keyattr)
                     .group_by(parent_keyattr)
                     .order_by(parent_keyattr)
@@ -998,6 +1024,14 @@ class CocoSqlIndex(object):
             'videos': index.videos,
         }
 
+    def _set_alchemy_mode(index, mode):
+        for v in index.__dict__.values():
+            if hasattr(v, 'ALCHEMY_MODE'):
+                v.ALCHEMY_MODE = mode
+        for v in index.dataset.values():
+            if hasattr(v, 'ALCHEMY_MODE'):
+                v.ALCHEMY_MODE = mode
+
 
 def _handle_sql_uri(uri):
     """
@@ -1012,6 +1046,8 @@ def _handle_sql_uri(uri):
         _handle_sql_uri('sqlite:///:memory:')
         _handle_sql_uri('/foo/bar')
         _handle_sql_uri('foo/bar')
+        _handle_sql_uri('postgresql:///tutorial.db')
+        _handle_sql_uri('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb')
     """
     import uritools
     uri_parsed = uritools.urisplit(uri)
@@ -1033,7 +1069,13 @@ def _handle_sql_uri(uri):
             path = file_prefix + path
         if authority is None:
             authority = ''
-    elif scheme != 'sqlite':
+    elif scheme == 'sqlite':
+        ...
+    elif scheme == 'postgresql':
+        raise ValueError('use postgresql+psycopg2 instead')
+    elif scheme == 'postgresql+psycopg2':
+        ...
+    else:
         raise NotImplementedError(scheme)
 
     if path == '/:memory:':
@@ -1054,6 +1096,7 @@ def _handle_sql_uri(uri):
         'local_path': local_path,
         'parsed': uri_parsed,
         'parent': parent,
+        'scheme': scheme,
     }
     return uri_info
 
@@ -1112,7 +1155,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         return ', '.join(parts)
 
     @classmethod
-    def coerce(self, data):
+    def coerce(self, data, backend=None):
         """
         Create an SQL CocoDataset from the input pointer.
 
@@ -1143,11 +1186,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
             data = os.fspath(data)
             if data.endswith('.json'):
                 dct_db_fpath = data
-                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath)
+                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath,
+                                            backend=backend)
             else:
                 raise NotImplementedError
         elif isinstance(data, kwcoco.CocoDataset):
-            self = cached_sql_coco_view(dset=data)
+            self = cached_sql_coco_view(dset=data, backend=backend)
         else:
             raise NotImplementedError
         return self
@@ -1211,7 +1255,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         self.engine = None
         self.index = None
 
-    def connect(self, readonly=False):
+    def connect(self, readonly=False, verbose=0):
         """
         Connects this instance to the underlying database.
 
@@ -1220,18 +1264,50 @@ class CocoSqlDatabase(AbstractCocoDataset,
             https://github.com/sqlalchemy/sqlalchemy/blob/master/lib/sqlalchemy/dialects/sqlite/pysqlite.py#L71
             https://github.com/pudo/dataset/issues/136
             https://writeonly.wordpress.com/2009/07/16/simple-read-only-sqlalchemy-sessions/
+
+        CommandLine:
+            KWCOCO_WITH_POSTGRESQL=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_sql_dataset.py CocoSqlDatabase.connect
+
+        Example:
+            >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(module:psycopg2)
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> dset = CocoSqlDatabase('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb')
+            >>> self = dset
+            >>> dset.connect(verbose=1)
         """
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
         # Create an engine that stores data at a specific uri location
 
         _uri_info = _handle_sql_uri(self.uri)
+        if verbose:
+            print('connecting')
+            print('_uri_info = {}'.format(ub.repr2(_uri_info, nl=1)))
         uri = _uri_info['normalized']
-        if readonly:
-            uri = uri + '?mode=ro&uri=true'
-        else:
-            uri = uri + '?uri=true'
+
+        if _uri_info['scheme'] == 'sqlite':
+            if readonly:
+                uri = uri + '?mode=ro&uri=true'
+            else:
+                uri = uri + '?uri=true'
+
+        if _uri_info['scheme'].startswith('postgresql'):
+            from sqlalchemy_utils import database_exists, create_database
+            did_exist = database_exists(uri)
+            if not did_exist:
+                if verbose:
+                    print('checking if database exists, no, creating')
+                create_database(uri)
+            else:
+                if verbose:
+                    print('checking if database exists, yes')
+
+        if verbose:
+            print('create_engine')
         self.engine = create_engine(uri)
+
         # table_names = self.engine.table_names()
         table_names = sqlalchemy.inspect(self.engine).get_table_names()
         if len(table_names) == 0:
@@ -1240,13 +1316,48 @@ class CocoSqlDatabase(AbstractCocoDataset,
             # This is equivalent to "Create Table" statements in raw SQL.
             # if readonly:
             #     raise AssertionError('must open existing table in readonly mode')
+            if verbose:
+                print('check for tables, none exist, making them')
             CocoBase.metadata.create_all(self.engine)
+        else:
+            if verbose:
+                print('check for tables, they exist')
+
         DBSession = sessionmaker(bind=self.engine)
         self.session = DBSession()
 
-        self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
+        if _uri_info['scheme'] == 'sqlite':
+            self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
+
+        if _uri_info['scheme'].startswith('postgresql'):
+            if 0:
+                # https://www.pgmustard.com/blog/max-parallel-workers-per-gather
+                postgres_knobs = [
+                    'max_parallel_workers_per_gather',
+                    'parallel_setup_cost',
+                    'parallel_tuple_cost',
+                    'min_parallel_table_scan_size',
+                    'min_parallel_index_scan_size',
+                ]
+                current = {}
+                for k in postgres_knobs:
+                    v = self.session.execute(f'SHOW {k};').fetchone()[0]
+                    current[k] = v
+                print('current = {}'.format(ub.repr2(current, nl=1)))
+                self.session.execute('SET max_parallel_workers_per_gather = 6;')
+                self.session.execute('select pg_reload_conf();')
+                current = {}
+                for k in postgres_knobs:
+                    v = self.session.execute(f'SHOW {k};').fetchone()[0]
+                    current[k] = v
+                print('current = {}'.format(ub.repr2(current, nl=1)))
+
+        if verbose:
+            print('create CocoSQLIndex')
 
         self.index = CocoSqlIndex()
+        if verbose:
+            print('build CocoSQLIndex')
         self.index.build(self)
         return self
 
@@ -1254,10 +1365,26 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def fpath(self):
         return self.uri
 
-    def delete(self):
+    def delete(self, verbose=0):
+        if verbose:
+            print(f'delete {self.uri}')
         fpath = self.uri.split('///file:')[-1]
         if self.uri != self.MEMORY_URI and exists(fpath):
+            if verbose:
+                print('delete sqlite database')
             ub.delete(fpath)
+        if 'postgresql+psycopg2' in self.uri:
+            _uri_info = _handle_sql_uri(self.uri)
+            uri = _uri_info['normalized']
+            from sqlalchemy_utils import drop_database
+            from sqlalchemy_utils import database_exists
+            if database_exists(uri):
+                if verbose:
+                    print(f'deleting postgresql database: {uri}')
+                drop_database(uri)
+            else:
+                if verbose:
+                    print('deleting postgresql database, doesnt exist')
 
     def populate_from(self, dset, verbose=1):
         """
@@ -1277,6 +1404,21 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> ti_dct = _benchmark_dset_readtime(dset2, 'dct')
             >>> print('ti_sql.rankings = {}'.format(ub.repr2(ti_sql.rankings, nl=2, precision=6, align=':')))
             >>> print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
+
+        CommandLine:
+            KWCOCO_WITH_POSTGRESQL=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_sql_dataset.py CocoSqlDatabase.populate_from:1
+
+        Example:
+            >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(module:psycopg2)
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> import kwcoco
+            >>> dset = dset2 = kwcoco.CocoDataset.demo()
+            >>> self = dset1 = CocoSqlDatabase('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/test_populate')
+            >>> self.delete(verbose=1)
+            >>> self.connect(verbose=1)
+            >>> #self.populate_from(dset)
         """
         from sqlalchemy import inspect
         import itertools as it
@@ -1373,6 +1515,15 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> cids2 = self.annots(rowids).get(key)
             >>> cids3 = dset.annots(rowids).get(key)
             >>> assert cids3 == cids2 == cids1
+            >>> # Test json columns work
+            >>> vals1 = self._column_lookup(tablename, 'bbox', rowids)
+            >>> vals2 = self.annots(rowids).lookup('bbox')
+            >>> vals3 = dset.annots(rowids).lookup('bbox')
+            >>> assert vals1 == vals2 == vals3
+            >>> vals1 = self._column_lookup(tablename, 'segmentation', rowids)
+            >>> vals2 = self.annots(rowids).lookup('segmentation')
+            >>> vals3 = dset.annots(rowids).lookup('segmentation')
+            >>> assert vals1 == vals2 == vals3
 
         Ignore:
             import timerit
@@ -1403,12 +1554,22 @@ class CocoSqlDatabase(AbstractCocoDataset,
             WHERE {tablename}.id = :rowid
             ''').format(tablename=tablename, key=key)
 
+        # TODO: memoize this check
+        table = CocoBase.TBLNAME_TO_CLASS[tablename]
+        needs_json_decode = (
+            table.__table__.columns[key].type.__class__.__name__ == 'JSON'
+        )
+
         values = [
             # self.anns[aid][key]
             # if aid in self.anns._cache else
             self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
             for rowid in rowids
         ]
+
+        if needs_json_decode:
+            values = [None if v is None else json.loads(v) for v in values]
+
         if keepid:
             if default is ub.NoParam:
                 attr_list = ub.dzip(rowids, values)
@@ -1514,7 +1675,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         how to construct side-car names that can be queried for inversed like
         this.
         """
-        view_fpath = ub.Path(self.fpath)
+        # view_fpath = ub.Path(self.fpath)
+        view_fpath = _handle_sql_uri(self.fpath)['parsed'].path
+        view_fpath = ub.Path(view_fpath)
         if '.view' not in view_fpath.name:
             raise ValueError('We are assuming this is a view of an existing json file')
         orig_fname = view_fpath.name[1:].split('.view')[0] + '.json'
@@ -1554,10 +1717,13 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
 
 def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
-                         force_rewrite=False):
+                         force_rewrite=False, backend=None):
     """
     Attempts to load a cached SQL-View dataset, only loading and converting the
     json dataset if necessary.
+
+    Ignore:
+        pass
     """
     # import os
     import kwcoco
@@ -1576,9 +1742,31 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     else:
         raise AssertionError
 
+    if backend is None:
+        backend = 'sqlite'
+
     if sql_db_fpath is None:
-        sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_',
-                                  ext='.view.' + SCHEMA_VERSION + '.sqlite')
+        ext = '.view.' + SCHEMA_VERSION + '.' + backend
+        if backend == 'sqlite':
+            sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_', ext=ext)
+        elif backend == 'postgresql':
+            # TODO: better way of handling authentication
+            # prefix = 'postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432'
+
+            host = os.environ.get('KWCOCO_HOST', 'localhost')
+            port = os.environ.get('KWCOCO_PORT', '5432')
+            user = os.environ.get('KWCOCO_USER', 'admin')
+            passwd = os.environ.get('KWCOCO_PASSWD', 'admin')
+
+            prefix = f'postgresql+psycopg2://{user}:{passwd}@{host}:{port}'
+            sql_db_fpath = prefix + ub.augpath(dct_db_fpath, prefix='_', ext=ext)
+        else:
+            raise KeyError(backend)
+
+    if backend == 'sqlite':
+        cache_product = [sql_db_fpath]
+    else:
+        cache_product = []
 
     self = CocoSqlDatabase(sql_db_fpath, img_root=bundle_dpath, tag=tag)
 
@@ -1587,9 +1775,12 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     enable_cache = not force_rewrite
     if os.fspath(sql_db_fpath) == ':memory:':
         enable_cache = False
-    stamp = ub.CacheStamp('kwcoco-sqlite-cache', dpath=_cache_dpath,
-                          depends=[dct_db_fpath],
-                          product=[sql_db_fpath], enabled=enable_cache,
+
+    # Note: we don't have a way of comparing timestamps for postgresql
+    # databases, but that shouldn't matter too much
+    stamp = ub.CacheStamp('kwcoco-sql-cache-' + SCHEMA_VERSION,
+                          dpath=_cache_dpath, depends=[dct_db_fpath],
+                          product=cache_product, enabled=enable_cache,
                           hasher=None, ext='.json')
     if stamp.expired():
         # TODO: use a CacheStamp instead
@@ -1603,48 +1794,30 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         dset._cached_hashid()
 
         # Convert a coco file to an sql database
-        print('Start SQL conversion')
+        print(f'Start SQL({backend}_ conversion')
         self.populate_from(dset, verbose=1)
         if stamp.cacher.enabled:
             stamp.renew()
     else:
         self.connect()
-
-    # needs_rewrite = True
-    # if not force_rewrite and exists(sql_db_fpath):
-    #     needs_rewrite = (
-    #         os.stat(dct_db_fpath).st_mtime > os.stat(sql_db_fpath).st_mtime
-    #     )
-    # if needs_rewrite:
-    #     # Write to the SQL instance
-
-    #     # TODO: use a CacheStamp instead
-    #     self.delete()
-    #     self.connect()
-    #     if dset is None:
-    #         print('Loading json dataset for SQL conversion')
-    #         dset = kwcoco.CocoDataset(dct_db_fpath)
-    #     # Convert a coco file to an sql database
-    #     print('Start SQL conversion')
-    #     self.populate_from(dset, verbose=1)
-    # else:
-    #     self.connect()
     return self
 
 
-def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False):
+def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False, backend=None):
     """
     Create a cached on-disk SQL view of an on-disk COCO dataset.
+
+    # DEPREICATE, use cache function instead
 
     Note:
         This function is fragile. It depends on looking at file modified
         timestamps to determine if it needs to write the dataset.
     """
     return cached_sql_coco_view(dset=dset, sql_db_fpath=db_fpath,
-                                force_rewrite=force_rewrite)
+                                force_rewrite=force_rewrite, backend=backend)
 
 
-def demo(num=10):
+def demo(num=10, backend=None):
     import kwcoco
     dset = kwcoco.CocoDataset.demo(
         'vidshapes', num_videos=1, num_frames=num, image_size=(64, 64))
@@ -1659,7 +1832,7 @@ def demo(num=10):
         dset.fpath = ub.augpath(dset.fpath, suffix='_hack', multidot=True)
         if not exists(dset.fpath):
             dset.dump(dset.fpath, newlines=True)
-    self = ensure_sql_coco_view(dset)
+    self = dset.view_sql(backend=backend)
     return self, dset
 
 
@@ -1721,52 +1894,149 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
     return True
 
 
-def _benchmark_dset_readtime(dset, tag='?'):
+def _benchmark_dset_readtime(dset, tag='?', n=4, post_iterate=False):
     """
     Helper for understanding the time differences between backends
+
+    Note:
+        post_iterate ensures that all of the returned data is looked at by the
+        python interpreter. Makes this a more fair comparison because python
+        can just return pointers to the data, but only in the case where most
+        of the data will touched. For one attribute lookups it is not a good
+        test.
+
+    Ignore:
+        # Try a RAM disk
+        sudo mkdir -p /mnt/ramdisk
+        sudo chmod -v 777 /mnt/ramdisk
+        sudo mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk
+
+    Ignore:
+        import kwcoco
+        datasets = {}
+        dset = kwcoco.CocoDataset.demo('vidshapes-videos1-frames20-tracks128', render=False, verbose=3)
+        datasets['dictionary'] = dset
+
+        datasets['postgres_am0'] = dset.view_sql(backend='postgresql')
+        datasets['postgres_am0'].index._set_alchemy_mode(0)
+
+        datasets['postgres_am1'] = dset.view_sql(backend='postgresql')
+        datasets['postgres_am1'].index._set_alchemy_mode(1)
+
+        datasets['sqlite_am1'] = dset.view_sql(backend='sqlite')
+        datasets['sqlite_am1'].index._set_alchemy_mode(1)
+
+        datasets['sqlite_am0'] = dset.view_sql(backend='sqlite')
+        datasets['sqlite_am0'].index._set_alchemy_mode(0)
+
+        # datasets['sqlite_memory'] = dset.view_sql(backend='sqlite', memory=True)
+        # datasets['sqlite_ramdisk'] = dset.view_sql(backend='sqlite', sql_db_fpath='/mnt/ramdisk/tmp_ramdisk4.sqlite3')
+
+        post_iterate = 1
+        _bkw = dict(post_iterate=post_iterate, n=4)
+
+        from kwcoco.coco_sql_dataset import _benchmark_dset_readtime  # NOQA
+        print('--')
+        tis = {}
+        for k, v in datasets.items():
+            print(f' --- {k} ---')
+            tis[k] = _benchmark_dset_readtime(v, k, **_bkw)
+
+        import pandas as pd
+        rows = []
+        for ti in tis.values():
+            for k in ti.measures['min'].keys():
+                v1 = ti.measures['min'][k]
+                v2 = ti.measures['mean'][k]
+                t, _, c = k.partition(' ')
+                rows.append({'label': t, 'test': c, 'min': v1, 'mean': v2})
+
+        tests = list(ub.unique([r['test'] for r in rows]))
+
+        df = pd.DataFrame(rows)
+        piv = df.pivot('test', 'label', 'mean').loc[tests]
+        import rich
+        rich.print(piv.to_string())
     """
 
     import timerit
-    ti = timerit.Timerit(4, bestof=2, verbose=2)
+    ti = timerit.Timerit(n, bestof=2, verbose=2)
 
     for timer in ti.reset('{} dict(gid_to_aids)'.format(tag)):
         with timer:
-            dict(dset.index.gid_to_aids)
+            r = dict(dset.index.gid_to_aids)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(cid_to_aids)'.format(tag)):
         with timer:
-            dict(dset.index.cid_to_aids)
+            r = dict(dset.index.cid_to_aids)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(imgs)'.format(tag)):
         with timer:
-            dict(dset.index.imgs)
+            r = dict(dset.index.imgs)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(cats)'.format(tag)):
         with timer:
-            dict(dset.index.cats)
+            r = dict(dset.index.cats)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(anns)'.format(tag)):
         with timer:
-            dict(dset.index.anns)
+            r = dict(dset.index.anns)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} dict(vidid_to_gids)'.format(tag)):
         with timer:
-            dict(dset.index.vidid_to_gids)
+            r = dict(dset.index.vidid_to_gids)
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} ann list iteration'.format(tag)):
         with timer:
-            list(dset.dataset['annotations'])
+            r = list(dset.dataset['annotations'])
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} ann dict iteration'.format(tag)):
         with timer:
-            list(dset.index.anns.items())
+            r = list(dset.index.anns.items())
+            if post_iterate:
+                list(ub.IndexableWalker(r))
 
     for timer in ti.reset('{} ann random lookup'.format(tag)):
         aids = list(dset.index.anns.keys())[0:10]
         with timer:
             for aid in aids:
-                dset.index.anns[aid]
+                r = dset.index.anns[aid]
+                if post_iterate:
+                    list(ub.IndexableWalker(r))
 
+    def _take_test(attr):
+        for timer in ti.reset('{} take ann.{}'.format(tag, attr)):
+            with timer:
+                r = [ann.get(attr, None) for ann in dset.dataset['annotations']]
+                if post_iterate:
+                    list(ub.IndexableWalker(r))
+
+    def _lookup_test(attr):
+        for timer in ti.reset('{} annots.lookup({})'.format(tag, attr)):
+            with timer:
+                r = dset.annots().lookup(attr, default=None)
+                if post_iterate:
+                    list(ub.IndexableWalker(r))
+    _take_test('image_id')
+    _lookup_test('image_id')
+    _take_test('bbox')
+    _lookup_test('bbox')
+    _take_test('segmentation')
+    _lookup_test('segmentation')
     return ti
 
 
@@ -1836,8 +2106,8 @@ def devcheck():
     from kwcoco.coco_sql_dataset import *  # NOQA
     self, dset = demo()
     """
-    # self = ensure_sql_coco_view(dset, db_fpath=':memory:')
-    self, dset = demo()
+    # self, dset = demo(backend='sqlite')
+    self, dset = demo(backend='postgresql')
 
     ti_sql = _benchmark_dset_readtime(self, 'sql')
     ti_dct = _benchmark_dset_readtime(dset, 'dct')
@@ -1870,7 +2140,7 @@ def devcheck():
     proxy = self.index.imgs
     gids = list(proxy.keys())
 
-    chosen_gids = gids[100:1000:4]
+    chosen_gids = gids[1:1000:4]
 
     query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
     print(query.statement)
@@ -1882,7 +2152,7 @@ def devcheck():
     with timerit.Timer('query with in hardcode'):
         query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)
         stmt = query.statement.compile(compile_kwargs={"literal_binds": True})
-        proxy.session.execute(str(stmt)).fetchall()
+        items0 = proxy.session.execute(str(stmt)).fetchall()  # NOQA
 
     with timerit.Timer('query with in'):
         query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)

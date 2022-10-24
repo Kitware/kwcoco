@@ -328,7 +328,6 @@ import copy
 import sys
 import itertools as it
 import numbers
-import numpy as np
 import os
 import ubelt as ub
 import warnings
@@ -345,7 +344,7 @@ from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco import exceptions
 
 from kwcoco._helpers import (
-    SortedSetQuiet, UniqueNameRemapper, _ID_Remapper, _NextId,
+    SortedSet, UniqueNameRemapper, _ID_Remapper, _NextId,
     _delitems, _lut_frame_index
 )
 
@@ -391,8 +390,100 @@ SPEC_KEYS = [
 
 class MixinCocoDepricate(object):
     """
-    These functions are marked for deprication and may be removed at any time
+    These functions are marked for deprication and will be removed
     """
+
+    def keypoint_annotation_frequency(self):
+        """
+        DEPRECATED
+
+        Example:
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> self = kwcoco.CocoDataset.demo('shapes', rng=0)
+            >>> hist = self.keypoint_annotation_frequency()
+            >>> hist = ub.odict(sorted(hist.items()))
+            >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
+            >>> print(ub.repr2(hist))  # xdoc: +IGNORE_WANT
+            {
+                'bot_tip': 6,
+                'left_eye': 14,
+                'mid_tip': 6,
+                'right_eye': 14,
+                'top_tip': 6,
+            }
+        """
+        ub.schedule_deprecation(
+            'kwcoco', name='keypoint_annotation_frequency', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'Implement this functionality explicitly. '
+                'It is too niche for a the core API.'
+                'Or propose a better way on '
+                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
+            )
+        )
+        ann_kpcids = [kp['keypoint_category_id']
+                      for ann in self.dataset['annotations']
+                      for kp in ann.get('keypoints', [])]
+        kpcid_to_name = {kpcat['id']: kpcat['name']
+                         for kpcat in self.dataset['keypoint_categories']}
+        kpcid_to_num = ub.dict_hist(ann_kpcids,
+                                    labels=list(kpcid_to_name.keys()))
+        kpname_to_num = ub.map_keys(kpcid_to_name, kpcid_to_num)
+        return kpname_to_num
+
+    def category_annotation_type_frequency(self):
+        """
+        DEPRECATED
+
+        Reports the number of annotations of each type for each category
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> hist = self.category_annotation_frequency()
+            >>> print(ub.repr2(hist))
+        """
+        catname_to_nannot_types = {}
+        ub.schedule_deprecation(
+            'kwcoco', name='category_annotation_type_frequency', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'Implement this functionality explicitly. '
+                'It is too niche for a the core API.'
+                'Or propose a better way on '
+                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
+            )
+        )
+
+        def _annot_type(ann):
+            """
+            Returns what type of annotation ``ann`` is.
+            """
+            return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
+
+        for cid, aids in self.index.cid_to_aids.items():
+            name = self.cats[cid]['name']
+            hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))
+            catname_to_nannot_types[name] = ub.map_keys(
+                lambda k: k[0] if len(k) == 1 else k, hist)
+        return catname_to_nannot_types
+
+    def imread(self, gid):
+        """
+        DEPRECATED: use load_image or delayed_image
+
+        Loads a particular image
+        """
+        ub.schedule_deprecation(
+            'kwcoco', name='imread', type='method',
+            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
+            migration=(
+                'use `self.coco_image(gid).delay().finalize()`.'
+            )
+        )
+        return self.load_image(gid)
 
 
 class MixinCocoAccessors(object):
@@ -568,6 +659,7 @@ class MixinCocoAccessors(object):
             >>> kwplot.show_if_requested()
         """
         import kwarray
+        import numpy as np
         ann = self._resolve_to_ann(aid_or_ann)
         if image is None:
             image = self.load_image(ann['image_id'])
@@ -989,10 +1081,11 @@ class MixinCocoExtras(object):
                string URI pointing to an on-disk dataset, or a special
                key for creating demodata.
 
-            sqlview (bool):
-                If True, will return the dataset as a cached sql view, which
-                can be quicker to load and use in some instances. Defaults to
-                False.
+            sqlview (bool | str):
+                If truthy, will return the dataset as a cached sql view, which
+                can be quicker to load and use in some instances. Can be given
+                as a string, which sets the backend that is used: either sqlite
+                or postgresql.  Defaults to False.
 
             **kw: passed to whatever constructor is chosen (if any)
 
@@ -1033,6 +1126,7 @@ class MixinCocoExtras(object):
             elif result.path.endswith('.json') or '.json' in result.path:
                 if sqlview:
                     from kwcoco.coco_sql_dataset import CocoSqlDatabase
+                    kw['backend'] = sqlview
                     self = CocoSqlDatabase.coerce(dset_fpath, **kw)
                 else:
                     self = kwcoco.CocoDataset(dset_fpath, **kw)
@@ -1084,7 +1178,8 @@ class MixinCocoExtras(object):
                 (2) vidshapes8-multispectral - generate 8 multispectral videos.
                 (3) vidshapes8-msi - msi is an alias for multispectral.
                 (4) vidshapes8-frames5 - generate 8 videos with 5 frames each.
-                (4) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
+                (5) vidshapes2-tracks5 - generate 2 videos with 5 tracks each.
+                (6) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
                 frames where the objects move with with a speed of 0.1.
 
             **kwargs : if key is shapes, these arguments are passed to toydata
@@ -2312,6 +2407,11 @@ class MixinCocoObjects(object):
             <Images(num=2)>
         """
         if vidid is not None:
+            ub.schedule_deprecation(
+                'kwcoco', 'vidid', 'argument of CocoDataset.images',
+                migration='Use "video_id" instead.',
+                deprecate='0.5.0', error='1.0.0', remove='1.1.0',
+            )
             video_id = vidid
 
         if video_id is not None:
@@ -2409,46 +2509,6 @@ class MixinCocoStats(object):
         """ The number of videos in the dataset """
         return len(self.dataset.get('videos', []))
 
-    def keypoint_annotation_frequency(self):
-        """
-        DEPRECATED
-
-        Example:
-            >>> import kwcoco
-            >>> import ubelt as ub
-            >>> self = kwcoco.CocoDataset.demo('shapes', rng=0)
-            >>> hist = self.keypoint_annotation_frequency()
-            >>> hist = ub.odict(sorted(hist.items()))
-            >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
-            >>> print(ub.repr2(hist))  # xdoc: +IGNORE_WANT
-            {
-                'bot_tip': 6,
-                'left_eye': 14,
-                'mid_tip': 6,
-                'right_eye': 14,
-                'top_tip': 6,
-            }
-        """
-        ub.schedule_deprecation(
-            'kwcoco', name='keypoint_annotation_frequency', type='method',
-            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
-            migration=(
-                'Implement this functionality explicitly. '
-                'It is too niche for a the core API.'
-                'Or propose a better way on '
-                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
-            )
-        )
-        ann_kpcids = [kp['keypoint_category_id']
-                      for ann in self.dataset['annotations']
-                      for kp in ann.get('keypoints', [])]
-        kpcid_to_name = {kpcat['id']: kpcat['name']
-                         for kpcat in self.dataset['keypoint_categories']}
-        kpcid_to_num = ub.dict_hist(ann_kpcids,
-                                    labels=list(kpcid_to_name.keys()))
-        kpname_to_num = ub.map_keys(kpcid_to_name, kpcid_to_num)
-        return kpname_to_num
-
     def category_annotation_frequency(self):
         """
         Reports the number of annotations of each category
@@ -2475,43 +2535,6 @@ class MixinCocoStats(object):
         catname_to_nannots = ub.odict(sorted(catname_to_nannots.items(),
                                              key=lambda kv: (kv[1], kv[0])))
         return catname_to_nannots
-
-    def category_annotation_type_frequency(self):
-        """
-        DEPRECATED
-
-        Reports the number of annotations of each type for each category
-
-        Example:
-            >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
-            >>> hist = self.category_annotation_frequency()
-            >>> print(ub.repr2(hist))
-        """
-        catname_to_nannot_types = {}
-        ub.schedule_deprecation(
-            'kwcoco', name='category_annotation_type_frequency', type='method',
-            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
-            migration=(
-                'Implement this functionality explicitly. '
-                'It is too niche for a the core API.'
-                'Or propose a better way on '
-                'https://gitlab.kitware.com/computer-vision/kwcoco/-/issues '
-            )
-        )
-
-        def _annot_type(ann):
-            """
-            Returns what type of annotation ``ann`` is.
-            """
-            return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
-
-        for cid, aids in self.index.cid_to_aids.items():
-            name = self.cats[cid]['name']
-            hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))
-            catname_to_nannot_types[name] = ub.map_keys(
-                lambda k: k[0] if len(k) == 1 else k, hist)
-        return catname_to_nannot_types
 
     def conform(self, **config):
         """
@@ -3041,6 +3064,7 @@ class MixinCocoStats(object):
             >>> print(ub.repr2(infos, nl=-1, precision=2))
         """
         import kwarray
+        import numpy as np
         cname_to_box_sizes = defaultdict(list)
 
         if bool(gids) and bool(aids):
@@ -3195,21 +3219,6 @@ class MixinCocoDraw(object):
     Matplotlib / display functionality
     """
 
-    def imread(self, gid):
-        """
-        DEPRECATED: use load_image or delayed_image
-
-        Loads a particular image
-        """
-        ub.schedule_deprecation(
-            'kwcoco', name='imread', type='method',
-            deprecate='0.3.4', error='1.0.0', remove='1.1.0',
-            migration=(
-                'use `self.coco_image(gid).delay().finalize()`.'
-            )
-        )
-        return self.load_image(gid)
-
     def draw_image(self, gid, channels=None):
         """
         Use kwimage to draw all annotations on an image and return the pixels
@@ -3310,6 +3319,7 @@ class MixinCocoDraw(object):
         from matplotlib import pyplot as plt
         import kwimage
         import kwplot
+        import numpy as np
 
         figkw = {k: kwargs[k] for k in ['fnum', 'pnum', 'doclf', 'docla']
                  if k in kwargs}
@@ -4513,7 +4523,7 @@ class CocoIndex(object):
         frame index.
         """
         # FIXME: likely need to do something to help this pickle nicely
-        return SortedSetQuiet(gids, key=partial(_lut_frame_index, index.imgs))
+        return SortedSet(gids, key=partial(_lut_frame_index, index.imgs))
         # This breaks in a different way
         # def _lut_frame_index2(gid):
         #     return index.imgs[gid]['frame_index']
@@ -4541,8 +4551,6 @@ class CocoIndex(object):
 
     def __bool__(index):
         return index.anns is not None
-
-    __nonzero__ = __bool__  # python 2 support
 
     # On-demand lookup tables
     @property
@@ -5392,8 +5400,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         jobs = ub.JobPool(mode, max_workers=max_workers)
         for fpath in ub.ProgIter(fpaths, desc='submit load coco jobs', verbose=verbose):
             jobs.submit(CocoDataset, fpath, autobuild=False)
-        results = [f.result() for f in ub.ProgIter(jobs.as_completed(),
-                   desc='collect load coco jobs', total=len(jobs), verbose=verbose)]
+
+        results = [f.result()
+                   for f in jobs.as_completed(desc='collect load coco jobs',
+                                              progkw=dict(verbose=verbose))]
 
         if union:
             try:
@@ -6237,7 +6247,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                autobuild=autobuild)
         return sub_dset
 
-    def view_sql(self, force_rewrite=False, memory=False):
+    def view_sql(self, force_rewrite=False, memory=False, backend='sqlite',
+                 sql_db_fpath=None):
         """
         Create a cached SQL interface to this dataset suitable for large scale
         multiprocessing use cases.
@@ -6245,21 +6256,53 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         Args:
             force_rewrite (bool, default=False):
                 if True, forces an update to any existing cache file on disk
+
             memory (bool, default=False):
                 if True, the database is constructed in memory.
+
+            backend (str): sqlite or postgresql
+
+            sql_db_fpath (str): overrides the database uri
 
         Note:
             This view cache is experimental and currently depends on the
             timestamp of the file pointed to by ``self.fpath``. In other words
             dont use this on in-memory datasets.
+
+        CommandLine:
+            KWCOCO_WITH_POSTGRESQL=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_dataset.py CocoDataset.view_sql
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
+            >>> # xdoctest: +REQUIRES(module:psycopg2)
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes32')
+            >>> postgres_dset = dset.view_sql(backend='postgresql', force_rewrite=True)
+            >>> sqlite_dset = dset.view_sql(backend='sqlite', force_rewrite=True)
+            >>> list(dset.anns.keys())
+            >>> list(postgres_dset.anns.keys())
+            >>> list(sqlite_dset.anns.keys())
+
+            import timerit
+            ti = timerit.Timerit(100, bestof=10, verbose=2)
+            for timer in ti.reset('dct_dset'):
+                dset.annots().detections
+            for timer in ti.reset('postgresql'):
+                postgres_dset.annots().detections
+            for timer in ti.reset('sqlite'):
+                sqlite_dset.annots().detections
+
+            ub.udict(sql_dset.annots().objs[0]) - {'segmentation'}
+            ub.udict(dct_dset.annots().objs[0]) - {'segmentation'}
         """
-        from kwcoco.coco_sql_dataset import ensure_sql_coco_view
-        if memory:
-            db_fpath = ':memory:'
-        else:
-            db_fpath = None
-        sql_dset = ensure_sql_coco_view(self, db_fpath=db_fpath,
-                                        force_rewrite=force_rewrite)
+        from kwcoco.coco_sql_dataset import cached_sql_coco_view
+        if sql_db_fpath is None:
+            if memory:
+                sql_db_fpath = ':memory:'
+        sql_dset = cached_sql_coco_view(dset=self, sql_db_fpath=sql_db_fpath,
+                                        force_rewrite=force_rewrite,
+                                        backend=backend)
         return sql_dset
 
 

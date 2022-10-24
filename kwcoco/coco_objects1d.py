@@ -190,13 +190,43 @@ class ObjectList1D(ub.NiceRepr):
             >>> self = dset.annots()
             >>> self.get('id')
             >>> self.get(key='foo', default=None, keepid=True)
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> import kwcoco
+            >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes8', rng=303232)
+            >>> dct_dset.anns[3]['blorgo'] = 3
+            >>> dct_dset.annots().lookup('blorgo', default=None)
+            >>> for a in dct_dset.anns.values():
+            ...     a['wizard'] = '10!'
+            >>> dset = dct_dset.view_sql(force_rewrite=1)
+            >>> assert dset.anns[3]['blorgo'] == 3
+            >>> assert dset.anns[3]['wizard'] == '10!'
+            >>> assert 'blorgo' not in dset.anns[2]
+            >>> dset.annots().lookup('blorgo', default=None)
+            >>> dset.annots().lookup('wizard', default=None)
+            >>> import pytest
+            >>> with pytest.raises(KeyError):
+            >>>     dset.annots().lookup('blorgo')
+            >>> dset.annots().lookup('wizard')
+            >>> #self = dset.annots()
         """
-        # if hasattr(self._dset, '_column_lookup'):
-        #     # Hack for SQL speed
-        #     # Agg, this doesn't work because some columns need json decoding
-        #     return self._dset._column_lookup(
-        #         tablename=self._key, key=key, rowids=self._ids)
-        _lut = self._id_to_obj
+        if hasattr(self._dset, '_column_lookup') and default is ub.NoParam:
+            # Special case for SQL speed. This only works on schema columns.
+            try:
+                # TODO: check if the column is in the stuctured schema
+                return self._dset._column_lookup(
+                    tablename=self._key, key=key, rowids=self._ids)
+            except KeyError:
+                # We can read only the unstructured bit, which is the best we
+                # can do in this case.
+                _lutv = self._dset._column_lookup(
+                    tablename=self._key, key='__unstructured__', rowids=self._ids)
+                _lut = dict(zip(self._ids, _lutv))
+            # TODO: optimize the case where default is given
+        else:
+            _lut = self._id_to_obj
+
         if keepid:
             if default is ub.NoParam:
                 attr_list = {_id: _lut[_id][key] for _id in self._ids}
@@ -213,6 +243,7 @@ class ObjectList1D(ub.NiceRepr):
         """
         Iterator version of get, not in stable API yet.
         """
+        # TODO: sql variant
         _lut = self._id_to_obj
         if default is ub.NoParam:
             attr_iter = (_lut[_id][key] for _id in self._ids)
