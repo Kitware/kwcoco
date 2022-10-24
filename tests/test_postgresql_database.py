@@ -1,5 +1,13 @@
 
 
+def have_sqlalchemy():
+    try:
+        import sqlalchemy  # NOQA
+    except ImportError:
+        return False
+    return True
+
+
 def have_postgresql():
     try:
         import psycopg2  # NOQA
@@ -10,7 +18,7 @@ def have_postgresql():
 
 def test_coerce_as_postgresql():
     import pytest
-    if not have_postgresql():
+    if not have_postgresql() or not have_sqlalchemy():
         pytest.skip()
 
     import kwcoco
@@ -22,6 +30,9 @@ def test_coerce_as_postgresql():
 
 
 def test_coerce_as_sqlite():
+    import pytest
+    if not have_sqlalchemy():
+        pytest.skip()
     import kwcoco
     dct_dset = kwcoco.CocoDataset.coerce('special:shapes8')
     psql_dset = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='sqlite')
