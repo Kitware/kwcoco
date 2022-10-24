@@ -290,9 +290,7 @@ class CocoImage(ub.NiceRepr):
 
         # Choose "best" auxiliary image based on a hueristic.
         eye = kwimage.Affine.eye().matrix
-        asset_objs = img.get('auxiliary', img.get('assets', []))
-        if asset_objs is None:
-            asset_objs = []
+        asset_objs = img.get('auxiliary', img.get('assets', [])) or []
         for idx, obj in enumerate(asset_objs):
             # Take frobenius norm to get "distance" between transform and
             # the identity. We want to find the auxiliary closest to the
@@ -691,7 +689,7 @@ class CocoImage(ub.NiceRepr):
         img_info = _delay_load_imglike(bundle_dpath, img,
                                        nodata_method=nodata_method)
         obj_info_list = [(img_info, img)]
-        auxlist = img.get('auxiliary', img.get('assets', []))
+        auxlist = img.get('auxiliary', img.get('assets', [])) or []
         for aux in auxlist:
             info = _delay_load_imglike(bundle_dpath, aux,
                                        nodata_method=nodata_method)
