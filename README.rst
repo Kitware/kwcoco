@@ -17,6 +17,15 @@ KWCOCO - The Kitware COCO Module
 
 The main webpage for this project is: https://gitlab.kitware.com/computer-vision/kwcoco
 
+The kwcoco package is a Python module and command line utility for reading,
+writing, modifying, and interacting with computer vision datasets --- i.e.
+images or videos with raster or vector annotations. A dataset is defined using
+a json file or SQL database that points to assets that exist on disk or on the
+cloud. The Python API provides a way to efficiently load image data and
+associated metadata (e.g. for writing torch datasets). The command line
+application provides a way to quickly summarize, visualize, and perform common
+modifications (e.g. subset, union) on the data.
+
 The Kitware COCO module defines a variant of the Microsoft COCO format,
 originally developed for the "collected images in context" object detection
 challenge. We are backwards compatible with the original module, but we also
