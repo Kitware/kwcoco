@@ -1684,6 +1684,42 @@ class MixinCocoExtras(object):
                 hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
         return self.hashid
 
+    @classmethod
+    def _cached_hashid_for(cls, fpath):
+        """
+        Lookup the cached hashid for a kwcoco json file if it exists.
+        """
+        coco_fpath = ub.Path(fpath)
+        enable_cache = coco_fpath.exists()
+
+        if enable_cache:
+            cache_dpath = (coco_fpath.parent / '_cache')
+            cache_fname = coco_fpath.name + '.hashid.cache'
+            hashid_sidecar_fpath = cache_dpath / cache_fname
+            # Generate current lookup key
+            fpath_stat = coco_fpath.stat()
+            status_key = {
+                'st_size': fpath_stat.st_size,
+                'st_mtime': fpath_stat.st_mtime
+            }
+            if hashid_sidecar_fpath.exists():
+                cached_data = json_r.loads(hashid_sidecar_fpath.read_text())
+                if cached_data['status_key'] == status_key:
+                    cached_data['hashid']
+                    cached_data['hashid_parts']
+                    cache_miss = False
+
+        if cache_miss:
+            self._build_hashid()
+            if enable_cache:
+                hashid_cache_data = {
+                    'hashid': self.hashid,
+                    'hashid_parts': self.hashid_parts,
+                    'status_key': status_key,
+                }
+                hashid_sidecar_fpath.parent.ensuredir()
+                hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+
     def _dataset_id(self):
         """
         A human interpretable name that can be used to uniquely identify the

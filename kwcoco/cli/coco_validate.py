@@ -65,7 +65,7 @@ class CocoValidateCLI:
                 if True, validate registered files exist
                 ''')),
 
-            'corrupted': scfg.Value(False, help=ub.paragraph(
+            'corrupted': scfg.Value(False, isflag=True, help=ub.paragraph(
                 '''
                 if True, validate data in registered files
                 ''')),
@@ -76,7 +76,7 @@ class CocoValidateCLI:
                   unique.
                 ''')),
 
-            'require_relative': scfg.Value(False, help=ub.paragraph(
+            'require_relative': scfg.Value(False, isflag=True, help=ub.paragraph(
                 '''
                 if True, causes validation to fail if paths are non-portable, i.e.
                 all paths must be relative to the bundle directory.
@@ -97,7 +97,7 @@ class CocoValidateCLI:
                 verbosity flag
                 ''')),
 
-            'fastfail': scfg.Value(False, help=ub.paragraph(
+            'fastfail': scfg.Value(False, isflag=True, help=ub.paragraph(
                 '''
                 if True raise errors immediately
                 ''')),

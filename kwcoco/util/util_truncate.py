@@ -5,7 +5,7 @@ https://pypi.org/project/python-slugify/1.2.2/
 """
 
 
-def _trunc_op(string, max_length, trunc_loc):
+def _trunc_op(string, max_length, trunc_loc, trunc_char='~'):
     """
     Example:
         >>> from kwcoco.util.util_truncate import _trunc_op
@@ -52,13 +52,14 @@ def _trunc_op(string, max_length, trunc_loc):
         end = string[high_pos:]
 
         mid = ub.hash_data(string)[0:hash_len]
-        trunc_text = ''.join([begin, '~', mid, '~', end])
+        trunc_text = ''.join([begin, trunc_char, mid, trunc_char, end])
     else:
         trunc_text = string
     return trunc_text
 
 
-def smart_truncate(string, max_length=0, separator=' ', trunc_loc=0.5):
+def smart_truncate(string, max_length=0, separator=' ', trunc_loc=0.5,
+                   trunc_char='~'):
     """
     Truncate a string.
     :param string (str): string for modification
@@ -67,15 +68,15 @@ def smart_truncate(string, max_length=0, separator=' ', trunc_loc=0.5):
     :param save_order (bool): if True then word order of output string is like input string
     :param separator (str): separator between words
     :param trunc_loc (float): fraction of location where to remove the text
+
+    trunc_char (str): the character to denote where truncation is starting
+
     :return:
     """
     string = string.strip(separator)
-
     if not max_length:
         return string
-
     if len(string) < max_length:
         return string
-
-    truncated = _trunc_op(string, max_length, trunc_loc)
+    truncated = _trunc_op(string, max_length, trunc_loc, trunc_char=trunc_char)
     return truncated.strip(separator)

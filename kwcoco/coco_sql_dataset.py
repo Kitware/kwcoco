@@ -107,6 +107,18 @@ except ImportError:
         _decl_class_registry = {}
 
 
+try:
+    from psycopg2.extensions import register_adapter, AsIs
+    def addapt_numpy_float64(numpy_float64):
+        return AsIs(numpy_float64)
+    def addapt_numpy_int64(numpy_int64):
+        return AsIs(numpy_int64)
+    register_adapter(np.float64, addapt_numpy_float64)
+    register_adapter(np.int64, addapt_numpy_int64)
+except ImportError:
+    ...
+
+
 # TODO: is it possible to get sclalchemy to use JSON for sqlite and JSONB for
 # postgresql?
 # from sqlalchemy.dialects.postgresql import JSONB
@@ -116,7 +128,7 @@ except ImportError:
 # in our sql schema. It will be stored as a json blob. The column names defined
 # in the alchemy tables must agree with this.
 UNSTRUCTURED = '__unstructured__'
-SCHEMA_VERSION = 'v009rc2'
+SCHEMA_VERSION = 'v009rc3'
 
 
 class Category(CocoBase):
@@ -1559,7 +1571,6 @@ class CocoSqlDatabase(AbstractCocoDataset,
         needs_json_decode = (
             table.__table__.columns[key].type.__class__.__name__ == 'JSON'
         )
-
         values = [
             # self.anns[aid][key]
             # if aid in self.anns._cache else
@@ -1745,6 +1756,8 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     if backend is None:
         backend = 'sqlite'
 
+    # TODO: the filename needs to include the hashed state.
+
     if sql_db_fpath is None:
         ext = '.view.' + SCHEMA_VERSION + '.' + backend
         if backend == 'sqlite':
@@ -1758,8 +1771,15 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
             user = os.environ.get('KWCOCO_USER', 'admin')
             passwd = os.environ.get('KWCOCO_PASSWD', 'admin')
 
+            # Note: a postgres database name can only be 63 characters at most.
+            # Very annoying.
+            from kwcoco.util.util_truncate import smart_truncate
+            postgres_name = smart_truncate(
+                ub.augpath(dct_db_fpath, ext=ext),
+                trunc_loc=0, max_length=60, trunc_char='_').lstrip('/')
             prefix = f'postgresql+psycopg2://{user}:{passwd}@{host}:{port}'
-            sql_db_fpath = prefix + ub.augpath(dct_db_fpath, prefix='_', ext=ext)
+            sql_db_fpath = prefix + '/' + postgres_name
+            # ub.augpath(dct_db_fpath, prefix='_', ext=ext)
         else:
             raise KeyError(backend)
 
@@ -1781,7 +1801,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     stamp = ub.CacheStamp('kwcoco-sql-cache-' + SCHEMA_VERSION,
                           dpath=_cache_dpath, depends=[dct_db_fpath],
                           product=cache_product, enabled=enable_cache,
-                          hasher=None, ext='.json')
+                          hasher=None, ext='.json', verbose=4)
     if stamp.expired():
         # TODO: use a CacheStamp instead
         self.delete()

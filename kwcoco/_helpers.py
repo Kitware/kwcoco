@@ -160,6 +160,11 @@ class SortedSet(sortedcontainers.SortedSet):
         return '{0}({1!r})'.format(type_name, list(self))
 
 
+# Do not use.
+# Just exist for backwards compatability with older pickeled data.
+SortedSetQuiet = SortedSet
+
+
 def _delitems(items, remove_idxs, thresh=750):
     """
     Args:

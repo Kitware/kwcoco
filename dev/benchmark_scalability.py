@@ -48,23 +48,29 @@ if USE_TORCH:
 
 def main():
     """
-    Demo scalability of the system (requires lots of disk space)
+    Demo / test scalability of the system (requires lots of disk space)
+
+    Ignore:
+        import sys, ubelt
+        sys.path.append(ubelt.expandpath('~/code/kwcoco/dev'))
+        from benchmark_scalability import *  # NOQA
+        from benchmark_scalability import _iter_images_worker
     """
 
     # Prepare data
-    num_videos_basis = [1, 5, 100, 1000, 10_000, 60_000, 100_000, 1_000_000]
+    # num_videos_basis = [1, 5, 100, 1000, 10_000, 60_000, 100_000, 1_000_000]
     # num_videos_basis = [1, 5, 100, 1000, 10_000, 60_000, 100_000]
     # num_videos_basis = [1, 5, 100, 1000, 10_000, 60_000]
     # num_videos_basis = [1, 5, 100, 1000, 10_000]
-    # num_videos_basis = [1, 5, 100, 1000]
-    json_fpaths = []
-    sql_fpaths = []
+
+    num_videos_basis = [1, 32, 64, 256]
+    backend_to_paths = ub.ddict(list)
     for num_videos in num_videos_basis:
         print('num_videos = {!r}'.format(num_videos))
         dset = kwcoco.CocoDataset.demo('vidshapes', num_videos=num_videos, num_frames=5, render=False, num_tracks=0, verbose=3)
-        json_fpaths.append(dset.fpath)
-        sql_dset = dset.view_sql()
-        sql_fpaths.append(sql_dset.fpath)
+        backend_to_paths['json'].append(dset.fpath)
+        backend_to_paths['sqlite'].append(dset.view_sql(backend='sqlite').fpath)
+        # backend_to_paths['postgresql'].append(dset.view_sql(backend='postgresql').fpath)
 
     # if True:
     #     # Hack
@@ -89,10 +95,6 @@ def main():
     ti = timerit.Timerit(1, bestof=1, verbose=2)
     measures = []
 
-    backend_to_paths = {
-        'json': json_fpaths,
-        'sql': sql_fpaths,
-    }
     benchmark_grid = []
     for backend, paths in backend_to_paths.items():
         for fpath in paths:
