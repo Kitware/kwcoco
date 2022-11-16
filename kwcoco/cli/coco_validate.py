@@ -159,6 +159,7 @@ class CocoValidateCLI:
         if config['fix'] is not None:
             fix_strat = {c.lower() for c in config['fix'].split('+')}
 
+        fpath_to_errors = {}
         for fpath in ub.ProgIter(fpaths, desc='reading datasets', verbose=1):
             print('reading fpath = {!r}'.format(fpath))
             dset = kwcoco.CocoDataset.coerce(fpath)
@@ -186,9 +187,13 @@ class CocoValidateCLI:
                 dset.dump(config['dst'], newlines=True)
 
             errors = result['errors']
-            if errors:
-                print('result = {}'.format(ub.repr2(result, nl=-1)))
-                raise Exception('\n'.join(errors))
+            fpath_to_errors[fpath] = errors
+
+        has_errors = any(ub.flatten(fpath_to_errors.values()))
+        if has_errors:
+            errmsg = ub.repr2(fpath_to_errors, nl=1)
+            print('fpath_to_errors = {}'.format(errmsg))
+            raise Exception(errmsg)
 
 
 _CLI = CocoValidateCLI

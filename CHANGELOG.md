@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.5.2 - Unreleased
 
+### Fixed
+* kwcoco validate now reports errors for all inputs
+
 
 ## Version 0.5.1 - Released 2022-10-24
 
