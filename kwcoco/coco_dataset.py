@@ -62,7 +62,7 @@ An informal spec is as follows:
         ]
 
         'video_id': str  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
-        'timestamp': str | int  # a iso-string timestamp or an integer in flicks.
+        'timestamp': str | int  # a iso-8601 or unix timestamp.
         'frame_index': int  # ordinal frame index which can be used if timestamp is unknown.
         'warp_img_to_vid': <TransformSpec>  # a transform image space to video space (identity if unspecified), can be used for sensor alignment or video stabilization
     }
@@ -272,7 +272,7 @@ An informal spec is as follows:
 
         {
             'video_id': str  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
-            'timestamp': int  # optional, timestamp (ideally in flicks), used to identify the timestamp of the frame. Only applicable video inputs.
+            'timestamp': str | int  # optional, an iso8601 or unix timestamp
             'frame_index': int  # optional, ordinal frame index which can be used if timestamp is unknown.
         }
 

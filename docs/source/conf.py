@@ -119,6 +119,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
     # 'myst_parser',  # TODO
+    'sphinx-jsonschema',
 ]
 
 todo_include_todos = True
@@ -767,4 +768,14 @@ def setup(app):
     docstring_processor = GoogleStyleDocstringProcessor()
     app.connect('autodoc-process-docstring', docstring_processor.process_docstring_callback)
     # https://stackoverflow.com/questions/26534184/can-sphinx-ignore-certain-tags-in-python-docstrings
+
+    # Hack copy over the json schema
+    import pathlib
+    import shutil
+    doc_outdir = pathlib.Path(app.outdir)
+    doc_srcdir = pathlib.Path(app.srcdir)
+    schema_src = (doc_srcdir / '../../kwcoco/coco_schema.json')
+    shutil.copy(schema_src, doc_outdir / 'coco_schema.json')
+    shutil.copy(schema_src, doc_srcdir / 'coco_schema.json')
+
     return app

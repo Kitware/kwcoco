@@ -187,8 +187,7 @@ IMAGE = OBJECT(OrderedDict((
     # Extension
     ('video_id', INTEGER),
 
-    # FIXME: timestamp could be a float, integer, or string in an isoformat
-    ('timestamp', NUMBER(description='todo describe format. flicks?')),
+    ('timestamp', STRING(description='An ISO-8601 timestamp') | NUMBER(description='A UNIX timestamp')),
 
     ('frame_index', INTEGER),
 

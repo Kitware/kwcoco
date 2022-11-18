@@ -11,6 +11,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * kwcoco validate now reports errors for all inputs
 
 
+### Changed
+* Removed mentions of "flicks" in timestamps. We are simply using ISO strings
+  and unix times for now.
+
+* Updated timestamp details in the SPEC.
+
+
 ## Version 0.5.1 - Released 2022-10-24
 
 
