@@ -95,13 +95,14 @@ Modalities
 KWCOCO Spec
 -----------
 
-A high level description of the kwcoco spec is given in:
-:py:mod:`kwcoco.coco_dataset`.
+A high level description of the kwcoco spec is given in :py:mod:`kwcoco.coco_dataset`.
 
 A formal json-schema is defined in :py:mod:`kwcoco.coco_schema` and is shown
 here:
 
 .. .. jsonschema:: kwcoco.coco_schema.COCO_SCHEMA
+
+.. .. TODO: Fix the width on this
 .. jsonschema:: coco_schema.json
 
 
