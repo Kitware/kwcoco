@@ -2367,19 +2367,23 @@ class MixinCocoObjects(object):
     This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
-    def annots(self, aids=None, gid=None, trackid=None):
+    def annots(self, annot_ids=None, image_id=None, trackid=None, aids=None, gid=None):
         """
         Return vectorized annotation objects
 
         Args:
-            aids (List[int]): annotation ids to reference, if unspecified
-                 all annotations are returned.
+            annot_ids (List[int]):
+                annotation ids to reference, if unspecified all annotations are
+                returned. An alias is "aids", which may be removed in the future.
 
-            gid (int): return all annotations that belong to this image id.
-                 mutually exclusive with other arguments.
+            image_id (int):
+                return all annotations that belong to this image id.
+                Mutually exclusive with other arguments.
+                An alias is "gids", which may be removed in the future.
 
-            trackid (int): return all annotations that belong to this track.
-                 mutually exclusive with other arguments.
+            trackid (int):
+                return all annotations that belong to this track.
+                mutually exclusive with other arguments.
 
         Returns:
             kwcoco.coco_objects1d.Annots: vectorized annotation object
@@ -2400,27 +2404,32 @@ class MixinCocoObjects(object):
                 None,
             ]
         """
-        if gid is not None:
-            aids = sorted(self.index.gid_to_aids[gid])
+        if image_id is None:
+            image_id = gid
+        if annot_ids is None:
+            annot_ids = aids
+
+        if image_id is not None:
+            annot_ids = sorted(self.index.gid_to_aids[image_id])
 
         if trackid is not None:
-            aids = self.index.trackid_to_aids[trackid]
+            annot_ids = self.index.trackid_to_aids[trackid]
 
-        if aids is None:
-            aids = sorted(self.index.anns.keys())
+        if annot_ids is None:
+            annot_ids = sorted(self.index.anns.keys())
 
-        return Annots(aids, self)
+        return Annots(annot_ids, self)
 
-    def images(self, gids=None, video_id=None, names=None, vidid=None):
+    def images(self, image_ids=None, video_id=None, names=None, gids=None, vidid=None):
         """
         Return vectorized image objects
 
         Args:
-            gids (List[int]): image ids to reference, if unspecified
-                 all images are returned.
+            image_ids (List[int]): image ids to reference, if unspecified
+                 all images are returned. An alias is `gids`.
 
             video_id (int): returns all images that belong to this video id.
-                mutually exclusive with `gids` arg.
+                mutually exclusive with `image_ids` arg.
 
             names (List[str]):
                 lookup images by their names.
@@ -2442,6 +2451,9 @@ class MixinCocoObjects(object):
             >>> print(images)
             <Images(num=2)>
         """
+        if image_ids is None:
+            image_ids = gids
+
         if vidid is not None:
             ub.schedule_deprecation(
                 'kwcoco', 'vidid', 'argument of CocoDataset.images',
@@ -2451,23 +2463,24 @@ class MixinCocoObjects(object):
             video_id = vidid
 
         if video_id is not None:
-            gids = self.index.vidid_to_gids[video_id]
+            image_ids = self.index.vidid_to_gids[video_id]
 
         if names is not None:
-            gids = [self.index.name_to_img[name]['id'] for name in names]
+            image_ids = [self.index.name_to_img[name]['id'] for name in names]
 
-        if gids is None:
-            gids = sorted(self.index.imgs.keys())
+        if image_ids is None:
+            image_ids = sorted(self.index.imgs.keys())
 
-        return Images(gids, self)
+        return Images(image_ids, self)
 
-    def categories(self, cids=None):
+    def categories(self, category_ids=None, cids=None):
         """
         Return vectorized category objects
 
         Args:
-            cids (List[int]): category ids to reference, if unspecified
-                 all categories are returned.
+            category_ids (List[int]):
+                category ids to reference, if unspecified all categories are
+                returned. The `cids` argument is an alias.
 
         Returns:
             kwcoco.coco_objects1d.Categories: vectorized category object
@@ -2479,20 +2492,24 @@ class MixinCocoObjects(object):
             >>> print(categories)
             <Categories(num=8)>
         """
-        if cids is None:
-            cids = sorted(self.index.cats.keys())
-        return Categories(cids, self)
+        if category_ids is None:
+            category_ids = cids
+        if category_ids is None:
+            category_ids = sorted(self.index.cats.keys())
+        return Categories(category_ids, self)
 
-    def videos(self, vidids=None, names=None):
+    def videos(self, video_ids=None, names=None, vidids=None):
         """
         Return vectorized video objects
 
         Args:
-            vidids (List[int]): video ids to reference, if unspecified
-                 all videos are returned.
+            video_ids (List[int]): video ids to reference, if unspecified
+                 all videos are returned. The `vidids` argument is an alias.
+                 Mutually exclusive with other args.
 
             names (List[str]):
                 lookup videos by their name.
+                Mutually exclusive with other args.
 
         Returns:
             kwcoco.coco_objects1d.Videos: vectorized video object
@@ -2513,11 +2530,14 @@ class MixinCocoObjects(object):
             >>> videos.lookup('id')
             >>> print('videos.objs = {}'.format(ub.repr2(videos.objs[0:2], nl=1)))
         """
-        if vidids is None:
-            vidids = sorted(self.index.videos.keys())
+        if video_ids is None:
+            video_ids = vidids
+        if video_ids is None:
+            video_ids = sorted(self.index.videos.keys())
+
         if names is not None:
-            vidids = [self.index.name_to_video[name]['id'] for name in names]
-        return Videos(vidids, self)
+            video_ids = [self.index.name_to_video[name]['id'] for name in names]
+        return Videos(video_ids, self)
 
 
 class MixinCocoStats(object):

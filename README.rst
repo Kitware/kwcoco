@@ -987,6 +987,22 @@ The KWCOCO Channel Specification
 See the documentation for ``kwcoco/channel_spec.py`` for more details.
 
 
+Related Work
+------------
+
+There are several other COCO libraries available:
+
+* https://pypi.org/project/coco-lib/
+* https://github.com/cocodataset/cocoapi
+* https://pypi.org/project/fast-coco-eval/
+* https://pypi.org/project/coco-assistant/
+* https://pypi.org/project/cocorepr/
+
+
+Tools that work with COCO files:
+* https://voxel51.com/docs/fiftyone/
+
+
 
 .. [1] http://cocodataset.org/#format-data
 

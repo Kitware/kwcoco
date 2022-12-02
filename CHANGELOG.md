@@ -12,6 +12,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Changed
+
+* Modified signatures of `annots` and `images` to use `annot_id` and `image_id`
+  instead of `aid` and `gid`.
+
+
 * Removed mentions of "flicks" in timestamps. We are simply using ISO strings
   and unix times for now.
 
