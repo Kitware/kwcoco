@@ -2781,8 +2781,6 @@ class MixinCocoStats(object):
             except jsonschema.exceptions.ValidationError as ex:
                 err = ex
                 print(f'err.absolute_path={err.absolute_path}')
-                import xdev
-                xdev.embed()
                 msg = 'Failed to validate schema: {}'.format(str(err))
                 _error(msg)
 
