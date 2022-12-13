@@ -1,6 +1,7 @@
 import ubelt as ub
 import numpy as np
 from os.path import join
+# from kwcoco.util.dict_like import DictLike
 
 try:
     from xdev import profile
@@ -86,6 +87,14 @@ class CocoImage(ub.NiceRepr):
         self._video = self.video
         self.dset = None
         return self
+
+    @property
+    def assets(self):
+        assets = []
+        for obj in self.iter_asset_objs():
+            asset = CocoAsset(obj)
+            assets.append(asset)
+        return assets
 
     def __nice__(self):
         """
@@ -818,6 +827,22 @@ class CocoImage(ub.NiceRepr):
         return warped_sseg
 
 
+# TODO:
+# class AliasedDictProxy(DictLike):
+#     def __init__(self, _data):
+#         self._data = _data
+
+#     def resolve_key(self, key):
+#         return self.__key_resolver__.get(key, key)
+
+#     def getitem(self, key):
+#         ...
+
+#     def keys(self, key):
+#         return map(self.resolve_key, self._data.keys())
+
+
+# TODO:
 class CocoAsset(object):
     """
     A Coco Asset / Auxiliary Item
@@ -830,6 +855,21 @@ class CocoAsset(object):
     Initially we called these "auxiliary" items, but I think we should
     change their name to "assets", which better maps with STAC terminology.
     """
+
+    # To maintain backwards compatibility we register aliases of properties
+    # The main key should be the primary property.
+    __key_aliases__ = {
+        'warp_img_from_asset': ['warp_aux_to_img'],
+        'warp_wld_from_asset': ['warp_to_wld'],
+    }
+    __key_resolver__ = {
+        v: k
+        for k, vs in __key_aliases__.items()
+        for v in vs
+    }
+
+    def __init__(self, obj):
+        self.obj = obj
 
     def __getitem__(self, key):
         """
