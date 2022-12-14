@@ -2606,7 +2606,10 @@ class MixinCocoStats(object):
 
                 ensure_imgsize (default=True): ensure image size is populated
 
-                legacy (default=False): if true tries to convert data
+                mmlab (default=False): if True tries to convert data
+                to be compatible with open-mmlab tooling.
+
+                legacy (default=False): if True tries to convert data
                 structures to items compatible with the original
                 pycocotools spec
 
@@ -2672,6 +2675,14 @@ class MixinCocoStats(object):
                                 '''))
                         else:
                             ann['area'] = w * h
+
+        if config.get('mmlab', False):
+            ### mmdet wants frame_id not frame_index, perhaps other properties
+            ### TODO: add more mmlab support
+            if self.dataset.get('videos', None):
+                for images in self.videos().images:
+                    for frame_index, img in enumerate(images.objs):
+                        img['frame_id'] = frame_index
 
         if config.get('legacy', False):
             try:

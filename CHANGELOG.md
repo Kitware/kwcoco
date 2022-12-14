@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.5.2 - Unreleased
 
+### Added
+
+* Initial support to conform to mmlab coco specs
+
+
 ### Fixed
 * kwcoco validate now reports errors for all inputs
 
@@ -16,11 +21,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Modified signatures of `annots` and `images` to use `annot_id` and `image_id`
   instead of `aid` and `gid`.
 
-
 * Removed mentions of "flicks" in timestamps. We are simply using ISO strings
   and unix times for now.
 
 * Updated timestamp details in the SPEC.
+
+* Updated descriptions and organization in the formal schema.
+
+* Require that names do not contain the "/" character in the formal schema.
 
 
 ## Version 0.5.1 - Released 2022-10-24
