@@ -76,6 +76,7 @@ class CocoImage(ub.NiceRepr):
 
     @video.setter
     def video(self, value):
+        # TODO: ducktype with an object
         self._video = value
 
     def detach(self):
@@ -92,7 +93,9 @@ class CocoImage(ub.NiceRepr):
     def assets(self):
         assets = []
         for obj in self.iter_asset_objs():
-            asset = CocoAsset(obj)
+            # TODO: ducktype with an object
+            # asset = CocoAsset(obj)
+            asset = obj
             assets.append(asset)
         return assets
 
