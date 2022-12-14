@@ -479,11 +479,11 @@ class CocoImage(ub.NiceRepr):
             raise ValueError('must specify file_name or imdata')
 
         # Check type of resolution inputs.
-        if type(width) != int:
+        if isinstance(width, int):
             if width is not None:
                 raise TypeError(f'"width" input is neither an int or None variable but type: "{type(width)}"')
 
-        if type(height) != int:
+        if isinstance(height, int):
             if height is not None:
                 raise TypeError(f'"height" input is neither an int or None variable but type: "{type(height)}"')
 
