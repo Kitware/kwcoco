@@ -14,6 +14,8 @@ sphinx-reredirects>=0.0.1
 kwplot 
 six
 
+sphinx-jsonschema>=1.19.1
+
 -r tests.txt
 -r headless.txt
 -r optional.txt

@@ -5,7 +5,35 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.5.1 - Unreleased
+## Version 0.5.2 - Unreleased
+
+### Added
+
+* Initial support to conform to mmlab coco specs
+* Added ability to specify resolution in `CocoImage.delay`
+* Add resolution to the image / video schema.
+
+
+### Fixed
+* kwcoco validate now reports errors for all inputs
+
+
+### Changed
+
+* Modified signatures of `annots` and `images` to use `annot_id` and `image_id`
+  instead of `aid` and `gid`.
+
+* Removed mentions of "flicks" in timestamps. We are simply using ISO strings
+  and unix times for now.
+
+* Updated timestamp details in the SPEC.
+
+* Updated descriptions and organization in the formal schema.
+
+* Require that names do not contain the "/" character in the formal schema.
+
+
+## Version 0.5.1 - Released 2022-10-24
 
 
 ### Added

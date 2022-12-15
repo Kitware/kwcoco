@@ -8,28 +8,29 @@
             "items": {
                 "type": "object",
                 "properties": {
-                    "id": {"type": "integer", "description": "unique internal id"},
-                    "name": {"type": "string", "description": "unique external name or identifier"},
+                    "id": {"type": "integer", "description": "A unique internal category id"},
+                    "name": {"type": "string", "pattern": "[^/]+", "description": "A unique external category name or identifier"},
                     "alias": {
                         "type": "array",
-                        "items": {"type": "string"},
-                        "description": "list of alter egos"
+                        "items": {"type": "string", "pattern": "[^/]+"},
+                        "description": "A list of alternate names that should be resolved to this category"
                     },
                     "supercategory": {
                         "anyOf": [
-                            {"type": "string", "description": "coarser category name"},
+                            {"type": "string", "pattern": "[^/]+", "description": "A coarser category name"},
                             {"type": "null"}
                         ]
                     },
                     "parents": {
                         "type": "array",
-                        "items": {"type": "string"},
-                        "description": "used for multiple inheritence"
+                        "items": {"type": "string", "pattern": "[^/]+"},
+                        "description": "Used for multiple inheritance"
                     },
                     "keypoints": {"description": "deprecated"},
                     "skeleton": {"description": "deprecated"}
                 },
                 "required": ["id", "name"],
+                "description": "High level information about an annotation category",
                 "title": "CATEGORY"
             }
         },
@@ -38,11 +39,11 @@
             "items": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string"},
+                    "name": {"type": "string", "pattern": "[^/]+", "description": "The name of the keypoint category"},
                     "id": {"type": "integer"},
                     "supercategory": {
                         "anyOf": [
-                            {"type": "string"},
+                            {"type": "string", "pattern": "[^/]+"},
                             {"type": "null"}
                         ]
                     },
@@ -50,10 +51,12 @@
                         "anyOf": [
                             {"type": "integer"},
                             {"type": "null"}
-                        ]
+                        ],
+                        "description": "The keypoint category this should change to if the image is horizontally flipped"
                     }
                 },
                 "required": ["id", "name"],
+                "description": "High level information about an annotation category",
                 "title": "KEYPOINT_CATEGORY"
             }
         },
@@ -62,11 +65,20 @@
             "items": {
                 "type": "object",
                 "properties": {
-                    "id": {"type": "integer"},
-                    "name": {"type": "string"},
-                    "caption": {"type": "string"}
+                    "id": {"type": "integer", "description": "An internal video identifier"},
+                    "name": {"type": "string", "pattern": "[^/]+", "description": "A unique name for this video"},
+                    "caption": {"type": "string", "description": "A video level text caption"},
+                    "resolution": {
+                        "anyOf": [
+                            {"type": "number"},
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "description": "a unit representing the size of a pixel in video space"
+                    }
                 },
                 "required": ["id", "name"],
+                "description": "High level information about a group of temporally ordered images",
                 "title": "VIDEO"
             }
         },
@@ -75,49 +87,89 @@
             "items": {
                 "type": "object",
                 "properties": {
-                    "id": {"type": "integer"},
+                    "id": {"type": "integer", "description": "a unique internal image identifier"},
                     "file_name": {
                         "anyOf": [
-                            {"type": "string", "description": "A relative or absolute path to the main image file. If this file_name is unspecified, then a name and auxiliary file paths must be specified. This should only be unspecified for multispectral observations that dont have a clear default file."},
+                            {"type": "string", "description": "A relative or absolute path to the main image file. If this file_name is unspecified, then a name and auxiliary items or assets must be specified. Likewise this should be null if assets are used."},
                             {"type": "null"}
                         ]
                     },
                     "name": {
                         "anyOf": [
-                            {"type": "string", "description": "Unique name for the image. If unspecified the file_name should be used as the default value for the name property."},
+                            {"type": "string", "pattern": "[^/]+", "description": "A unique name for the image. If unspecified the file_name should be used as the default value for the name property. Required if assets / auxiliary are specified."},
                             {"type": "null"}
                         ]
                     },
-                    "width": {"type": "integer"},
-                    "height": {"type": "integer"},
-                    "video_id": {"type": "integer"},
-                    "timestamp": {"type": "number", "description": "todo describe format. flicks?"},
-                    "frame_index": {"type": "integer"},
-                    "channels": {"type": "string", "title": "CHANNEL_SPEC", "description": "experimental. todo: refine"},
+                    "width": {"type": "integer", "description": "The width of the image in image space pixels"},
+                    "height": {"type": "integer", "description": "The height of the image in image space pixels"},
+                    "video_id": {"type": "integer", "description": "The video this image belongs to"},
+                    "timestamp": {
+                        "anyOf": [
+                            {"type": "string", "description": "An ISO-8601 timestamp"},
+                            {"type": "number", "description": "A UNIX timestamp"}
+                        ]
+                    },
+                    "frame_index": {"type": "integer", "description": "Used to temporally order the images in a video"},
+                    "channels": {
+                        "anyOf": [
+                            {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
+                            {"type": "null"}
+                        ]
+                    },
+                    "resolution": {
+                        "anyOf": [
+                            {"type": "number"},
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "description": "a unit representing the size of a pixel in image space"
+                    },
                     "auxiliary": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "file_name": {"type": "string"},
-                                "channels": {"type": "string", "title": "CHANNEL_SPEC", "description": "experimental. todo: refine"},
-                                "width": {"type": "integer"},
-                                "height": {"type": "integer"}
+                                "channels": {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
+                                "width": {"type": "integer", "description": "The width in asset-space pixels"},
+                                "height": {"type": "integer", "description": "The height in asset-space pixels"}
                             },
-                            "title": "aux",
-                            "required": ["file_name"]
-                        }
+                            "required": ["file_name"],
+                            "description": "Information about a single file belonging to an image",
+                            "title": "ASSET"
+                        },
+                        "description": "This will be deprecated for assets in the future"
+                    },
+                    "assets": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "file_name": {"type": "string"},
+                                "channels": {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
+                                "width": {"type": "integer", "description": "The width in asset-space pixels"},
+                                "height": {"type": "integer", "description": "The height in asset-space pixels"}
+                            },
+                            "required": ["file_name"],
+                            "description": "Information about a single file belonging to an image",
+                            "title": "ASSET"
+                        },
+                        "description": "A list of assets belonging to this image, used when image channels are split across multiple files"
                     }
                 },
-                "title": "IMAGE",
                 "anyOf": [
                     {
                         "required": ["id", "file_name"]
                     },
                     {
                         "required": ["id", "name", "auxiliary"]
+                    },
+                    {
+                        "required": ["id", "name", "assets"]
                     }
-                ]
+                ],
+                "description": "High level information about a image file or a collection of image files corresponding to a single point in (or small interval of) time",
+                "title": "IMAGE"
             }
         },
         "annotations": {
@@ -125,23 +177,24 @@
             "items": {
                 "type": "object",
                 "properties": {
-                    "id": {"type": "integer"},
-                    "image_id": {"type": "integer"},
+                    "id": {"type": "integer", "description": "A unique internal id for this annotation"},
+                    "image_id": {"type": "integer", "description": "The image id this annotation belongs to"},
                     "bbox": {
                         "type": "array",
                         "items": {"type": "number"},
-                        "title": "bbox",
-                        "description": "[top-left x, top-left-y, width, height] in pixels",
+                        "description": "[top-left x, top-left-y, width, height] in image-space pixels",
+                        "title": "BBOX",
                         "minItems": 4,
                         "maxItems": 4
                     },
-                    "category_id": {"type": "integer"},
+                    "category_id": {"type": "integer", "description": "The category id of this annotation"},
                     "track_id": {
                         "anyOf": [
                             {"type": "integer"},
                             {"type": "string"},
                             {"type": "string"}
-                        ]
+                        ],
+                        "description": "An identifier used to group annotations belonging to the same object over multiple frames in a video"
                     },
                     "segmentation": {
                         "anyOf": [
@@ -175,7 +228,7 @@
                                             }
                                         },
                                         "title": "KWCOCO_POLYGON",
-                                        "description": "a simply polygon format that supports holes"
+                                        "description": "A new-style polygon format that supports holes"
                                     },
                                     {
                                         "type": "array",
@@ -207,29 +260,36 @@
                                                 }
                                             },
                                             "title": "KWCOCO_POLYGON",
-                                            "description": "a simply polygon format that supports holes"
+                                            "description": "A new-style polygon format that supports holes"
                                         }
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {"type": "number"},
+                                        "description": "an old-style polygon [x1,y1,v1,...,xk,yk,vk]",
+                                        "title": "MSCOCO_POLYGON"
                                     },
                                     {
                                         "type": "array",
                                         "items": {
                                             "type": "array",
-                                            "items": {"type": "number"}
-                                        },
-                                        "title": "ORIG_COCO_POLYGON",
-                                        "description": "[x1,y1,v1,...,xk,yk,vk]"
+                                            "items": {"type": "number"},
+                                            "description": "an old-style polygon [x1,y1,v1,...,xk,yk,vk]",
+                                            "title": "MSCOCO_POLYGON"
+                                        }
                                     }
                                 ]
                             },
-                            {"type": "string", "description": "format read by pycocotools"}
-                        ]
+                            {"type": "string", "description": "A run-length-encoding mask format read by pycocotools"}
+                        ],
+                        "description": "A polygon or mask specifying the pixels in this annotation in image-space"
                     },
                     "keypoints": {
                         "anyOf": [
                             {
                                 "type": "array",
                                 "items": {"type": "integer"},
-                                "description": "old format (x1,y1,v1,...,xk,yk,vk)",
+                                "description": "An old-style set of keypoints (x1,y1,v1,...,xk,yk,vk)",
                                 "title": "MSCOCO_KEYPOINTS"
                             },
                             {
@@ -251,12 +311,13 @@
                                     "title": "KWCOCO_KEYPOINT"
                                 }
                             }
-                        ]
+                        ],
+                        "description": "A set of categorized points belonging to this annotation in image space"
                     },
                     "prob": {
                         "type": "array",
                         "items": {"type": "number"},
-                        "description": "This needs to be in the same order as categories. probability order currently needs to be known a-priori, typically in *order* of the classes, but its hard to always keep that consistent."
+                        "description": "This needs to be in the same order as categories. The probability order currently needs to be known a-priori, typically in *order* of the classes, but its hard to always keep that consistent. This SPEC is subject to change in the future."
                     },
                     "score": {"type": "number", "description": "Typically assigned to predicted annotations"},
                     "weight": {"type": "number", "description": "Typically given to truth annotations to indicate quality."},
@@ -264,15 +325,18 @@
                         "anyOf": [
                             {"type": "integer"},
                             {"type": "boolean"}
-                        ]
+                        ],
+                        "description": "A legacy mscoco field used to indicate if an annotation contains multiple objects"
                     },
-                    "caption": {"type": "string"}
+                    "caption": {"type": "string", "description": "An annotation-level text caption"}
                 },
                 "required": ["id", "image_id"],
+                "description": "Metadata about some semantic attribute of an image.",
                 "title": "ANNOTATION"
             }
         }
     },
-    "title": "KWCOCO_SCHEMA",
-    "required": []
+    "required": [],
+    "description": "The formal kwcoco schema",
+    "title": "KWCOCO_SCHEMA"
 }

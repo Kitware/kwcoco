@@ -8,18 +8,32 @@ class CocoConformCLI:
 
     class CLIConfig(scfg.Config):
         """
-        Make the COCO file conform to the spec.
+        Infer properties to make the COCO file conform to different specs.
 
-        Populates inferable information such as image size, annotation area, etc.
+        Arguments can be used to control which information is inferred.  By
+        default, information such as image size, annotation area, are added to
+        the file.
+
+        Other arguments like ``--legacy`` and ``--mmlab`` can be used to
+        conform to specifications expected by external tooling.
         """
         epilog = """
         Example Usage:
             kwcoco conform --help
             kwcoco conform --src=special:shapes8 --dst conformed.json
+            kwcoco conform special:shapes8 conformed.json
         """
         default = {
             'src': scfg.Value(None, help=(
-                'Path to the coco dataset'), position=1),
+                'the path to the input coco dataset'),
+                position=1,
+                # FIXME: required is broken with --help
+            ),
+
+            'dst': scfg.Value(None, help=(
+                'the location to save the output dataset.'),
+                position=2,
+            ),
 
             'ensure_imgsize': scfg.Value(True, help=ub.paragraph(
                 '''
@@ -34,19 +48,23 @@ class CocoConformCLI:
             'legacy': scfg.Value(False, help='if True tries to convert to the '
                                  'original ms-coco format'),
 
-            'workers': scfg.Value(
-                8, help='number of background workers for bigger checks'),
+            'mmlab': scfg.Value(False, help='if True tries to convert data '
+                                'to be compatible with open-mmlab tooling'),
 
-            'dst': scfg.Value(None, help=(
-                'Save the modified dataset to a new file')),
+            'workers': scfg.Value(
+                8, help='number of background workers used for IO bound checks'),
         }
 
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
         Example:
-            >>> # xdoctest: +SKIP
-            >>> kw = {'src': 'special:shapes8'}
+            >>> from kwcoco.cli.coco_conform import *  # NOQA
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/cli/conform').ensuredir()
+            >>> dst = dpath / 'out.kwcoco.json'
+            >>> kw = {'src': 'special:shapes8', 'dst': dst}
             >>> cmdline = False
             >>> cls = CocoConformCLI
             >>> cls.main(cmdline, **kw)

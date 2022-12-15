@@ -73,12 +73,14 @@ UUID = STRING
 PATH = STRING
 
 KWCOCO_KEYPOINT = OBJECT(
-    title='KWCOCO_KEYPOINT',
     PROPERTIES={
         'xy': TUPLE(NUMBER, NUMBER, description='<x1, y1> in pixels'),
         'visible': INTEGER(description='choice(0, 1, 2)'),
         'keypoint_category_id': INTEGER,
-        'keypoint_category': STRING(description='only to be used as a hint')}
+        'keypoint_category': STRING(description='only to be used as a hint')
+    },
+    title='KWCOCO_KEYPOINT',
+    descripton='A new-style point',
 )
 
 KWCOCO_POLYGON = OBJECT(
@@ -93,33 +95,40 @@ KWCOCO_POLYGON = OBJECT(
         )
     },
     title='KWCOCO_POLYGON',
-    description='a simply polygon format that supports holes',
+    description='A new-style polygon format that supports holes',
 )
 
 
 ORIG_COCO_KEYPOINTS = ARRAY(
-    INTEGER, description='old format (x1,y1,v1,...,xk,yk,vk)', title='MSCOCO_KEYPOINTS')
+    INTEGER,
+    description='An old-style set of keypoints (x1,y1,v1,...,xk,yk,vk)',
+    title='MSCOCO_KEYPOINTS'
+)
 KWCOCO_KEYPOINTS = ARRAY(KWCOCO_KEYPOINT)
 KEYPOINTS = ANYOF(ORIG_COCO_KEYPOINTS, KWCOCO_KEYPOINTS)
 
 
-ORIG_COCO_POLYGON = ARRAY(TYPE=NUMBER, title='ORIG_COCO_POLYGON', description='[x1,y1,v1,...,xk,yk,vk]')
-ORIG_COCO_MULTI_POLYGON = ARRAY(ORIG_COCO_POLYGON)
+MSCOCO_POLYGON = ARRAY(
+    TYPE=NUMBER,
+    description='an old-style polygon [x1,y1,v1,...,xk,yk,vk]',
+    title='MSCOCO_POLYGON',
+)
+MSCOCO_MULTIPOLYGON = ARRAY(MSCOCO_POLYGON)
 
 POLYGON = ANYOF(
     KWCOCO_POLYGON,
     ARRAY(KWCOCO_POLYGON),
-    ORIG_COCO_POLYGON,
-    ORIG_COCO_MULTI_POLYGON,
+    MSCOCO_POLYGON,
+    MSCOCO_MULTIPOLYGON,
 )
 
-RUN_LENGTH_ENCODING = STRING(description='format read by pycocotools')
+RUN_LENGTH_ENCODING = STRING(description='A run-length-encoding mask format read by pycocotools')
 
 BBOX = ARRAY(
     TYPE=NUMBER,
-    title='bbox',
     numItems=4,
-    description='[top-left x, top-left-y, width, height] in pixels'
+    description='[top-left x, top-left-y, width, height] in image-space pixels',
+    title='BBOX',
 )
 
 ### ------------------------
@@ -127,126 +136,164 @@ BBOX = ARRAY(
 
 SEGMENTATION = ANYOF(POLYGON, RUN_LENGTH_ENCODING)
 
+# Names cannot contain certain special characters
+NAME = STRING(pattern='[^/]+')
+
 
 CATEGORY = OBJECT({
-    'id': INTEGER(description='unique internal id'),
-    'name': STRING(description='unique external name or identifier'),
+    'id': INTEGER(description='A unique internal category id'),
+    'name': NAME(description='A unique external category name or identifier'),
 
-    'alias': ARRAY(STRING, description='list of alter egos'),
+    'alias': ARRAY(NAME, description='A list of alternate names that should be resolved to this category'),
 
-    'supercategory': ANYOF(STRING(description='coarser category name'), NULL),
-    'parents': ARRAY(STRING, description='used for multiple inheritence'),
+    'supercategory': ANYOF(NAME(description='A coarser category name'), NULL),
+    'parents': ARRAY(NAME, description='Used for multiple inheritance'),
 
     # Legacy
     'keypoints': deprecated(ARRAY(STRING)),
     'skeleton': deprecated(ARRAY(TUPLE(INTEGER, INTEGER))),
 },
     required=['id', 'name'],
+    description='High level information about an annotation category',
     title='CATEGORY')
 
-KEYPOINT_CATEGORY = OBJECT({
-    'name': STRING,
-    'id': INTEGER,
-    'supercategory': ANYOF(STRING, NULL),
-    'reflection_id': ANYOF(INTEGER, NULL),
-}, required=['id', 'name'], title='KEYPOINT_CATEGORY')
+KEYPOINT_CATEGORY = OBJECT(
+    PROPERTIES={
+        'name': NAME(description='The name of the keypoint category'),
+        'id': INTEGER,
+        'supercategory': ANYOF(NAME, NULL),
+        # TODO: should have this name changed to reflect the fact it is horizontal.
+        # TODO: should add a variant of this for vertical or other transforms.
+        'reflection_id': ANYOF(INTEGER, NULL)(
+            description='The keypoint category this should change to if the image is horizontally flipped'),
+    },
+    required=['id', 'name'],
+    description='High level information about an annotation category',
+    title='KEYPOINT_CATEGORY',
+)
 
 # Extension
 VIDEO = OBJECT(
     PROPERTIES={
-        'id': INTEGER,
-        'name': STRING,
-        'caption': STRING,
+        'id': INTEGER(description='An internal video identifier'),
+        'name': NAME(description='A unique name for this video'),
+        'caption': STRING(description='A video level text caption'),
+        'resolution': (NUMBER | STRING | NULL)(description='a unit representing the size of a pixel in video space'),
         },
     required=['id', 'name'],
-    title='VIDEO'
+    description='High level information about a group of temporally ordered images',
+    title='VIDEO',
 )
 
-CHANNELS = STRING(title='CHANNEL_SPEC', description='experimental. todo: refine')
+CHANNELS = STRING(
+    pattern='[^/]*',  # a simple check, full pattern is a context free grammar
+    description=(
+        'A human readable channel name. '
+        'Must be compatible with kwcoco.ChannelSpec'
+    ),
+    title='CHANNEL_SPEC',
+)
+
+
+ASSET = OBJECT(
+    PROPERTIES={
+        'file_name': PATH,
+        'channels': CHANNELS,
+        'width': INTEGER(description='The width in asset-space pixels'),
+        'height': INTEGER(description='The height in asset-space pixels'),
+    },
+    required=['file_name'],
+    description='Information about a single file belonging to an image',
+    title='ASSET',
+)
 
 IMAGE = OBJECT(OrderedDict((
-    ('id', INTEGER),
+    ('id', INTEGER(description='a unique internal image identifier')),
     ('file_name', PATH(description=ub.paragraph(
         '''
         A relative or absolute path to the main image file. If this file_name
-        is unspecified, then a name and auxiliary file paths must be specified.
-        This should only be unspecified for multispectral observations that
-        dont have a clear default file.
+        is unspecified, then a name and auxiliary items or assets must be
+        specified. Likewise this should be null if assets are used.
         ''')) | NULL),
 
-    ('name', STRING(description=ub.paragraph(
-        '''
-        Unique name for the image.
-        If unspecified the file_name should be used as the default value
-        for the name property.
-        ''')) | NULL),
+    ('name', NAME(
+        description=ub.paragraph(
+            '''
+            A unique name for the image.
+            If unspecified the file_name should be used as the default value
+            for the name property. Required if assets / auxiliary are
+            specified.
+            ''')) | NULL),
 
-    ('width', INTEGER),
-    ('height', INTEGER),
+    ('width', INTEGER(description='The width of the image in image space pixels')),
+    ('height', INTEGER(description='The height of the image in image space pixels')),
 
     # Extension
-    ('video_id', INTEGER),
+    ('video_id', INTEGER(description='The video this image belongs to')),
 
-    # FIXME: timestamp could be a float, integer, or string in an isoformat
-    ('timestamp', NUMBER(description='todo describe format. flicks?')),
+    ('timestamp', STRING(description='An ISO-8601 timestamp') | NUMBER(description='A UNIX timestamp')),
 
-    ('frame_index', INTEGER),
+    ('frame_index', INTEGER(description='Used to temporally order the images in a video')),
 
     ('channels', CHANNELS | NULL),
 
-    # TODO: optional world localization information
-    # TODO: camera information?
+    ('resolution', (NUMBER | STRING | NULL)(description='a unit representing the size of a pixel in image space')),
 
-    ('auxiliary', ARRAY(
-        TYPE=OBJECT({
-            'file_name': PATH,
-            'channels': CHANNELS,
-            'width': INTEGER,
-            'height': INTEGER,
-        }, title='aux', required=['file_name'])
-    )),
-)), title='IMAGE',
+    ('auxiliary', ARRAY(TYPE=ASSET, description='This will be deprecated for assets in the future')),
+
+    ('assets', ARRAY(TYPE=ASSET, description='A list of assets belonging to this image, used when image channels are split across multiple files')),
+
+)),
     # required=['id', 'file_name']
     anyOf=[
         {'required': ['id', 'file_name']},
         {'required': ['id', 'name', 'auxiliary']},
+        {'required': ['id', 'name', 'assets']},
     ],
+    description=(
+        'High level information about a image file or a collection of '
+        'image files corresponding to a single point in (or small interval of) '
+        'time'
+    ),
+    title='IMAGE',
 )
 
 ANNOTATION = OBJECT(OrderedDict((
-    ('id', INTEGER),
-    ('image_id', INTEGER),
+    ('id', INTEGER(description='A unique internal id for this annotation')),
+    ('image_id', INTEGER(description='The image id this annotation belongs to')),
 
     ('bbox', BBOX),
 
-    ('category_id', INTEGER),
-    ('track_id', ANYOF(INTEGER, STRING, UUID)),
+    ('category_id', INTEGER(description='The category id of this annotation')),
+    ('track_id', ANYOF(INTEGER, STRING, UUID)(
+        description='An identifier used to group annotations belonging to the same object over multiple frames in a video')),
 
-    ('segmentation', SEGMENTATION),
-    ('keypoints', KEYPOINTS),
+    ('segmentation', SEGMENTATION(description='A polygon or mask specifying the pixels in this annotation in image-space')),
+    ('keypoints', KEYPOINTS(description='A set of categorized points belonging to this annotation in image space')),
 
     ('prob', ARRAY(NUMBER, description=ub.paragraph(
         '''
         This needs to be in the same order as categories.
-        probability order currently needs to be known a-priori,
+        The probability order currently needs to be known a-priori,
         typically in *order* of the classes, but its hard to always
         keep that consistent.
+        This SPEC is subject to change in the future.
         '''))),
 
     ('score', NUMBER(description='Typically assigned to predicted annotations')),
     ('weight', NUMBER(description='Typically given to truth annotations to indicate quality.')),
 
-    ('iscrowd', ANYOF(INTEGER, BOOLEAN)),  # legacy
-    ('caption', STRING),
+    ('iscrowd', ANYOF(INTEGER, BOOLEAN)(description=(
+        'A legacy mscoco field used to indicate if an annotation contains multiple objects'))),
+    ('caption', STRING(description='An annotation-level text caption')),
 )),
     required=['id', 'image_id'],
+    description='Metadata about some semantic attribute of an image.',
     title='ANNOTATION',
 )
 
 
 COCO_SCHEMA = OBJECT(
-    title='KWCOCO_SCHEMA',
-    required=[],
     PROPERTIES=ub.odict([
         ('info', ANY),
         ('licenses', ANY),
@@ -260,20 +307,25 @@ COCO_SCHEMA = OBJECT(
         ('images', ARRAY(IMAGE)),
 
         ('annotations', ARRAY(ANNOTATION)),
-    ])
+    ]),
+    required=[],
+    description='The formal kwcoco schema',
+    title='KWCOCO_SCHEMA',
 )
 
 
-if ub.argflag('--debug'):
+if ub.argflag('--debug') or ub.argflag('--validate'):
     COCO_SCHEMA.validate()
 
 
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/coco_schema.py
+        python ~/code/kwcoco/kwcoco/coco_schema.py --validate
         python ~/code/kwcoco/kwcoco/coco_schema.py > ~/code/kwcoco/kwcoco/coco_schema.json
         jq .properties.images ~/code/kwcoco/kwcoco/coco_schema.json
+        jq .properties.categories ~/code/kwcoco/kwcoco/coco_schema.json
+        jq . ~/code/kwcoco/kwcoco/coco_schema.json
     """
     # import json
     print(ub.repr2(COCO_SCHEMA, nl=-1, trailsep=False, sort=False).replace("'", '"'))

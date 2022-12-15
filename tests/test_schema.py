@@ -13,7 +13,7 @@ def test_polygon_schema():
     rng = kwarray.ensure_rng(0)
 
     coco_schema.KWCOCO_POLYGON
-    coco_schema.ORIG_COCO_POLYGON
+    coco_schema.MSCOCO_POLYGON
     basis = {
         # 'n': [3, 4, 6],
         'n': [3, 6],
@@ -42,5 +42,5 @@ def test_polygon_schema():
         jsonschema.validate(kwcoco_poly, schema=coco_schema.POLYGON)
         if not poly.interiors:
             coco_poly = poly.to_coco(style='orig')
-            jsonschema.validate(coco_poly, schema=coco_schema.ORIG_COCO_POLYGON)
+            jsonschema.validate(coco_poly, schema=coco_schema.MSCOCO_POLYGON)
             jsonschema.validate(coco_poly, schema=coco_schema.POLYGON)

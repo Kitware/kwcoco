@@ -19,7 +19,6 @@ Submodules
    kwcoco.util.jsonschema_elements
    kwcoco.util.lazy_frame_backends
    kwcoco.util.util_archive
-   kwcoco.util.util_delayed_poc
    kwcoco.util.util_futures
    kwcoco.util.util_json
    kwcoco.util.util_monkey
