@@ -243,8 +243,8 @@ An informal spec is as follows:
                    {"channels": "cloudmask": "file_name": "cloudmask.tif", "warp_aux_to_img": {"scale": 4.0}, "height": 100, "width": 100, ...},
                    {"channels": "nir": "file_name": "nir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
                    {"channels": "swir": "file_name": "swir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
-                   {"channels": "model1_predictions:0.6": "file_name": "model1_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
-                   {"channels": "model2_predictions:0.3": "file_name": "model2_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                   {"channels": "model1_predictions.0:6": "file_name": "model1_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                   {"channels": "model2_predictions.0:3": "file_name": "model2_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
                 ]
             }
 
@@ -291,9 +291,10 @@ Note:
 
 
 TODO:
-    - [ ] Use ijson to lazilly load pieces of the dataset in the background or
-      on demand. This will give us faster access to categories / images,
-      whereas we will always have to wait for annotations etc...
+    - [ ] Use ijson (modified to support NaN) to lazilly load pieces of the
+        dataset in the background or on demand. This will give us faster access
+        to categories / images, whereas we will always have to wait for
+        annotations etc...
 
     - [X] Should img_root be changed to bundle_dpath?
 

@@ -554,8 +554,9 @@ class CocoImage(ub.NiceRepr):
     add_asset = add_auxiliary_item
 
     @profile
-    def delay(self, channels=None, space='image', bundle_dpath=None,
-              interpolation='linear', antialias=True, nodata_method=None):
+    def delay(self, channels=None, space='image',
+              resolution=None, bundle_dpath=None, interpolation='linear',
+              antialias=True, nodata_method=None, RESOLUTION_KEY='resolution'):
         """
         Perform a delayed load on the data in this image.
 
@@ -577,6 +578,13 @@ class CocoImage(ub.NiceRepr):
             space (str):
                 can either be "image" for loading in image space, or
                 "video" for loading in video space.
+
+            resolution (None | str | float):
+                If specified, applies an additional scale factor to the result
+                such that the data is loaded at this specified resolution.
+                This requires that the image / video has a registered
+                resolution attribute and that its units agree with this
+                request.
 
         TODO:
             - [X] Currently can only take all or none of the channels from each
@@ -685,6 +693,27 @@ class CocoImage(ub.NiceRepr):
             >>> from delayed_image.delayed_nodes import CoordinateCompatibilityError
             >>> with pytest.raises(CoordinateCompatibilityError):
             >>>     aux_delayed2 = coco_img.delay(fused_channels, space='asset')
+
+        Example:
+            >>> # Test loading at a specific resolution.
+            >>> from kwcoco.coco_image import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
+            >>> coco_img = dset.coco_image(1)
+            >>> coco_img.img['resolution'] = '1 meter'
+            >>> img_delayed1 = coco_img.delay(space='image')
+            >>> vid_delayed1 = coco_img.delay(space='video')
+            >>> # test with unitless request
+            >>> img_delayed2 = coco_img.delay(space='image', resolution=3.1)
+            >>> vid_delayed2 = coco_img.delay(space='video', resolution='3.1 meter')
+            >>> np.ceil(img_delayed1.shape[0] / 3.1) == img_delayed2.shape[0]
+            >>> np.ceil(vid_delayed1.shape[0] / 3.1) == vid_delayed2.shape[0]
+            >>> # test with unitless data
+            >>> coco_img.img['resolution'] = 1
+            >>> img_delayed2 = coco_img.delay(space='image', resolution=3.1)
+            >>> vid_delayed2 = coco_img.delay(space='video', resolution='3.1 meter')
+            >>> np.ceil(img_delayed1.shape[0] / 3.1) == img_delayed2.shape[0]
+            >>> np.ceil(vid_delayed1.shape[0] / 3.1) == vid_delayed2.shape[0]
         """
         from kwimage.transform import Affine
         from kwcoco.channel_spec import FusedChannelSpec
@@ -770,6 +799,13 @@ class CocoImage(ub.NiceRepr):
         else:
             raise KeyError('space = {}'.format(space))
 
+        if resolution is not None:
+            # Adjust to the requested resolution
+            factor = self._scalefactor_for_resolution(
+                space=space, resolution=resolution,
+                RESOLUTION_KEY=RESOLUTION_KEY)
+            delayed = delayed.scale(factor)
+
         return delayed
 
     @ub.memoize_method
@@ -828,6 +864,78 @@ class CocoImage(ub.NiceRepr):
         else:
             raise NotImplementedError(space)  # auxiliary/asset space
         return warped_sseg
+
+    def resolution(self, space='image', RESOLUTION_KEY='resolution'):
+        """
+        Returns the resolution of this CocoImage in the requested space if
+        known. Errors if this information is not registered.
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> self = dset.coco_image(1)
+            >>> self.img['resolution'] = 1
+            >>> self.resolution()
+            >>> self.img['resolution'] = '1 meter'
+            >>> self.resolution(space='video')
+        """
+        import kwimage
+        # Compute the offset transform from the requested space
+        # Handle the cases where resolution is specified at the image or at the
+        # video level.
+        if space == 'video':
+            vid_resolution_expr = self.video.get(RESOLUTION_KEY, None)
+            if vid_resolution_expr is None:
+                # Do we have an image level resolution?
+                img_resolution_expr = self.img.get(RESOLUTION_KEY, None)
+                assert img_resolution_expr is not None
+                img_resolution_info = coerce_resolution(img_resolution_expr)
+                img_resolution_mat = kwimage.Affine.scale(img_resolution_info['mag'])
+                vid_resolution = (self.warp_vid_from_img @ img_resolution_mat.inv()).inv()
+                vid_resolution_info = {
+                    'mag': vid_resolution.decompose()['scale'],
+                    'unit': img_resolution_info['unit']
+                }
+            else:
+                vid_resolution_info = coerce_resolution(vid_resolution_expr)
+            space_resolution_info = vid_resolution_info
+        elif space == 'image':
+            img_resolution_expr = self.img.get(RESOLUTION_KEY, None)
+            if img_resolution_expr is None:
+                # Do we have an image level resolution?
+                vid_resolution_expr = self.video.get(RESOLUTION_KEY, None)
+                assert vid_resolution_expr is not None
+                vid_resolution_info = coerce_resolution(vid_resolution_expr)
+                vid_resolution_mat = kwimage.Affine.scale(vid_resolution_info['mag'])
+                img_resolution = (self.warp_img_from_vid @ vid_resolution_mat.inv()).inv()
+                img_resolution_info = {
+                    'mag': img_resolution.decompose()['scale'],
+                    'unit': vid_resolution_info['unit']
+                }
+            else:
+                img_resolution_info = coerce_resolution(img_resolution_expr)
+            space_resolution_info = img_resolution_info
+        elif space == 'asset':
+            raise NotImplementedError(space)
+        else:
+            raise KeyError(space)
+        return space_resolution_info
+
+    def _scalefactor_for_resolution(self, space, resolution, RESOLUTION_KEY='resolution'):
+        """
+        Given image or video space, compute the scale factor needed to achieve the
+        target resolution.
+        """
+        space_resolution_info = self.resolution(space=space, RESOLUTION_KEY=RESOLUTION_KEY)
+        request_resolution_info = coerce_resolution(resolution)
+        # If units are unspecified, assume they are compatible
+        if space_resolution_info['unit'] is not None:
+            if request_resolution_info['unit'] is not None:
+                assert space_resolution_info['unit'] == request_resolution_info['unit']
+        x1, y1 = request_resolution_info['mag']
+        x2, y2 = space_resolution_info['mag']
+        scale_factor = (x2 / x1, y2 / y1)
+        return scale_factor
 
 
 # TODO:
@@ -928,3 +1036,29 @@ def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     info['quantization'] = quantization
 
     return info
+
+
+def parse_quantity(expr):
+    import re
+    expr_pat = re.compile(
+        r'^(?P<magnitude>[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)'
+        '(?P<spaces> *)'
+        '(?P<unit>.*)$')
+    match = expr_pat.match(expr.strip())
+    return match.groupdict()
+
+
+def coerce_resolution(expr):
+    if isinstance(expr, str):
+        result = parse_quantity(expr)
+        unit = result['unit']
+        x = y = float(result['magnitude'])
+    else:
+        x = y = float(expr)
+        unit = None
+
+    parsed = {
+        'mag': (x, y),
+        'unit': unit,
+    }
+    return parsed
