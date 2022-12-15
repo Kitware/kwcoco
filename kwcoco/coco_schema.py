@@ -178,6 +178,7 @@ VIDEO = OBJECT(
         'id': INTEGER(description='An internal video identifier'),
         'name': NAME(description='A unique name for this video'),
         'caption': STRING(description='A video level text caption'),
+        'resolution': (NUMBER | STRING | NULL)(description='a unit representing the size of a pixel in video space'),
         },
     required=['id', 'name'],
     description='High level information about a group of temporally ordered images',
@@ -235,6 +236,8 @@ IMAGE = OBJECT(OrderedDict((
     ('frame_index', INTEGER(description='Used to temporally order the images in a video')),
 
     ('channels', CHANNELS | NULL),
+
+    ('resolution', (NUMBER | STRING | NULL)(description='a unit representing the size of a pixel in image space')),
 
     ('auxiliary', ARRAY(TYPE=ASSET, description='This will be deprecated for assets in the future')),
 

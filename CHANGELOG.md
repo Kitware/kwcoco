@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * Initial support to conform to mmlab coco specs
 * Added ability to specify resolution in `CocoImage.delay`
+* Add resolution to the image / video schema.
 
 
 ### Fixed

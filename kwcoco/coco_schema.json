@@ -12,18 +12,18 @@
                     "name": {"type": "string", "pattern": "[^/]+", "description": "A unique external category name or identifier"},
                     "alias": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "items": {"type": "string", "pattern": "[^/]+"},
                         "description": "A list of alternate names that should be resolved to this category"
                     },
                     "supercategory": {
                         "anyOf": [
-                            {"type": "string", "description": "A coarser category name"},
+                            {"type": "string", "pattern": "[^/]+", "description": "A coarser category name"},
                             {"type": "null"}
                         ]
                     },
                     "parents": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "items": {"type": "string", "pattern": "[^/]+"},
                         "description": "Used for multiple inheritance"
                     },
                     "keypoints": {"description": "deprecated"},
@@ -39,11 +39,11 @@
             "items": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "The name of the keypoint category"},
+                    "name": {"type": "string", "pattern": "[^/]+", "description": "The name of the keypoint category"},
                     "id": {"type": "integer"},
                     "supercategory": {
                         "anyOf": [
-                            {"type": "string"},
+                            {"type": "string", "pattern": "[^/]+"},
                             {"type": "null"}
                         ]
                     },
@@ -67,7 +67,15 @@
                 "properties": {
                     "id": {"type": "integer", "description": "An internal video identifier"},
                     "name": {"type": "string", "pattern": "[^/]+", "description": "A unique name for this video"},
-                    "caption": {"type": "string", "description": "A video level text caption"}
+                    "caption": {"type": "string", "description": "A video level text caption"},
+                    "resolution": {
+                        "anyOf": [
+                            {"type": "number"},
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "description": "a unit representing the size of a pixel in video space"
+                    }
                 },
                 "required": ["id", "name"],
                 "description": "High level information about a group of temporally ordered images",
@@ -107,6 +115,14 @@
                             {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
                             {"type": "null"}
                         ]
+                    },
+                    "resolution": {
+                        "anyOf": [
+                            {"type": "number"},
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "description": "a unit representing the size of a pixel in image space"
                     },
                     "auxiliary": {
                         "type": "array",

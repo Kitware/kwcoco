@@ -27,6 +27,8 @@ An informal spec is as follows:
         'width': int  # the base width of this video (all associated images must have this width)
         'height': int  # the base height of this video (all associated images must have this height)
 
+        'resolution': int | str,  # indicates the size of a pixel in video space
+
         # In the future this may be extended to allow pointing to video files
     }
 
@@ -49,6 +51,7 @@ An informal spec is as follows:
         'height': int,  # pixel height of "base" image
 
         'channels': <ChannelSpec>,   # a string encoding of the channels in the main image (optional if auxiliary items are specified)
+        'resolution': int | str,  # indicates the size of a pixel in image space
 
         'auxiliary': [  # information about any auxiliary channels / bands
             {
