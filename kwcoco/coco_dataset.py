@@ -2681,12 +2681,16 @@ class MixinCocoStats(object):
                             ann['area'] = w * h
 
         if config.get('mmlab', False):
-            ### mmdet wants frame_id not frame_index, perhaps other properties
-            ### TODO: add more mmlab support
+            # Add support for open-mmlab coco dataset ingestion
             if self.dataset.get('videos', None):
                 for images in self.videos().images:
+                    # mmdet wants the frame_id property
                     for frame_index, img in enumerate(images.objs):
                         img['frame_id'] = frame_index
+                    # mmdet wants the instance_id property
+                    for img in enumerate(images.objs):
+                        if img['track_id'] in img:
+                            img['instance_id'] = img['track_id']
 
         if config.get('legacy', False):
             try:

@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.5.3 - Unreleased
 
+### Fixed
+* Added "instance_id" for mmlab tracking
+
 
 ## Version 0.5.2 - Released 2022-12-15
 
