@@ -1,6 +1,8 @@
 """
 Evaluates a predicted coco dataset against a truth coco dataset.
 
+This currently computes detection-level metrics.
+
 The components in this module work programatically or as a command line script.
 
 TODO:

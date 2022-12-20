@@ -1,3 +1,12 @@
+"""
+Defines the CocoImage class which is an object oriented way of manipulating
+data pointed to by a COCO image dictionary.
+
+Notably this provides the ``.delay`` method for delayed image loading ( which
+enables things like fast loading of subimage-regions / coarser scales in images
+that contain tiles / overviews - e.g. Cloud Optimized Geotiffs or COGs (Medical
+image formats may be supported in the future).
+"""
 import ubelt as ub
 import numpy as np
 from os.path import join

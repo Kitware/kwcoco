@@ -1714,15 +1714,17 @@ class MixinCocoExtras(object):
                     cache_miss = False
 
         if cache_miss:
-            self._build_hashid()
-            if enable_cache:
-                hashid_cache_data = {
-                    'hashid': self.hashid,
-                    'hashid_parts': self.hashid_parts,
-                    'status_key': status_key,
-                }
-                hashid_sidecar_fpath.parent.ensuredir()
-                hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+            raise Exception("cache miss")
+            # TODO: fixme?
+            # self._build_hashid()
+            # if enable_cache:
+            #     hashid_cache_data = {
+            #         'hashid': self.hashid,
+            #         'hashid_parts': self.hashid_parts,
+            #         'status_key': status_key,
+            #     }
+            #     hashid_sidecar_fpath.parent.ensuredir()
+            #     hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
 
     def _dataset_id(self):
         """

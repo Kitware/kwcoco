@@ -1,4 +1,6 @@
 """
+The place where the formal KWCOCO schema is defined.
+
 CommandLine:
     python -m kwcoco.coco_schema
     xdoctest -m kwcoco.coco_schema __doc__
