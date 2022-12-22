@@ -1,0 +1,35 @@
+# Rules for where jobs can run
+# Derived from: https://gitlab.kitware.com/cmake/cmake/-/blob/v3.25.1/.gitlab/rules.yml
+# For an overview of gitlab rules see:
+# https://docs.gitlab.com/ee/ci/yaml/#workflowrules
+
+.run_manually:
+    rules:
+        - if: '$CI_MERGE_REQUEST_ID'
+          when: manual
+        - if: '$CI_COMMIT_REF_PROTECTED == true'
+          when: on_success
+        - if: '$CI_PROJECT_PATH == "computer-vision/kwcoco" && $CI_PIPELINE_SOURCE == "schedule"'
+          when: on_success
+        - if: '$CI_PROJECT_PATH == "computer-vision/kwcoco"'
+          when: manual
+        - when: never
+
+.run_automatically:
+    rules:
+        - if: '$CI_MERGE_REQUEST_ID'
+          when: on_success
+        - if: '$CI_PROJECT_PATH == "computer-vision/kwcoco" && $CI_PIPELINE_SOURCE == "schedule"'
+          when: on_success
+        - if: '$CI_PROJECT_PATH == "computer-vision/kwcoco"'
+          when: delayed
+          start_in: 5 minutes
+        - when: never
+
+.run_dependent:
+    rules:
+        - if: '$CI_MERGE_REQUEST_ID'
+          when: on_success
+        - if: '$CI_PROJECT_PATH == "computer-vision/kwcoco"'
+          when: on_success
+        - when: never
