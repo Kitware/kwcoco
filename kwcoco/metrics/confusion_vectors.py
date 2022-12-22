@@ -970,7 +970,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         y_true = data['is_true'].astype(np.uint8)
         y_score = data['pred_score']
 
-        y_true = y_true.astype(np.bool)
+        y_true = y_true.astype(bool)
 
         nbins = 100
         all_freq, xdata = np.histogram(y_score, nbins)
