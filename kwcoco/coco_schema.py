@@ -288,6 +288,14 @@ ANNOTATION = OBJECT(OrderedDict((
     ('iscrowd', ANYOF(INTEGER, BOOLEAN)(description=(
         'A legacy mscoco field used to indicate if an annotation contains multiple objects'))),
     ('caption', STRING(description='An annotation-level text caption')),
+
+    ('role', (STRING | NULL)(
+        description=ub.paragraph(
+            '''
+            A optional application specific key used to differentiate between
+            annotations used for different purposes: e.g. truth / prediction /
+            confusion.
+            '''))),
 )),
     required=['id', 'image_id'],
     description='Metadata about some semantic attribute of an image.',
@@ -323,11 +331,12 @@ if ub.argflag('--debug') or ub.argflag('--validate'):
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/kwcoco/coco_schema.py --validate
-        python ~/code/kwcoco/kwcoco/coco_schema.py > ~/code/kwcoco/kwcoco/coco_schema.json
-        jq .properties.images ~/code/kwcoco/kwcoco/coco_schema.json
-        jq .properties.categories ~/code/kwcoco/kwcoco/coco_schema.json
-        jq . ~/code/kwcoco/kwcoco/coco_schema.json
+        KWCOCO_MODPATH=$(xdev modpath kwcoco)
+        python $KWCOCO_MODPATH/coco_schema.py --validate
+        python $KWCOCO_MODPATH/coco_schema.py > ~/code/kwcoco/kwcoco/coco_schema.json
+        jq .properties.images $KWCOCO_MODPATH/coco_schema.json
+        jq .properties.categories $KWCOCO_MODPATH/coco_schema.json
+        jq . $KWCOCO_MODPATH/coco_schema.json
     """
     # import json
     print(ub.repr2(COCO_SCHEMA, nl=-1, trailsep=False, sort=False).replace("'", '"'))

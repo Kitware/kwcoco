@@ -1062,6 +1062,8 @@ def parse_quantity(expr):
         '(?P<spaces> *)'
         '(?P<unit>.*)$')
     match = expr_pat.match(expr.strip())
+    if match is None:
+        raise ValueError(f'Unable to parse {expr!r}')
     return match.groupdict()
 
 
