@@ -524,7 +524,7 @@ An informal description of the spec is written here:
 
 For a formal description of the spec see the  `kwcoco/coco_schema.json <kwcoco/coco_schema.json>`_.
 
-For more information on the "warp" transforms see `warping_and_spaces <docs/source/warping_and_spaces.rst>`_. 
+For more information on the "warp" transforms see `warping_and_spaces <docs/source/concepts/warping_and_spaces.rst>`_. 
 
 
 The CocoDatset API Grouped by Functinoality

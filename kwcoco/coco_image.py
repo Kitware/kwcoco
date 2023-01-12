@@ -954,6 +954,29 @@ class CocoImage(ub.NiceRepr):
         scale_factor = (x2 / x1, y2 / y1)
         return scale_factor
 
+    def _detections_for_resolution(coco_img, space='video', resolution=None,
+                                   RESOLUTION_KEY='resolution'):
+        """
+        This is slightly less than ideal in terms of API, but it will work for
+        now.
+        """
+        import kwimage
+        # Build transform from image to requested space
+        warp_vid_from_img = coco_img._warp_vid_from_img
+        scale = coco_img._scalefactor_for_resolution(space='video',
+                                                     resolution=resolution,
+                                                     RESOLUTION_KEY=RESOLUTION_KEY)
+        warp_req_from_vid = kwimage.Affine.scale(scale)
+        warp_req_from_img = warp_req_from_vid @ warp_vid_from_img
+
+        # Get annotations in "Image Space"
+        annots = coco_img.dset.annots(image_id=coco_img.img['id'])
+        imgspace_dets = annots.detections
+
+        # Warp them into the requested space
+        reqspace_dets = imgspace_dets.warp(warp_req_from_img)
+        return reqspace_dets
+
 
 # TODO:
 # class AliasedDictProxy(DictLike):
