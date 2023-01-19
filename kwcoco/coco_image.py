@@ -18,6 +18,9 @@ except Exception:
     profile = ub.identity
 
 
+DEFAULT_RESOLUTION_KEYS = {'resolution'}
+
+
 class CocoImage(ub.NiceRepr):
     """
     An object-oriented representation of a coco image.
@@ -573,7 +576,7 @@ class CocoImage(ub.NiceRepr):
     @profile
     def delay(self, channels=None, space='image',
               resolution=None, bundle_dpath=None, interpolation='linear',
-              antialias=True, nodata_method=None, RESOLUTION_KEY='resolution'):
+              antialias=True, nodata_method=None, RESOLUTION_KEY=None):
         """
         Perform a delayed load on the data in this image.
 
@@ -882,7 +885,7 @@ class CocoImage(ub.NiceRepr):
             raise NotImplementedError(space)  # auxiliary/asset space
         return warped_sseg
 
-    def resolution(self, space='image', RESOLUTION_KEY='resolution'):
+    def resolution(self, space='image', RESOLUTION_KEY=None):
         """
         Returns the resolution of this CocoImage in the requested space if
         known. Errors if this information is not registered.
@@ -900,11 +903,29 @@ class CocoImage(ub.NiceRepr):
         # Compute the offset transform from the requested space
         # Handle the cases where resolution is specified at the image or at the
         # video level.
+
+        if RESOLUTION_KEY is None:
+            RESOLUTION_KEY = DEFAULT_RESOLUTION_KEYS
+
+        def aliased_get(d, keys, default=None):
+            if not ub.iterable(keys):
+                return d.get(keys, default)
+            else:
+                found = 0
+                for key in keys:
+                    if key in d:
+                        found = 1
+                        val = d[key]
+                        break
+                if not found:
+                    val = default
+                return val
+
         if space == 'video':
-            vid_resolution_expr = self.video.get(RESOLUTION_KEY, None)
+            vid_resolution_expr = aliased_get(self.video, RESOLUTION_KEY, None)
             if vid_resolution_expr is None:
                 # Do we have an image level resolution?
-                img_resolution_expr = self.img.get(RESOLUTION_KEY, None)
+                img_resolution_expr = aliased_get(self.img, RESOLUTION_KEY, None)
                 assert img_resolution_expr is not None
                 img_resolution_info = coerce_resolution(img_resolution_expr)
                 img_resolution_mat = kwimage.Affine.scale(img_resolution_info['mag'])
@@ -917,10 +938,10 @@ class CocoImage(ub.NiceRepr):
                 vid_resolution_info = coerce_resolution(vid_resolution_expr)
             space_resolution_info = vid_resolution_info
         elif space == 'image':
-            img_resolution_expr = self.img.get(RESOLUTION_KEY, None)
+            img_resolution_expr = aliased_get(self.img, RESOLUTION_KEY, None)
             if img_resolution_expr is None:
                 # Do we have an image level resolution?
-                vid_resolution_expr = self.video.get(RESOLUTION_KEY, None)
+                vid_resolution_expr = aliased_get(self.video, RESOLUTION_KEY, None)
                 assert vid_resolution_expr is not None
                 vid_resolution_info = coerce_resolution(vid_resolution_expr)
                 vid_resolution_mat = kwimage.Affine.scale(vid_resolution_info['mag'])
@@ -938,7 +959,7 @@ class CocoImage(ub.NiceRepr):
             raise KeyError(space)
         return space_resolution_info
 
-    def _scalefactor_for_resolution(self, space, resolution, RESOLUTION_KEY='resolution'):
+    def _scalefactor_for_resolution(self, space, resolution, RESOLUTION_KEY=None):
         """
         Given image or video space, compute the scale factor needed to achieve the
         target resolution.
@@ -955,14 +976,14 @@ class CocoImage(ub.NiceRepr):
         return scale_factor
 
     def _detections_for_resolution(coco_img, space='video', resolution=None,
-                                   RESOLUTION_KEY='resolution'):
+                                   RESOLUTION_KEY=None):
         """
         This is slightly less than ideal in terms of API, but it will work for
         now.
         """
         import kwimage
         # Build transform from image to requested space
-        warp_vid_from_img = coco_img._warp_vid_from_img
+        warp_vid_from_img = coco_img.warp_vid_from_img
         scale = coco_img._scalefactor_for_resolution(space='video',
                                                      resolution=resolution,
                                                      RESOLUTION_KEY=RESOLUTION_KEY)
@@ -975,6 +996,7 @@ class CocoImage(ub.NiceRepr):
 
         # Warp them into the requested space
         reqspace_dets = imgspace_dets.warp(warp_req_from_img)
+        reqspace_dets.data['aids'] = np.array(list(annots))
         return reqspace_dets
 
 
