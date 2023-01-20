@@ -2689,10 +2689,10 @@ class MixinCocoStats(object):
                     # mmdet wants the frame_id property
                     for frame_index, img in enumerate(images.objs):
                         img['frame_id'] = frame_index
-                    # mmdet wants the instance_id property
-                    for img in enumerate(images.objs):
-                        if img['track_id'] in img:
-                            img['instance_id'] = img['track_id']
+                # mmdet wants the instance_id property
+                for ann in enumerate(self.dataset['annotations']):
+                    if 'track_id' in ann:
+                        ann['instance_id'] = ann['track_id']
 
         if config.get('legacy', False):
             try:

@@ -73,7 +73,7 @@ class StratifiedGroupKFold(_BaseKFold):
                 np.bincount(y_, minlength=n_classes) for y_ in grouped_y])
 
             target_freq = grouped_y_counts.sum(axis=0)
-            target_freq = target_freq.astype(np.float)
+            target_freq = target_freq.astype(float)
             target_ratio = target_freq / float(target_freq.sum())
 
             # Greedilly choose the split assignment that minimizes the local
@@ -95,7 +95,7 @@ class StratifiedGroupKFold(_BaseKFold):
                 # print('---------\n')
                 group_freq = grouped_y_counts[group_idx]
                 cand_freq = (split_freq + group_freq)
-                cand_freq = cand_freq.astype(np.float)
+                cand_freq = cand_freq.astype(float)
                 cand_ratio = cand_freq / cand_freq.sum(axis=1)[:, None]
                 cand_diffs = ((cand_ratio - target_ratio) ** 2).sum(axis=1)
                 # Compute loss
@@ -109,7 +109,7 @@ class StratifiedGroupKFold(_BaseKFold):
                 ratio_loss = other_diffs + cand_diffs
                 # penalize heavy splits
                 freq_loss = split_freq.sum(axis=1)
-                freq_loss = freq_loss.astype(np.float)
+                freq_loss = freq_loss.astype(float)
                 freq_loss = freq_loss / freq_loss.sum()
                 losses = ratio_loss + freq_loss
                 #-------

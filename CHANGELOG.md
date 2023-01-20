@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 * Added `instance_id` for mmlab tracking
 * Fixed np.bool
+* Fixed np.float
 
 
 ## Version 0.5.2 - Released 2022-12-15

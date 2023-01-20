@@ -909,7 +909,7 @@ class DetectionMetrics(ub.NiceRepr):
                 pred_cxs = true_cxs.copy()
 
                 # Perterb box coordinates
-                pred_boxes.data = np.abs(pred_boxes.data.astype(np.float) +
+                pred_boxes.data = np.abs(pred_boxes.data.astype(float) +
                                          box_noise_RV())
 
                 # Perterb class predictions
