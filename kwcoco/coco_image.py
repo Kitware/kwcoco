@@ -18,7 +18,10 @@ except Exception:
     profile = ub.identity
 
 
-DEFAULT_RESOLUTION_KEYS = {'resolution'}
+DEFAULT_RESOLUTION_KEYS = {
+    'resolution',
+    'target_gsd',  # only exists as a convinience for other projects. Remove in the future.
+}
 
 
 class CocoImage(ub.NiceRepr):
