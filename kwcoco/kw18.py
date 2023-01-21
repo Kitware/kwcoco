@@ -164,10 +164,10 @@ class KW18(kwarray.DataFrameArray):
             the returned coco dataset may need to be augmented.
 
         Args:
-            image_paths (Dict[int, str], default=None):
+            image_paths (Dict[int, str] | None):
                 if specified, maps frame numbers to image file paths.
 
-            video_name (str, default=None):
+            video_name (str | None):
                 if specified records the name of the video this kw18 belongs to
 
         TODO:

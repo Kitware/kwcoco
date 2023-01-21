@@ -257,7 +257,7 @@ def ensure_voc_coco(dpath=None):
     Download the Pascal VOC data and convert it to coco, if it does exit.
 
     Args:
-        dpath (str): download directory. Defaults to "~/data/VOC".
+        dpath (str | None): download directory. Defaults to "~/data/VOC".
 
     Returns:
         Dict[str, str]: mapping from dataset tags to coco file paths.

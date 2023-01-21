@@ -36,24 +36,24 @@ def classification_report(y_true, y_pred, target_names=None,
         .. [MulticlassMCC] Jurman, Riccadonna, Furlanello, (2012). A Comparison of MCC and CEN Error Measures in MultiClass Prediction
 
     Args:
-        y_true (array): true labels for each item
+        y_true (ndarray): true labels for each item
 
-        y_pred (array): predicted labels for each item
+        y_pred (ndarray): predicted labels for each item
 
-        target_names (List): mapping from label to category name
+        target_names (List | None): mapping from label to category name
 
-        sample_weight (ndarray): weight for each item
+        sample_weight (ndarray | None): weight for each item
 
-        verbose (False): print if True
+        verbose (int): print if True
 
-        log (callable): print or logging function
+        log (callable | None): print or logging function
 
-        remove_unsupported (bool, default=False): removes categories that have
-            no support.
+        remove_unsupported (bool): removes categories that have no support.
+            Defaults to False.
 
-        ascii_only (bool, default=False): if True dont use unicode characters.
+        ascii_only (bool): if True dont use unicode characters.
             if the environ ASCII_ONLY is present this is forced to True and
-            cannot be undone.
+            cannot be undone. Defaults to False.
 
     Example:
         >>> # xdoctest: +IGNORE_WANT
@@ -416,17 +416,17 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     One-vs-rest classification report
 
     Args:
-        mc_y_true (ndarray[Any, Int]): multiclass truth labels (integer label
-            format). Shape [N].
+        mc_y_true (ndarray):
+            multiclass truth labels (integer label format). Shape [N].
 
-        mc_probs (ndarray): multiclass probabilities for each class.
-            Shape [N x C].
+        mc_probs (ndarray):
+            multiclass probabilities for each class.  Shape [N x C].
 
-        target_names (Dict[int, str]): mapping from int label to string name
+        target_names (Dict[int, str] | None): mapping from int label to string name
 
-        sample_weight (ndarray): weight for each item. Shape [N].
+        sample_weight (ndarray | None): weight for each item. Shape [N].
 
-        metrics (List[str]): names of metrics to compute
+        metrics (List[str] | None): names of metrics to compute
 
 
     Example:

@@ -269,7 +269,7 @@ class CocoImage(ub.NiceRepr):
               auxiliary image.
 
         Args:
-            requires (List[str]):
+            requires (List[str] | None):
                 list of attribute that must be non-None to consider an object
                 as the primary one.
 
@@ -440,11 +440,11 @@ class CocoImage(ub.NiceRepr):
         data can be written to a file on disk (via the imwrite=True flag).
 
         Args:
-            file_name (str | None):
+            file_name (str | PathLike | None):
                 The name of the file relative to the bundle directory. If
                 unspecified, imdata must be given.
 
-            channels (str | kwcoco.FusedChannelSpec):
+            channels (str | kwcoco.FusedChannelSpec | None):
                 The channel code indicating what each of the bands represents.
                 These channels should be disjoint wrt to the existing data in
                 this image (this is not checked).
@@ -456,15 +456,15 @@ class CocoImage(ub.NiceRepr):
                 special imwrite=True flag are specified, this function will
                 write the data to disk.
 
-            warp_aux_to_img (kwimage.Affine):
+            warp_aux_to_img (kwimage.Affine | None):
                 The transformation from this auxiliary space to image space.
                 If unspecified, assumes this item is related to image space by
                 only a scale factor.
 
-            width (int):
+            width (int | None):
                 Width of the data in auxiliary space (inferred if unspecified)
 
-            height (int):
+            height (int | None):
                 Height of the data in auxiliary space (inferred if unspecified)
 
             imwrite (bool):

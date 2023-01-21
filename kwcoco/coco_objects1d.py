@@ -16,6 +16,12 @@ import numpy as np
 import ubelt as ub
 
 
+__docstubs__ = """
+from typing import Dict
+ObjT = Dict
+"""
+
+
 class ObjectList1D(ub.NiceRepr):
     """
     Vectorized access to lists of dictionary objects
@@ -783,7 +789,7 @@ class AnnotGroups(ObjectGroups):
         Get the grouped category ids for annotations in this group
 
         Returns:
-            List[List[id]]:
+            List[List[int]]:
 
         Example:
             >>> import kwcoco

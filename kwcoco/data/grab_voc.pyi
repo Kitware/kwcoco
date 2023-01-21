@@ -1,3 +1,4 @@
+from typing import Union
 from typing import Dict
 from _typeshed import Incomplete
 
@@ -12,7 +13,7 @@ def ensure_voc_data(dpath: Incomplete | None = ...,
     ...
 
 
-def ensure_voc_coco(dpath: str = None) -> Dict[str, str]:
+def ensure_voc_coco(dpath: Union[str, None] = None) -> Dict[str, str]:
     ...
 
 

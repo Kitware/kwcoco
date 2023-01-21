@@ -5,10 +5,12 @@ from typing import Dict
 from typing import Any
 import kwimage
 import ubelt as ub
-from typing import TypeVar
+from typing import Any
 
+from typing import Dict
 
-ObjT = TypeVar('ObjT')
+ObjT = Dict
+__docstubs__: str
 
 
 class ObjectList1D(ub.NiceRepr):
@@ -198,26 +200,26 @@ class Annots(ObjectList1D):
         ...
 
     @property
-    def boxes(self):
+    def boxes(self) -> kwimage.Boxes:
         ...
 
     @boxes.setter
-    def boxes(self, boxes) -> None:
+    def boxes(self, boxes) -> kwimage.Boxes:
         ...
 
     @property
-    def xywh(self):
+    def xywh(self) -> List[List[int]]:
         ...
 
 
 class AnnotGroups(ObjectGroups):
 
     @property
-    def cids(self):
+    def cids(self) -> List[List[int]]:
         ...
 
     @property
-    def cnames(self):
+    def cnames(self) -> List[List[str]]:
         ...
 
 

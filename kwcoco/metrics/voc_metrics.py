@@ -11,7 +11,7 @@ class VOC_Metrics(ub.NiceRepr):
     :func:`VOC_Metrics.score` function.
 
     Attributes:
-        recs (Dict[int, List[dict]):
+        recs (Dict[int, List[dict]]):
             true boxes for each image.  maps image ids to a list of records
             within that image.  Each record is a tlbr bbox, a difficult flag,
             and a class name.
@@ -20,6 +20,9 @@ class VOC_Metrics(ub.NiceRepr):
             VOC formatted prediction preditions.  mapping from class index to
             all predictions for that category.  Each "line" is a list of
             [[<imgid>, <score>, <tl_x>, <tl_y>, <br_x>, <br_y>]].
+
+        classes (None | List[str] | kwcoco.CategoryTree):
+            class names
     """
     def __init__(self, classes=None):
         self.recs = {}
