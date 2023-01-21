@@ -54,11 +54,11 @@ class Measures(ub.NiceRepr, DictProxy):
 
     @classmethod
     def combine(
-            cls,
-            tocombine: List[Measures],
-            precision: Union[int, None] = None,
-            growth: Union[int, None] = None,
-            thresh_bins: int = None
+        cls,
+        tocombine: List[Measures],
+        precision: Union[int, None] = None,
+        growth: Union[int, None] = None,
+        thresh_bins: Union[int, None] = None
     ) -> kwcoco.metrics.confusion_measures.Measures:
         ...
 

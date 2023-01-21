@@ -84,7 +84,7 @@ class COCO(CocoDataset):
             imgIds  (List[int]): get anns for given imgs
             catIds  (List[int]): get anns for given cats
             areaRng (List[float]): get anns for given area range (e.g. [0 inf])
-            iscrowd (bool): get anns for given crowd label (False or True)
+            iscrowd (bool | None): get anns for given crowd label (False or True)
 
         Returns:
             List[int]: integer array of ann ids
@@ -330,7 +330,7 @@ class COCO(CocoDataset):
         Download COCO images from mscoco.org server.
 
         Args:
-            tarDir (str): COCO results directory name
+            tarDir (str | PathLike | None): COCO results directory name
             imgIds (list): images to be downloaded
         '''
         if tarDir is not None:

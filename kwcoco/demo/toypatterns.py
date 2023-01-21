@@ -100,7 +100,7 @@ class CategoryPatterns(object):
     def __init__(self, categories=None, fg_scale=0.5, fg_intensity=0.9, rng=None):
         """
         Args:
-            categories (List[Dict]): List of coco category dictionaries
+            categories (List[Dict] | None): List of coco category dictionaries
         """
         self.rng = kwarray.ensure_rng(rng)
         self.fg_scale = fg_scale

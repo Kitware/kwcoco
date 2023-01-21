@@ -43,3 +43,6 @@ class UniqueNameRemapper:
 
 class SortedSet(sortedcontainers.SortedSet):
     ...
+
+
+SortedSetQuiet = SortedSet

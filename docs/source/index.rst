@@ -16,7 +16,7 @@ If you are new, please see our getting started document: :doc:`getting_started <
 Please also see information in the repo `README <https://github.com/Kitware/kwcoco#readme>`_, which 
 contains similar but complementary information.
 
-For notes about warping and spaces see :doc:`warping_and_spaces <warping_and_spaces>`.
+Documentation about higher level kwcoco concepts can be found :doc:`here <concepts/index.rst>`.
 
 
 .. The __init__ files contains the top-level documentation overview

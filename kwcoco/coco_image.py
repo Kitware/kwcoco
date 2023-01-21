@@ -1,3 +1,12 @@
+"""
+Defines the CocoImage class which is an object oriented way of manipulating
+data pointed to by a COCO image dictionary.
+
+Notably this provides the ``.delay`` method for delayed image loading ( which
+enables things like fast loading of subimage-regions / coarser scales in images
+that contain tiles / overviews - e.g. Cloud Optimized Geotiffs or COGs (Medical
+image formats may be supported in the future).
+"""
 import ubelt as ub
 import numpy as np
 from os.path import join
@@ -7,6 +16,12 @@ try:
     from xdev import profile
 except Exception:
     profile = ub.identity
+
+
+DEFAULT_RESOLUTION_KEYS = {
+    'resolution',
+    'target_gsd',  # only exists as a convinience for other projects. Remove in the future.
+}
 
 
 class CocoImage(ub.NiceRepr):
@@ -254,7 +269,7 @@ class CocoImage(ub.NiceRepr):
               auxiliary image.
 
         Args:
-            requires (List[str]):
+            requires (List[str] | None):
                 list of attribute that must be non-None to consider an object
                 as the primary one.
 
@@ -425,11 +440,11 @@ class CocoImage(ub.NiceRepr):
         data can be written to a file on disk (via the imwrite=True flag).
 
         Args:
-            file_name (str | None):
+            file_name (str | PathLike | None):
                 The name of the file relative to the bundle directory. If
                 unspecified, imdata must be given.
 
-            channels (str | kwcoco.FusedChannelSpec):
+            channels (str | kwcoco.FusedChannelSpec | None):
                 The channel code indicating what each of the bands represents.
                 These channels should be disjoint wrt to the existing data in
                 this image (this is not checked).
@@ -441,15 +456,15 @@ class CocoImage(ub.NiceRepr):
                 special imwrite=True flag are specified, this function will
                 write the data to disk.
 
-            warp_aux_to_img (kwimage.Affine):
+            warp_aux_to_img (kwimage.Affine | None):
                 The transformation from this auxiliary space to image space.
                 If unspecified, assumes this item is related to image space by
                 only a scale factor.
 
-            width (int):
+            width (int | None):
                 Width of the data in auxiliary space (inferred if unspecified)
 
-            height (int):
+            height (int | None):
                 Height of the data in auxiliary space (inferred if unspecified)
 
             imwrite (bool):
@@ -564,7 +579,7 @@ class CocoImage(ub.NiceRepr):
     @profile
     def delay(self, channels=None, space='image',
               resolution=None, bundle_dpath=None, interpolation='linear',
-              antialias=True, nodata_method=None, RESOLUTION_KEY='resolution'):
+              antialias=True, nodata_method=None, RESOLUTION_KEY=None):
         """
         Perform a delayed load on the data in this image.
 
@@ -873,7 +888,7 @@ class CocoImage(ub.NiceRepr):
             raise NotImplementedError(space)  # auxiliary/asset space
         return warped_sseg
 
-    def resolution(self, space='image', RESOLUTION_KEY='resolution'):
+    def resolution(self, space='image', RESOLUTION_KEY=None):
         """
         Returns the resolution of this CocoImage in the requested space if
         known. Errors if this information is not registered.
@@ -891,11 +906,29 @@ class CocoImage(ub.NiceRepr):
         # Compute the offset transform from the requested space
         # Handle the cases where resolution is specified at the image or at the
         # video level.
+
+        if RESOLUTION_KEY is None:
+            RESOLUTION_KEY = DEFAULT_RESOLUTION_KEYS
+
+        def aliased_get(d, keys, default=None):
+            if not ub.iterable(keys):
+                return d.get(keys, default)
+            else:
+                found = 0
+                for key in keys:
+                    if key in d:
+                        found = 1
+                        val = d[key]
+                        break
+                if not found:
+                    val = default
+                return val
+
         if space == 'video':
-            vid_resolution_expr = self.video.get(RESOLUTION_KEY, None)
+            vid_resolution_expr = aliased_get(self.video, RESOLUTION_KEY, None)
             if vid_resolution_expr is None:
                 # Do we have an image level resolution?
-                img_resolution_expr = self.img.get(RESOLUTION_KEY, None)
+                img_resolution_expr = aliased_get(self.img, RESOLUTION_KEY, None)
                 assert img_resolution_expr is not None
                 img_resolution_info = coerce_resolution(img_resolution_expr)
                 img_resolution_mat = kwimage.Affine.scale(img_resolution_info['mag'])
@@ -908,10 +941,10 @@ class CocoImage(ub.NiceRepr):
                 vid_resolution_info = coerce_resolution(vid_resolution_expr)
             space_resolution_info = vid_resolution_info
         elif space == 'image':
-            img_resolution_expr = self.img.get(RESOLUTION_KEY, None)
+            img_resolution_expr = aliased_get(self.img, RESOLUTION_KEY, None)
             if img_resolution_expr is None:
                 # Do we have an image level resolution?
-                vid_resolution_expr = self.video.get(RESOLUTION_KEY, None)
+                vid_resolution_expr = aliased_get(self.video, RESOLUTION_KEY, None)
                 assert vid_resolution_expr is not None
                 vid_resolution_info = coerce_resolution(vid_resolution_expr)
                 vid_resolution_mat = kwimage.Affine.scale(vid_resolution_info['mag'])
@@ -929,7 +962,7 @@ class CocoImage(ub.NiceRepr):
             raise KeyError(space)
         return space_resolution_info
 
-    def _scalefactor_for_resolution(self, space, resolution, RESOLUTION_KEY='resolution'):
+    def _scalefactor_for_resolution(self, space, resolution, RESOLUTION_KEY=None):
         """
         Given image or video space, compute the scale factor needed to achieve the
         target resolution.
@@ -944,6 +977,30 @@ class CocoImage(ub.NiceRepr):
         x2, y2 = space_resolution_info['mag']
         scale_factor = (x2 / x1, y2 / y1)
         return scale_factor
+
+    def _detections_for_resolution(coco_img, space='video', resolution=None,
+                                   RESOLUTION_KEY=None):
+        """
+        This is slightly less than ideal in terms of API, but it will work for
+        now.
+        """
+        import kwimage
+        # Build transform from image to requested space
+        warp_vid_from_img = coco_img.warp_vid_from_img
+        scale = coco_img._scalefactor_for_resolution(space='video',
+                                                     resolution=resolution,
+                                                     RESOLUTION_KEY=RESOLUTION_KEY)
+        warp_req_from_vid = kwimage.Affine.scale(scale)
+        warp_req_from_img = warp_req_from_vid @ warp_vid_from_img
+
+        # Get annotations in "Image Space"
+        annots = coco_img.dset.annots(image_id=coco_img.img['id'])
+        imgspace_dets = annots.detections
+
+        # Warp them into the requested space
+        reqspace_dets = imgspace_dets.warp(warp_req_from_img)
+        reqspace_dets.data['aids'] = np.array(list(annots))
+        return reqspace_dets
 
 
 # TODO:
@@ -1053,6 +1110,8 @@ def parse_quantity(expr):
         '(?P<spaces> *)'
         '(?P<unit>.*)$')
     match = expr_pat.match(expr.strip())
+    if match is None:
+        raise ValueError(f'Unable to parse {expr!r}')
     return match.groupdict()
 
 

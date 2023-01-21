@@ -1,6 +1,8 @@
 """
 Evaluates a predicted coco dataset against a truth coco dataset.
 
+This currently computes detection-level metrics.
+
 The components in this module work programatically or as a command line script.
 
 TODO:
@@ -800,7 +802,7 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
             minmax = minmax_key
         area_min, area_max = minmax
         gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
-        new_ignore = np.zeros(len(cfsn_vecs.data), dtype=np.bool)
+        new_ignore = np.zeros(len(cfsn_vecs.data), dtype=bool)
         for gid, groupx in zip(gids, groupxs):
             if use_area_attr:
                 # Use coco area attribute (if available)

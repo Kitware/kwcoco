@@ -48,29 +48,30 @@ def demodata_toy_dset(image_size=(600, 600),
 
         n_imgs (int): number of images to generate
 
-        rng (int | RandomState, default=0):
-            random number generator or seed
+        rng (int | RandomState | None):
+            random number generator or seed. Defaults to 0.
 
-        newstyle (bool, default=True): create newstyle kwcoco data
+        newstyle (bool): create newstyle kwcoco data. default=True
 
-        dpath (str): path to the directory that will contain the bundle,
-            (defaults to a kwcoco cache dir). Ignored if `bundle_dpath` is
-            given.
+        dpath (str | PathLike | None):
+            path to the directory that will contain the bundle, (defaults to a
+            kwcoco cache dir). Ignored if `bundle_dpath` is given.
 
-        fpath (str): path to the kwcoco file. The parent will be the bundle
-            if it is not specified. Should be a descendant of the dpath if
-            specified.
+        fpath (str | PathLike | None):
+            path to the kwcoco file. The parent will be the bundle if it is not
+            specified. Should be a descendant of the dpath if specified.
 
-        bundle_dpath (str): path to the directory that will store images.
-            If specified, dpath is ignored. If unspecified, a bundle
-            will be written inside `dpath`.
-
-        aux (bool): if True generates dummy auxiliary channels
-
-        verbose (int, default=3): verbosity mode
-
-        use_cache (bool, default=True): if True caches the generated json in the
+        bundle_dpath (str | PathLike | None):
+            path to the directory that will store images.  If specified, dpath
+            is ignored. If unspecified, a bundle will be written inside
             `dpath`.
+
+        aux (bool | None): if True generates dummy auxiliary channels
+
+        verbose (int): verbosity mode. default=3
+
+        use_cache (bool): if True caches the generated json in the
+            `dpath`. Default=True
 
         **kwargs : used for old backwards compatible argument names
             gsize - alias for image_size
@@ -324,11 +325,11 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
             random_single_video_dset + render_toy_image
 
     Args:
-        anchors (ndarray): Nx2 base width / height of boxes
+        anchors (ndarray | None): Nx2 base width / height of boxes
 
         gsize (Tuple[int, int]): width / height of the image
 
-        categories (List[str]): list of category names
+        categories (List[str] | None): list of category names
 
         n_annots (Tuple | int): controls how many annotations are in the image.
             if it is a tuple, then it is interpreted as uniform random bounds
@@ -341,18 +342,19 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
 
         fg_intensity (float): mean of foreground intensity
 
-        centerobj (bool): if 'pos', then the first annotation will be in the
-            center of the image, if 'neg', then no annotations will be in the
-            center.
+        centerobj (bool | None):
+            if 'pos', then the first annotation will be in the center of the
+            image, if 'neg', then no annotations will be in the center.
 
         exact (bool): if True, ensures that exactly the number of specified
             annots are generated.
 
         newstyle (bool): use new-sytle kwcoco format
 
-        rng (RandomState): the random state used to seed the process
+        rng (RandomState | int | None):
+            the random state used to seed the process
 
-        aux: if specified builds auxiliary channels
+        aux (bool | None): if specified builds auxiliary channels
 
         **kwargs : used for old backwards compatible argument names.
             gsize - alias for image_size

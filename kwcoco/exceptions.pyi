@@ -8,7 +8,3 @@ class DuplicateAddError(ValueError):
 
 class InvalidAddError(ValueError):
     ...
-
-
-class CoordinateCompatibilityError(ValueError):
-    ...

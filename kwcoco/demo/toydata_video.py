@@ -48,20 +48,20 @@ def random_video_dset(
 
         rng (int | None | RandomState): random seed / state
 
-        dpath (str): only used if render is truthy, place to write rendered
-            images.
+        dpath (str | PathLike | None):
+            only used if render is truthy, place to write rendered images.
 
-        verbose (int, default=3): verbosity mode
+        verbose (int): verbosity mode, default=3
 
-        aux (bool): if True generates dummy auxiliary channels
+        aux (bool | None): if True generates dummy auxiliary channels
 
         multispectral (bool): similar to aux, but does not have the concept of
             a "main" image.
 
         max_speed (float): max speed of movers
 
-        channels (str): experimental new way to get MSI with specific
-            band distributions.
+        channels (str | None):
+            experimental new way to get MSI with specific band distributions.
 
         **kwargs : used for old backwards compatible argument names
             gsize - alias for image_size
@@ -198,25 +198,25 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
         num_tracks (int): number of tracks in this video
 
-        tid_start (int, default=1): track-id start index
+        tid_start (int): track-id start index, default=1
 
-        gid_start (int, default=1): image-id start index
+        gid_start (int): image-id start index, default=1
 
-        video_id (int, default=1): video-id of this video
+        video_id (int): video-id of this video, default=1
 
         anchors (ndarray | None): base anchor sizes of the object boxes we will
             generate.
 
-        rng (RandomState): random state / seed
+        rng (RandomState | None | int): random state / seed
 
         render (bool | dict): if truthy, does the rendering according to
             provided params in the case of dict input.
 
-        autobuild (bool, default=True): prebuild coco lookup indexes
+        autobuild (bool): prebuild coco lookup indexes, default=True
 
         verbose (int): verbosity level
 
-        aux (bool | List[str]): if specified generates auxiliary channels
+        aux (bool | None | List[str]): if specified generates auxiliary channels
 
         multispectral (bool): if specified simulates multispectral imagry
             This is similar to aux, but has no "main" file.
@@ -740,11 +740,11 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
 
         rng (int | None | RandomState): random state
 
-        dpath (str):
+        dpath (str | PathLike | None):
             The location to write the images to. If unspecified, it is written
             to the rendered folder inside the kwcoco cache directory.
 
-        renderkw (dict): See :func:`render_toy_image` for details.
+        renderkw (dict | None): See :func:`render_toy_image` for details.
             Also takes imwrite keywords args only handled in this function.
             TODO better docs.
 
@@ -848,7 +848,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         dset (kwcoco.CocoDataset): coco dataset with renderable anotations / images
         gid (int): image to render
         rng (int | None | RandomState): random state
-        renderkw (dict): rendering config
+        renderkw (dict | None): rendering config
              gray (boo): gray or color images
              fg_scale (float): foreground noisyness (gauss std)
              bg_scale (float): background noisyness (gauss std)
@@ -1276,10 +1276,10 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
 
     Args:
         num (int): number of points in the path
-        degree (int, default=1): degree of curvieness of the path
-        dimension (int, default=2): number of spatial dimensions
+        degree (int): degree of curvieness of the path, default=1
+        dimension (int): number of spatial dimensions, default=2
         mode (str): can be boid, walk, or bezier
-        rng (RandomState, default=None): seed
+        rng (RandomState | None | int): seed, default=None
 
     References:
         https://github.com/dhermes/bezier

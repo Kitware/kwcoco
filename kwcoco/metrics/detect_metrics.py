@@ -6,6 +6,12 @@ from kwcoco.metrics.confusion_vectors import ConfusionVectors
 from kwcoco.metrics.assignment import _assign_confusion_vectors
 
 
+# Helper for xdev docstubs
+__docstubs__ = """
+from kwcoco.metrics.confusion_vectors import ConfusionVectors
+"""
+
+
 class DetectionMetrics(ub.NiceRepr):
     """
     Object that computes associations between detections and can convert them
@@ -14,7 +20,7 @@ class DetectionMetrics(ub.NiceRepr):
     Attributes:
         gid_to_true_dets (Dict): maps image ids to truth
         gid_to_pred_dets (Dict): maps image ids to predictions
-        classes (CategoryTree): category coder
+        classes (kwcoco.CategoryTree): category coder
 
     Example:
         >>> dmet = DetectionMetrics.demo(
@@ -114,7 +120,7 @@ class DetectionMetrics(ub.NiceRepr):
 
         Args:
             pred_dets (kwimage.Detections): predicted detections
-            imgname (str): a unique string to identify the image
+            imgname (str | None): a unique string to identify the image
             gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
@@ -126,7 +132,7 @@ class DetectionMetrics(ub.NiceRepr):
 
         Args:
             true_dets (kwimage.Detections): groundtruth
-            imgname (str): a unique string to identify the image
+            imgname (str | None): a unique string to identify the image
             gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
@@ -150,26 +156,27 @@ class DetectionMetrics(ub.NiceRepr):
 
         Args:
 
-            iou_thresh (float | List[float], default=0.5):
+            iou_thresh (float | List[float]):
                 bounding box overlap iou threshold required for assignment
-                if a list, then return type is a dict
+                if a list, then return type is a dict. Defaults to 0.5
 
-            bias (float, default=0.0):
+            bias (float):
                 for computing bounding box overlap, either 1 or 0
+                Defaults to 0.
 
-            gids (List[int], default=None):
+            gids (List[int] | None):
                 which subset of images ids to compute confusion metrics on. If
-                not specified all images are used.
+                not specified all images are used. Defaults to None.
 
-            compat (str, default='all'):
+            compat (str):
                 can be ('ancestors' | 'mutex' | 'all').  determines which pred
                 boxes are allowed to match which true boxes. If 'mutex', then
                 pred boxes can only match true boxes of the same class. If
                 'ancestors', then pred boxes can match true boxes that match or
                 have a coarser label. If 'all', then any pred can match any
-                true, regardless of its category label.
+                true, regardless of its category label.  Defaults to all.
 
-            prioritize (str, default='iou'):
+            prioritize (str):
                 can be ('iou' | 'class' | 'correct') determines which box to
                 assign to if mutiple true boxes overlap a predicted box.  if
                 prioritize is iou, then the true box with maximum iou (above
@@ -177,28 +184,28 @@ class DetectionMetrics(ub.NiceRepr):
                 prefer matching a compatible class above a higher iou. If
                 prioritize is correct, then ancestors of the true class are
                 preferred over descendents of the true class, over unreleated
-                classes.
+                classes. Default to 'iou'
 
-            ignore_classes (set | str, default={'ignore'}):
-                class names indicating ignore regions
+            ignore_classes (set | str):
+                class names indicating ignore regions. Default={'ignore'}
 
-            background_class (str, default=ub.NoParam):
+            background_class (str | NoParamType):
                 Name of the background class. If unspecified we try to
                 determine it with heuristics. A value of None means there is no
                 background class.
 
-            verbose (int | str, default='auto'): verbosity flag. In auto mode,
+            verbose (int | str): verbosity flag. Default to 'auto'. In auto mode,
                 verbose=1 if len(gids) > 1000.
 
-            workers (int, default=0):
-                number of parallel assignment processes
+            workers (int):
+                number of parallel assignment processes. Defaults to 0
 
-            track_probs (str, default='try'): can be 'try', 'force', or False.
-                if truthy, we assume probabilities for multiple classes are
-                available.
+            track_probs (str):
+                can be 'try', 'force', or False.  if truthy, we assume
+                probabilities for multiple classes are available. default='try'
 
         Returns:
-            kwcoco.metrics.confusion_vectors.ConfusionVectors | Dict[float, kwcoco.metrics.confusion_vectors.ConfusionVectors]
+            ConfusionVectors | Dict[float, ConfusionVectors]
 
         Example:
             >>> dmet = DetectionMetrics.demo(nimgs=30, classes=3,
@@ -909,7 +916,7 @@ class DetectionMetrics(ub.NiceRepr):
                 pred_cxs = true_cxs.copy()
 
                 # Perterb box coordinates
-                pred_boxes.data = np.abs(pred_boxes.data.astype(np.float) +
+                pred_boxes.data = np.abs(pred_boxes.data.astype(float) +
                                          box_noise_RV())
 
                 # Perterb class predictions

@@ -274,7 +274,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     import kwarray
 
     # Keep track of which true items have been used
-    true_unused = np.ones(len(true_dets), dtype=np.bool)
+    true_unused = np.ones(len(true_dets), dtype=bool)
 
     # sort predictions by descending score
     if 'scores' in pred_dets.data:
@@ -571,8 +571,8 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
         >>> assert np.all(flags1 == flags3)
         >>> assert np.all(flags2 == flags4)
     """
-    true_ignore_flags = np.zeros(len(true_dets), dtype=np.bool)
-    pred_ignore_flags = np.zeros(len(pred_dets), dtype=np.bool)
+    true_ignore_flags = np.zeros(len(true_dets), dtype=bool)
+    pred_ignore_flags = np.zeros(len(pred_dets), dtype=bool)
 
     if not ub.iterable(ignore_classes):
         ignore_classes = {ignore_classes}

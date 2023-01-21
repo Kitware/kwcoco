@@ -1,3 +1,4 @@
+from typing import Union
 from typing import Dict
 import kwarray
 from _typeshed import Incomplete
@@ -18,8 +19,8 @@ class KW18(kwarray.DataFrameArray):
         ...
 
     def to_coco(self,
-                image_paths: Dict[int, str] = None,
-                video_name: str = None):
+                image_paths: Union[Dict[int, str], None] = None,
+                video_name: Union[str, None] = None):
         ...
 
     @classmethod

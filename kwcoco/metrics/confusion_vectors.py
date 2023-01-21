@@ -26,7 +26,7 @@ class ConfusionVectors(ub.NiceRepr):
     Attributes:
         data (kwarray.DataFrameArray) : should at least have keys true, pred, weight
         classes (Sequence | CategoryTree): list of category names or category graph
-        probs (ndarray, optional): probabilities for each class
+        probs (ndarray | None): probabilities for each class
 
     Example:
         >>> # xdoctest: IGNORE_WANT
@@ -306,9 +306,10 @@ class ConfusionVectors(ub.NiceRepr):
         high and "negative" clases should be low.
 
         Args:
-            negative_classes (List[str | int]): list of negative class names or
-                idxs, by default chooses any class with a true class index of
-                -1. These classes should ideally have low scores.
+            negative_classes (List[str | int] | None):
+                list of negative class names or idxs, by default chooses any
+                class with a true class index of -1. These classes should
+                ideally have low scores.
 
         Returns:
             BinaryConfusionVectors
@@ -639,18 +640,18 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         Creates binary confusion measures for every one-versus-rest category.
 
         Args:
-            stabalize_thresh (int, default=7):
+            stabalize_thresh (int):
                 if fewer than this many data points inserts dummy stabilization
-                data so curves can still be drawn.
+                data so curves can still be drawn. Default to 7.
 
-            fp_cutoff (int, default=None):
+            fp_cutoff (int | None):
                 maximum number of false positives in the truncated roc curves.
-                ``None`` is equivalent to ``float('inf')``
+                The default ``None`` is equivalent to ``float('inf')``
 
-            monotonic_ppv (bool, default=True):
+            monotonic_ppv (bool):
                 if True ensures that precision is always increasing as recall
                 decreases. This is done in pycocotools scoring, but I'm not
-                sure its a good idea.
+                sure its a good idea. Default to True.
 
         SeeAlso:
             :func:`BinaryConfusionVectors.measures`
@@ -735,7 +736,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             p_true (float): fraction of real positive cases
             p_error (float): probability of making a recoverable mistake
             p_miss (float): probability of making a unrecoverable mistake
-            rng (int | RandomState): random seed / state
+            rng (int | RandomState | None): random seed / state
 
         Returns:
             BinaryConfusionVectors
@@ -798,11 +799,11 @@ class BinaryConfusionVectors(ub.NiceRepr):
                 if fewer than this many data points inserts dummy stabalization
                 data so curves can still be drawn.
 
-            fp_cutoff (int, default=None):
+            fp_cutoff (int | None):
                 maximum number of false positives in the truncated roc curves.
-                ``None`` is equivalent to ``float('inf')``
+                The default of ``None`` is equivalent to ``float('inf')``
 
-            monotonic_ppv (bool, default=True):
+            monotonic_ppv (bool):
                 if True ensures that precision is always increasing as recall
                 decreases. This is done in pycocotools scoring, but I'm not
                 sure its a good idea.
@@ -866,7 +867,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             stabalize_thresh (int): if fewer than this many data points insert
                 stabalization data.
 
-            fp_cutoff (int): maximum number of false positives
+            fp_cutoff (int | None): maximum number of false positives
 
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
@@ -970,7 +971,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         y_true = data['is_true'].astype(np.uint8)
         y_score = data['pred_score']
 
-        y_true = y_true.astype(np.bool)
+        y_true = y_true.astype(bool)
 
         nbins = 100
         all_freq, xdata = np.histogram(y_score, nbins)

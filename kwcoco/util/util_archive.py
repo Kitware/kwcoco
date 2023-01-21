@@ -70,11 +70,11 @@ class Archive(object):
     def __init__(self, fpath=None, mode='r', backend=None, file=None):
         """
         Args:
-            fpath (str): path to open
+            fpath (str | None): path to open
 
             mode (str): either r or w
 
-            backend (str | ModuleType):
+            backend (str | ModuleType | None):
                 either tarfile, zipfile string or module.
 
             file (tarfile.TarFile | zipfile.ZipFile | None):

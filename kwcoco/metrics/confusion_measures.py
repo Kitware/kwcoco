@@ -240,7 +240,7 @@ class Measures(ub.NiceRepr, DictProxy):
                 maximum length of an input. We might make this more numerical
                 in the future.
 
-            thresh_bins (int):
+            thresh_bins (int | None):
                 Force this many threshold bins.
 
         Returns:

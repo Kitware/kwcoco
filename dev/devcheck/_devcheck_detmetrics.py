@@ -313,7 +313,7 @@ def _devcheck_voc_consistency():
             import kwimage
             true_boxes = kwimage.Boxes.random(num=nboxes, scale=100., rng=rng, format='cxywh')
             pred_boxes = true_boxes.copy()
-            pred_boxes.data = pred_boxes.data.astype(np.float) + (rng.rand() * noise)
+            pred_boxes.data = pred_boxes.data.astype(float) + (rng.rand() * noise)
             if nbad:
                 pred_boxes.data = np.vstack([
                     pred_boxes.data,

@@ -1,5 +1,6 @@
 from typing import List
 from typing import Dict
+import networkx
 import networkx as nx
 import ubelt as ub
 from _typeshed import Incomplete
@@ -8,12 +9,12 @@ from typing import Any
 
 
 class CategoryTree(ub.NiceRepr):
-    graph: Incomplete
-    id_to_node: Incomplete
-    node_to_id: Incomplete
-    node_to_idx: Incomplete
-    idx_to_node: Incomplete
-    idx_groups: Incomplete
+    idx_to_node: List[str]
+    id_to_node: Dict[int, str]
+    node_to_id: Dict[str, int]
+    node_to_idx: Dict[str, int]
+    graph: networkx.Graph
+    idx_groups: List[List[int]]
 
     def __init__(self, graph: nx.DiGraph = None, checks: bool = True) -> None:
         ...
@@ -50,10 +51,10 @@ class CategoryTree(ub.NiceRepr):
     def idx_to_id(self):
         ...
 
-    def idx_to_ancestor_idxs(self, include_self: bool = ...):
+    def idx_to_ancestor_idxs(self, include_self: bool = True):
         ...
 
-    def idx_to_descendants_idxs(self, include_self: bool = ...):
+    def idx_to_descendants_idxs(self, include_self: bool = False):
         ...
 
     def idx_pairwise_distance(self):

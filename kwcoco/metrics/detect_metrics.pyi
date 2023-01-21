@@ -1,14 +1,21 @@
+from typing import Dict
 import kwcoco
 import kwimage
 from typing import Union
 from typing import List
-import ubelt as ub
-from typing import Dict
+from ubelt.util_const import NoParamType
 import ubelt as ub
 from _typeshed import Incomplete
 
+from kwcoco.metrics.confusion_vectors import ConfusionVectors
+
+__docstubs__: str
+
 
 class DetectionMetrics(ub.NiceRepr):
+    gid_to_true_dets: Dict
+    gid_to_pred_dets: Dict
+    classes: kwcoco.CategoryTree
 
     def __init__(dmet, classes: Incomplete | None = ...) -> None:
         ...
@@ -29,13 +36,13 @@ class DetectionMetrics(ub.NiceRepr):
 
     def add_predictions(dmet,
                         pred_dets: kwimage.Detections,
-                        imgname: str = None,
+                        imgname: Union[str, None] = None,
                         gid: Union[int, None] = None) -> None:
         ...
 
     def add_truth(dmet,
                   true_dets: kwimage.Detections,
-                  imgname: str = None,
+                  imgname: Union[str, None] = None,
                   gid: Union[int, None] = None) -> None:
         ...
 
@@ -49,17 +56,16 @@ class DetectionMetrics(ub.NiceRepr):
         dmet,
         iou_thresh: Union[float, List[float]] = 0.5,
         bias: float = 0,
-        gids: List[int] = None,
+        gids: Union[List[int], None] = None,
         compat: str = 'mutex',
         prioritize: str = 'iou',
         ignore_classes: Union[set, str] = 'ignore',
-        background_class: str = ...,
+        background_class: Union[str, NoParamType] = ...,
         verbose: Union[int, str] = 'auto',
         workers: int = 0,
         track_probs: str = 'try',
         max_dets: Incomplete | None = ...
-    ) -> kwcoco.metrics.confusion_vectors.ConfusionVectors | Dict[
-            float, kwcoco.metrics.confusion_vectors.ConfusionVectors]:
+    ) -> ConfusionVectors | Dict[float, ConfusionVectors]:
         ...
 
     def score_kwant(dmet, iou_thresh: float = ...):

@@ -328,7 +328,14 @@
                         ],
                         "description": "A legacy mscoco field used to indicate if an annotation contains multiple objects"
                     },
-                    "caption": {"type": "string", "description": "An annotation-level text caption"}
+                    "caption": {"type": "string", "description": "An annotation-level text caption"},
+                    "role": {
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "null"}
+                        ],
+                        "description": "A optional application specific key used to differentiate between annotations used for different purposes: e.g. truth / prediction / confusion."
+                    }
                 },
                 "required": ["id", "image_id"],
                 "description": "Metadata about some semantic attribute of an image.",

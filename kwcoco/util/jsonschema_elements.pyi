@@ -1,3 +1,4 @@
+from typing import Union
 from typing import Callable
 from _typeshed import Incomplete
 
@@ -8,7 +9,7 @@ class Element(dict):
     def __init__(self,
                  base: dict,
                  options: dict = ...,
-                 _magic: Callable = None) -> None:
+                 _magic: Union[Callable, None] = None) -> None:
         ...
 
     def __call__(self, *args, **kw):

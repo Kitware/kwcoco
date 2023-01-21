@@ -1,3 +1,4 @@
+from typing import Union
 from typing import Dict
 from typing import List
 from _typeshed import Incomplete
@@ -12,7 +13,7 @@ class CategoryPatterns:
     rng: Incomplete
     fg_scale: Incomplete
     fg_intensity: Incomplete
-    categories: Incomplete
+    categories: Union[List[Dict], None]
     cname_to_kp: Incomplete
     obj_catnames: Incomplete
     kp_catnames: Incomplete
@@ -21,7 +22,7 @@ class CategoryPatterns:
     cname_to_cx: Incomplete
 
     def __init__(self,
-                 categories: List[Dict] = None,
+                 categories: Union[List[Dict], None] = None,
                  fg_scale: float = ...,
                  fg_intensity: float = ...,
                  rng: Incomplete | None = ...):

@@ -1,11 +1,15 @@
+from typing import Dict
+from typing import List
+from typing import Union
+import kwcoco
 import ubelt as ub
 from _typeshed import Incomplete
 
 
 class VOC_Metrics(ub.NiceRepr):
-    recs: Incomplete
-    cx_to_lines: Incomplete
-    classes: Incomplete
+    recs: Dict[int, List[dict]]
+    cx_to_lines: Dict[int, List]
+    classes: Union[None, List[str], kwcoco.CategoryTree]
 
     def __init__(self, classes: Incomplete | None = ...) -> None:
         ...

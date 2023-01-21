@@ -82,11 +82,27 @@ from kwcoco.coco_dataset import (  # NOQA
     MixinCocoStats, MixinCocoDraw
 )
 
+# __docstubs__ = """
+# from typing import TypeVar
+# F = TypeVar("F", bound=Callable)
+# """
+# https://github.com/python/mypy/issues/8016
+# https://github.com/mkorpela/overrides/issues/109
+
+
+class FallbackCocoBase:
+    # Used when sqlalchemy doesn't exist to allow for import without error
+    _decl_class_registry = {}
+
+
+CocoBase: type
+
 try:
     from sqlalchemy.sql.schema import Column
     from sqlalchemy.sql.schema import Index
     from sqlalchemy.types import Float, Integer, String, JSON
     from sqlalchemy.ext.declarative import declarative_base
+    # from sqlalchemy.orm.decl_api import DeclarativeMeta
     import sqlalchemy
     import sqlite3
     sqlite3.register_adapter(np.int64, int)
@@ -103,8 +119,7 @@ except ImportError:
     Integer = ub.identity
     Column = ub.identity
     Index = ub.identity
-    class CocoBase:
-        _decl_class_registry = {}
+    CocoBase = FallbackCocoBase
 
 
 try:

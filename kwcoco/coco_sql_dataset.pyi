@@ -8,8 +8,24 @@ from kwcoco.util.dict_like import DictLike
 from typing import Any
 
 
-class CocoBase:
+class FallbackCocoBase:
     ...
+
+
+CocoBase: type
+CocoBase = FallbackCocoBase
+
+
+def addapt_numpy_float64(numpy_float64):
+    ...
+
+
+def addapt_numpy_int64(numpy_int64):
+    ...
+
+
+UNSTRUCTURED: str
+SCHEMA_VERSION: str
 
 
 class Category(CocoBase):
@@ -18,7 +34,7 @@ class Category(CocoBase):
     name: Incomplete
     alias: Incomplete
     supercategory: Incomplete
-    extra: Incomplete
+    __unstructured__: Incomplete
 
 
 class KeypointCategory(CocoBase):
@@ -28,7 +44,7 @@ class KeypointCategory(CocoBase):
     alias: Incomplete
     supercategory: Incomplete
     reflection_id: Incomplete
-    extra: Incomplete
+    __unstructured__: Incomplete
 
 
 class Video(CocoBase):
@@ -38,7 +54,7 @@ class Video(CocoBase):
     caption: Incomplete
     width: Incomplete
     height: Incomplete
-    extra: Incomplete
+    __unstructured__: Incomplete
 
 
 class Image(CocoBase):
@@ -52,8 +68,9 @@ class Image(CocoBase):
     timestamp: Incomplete
     frame_index: Incomplete
     channels: Incomplete
+    warp_img_to_vid: Incomplete
     auxiliary: Incomplete
-    extra: Incomplete
+    __unstructured__: Incomplete
 
 
 class Annotation(CocoBase):
@@ -70,7 +87,7 @@ class Annotation(CocoBase):
     prob: Incomplete
     iscrowd: Incomplete
     caption: Incomplete
-    extra: Incomplete
+    __unstructured__: Incomplete
 
 
 ALCHEMY_MODE_DEFAULT: int
@@ -80,6 +97,10 @@ classname: Incomplete
 
 
 def orm_to_dict(obj):
+    ...
+
+
+def dict_restructure(item):
     ...
 
 
@@ -203,20 +224,20 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoAccessors,
         ...
 
     @classmethod
-    def coerce(self, data):
+    def coerce(self, data, backend: Incomplete | None = ...):
         ...
 
     def disconnect(self) -> None:
         ...
 
-    def connect(self, readonly: bool = ...):
+    def connect(self, readonly: bool = ..., verbose: int = ...):
         ...
 
     @property
     def fpath(self):
         ...
 
-    def delete(self) -> None:
+    def delete(self, verbose: int = ...) -> None:
         ...
 
     def populate_from(self, dset, verbose: int = ...) -> None:
@@ -268,17 +289,19 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoAccessors,
 def cached_sql_coco_view(dct_db_fpath: Incomplete | None = ...,
                          sql_db_fpath: Incomplete | None = ...,
                          dset: Incomplete | None = ...,
-                         force_rewrite: bool = ...):
+                         force_rewrite: bool = ...,
+                         backend: Incomplete | None = ...):
     ...
 
 
 def ensure_sql_coco_view(dset,
                          db_fpath: Incomplete | None = ...,
-                         force_rewrite: bool = ...):
+                         force_rewrite: bool = ...,
+                         backend: Incomplete | None = ...):
     ...
 
 
-def demo(num: int = ...):
+def demo(num: int = ..., backend: Incomplete | None = ...):
     ...
 
 

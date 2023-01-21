@@ -353,6 +353,7 @@ from kwcoco._helpers import (
 )
 
 import json as pjson
+from types import ModuleType
 # The ujson library is faster than Python's json, but the API has some
 # limitations and requires a minimum version. Currently we only use it to read,
 # we have to wait for https://github.com/ultrajson/ultrajson/pull/518 to land
@@ -365,11 +366,11 @@ except ImportError:
 KWCOCO_USE_UJSON = bool(os.environ.get('KWCOCO_USE_UJSON'))
 
 if ujson is not None and Version(ujson.__version__) >= Version('5.2.0') and KWCOCO_USE_UJSON:
-    json_r = ujson
-    json_w = pjson
+    json_r: ModuleType = ujson
+    json_w: ModuleType = pjson
 else:
-    json_r = pjson
-    json_w = pjson
+    json_r: ModuleType = pjson
+    json_w: ModuleType = pjson
 
 
 if sys.version_info <= (3, 6):
@@ -591,7 +592,7 @@ class MixinCocoAccessors(object):
 
         Args:
             gid_or_img (int | dict): image id or image dict
-            channels (str, default=None): if specified, return a path to data
+            channels (str | None): if specified, return a path to data
                 containing auxiliary channels instead
 
         Returns:
@@ -649,7 +650,7 @@ class MixinCocoAccessors(object):
 
         Args:
             aid_or_int (int | dict): annot id or dict
-            image (ArrayLike, default=None): preloaded image
+            image (ArrayLike | None): preloaded image
                 (note: this process is inefficient unless image is specified)
 
         Example:
@@ -1161,9 +1162,9 @@ class MixinCocoExtras(object):
         Create a toy coco dataset for testing and demo puposes
 
         Args:
-            key (str, default=photos):
-                Either 'photos', 'shapes', or 'vidshapes'. There are also
-                special sufixes that can control behavior.
+            key (str):
+                Either 'photos' (default), 'shapes', or 'vidshapes'. There are
+                also special sufixes that can control behavior.
 
                 Basic options that define which flavor of demodata to generate
                 are: `photos`, `shapes`, and `vidshapes`. A numeric suffix e.g.
@@ -1200,10 +1201,10 @@ class MixinCocoExtras(object):
 
             aux (bool): if True generates dummy auxiliary channels
 
-            rng (int | RandomState, default=0):
+            rng (int | RandomState | None):
                 random number generator or seed
 
-            verbose (int, default=3): verbosity mode
+            verbose (int): verbosity mode. Defaults to 3.
 
         Example:
             >>> # Basic demodata keys
@@ -1714,15 +1715,17 @@ class MixinCocoExtras(object):
                     cache_miss = False
 
         if cache_miss:
-            self._build_hashid()
-            if enable_cache:
-                hashid_cache_data = {
-                    'hashid': self.hashid,
-                    'hashid_parts': self.hashid_parts,
-                    'status_key': status_key,
-                }
-                hashid_sidecar_fpath.parent.ensuredir()
-                hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+            raise Exception("cache miss")
+            # TODO: fixme?
+            # self._build_hashid()
+            # if enable_cache:
+            #     hashid_cache_data = {
+            #         'hashid': self.hashid,
+            #         'hashid_parts': self.hashid_parts,
+            #         'status_key': status_key,
+            #     }
+            #     hashid_sidecar_fpath.parent.ensuredir()
+            #     hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
 
     def _dataset_id(self):
         """
@@ -1753,12 +1756,12 @@ class MixinCocoExtras(object):
         Populate the imgsize field if it does not exist.
 
         Args:
-            workers (int, default=0): number of workers for parallel
+            workers (int): number of workers for parallel
                 processing.
 
-            verbose (int, default=1): verbosity level
+            verbose (int): verbosity level
 
-            fail (bool, default=False): if True, raises an exception if
+            fail (bool): if True, raises an exception if
                anything size fails to load.
 
         Returns:
@@ -1859,7 +1862,7 @@ class MixinCocoExtras(object):
         Check for images that don't exist
 
         Args:
-            check_aux (bool, default=False):
+            check_aux (bool):
                 if specified also checks auxiliary images
             verbose (int): verbosity level
 
@@ -1891,7 +1894,7 @@ class MixinCocoExtras(object):
         Check for images that don't exist or can't be opened
 
         Args:
-            check_aux (bool, default=False):
+            check_aux (bool):
                 if specified also checks auxiliary images
             verbose (int): verbosity level
 
@@ -2376,16 +2379,16 @@ class MixinCocoObjects(object):
         Return vectorized annotation objects
 
         Args:
-            annot_ids (List[int]):
+            annot_ids (List[int] | None):
                 annotation ids to reference, if unspecified all annotations are
                 returned. An alias is "aids", which may be removed in the future.
 
-            image_id (int):
+            image_id (int | None):
                 return all annotations that belong to this image id.
                 Mutually exclusive with other arguments.
                 An alias is "gids", which may be removed in the future.
 
-            trackid (int):
+            trackid (int | None):
                 return all annotations that belong to this track.
                 mutually exclusive with other arguments.
 
@@ -2429,13 +2432,13 @@ class MixinCocoObjects(object):
         Return vectorized image objects
 
         Args:
-            image_ids (List[int]): image ids to reference, if unspecified
+            image_ids (List[int] | None): image ids to reference, if unspecified
                  all images are returned. An alias is `gids`.
 
-            video_id (int): returns all images that belong to this video id.
+            video_id (int | None): returns all images that belong to this video id.
                 mutually exclusive with `image_ids` arg.
 
-            names (List[str]):
+            names (List[str] | None):
                 lookup images by their names.
 
         Returns:
@@ -2482,7 +2485,7 @@ class MixinCocoObjects(object):
         Return vectorized category objects
 
         Args:
-            category_ids (List[int]):
+            category_ids (List[int] | None):
                 category ids to reference, if unspecified all categories are
                 returned. The `cids` argument is an alias.
 
@@ -2507,11 +2510,12 @@ class MixinCocoObjects(object):
         Return vectorized video objects
 
         Args:
-            video_ids (List[int]): video ids to reference, if unspecified
-                 all videos are returned. The `vidids` argument is an alias.
-                 Mutually exclusive with other args.
+            video_ids (List[int] | None):
+                video ids to reference, if unspecified all videos are returned.
+                The `vidids` argument is an alias.  Mutually exclusive with
+                other args.
 
-            names (List[str]):
+            names (List[str] | None):
                 lookup videos by their name.
                 Mutually exclusive with other args.
 
@@ -2681,12 +2685,16 @@ class MixinCocoStats(object):
                             ann['area'] = w * h
 
         if config.get('mmlab', False):
-            ### mmdet wants frame_id not frame_index, perhaps other properties
-            ### TODO: add more mmlab support
+            # Add support for open-mmlab coco dataset ingestion
             if self.dataset.get('videos', None):
                 for images in self.videos().images:
+                    # mmdet wants the frame_id property
                     for frame_index, img in enumerate(images.objs):
                         img['frame_id'] = frame_index
+                # mmdet wants the instance_id property
+                for ann in enumerate(self.dataset['annotations']):
+                    if 'track_id' in ann:
+                        ann['instance_id'] = ann['track_id']
 
         if config.get('legacy', False):
             try:
@@ -2951,13 +2959,13 @@ class MixinCocoStats(object):
         This function corresponds to :mod:`kwcoco.cli.coco_stats`.
 
         KWargs:
-            basic(bool, default=True): return basic stats'
-            extended(bool, default=True): return extended stats'
-            catfreq(bool, default=True): return category frequency stats'
-            boxes(bool, default=False): return bounding box stats'
+            basic(bool): return basic stats', default=True
+            extended(bool): return extended stats', default=True
+            catfreq(bool): return category frequency stats', default=True
+            boxes(bool): return bounding box stats', default=False
 
-            annot_attrs(bool, default=True): return annotation attribute information'
-            image_attrs(bool, default=True): return image attribute information'
+            annot_attrs(bool): return annotation attribute information', default=True
+            image_attrs(bool): return image attribute information', default=True
 
         Returns:
             dict: info
@@ -3100,16 +3108,18 @@ class MixinCocoStats(object):
         Also computes anchor boxes using kmeans if ``anchors`` is specified.
 
         Args:
-            anchors (int): if specified also computes box anchors
+            anchors (int | None): if specified also computes box anchors
                 via KMeans clustering
 
             perclass (bool): if True also computes stats for each category
 
-            gids (List[int], default=None):
+            gids (List[int] | None):
                 if specified only compute stats for these image ids.
+                Defaults to None.
 
-            aids (List[int], default=None):
+            aids (List[int] | None):
                 if specified only compute stats for these annotation ids.
+                Defaults to None.
 
             verbose (int): verbosity level
 
@@ -3351,11 +3361,15 @@ class MixinCocoDraw(object):
         Use matplotlib to show an image with annotations overlaid
 
         Args:
-            gid (int): image to show
-            aids (list): aids to highlight within the image
-            aid (int): a specific aid to focus on. If gid is not give,
-                look up gid based on this aid.
-            setlim (None | str): if 'image' sets the limit to the image extent
+            gid (int | None):
+                image id to show
+            aids (list | None):
+                aids to highlight within the image
+            aid (int | None):
+                a specific aid to focus on. If gid is not give, look up gid
+                based on this aid.
+            setlim (None | str):
+                if 'image' sets the limit to the image extent
             **kwargs:
                 show_annots, show_aid, show_catname, show_kpname,
                 show_segmentation, title, show_gid, show_filename,
@@ -4192,8 +4206,8 @@ class MixinCocoAddRemove(object):
         Args:
             anns_or_aids (List): list of annotation dicts or ids
 
-            safe (bool, default=True): if True, we perform checks to remove
-                duplicates and non-existing identifiers.
+            safe (bool): if True, we perform checks to remove
+                duplicates and non-existing identifiers. Defaults to True.
 
         Returns:
             Dict: num_removed: information on the number of items removed
@@ -4244,11 +4258,12 @@ class MixinCocoAddRemove(object):
         Args:
             cat_identifiers (List): list of category dicts, names, or ids
 
-            keep_annots (bool, default=False):
+            keep_annots (bool):
                 if True, keeps annotations, but removes category labels.
+                Defaults to False.
 
-            safe (bool, default=True): if True, we perform checks to remove
-                duplicates and non-existing identifiers.
+            safe (bool): if True, we perform checks to remove
+                duplicates and non-existing identifiers. Defaults to True.
 
         Returns:
             Dict: num_removed: information on the number of items removed
@@ -4317,7 +4332,7 @@ class MixinCocoAddRemove(object):
         Args:
             gids_or_imgs (List): list of image dicts, names, or ids
 
-            safe (bool, default=True): if True, we perform checks to remove
+            safe (bool): if True, we perform checks to remove
                 duplicates and non-existing identifiers.
 
         Returns:
@@ -4379,8 +4394,9 @@ class MixinCocoAddRemove(object):
         Args:
             vidids_or_videos (List): list of video dicts, names, or ids
 
-            safe (bool, default=True): if True, we perform checks to remove
-                duplicates and non-existing identifiers.
+            safe (bool):
+                if True, we perform checks to remove duplicates and
+                non-existing identifiers.
 
         Returns:
             Dict: num_removed: information on the number of items removed
@@ -5094,7 +5110,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         fpath (PathLike | None):
             if known, this stores the filepath the dataset was loaded from
 
-        tag (str):
+        tag (str | None):
             A tag indicating the name of the dataset.
 
         bundle_dpath (PathLike | None) :
@@ -5186,12 +5202,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """
         Args:
 
-            data (str | dict):
+            data (str | PathLike | dict | None):
                 Either a filepath to a coco json file, or a dictionary
                 containing the actual coco json structure. For a more generally
                 coercable constructor see func:`CocoDataset.coerce`.
 
-            tag (str) :
+            tag (str | None) :
                 Name of the dataset for display purposes, and does not
                 influence behavior of the underlying data structure, although
                 it may be used via convinience methods. We attempt to
@@ -5454,16 +5470,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             fpaths (List[str]): list of paths to multiple coco files to be
                 loaded and unioned.
 
-            max_workers (int, default=0): number of worker threads / processes
+            max_workers (int): number of worker threads / processes
 
             verbose (int): verbosity level
 
             mode (str): thread, process, or serial
 
-            union (str | bool, default='try'): If True, unions the result
+            union (str | bool): If True, unions the result
                 datasets after loading. If False, just returns the result list.
                 If 'try', then try to preform the union, but return the result
-                list if it fails.
+                list if it fails. Default='try'
         """
         # Can this be done better with asyncio?
         jobs = ub.JobPool(mode, max_workers=max_workers)
@@ -5530,7 +5546,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             newlines (bool) :
                 if True, each annotation, image, category gets its own line
 
-            indent (int | str): indentation for the json file. See
+            indent (int | str | None): indentation for the json file. See
                 :func:`json.dump` for details.
 
             newlines (bool):
@@ -5667,15 +5683,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 open file pointer / stream. If unspecified, it will be written
                 to the current ``fpath`` property.
 
-            indent (int | str): indentation for the json file. See
+            indent (int | str | None): indentation for the json file. See
                 :func:`json.dump` for details.
 
             newlines (bool):
                 if True, each annotation, image, category gets its own line.
 
-            temp_file (bool | str, default=True):
+            temp_file (bool | str):
                 Argument to :func:`safer.open`.  Ignored if ``file`` is not a
-                PathLike object.
+                PathLike object. Defaults to True.
 
         Example:
             >>> import tempfile
@@ -5871,10 +5887,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 will be the first item in the "others" list. But if called
                 like a classmethod, "others" will be empty by default.
 
-            disjoint_tracks (bool, default=True):
+            disjoint_tracks (bool):
                 if True, we will assume track-ids are disjoint and if two
                 datasets share the same track-id, we will disambiguate them.
-                Otherwise they will be copied over as-is.
+                Otherwise they will be copied over as-is. Defaults to True.
 
             **kwargs : constructor options for the new merged CocoDataset
 
@@ -6248,11 +6264,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         to port. All annotations in those images will be taken.
 
         Args:
-            gids (List[int]): image-ids to copy into a new dataset
-            copy (bool, default=False): if True, makes a deep copy of
-                all nested attributes, otherwise makes a shallow copy.
-            autobuild (bool, default=True): if True will automatically
-                build the fast lookup index.
+            gids (List[int]):
+                image-ids to copy into a new dataset
+
+            copy (bool):
+                if True, makes a deep copy of all nested attributes, otherwise
+                makes a shallow copy.  Defaults to True.
+
+            autobuild (bool):
+                if True will automatically build the fast lookup index.
+                Defaults to True.
 
         Example:
             >>> import kwcoco
@@ -6323,15 +6344,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         multiprocessing use cases.
 
         Args:
-            force_rewrite (bool, default=False):
+            force_rewrite (bool):
                 if True, forces an update to any existing cache file on disk
 
-            memory (bool, default=False):
+            memory (bool):
                 if True, the database is constructed in memory.
 
             backend (str): sqlite or postgresql
 
-            sql_db_fpath (str): overrides the database uri
+            sql_db_fpath (str | PathLike | None): overrides the database uri
 
         Note:
             This view cache is experimental and currently depends on the

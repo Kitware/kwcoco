@@ -1,13 +1,20 @@
-import pandas as pd
+import kwarray
 from typing import Union
+from typing import Sequence
+from numpy import ndarray
+import pandas as pd
 from typing import List
 from typing import Set
 from numpy.random import RandomState
 import ubelt as ub
 from _typeshed import Incomplete
+from kwcoco.category_tree import CategoryTree
 
 
 class ConfusionVectors(ub.NiceRepr):
+    data: kwarray.DataFrameArray
+    classes: Union[Sequence, CategoryTree]
+    probs: Union[ndarray, None]
 
     def __init__(cfsn_vecs,
                  data,
@@ -47,8 +54,8 @@ class ConfusionVectors(ub.NiceRepr):
 
     def binarize_classless(
         cfsn_vecs,
-        negative_classes: List[Union[str,
-                                     int]] = None) -> BinaryConfusionVectors:
+        negative_classes: Union[List[Union[str, int]], None] = None
+    ) -> BinaryConfusionVectors:
         ...
 
     def binarize_ovr(cfsn_vecs,
@@ -84,7 +91,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
 
     def measures(self,
                  stabalize_thresh: int = 7,
-                 fp_cutoff: int = None,
+                 fp_cutoff: Union[int, None] = None,
                  monotonic_ppv: bool = True,
                  ap_method: str = ...):
         ...
@@ -105,12 +112,14 @@ class BinaryConfusionVectors(ub.NiceRepr):
         ...
 
     @classmethod
-    def demo(cls,
-             n: int = 10,
-             p_true: float = 0.5,
-             p_error: float = 0.2,
-             p_miss: float = 0.0,
-             rng: Union[int, RandomState] = None) -> BinaryConfusionVectors:
+    def demo(
+            cls,
+            n: int = 10,
+            p_true: float = 0.5,
+            p_error: float = 0.2,
+            p_miss: float = 0.0,
+            rng: Union[int, RandomState,
+                       None] = None) -> BinaryConfusionVectors:
         ...
 
     @property
@@ -125,7 +134,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
     def measures(self,
                  stabalize_thresh: int = 7,
-                 fp_cutoff: int = None,
+                 fp_cutoff: Union[int, None] = None,
                  monotonic_ppv: bool = True,
                  ap_method: str = ...):
         ...

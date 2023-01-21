@@ -1,9 +1,25 @@
 """
-Vectorized ORM-like objects used in conjunction with coco_dataset
+Vectorized ORM-like objects used in conjunction with coco_dataset.
+
+This powers the ``.images()``, ``.videos()``, and ``.annotation()`` methods of
+:class:`kwcoco.CocoDataset`.
+
+See:
+    :func:`kwcoco.coco_dataset.MixinCocoObjects.categories`
+    :func:`kwcoco.coco_dataset.MixinCocoObjects.videos`
+    :func:`kwcoco.coco_dataset.MixinCocoObjects.images`
+    :func:`kwcoco.coco_dataset.MixinCocoObjects.annots`
+
 """
 from os.path import join
 import numpy as np
 import ubelt as ub
+
+
+__docstubs__ = """
+from typing import Dict
+ObjT = Dict
+"""
 
 
 class ObjectList1D(ub.NiceRepr):
@@ -773,7 +789,7 @@ class AnnotGroups(ObjectGroups):
         Get the grouped category ids for annotations in this group
 
         Returns:
-            List[List[id]]:
+            List[List[int]]:
 
         Example:
             >>> import kwcoco

@@ -1,5 +1,6 @@
-from typing import List
 from typing import Union
+from typing import List
+from os import PathLike
 import kwcoco
 from numpy import ndarray
 import kwimage
@@ -7,6 +8,8 @@ import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
 from typing import Any
+
+DEFAULT_RESOLUTION_KEYS: Incomplete
 
 
 class CocoImage(ub.NiceRepr):
@@ -37,6 +40,10 @@ class CocoImage(ub.NiceRepr):
         ...
 
     def detach(self):
+        ...
+
+    @property
+    def assets(self):
         ...
 
     def __nice__(self):
@@ -72,10 +79,13 @@ class CocoImage(ub.NiceRepr):
     def primary_image_filepath(self, requires: Incomplete | None = ...):
         ...
 
-    def primary_asset(self, requires: List[str] = None):
+    def primary_asset(self,
+                      requires: Union[List[str], None] = None) -> None | dict:
         ...
 
-    def iter_image_filepaths(self) -> Generator[Any, None, None]:
+    def iter_image_filepaths(self,
+                             with_bundle: bool = True
+                             ) -> Generator[Any, None, None]:
         ...
 
     def iter_asset_objs(self) -> Generator[dict, None, None]:
@@ -85,27 +95,27 @@ class CocoImage(ub.NiceRepr):
         ...
 
     def add_auxiliary_item(self,
-                           file_name: Union[str, None] = None,
-                           channels: Union[str,
-                                           kwcoco.FusedChannelSpec] = None,
+                           file_name: Union[str, PathLike, None] = None,
+                           channels: Union[str, kwcoco.FusedChannelSpec,
+                                           None] = None,
                            imdata: Union[ndarray, None] = None,
-                           warp_aux_to_img: kwimage.Affine = None,
-                           width: int = None,
-                           height: int = None,
+                           warp_aux_to_img: Union[kwimage.Affine, None] = None,
+                           width: Union[int, None] = None,
+                           height: Union[int, None] = None,
                            imwrite: bool = False) -> None:
         ...
 
     add_asset: Incomplete
 
     def delay(self,
-              channels: Incomplete | None = ...,
-              space: str = ...,
+              channels: kwcoco.FusedChannelSpec = None,
+              space: str = 'image',
+              resolution: Union[None, str, float] = None,
               bundle_dpath: Incomplete | None = ...,
               interpolation: str = ...,
               antialias: bool = ...,
               nodata_method: Incomplete | None = ...,
-              jagged: bool = ...,
-              mode: int = ...):
+              RESOLUTION_KEY: Incomplete | None = ...):
         ...
 
     def valid_region(self, space: str = ...):
@@ -117,8 +127,19 @@ class CocoImage(ub.NiceRepr):
     def warp_img_from_vid(self):
         ...
 
+    def resolution(self,
+                   space: str = ...,
+                   RESOLUTION_KEY: Incomplete | None = ...):
+        ...
+
 
 class CocoAsset:
+    __key_aliases__: Incomplete
+    __key_resolver__: Incomplete
+    obj: Incomplete
+
+    def __init__(self, obj) -> None:
+        ...
 
     def __getitem__(self, key):
         ...
@@ -128,3 +149,11 @@ class CocoAsset:
 
     def get(self, key, default=...):
         ...
+
+
+def parse_quantity(expr):
+    ...
+
+
+def coerce_resolution(expr):
+    ...

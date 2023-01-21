@@ -1,3 +1,9 @@
+from typing import List
+from typing import Union
+from typing import Dict
+from os import PathLike
+import kwimage
+from numpy import ndarray
 from _typeshed import Incomplete
 from kwcoco.coco_dataset import CocoDataset
 
@@ -24,41 +30,48 @@ class COCO(CocoDataset):
         ...
 
     def getAnnIds(self,
-                  imgIds=...,
-                  catIds=...,
-                  areaRng=...,
-                  iscrowd: Incomplete | None = ...):
+                  imgIds: List[int] = ...,
+                  catIds: List[int] = ...,
+                  areaRng: List[float] = ...,
+                  iscrowd: Union[bool, None] = None) -> List[int]:
         ...
 
-    def getCatIds(self, catNms=..., supNms=..., catIds=...):
+    def getCatIds(self,
+                  catNms: List[str] = ...,
+                  supNms: List[str] = ...,
+                  catIds: List[int] = ...) -> List[int]:
         ...
 
-    def getImgIds(self, imgIds=..., catIds=...):
+    def getImgIds(self,
+                  imgIds: List[int] = ...,
+                  catIds: List[int] = ...) -> List[int]:
         ...
 
-    def loadAnns(self, ids=...):
+    def loadAnns(self, ids: List[int] = ...) -> List[dict]:
         ...
 
-    def loadCats(self, ids=...):
+    def loadCats(self, ids: List[int] = ...) -> List[dict]:
         ...
 
-    def loadImgs(self, ids=...):
+    def loadImgs(self, ids: List[int] = ...) -> List[dict]:
         ...
 
-    def showAnns(self, anns, draw_bbox: bool = ...) -> None:
+    def showAnns(self, anns: List[Dict], draw_bbox: bool = ...) -> None:
         ...
 
-    def loadRes(self, resFile):
+    def loadRes(self, resFile: str) -> object:
         ...
 
-    def download(self, tarDir: Incomplete | None = ..., imgIds=...) -> None:
+    def download(self,
+                 tarDir: Union[str, PathLike, None] = None,
+                 imgIds: list = ...) -> None:
         ...
 
-    def loadNumpyAnnotations(self, data):
+    def loadNumpyAnnotations(self, data) -> List[Dict]:
         ...
 
-    def annToRLE(self, ann):
+    def annToRLE(self, ann) -> kwimage.Mask:
         ...
 
-    def annToMask(self, ann):
+    def annToMask(self, ann) -> ndarray:
         ...
