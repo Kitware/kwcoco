@@ -5633,6 +5633,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             dict_lines = []
             main_keys = SPEC_KEYS
             other_keys = sorted(set(self.dataset.keys()) - set(main_keys))
+            # TODO: optimize efficiency
+            # TODO: general "flexible json" package that can read to/from
+            # zipfiles, support ujson or pjson backends, has pretty newline
+            # properties. This would abstrat much of the logic away from this
+            # module and be generally useful when dealing with other larger
+            # json files.
             for key in main_keys:
                 if key not in self.dataset:
                     continue

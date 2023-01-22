@@ -4,6 +4,13 @@ import scriptconfig as scfg
 
 
 class CocoSplitCLI(object):
+    """
+    Splits a coco files into two parts base on some criteria.
+
+    Useful for generating quick and dirty train/test splits, but in general
+    users should opt for using ``kwcoco subset`` instead to explicitly
+    construct these splits based on domain knowledge.
+    """
     name = 'split'
 
     class CLIConfig(scfg.Config):
@@ -16,6 +23,15 @@ class CocoSplitCLI(object):
             'dst2': scfg.Value('split2.mscoco.json', help='output path2'),
             'factor': scfg.Value(3, help='ratio of items put in dset1 vs dset2'),
             'rng': scfg.Value(None, help='random seed'),
+            'balance_categories': scfg.Value(True, help='if True tries to balance annotation categories across splits'),
+            'splitter': scfg.Value(
+                'auto', help=ub.paragraph(
+                    '''
+                    Split method to use.
+                    Using "image" will randomly assign each image to a partition.
+                    Using "video" will randomly assign each video to a partition.
+                    Using "auto" chooses "video" if there are any, otherwise "image".
+                    '''), choices=['auto', 'image', 'video'])
         }
         epilog = """
         Example Usage:
@@ -29,7 +45,7 @@ class CocoSplitCLI(object):
             >>> from kwcoco.cli.coco_split import *  # NOQA
             >>> import ubelt as ub
             >>> dpath = ub.Path.appdir('kwcoco/tests/cli/split').ensuredir()
-            >>> kw = {'src': 'special:shapes8',
+            >>> kw = {'src': 'special:vidshapes8',
             >>>       'dst1': dpath / 'train.json',
             >>>       'dst2': dpath / 'test.json'}
             >>> cmdline = False
@@ -48,9 +64,35 @@ class CocoSplitCLI(object):
 
         print('reading fpath = {!r}'.format(config['src']))
         dset = kwcoco.CocoDataset.coerce(config['src'])
-        annots = dset.annots()
-        gids = annots.gids
-        cids = annots.cids
+
+        splitter = config['splitter']
+        if splitter == 'auto':
+            splitter = 'video' if dset.n_videos > 0 else 'image'
+
+        images = dset.images()
+        cids_per_image = images.annots.cids
+        gids = images.lookup('id')
+
+        if splitter == 'video':
+            group_ids = images.lookup('video_id')
+        elif splitter == 'image':
+            group_ids = gids
+        else:
+            raise KeyError(splitter)
+
+        final_group_ids = []
+        final_group_gids = []
+        final_group_cids = []
+
+        for group_id, gid, cids in zip(group_ids, gids, cids_per_image):
+            if len(cids) == 0:
+                final_group_ids.append(group_id)
+                final_group_gids.append(gid)
+                final_group_cids.append(-1)
+            else:
+                final_group_ids.extend([group_id] * len(cids))
+                final_group_gids.extend([gid] * len(cids))
+                final_group_cids.extend(cids)
 
         # Balanced category split
         rng = kwarray.ensure_rng(config['rng'])
@@ -59,11 +101,15 @@ class CocoSplitCLI(object):
         self = util_sklearn.StratifiedGroupKFold(n_splits=config['factor'],
                                                  random_state=rng,
                                                  shuffle=shuffle)
-        split_idxs = list(self.split(X=gids, y=cids, groups=gids))
+
+        if config['balance_categories']:
+            split_idxs = list(self.split(X=final_group_gids, y=final_group_cids, groups=final_group_ids))
+        else:
+            split_idxs = list(self.split(X=final_group_gids, y=final_group_gids, groups=final_group_ids))
         idxs1, idxs2 = split_idxs[0]
 
-        gids1 = sorted(ub.unique(ub.take(gids, idxs1)))
-        gids2 = sorted(ub.unique(ub.take(gids, idxs2)))
+        gids1 = sorted(ub.unique(ub.take(final_group_gids, idxs1)))
+        gids2 = sorted(ub.unique(ub.take(final_group_gids, idxs2)))
 
         dset1 = dset.subset(gids1)
         dset2 = dset.subset(gids2)

@@ -10,6 +10,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Experimental support for reading / writing kwcoco files to / from zipfiles. 
 
+### Changed
+* Improved splitting in kwcoco split CLI. Better handling for video datasets. Category balance is now optional.
+
 
 ## Version 0.5.3 - Released 2023-01-20
 
