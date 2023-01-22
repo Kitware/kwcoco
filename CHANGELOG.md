@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.5.4 - Unreleased
 
+### Added
+* Experimental support for reading / writing kwcoco files to / from zipfiles. 
+
 
 ## Version 0.5.3 - Released 2023-01-20
 

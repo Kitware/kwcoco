@@ -5331,8 +5331,22 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     ''').format(fpath))
 
             self._state['was_loaded'] = True
-            with open(fpath, 'r') as file:
-                data = json_r.load(file)
+
+            # Test to see if the kwcoco file is compressed
+            import zipfile
+            if zipfile.is_zipfile(fpath):
+                with open(fpath, 'rb') as file:
+                    with zipfile.ZipFile(file, 'r') as zfile:
+                        members = zfile.namelist()
+                        if len(members) != 1:
+                            raise Exception(
+                                'Currently only zipfiles with exactly 1 '
+                                'kwcoco member are supported')
+                        text = zfile.read(members[0]).decode('utf8')
+                        data = json_r.loads(text)
+            else:
+                with open(fpath, 'r') as file:
+                    data = json_r.load(file)
 
             # If data is a path it gives us the absolute location of the root
             if tag is None:
@@ -5672,6 +5686,24 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             text = _json_dumps(self.dataset, indent=indent)
 
         return text
+
+    def _dump_to_zipfile(self, zip_fpath, indent=None, newlines=False, temp_file=True):
+        """
+        Experimental method to save compressed kwcoco files
+        """
+        import safer
+        import zipfile
+        compression = zipfile.ZIP_LZMA
+        compresslevel = None
+        arcname = basename(zip_fpath)
+        if arcname.endswith('.zip'):
+            arcname = arcname[:-4]
+            if not arcname.endswith('.json'):
+                arcname = arcname + '.json'
+        with safer.open(zip_fpath, 'wb', temp_file=temp_file) as file:
+            with zipfile.ZipFile(file, 'w', compression=compression, compresslevel=compresslevel) as zfile:
+                text = self.dumps(indent=indent, newlines=newlines)
+                zfile.writestr(arcname, text.encode('utf8'))
 
     def dump(self, file=None, indent=None, newlines=False, temp_file=True):
         """
