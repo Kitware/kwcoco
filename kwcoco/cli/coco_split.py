@@ -84,11 +84,14 @@ class CocoSplitCLI(object):
         final_group_gids = []
         final_group_cids = []
 
+        unique_cids = set(ub.flatten(cids_per_image)) | {0}
+        distinct_cid = max(unique_cids) + 11
+
         for group_id, gid, cids in zip(group_ids, gids, cids_per_image):
             if len(cids) == 0:
                 final_group_ids.append(group_id)
                 final_group_gids.append(gid)
-                final_group_cids.append(-1)
+                final_group_cids.append(distinct_cid)
             else:
                 final_group_ids.extend([group_id] * len(cids))
                 final_group_gids.extend([gid] * len(cids))
