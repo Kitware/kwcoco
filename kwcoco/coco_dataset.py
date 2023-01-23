@@ -5700,8 +5700,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """
         import safer
         import zipfile
+        from kwcoco.util import util_archive
+        compression = util_archive._coerce_zipfile_compression('auto')
         zipkw = {
-            'compression': zipfile.ZIP_LZMA,
+            'compression': compression,
         }
         if sys.version_info[0:2] >= (3, 7):
             zipkw['compresslevel'] = None
@@ -5711,7 +5713,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             if not arcname.endswith('.json'):
                 arcname = arcname + '.json'
         with safer.open(zip_fpath, 'wb', temp_file=temp_file) as file:
-            with zipfile.ZipFile(file, 'w', *zipkw) as zfile:
+            with zipfile.ZipFile(file, 'w', **zipkw) as zfile:
                 text = self.dumps(indent=indent, newlines=newlines)
                 zfile.writestr(arcname, text.encode('utf8'))
 
