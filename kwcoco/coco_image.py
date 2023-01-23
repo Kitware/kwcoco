@@ -610,15 +610,6 @@ class CocoImage(ub.NiceRepr):
                 request.
 
         TODO:
-            - [X] Currently can only take all or none of the channels from each
-                base-image / auxiliary dict. For instance if the main image is
-                r|g|b you can't just select g|b at the moment.
-
-            - [X] The order of the channels in the delayed load should
-                match the requested channel order.
-
-            - [X] TODO: add nans to bands that don't exist or throw an error
-
             - [ ] This function could stand to have a better name. Maybe imread
                   with a delayed=True flag? Or maybe just delayed_load?
 
@@ -678,7 +669,6 @@ class CocoImage(ub.NiceRepr):
             >>> final = delayed.finalize()
             >>> print('final.shape = {}'.format(ub.repr2(final.shape, nl=1)))
             >>> assert final.shape == (512, 512, 3)
-
 
         Example:
             >>> # Test that delay works when imdata is stored in the image
@@ -797,30 +787,29 @@ class CocoImage(ub.NiceRepr):
                 from delayed_image import DelayedChannelConcat
                 delayed = DelayedNans(dsize=dsize, channels=requested)
                 delayed = DelayedChannelConcat([delayed])
-                return delayed
             else:
                 raise ValueError('no data registered in kwcoco image')
         else:
             from delayed_image import DelayedChannelConcat
             delayed = DelayedChannelConcat(chan_list)
 
-        # Reorder channels in the requested order
-        if requested is not None:
-            delayed = delayed.take_channels(requested)
+            # Reorder channels in the requested order
+            if requested is not None:
+                delayed = delayed.take_channels(requested)
 
-        if hasattr(delayed, 'components'):
-            if len(delayed.components) == 1:
-                delayed = delayed.components[0]
+            if hasattr(delayed, 'components'):
+                if len(delayed.components) == 1:
+                    delayed = delayed.components[0]
 
-        if space in {'image', 'auxiliary', 'asset'}:
-            pass
-        elif space == 'video':
-            img_to_vid = self.warp_vid_from_img
-            delayed = delayed.warp(img_to_vid, dsize=dsize,
-                                   interpolation=interpolation,
-                                   antialias=antialias)
-        else:
-            raise KeyError('space = {}'.format(space))
+            if space in {'image', 'auxiliary', 'asset'}:
+                pass
+            elif space == 'video':
+                img_to_vid = self.warp_vid_from_img
+                delayed = delayed.warp(img_to_vid, dsize=dsize,
+                                       interpolation=interpolation,
+                                       antialias=antialias)
+            else:
+                raise KeyError('space = {}'.format(space))
 
         if resolution is not None:
             # Adjust to the requested resolution

@@ -13,6 +13,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * Improved splitting in kwcoco split CLI. Better handling for video datasets. Category balance is now optional.
 
+### Fixed
+* Bug where specifying resolution to `delay` would not work if the channels did not exist.
+
 
 ## Version 0.5.3 - Released 2023-01-20
 
