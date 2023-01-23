@@ -5,10 +5,19 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.5.4 - Unreleased
+## Version 0.5.4 - Released 2023-01-23
+
+### Added
+* Experimental support for reading / writing kwcoco files to / from zipfiles. 
+
+### Changed
+* Improved splitting in kwcoco split CLI. Better handling for video datasets. Category balance is now optional.
+
+### Fixed
+* Bug where specifying resolution to `delay` would not work if the channels did not exist.
 
 
-## Version 0.5.3 - Released 2023-01-23
+## Version 0.5.3 - Released 2023-01-20
 
 ### Added
 * Add `role` property for annotations in the schema.

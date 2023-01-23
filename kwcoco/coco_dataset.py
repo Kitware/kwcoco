@@ -5331,8 +5331,22 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     ''').format(fpath))
 
             self._state['was_loaded'] = True
-            with open(fpath, 'r') as file:
-                data = json_r.load(file)
+
+            # Test to see if the kwcoco file is compressed
+            import zipfile
+            if zipfile.is_zipfile(fpath):
+                with open(fpath, 'rb') as file:
+                    with zipfile.ZipFile(file, 'r') as zfile:
+                        members = zfile.namelist()
+                        if len(members) != 1:
+                            raise Exception(
+                                'Currently only zipfiles with exactly 1 '
+                                'kwcoco member are supported')
+                        text = zfile.read(members[0]).decode('utf8')
+                        data = json_r.loads(text)
+            else:
+                with open(fpath, 'r') as file:
+                    data = json_r.load(file)
 
             # If data is a path it gives us the absolute location of the root
             if tag is None:
@@ -5619,6 +5633,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             dict_lines = []
             main_keys = SPEC_KEYS
             other_keys = sorted(set(self.dataset.keys()) - set(main_keys))
+            # TODO: optimize efficiency
+            # TODO: general "flexible json" package that can read to/from
+            # zipfiles, support ujson or pjson backends, has pretty newline
+            # properties. This would abstrat much of the logic away from this
+            # module and be generally useful when dealing with other larger
+            # json files.
             for key in main_keys:
                 if key not in self.dataset:
                     continue
@@ -5672,6 +5692,30 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             text = _json_dumps(self.dataset, indent=indent)
 
         return text
+
+    def _dump_to_zipfile(self, zip_fpath, indent=None, newlines=False, temp_file=True):
+        """
+        Experimental method to save compressed kwcoco files, may be folded into
+        dump in the future.
+        """
+        import safer
+        import zipfile
+        from kwcoco.util import util_archive
+        compression = util_archive._coerce_zipfile_compression('auto')
+        zipkw = {
+            'compression': compression,
+        }
+        if sys.version_info[0:2] >= (3, 7):
+            zipkw['compresslevel'] = None
+        arcname = basename(zip_fpath)
+        if arcname.endswith('.zip'):
+            arcname = arcname[:-4]
+            if not arcname.endswith('.json'):
+                arcname = arcname + '.json'
+        with safer.open(zip_fpath, 'wb', temp_file=temp_file) as file:
+            with zipfile.ZipFile(file, 'w', **zipkw) as zfile:
+                text = self.dumps(indent=indent, newlines=newlines)
+                zfile.writestr(arcname, text.encode('utf8'))
 
     def dump(self, file=None, indent=None, newlines=False, temp_file=True):
         """

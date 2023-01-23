@@ -269,3 +269,42 @@ def unarchive_file(archive_fpath, output_dpath='.', verbose=1, overwrite=True):
         if archive_file is not None:
             archive_file.close()
     return unarchived_paths
+
+
+@ub.memoize
+def _available_zipfile_compressions():
+    available = set(['ZIP_STORED'])
+    try:
+        import zlib  # NOQA
+    except ImportError:
+        ...
+    else:
+        available.add('ZIP_DEFLATED')
+    try:
+        import bz2  # NOQA
+    except ImportError:
+        ...
+    else:
+        available.add('ZIP_BZIP2')
+    try:
+        import lzma  # NOQA
+    except ImportError:
+        ...
+    else:
+        available.add('ZIP_LZMA')
+    return available
+
+
+def _coerce_zipfile_compression(compression):
+    if isinstance(compression, str):
+        if compression == 'auto':
+            priority = ['ZIP_LZMA', 'ZIP_DEFLATED', 'ZIP_BZIP2', 'ZIP_STORED']
+            available = _available_zipfile_compressions()
+            found = None
+            for cand in priority:
+                if cand in available:
+                    found = cand
+                    break
+            compression = found
+        compression = getattr(zipfile, compression)
+    return compression
