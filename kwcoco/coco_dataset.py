@@ -5695,19 +5695,23 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     def _dump_to_zipfile(self, zip_fpath, indent=None, newlines=False, temp_file=True):
         """
-        Experimental method to save compressed kwcoco files
+        Experimental method to save compressed kwcoco files, may be folded into
+        dump in the future.
         """
         import safer
         import zipfile
-        compression = zipfile.ZIP_LZMA
-        compresslevel = None
+        zipkw = {
+            'compression': zipfile.ZIP_LZMA,
+        }
+        if sys.version_info[0:2] >= (3, 7):
+            zipkw['compresslevel'] = None
         arcname = basename(zip_fpath)
         if arcname.endswith('.zip'):
             arcname = arcname[:-4]
             if not arcname.endswith('.json'):
                 arcname = arcname + '.json'
         with safer.open(zip_fpath, 'wb', temp_file=temp_file) as file:
-            with zipfile.ZipFile(file, 'w', compression=compression, compresslevel=compresslevel) as zfile:
+            with zipfile.ZipFile(file, 'w', *zipkw) as zfile:
                 text = self.dumps(indent=indent, newlines=newlines)
                 zfile.writestr(arcname, text.encode('utf8'))
 
