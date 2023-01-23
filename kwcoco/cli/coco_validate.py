@@ -39,8 +39,13 @@ class CocoValidateCLI:
 
     class CLIConfig(scfg.Config):
         """
-        Validate that a coco file conforms to the json schema, that assets
-        exist, and potentially fix corrupted assets by removing them.
+        Validates that a coco file satisfies expected properties.
+
+        Checks that a coco file conforms to the json schema, that assets
+        exist, and that other expected properties are satisfied.
+
+        This also has the ability to fix corrupted assets by removing them, but
+        that functionality may be moved to a new command in the future.
         """
         default = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to datasets', position=1),

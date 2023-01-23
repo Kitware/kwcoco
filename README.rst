@@ -86,12 +86,12 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
         union               Combine multiple COCO datasets into a single merged dataset.
         split               Split a single COCO dataset into two sub-datasets.
         show                Visualize a COCO image using matplotlib or opencv, optionally writing
-        toydata             Create COCO toydata
-        eval                Evaluate detection metrics using a predicted and truth coco file.
-        conform             Make the COCO file conform to the spec.
+        toydata             Create COCO toydata for demo and testing purposes.
+        eval                Evaluate and score predicted versus truth detections / classifications in a COCO dataset
+        conform             Infer properties to make the COCO file conform to different specs.
         modify_categories   Rename or remove categories
         reroot              Reroot image paths onto a new image root.
-        validate            Validate that a coco file conforms to the json schema, that assets
+        validate            Validates that a coco file satisfies expected properties.
         subset              Take a subset of this dataset and write it to a new file
         grab                Grab standard datasets.
 
@@ -266,6 +266,8 @@ An informal description of the spec is written here:
         'width': int  # the base width of this video (all associated images must have this width)
         'height': int  # the base height of this video (all associated images must have this height)
 
+        'resolution': int | str,  # indicates the size of a pixel in video space
+
         # In the future this may be extended to allow pointing to video files
     }
 
@@ -281,13 +283,14 @@ An informal description of the spec is written here:
     image = {
         'id': int,
 
-        'name': str,  # an encouraged but optional unique name
+        'name': str,  # an encouraged but optional unique name (ideally not larger than 256 characters)
         'file_name': str,  # relative path to the "base" image data (optional if auxiliary items are specified)
 
         'width': int,   # pixel width of "base" image
         'height': int,  # pixel height of "base" image
 
         'channels': <ChannelSpec>,   # a string encoding of the channels in the main image (optional if auxiliary items are specified)
+        'resolution': int | str,  # indicates the size of a pixel in image space
 
         'auxiliary': [  # information about any auxiliary channels / bands
             {
@@ -301,7 +304,7 @@ An informal description of the spec is written here:
         ]
 
         'video_id': str  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
-        'timestamp': str | int  # a iso-string timestamp or an integer in flicks.
+        'timestamp': str | int  # a iso-8601 or unix timestamp.
         'frame_index': int  # ordinal frame index which can be used if timestamp is unknown.
         'warp_img_to_vid': <TransformSpec>  # a transform image space to video space (identity if unspecified), can be used for sensor alignment or video stabilization
     }
@@ -372,10 +375,10 @@ An informal description of the spec is written here:
     }
 
     Polygon:
-        A flattned list of xy coordinates.
+        A flattened list of xy coordinates.
         [x1, y1, x2, y2, ..., xn, yn]
 
-        or a list of flattned list of xy coordinates if the CCs are disjoint
+        or a list of flattened list of xy coordinates if the CCs are disjoint
         [[x1, y1, x2, y2, ..., xn, yn], [x1, y1, ..., xm, ym],]
 
         Note: the original coco spec does not allow for holes in polygons.
@@ -388,9 +391,9 @@ An informal description of the spec is written here:
 
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
-        encoding. We reuse the original C functions are in [2]_ in
-        ``kwimage.structs.Mask`` to provide a convinient way to abstract this
-        rather esoteric bytes encoding.
+        encoding. We reuse the original C functions are in [PyCocoToolsMask]_
+        in ``kwimage.structs.Mask`` to provide a convinient way to abstract
+        this rather esoteric bytes encoding.
 
         For pure python implementations see kwimage:
             Converting from an image to RLE can be done via kwimage.run_length_encoding
@@ -482,8 +485,8 @@ An informal description of the spec is written here:
                    {"channels": "cloudmask": "file_name": "cloudmask.tif", "warp_aux_to_img": {"scale": 4.0}, "height": 100, "width": 100, ...},
                    {"channels": "nir": "file_name": "nir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
                    {"channels": "swir": "file_name": "swir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
-                   {"channels": "model1_predictions:0.6": "file_name": "model1_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
-                   {"channels": "model2_predictions:0.3": "file_name": "model2_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                   {"channels": "model1_predictions.0:6": "file_name": "model1_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                   {"channels": "model2_predictions.0:3": "file_name": "model2_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
                 ]
             }
 
@@ -511,7 +514,7 @@ An informal description of the spec is written here:
 
         {
             'video_id': str  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
-            'timestamp': int  # optional, timestamp (ideally in flicks), used to identify the timestamp of the frame. Only applicable video inputs.
+            'timestamp': str | int  # optional, an iso8601 or unix timestamp
             'frame_index': int  # optional, ordinal frame index which can be used if timestamp is unknown.
         }
 
