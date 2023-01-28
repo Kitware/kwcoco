@@ -31,7 +31,8 @@ class CocoSplitCLI(object):
                     Using "image" will randomly assign each image to a partition.
                     Using "video" will randomly assign each video to a partition.
                     Using "auto" chooses "video" if there are any, otherwise "image".
-                    '''), choices=['auto', 'image', 'video'])
+                    '''), choices=['auto', 'image', 'video']),
+            'compress': scfg.Value(False, help='if True writes results with compression'),
         }
         epilog = """
         Example Usage:
@@ -117,13 +118,17 @@ class CocoSplitCLI(object):
         dset1 = dset.subset(gids1)
         dset2 = dset.subset(gids2)
 
+        dumpkw = {
+            'newlines': True,
+            'compress': config['compress'],
+        }
         dset1.fpath = config['dst1']
         print('Writing dset1 = {!r}'.format(dset1.fpath))
-        dset1.dump(dset1.fpath, newlines=True)
+        dset1.dump(**dumpkw)
 
         dset2.fpath = config['dst2']
         print('Writing dset2 = {!r}'.format(dset2.fpath))
-        dset2.dump(dset2.fpath, newlines=True)
+        dset2.dump(**dumpkw)
 
 _CLI = CocoSplitCLI
 

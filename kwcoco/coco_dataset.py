@@ -5287,6 +5287,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     'data',
                     'data.json',
                     'data.kwcoco.json',
+                    'data.kwcoco.zip',  # Allow zipfiles
+                    'data.kwcoco.json.zip',
                     '*.kwcoco.json',
                     '*.mscoco.json',
                 ]

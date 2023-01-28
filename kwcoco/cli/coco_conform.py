@@ -51,6 +51,8 @@ class CocoConformCLI:
             'mmlab': scfg.Value(False, help='if True tries to convert data '
                                 'to be compatible with open-mmlab tooling'),
 
+            'compress': scfg.Value(False, help='if True writes results with compression'),
+
             'workers': scfg.Value(
                 8, help='number of background workers used for IO bound checks'),
         }
@@ -64,7 +66,7 @@ class CocoConformCLI:
             >>> import ubelt as ub
             >>> dpath = ub.Path.appdir('kwcoco/tests/cli/conform').ensuredir()
             >>> dst = dpath / 'out.kwcoco.json'
-            >>> kw = {'src': 'special:shapes8', 'dst': dst}
+            >>> kw = {'src': 'special:shapes8', 'dst': dst, 'compress': True}
             >>> cmdline = False
             >>> cls = CocoConformCLI
             >>> cls.main(cmdline, **kw)
@@ -81,12 +83,12 @@ class CocoConformCLI:
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
-        config_ = ub.dict_diff(config, {'src', 'dst'})
+        config_ = ub.udict(config) - {'src', 'dst', 'compress'}
         dset.conform(**config_)
 
         dset.fpath = config['dst']
         print('dump dset.fpath = {!r}'.format(dset.fpath))
-        dset.dump(dset.fpath, newlines=True)
+        dset.dump(dset.fpath, newlines=True, compress=config['compress'])
 
 
 _CLI = CocoConformCLI

@@ -77,6 +77,8 @@ class CocoSubsetCLI(object):
 
             'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
 
+            'compress': scfg.Value(False, help='if True writes results with compression'),
+
             'absolute': scfg.Value('auto', help=ub.paragraph(
                 '''
                 if True will reroot all paths to be absolute before writing. If
@@ -189,7 +191,11 @@ class CocoSubsetCLI(object):
                 future.result()
 
         print('Writing new_dset.fpath = {!r}'.format(new_dset.fpath))
-        new_dset.dump(new_dset.fpath, newlines=True)
+        dumpkw = {
+            'newlines': True,
+            'compress': config['compress'],
+        }
+        new_dset.dump(new_dset.fpath, **dumpkw)
 
 
 def query_subset(dset, config):
