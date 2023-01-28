@@ -134,6 +134,11 @@ except ImportError:
     ...
 
 
+try:
+    from sqlalchemy.sql import text
+except ImportError:
+    text = ub.identity
+
 # TODO: is it possible to get sclalchemy to use JSON for sqlite and JSONB for
 # postgresql?
 # from sqlalchemy.dialects.postgresql import JSONB
@@ -1354,7 +1359,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         self.session = DBSession()
 
         if _uri_info['scheme'] == 'sqlite':
-            self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
+            self.session.execute(text('PRAGMA cache_size=-{}'.format(128 * 1000)))
 
         if _uri_info['scheme'].startswith('postgresql'):
             if 0:
