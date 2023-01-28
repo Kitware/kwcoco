@@ -17,10 +17,10 @@ numpy>=1.19.2  ; python_version < '3.9' and python_version >= '3.8'    # Python 
 numpy>=1.19.2  ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
 numpy>=1.19.2  ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
 
-# python ~/local/tools/supported_python_versions_pip.py pandas --request_min=1.1.4
-pandas>=1.3.5     ;                            python_version >= '3.10'    # Python 3.10+
-pandas>=1.4.0     ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
-pandas>=1.4.0     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
+# xdev availpkg pandas --request_min=1.1.4
+pandas>=1.5.3     ;                            python_version >= '3.10'    # Python 3.10+
+pandas>=1.5.3     ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
+pandas>=1.5.3     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
 pandas>=1.2.0     ; python_version < '3.8' and python_version >= '3.7.1'    # Python 3.7.1
 pandas>=1.1.4     ; python_version < '3.7.1' and python_version >= '3.7'    # Python 3.7
 pandas>=1.1.4     ; python_version < '3.7' and python_version >= '3.6.1'    # Python 3.6.1
