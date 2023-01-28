@@ -5594,6 +5594,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> self.remove_annotations(self.annots())
             >>> text = self.dumps(newlines=True, indent='  ')
             >>> print(text)
+            >>> text = self.dumps(newlines=0, indent='  ')
+            >>> print(text)
         """
         def _json_dumps(data, indent=None):
             if indent is not None:
@@ -5649,19 +5651,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     # Except image, where every auxiliary item also gets a line
                     value_lines = []
                     for img in value:
+                        asset_key = None
                         if 'auxiliary' in img:
-                            topimg = img.copy()
-                            aux_items = topimg.pop('auxiliary')
-                            aux_items_repr = _json_lines_dumps('auxiliary', aux_items, indent + indent)
-                            topimg_repr = _json_dumps(topimg)
-                            if len(topimg) == 0:
-                                v2 = '{' + aux_items_repr + '}'
-                            else:
-                                v2 = topimg_repr[:-1] + ', ' + aux_items_repr + '}'
+                            asset_key = 'auxiliary'
                         elif 'assets' in img:
+                            asset_key = 'assets'
+                        if asset_key is not None:
                             topimg = img.copy()
-                            aux_items = topimg.pop('assets')
-                            aux_items_repr = _json_lines_dumps('assets', aux_items, indent + indent)
+                            aux_items = topimg.pop(asset_key)
+                            aux_items_repr = _json_lines_dumps(asset_key, aux_items, indent + indent)
                             topimg_repr = _json_dumps(topimg)
                             if len(topimg) == 0:
                                 v2 = '{' + aux_items_repr + '}'
