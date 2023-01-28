@@ -256,7 +256,7 @@ class CategoryPatterns(object):
             kpts = kpts.scale(size)
 
         if size[0] == 0 or size[1] == 0:
-            print('size = {!r}'.format(size))
+            # print('size = {!r}'.format(size))
             template = np.empty(size[::-1], dtype=np.float32)
         else:
             template = cv2.resize(elem, size).astype(np.float32)

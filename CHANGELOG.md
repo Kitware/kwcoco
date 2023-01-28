@@ -8,6 +8,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.5.4 - Unreleased 
 
 
+### Added
+* New `compress=True` argument to `dump` which will compress the kwcoco file before writing it.
+
+
+### Changed
+* The `.fpath` attribute is no longer cast by default and is now allowed to be
+  a `pathlib.Path` instance. In the future we may always convert this attribute
+  to a pathlib object.
+
 
 ## Version 0.5.4 - Released 2023-01-23
 

@@ -339,7 +339,6 @@ import warnings
 from packaging.version import parse as Version
 from collections import OrderedDict, defaultdict
 from os.path import (dirname, basename, join, exists, isdir, relpath)
-from io import StringIO
 from functools import partial
 
 # Vectorized ORM-Like containers
@@ -5413,7 +5412,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     @fpath.setter
     def fpath(self, value):
-        self._fpath = value if value is None else os.fspath(value)
+        self._fpath = value if value is None else value
         self._infer_dirs()
 
     def _infer_dirs(self):
@@ -5592,102 +5591,24 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.coerce('vidshapes1-msi-multisensor', verbose=3)
             >>> self.remove_annotations(self.annots())
-            >>> text = self.dumps(newlines=True, indent='  ')
-            >>> print(text)
             >>> text = self.dumps(newlines=0, indent='  ')
             >>> print(text)
+            >>> text = self.dumps(newlines=True, indent='  ')
+            >>> print(text)
         """
-        def _json_dumps(data, indent=None):
-            if indent is not None:
-                if isinstance(indent, str):
-                    assert indent.count(' ') == len(indent), 'must be all spaces, got {!r}'.format(indent)
-                    indent = len(indent)
-            if indent is None:
-                indent = 0
-            fp = StringIO()
-            try:
-                json_w.dump(data, fp, indent=indent, ensure_ascii=False)
-            except Exception as ex:
-                print('Failed to dump ex = {!r}'.format(ex))
-                self._check_json_serializable()
-                raise
-            fp.seek(0)
-            text = fp.read()
-            return text
-
-        def _json_lines_dumps(key, value, indent):
-            value_lines = [_json_dumps(v) for v in value]
-            if value_lines:
-                value_body = (',\n' + indent).join(value_lines)
-                value_repr = '[\n' + indent + value_body + '\n]'
-            else:
-                value_repr = '[]'
-            item_repr = '{}: {}'.format(_json_dumps(key), value_repr)
-            return item_repr
-
+        from kwcoco.util import util_special_json
         # Instead of using json to dump the whole thing make the text a bit
         # more pretty.
-        if newlines:
-            if indent is None:
-                indent = ''
-            if isinstance(indent, int):
-                indent = ' ' * indent
-            dict_lines = []
-            main_keys = SPEC_KEYS
-            other_keys = sorted(set(self.dataset.keys()) - set(main_keys))
-            # TODO: optimize efficiency
-            # TODO: general "flexible json" package that can read to/from
-            # zipfiles, support ujson or pjson backends, has pretty newline
-            # properties. This would abstrat much of the logic away from this
-            # module and be generally useful when dealing with other larger
-            # json files.
-            for key in main_keys:
-                if key not in self.dataset:
-                    continue
-                # We know each main entry is a list, so make it such that
-                # Each entry gets its own line
-                value = self.dataset[key]
-                if key == 'images':
-                    # Except image, where every auxiliary item also gets a line
-                    value_lines = []
-                    for img in value:
-                        asset_key = None
-                        if 'auxiliary' in img:
-                            asset_key = 'auxiliary'
-                        elif 'assets' in img:
-                            asset_key = 'assets'
-                        if asset_key is not None:
-                            topimg = img.copy()
-                            aux_items = topimg.pop(asset_key)
-                            aux_items_repr = _json_lines_dumps(asset_key, aux_items, indent + indent)
-                            topimg_repr = _json_dumps(topimg)
-                            if len(topimg) == 0:
-                                v2 = '{' + aux_items_repr + '}'
-                            else:
-                                v2 = topimg_repr[:-1] + ', ' + aux_items_repr + '}'
-                        else:
-                            v2 = _json_dumps(img)
-                        value_lines.append(v2)
-                else:
-                    value_lines = [_json_dumps(v) for v in value]
-                if value_lines:
-                    value_body = (',\n' + indent).join(value_lines)
-                    value_repr = '[\n' + indent + value_body + '\n]'
-                else:
-                    value_repr = '[]'
-                item_repr = '{}: {}'.format(_json_dumps(key), value_repr)
-                dict_lines.append(item_repr)
-
-            for key in other_keys:
-                # Dont assume anything about other data
-                value = self.dataset.get(key, [])
-                value_repr = _json_dumps(value)
-                item_repr = '{}: {}'.format(_json_dumps(key), value_repr)
-                dict_lines.append(item_repr)
-            text = ''.join(['{\n', ',\n'.join(dict_lines), '\n}'])
-        else:
-            # TODO: do main key sorting here as well
-            text = _json_dumps(self.dataset, indent=indent)
+        try:
+            if newlines:
+                text = util_special_json._special_kwcoco_pretty_dumps_orig(self.dataset)
+            else:
+                # TODO: do main key sorting here as well
+                text = util_special_json._json_dumps(self.dataset, indent=indent)
+        except Exception as ex:
+            print('Failed to dump ex = {!r}'.format(ex))
+            self._check_json_serializable()
+            raise
 
         return text
 
@@ -5715,7 +5636,53 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 text = self.dumps(indent=indent, newlines=newlines)
                 zfile.writestr(arcname, text.encode('utf8'))
 
-    def dump(self, file=None, indent=None, newlines=False, temp_file=True):
+    def _compress_dump_to_fileptr(self, file, arcname=None, indent=None, newlines=False):
+        """
+        Experimental method to save compressed kwcoco files, may be folded into
+        dump in the future.
+        """
+        import zipfile
+        from kwcoco.util import util_archive
+        compression = util_archive._coerce_zipfile_compression('auto')
+        zipkw = {
+            'compression': compression,
+        }
+        if sys.version_info[0:2] >= (3, 7):
+            zipkw['compresslevel'] = None
+        if arcname is None:
+            arcname = 'data.kwcoco.json'
+        # arcname = basename(zip_fpath)
+        # if arcname.endswith('.zip'):
+        #     arcname = arcname[:-4]
+        #     if not arcname.endswith('.json'):
+        #         arcname = arcname + '.json'
+        with zipfile.ZipFile(file, 'w', **zipkw) as zfile:
+            text = self.dumps(indent=indent, newlines=newlines)
+            zfile.writestr(arcname, text.encode('utf8'))
+
+    def _dump(self, file, indent, newlines, compress):
+        """
+        Case where we are dumping to an open file pointer.
+        We assume this means the dataset has been written to disk.
+        """
+        if compress:
+            self._compress_dump_to_fileptr(
+                file, indent=indent, newlines=newlines)
+        else:
+            if newlines:
+                file.write(self.dumps(indent=indent, newlines=newlines))
+            else:
+                try:
+                    json_w.dump(self.dataset, file, indent=indent,
+                                ensure_ascii=False)
+                except Exception as ex:
+                    print('Failed to dump ex = {!r}'.format(ex))
+                    self._check_json_serializable()
+                    raise
+        self._state['was_saved'] = True
+
+    def dump(self, file=None, indent=None, newlines=False, temp_file=True,
+             compress=False):
         """
         Writes the dataset out to the json format
 
@@ -5735,61 +5702,47 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 Argument to :func:`safer.open`.  Ignored if ``file`` is not a
                 PathLike object. Defaults to True.
 
-        Example:
-            >>> import tempfile
-            >>> import json
-            >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
-            >>> file = tempfile.NamedTemporaryFile('w')
-            >>> self.dump(file)
-            >>> file.seek(0)
-            >>> text = open(file.name, 'r').read()
-            >>> print(text)
-            >>> file.seek(0)
-            >>> dataset = json.load(open(file.name, 'r'))
-            >>> self2 = kwcoco.CocoDataset(dataset, tag='demo2')
-            >>> assert self2.dataset == self.dataset
-            >>> assert self2.dataset is not self.dataset
+            compress (bool):
+                if True, dumps the kwcoco file as a compressed zipfile.
+                In this case a literal IO file object must be opened in binary
+                write mode.
 
-            >>> file = tempfile.NamedTemporaryFile('w')
-            >>> self.dump(file, newlines=True)
-            >>> file.seek(0)
-            >>> text = open(file.name, 'r').read()
-            >>> print(text)
-            >>> file.seek(0)
-            >>> dataset = json.load(open(file.name, 'r'))
-            >>> self2 = kwcoco.CocoDataset(dataset, tag='demo2')
-            >>> assert self2.dataset == self.dataset
-            >>> assert self2.dataset is not self.dataset
+        Example:
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/demo/dump').ensuredir()
+            >>> dset = kwcoco.CocoDataset.demo()
+            >>> dset.fpath = dpath / 'my_coco_file.json'
+            >>> # Calling dump writes to the current fpath attribute.
+            >>> dset.dump()
+            >>> assert dset.dataset == kwcoco.CocoDataset(dset.fpath).dataset
+            >>> assert dset.dumps() == dset.fpath.read_text()
+            >>> #
+            >>> # Using compress=True can save a lot of space and it
+            >>> # is transparent when reading files via CocoDataset
+            >>> dset.dump(compress=True)
+            >>> assert dset.dataset == kwcoco.CocoDataset(dset.fpath).dataset
+            >>> assert dset.dumps() != dset.fpath.read_text(errors='replace')
         """
+        from kwcoco.util.util_json import coerce_indent
+        indent = coerce_indent(indent)
+
         if file is None:
             file = self.fpath
 
-        if indent is not None and isinstance(indent, str):
-            assert indent.count(' ') == len(indent), (
-                'must be all spaces, got {!r}'.format(indent))
-            indent = len(indent)
-        if indent is None:
-            indent = 0
+        mode = 'wb' if compress else 'w'
+
         try:
             fpath = os.fspath(file)
         except TypeError:
-            if newlines:
-                file.write(self.dumps(indent=indent, newlines=newlines))
-            else:
-                try:
-                    json_w.dump(self.dataset, file, indent=indent,
-                                ensure_ascii=False)
-                except Exception as ex:
-                    print('Failed to dump ex = {!r}'.format(ex))
-                    self._check_json_serializable()
-                    raise
-                else:
-                    self._state['was_saved'] = True
+            # We are likely dumping to a real file.
+            self._dump(
+                file, indent=indent, newlines=newlines, compress=compress)
         else:
             import safer
-            with safer.open(fpath, 'w', temp_file=temp_file) as fp:
-                self.dump(fp, indent=indent, newlines=newlines)
+            with safer.open(fpath, mode, temp_file=temp_file) as fp:
+                self._dump(
+                    fp, indent=indent, newlines=newlines, compress=compress)
 
     def _check_json_serializable(self, verbose=1):
         """
@@ -5905,9 +5858,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     # Dont make this an error because a video dictionary is not
                     # strictly necessary for images to be linked via videos.
                     # We could make this a warning.
-                    # errors.append('gid={} references bad vidid={}'.format(gid, vidid))
+                    # errors.append('gid={} references bad video_id={}'.format(gid, vidid))
                 elif self.index.videos[vidid]['id'] != vidid:
-                    errors.append('vidid={} has a bad index'.format(vidid))
+                    errors.append('video_id={} has a bad index'.format(vidid))
 
         if errors:
             raise Exception('\n'.join(errors))

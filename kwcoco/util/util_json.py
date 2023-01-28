@@ -4,27 +4,6 @@ import ubelt as ub
 import json
 from collections import OrderedDict
 import pathlib
-from packaging.version import parse as Version
-import os
-import json as pjson
-from types import ModuleType
-# The ujson library is faster than Python's json, but the API has some
-# limitations and requires a minimum version. Currently we only use it to read,
-# we have to wait for https://github.com/ultrajson/ultrajson/pull/518 to land
-# before we use it to write.
-try:
-    import ujson
-except ImportError:
-    ujson = None
-
-KWCOCO_USE_UJSON = bool(os.environ.get('KWCOCO_USE_UJSON'))
-
-if ujson is not None and Version(ujson.__version__) >= Version('5.2.0') and KWCOCO_USE_UJSON:
-    json_r: ModuleType = ujson
-    json_w: ModuleType = pjson
-else:
-    json_r: ModuleType = pjson
-    json_w: ModuleType = pjson
 
 # backwards compat
 IndexableWalker = ub.IndexableWalker
@@ -264,120 +243,19 @@ def indexable_allclose(dct1, dct2, return_info=False):
         return final_flag
 
 
-def _special_kwcoco_pretty_dumps(data):
+def coerce_indent(indent):
     """
-    json dumps, but nicer using lark
-
-    Ignore:
-        import kwcoco
-        dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
-        data = dset.dataset
+    Example:
+        .. code:: python
+            print(repr(coerce_indent(None)))
+            print(repr(coerce_indent('   ')))
+            print(repr(coerce_indent(3)))
     """
-    print(json_w.dumps(data, indent='    '))
-    print('data = {}'.format(ub.urepr(data, nl=4)))
-    # from lark import Lark, Transformer, v_args
-    from lark import Lark
-
-    reformat_grammar = r"""
-        ?start: outer_tables
-
-        ?value: object
-              | array
-              | string
-              | SIGNED_NUMBER      -> number
-              | "true"             -> true
-              | "false"            -> false
-              | "null"             -> null
-              | "NaN"              -> nan
-              | "Inf"              -> inf
-
-        array  : "[" [value ("," value)*] "]"
-        object : "{" [pair ("," pair)*] "}"
-        pair   : string ":" value
-
-        table_row : "{" [pair ("," pair)*] "}"
-        outer_table  : "[" [table_row ("," table_row)*] "]"
-        outer_pair   : string ":" outer_table
-        outer_tables : "{" [outer_pair ("," outer_pair)*] "}"
-
-        string : ESCAPED_STRING
-
-        %import common.ESCAPED_STRING
-        %import common.SIGNED_NUMBER
-        %import common.WS
-
-        %ignore WS
-    """
-
-    # https://github.com/lark-parser/lark/issues/12
-
-    ### Create the JSON parser with Lark, using the LALR algorithm
-    json_parser = Lark(reformat_grammar, parser='lalr',
-                       # Using the basic lexer isn't required, and isn't usually recommended.
-                       # But, it's good enough for JSON, and it's slightly faster.
-                       # lexer='standard',
-                       lexer='contextual',
-                       propagate_positions=True,
-                       maybe_placeholders=True,
-                       # # Disabling propagate_positions and placeholders slightly improves speed
-                       # propagate_positions=False,
-                       # maybe_placeholders=False,
-                       )
-
-    raw_text = json.dumps(data)
-    parsed = json_parser.parse(raw_text)
-    # outer_table = parsed.children[2].children[1]
-
-    table_splits = []
-    table_indents = []
-    table_indents.append('')
-    assert parsed.data == 'outer_tables'
-    table_splits.append(parsed.meta.start_pos + 1)
-    for child in parsed.children:
-        assert child.data == 'outer_pair'
-        table = child.children[1]
-        table_name = child.children[0]
-        assert table.data == 'outer_table'
-
-        table_splits.append(table.meta.start_pos + 1)
-        table_indents.append('')
-
-        if table_name.children[0] == '"images"':
-            # Special case for image table
-            for table_row in table.children:
-                if table_row is not None:
-                    assert table_row.data == 'table_row'
-                    for img_field in table_row.children:
-                        img_key = img_field.children[0]
-                        if img_key.children[0] == '"auxiliary"':
-                            img_val = img_field.children[1]
-                            # table_splits.append(img_field.meta.start_pos)
-                            table_splits.append(img_val.meta.start_pos + 1)
-                            table_indents.append('')
-                            for aux_token in img_val.children:
-                                table_indents.append('    ')
-                                table_splits.append(aux_token.meta.end_pos + 1)
-                            # table_splits.append(pair_item.meta.end_pos + 1)
-                    # table_splits.append(table_row.meta.start_pos)
-                    table_splits.append(table_row.meta.end_pos + 1)
-                    table_indents.append('')
-        else:
-            for table_row in table.children:
-                if table_row is not None:
-                    assert table_row.data == 'table_row'
-                    # table_splits.append(table_row.meta.start_pos)
-                    table_splits.append(table_row.meta.end_pos + 1)
-                    table_indents.append('    ')
-
-        table_splits.append(table.meta.end_pos + 1)
-        table_indents.append('')
-    table_splits.append(parsed.meta.end_pos + 1)
-    table_indents.append('')
-    table_indents.append('')
-
-    parts = [
-        raw_text[a:b]
-        for a, b in ub.iter_window([0] + table_splits + [-1], 2)]
-
-    x = list(ub.flatten(zip(['\n' + a for a in table_indents], parts)))
-    print(''.join(x))
+    if indent is not None and isinstance(indent, str):
+        assert indent.count(' ') == len(indent), (
+            'must be all spaces, got {!r}'.format(indent))
+        indent = len(indent)
+    if indent is None:
+        ...
+        # indent = 0  # Can't do this. It introduces a bug
+    return indent

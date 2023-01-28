@@ -459,7 +459,7 @@ class Videos(ObjectList1D):
             <ImageGroups(n=8, m=2.0, s=0.0)>
         """
         return ImageGroups(
-            [self._dset.images(vidid=vidid) for vidid in self._ids],
+            [self._dset.images(video_id=vidid) for vidid in self._ids],
             self._dset)
 
 
