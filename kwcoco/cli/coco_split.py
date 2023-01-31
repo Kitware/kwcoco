@@ -135,7 +135,7 @@ class CocoSplitCLI(object):
             'compress': config['compress'],
         }
         for split_num, (idxs1, idxs2) in enumerate(split_idxs):
-            print('Build split {split_num} / {factor} with ratio {len(idxs1}:{len(idxs2}')
+            print(f'Build split {split_num} / {factor} with ratio {len(idxs1)}:{len(idxs2)}')
             idxs1, idxs2 = split_idxs[0]
             gids1 = sorted(ub.unique(ub.take(final_group_gids, idxs1)))
             gids2 = sorted(ub.unique(ub.take(final_group_gids, idxs2)))

@@ -94,6 +94,7 @@ def main(cmdline=True, **kw):
         import argcomplete
         # Need to run: "$(register-python-argcomplete xdev)"
         # or activate-global-python-argcomplete --dest=-
+        # mkdir -p ~/.bash_completion.d
         # activate-global-python-argcomplete --dest ~/.bash_completion.d
         # To enable this.
     except ImportError:
