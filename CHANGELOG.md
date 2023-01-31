@@ -9,7 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * New `compress=True` argument to `dump` which will compress the kwcoco file before writing it.
-* Add CLI argument `--write_all` to `kwcoco split` to write all splits.
+* Add CLI argument `--num_write` to `kwcoco split` to write multiple splits.
 
 
 ### Changed

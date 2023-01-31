@@ -24,11 +24,12 @@ class CocoSplitCLI(object):
             'factor': scfg.Value(3, help='ratio of items put in dset1 vs dset2'),
             'rng': scfg.Value(None, help='random seed'),
             'balance_categories': scfg.Value(True, help='if True tries to balance annotation categories across splits'),
-            'write_all': scfg.Value(False, isflag=True, help=ub.paragraph(
+            'num_write': scfg.Value(1, isflag=True, help=ub.paragraph(
                 '''
-                if True then all ``factor`` splits are written to disk. In this
-                case the dst1 and dst2 datasets must contain a {} format string
-                specifier so each of the output filesnames can be indexed.
+                The number of splits to write. Can be between 1 and ``factor``.
+                In the case that ``num_write > ``, then dst1 and dst2 datasets
+                must contain a {} format string specifier so each of the output
+                filesnames can be indexed.
                 ''')),
             'splitter': scfg.Value(
                 'auto', help=ub.paragraph(
@@ -63,7 +64,6 @@ class CocoSplitCLI(object):
         """
         import kwcoco
         import kwarray
-        import warnings
         from kwcoco.util import util_sklearn
 
         config = cls.CLIConfig(kw, cmdline=cmdline)
@@ -72,20 +72,14 @@ class CocoSplitCLI(object):
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
 
-        if config['write_all']:
+        if config['num_write']:
             if not set(config['dst1']).issuperset(set('{}')):
                 raise Exception(
-                    'when write_all is True dst1 and dst2 must contain a {} format string placeholder')
+                    'when num_write is True dst1 and dst2 must contain a {} format string placeholder')
 
             if not set(config['dst2']).issuperset(set('{}')):
                 raise Exception(
-                    'when write_all is True dst1 and dst2 must contain a {} format string placeholder')
-        else:
-            if set(config['dst1']).issuperset(set('{}')):
-                warnings.warn('write_all is False, but dst1 has a format string placeholder')
-
-            if set(config['dst2']).issuperset(set('{}')):
-                warnings.warn('write_all is False, but dst2 has a format string placeholder')
+                    'when num_write is True dst1 and dst2 must contain a {} format string placeholder')
 
         print('reading fpath = {!r}'.format(config['src']))
         dset = kwcoco.CocoDataset.coerce(config['src'])
@@ -141,28 +135,26 @@ class CocoSplitCLI(object):
             'compress': config['compress'],
         }
         for split_num, (idxs1, idxs2) in enumerate(split_idxs):
+            print('Build split {split_num} / {factor} with ratio {len(idxs1}:{len(idxs2}')
             idxs1, idxs2 = split_idxs[0]
             gids1 = sorted(ub.unique(ub.take(final_group_gids, idxs1)))
             gids2 = sorted(ub.unique(ub.take(final_group_gids, idxs2)))
 
             dset1 = dset.subset(gids1)
             dset2 = dset.subset(gids2)
+            print('stats(dset1): ' + ub.urepr(dset1.basic_stats(), nl=0))
+            print('stats(dset2): ' + ub.urepr(dset2.basic_stats(), nl=0))
 
-            if config['write_all']:
-                dset1.fpath = config['dst1'].format(split_num)
-                dset2.fpath = config['dst2'].format(split_num)
-                print(f'Writing dset1({split_num} / {factor}) = {dset1.fpath!r}')
-                dset1.dump(**dumpkw)
-                print(f'Writing dset2({split_num} / {factor}) = {dset2.fpath!r}')
-                dset2.dump(**dumpkw)
-            else:
-                dset1.fpath = config['dst1']
-                dset2.fpath = config['dst2']
-                print(f'Writing dset1 = {dset1.fpath!r}')
-                dset1.dump(**dumpkw)
-                print(f'Writing dset2 = {dset2.fpath!r}')
-                dset2.dump(**dumpkw)
+            dset1.fpath = config['dst1'].format(split_num)
+            dset2.fpath = config['dst2'].format(split_num)
+            print(f'Writing dset1({split_num} / {factor}) = {dset1.fpath!r}')
+            dset1.dump(**dumpkw)
+            print(f'Writing dset2({split_num} / {factor}) = {dset2.fpath!r}')
+            dset2.dump(**dumpkw)
+
+            if split_num + 1 >= config['num_write']:
                 break
+
 
 _CLI = CocoSplitCLI
 
