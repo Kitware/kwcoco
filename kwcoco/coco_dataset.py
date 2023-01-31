@@ -1323,13 +1323,7 @@ class MixinCocoExtras(object):
                     value = part[match.span()[0]:]
                 key = alias_to_key.get(key, key)
                 if key == 'image_size':
-                    if isinstance(value, str):
-                        s = int(value)
-                        value = (s, s)
-                    if isinstance(value, (float, int)):
-                        s = int(value)
-                        value = (s, s)
-                    value = value
+                    value = int(value)
                 if key == 'num_frames':
                     value = int(value)
                 if key == 'num_tracks':
@@ -1354,6 +1348,10 @@ class MixinCocoExtras(object):
                 vidkw[key] = value
 
             vidkw.update(kwargs)
+
+            if isinstance(vidkw['image_size'], int):
+                vidkw['image_size'] = (vidkw['image_size'], vidkw['image_size'])
+
             use_cache = vidkw.pop('use_cache', True)
 
             if 'rng' not in vidkw:
@@ -5684,7 +5682,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         self._state['was_saved'] = True
 
     def dump(self, file=None, indent=None, newlines=False, temp_file=True,
-             compress=False):
+             compress='auto'):
         """
         Writes the dataset out to the json format
 
@@ -5704,10 +5702,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 Argument to :func:`safer.open`.  Ignored if ``file`` is not a
                 PathLike object. Defaults to True.
 
-            compress (bool):
+            compress (bool | str):
                 if True, dumps the kwcoco file as a compressed zipfile.
                 In this case a literal IO file object must be opened in binary
-                write mode.
+                write mode. If auto, then it will default to False unless
+                it can introspect the file name and the name ends with .zip
 
         Example:
             >>> import kwcoco
@@ -5725,6 +5724,18 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> dset.dump(compress=True)
             >>> assert dset.dataset == kwcoco.CocoDataset(dset.fpath).dataset
             >>> assert dset.dumps() != dset.fpath.read_text(errors='replace')
+
+        Example:
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> # Compression auto-defaults based on the file name.
+            >>> dpath = ub.Path.appdir('kwcoco/demo/dump').ensuredir()
+            >>> dset = kwcoco.CocoDataset.demo()
+            >>> fpath1 = dset.fpath = dpath / 'my_coco_file.zip'
+            >>> dset.dump()
+            >>> fpath2 = dset.fpath = dpath / 'my_coco_file.json'
+            >>> dset.dump()
+            >>> assert fpath1.read_bytes()[0:8] != fpath2.read_bytes()[0:8]
         """
         from kwcoco.util.util_json import coerce_indent
         indent = coerce_indent(indent)
@@ -5732,19 +5743,32 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if file is None:
             file = self.fpath
 
-        mode = 'wb' if compress else 'w'
-
         try:
             fpath = os.fspath(file)
         except TypeError:
-            # We are likely dumping to a real file.
-            self._dump(
-                file, indent=indent, newlines=newlines, compress=compress)
+            input_was_pathlike = False
         else:
+            input_was_pathlike = True
+
+        if compress == 'auto':
+            compress = False
+            if not input_was_pathlike:
+                fpath = getattr(file, 'name', None)
+            if fpath is not None:
+                if os.fspath(fpath).endswith('.zip'):
+                    compress = True
+
+        mode = 'wb' if compress else 'w'
+
+        if input_was_pathlike:
             import safer
             with safer.open(fpath, mode, temp_file=temp_file) as fp:
                 self._dump(
                     fp, indent=indent, newlines=newlines, compress=compress)
+        else:
+            # We are likely dumping to a real file.
+            self._dump(
+                file, indent=indent, newlines=newlines, compress=compress)
 
     def _check_json_serializable(self, verbose=1):
         """
