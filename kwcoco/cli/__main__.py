@@ -108,7 +108,12 @@ def main(cmdline=True, **kw):
             from kwcoco.demo.boids import _yeah_boid
             _yeah_boid()
 
-    ns = parser.parse_known_args()[0]
+    import os
+    KWCOCO_LOOSE_CLI = os.environ.get('KWCOCO_LOOSE_CLI', '')
+    if KWCOCO_LOOSE_CLI:
+        ns = parser.parse_known_args()[0]
+    else:
+        ns = parser.parse_args()
     # print('ns = {!r}'.format(ns))
 
     # Execute the subcommand without additional CLI parsing

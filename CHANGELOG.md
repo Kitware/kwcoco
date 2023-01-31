@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Changed
+* The kwcoco CLI is now strict (i.e. will error on unsupported arguments) by default. Set the `KWCOCO_LOOSE_CLI` environment variable to use the old behavior. 
 * Added argcomplete support
 * The `.fpath` attribute is no longer cast by default and is now allowed to be
   a `pathlib.Path` instance. In the future we may always convert this attribute
