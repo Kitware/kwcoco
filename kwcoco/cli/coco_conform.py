@@ -88,7 +88,11 @@ class CocoConformCLI:
 
         dset.fpath = config['dst']
         print('dump dset.fpath = {!r}'.format(dset.fpath))
-        dset.dump(dset.fpath, newlines=True, compress=config['compress'])
+        dumpkw = {
+            'newlines': True,
+            'compress': config['compress'],
+        }
+        dset.dump(dset.fpath, **dumpkw)
 
 
 _CLI = CocoConformCLI

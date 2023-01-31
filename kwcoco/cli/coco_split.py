@@ -21,8 +21,8 @@ class CocoSplitCLI(object):
             'src': scfg.Value(None, help='input dataset to split', position=1),
             'dst1': scfg.Value('split1.kwcoco.json', help='output path of the larger split'),
             'dst2': scfg.Value('split2.kwcoco.json', help='output path of the smaller split'),
-            'factor': scfg.Value(3, help='ratio of items put in dset1 vs dset2'),
-            'rng': scfg.Value(None, help='random seed'),
+            'factor': scfg.Value(3, help='number of items in dset1 for each item in dset2. Also defines the maximum number of splits that could be written.'),
+            'rng': scfg.Value(None, help='A random seed for reproducible splits'),
             'balance_categories': scfg.Value(True, help='if True tries to balance annotation categories across splits'),
             'num_write': scfg.Value(1, isflag=True, help=ub.paragraph(
                 '''

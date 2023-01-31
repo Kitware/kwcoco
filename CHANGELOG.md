@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Changed
+* Added argcomplete support
 * The `.fpath` attribute is no longer cast by default and is now allowed to be
   a `pathlib.Path` instance. In the future we may always convert this attribute
   to a pathlib object.

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# PYTHON_ARGCOMPLETE_OK
 import sys
 import ubelt as ub
 
@@ -87,6 +89,18 @@ def main(cmdline=True, **kw):
         for sub in parser._subparsers:
             parser._subparsers._actions
             pass
+
+    try:
+        import argcomplete
+        # Need to run: "$(register-python-argcomplete xdev)"
+        # or activate-global-python-argcomplete --dest=-
+        # activate-global-python-argcomplete --dest ~/.bash_completion.d
+        # To enable this.
+    except ImportError:
+        argcomplete = None
+
+    if argcomplete is not None:
+        argcomplete.autocomplete(parser)
 
     EASTER = 1
     if EASTER:
