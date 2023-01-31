@@ -51,7 +51,7 @@ class CocoConformCLI:
             'mmlab': scfg.Value(False, help='if True tries to convert data '
                                 'to be compatible with open-mmlab tooling'),
 
-            'compress': scfg.Value(False, help='if True writes results with compression'),
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
 
             'workers': scfg.Value(
                 8, help='number of background workers used for IO bound checks'),

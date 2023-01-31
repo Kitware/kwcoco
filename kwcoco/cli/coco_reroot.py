@@ -43,7 +43,7 @@ class CocoRerootCLI:
             'check': scfg.Value(True, help=(
                 'If True, checks that all data exists')),
 
-            'compress': scfg.Value(False, help='if True writes results with compression'),
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
 
     @classmethod

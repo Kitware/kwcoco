@@ -15,7 +15,7 @@ class CocoUnionCLI(object):
             'src': scfg.Value([], nargs='+', help='path to multiple input datasets', position=1),
             'dst': scfg.Value('combo.kwcoco.json', help='path to output dataset'),
             'absolute': scfg.Value(False, isflag=1, help='if True, converts paths to absolute paths before doing union'),
-            'compress': scfg.Value(False, help='if True writes results with compression'),
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
         epilog = """
         Example Usage:

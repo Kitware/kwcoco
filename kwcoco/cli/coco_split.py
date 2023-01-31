@@ -39,7 +39,7 @@ class CocoSplitCLI(object):
                     Using "video" will randomly assign each video to a partition.
                     Using "auto" chooses "video" if there are any, otherwise "image".
                     '''), choices=['auto', 'image', 'video']),
-            'compress': scfg.Value(False, help='if True writes results with compression'),
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
         epilog = """
         Example Usage:

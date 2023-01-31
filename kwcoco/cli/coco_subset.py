@@ -77,7 +77,7 @@ class CocoSubsetCLI(object):
 
             'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
 
-            'compress': scfg.Value(False, help='if True writes results with compression'),
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
 
             'absolute': scfg.Value('auto', help=ub.paragraph(
                 '''

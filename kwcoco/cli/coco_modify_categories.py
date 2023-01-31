@@ -40,7 +40,7 @@ class CocoModifyCatsCLI:
 
             'rename': scfg.Value(None, type=str, help='category mapping in the format. "old1:new1,old2:new2"'),
 
-            'compress': scfg.Value(False, help='if True writes results with compression'),
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
 
     @classmethod
