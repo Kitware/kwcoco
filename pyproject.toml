@@ -21,6 +21,7 @@ author_email = "jon.crall@kitware.com"
 license = "Apache 2"
 description = "The kwcoco module and cli for image datasets"
 dev_status = "beta"
+typed = true
 
 [tool.xcookie.entry_points]
 # the console_scripts entry point creates the xdoctest executable
