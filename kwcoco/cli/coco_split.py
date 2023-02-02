@@ -72,12 +72,12 @@ class CocoSplitCLI(object):
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
 
-        if config['num_write']:
-            if not set(config['dst1']).issuperset(set('{}')):
+        if config['num_write'] > 1:
+            if not set(str(config['dst1'])).issuperset(set('{}')):
                 raise Exception(
                     'when num_write is True dst1 and dst2 must contain a {} format string placeholder')
 
-            if not set(config['dst2']).issuperset(set('{}')):
+            if not set(str(config['dst2'])).issuperset(set('{}')):
                 raise Exception(
                     'when num_write is True dst1 and dst2 must contain a {} format string placeholder')
 
@@ -145,8 +145,8 @@ class CocoSplitCLI(object):
             print('stats(dset1): ' + ub.urepr(dset1.basic_stats(), nl=0))
             print('stats(dset2): ' + ub.urepr(dset2.basic_stats(), nl=0))
 
-            dset1.fpath = config['dst1'].format(split_num)
-            dset2.fpath = config['dst2'].format(split_num)
+            dset1.fpath = str(config['dst1']).format(split_num)
+            dset2.fpath = str(config['dst2']).format(split_num)
             print(f'Writing dset1({split_num} / {factor}) = {dset1.fpath!r}')
             dset1.dump(**dumpkw)
             print(f'Writing dset2({split_num} / {factor}) = {dset2.fpath!r}')
