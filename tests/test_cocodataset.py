@@ -134,3 +134,41 @@ def test_partial_null_category_id():
     cat_hist = ub.dict_hist([ann['category_id'] for ann in new_dset.anns.values()])
     assert cat_hist == {None: 4, 1: 2}
     assert new_dset.category_annotation_frequency() == ub.odict([('a', 2), (None, 4)])
+
+
+def test_dump():
+    import tempfile
+    import json
+    import kwcoco
+    self = kwcoco.CocoDataset.demo()
+    file = tempfile.NamedTemporaryFile('w')
+    self.dump(file)
+    file.seek(0)
+    text = open(file.name, 'r').read()
+    print(text)
+    file.seek(0)
+    dataset = json.load(open(file.name, 'r'))
+    self2 = kwcoco.CocoDataset(dataset, tag='demo2')
+    assert self2.dataset == self.dataset
+    assert self2.dataset is not self.dataset
+
+    file = tempfile.NamedTemporaryFile('w')
+    self.dump(file, newlines=True)
+    text = ub.Path(file.name).read_text()
+    print(text)
+    file.seek(0)
+    dataset = json.load(open(file.name, 'r'))
+    self2 = kwcoco.CocoDataset(dataset, tag='demo2')
+    assert self2.dataset == self.dataset
+    assert self2.dataset is not self.dataset
+
+
+def test_dump_causes_saved_status():
+    import kwcoco
+    import ubelt as ub
+    dpath = ub.Path.appdir('kwcoco/test/test_dump_causes_saved_status').ensuredir()
+    dset = kwcoco.CocoDataset.demo()
+    fpath = dpath / 'mydata.kwcoco.json'
+    dset.dump(fpath)
+    dpath.delete()
+    assert dset._state['was_saved']

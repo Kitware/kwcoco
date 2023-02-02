@@ -816,7 +816,8 @@ class CocoImage(ub.NiceRepr):
             factor = self._scalefactor_for_resolution(
                 space=space, resolution=resolution,
                 RESOLUTION_KEY=RESOLUTION_KEY)
-            delayed = delayed.scale(factor)
+            delayed = delayed.scale(
+                factor, antialias=antialias, interpolation=interpolation)
 
         return delayed
 

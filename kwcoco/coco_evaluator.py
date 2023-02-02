@@ -546,7 +546,7 @@ class CocoEvaluator(object):
             gid_to_det, _extra = CocoEvaluator._coerce_dets(
                 coco_dset, verbose, workers=workers)
             extra.update(_extra)
-        elif isinstance(dataset, str):
+        elif isinstance(dataset, (str, os.PathLike)):
             if exists(dataset):
                 # on-disk detections
                 if isdir(dataset):

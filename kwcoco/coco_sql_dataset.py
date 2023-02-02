@@ -68,6 +68,7 @@ interested in setting up a global service though 😞. I also found a 10-year
 old thread with a hash-index feature request for SQLite, which I
 unabashedly resurrected
 http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
+https://web.archive.org/web/20210326010915/http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 """
 import json
 import numpy as np
@@ -133,6 +134,11 @@ try:
 except ImportError:
     ...
 
+
+try:
+    from sqlalchemy.sql import text
+except ImportError:
+    text = ub.identity
 
 # TODO: is it possible to get sclalchemy to use JSON for sqlite and JSONB for
 # postgresql?
@@ -1354,7 +1360,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         self.session = DBSession()
 
         if _uri_info['scheme'] == 'sqlite':
-            self.session.execute('PRAGMA cache_size=-{}'.format(128 * 1000))
+            self.session.execute(text('PRAGMA cache_size=-{}'.format(128 * 1000)))
 
         if _uri_info['scheme'].startswith('postgresql'):
             if 0:
@@ -1416,6 +1422,25 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def populate_from(self, dset, verbose=1):
         """
         Copy the information in a :class:`CocoDataset` into this SQL database.
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> from kwcoco.coco_sql_dataset import _benchmark_dset_readtime  # NOQA
+            >>> import kwcoco
+            >>> from kwcoco.coco_sql_dataset import *
+            >>> dset2 = dset = kwcoco.CocoDataset.demo()
+            >>> dset2.clear_annotations()
+            >>> dset1 = self = CocoSqlDatabase('sqlite:///:memory:')
+            >>> self.connect()
+            >>> self.populate_from(dset)
+            >>> dset1_images = list(dset1.dataset['images'])
+            >>> print('dset1_images = {}'.format(ub.urepr(dset1_images, nl=1)))
+            >>> print(dset2.dumps(newlines=True))
+            >>> assert_dsets_allclose(dset1, dset2, tag1='sql', tag2='dct')
+            >>> ti_sql = _benchmark_dset_readtime(dset1, 'sql')
+            >>> ti_dct = _benchmark_dset_readtime(dset2, 'dct')
+            >>> print('ti_sql.rankings = {}'.format(ub.repr2(ti_sql.rankings, nl=2, precision=6, align=':')))
+            >>> print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -1573,13 +1598,13 @@ class CocoSqlDatabase(AbstractCocoDataset,
                     cids = [ann[key] for ann in anns]
         """
         # FIXME: Make this work for columns that need json decoding
-        stmt = ub.paragraph(
+        stmt = text(ub.paragraph(
             '''
             SELECT
                 {tablename}.{key}
             FROM {tablename}
             WHERE {tablename}.id = :rowid
-            ''').format(tablename=tablename, key=key)
+            ''').format(tablename=tablename, key=key))
 
         # TODO: memoize this check
         table = CocoBase.TBLNAME_TO_CLASS[tablename]
@@ -1623,12 +1648,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
         """
         colnames_list = ['{}.{}'.format(tablename, key) for key in keys]
         colnames = ', '.join(colnames_list)
-        stmt = ub.paragraph(
+        stmt = text(ub.paragraph(
             '''
             SELECT
                 {colnames}
             FROM {tablename} ORDER BY {tablename}.id
-            ''').format(colnames=colnames, tablename=tablename)
+            ''').format(colnames=colnames, tablename=tablename))
         result = self.session.execute(stmt)
         rows = result.fetchall()
         return rows
@@ -1655,7 +1680,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
             FROM annotations
             JOIN images on images.id = annotations.image_id
             ''')
-        result = self.session.execute(stmt)
+        result = self.session.execute(text(stmt))
         rows = result.fetchall()
         aids, gids, cids, cxs, cys, ws, hs, img_ws, img_hs = list(zip(*rows))
 
@@ -1887,8 +1912,9 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
     for key, pair in compare.items():
         lut1 = pair[tag1]
         lut2 = pair[tag2]
-        assert lut1 == lut2, (
-            'Failed {} on lut1={!r}, lut2={!r}'.format(key, lut1, lut2))
+        if lut1 != lut2:
+            raise AssertionError(
+                'Failed {} on lut1={!r}, lut2={!r}'.format(key, lut1, lut2))
     # ------
     # The row dictionaries may have extra Nones on the SQL side
     # So the comparison logic is slightly more involved here
@@ -1913,7 +1939,11 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
         lut1 = pair[tag1]
         lut2 = pair[tag2]
         keys = set(lut1.keys()) & set(lut2.keys())
-        assert len(keys) == len(lut2) == len(lut1)
+        if not (len(keys) == len(lut2) == len(lut1)):
+            print(f'keys={keys}')
+            print(f'lut1={lut1}')
+            print(f'lut2={lut2}')
+            raise AssertionError('Datasets keys are not close (case 0')
         for key in keys:
             item1 = ub.dict_diff(lut1[key], special_cols)
             item2 = ub.dict_diff(lut2[key], special_cols)
@@ -1923,9 +1953,24 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
             common2 = ub.dict_isect(item1, item2)
             diff1 = ub.dict_diff(item1, common2)
             diff2 = ub.dict_diff(item2, common1)
-            assert indexable_allclose(common2, common1)
-            assert all(v is None for v in diff2.values())
-            assert all(v is None for v in diff1.values())
+            if not indexable_allclose(common2, common1):
+                print('item1 = {}'.format(ub.urepr(item1, nl=1)))
+                print('item2 = {}'.format(ub.urepr(item2, nl=1)))
+                print('common1 = {}'.format(ub.urepr(common1, nl=1)))
+                print('common2 = {}'.format(ub.urepr(common2, nl=1)))
+                raise AssertionError('Datasets are not close (case common)')
+
+            if any(v is not None for v in diff2.values()):
+                print('item1 = {}'.format(ub.urepr(item1, nl=1)))
+                print('item2 = {}'.format(ub.urepr(item2, nl=1)))
+                print('diff2 = {}'.format(ub.urepr(diff2, nl=1)))
+                raise AssertionError('Datasets are not close (case diff2)')
+
+            if any(v is not None for v in diff1.values()):
+                print('item1 = {}'.format(ub.urepr(item1, nl=1)))
+                print('item2 = {}'.format(ub.urepr(item2, nl=1)))
+                print('diff1 = {}'.format(ub.urepr(diff1, nl=1)))
+                raise AssertionError('Datasets are not close (case diff1)')
     return True
 
 

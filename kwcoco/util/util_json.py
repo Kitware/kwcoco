@@ -241,3 +241,21 @@ def indexable_allclose(dct1, dct2, return_info=False):
         return final_flag, info
     else:
         return final_flag
+
+
+def coerce_indent(indent):
+    """
+    Example:
+        .. code:: python
+            print(repr(coerce_indent(None)))
+            print(repr(coerce_indent('   ')))
+            print(repr(coerce_indent(3)))
+    """
+    if indent is not None and isinstance(indent, str):
+        assert indent.count(' ') == len(indent), (
+            'must be all spaces, got {!r}'.format(indent))
+        indent = len(indent)
+    if indent is None:
+        ...
+        # indent = 0  # Can't do this. It introduces a bug
+    return indent

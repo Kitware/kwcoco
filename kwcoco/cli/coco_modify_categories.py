@@ -39,6 +39,8 @@ class CocoModifyCatsCLI:
             'keep': scfg.Value(None, help='If specified, remove all other categories. Mutex with remove.'),
 
             'rename': scfg.Value(None, type=str, help='category mapping in the format. "old1:new1,old2:new2"'),
+
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
 
     @classmethod
@@ -103,7 +105,11 @@ class CocoModifyCatsCLI:
         else:
             dset.fpath = config['dst']
             print('dset.fpath = {!r}'.format(dset.fpath))
-            dset.dump(dset.fpath, newlines=True)
+            dumpkw = {
+                'newlines': True,
+                'compress': config['compress'],
+            }
+            dset.dump(dset.fpath, **dumpkw)
 
 
 _CLI = CocoModifyCatsCLI

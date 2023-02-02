@@ -14,7 +14,8 @@ class CocoUnionCLI(object):
         default = {
             'src': scfg.Value([], nargs='+', help='path to multiple input datasets', position=1),
             'dst': scfg.Value('combo.kwcoco.json', help='path to output dataset'),
-            'absolute': scfg.Value(False, isflag=1, help='if True, converts paths to absolute paths before doing union')
+            'absolute': scfg.Value(False, isflag=1, help='if True, converts paths to absolute paths before doing union'),
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
         epilog = """
         Example Usage:
@@ -66,7 +67,11 @@ class CocoUnionCLI(object):
             ub.ensuredir(out_dpath)
         print('Writing to out_fpath = {!r}'.format(out_fpath))
         combo.fpath = out_fpath
-        combo.dump(combo.fpath, newlines=True)
+        dumpkw = {
+            'newlines': True,
+            'compress': config['compress'],
+        }
+        combo.dump(combo.fpath, **dumpkw)
 
 _CLI = CocoUnionCLI
 

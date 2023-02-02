@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# PYTHON_ARGCOMPLETE_OK
 import sys
 import ubelt as ub
 
@@ -88,13 +90,31 @@ def main(cmdline=True, **kw):
             parser._subparsers._actions
             pass
 
+    try:
+        import argcomplete
+        # Need to run: "$(register-python-argcomplete xdev)"
+        # or activate-global-python-argcomplete --dest=-
+        # mkdir -p ~/.bash_completion.d
+        # activate-global-python-argcomplete --dest ~/.bash_completion.d
+        # To enable this.
+    except ImportError:
+        argcomplete = None
+
+    if argcomplete is not None:
+        argcomplete.autocomplete(parser)
+
     EASTER = 1
     if EASTER:
         if len(sys.argv) == 2 and sys.argv[1] == 'boid':
             from kwcoco.demo.boids import _yeah_boid
             _yeah_boid()
 
-    ns = parser.parse_known_args()[0]
+    import os
+    KWCOCO_LOOSE_CLI = os.environ.get('KWCOCO_LOOSE_CLI', '')
+    if KWCOCO_LOOSE_CLI:
+        ns = parser.parse_known_args()[0]
+    else:
+        ns = parser.parse_args()
     # print('ns = {!r}'.format(ns))
 
     # Execute the subcommand without additional CLI parsing

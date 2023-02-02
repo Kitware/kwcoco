@@ -8,6 +8,7 @@ mod_name = "kwcoco"
 repo_name = "kwcoco"
 rel_mod_parent_dpath = "."
 min_python = 3.6
+url = "https://gitlab.kitware.com/computer-vision/kwcoco"
 ci_cpython_versions = ["3.6", "3.7", "3.8", "3.9", "3.10"]
 extra_full_strict_lines = [
     "pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
@@ -18,7 +19,15 @@ extra_full_loose_lines = [
 author = "Jon Crall"
 author_email = "jon.crall@kitware.com"
 license = "Apache 2"
+description = "The kwcoco module and cli for image datasets"
 dev_status = "beta"
+typed = true
+
+[tool.xcookie.entry_points]
+# the console_scripts entry point creates the xdoctest executable
+console_scripts = [
+    "kwcoco = kwcoco.cli.__main__:main",
+]
 
 [tool.pytest.ini_options]
 addopts = "-p no:doctest --xdoctest --xdoctest-style=google --ignore-glob=setup.py"

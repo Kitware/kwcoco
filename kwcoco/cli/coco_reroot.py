@@ -42,6 +42,8 @@ class CocoRerootCLI:
 
             'check': scfg.Value(True, help=(
                 'If True, checks that all data exists')),
+
+            'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
 
     @classmethod
@@ -103,7 +105,11 @@ class CocoRerootCLI:
 
         dset.fpath = config['dst']
         print('dump dset.fpath = {!r}'.format(dset.fpath))
-        dset.dump(dset.fpath, newlines=True)
+        dumpkw = {
+            'newlines': True,
+            'compress': config['compress'],
+        }
+        dset.dump(dset.fpath, **dumpkw)
 
 
 _CLI = CocoRerootCLI

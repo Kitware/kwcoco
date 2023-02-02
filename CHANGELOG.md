@@ -5,6 +5,21 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## Version 0.5.4 - Unreleased 
+
+### Added
+* New `compress=True` argument to `dump` which will compress the kwcoco file before writing it.
+* Add CLI argument `--num_write` to `kwcoco split` to write multiple splits.
+
+
+### Changed
+* The kwcoco CLI is now strict (i.e. will error on unsupported arguments) by default. Set the `KWCOCO_LOOSE_CLI` environment variable to use the old behavior. 
+* Added argcomplete support
+* The `.fpath` attribute is no longer cast by default and is now allowed to be
+  a `pathlib.Path` instance. In the future we may always convert this attribute
+  to a pathlib object.
+
+
 ## Version 0.5.4 - Released 2023-01-23
 
 ### Added
