@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import ubelt as ub
 import scriptconfig as scfg
-import numpy as np
 
 
 class CocoStatsCLI:
@@ -45,6 +44,7 @@ class CocoStatsCLI:
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
+        import numpy as np
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.repr2(dict(config), nl=1)))
 
