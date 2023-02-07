@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 * Renamed `CocoImage.delay` to `CocoImage.imdelay`. The old name will be available as an alias, but will eventually be deprecated.
+* Import time is now much faster.
 
 
 ## Version 0.5.4 - Released 2023-02-02 

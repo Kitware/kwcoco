@@ -1,4 +1,5 @@
 import ubelt as ub
+from scriptconfig.dict_like import DictLike as DictLike_  # FIXME: do we vendor or not?
 
 
 class DictLike(ub.NiceRepr):
@@ -160,3 +161,20 @@ class DictLike(ub.NiceRepr):
             return self[key]
         except KeyError:
             return default
+
+
+class DictProxy(DictLike_):
+    """
+    Allows an object to proxy the behavior of a dict attribute
+    """
+    def __getitem__(self, key):
+        return self.proxy[key]
+
+    def __setitem__(self, key, value):
+        self.proxy[key] = value
+
+    def keys(self):
+        return self.proxy.keys()
+
+    def __json__(self):
+        return ub.odict(self.proxy)

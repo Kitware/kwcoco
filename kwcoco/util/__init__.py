@@ -11,34 +11,35 @@ __protected__ = [
     'util_futures',
 ]
 
-from kwcoco.util import delayed_ops
-from kwcoco.util import dict_like
-from kwcoco.util import jsonschema_elements
-from kwcoco.util import lazy_frame_backends
-from kwcoco.util import util_archive
-from kwcoco.util import util_futures
-from kwcoco.util import util_json
-from kwcoco.util import util_monkey
-from kwcoco.util import util_reroot
-from kwcoco.util import util_sklearn
-from kwcoco.util import util_truncate
+if sys.version_info[0:2] <= (3, 6):
+    from kwcoco.util import delayed_ops
+    from kwcoco.util import dict_like
+    from kwcoco.util import jsonschema_elements
+    from kwcoco.util import lazy_frame_backends
+    from kwcoco.util import util_archive
+    from kwcoco.util import util_futures
+    from kwcoco.util import util_json
+    from kwcoco.util import util_monkey
+    from kwcoco.util import util_reroot
+    from kwcoco.util import util_sklearn
+    from kwcoco.util import util_truncate
 
-from kwcoco.util.dict_like import (DictLike,)
-from kwcoco.util.jsonschema_elements import (ALLOF, ANY, ANYOF, ARRAY, BOOLEAN,
-                                             ContainerElements, Element,
-                                             INTEGER, NOT, NULL, NUMBER,
-                                             OBJECT, ONEOF, QuantifierElements,
-                                             STRING, ScalarElements,
-                                             SchemaElements, elem,)
-from kwcoco.util.util_archive import (Archive, unarchive_file,)
-from kwcoco.util.util_json import (IndexableWalker, ensure_json_serializable,
-                                   find_json_unserializable,
-                                   indexable_allclose,)
-from kwcoco.util.util_reroot import (resolve_directory_symlinks,
-                                     resolve_relative_to,
-                                     special_reroot_single,)
-from kwcoco.util.util_sklearn import (StratifiedGroupKFold,)
-from kwcoco.util.util_truncate import (smart_truncate,)
+    from kwcoco.util.dict_like import (DictLike,)
+    from kwcoco.util.jsonschema_elements import (ALLOF, ANY, ANYOF, ARRAY, BOOLEAN,
+                                                 ContainerElements, Element,
+                                                 INTEGER, NOT, NULL, NUMBER,
+                                                 OBJECT, ONEOF, QuantifierElements,
+                                                 STRING, ScalarElements,
+                                                 SchemaElements, elem,)
+    from kwcoco.util.util_archive import (Archive, unarchive_file,)
+    from kwcoco.util.util_json import (IndexableWalker, ensure_json_serializable,
+                                       find_json_unserializable,
+                                       indexable_allclose,)
+    from kwcoco.util.util_reroot import (resolve_directory_symlinks,
+                                         resolve_relative_to,
+                                         special_reroot_single,)
+    from kwcoco.util.util_sklearn import (StratifiedGroupKFold,)
+    from kwcoco.util.util_truncate import (smart_truncate,)
 
 
 def lazy_import(module_name, submodules, submod_attrs):

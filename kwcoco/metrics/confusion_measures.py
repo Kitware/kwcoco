@@ -19,7 +19,7 @@ import kwarray
 import numpy as np
 import ubelt as ub
 import warnings
-from kwcoco.metrics.util import DictProxy
+from kwcoco.util.dict_like import DictProxy
 
 
 try:

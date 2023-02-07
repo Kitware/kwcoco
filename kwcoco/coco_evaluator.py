@@ -71,7 +71,7 @@ import warnings
 from os.path import exists
 from os.path import isdir
 from os.path import isfile
-from kwcoco.metrics.util import DictProxy
+from kwcoco.util.dict_like import DictProxy
 
 
 try:
