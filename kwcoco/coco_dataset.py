@@ -1578,13 +1578,14 @@ class MixinCocoExtras(object):
             else:
                 raise Exception('missing image, but no url')
 
-    def missing_images(self, check_aux=False, verbose=0):
+    def missing_images(self, check_aux=True, verbose=0):
         """
         Check for images that don't exist
 
         Args:
             check_aux (bool):
                 if specified also checks auxiliary images
+
             verbose (int): verbosity level
 
         Returns:
