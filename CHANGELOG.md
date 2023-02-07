@@ -5,7 +5,19 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.5.4 - Unreleased 
+## Version 0.5.6 - Unreleased
+
+### Added
+* Can now ask for the resolution of an asset in CocoImage.
+
+
+### Changed
+* Renamed `CocoImage.delay` to `CocoImage.imdelay`. The old name will be available as an alias, but will eventually be deprecated.
+* Import time is now much faster.
+* default `check_aux` to True in `CocoDataset.missing_images`
+
+
+## Version 0.5.4 - Released 2023-02-02 
 
 ### Added
 * New `compress=True` argument to `dump` which will compress the kwcoco file before writing it.

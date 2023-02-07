@@ -577,9 +577,9 @@ class CocoImage(ub.NiceRepr):
     add_asset = add_auxiliary_item
 
     @profile
-    def delay(self, channels=None, space='image',
-              resolution=None, bundle_dpath=None, interpolation='linear',
-              antialias=True, nodata_method=None, RESOLUTION_KEY=None):
+    def imdelay(self, channels=None, space='image', resolution=None,
+                bundle_dpath=None, interpolation='linear', antialias=True,
+                nodata_method=None, RESOLUTION_KEY=None):
         """
         Perform a delayed load on the data in this image.
 
@@ -821,6 +821,8 @@ class CocoImage(ub.NiceRepr):
 
         return delayed
 
+    delay = imdelay  # backwards compat
+
     @ub.memoize_method
     def valid_region(self, space='image'):
         """
@@ -878,10 +880,23 @@ class CocoImage(ub.NiceRepr):
             raise NotImplementedError(space)  # auxiliary/asset space
         return warped_sseg
 
-    def resolution(self, space='image', RESOLUTION_KEY=None):
+    def resolution(self, space='image', channel=None, RESOLUTION_KEY=None):
         """
         Returns the resolution of this CocoImage in the requested space if
         known. Errors if this information is not registered.
+
+        Args:
+            space (str): the space to the resolution of.
+                Can be either "image", "video", or "asset".
+
+            channel (str | kwcoco.FusedChannelSpec | None):
+                a channel that identifies a single asset, only relevant if
+                asking for asset space
+
+        Returns:
+            Dict:
+                has items mag (with the magnitude of the resolution) and
+                unit, which is a convinience and only loosely enforced.
 
         Example:
             >>> import kwcoco
@@ -891,6 +906,9 @@ class CocoImage(ub.NiceRepr):
             >>> self.resolution()
             >>> self.img['resolution'] = '1 meter'
             >>> self.resolution(space='video')
+            {'mag': (1.0, 1.0), 'unit': 'meter'}
+            >>> self.resolution(space='asset', channel='B11')
+            >>> self.resolution(space='asset', channel='B1')
         """
         import kwimage
         # Compute the offset transform from the requested space
@@ -946,18 +964,51 @@ class CocoImage(ub.NiceRepr):
             else:
                 img_resolution_info = coerce_resolution(img_resolution_expr)
             space_resolution_info = img_resolution_info
-        elif space == 'asset':
-            raise NotImplementedError(space)
+        elif space in {'asset', 'auxiliary'}:
+            if channel is None:
+                raise ValueError('must specify a channel to ask for the asset resolution')
+            # Use existing code to get the resolution of the image (could be more efficient)
+            space_resolution_info = self.resolution('image', RESOLUTION_KEY=RESOLUTION_KEY).copy()
+            # Adjust the image resolution based on the asset scale factor
+            warp_img_from_aux = kwimage.Affine.coerce(self.find_asset_obj(channel).get('warp_aux_to_img', None))
+            img_res_mat = kwimage.Affine.scale(space_resolution_info['mag'])
+            aux_res_mat = img_res_mat @ warp_img_from_aux
+            space_resolution_info['mag'] = np.array(aux_res_mat.decompose()['scale'])
         else:
             raise KeyError(space)
         return space_resolution_info
 
-    def _scalefactor_for_resolution(self, space, resolution, RESOLUTION_KEY=None):
+    def _scalefactor_for_resolution(self, space, resolution, channel=None, RESOLUTION_KEY=None):
         """
         Given image or video space, compute the scale factor needed to achieve the
         target resolution.
+
+        Args:
+            space (str): the space to the resolution of.
+                Can be either "image", "video", or "asset".
+
+            resolution (str | float | int):
+                the resolution (ideally with units) you want.
+
+            channel (str | kwcoco.FusedChannelSpec | None):
+                a channel that identifies a single asset, only relevant if
+                asking for asset space
+
+        Returns:
+            Tuple[float, float]:
+                the x and y scale factor that can be used to scale the
+                underlying "space" to acheive the requested resolution.
+
+        Ignore:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> self = dset.coco_image(1)
+            >>> self.img['resolution'] = "3 puppies"
+            >>> scale_factor = self._scalefactor_for_resolution(space='asset', channel='B11', resolution="7 puppies")
+            >>> print('scale_factor = {}'.format(ub.urepr(scale_factor, precision=4, nl=0)))
+            scale_factor = (1.2857, 1.2857)
         """
-        space_resolution_info = self.resolution(space=space, RESOLUTION_KEY=RESOLUTION_KEY)
+        space_resolution_info = self.resolution(space=space, channel=channel, RESOLUTION_KEY=RESOLUTION_KEY)
         request_resolution_info = coerce_resolution(resolution)
         # If units are unspecified, assume they are compatible
         if space_resolution_info['unit'] is not None:

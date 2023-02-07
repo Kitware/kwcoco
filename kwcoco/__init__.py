@@ -269,7 +269,7 @@ Testing:
 
 """
 
-__version__ = '0.5.5'
+__version__ = '0.5.6'
 
 
 __submodules__ = {
@@ -279,13 +279,15 @@ __submodules__ = {
     'category_tree': ['CategoryTree'],
     'channel_spec': ['ChannelSpec', 'FusedChannelSpec'],
     'exceptions': [],
-}
-
-__lazy_submodules__ = {
-    # TODO: always lazy submodules
     'coco_sql_dataset': ['CocoSqlDatabase'],
     'sensorchan_spec': ['SensorChanSpec'],
 }
+
+# __lazy_submodules__ = {
+#     # TODO: always lazy submodules
+#     'coco_sql_dataset': ['CocoSqlDatabase'],
+#     'sensorchan_spec': ['SensorChanSpec'],
+# }
 
 import sys
 if sys.version_info[0:2] < (3, 7):
@@ -293,19 +295,18 @@ if sys.version_info[0:2] < (3, 7):
     from kwcoco.sensorchan_spec import SensorChanSpec
     from kwcoco.coco_sql_dataset import CocoSqlDatabase
 
+    from kwcoco import abstract_coco_dataset
+    from kwcoco import category_tree
+    from kwcoco import channel_spec
+    from kwcoco import coco_dataset
+    from kwcoco import coco_image
+    from kwcoco import exceptions
 
-from kwcoco import abstract_coco_dataset
-from kwcoco import category_tree
-from kwcoco import channel_spec
-from kwcoco import coco_dataset
-from kwcoco import coco_image
-from kwcoco import exceptions
-
-from kwcoco.abstract_coco_dataset import (AbstractCocoDataset,)
-from kwcoco.coco_dataset import (CocoDataset,)
-from kwcoco.coco_image import (CocoImage,)
-from kwcoco.category_tree import (CategoryTree,)
-from kwcoco.channel_spec import (ChannelSpec, FusedChannelSpec,)
+    from kwcoco.abstract_coco_dataset import (AbstractCocoDataset,)
+    from kwcoco.coco_dataset import (CocoDataset,)
+    from kwcoco.coco_image import (CocoImage,)
+    from kwcoco.category_tree import (CategoryTree,)
+    from kwcoco.channel_spec import (ChannelSpec, FusedChannelSpec,)
 
 ####
 
@@ -350,8 +351,40 @@ def lazy_import(module_name, submodules, submod_attrs):
 
 __getattr__ = lazy_import(
     __name__,
-    submodules=[],
-    submod_attrs=__lazy_submodules__,
+    submodules={
+        'abstract_coco_dataset',
+        'category_tree',
+        'channel_spec',
+        'coco_dataset',
+        'coco_image',
+        'coco_sql_dataset',
+        'exceptions',
+        'sensorchan_spec',
+    },
+    submod_attrs={
+        'abstract_coco_dataset': [
+            'AbstractCocoDataset',
+        ],
+        'category_tree': [
+            'CategoryTree',
+        ],
+        'channel_spec': [
+            'ChannelSpec',
+            'FusedChannelSpec',
+        ],
+        'coco_dataset': [
+            'CocoDataset',
+        ],
+        'coco_image': [
+            'CocoImage',
+        ],
+        'coco_sql_dataset': [
+            'CocoSqlDatabase',
+        ],
+        'sensorchan_spec': [
+            'SensorChanSpec',
+        ],
+    },
 )
 
 
@@ -359,6 +392,7 @@ def __dir__():
     return __all__
 
 __all__ = ['AbstractCocoDataset', 'CategoryTree', 'ChannelSpec', 'CocoDataset',
-           'CocoImage', 'FusedChannelSpec', 'abstract_coco_dataset',
-           'category_tree', 'channel_spec', 'coco_dataset', 'coco_image',
-           'exceptions', 'SensorChanSpec', 'CocoSqlDatabase']
+           'CocoImage', 'CocoSqlDatabase', 'FusedChannelSpec',
+           'SensorChanSpec', 'abstract_coco_dataset', 'category_tree',
+           'channel_spec', 'coco_dataset', 'coco_image', 'coco_sql_dataset',
+           'exceptions', 'sensorchan_spec']

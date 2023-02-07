@@ -45,7 +45,7 @@ Example:
     >>> results = coco_eval.evaluate()
     >>> # Now we can draw / serialize the results as we please
     >>> dpath = ub.Path.appdir('kwcoco/tests/test_out_dpath').ensuredir()
-    >>> results_fpath = join(dpath, 'metrics.json')
+    >>> results_fpath = dpath / 'metrics.json'
     >>> print('results_fpath = {!r}'.format(results_fpath))
     >>> results.dump(results_fpath, indent='    ')
     >>> measures = results['area_range=all,iou_thresh=0.3'].nocls_measures
@@ -64,33 +64,20 @@ Example:
     >>>     import xdev
     >>>     xdev.view_directory(dpath)
 """
-import glob
-import json
-import kwarray
 import os
-import kwimage
-import numpy as np
 import scriptconfig as scfg
 import ubelt as ub
 import warnings
 from os.path import exists
 from os.path import isdir
 from os.path import isfile
-from os.path import join
-from kwcoco.metrics.util import DictProxy
+from kwcoco.util.dict_like import DictProxy
 
 
 try:
     from xdev import profile
 except Exception:
     profile = ub.identity
-
-
-try:
-    import ndsampler
-    COCO_SAMPLER_CLS = ndsampler.CocoSampler
-except Exception:
-    COCO_SAMPLER_CLS = None
 
 
 class CocoEvalConfig(scfg.Config):
@@ -168,7 +155,7 @@ class CocoEvalConfig(scfg.Config):
             )),
 
         # TODO options:
-        'max_dets': scfg.Value(np.inf, help=(
+        'max_dets': scfg.Value(float('inf'), help=(
             'maximum number of predictions to consider')),
 
         'iou_bias': scfg.Value(1, help=(
@@ -273,6 +260,7 @@ class CocoEvaluator(object):
         kwimage.Detection objects and attempts to ensure comparable category
         and image ids.
         """
+        import numpy as np
         # TODO: coerce into a cocodataset form if possible
         # TODO: Optionally:
         # * validate the input coco files,
@@ -484,6 +472,14 @@ class CocoEvaluator(object):
         """
         # coerce the input into dictionary of detection objects.
         import kwcoco
+        import kwimage
+        import numpy as np
+        import glob
+        try:
+            import ndsampler
+            COCO_SAMPLER_CLS = ndsampler.CocoSampler
+        except Exception:
+            COCO_SAMPLER_CLS = None
 
         # We only need the box locations, but if we can coerce extra
         # information we will maintain that as well.
@@ -554,7 +550,7 @@ class CocoEvaluator(object):
                         print('Loading mscoco directory')
                     # directory of predictions
                     extra['coco_dpath'] = coco_dpath = dataset
-                    pat = join(coco_dpath, '**/*.json')
+                    pat = ub.Path(coco_dpath) / '**/*.json'
                     coco_fpaths = sorted(glob.glob(pat, recursive=True))
                     dets, coco_dset = _load_dets(coco_fpaths, workers=workers)
                     extra['coco_dset'] = coco_dset
@@ -637,6 +633,8 @@ class CocoEvaluator(object):
                 serializing) results
         """
         import platform
+        import kwarray
+        import numpy as np
         coco_eval.log('evaluating')
         # print('coco_eval.config = {}'.format(ub.repr2(dict(coco_eval.config), nl=3)))
 
@@ -778,6 +776,8 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
     Hacky function to compute confusion vector ignore weights for different
     area thresholds. Needs to be slightly refactored.
     """
+    import kwarray
+    import numpy as np
     if use_area_attr:
         coco_true = coco_eval.true_extra['coco_dset']
         try:
@@ -889,7 +889,7 @@ class CocoResults(ub.NiceRepr, DictProxy):
         >>> #
         >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> results.dump_figures(dpath, figsize=(3, 2), tight=False)  # make this go faster
-        >>> results.dump(join(dpath, 'metrics.json'), indent='    ')
+        >>> results.dump(dpath / 'metrics.json', indent='    ')
 
     """
     def __init__(results, resdata=None):
@@ -928,6 +928,7 @@ class CocoResults(ub.NiceRepr, DictProxy):
         """
         Serialize to json file
         """
+        import json
         import pathlib
         if isinstance(file, (str, pathlib.Path)):
             with open(file, 'w') as fp:
@@ -1016,6 +1017,7 @@ class CocoSingleResult(ub.NiceRepr):
         """
         Serialize to json file
         """
+        import json
         try:
             fpath = os.fspath(file)
         except TypeError:
@@ -1134,7 +1136,7 @@ class CocoSingleResult(ub.NiceRepr):
 
 @profile
 def _writefig(fig, metrics_dpath, fname, figsize, verbose, tight):
-    fig_fpath = join(metrics_dpath, fname)
+    fig_fpath = ub.Path(metrics_dpath) / fname
     if verbose:
         print('write fig_fpath = {!r}'.format(fig_fpath))
     fig.set_size_inches(figsize)
@@ -1149,13 +1151,12 @@ def _load_dets(pred_fpaths, workers=0):
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
         >>> import ubelt as ub
         >>> import kwcoco
-        >>> from os.path import join
         >>> dpath = ub.Path.appdir('kwcoco/tests/load_dets').ensuredir()
         >>> N = 4
         >>> pred_fpaths = []
         >>> for i in range(1, N + 1):
         >>>     dset = kwcoco.CocoDataset.demo('shapes{}'.format(i))
-        >>>     dset.fpath = join(dpath, 'shapes_{}.mscoco.json'.format(i))
+        >>>     dset.fpath = dpath / 'shapes_{}.mscoco.json'.format(i)
         >>>     dset.dump(dset.fpath)
         >>>     pred_fpaths.append(dset.fpath)
         >>> dets, coco_dset = _load_dets(pred_fpaths)
@@ -1182,10 +1183,9 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
         >>> from kwcoco.coco_evaluator import _load_dets, _load_dets_worker
         >>> import ubelt as ub
         >>> import kwcoco
-        >>> from os.path import join
         >>> dpath = ub.Path.appdir('kwcoco/tests/load_dets').ensuredir()
         >>> dset = kwcoco.CocoDataset.demo('shapes8')
-        >>> dset.fpath = join(dpath, 'shapes8.mscoco.json')
+        >>> dset.fpath = dpath / 'shapes8.mscoco.json'
         >>> dset.dump(dset.fpath)
         >>> single_pred_fpath = dset.fpath
         >>> dets, coco = _load_dets_worker(single_pred_fpath)
@@ -1193,6 +1193,7 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
         >>> print('coco = {!r}'.format(coco))
     """
     import kwcoco
+    import kwimage
     single_img_coco = kwcoco.CocoDataset(single_pred_fpath, autobuild=False)
     dets = kwimage.Detections.from_coco_annots(single_img_coco.dataset['annotations'],
                                                dset=single_img_coco)

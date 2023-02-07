@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from os.path import dirname
 import ubelt as ub
 import scriptconfig as scfg
 
@@ -62,7 +61,7 @@ class CocoUnionCLI(object):
         combo = kwcoco.CocoDataset.union(*datasets)
 
         out_fpath = config['dst']
-        out_dpath = dirname(out_fpath)
+        out_dpath = ub.Path(out_fpath).parent
         if out_dpath:
             ub.ensuredir(out_dpath)
         print('Writing to out_fpath = {!r}'.format(out_fpath))
