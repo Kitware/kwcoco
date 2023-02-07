@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.5.6 - Unreleased
 
+### Added
+* Can now ask for the resolution of an asset in CocoImage.
+
 
 ## Version 0.5.4 - Released 2023-02-02 
 
