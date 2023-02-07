@@ -577,9 +577,9 @@ class CocoImage(ub.NiceRepr):
     add_asset = add_auxiliary_item
 
     @profile
-    def delay(self, channels=None, space='image',
-              resolution=None, bundle_dpath=None, interpolation='linear',
-              antialias=True, nodata_method=None, RESOLUTION_KEY=None):
+    def imdelay(self, channels=None, space='image', resolution=None,
+                bundle_dpath=None, interpolation='linear', antialias=True,
+                nodata_method=None, RESOLUTION_KEY=None):
         """
         Perform a delayed load on the data in this image.
 
@@ -821,6 +821,8 @@ class CocoImage(ub.NiceRepr):
 
         return delayed
 
+    delay = imdelay  # backwards compat
+
     @ub.memoize_method
     def valid_region(self, space='image'):
         """
@@ -887,7 +889,7 @@ class CocoImage(ub.NiceRepr):
             space (str): the space to the resolution of.
                 Can be either "image", "video", or "asset".
 
-            channel (str | FusedChannelSpec | None):
+            channel (str | kwcoco.FusedChannelSpec | None):
                 a channel that identifies a single asset, only relevant if
                 asking for asset space
 
@@ -988,7 +990,7 @@ class CocoImage(ub.NiceRepr):
             resolution (str | float | int):
                 the resolution (ideally with units) you want.
 
-            channel (str | FusedChannelSpec | None):
+            channel (str | kwcoco.FusedChannelSpec | None):
                 a channel that identifies a single asset, only relevant if
                 asking for asset space
 
