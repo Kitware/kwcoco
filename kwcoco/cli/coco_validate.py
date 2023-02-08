@@ -55,17 +55,17 @@ class CocoValidateCLI:
             # 'corrupted': scfg.Value(False, help='If True check the assets can be read'),
             # 'require_relative': scfg.Value(False, help='If 1, requires all assets are relative to the bundle dpath. If 2, then they must be inside the bundle dpath'),
 
-            'schema': scfg.Value(True, help=ub.paragraph(
+            'schema': scfg.Value(True, isflag=True, help=ub.paragraph(
                 '''
                 if True, validate the json-schema
                 ''')),
 
-            'unique': scfg.Value(True, help=ub.paragraph(
+            'unique': scfg.Value(True, isflag=True, help=ub.paragraph(
                 '''
                 if True, validate unique secondary keys
                 ''')),
 
-            'missing': scfg.Value(True, help=ub.paragraph(
+            'missing': scfg.Value(True, isflag=True, help=ub.paragraph(
                 '''
                 if True, validate registered files exist
                 ''')),
@@ -75,7 +75,7 @@ class CocoValidateCLI:
                 if True, validate data in registered files
                 ''')),
 
-            'channels': scfg.Value(True, help=ub.paragraph(
+            'channels': scfg.Value(True, isflag=True, help=ub.paragraph(
                 '''
                 if True, validate that channels in auxiliary/asset items are all
                   unique.
