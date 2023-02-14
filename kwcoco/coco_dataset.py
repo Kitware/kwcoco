@@ -2627,6 +2627,10 @@ class MixinCocoStats(object):
             _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary'], col_key='width', required=required)
             _check_subtable_attrs(dset, table_key='images', subtable_keys=['asset', 'auxiliary'], col_key='height', required=required)
 
+        if config.get('annot_attrs', True):
+            required = config.get('annot_attrs', False) == 'error'
+            _check_attrs(dset, table_key='annotations', col_key='bbox', required=False)
+
         if config.get('channels', True):
             for img in self.dataset.get('images', []):
                 seen = set()

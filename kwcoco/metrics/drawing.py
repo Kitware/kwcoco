@@ -541,10 +541,14 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     Args:
         info (Measures | Dict)
 
+        keys (None | List[str]):
+            the metrics to view over threhsolds
+
+    CommandLine:
+        xdoctest -m kwcoco.metrics.drawing draw_threshold_curves --show
+
     Example:
         >>> # xdoctest: +REQUIRES(module:kwplot)
-        >>> import sys, ubelt
-        >>> sys.path.append(ubelt.expandpath('~/code/kwcoco'))
         >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
@@ -554,6 +558,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         >>> keys = None
         >>> import kwplot
         >>> kwplot.autompl()
+        >>> keys = {'g1', 'f1', 'acc', 'mcc', 'tpr'}
         >>> draw_threshold_curves(info, keys)
         >>> # xdoctest: +REQUIRES(--show)
         >>> kwplot.show_if_requested()
@@ -565,7 +570,33 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     if keys is None:
         keys = {'g1', 'f1', 'acc', 'mcc'}
 
-    idx_to_colors = kwimage.Color.distinct(len(keys), space='rgba')
+    preset_colors = {
+        'f1': kwimage.Color.coerce('kitware_green').as01('rgba'),
+        'acc': kwimage.Color.coerce('kitware_red').as01('rgba'),
+        'mcc': kwimage.Color.coerce('kitware_blue').as01('rgba'),
+        'g1': kwimage.Color.coerce('kitware_orange').as01('rgba'),
+    }
+    def determenistic_colors(keys, preset_colors):
+        known_colors = ub.udict(preset_colors) & keys
+        needs_colors = set(keys) - set(known_colors)
+        if needs_colors:
+            import matplotlib as mpl
+            import matplotlib._cm  as _cm
+            cm = mpl.colors.LinearSegmentedColormap.from_list(
+                'gist_rainbow', _cm.datad['gist_rainbow'],
+                mpl.rcParams['image.lut'])
+            for color in needs_colors:
+                # Get a randomized color that is determined by the name of the
+                # color so it is at least consistent.
+                import kwarray
+                seed = int(ub.hash_data(color, base=10)[0:12])
+                rng = kwarray.ensure_rng(seed)
+                known_colors[color] = cm(rng.rand())
+        return known_colors
+    key_to_color = determenistic_colors(keys, preset_colors)
+
+    # idx_to_colors = kwimage.Color.distinct(len(keys), space='rgba')
+    idx_to_colors = list(ub.take(key_to_color, keys))
     idx_to_best_pt = {}
 
     xydata = {}
@@ -611,7 +642,12 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     for idx, best_pt in idx_to_best_pt.items():
         best_thresh, best_measure = best_pt
         color = idx_to_colors[idx]
-        ax.plot(best_thresh, best_measure, '*', color=color)
+        edgecolor = kwimage.Color.coerce(color).adjust(lighten=-0.4).as01('rgba')
+
+        # ax.plot(best_thresh, best_measure, '*', color=color, edgecolor=edgecolor)
+        ax.scatter(
+            best_thresh, best_measure, marker='*', edgecolor=edgecolor,
+            facecolor=color, s=120, zorder=10)
     return ax
 
 if __name__ == '__main__':

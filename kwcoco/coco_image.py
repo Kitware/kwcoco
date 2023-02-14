@@ -114,6 +114,13 @@ class CocoImage(ub.NiceRepr):
             assets.append(asset)
         return assets
 
+    def annots(self):
+        """
+        Returns:
+            Annots: a 1d annotations object referencing annotations in this image
+        """
+        return self.dset.annots(image_id=self.img['id'])
+
     def __nice__(self):
         """
         Example:
@@ -847,14 +854,11 @@ class CocoImage(ub.NiceRepr):
                     raise NotImplementedError(space)
         return valid_poly
 
-    # def warp_vid_from_img(self):
-    #     pass
-
-    # def warp_vid_from_img(self):
-    #     pass
-
     @ub.memoize_property
     def warp_vid_from_img(self):
+        """
+        Affine transformation that warps image space -> video space.
+        """
         import kwimage
         warp_img_to_vid = kwimage.Affine.coerce(self.img.get('warp_img_to_vid', None))
         if warp_img_to_vid.matrix is None:
@@ -864,6 +868,9 @@ class CocoImage(ub.NiceRepr):
 
     @ub.memoize_property
     def warp_img_from_vid(self):
+        """
+        Affine transformation that warps video space -> image space.
+        """
         return self.warp_vid_from_img.inv()
 
     def _annot_segmentation(self, ann, space='video'):

@@ -7,6 +7,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.5.7 - Unreleased
 
+### Changed
+* In `metrics.drawing`, make threshold colors more consistent
+* Added `category_names` property to `Annots1d` object.
+
+
+### Added
+* Added `annots` property to CocoImge
+
 
 ## Version 0.5.6 - Released 2023-02-07
 
