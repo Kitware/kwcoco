@@ -429,6 +429,11 @@ def draw_roc(info, prefix='', fnum=1, **kw):
     label_suffix = _realpos_label_suffix(info)
     label = 'AUC*={:0.4f}: ({}) {}'.format(auc, label_suffix, prefix)
 
+    color = kw.pop('color', None)
+    if color is None:
+        import kwimage
+        color = kwimage.Color.coerce('kitware_blue').as01()
+
     if 0:
         # TODO: deprecate multi_plot for seaborn?
         fig = kwplot.figure(fnum=fnum)
@@ -454,7 +459,7 @@ def draw_roc(info, prefix='', fnum=1, **kw):
             title=title,
             ylim=(0, 1), ypad=1e-2,
             xlim=(0, 1), xpad=1e-2,
-            fnum=fnum, **kw)
+            fnum=fnum, color=color, **kw)
 
     return ax
 
@@ -502,9 +507,13 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
         precision, recall = [0], [0]
 
     label_suffix = _realpos_label_suffix(info)
-    label = 'ap={:0.2f}: ({}) {}'.format(ap, label_suffix, prefix)
+    label = 'AP={:0.2f}: ({}) {}'.format(ap, label_suffix, prefix)
 
-    color = kw.pop('color', 'distinct')
+    # color = kw.pop('color', 'distinct')
+    color = kw.pop('color', None)
+    if color is None:
+        import kwimage
+        color = kwimage.Color.coerce('kitware_green').as01()
 
     node = info.get('node', 'classless')
 
@@ -576,23 +585,6 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         'mcc': kwimage.Color.coerce('kitware_blue').as01('rgba'),
         'g1': kwimage.Color.coerce('kitware_orange').as01('rgba'),
     }
-    def determenistic_colors(keys, preset_colors):
-        known_colors = ub.udict(preset_colors) & keys
-        needs_colors = set(keys) - set(known_colors)
-        if needs_colors:
-            import matplotlib as mpl
-            import matplotlib._cm  as _cm
-            cm = mpl.colors.LinearSegmentedColormap.from_list(
-                'gist_rainbow', _cm.datad['gist_rainbow'],
-                mpl.rcParams['image.lut'])
-            for color in needs_colors:
-                # Get a randomized color that is determined by the name of the
-                # color so it is at least consistent.
-                import kwarray
-                seed = int(ub.hash_data(color, base=10)[0:12])
-                rng = kwarray.ensure_rng(seed)
-                known_colors[color] = cm(rng.rand())
-        return known_colors
     key_to_color = determenistic_colors(keys, preset_colors)
 
     # idx_to_colors = kwimage.Color.distinct(len(keys), space='rgba')
@@ -649,6 +641,27 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
             best_thresh, best_measure, marker='*', edgecolor=edgecolor,
             facecolor=color, s=120, zorder=10)
     return ax
+
+
+def determenistic_colors(keys, preset_colors):
+    # TODO: port to kwimage / kwplot
+    known_colors = ub.udict(preset_colors) & keys
+    needs_colors = set(keys) - set(known_colors)
+    if needs_colors:
+        import matplotlib as mpl
+        import matplotlib._cm  as _cm
+        cm = mpl.colors.LinearSegmentedColormap.from_list(
+            'gist_rainbow', _cm.datad['gist_rainbow'],
+            mpl.rcParams['image.lut'])
+        for color in needs_colors:
+            # Get a randomized color that is determined by the name of the
+            # color so it is at least consistent.
+            import kwarray
+            seed = int(ub.hash_data(color, base=10)[0:12])
+            rng = kwarray.ensure_rng(seed)
+            known_colors[color] = cm(rng.rand())
+    return known_colors
+
 
 if __name__ == '__main__':
     """
