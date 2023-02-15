@@ -577,7 +577,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     thresh = info['thresholds']
 
     if keys is None:
-        keys = {'g1', 'f1', 'acc', 'mcc'}
+        keys = ['mcc', 'f1', 'g1', 'acc']
 
     preset_colors = {
         'f1': kwimage.Color.coerce('kitware_green').as01('rgba'),
