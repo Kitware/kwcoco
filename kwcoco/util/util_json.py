@@ -3,6 +3,8 @@ import numpy as np
 import ubelt as ub
 import json
 from collections import OrderedDict
+import decimal
+import fractions
 import pathlib
 
 # backwards compat
@@ -63,6 +65,12 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
             walker[prefix] = new_value
         elif isinstance(value, (np.complexfloating)):
             new_value = complex(value)
+            walker[prefix] = new_value
+        elif isinstance(value, decimal.Decimal):
+            new_value = float(value)
+            walker[prefix] = new_value
+        elif isinstance(value, fractions.Fraction):
+            new_value = float(value)
             walker[prefix] = new_value
         elif isinstance(value, pathlib.Path):
             new_value = str(value)
