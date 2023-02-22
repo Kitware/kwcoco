@@ -3478,6 +3478,8 @@ class MixinCocoAddRemove(object):
             video_id (int): id of parent video, if applicable
             frame_index (int): frame index in parent video
             timestamp (number | str): timestamp of frame index
+            warp_img_to_vid (Dict): this transform is used to align
+                the image to a video if it belongs to one.
             **kw : stores arbitrary key/value pairs in this new image
 
         Returns:
