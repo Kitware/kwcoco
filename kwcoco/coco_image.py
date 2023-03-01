@@ -2,7 +2,7 @@
 Defines the CocoImage class which is an object oriented way of manipulating
 data pointed to by a COCO image dictionary.
 
-Notably this provides the ``.delay`` method for delayed image loading ( which
+Notably this provides the ``.imdelay`` method for delayed image loading ( which
 enables things like fast loading of subimage-regions / coarser scales in images
 that contain tiles / overviews - e.g. Cloud Optimized Geotiffs or COGs (Medical
 image formats may be supported in the future).
@@ -627,13 +627,13 @@ class CocoImage(ub.NiceRepr):
             >>> #
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> self = CocoImage(dset.imgs[gid], dset)
-            >>> delayed = self.delay()
+            >>> delayed = self.imdelay()
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
             >>> #
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
-            >>> delayed = dset.coco_image(gid).delay()
+            >>> delayed = dset.coco_image(gid).imdelay()
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
@@ -643,23 +643,23 @@ class CocoImage(ub.NiceRepr):
 
             >>> # TODO: should only select the "red" channel
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
-            >>> delayed = CocoImage(dset.imgs[gid], dset).delay(channels='r')
+            >>> delayed = CocoImage(dset.imgs[gid], dset).imdelay(channels='r')
 
             >>> import kwcoco
             >>> gid = 1
             >>> #
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
-            >>> delayed = dset.coco_image(gid).delay(channels='B1|B2', space='image')
+            >>> delayed = dset.coco_image(gid).imdelay(channels='B1|B2', space='image')
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
-            >>> delayed = dset.coco_image(gid).delay(channels='B1|B2|B11', space='image')
+            >>> delayed = dset.coco_image(gid).imdelay(channels='B1|B2|B11', space='image')
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
-            >>> delayed = dset.coco_image(gid).delay(channels='B8|B1', space='video')
+            >>> delayed = dset.coco_image(gid).imdelay(channels='B8|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
 
-            >>> delayed = dset.coco_image(gid).delay(channels='B8|foo|bar|B1', space='video')
+            >>> delayed = dset.coco_image(gid).imdelay(channels='B8|foo|bar|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
             >>> print('delayed.finalize() = {!r}'.format(delayed.finalize()))
 
@@ -668,11 +668,11 @@ class CocoImage(ub.NiceRepr):
             >>> dset = kwcoco.CocoDataset.demo()
             >>> coco_img = dset.coco_image(1)
             >>> # Test case where nothing is registered in the dataset
-            >>> delayed = coco_img.delay()
+            >>> delayed = coco_img.imdelay()
             >>> final = delayed.finalize()
             >>> assert final.shape == (512, 512, 3)
 
-            >>> delayed = coco_img.delay()
+            >>> delayed = coco_img.imdelay()
             >>> final = delayed.finalize()
             >>> print('final.shape = {}'.format(ub.repr2(final.shape, nl=1)))
             >>> assert final.shape == (512, 512, 3)
@@ -688,7 +688,7 @@ class CocoImage(ub.NiceRepr):
             >>> imdata[:] = np.arange(5)[None, None, :]
             >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
             >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
-            >>> delayed = coco_img.delay(channels='B1|Aux:2:4')
+            >>> delayed = coco_img.imdelay(channels='B1|Aux:2:4')
             >>> final = delayed.finalize()
 
         Example:
@@ -699,20 +699,20 @@ class CocoImage(ub.NiceRepr):
             >>> coco_img = dset.coco_image(1)
             >>> stream1 = coco_img.channels.streams()[0]
             >>> stream2 = coco_img.channels.streams()[1]
-            >>> aux_delayed = coco_img.delay(stream1, space='asset')
-            >>> img_delayed = coco_img.delay(stream1, space='image')
-            >>> vid_delayed = coco_img.delay(stream1, space='video')
+            >>> asset_delayed = coco_img.imdelay(stream1, space='asset')
+            >>> img_delayed = coco_img.imdelay(stream1, space='image')
+            >>> vid_delayed = coco_img.imdelay(stream1, space='video')
             >>> #
-            >>> aux_imdata = aux_delayed.as_xarray().finalize()
+            >>> aux_imdata = asset_delayed.as_xarray().finalize()
             >>> img_imdata = img_delayed.as_xarray().finalize()
             >>> assert aux_imdata.shape != img_imdata.shape
             >>> # Cannot load multiple asset items at the same time in
             >>> # asset space
             >>> import pytest
             >>> fused_channels = stream1 | stream2
-            >>> from delayed_image.delayed_nodes import CoordinateCompatibilityError
+            >>> from delayed_image.imdelayed_nodes import CoordinateCompatibilityError
             >>> with pytest.raises(CoordinateCompatibilityError):
-            >>>     aux_delayed2 = coco_img.delay(fused_channels, space='asset')
+            >>>     aux_delayed2 = coco_img.imdelay(fused_channels, space='asset')
 
         Example:
             >>> # Test loading at a specific resolution.
@@ -721,17 +721,17 @@ class CocoImage(ub.NiceRepr):
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
             >>> coco_img = dset.coco_image(1)
             >>> coco_img.img['resolution'] = '1 meter'
-            >>> img_delayed1 = coco_img.delay(space='image')
-            >>> vid_delayed1 = coco_img.delay(space='video')
+            >>> img_delayed1 = coco_img.imdelay(space='image')
+            >>> vid_delayed1 = coco_img.imdelay(space='video')
             >>> # test with unitless request
-            >>> img_delayed2 = coco_img.delay(space='image', resolution=3.1)
-            >>> vid_delayed2 = coco_img.delay(space='video', resolution='3.1 meter')
+            >>> img_delayed2 = coco_img.imdelay(space='image', resolution=3.1)
+            >>> vid_delayed2 = coco_img.imdelay(space='video', resolution='3.1 meter')
             >>> np.ceil(img_delayed1.shape[0] / 3.1) == img_delayed2.shape[0]
             >>> np.ceil(vid_delayed1.shape[0] / 3.1) == vid_delayed2.shape[0]
             >>> # test with unitless data
             >>> coco_img.img['resolution'] = 1
-            >>> img_delayed2 = coco_img.delay(space='image', resolution=3.1)
-            >>> vid_delayed2 = coco_img.delay(space='video', resolution='3.1 meter')
+            >>> img_delayed2 = coco_img.imdelay(space='image', resolution=3.1)
+            >>> vid_delayed2 = coco_img.imdelay(space='video', resolution='3.1 meter')
             >>> np.ceil(img_delayed1.shape[0] / 3.1) == img_delayed2.shape[0]
             >>> np.ceil(vid_delayed1.shape[0] / 3.1) == vid_delayed2.shape[0]
         """
@@ -750,8 +750,8 @@ class CocoImage(ub.NiceRepr):
         img_info = _delay_load_imglike(bundle_dpath, img,
                                        nodata_method=nodata_method)
         obj_info_list = [(img_info, img)]
-        auxlist = img.get('auxiliary', img.get('assets', [])) or []
-        for aux in auxlist:
+        asset_list = img.get('auxiliary', img.get('assets', [])) or []
+        for aux in asset_list:
             info = _delay_load_imglike(bundle_dpath, aux,
                                        nodata_method=nodata_method)
             obj_info_list.append((info, aux))
@@ -775,15 +775,23 @@ class CocoImage(ub.NiceRepr):
                             aux_to_img, dsize=img_info['dsize'])
                     chan_list.append(chan)
 
-        # TODO: allow load in auxiliary/asset space
-
         if space == 'video':
             video = self.video
             width = video.get('width', img.get('width', None))
             height = video.get('height', img.get('height', None))
-        else:
+        elif space in {'asset', 'auxiliary'}:
+            if len(chan_list) == 0:
+                width = img.get('width', None)
+                height = img.get('height', None)
+            else:
+                # TODO: should check these are all in the same space
+                width, height = chan_list[0].dsize
+        elif space == 'image':
             width = img.get('width', None)
             height = img.get('height', None)
+        else:
+            raise KeyError(space)
+
         dsize = (width, height)
 
         if len(chan_list) == 0:
