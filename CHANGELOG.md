@@ -15,6 +15,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Added `annots` property to CocoImge
 
+### Fixed 
+* Better asset space support
+
 
 ## Version 0.5.6 - Released 2023-02-07
 
