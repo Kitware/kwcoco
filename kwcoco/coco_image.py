@@ -710,7 +710,7 @@ class CocoImage(ub.NiceRepr):
             >>> # asset space
             >>> import pytest
             >>> fused_channels = stream1 | stream2
-            >>> from delayed_image.imdelayed_nodes import CoordinateCompatibilityError
+            >>> from delayed_image.delayed_nodes import CoordinateCompatibilityError
             >>> with pytest.raises(CoordinateCompatibilityError):
             >>>     aux_delayed2 = coco_img.imdelay(fused_channels, space='asset')
 
