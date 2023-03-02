@@ -17,6 +17,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed 
 * Better asset space support
+* Querying `annots` by track-id now return them in a sorted order.
 
 
 ## Version 0.5.6 - Released 2023-02-07
