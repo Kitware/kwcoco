@@ -1,5 +1,5 @@
 jsonschema >= 3.2.0
-kwarray >= 0.6.0
+kwarray >= 0.6.7
 kwimage >= 0.9.12
 delayed_image >= 0.2.4
 
