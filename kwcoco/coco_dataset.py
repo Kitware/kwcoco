@@ -72,7 +72,7 @@ from kwcoco import exceptions
 
 from kwcoco._helpers import (
     SortedSet, UniqueNameRemapper, _ID_Remapper, _NextId,
-    _delitems, _lut_frame_index
+    _delitems, _lut_image_frame_index, _lut_annot_frame_index
 )
 
 import json as pjson
@@ -3970,9 +3970,11 @@ class MixinCocoAddRemove(object):
                 print('Removing {} annotations'.format(len(remove_aids)))
 
             remove_idxs = list(ub.take(aid_to_index, remove_aids))
-            _delitems(self.dataset['annotations'], remove_idxs)
 
             self.index._remove_annotations(remove_aids, verbose=verbose)
+
+            _delitems(self.dataset['annotations'], remove_idxs)
+
             self._invalidate_hashid(['annotations'])
         return remove_info
 
@@ -4330,17 +4332,22 @@ class CocoIndex(object):
     # _set = ub.oset  # many operations are much slower for oset
     _set = set
 
-    def _set_sorted_by_frame_index(index, gids=None):
+    def _images_set_sorted_by_frame_index(index, gids=None):
         """
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
         """
-        # FIXME: likely need to do something to help this pickle nicely
-        return SortedSet(gids, key=partial(_lut_frame_index, index.imgs))
-        # This breaks in a different way
-        # def _lut_frame_index2(gid):
-        #     return index.imgs[gid]['frame_index']
-        # return sortedcontainers.SortedSet(gids, key=_lut_frame_index2)
+        return SortedSet(gids, key=partial(_lut_image_frame_index, index.imgs))
+
+    def _annots_set_sorted_by_frame_index(index, aids=None):
+        """
+        Helper for ensuring that vidid_to_gids returns image ids ordered by
+        frame index.
+        """
+        # if aids is None:
+        #     return set()
+        # return set(aids)
+        return SortedSet(aids, key=partial(_lut_annot_frame_index, index.imgs, index.anns))
 
     def __init__(index):
         index.anns = None
@@ -4396,7 +4403,7 @@ class CocoIndex(object):
                         'video with name={} already exists'.format(name))
             index.videos[vidid] = video
             if vidid not in index.vidid_to_gids:
-                index.vidid_to_gids[vidid] = index._set_sorted_by_frame_index()
+                index.vidid_to_gids[vidid] = index._images_set_sorted_by_frame_index()
             index.name_to_video[name] = video
 
     def _add_image(index, gid, img):
@@ -4452,7 +4459,7 @@ class CocoIndex(object):
                     #        'non-existing video-id={}').format(gid, vidid)
                     msg = 'Adding image to non-existing video'
                     warnings.warn(msg)
-                    index.vidid_to_gids[vidid] = index._set_sorted_by_frame_index()
+                    index.vidid_to_gids[vidid] = index._images_set_sorted_by_frame_index()
                     index.vidid_to_gids[vidid].add(gid)
 
     def _add_images(index, imgs):
@@ -4493,7 +4500,16 @@ class CocoIndex(object):
             # Note: it should be ok to have None's here
             index.gid_to_aids[gid].add(aid)
             index.cid_to_aids[cid].add(aid)
-            index.trackid_to_aids[tid].add(aid)
+            # index.trackid_to_aids[tid].add(aid)
+            try:
+                index.trackid_to_aids[tid].add(aid)
+            except KeyError:
+                # Be careful to not apply sorting to trackless annotations
+                if tid is None:
+                    index.trackid_to_aids[tid] = set()
+                else:
+                    index.trackid_to_aids[tid] = index._annots_set_sorted_by_frame_index()
+                index.trackid_to_aids[tid].add(aid)
 
     def _add_annotations(index, anns):
         if index.anns is not None:
@@ -4506,7 +4522,14 @@ class CocoIndex(object):
             for gid, cid, tid, aid in zip(gids, cids, tids, aids):
                 index.gid_to_aids[gid].add(aid)
                 index.cid_to_aids[cid].add(aid)
-                index.trackid_to_aids[tid].add(aid)
+                try:
+                    index.trackid_to_aids[tid].add(aid)
+                except KeyError:
+                    if tid is None:
+                        index.trackid_to_aids[tid] = set()
+                    else:
+                        index.trackid_to_aids[tid] = index._annots_set_sorted_by_frame_index()
+                    index.trackid_to_aids[tid].add(aid)
 
     def _add_category(index, cid, name, cat):
         if index.cats is not None:
@@ -4517,13 +4540,13 @@ class CocoIndex(object):
     def _remove_all_annotations(index):
         # Keep the category and image indexes alive
         if index.anns is not None:
-            index.anns.clear()
             for _ in index.gid_to_aids.values():
                 _.clear()
             for _ in index.cid_to_aids.values():
                 _.clear()
             for _ in index.trackid_to_aids.values():
                 _.clear()
+            index.anns.clear()
 
     def _remove_all_images(index):
         # Keep the category indexes alive
@@ -4543,13 +4566,14 @@ class CocoIndex(object):
                 print('Updating annotation index')
             # This is faster for simple set cid_to_aids
             for aid in remove_aids:
-                ann = index.anns.pop(aid)
+                ann = index.anns[aid]
                 gid = ann['image_id']
                 cid = ann.get('category_id', None)
                 track_id = ann.get('track_id', None)
+                index.trackid_to_aids[track_id].remove(aid)
                 index.cid_to_aids[cid].remove(aid)
                 index.gid_to_aids[gid].remove(aid)
-                index.trackid_to_aids[track_id].remove(aid)
+                index.anns.pop(aid)
 
     def _remove_categories(index, remove_cids, verbose=0):
         # dynamically update the category index
@@ -4685,7 +4709,7 @@ class CocoIndex(object):
             gid_to_aids = ub.map_vals(index._set, gid_to_aids)
             cid_to_aids = ub.map_vals(index._set, cid_to_aids)
             trackid_to_aids = ub.map_vals(index._set, trackid_to_aids)
-            vidid_to_gids = ub.map_vals(index._set_sorted_by_frame_index, vidid_to_gids)
+            vidid_to_gids = ub.map_vals(index._images_set_sorted_by_frame_index, vidid_to_gids)
         else:
             gid_to_aids = defaultdict(index._set)
             cid_to_aids = defaultdict(index._set)
@@ -4761,7 +4785,13 @@ class CocoIndex(object):
 
         # Ensure that the values are cast to the appropriate set type
         # This needs to happen after index.imgs is populated
-        vidid_to_gids = ub.map_vals(index._set_sorted_by_frame_index, vidid_to_gids)
+        vidid_to_gids = ub.map_vals(index._images_set_sorted_by_frame_index, vidid_to_gids)
+
+        # Be careful to not apply sorting to trackless annotations
+        _notrack_aids = trackid_to_aids.pop(None, None)
+        trackid_to_aids = ub.map_vals(index._annots_set_sorted_by_frame_index, trackid_to_aids)
+        if _notrack_aids is not None:
+            trackid_to_aids[None] = set(_notrack_aids)
 
         index.gid_to_aids = gid_to_aids
         index.cid_to_aids = cid_to_aids
