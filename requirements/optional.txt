@@ -1,4 +1,5 @@
 kwplot>=0.4.13
+colormath>=3.0.0
 seaborn>=0.9.0
 affine>=2.3.0
 # gdal  # not a robust requirement
