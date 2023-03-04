@@ -971,7 +971,9 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
             elif chan_name == 'flowy':
                 auxdata[..., chan_idx] = np.gradient(auxdata[..., chan_idx], axis=1)
             elif chan_name.startswith('B') or 1:
-                mask = rng.rand(*auxdata[..., chan_idx].shape[0:2]) > 0.5
+                maskshape = auxdata[..., chan_idx].shape[0:2]
+                mask = rng.randint(0, 2, size=maskshape, dtype=bool)
+                # mask = rng.rand(*maskshape) > 0.5
                 # NOTE: fourier mask takes a long time! Up to 80% of it!
                 auxdata[..., chan_idx] = kwimage.fourier_mask(auxdata[..., chan_idx], mask)[..., 0]
         auxdata = kwarray.normalize(auxdata)
