@@ -972,6 +972,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
                 auxdata[..., chan_idx] = np.gradient(auxdata[..., chan_idx], axis=1)
             elif chan_name.startswith('B') or 1:
                 mask = rng.rand(*auxdata[..., chan_idx].shape[0:2]) > 0.5
+                # NOTE: fourier mask takes a long time! Up to 80% of it!
                 auxdata[..., chan_idx] = kwimage.fourier_mask(auxdata[..., chan_idx], mask)[..., 0]
         auxdata = kwarray.normalize(auxdata)
         auxdata = auxdata.clip(0, 1)

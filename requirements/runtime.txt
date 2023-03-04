@@ -45,7 +45,7 @@ scipy>=1.6.0     ; python_version < '3.8' and python_version >= '3.7'    # Pytho
 scipy>=1.5.4     ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
 
 
-scriptconfig >= 0.7.0
+scriptconfig >= 0.7.3
 sortedcontainers >= 2.3.0
 ubelt >= 1.2.3
 uritools >= 3.0.0

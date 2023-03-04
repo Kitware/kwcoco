@@ -4339,6 +4339,9 @@ class CocoIndex(object):
         """
         return SortedSet(gids, key=partial(_lut_image_frame_index, index.imgs))
 
+    # Backwards compat
+    _set_sorted_by_frame_index = _images_set_sorted_by_frame_index
+
     def _annots_set_sorted_by_frame_index(index, aids=None):
         """
         Helper for ensuring that vidid_to_gids returns image ids ordered by
