@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.5.7 - Unreleased
+## Version 0.5.8 - Unreleased
+
+
+## Version 0.5.7 - Released 2023-03-04
 
 ### Changed
 * In `metrics.drawing`, make threshold colors more consistent
