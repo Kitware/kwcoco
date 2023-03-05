@@ -142,9 +142,12 @@ class UniqueNameRemapper(object):
 
 
 # Defined as a global for pickle
-# TODO: add a pickled test, FIXME: I dont think this is safe
-def _lut_frame_index(imgs, gid):
+def _lut_image_frame_index(imgs, gid):
     return imgs[gid]['frame_index']
+
+
+def _lut_annot_frame_index(imgs, anns, aid):
+    return imgs[anns[aid]['image_id']]['frame_index']
 
 
 class SortedSet(sortedcontainers.SortedSet):
@@ -154,7 +157,6 @@ class SortedSet(sortedcontainers.SortedSet):
         ``ss.__repr__()`` <==> ``repr(ss)``
 
         :return: string representation
-
         """
         type_name = type(self).__name__
         return '{0}({1!r})'.format(type_name, list(self))

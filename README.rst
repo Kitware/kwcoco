@@ -102,7 +102,9 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 
 This should help you inspect (via stats and show), combine (via union), and
 make training splits (via split) using the command line. Also ships with
-toydata, which generates a COCO file you can use for testing.
+toydata, which generates a COCO file you can use for testing. The kwcoco CLI
+has tab-complete features, but requires 
+`enabling argcomplete <docs/source/on_autocomplete.rst>`_.
 
 
 Toy Data
@@ -710,7 +712,16 @@ Key notes to takeaway:
 The KWCOCO Channel Specification
 --------------------------------
 
-See the documentation for ``kwcoco/channel_spec.py`` for more details.
+To summarize ``kwcoco.ChannelSpec`` and ``kwcoco.FusedChannelSpec`` represent a
+set of channels or bands in an image.  A FusedChannelSpec could be as simple as
+``red|green|blue``, or more complex like: ``red|green|blue|nir|swir16|swir22``
+and a ChannelSpec can be a collection of one or more FusedChannelSpecs
+separated by a comma.
+
+
+The home of the channel specification has moved to 
+`delayed_image <https://gitlab.kitware.com/computer-vision/delayed_image>`_.
+See the `delayed image channel spec docs <https://delayed-image.readthedocs.io/en/latest/delayed_image.channel_spec.html#>`_ for more details.
 
 
 Related Work
@@ -724,8 +735,8 @@ There are several other COCO libraries available:
 * https://pypi.org/project/coco-assistant/
 * https://pypi.org/project/cocorepr/
 
-
 Tools that work with COCO files:
+
 * https://voxel51.com/docs/fiftyone/
 
 

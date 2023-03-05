@@ -43,6 +43,15 @@ class CocoRerootCLI:
             'check': scfg.Value(True, help=(
                 'If True, checks that all data exists')),
 
+            'autofix': scfg.Value(False, help=(
+                ub.paragraph(
+                    '''
+                    If True, attempts an automatic fix. This assumes that paths
+                    are prefixed with an absolute path belonging to a different
+                    machine, and it attempts to strip off a minimal prefix to
+                    find relative paths that do exist.
+                    '''))),
+
             'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
 
@@ -95,6 +104,12 @@ class CocoRerootCLI:
         if config['absolute']:
             new_root = abspath(new_root)
 
+        if config['autofix']:
+            autfixer = find_reroot_autofix(dset)
+            print('Found autfixer = {}'.format(ub.urepr(autfixer, nl=1)))
+            config['new_prefix'] = autfixer['new_prefix']
+            config['old_prefix'] = autfixer['old_prefix']
+
         dset.reroot(
             new_root=new_root,
             new_prefix=config['new_prefix'],
@@ -110,6 +125,48 @@ class CocoRerootCLI:
             'compress': config['compress'],
         }
         dset.dump(dset.fpath, **dumpkw)
+
+
+def find_reroot_autofix(dset):
+    import os
+    # Given a set of missing images, is there a way we can autofix them
+    missing_tups = dset.missing_images()
+    missing_gpaths = [t[1] for t in missing_tups]
+    chosen = None
+    if len(missing_gpaths) > 0:
+        bundle_dpath = ub.Path(dset.bundle_dpath)
+        first = ub.Path(missing_gpaths[0])
+        first_parts = first.parts
+        candidates = []
+        for i in range(len(first_parts)):
+            cand_path = bundle_dpath / ub.Path(*first_parts[i:])
+            if cand_path.exists():
+                candidates.append({
+                    'old_prefix': os.fspath(ub.Path(*first_parts[:i])) + '/',
+                    'new_prefix': '',
+                })
+        if len(candidates) == 0:
+            raise RuntimeError('Could not determine a valid autofix')
+
+        # Check that the fix fixes everything or dont do it.
+        for candidate in candidates:
+            old_pref = os.fspath(candidate['old_prefix'])
+            new_pref = os.fspath(candidate['new_prefix'])
+
+            any_missing = False
+            for gpath in missing_gpaths:
+                new_gpath = bundle_dpath / ub.Path(os.fspath(gpath).replace(old_pref, new_pref))
+                if not new_gpath.exists():
+                    any_missing = True
+                    break
+
+            if any_missing:
+                continue
+
+            chosen = candidate
+    if not chosen:
+        raise RuntimeError('No candidate fixed all paths')
+    return chosen
 
 
 _CLI = CocoRerootCLI

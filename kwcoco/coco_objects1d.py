@@ -641,6 +641,7 @@ class Annots(ObjectList1D):
         Returns:
             List[int]
         """
+        # TODO: deprecate cnames and use category_names instead
         return [cat['name'] for cat in ub.take(self._dset.cats, self.cids)]
 
     @cnames.setter
@@ -663,6 +664,26 @@ class Annots(ObjectList1D):
         cats = map(self._dset._alias_to_cat, cnames)
         cids = (cat['id'] for cat in cats)
         self.set('category_id', cids)
+
+    @property
+    def category_names(self):
+        """
+        Get the column of category names
+
+        Returns:
+            List[int]
+        """
+        return self.cnames
+
+    @category_names.setter
+    def category_names(self, names):
+        """
+        Get the column of category names
+
+        Returns:
+            List[int]
+        """
+        self.cnames = names
 
     @property
     def detections(self):

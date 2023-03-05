@@ -53,6 +53,52 @@ class DetectionMetrics(ub.NiceRepr):
         }
         return ub.repr2(info)
 
+    def enrich_confusion_vectors(dmet, cfsn_vecs):
+        """
+        Adds annotation id information into confusion vectors computed
+        via this detection metrics object.
+
+        TODO: should likely use this at the end of the function that builds the
+        confusion vectors.
+        """
+        import kwarray
+        cfsn_data = cfsn_vecs.data
+        all_gids = cfsn_data['gid']
+        all_txs = cfsn_data['txs']
+        all_pxs = cfsn_data['pxs']
+
+        # Initialize new annotation-id columns to add to confusion vectors
+        cfsn_pred_aids = np.full(len(all_gids), fill_value=-1, dtype=int)
+        cfsn_true_aids = np.full(len(all_gids), fill_value=-1, dtype=int)
+
+        # For each image
+        unique_gids, grouped_indexes = kwarray.group_indices(all_gids)
+        for gid, rowxs in zip(unique_gids, grouped_indexes):
+            # Find the confusion rows that correspond to it
+            txs = all_txs[rowxs]
+            pxs = all_pxs[rowxs]
+            # Filter to only valid indexes and their row index in the
+            # confusion vectors.
+            tx_flags = txs >= 0
+            px_flags = pxs >= 0
+            valid_txs = txs[tx_flags]
+            valid_pxs = pxs[px_flags]
+            valid_tx_rowxs = rowxs[tx_flags]
+            valid_px_rowxs = rowxs[px_flags]
+            # Get the true and predicted detection annotation ids
+            # the txs and pxs index into these arrays.
+            pred_aids = dmet.gid_to_pred_dets[gid].data['aids']
+            true_aids = dmet.gid_to_true_dets[gid].data['aids']
+            valid_true_aids = true_aids[valid_txs]
+            valid_pred_aids = pred_aids[valid_pxs]
+            # Assign the annotation ids to their appropriate confusion rows
+            # in the confusion vectors.
+            cfsn_true_aids[valid_tx_rowxs] = valid_true_aids
+            cfsn_pred_aids[valid_px_rowxs] = valid_pred_aids
+
+        cfsn_data['true_aid'] = cfsn_true_aids
+        cfsn_data['pred_aid'] = cfsn_pred_aids
+
     @classmethod
     def from_coco(DetectionMetrics, true_coco, pred_coco, gids=None, verbose=0):
         """

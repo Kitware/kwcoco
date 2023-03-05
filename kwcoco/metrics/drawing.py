@@ -429,6 +429,11 @@ def draw_roc(info, prefix='', fnum=1, **kw):
     label_suffix = _realpos_label_suffix(info)
     label = 'AUC*={:0.4f}: ({}) {}'.format(auc, label_suffix, prefix)
 
+    color = kw.pop('color', None)
+    if color is None:
+        import kwimage
+        color = kwimage.Color.coerce('kitware_blue').as01()
+
     if 0:
         # TODO: deprecate multi_plot for seaborn?
         fig = kwplot.figure(fnum=fnum)
@@ -454,7 +459,7 @@ def draw_roc(info, prefix='', fnum=1, **kw):
             title=title,
             ylim=(0, 1), ypad=1e-2,
             xlim=(0, 1), xpad=1e-2,
-            fnum=fnum, **kw)
+            fnum=fnum, color=color, **kw)
 
     return ax
 
@@ -502,9 +507,13 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
         precision, recall = [0], [0]
 
     label_suffix = _realpos_label_suffix(info)
-    label = 'ap={:0.2f}: ({}) {}'.format(ap, label_suffix, prefix)
+    label = 'AP={:0.2f}: ({}) {}'.format(ap, label_suffix, prefix)
 
-    color = kw.pop('color', 'distinct')
+    # color = kw.pop('color', 'distinct')
+    color = kw.pop('color', None)
+    if color is None:
+        import kwimage
+        color = kwimage.Color.coerce('kitware_green').as01()
 
     node = info.get('node', 'classless')
 
@@ -541,10 +550,14 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     Args:
         info (Measures | Dict)
 
+        keys (None | List[str]):
+            the metrics to view over threhsolds
+
+    CommandLine:
+        xdoctest -m kwcoco.metrics.drawing draw_threshold_curves --show
+
     Example:
         >>> # xdoctest: +REQUIRES(module:kwplot)
-        >>> import sys, ubelt
-        >>> sys.path.append(ubelt.expandpath('~/code/kwcoco'))
         >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(
@@ -554,6 +567,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         >>> keys = None
         >>> import kwplot
         >>> kwplot.autompl()
+        >>> keys = {'g1', 'f1', 'acc', 'mcc', 'tpr'}
         >>> draw_threshold_curves(info, keys)
         >>> # xdoctest: +REQUIRES(--show)
         >>> kwplot.show_if_requested()
@@ -563,9 +577,18 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     thresh = info['thresholds']
 
     if keys is None:
-        keys = {'g1', 'f1', 'acc', 'mcc'}
+        keys = ['mcc', 'f1', 'g1', 'acc']
 
-    idx_to_colors = kwimage.Color.distinct(len(keys), space='rgba')
+    preset_colors = {
+        'f1': kwimage.Color.coerce('kitware_green').as01('rgba'),
+        'acc': kwimage.Color.coerce('kitware_red').as01('rgba'),
+        'mcc': kwimage.Color.coerce('kitware_blue').as01('rgba'),
+        'g1': kwimage.Color.coerce('kitware_orange').as01('rgba'),
+    }
+    key_to_color = determenistic_colors(keys, preset_colors)
+
+    # idx_to_colors = kwimage.Color.distinct(len(keys), space='rgba')
+    idx_to_colors = list(ub.take(key_to_color, keys))
     idx_to_best_pt = {}
 
     xydata = {}
@@ -611,8 +634,34 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     for idx, best_pt in idx_to_best_pt.items():
         best_thresh, best_measure = best_pt
         color = idx_to_colors[idx]
-        ax.plot(best_thresh, best_measure, '*', color=color)
+        edgecolor = kwimage.Color.coerce(color).adjust(lighten=-0.4).as01('rgba')
+
+        # ax.plot(best_thresh, best_measure, '*', color=color, edgecolor=edgecolor)
+        ax.scatter(
+            best_thresh, best_measure, marker='*', edgecolor=edgecolor,
+            facecolor=color, s=120, zorder=10)
     return ax
+
+
+def determenistic_colors(keys, preset_colors):
+    # TODO: port to kwimage / kwplot
+    known_colors = ub.udict(preset_colors) & keys
+    needs_colors = set(keys) - set(known_colors)
+    if needs_colors:
+        import matplotlib as mpl
+        import matplotlib._cm  as _cm
+        cm = mpl.colors.LinearSegmentedColormap.from_list(
+            'gist_rainbow', _cm.datad['gist_rainbow'],
+            mpl.rcParams['image.lut'])
+        for color in needs_colors:
+            # Get a randomized color that is determined by the name of the
+            # color so it is at least consistent.
+            import kwarray
+            seed = int(ub.hash_data(color, base=10)[0:12])
+            rng = kwarray.ensure_rng(seed)
+            known_colors[color] = cm(rng.rand())
+    return known_colors
+
 
 if __name__ == '__main__':
     """
