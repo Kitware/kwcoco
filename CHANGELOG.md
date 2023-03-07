@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.5.8 - Unreleased
 
+### Changed
+* Toydata now has better polygon generation for small image sizes, but is still
+  not perfect.
+
 
 ## Version 0.5.7 - Released 2023-03-04
 
