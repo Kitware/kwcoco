@@ -11,16 +11,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Toydata now has better polygon generation for small image sizes, but is still
   not perfect.
 
+### Fixed
+Bug in `CocoImage.add_asset` where 
+
 
 ## Version 0.5.7 - Released 2023-03-04
 
 ### Changed
 * In `metrics.drawing`, make threshold colors more consistent
 * Added `category_names` property to `Annots1d` object.
+* Deprecate `CocoImage.add_auxiliary_item` in favor of `CocoImage.add_asset`
 
 
 ### Added
 * Added `annots` property to CocoImge
+* Added `add_annotation` to `CocoImage`
 
 ### Fixed 
 * Better asset space support

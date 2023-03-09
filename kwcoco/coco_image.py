@@ -8,8 +8,10 @@ that contain tiles / overviews - e.g. Cloud Optimized Geotiffs or COGs (Medical
 image formats may be supported in the future).
 """
 import ubelt as ub
+import os
 import numpy as np
 from os.path import join
+from kwcoco.util.util_deprecate import deprecated_function_alias
 # from kwcoco.util.dict_like import DictLike
 
 try:
@@ -437,9 +439,31 @@ class CocoImage(ub.NiceRepr):
         else:
             return 'auxiliary'
 
-    def add_auxiliary_item(self, file_name=None, channels=None,
-                           imdata=None, warp_aux_to_img=None, width=None,
-                           height=None, imwrite=False):
+    def add_annotation(self, **ann):
+        """
+        Adds an annotation to this image.
+
+        This is a convinience method, and requires that this CocoImage is still
+        connected to a parent dataset.
+
+        Args:
+            **ann: annotation attributes (e.g. bbox, category_id)
+
+        Returns:
+            int: the new annotation id
+
+        SeeAlso:
+            :func:`kwcoco.CocoDataset.add_annotation`
+        """
+        if self.dset is None:
+            raise RuntimeError(
+                'Can only add an annotation through a CocoImage '
+                'if it is connected to its parent CocoDataset')
+        return self.dset.add_annotation(image_id=self.img['id'], **ann)
+
+    def add_asset(self, file_name=None, channels=None, imdata=None,
+                  warp_aux_to_img=None, width=None, height=None,
+                  imwrite=False):
         """
         Adds an auxiliary / asset item to the image dictionary.
 
@@ -491,17 +515,17 @@ class CocoImage(ub.NiceRepr):
             >>> coco_img = dset.coco_image(1)
             >>> imdata = np.random.rand(32, 32, 5)
             >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
-            >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
+            >>> coco_img.add_asset(imdata=imdata, channels=channels)
 
         Example:
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset()
             >>> gid = dset.add_image(name='my_image_name', width=200, height=200)
             >>> coco_img = dset.coco_image(gid)
-            >>> coco_img.add_auxiliary_item('path/img1_B0.tif', channels='B0', width=200, height=200)
-            >>> coco_img.add_auxiliary_item('path/img1_B1.tif', channels='B1', width=200, height=200)
-            >>> coco_img.add_auxiliary_item('path/img1_B2.tif', channels='B2', width=200, height=200)
-            >>> coco_img.add_auxiliary_item('path/img1_TCI.tif', channels='r|g|b', width=200, height=200)
+            >>> coco_img.add_asset('path/img1_B0.tif', channels='B0', width=200, height=200)
+            >>> coco_img.add_asset('path/img1_B1.tif', channels='B1', width=200, height=200)
+            >>> coco_img.add_asset('path/img1_B2.tif', channels='B2', width=200, height=200)
+            >>> coco_img.add_asset('path/img1_TCI.tif', channels='r|g|b', width=200, height=200)
         """
         from os.path import isabs, join  # NOQA
         import kwimage
@@ -541,8 +565,12 @@ class CocoImage(ub.NiceRepr):
         else:
             warp_aux_to_img = kwimage.Affine.coerce(warp_aux_to_img)
 
+        # Normalize for json serializability
         if channels is not None:
             channels = FusedChannelSpec.coerce(channels).spec
+
+        if file_name is not None:
+            file_name = os.fspath(file_name)
 
         # Make the aux info dict
         obj = {
@@ -579,9 +607,6 @@ class CocoImage(ub.NiceRepr):
         asset_list.append(obj)
         if self.dset is not None:
             self.dset._invalidate_hashid()
-
-    # Alias for add_auxiliary_item (which will eventually be deprecated)
-    add_asset = add_auxiliary_item
 
     @profile
     def imdelay(self, channels=None, space='image', resolution=None,
@@ -836,8 +861,6 @@ class CocoImage(ub.NiceRepr):
 
         return delayed
 
-    delay = imdelay  # backwards compat
-
     @ub.memoize_method
     def valid_region(self, space='image'):
         """
@@ -1057,6 +1080,13 @@ class CocoImage(ub.NiceRepr):
         reqspace_dets = imgspace_dets.warp(warp_req_from_img)
         reqspace_dets.data['aids'] = np.array(list(annots))
         return reqspace_dets
+
+    # Deprecated aliases
+    add_auxiliary_item = deprecated_function_alias(
+        'kwcoco', 'add_auxiliary_item', deprecate='now', new_func=add_asset)
+
+    delay = deprecated_function_alias(
+        'kwcoco', 'delay', new_func=imdelay, deprecate='now')
 
 
 # TODO:
