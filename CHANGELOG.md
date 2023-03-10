@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * Toydata now has better polygon generation for small image sizes, but is still
   not perfect.
+* Changed the internal name used in compressed zip files.
 
 ### Fixed
 Bug in `CocoImage.add_asset` where 

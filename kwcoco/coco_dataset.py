@@ -5390,12 +5390,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if sys.version_info[0:2] >= (3, 7):
             zipkw['compresslevel'] = None
         if arcname is None:
-            arcname = 'data.kwcoco.json'
-        # arcname = basename(zip_fpath)
-        # if arcname.endswith('.zip'):
-        #     arcname = arcname[:-4]
-        #     if not arcname.endswith('.json'):
-        #         arcname = arcname + '.json'
+            if not self.fpath:
+                arcname = '_data.kwcoco.json'
+            else:
+                # Use the current name of the file to compress
+                arcname = basename(self.fpath)
+                if arcname.endswith('.zip'):
+                    arcname = arcname[:-4]
+                    if not arcname.endswith('.json'):
+                        arcname = arcname + '.json'
         with zipfile.ZipFile(file, 'w', **zipkw) as zfile:
             text = self.dumps(indent=indent, newlines=newlines)
             zfile.writestr(arcname, text.encode('utf8'))
