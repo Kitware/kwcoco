@@ -1021,6 +1021,10 @@ class CocoImage(ub.NiceRepr):
         Given image or video space, compute the scale factor needed to achieve the
         target resolution.
 
+        # Use this to implement
+        scale_resolution_from_img
+        scale_resolution_from_vid
+
         Args:
             space (str): the space to the resolution of.
                 Can be either "image", "video", or "asset".
@@ -1046,6 +1050,8 @@ class CocoImage(ub.NiceRepr):
             >>> print('scale_factor = {}'.format(ub.urepr(scale_factor, precision=4, nl=0)))
             scale_factor = (1.2857, 1.2857)
         """
+        if resolution is None:
+            return (1., 1.)
         space_resolution_info = self.resolution(space=space, channel=channel, RESOLUTION_KEY=RESOLUTION_KEY)
         request_resolution_info = coerce_resolution(resolution)
         # If units are unspecified, assume they are compatible

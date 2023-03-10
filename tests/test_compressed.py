@@ -9,7 +9,9 @@ def test_read_zipped_kwcoco():
     zip_fpath = src_fpath.augment(ext='.zip')
 
     # Test that we can dump to a zipfile
-    dset._dump_to_zipfile(zip_fpath)
+    dset.dump(zip_fpath)
+    import zipfile
+    assert zipfile.is_zipfile(zip_fpath)
 
     # Test that the zipfile can be read
     dset2 = kwcoco.CocoDataset(zip_fpath)
