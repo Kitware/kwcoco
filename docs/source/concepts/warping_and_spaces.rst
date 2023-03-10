@@ -79,13 +79,23 @@ A rgb-video with no auxiliary images with may look like this:
 
 There are 3 coordinate spaces that we are concerned about in kwcoco.
 
-* Auxiliary Space - all the images are in their native on-disk resolutions.
+* Asset Space - all the images are in their native on-disk resolutions.
 * Image Space - coordinates that belong to the base image or the coordinate that all "auxiliary" images are aligned to.
 * Video Spce - the coordinates that all images in a video sequence are aligned to.
 
+The following visualizes these key spaces:
 
-Each "auxiliary" dictionary, if they exist, contains a ``warp_aux_to_img``
-transform that aligns the auxiliary image into the common "image-space".
+.. image:: https://i.imgur.com/QuiSJwR.png
+
+
+NOTE: we use the terms "auxiliary" and "asset" interchangably. The code was
+originally written using "auxiliary", but we later switched to "asset".
+Termonology will vary based on when something was written, eventually we will
+deprecate all instances of "auxiliary" and only refer to "assets".
+
+Each "asset" / "auxiliary" dictionary, if they exist, contains a
+``warp_aux_to_img`` transform that aligns the auxiliary image into the common
+"image-space".
 
 Each "image" dictionary in a video sequence contains a ``warp_img_to_vid``
 transform that aligns anything in image space into video space such that all
