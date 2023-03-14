@@ -271,7 +271,7 @@ class CategoryPatterns(object):
             elem_big, _ = elem_func(5)
             mask_big = (elem_big > 0.05).astype(np.uint8)
             cmask_big = kwimage.Mask(mask_big, 'c_mask')
-            sseg_big = cmask_big.to_multi_polygon(pixels_are='areas')
+            sseg_big = cmask_big.to_multi_polygon()
             sfactor = np.array(dsize) / np.array(cmask_big.shape[0:2][::-1])
             sseg = sseg_big.scale(sfactor)
         else:
