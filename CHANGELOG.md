@@ -13,7 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Changed the internal name used in compressed zip files.
 
 ### Fixed
-Bug in `CocoImage.add_asset` where 
+Bug in `CocoImage.add_asset` where json serialization was broken
 
 
 ## Version 0.5.7 - Released 2023-03-04
