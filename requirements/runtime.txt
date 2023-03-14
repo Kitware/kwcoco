@@ -13,9 +13,10 @@ xarray >= 0.16.0
 
 # xdev availpkg networkx --request_min=2.2.0
 # xdev availpkg imageio
-networkx>=2.7           ;                            python_version >= '3.8'    # Python 3.8+
-networkx>=2.6.2         ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
-networkx>=2.2.0,<=2.5.1 ; python_version < '3.7.0' and python_version >= '3.6.0'   # Python 3.6
+networkx>=2.8           ; python_version < '4.0'   and python_version >= '3.11'   # Python 3.11+
+networkx>=2.7           ; python_version < '3.11'  and python_version >= '3.8'    # Python 3.8-3.11
+networkx>=2.6.2         ; python_version < '3.8'   and python_version >= '3.7'    # Python 3.7
+networkx>=2.2.0,<=2.5.1 ; python_version < '3.7.0' and python_version >= '3.6.0'  # Python 3.6
 
 # 1.19.2 is the tensorflow minimum
 numpy>=1.23.2  ; python_version < '4.0'  and python_version >= '3.11'  # Python 3.11
