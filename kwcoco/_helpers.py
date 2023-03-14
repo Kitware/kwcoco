@@ -146,6 +146,10 @@ def _lut_image_frame_index(imgs, gid):
     return imgs[gid]['frame_index']
 
 
+# backwards compat for pickles
+_lut_frame_index = _lut_image_frame_index
+
+
 def _lut_annot_frame_index(imgs, anns, aid):
     return imgs[anns[aid]['image_id']]['frame_index']
 
