@@ -233,36 +233,55 @@ class CategoryPatterns(object):
             >>> cname = 'superstar'
             >>> xy_offset = None
             >>> self._todo_refactor_geometric_info(cname, xy_offset, dims)
+
+        Example:
+            >>> from kwcoco.demo.toypatterns import *  # NOQA
+            >>> cname = 'star'
+            >>> xy_offset = None
+            >>> self = CategoryPatterns.coerce([cname])
+            >>> for d in range(0, 5):
+            ...     dims = (d, d)
+            ...     info = self._todo_refactor_geometric_info(cname, xy_offset, dims)
+            ...     print(info['segmentation'].data)
         """
         elem_func = self._category_to_elemfunc[cname]
         x = max(dims)
-        # x = int(2 ** np.floor(np.log2(x)))
-        elem, kpts_yx = elem_func(x)
 
-        size = tuple(map(int, dims[::-1]))
+        elem, kpts_yx = elem_func(x)
+        dsize = tuple(map(int, dims[::-1]))
 
         if kpts_yx is not None:
             kp_catnames = list(kpts_yx.keys())
             xy = np.array([yx[::-1] for yx in kpts_yx.values()])
             kpts = kwimage.Points(xy=xy, class_idxs=np.arange(len(xy)),
                                   classes=kp_catnames)
-            sf = np.array(size) / np.array(elem.shape[0:2][::-1])
+            sf = np.array(dsize) / np.array(elem.shape[0:2][::-1])
             kpts = kpts.scale(sf)
         else:
             kpts = None
             # center
             kpts = kwimage.Points(xy=np.array([]).reshape(0, 2))
             # kpts = kwimage.Points(xy=np.array([[.5, .5]]))
-            kpts = kpts.scale(size)
+            kpts = kpts.scale(dsize)
 
-        if size[0] == 0 or size[1] == 0:
-            # print('size = {!r}'.format(size))
-            template = np.empty(size[::-1], dtype=np.float32)
+        if x <= 3 and x > 0:
+            # One pixel images can't have a polygon traced when interpreting
+            # pixels as points, so in this we define the polygon on a larger
+            # canvas and then rescale the polygon itself.
+            elem_big, _ = elem_func(5)
+            mask_big = (elem_big > 0.05).astype(np.uint8)
+            cmask_big = kwimage.Mask(mask_big, 'c_mask')
+            sseg_big = cmask_big.to_multi_polygon()
+            sfactor = np.array(dsize) / np.array(cmask_big.shape[0:2][::-1])
+            sseg = sseg_big.scale(sfactor)
         else:
-            template = cv2.resize(elem, size).astype(np.float32)
-
-        mask = (template > 0.05).astype(np.uint8)
-        sseg = kwimage.Mask(mask, 'c_mask').to_multi_polygon()
+            if dsize[0] == 0 or dsize[1] == 0:
+                template = np.empty(dsize[::-1], dtype=np.float32)
+            else:
+                template = cv2.resize(elem, dsize).astype(np.float32)
+            mask = (template > 0.05).astype(np.uint8)
+            cmask = kwimage.Mask(mask, 'c_mask')
+            sseg = cmask.to_multi_polygon()
 
         if xy_offset is not None:
             sseg = sseg.translate(xy_offset, output_dims=dims)

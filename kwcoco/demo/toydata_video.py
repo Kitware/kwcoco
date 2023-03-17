@@ -20,7 +20,7 @@ except Exception:
     profile = ub.identity
 
 
-TOYDATA_VIDEO_VERSION = 21
+TOYDATA_VIDEO_VERSION = 22
 
 
 @profile
@@ -74,6 +74,8 @@ def random_video_dset(
         >>> dset = random_video_dset(render=True, num_videos=3, num_frames=2,
         >>>                          num_tracks=5, image_size=(128, 128))
         >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
         >>> dset.show_image(1, doclf=True)
         >>> dset.show_image(2, doclf=True)
 
@@ -82,6 +84,18 @@ def random_video_dset(
             num_tracks=10)
         dset._tree()
         dset.imgs[1]
+
+    Example:
+        >>> from kwcoco.demo.toydata_video import *  # NOQA
+        >>> # Test small images
+        >>> dset = random_video_dset(render=True, num_videos=1, num_frames=1,
+        >>>                          num_tracks=1, image_size=(2, 2))
+        >>> ann = dset.annots().peek()
+        >>> print('ann = {}'.format(ub.urepr(ann, nl=2)))
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> dset.show_image(1, doclf=True)
 
     Ignore:
         dset = random_single_video_dset()
@@ -967,9 +981,15 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         auxchan = kwcoco.FusedChannelSpec.coerce(chankey)
         for chan_idx, chan_name in enumerate(auxchan.as_list()):
             if chan_name == 'flowx':
-                auxdata[..., chan_idx] = np.gradient(auxdata[..., chan_idx], axis=0)
+                try:
+                    auxdata[..., chan_idx] = np.gradient(auxdata[..., chan_idx], axis=0)
+                except ValueError:
+                    auxdata[..., chan_idx] = auxdata[..., chan_idx]
             elif chan_name == 'flowy':
-                auxdata[..., chan_idx] = np.gradient(auxdata[..., chan_idx], axis=1)
+                try:
+                    auxdata[..., chan_idx] = np.gradient(auxdata[..., chan_idx], axis=1)
+                except ValueError:
+                    auxdata[..., chan_idx] = auxdata[..., chan_idx]
             elif chan_name.startswith('B') or 1:
                 maskshape = auxdata[..., chan_idx].shape[0:2]
                 mask = rng.randint(0, 2, size=maskshape, dtype=bool)
