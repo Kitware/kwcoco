@@ -26,10 +26,10 @@ Bug in `CocoImage.add_asset` where json serialization was broken
 * Added `category_names` property to `Annots1d` object.
 * Deprecate `CocoImage.add_auxiliary_item` in favor of `CocoImage.add_asset`
 
-
 ### Added
 * Added `annots` property to CocoImge
 * Added `add_annotation` to `CocoImage`
+* Added `autofix` option `kwcoco reroot`
 
 ### Fixed 
 * Better asset space support

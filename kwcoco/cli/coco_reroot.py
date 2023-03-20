@@ -43,7 +43,7 @@ class CocoRerootCLI:
             'check': scfg.Value(True, help=(
                 'If True, checks that all data exists')),
 
-            'autofix': scfg.Value(False, help=(
+            'autofix': scfg.Value(False, isflag=True, help=(
                 ub.paragraph(
                     '''
                     If True, attempts an automatic fix. This assumes that paths
