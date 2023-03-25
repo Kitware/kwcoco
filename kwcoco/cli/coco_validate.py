@@ -47,7 +47,7 @@ class CocoValidateCLI:
         This also has the ability to fix corrupted assets by removing them, but
         that functionality may be moved to a new command in the future.
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to datasets', position=1),
 
             # 'schema': scfg.Value(True, help='If True check the json schema'),

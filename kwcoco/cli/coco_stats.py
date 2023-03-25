@@ -7,10 +7,11 @@ class CocoStatsCLI:
     name = 'stats'
 
     class CLIConfig(scfg.Config):
+        __command__ = 'stats'
         """
         Compute summary statistics about a COCO dataset
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to dataset', position=1),
             'basic': scfg.Value(True, isflag=True, help='show basic stats'),
             'extended': scfg.Value(True, isflag=True, help='show extended stats'),

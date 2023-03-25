@@ -10,7 +10,7 @@ class CocoToyDataCLI(object):
         """
         Create COCO toydata for demo and testing purposes.
         """
-        default = {
+        __default__ = {
             'key': scfg.Value('shapes8', help=ub.paragraph(
                 '''
                 Special demodata code. Basic options that define which flavor

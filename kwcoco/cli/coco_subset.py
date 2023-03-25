@@ -10,7 +10,8 @@ class CocoSubsetCLI(object):
         """
         Take a subset of this dataset and write it to a new file
         """
-        default = {
+        __command__ = 'subset'
+        __default__ = {
             'src': scfg.Value(None, help='input dataset path', position=1),
             'dst': scfg.Value(None, help='output dataset path', position=2),
             'include_categories': scfg.Value(

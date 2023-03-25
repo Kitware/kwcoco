@@ -11,7 +11,7 @@ from os.path import join
 class CocoEvalCLIConfig(scfg.Config):
     __doc__ = coco_evaluator.CocoEvalConfig.__doc__
 
-    default = ub.dict_union(coco_evaluator.CocoEvalConfig.default, {
+    __default__ = ub.dict_union(coco_evaluator.CocoEvalConfig.__default__, {
         # These should go into the CLI args, not the class config args
         'expt_title': scfg.Value('', type=str, help='title for plots'),
         'draw': scfg.Value(True, isflag=1, help='draw metric plots'),
@@ -49,12 +49,12 @@ class CocoEvalCLI:
             >>> true_dset.dump(true_dset.fpath)
             >>> pred_dset.dump(pred_dset.fpath)
             >>> draw = False  # set to false for faster tests
-            >>> CocoEvalCLI.main(
+            >>> CocoEvalCLI.main(cmdline=False,
             >>>     true_dataset=true_dset.fpath,
             >>>     pred_dataset=pred_dset.fpath,
             >>>     draw=draw, out_dpath=dpath)
         """
-        main(cmdline=True, **kw)
+        main(cmdline=cmdline, **kw)
 
 
 def main(cmdline=True, **kw):
@@ -78,7 +78,7 @@ def main(cmdline=True, **kw):
     """
     import kwimage
     import kwarray
-    cli_config = CocoEvalCLIConfig(cmdline=cmdline, default=kw)
+    cli_config = CocoEvalCLIConfig.cli(cmdline=cmdline, default=kw)
     print('cli_config = {}'.format(ub.repr2(dict(cli_config), nl=1)))
 
     eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvaluator.Config.default)

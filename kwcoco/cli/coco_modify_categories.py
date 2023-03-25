@@ -23,7 +23,7 @@ class CocoModifyCatsCLI:
 
             kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep=[] --keep_annots=True
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(None, help=(
                 'Path to the coco dataset'), position=1),
 

@@ -17,14 +17,14 @@ class CocoRerootCLI:
             - [ ] Evaluate that all tests cases work
         """
 
-        epilog = """
+        __epilog__ = """
 
         Example Usage:
             kwcoco reroot --help
             kwcoco reroot --src=special:shapes8 --dst rerooted.json
             kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rerooted.json
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(None, help=(
                 'Path to the coco dataset'), position=1),
 

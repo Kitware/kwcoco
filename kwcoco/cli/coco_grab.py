@@ -16,7 +16,7 @@ class CocoGrabCLI:
             kwcoco grab cifar10 camvid
         """
 
-        default = {
+        __default__ = {
             'names': scfg.Value([], nargs='+', position=1, help=ub.paragraph(
                 '''
                 Dataset names to grab. Valid values are cifar10, cifar100,

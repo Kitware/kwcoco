@@ -23,7 +23,7 @@ class CocoConformCLI:
             kwcoco conform --src=special:shapes8 --dst conformed.json
             kwcoco conform special:shapes8 conformed.json
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(None, help=(
                 'the path to the input coco dataset'),
                 position=1,

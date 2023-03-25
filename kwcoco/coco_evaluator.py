@@ -84,7 +84,7 @@ class CocoEvalConfig(scfg.Config):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
-    default = {
+    __default__ = {
         'true_dataset': scfg.Value(None, type=str, help='coercable true detections', position=1),
         'pred_dataset': scfg.Value(None, type=str, help='coercable predicted detections', position=2),
 
