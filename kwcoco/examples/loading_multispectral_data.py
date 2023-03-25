@@ -9,7 +9,7 @@ def demo_load_msi_data():
     channels = 'B1|B8a|B8|B11|B10'
     # The delayed image is just a reference, it does not load data
     # until you finish describing all the operations you want to do
-    delayed = coco_img.delay(channels=channels)
+    delayed = coco_img.imdelay(channels=channels)
     delayed = delayed.crop((slice(30, 130), slice(20, 200)))
     delayed = delayed.warp(kwimage.Affine.scale(2), dsize='auto')
     # Calling finalize returns the warped and aligned sub-patch of data

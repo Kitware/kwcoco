@@ -69,6 +69,8 @@ old thread with a hash-index feature request for SQLite, which I
 unabashedly resurrected
 http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 https://web.archive.org/web/20210326010915/http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
+
+
 """
 import json
 import numpy as np
@@ -109,6 +111,14 @@ try:
     sqlite3.register_adapter(np.int64, int)
     sqlite3.register_adapter(np.int32, int)
     CocoBase = declarative_base()
+
+    from sqlalchemy.dialects.postgresql import JSONB
+    # References:
+    # https://github.com/sqlalchemy/sqlalchemy/discussions/9530
+    # Use JSON with SQLite and JSONB with PostgreSQL.
+    JSONVariant = JSON().with_variant(JSONB(), "postgresql")
+    # SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.ProgrammingError)
+    SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,)
 except ImportError:
     # Hack: xdoctest should have been able to figure out that
     # all of these tests were diabled due to the absense of sqlalchemy
@@ -121,8 +131,8 @@ except ImportError:
     Column = ub.identity
     Index = ub.identity
     CocoBase = FallbackCocoBase
-
-
+    JSONVariant = None
+    SQL_ERROR_TYPES = (Exception,)
 try:
     from psycopg2.extensions import register_adapter, AsIs
     def addapt_numpy_float64(numpy_float64):
@@ -221,6 +231,8 @@ class Annotation(CocoBase):
     # track_id = Column(JSON, index=True, unique=False) # fixme: via postgresql gin index
     # track_id = Column(Integer, index=True, unique=False)
     track_id = Column(JSON)
+    # track_id = Column(JSONVariant, index=True)
+    # track_id = Column(JSONVariant)
 
     segmentation = Column(JSON)
     keypoints = Column(JSON)
@@ -534,7 +546,7 @@ class SqlDictProxy(DictLike):
         try:
             query = proxy.session.query(proxy.cls.id).filter(keyattr == key)
             flag = query.count() > 0
-        except sqlalchemy.exc.InterfaceError as ex:
+        except SQL_ERROR_TYPES as ex:
             if 'unsupported type' in str(ex):
                 return False
             else:
@@ -565,7 +577,7 @@ class SqlDictProxy(DictLike):
                     raise AssertionError('Should only have 1 result')
                 else:
                     obj = results[0]
-        except sqlalchemy.exc.InterfaceError as ex:
+        except SQL_ERROR_TYPES as ex:
             if 'unsupported type' in str(ex):
                 raise KeyError(key)
             else:
@@ -814,7 +826,7 @@ class SqlIdGroupDictProxy(DictLike):
             query = (proxy.session.query(proxy.parent_keyattr)
                      .filter(proxy.parent_keyattr == key))
             flag = query.count() > 0
-        except sqlalchemy.exc.InterfaceError as ex:
+        except SQL_ERROR_TYPES as ex:
             if 'unsupported type' in str(ex):
                 return False
             else:

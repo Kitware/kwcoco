@@ -208,7 +208,7 @@ class MixinCocoDepricate(object):
             'kwcoco', name='imread', type='method',
             deprecate='0.3.4', error='1.0.0', remove='1.1.0',
             migration=(
-                'use `self.coco_image(gid).delay().finalize()`.'
+                'use `self.coco_image(gid).imdelay().finalize()`.'
             )
         )
         return self.load_image(gid)
@@ -279,7 +279,7 @@ class MixinCocoAccessors(object):
             >>> print('delayed = {!r}'.format(delayed))
         """
         coco_img = self.coco_image(gid)
-        delayed = coco_img.delay(channels=channels, space=space)
+        delayed = coco_img.imdelay(channels=channels, space=space)
         return delayed
 
     def load_image(self, gid_or_img, channels=None):

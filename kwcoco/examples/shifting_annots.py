@@ -23,7 +23,7 @@ def main():
         image_dets: kwimage.Detections = dset.annots(gid=image_id).detections
 
         coco_img: kwcoco.CocoImage = dset.coco_image(image_id)
-        delayed_img = coco_img.delay()
+        delayed_img = coco_img.imdelay()
 
         # Pure coco variant
         for space_slice in slider:

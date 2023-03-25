@@ -103,13 +103,13 @@ def demo():
     space = 'video'
     scale_factor = scalefactor_for_resolution(coco_img, space, resolution, RESOLUTION_KEY=RESOLUTION_KEY)
     print(f'scale_factor={scale_factor}')
-    delayed1 = coco_img.delay(space=space).scale(scale_factor)
+    delayed1 = coco_img.imdelay(space=space).scale(scale_factor)
     delayed1.write_network_text()
 
     space = 'image'
     scale_factor = scalefactor_for_resolution(coco_img, space, resolution, RESOLUTION_KEY=RESOLUTION_KEY)
     print(f'scale_factor={scale_factor}')
-    delayed2 = coco_img.delay(space=space).scale(scale_factor)
+    delayed2 = coco_img.imdelay(space=space).scale(scale_factor)
     delayed2.write_network_text()
 
     assert delayed1.dsize == delayed2.dsize, (

@@ -640,7 +640,7 @@ or a RAW format) using the delayed load interface.
     # Note: that when specifying channels from multiple asset items
     # it is not possible to sample in the the auxiliary / asset space 
     # so only image and video are allowed there.
-    delayed_img = coco_img.delay('fx|depth|red', space='image')
+    delayed_img = coco_img.imdelay('fx|depth|red', space='image')
 
     # We finalize the data to load it
     imdata = delayed_img.finalize()
@@ -670,7 +670,7 @@ contain different number of channels.
     channels = '|'.join(kwarray.shuffle(avail_channels)[0:3])
     print('channels = {!r}'.format(channels))
 
-    delayed_img = coco_img.delay(channels, space='video')
+    delayed_img = coco_img.imdelay(channels, space='video')
 
     imdata = delayed_img.finalize()
 

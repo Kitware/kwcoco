@@ -15,9 +15,9 @@ def test_resolution_with_channels():
     shapes2 = []
     shapes3 = []
     for resolution in [None, 1.1, 2.2]:
-        d1 = coco_img.delay(chan, space='video', resolution=resolution)
-        d2 = coco_img.delay('fds', space='video', resolution=resolution)
-        d3 = coco_img.delay(chan + '|fds', space='video', resolution=resolution)
+        d1 = coco_img.imdelay(chan, space='video', resolution=resolution)
+        d2 = coco_img.imdelay('fds', space='video', resolution=resolution)
+        d3 = coco_img.imdelay(chan + '|fds', space='video', resolution=resolution)
         shapes1.append(d1.dsize)
         shapes2.append(d2.dsize)
         shapes3.append(d3.dsize)

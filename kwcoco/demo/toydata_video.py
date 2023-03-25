@@ -697,7 +697,7 @@ def _draw_video_sequence(dset, gids):
     images = dset.images(gids)
     for coco_img in images.coco_images:
         chan_names = coco_img.channels.fuse()
-        chan_hwc = coco_img.delay(space='video').finalize()
+        chan_hwc = coco_img.imdelay(space='video').finalize()
         chan_chw = chan_hwc.transpose(2, 0, 1)
         cells = []
         for raw_data, chan_name in zip(chan_chw, chan_names):
