@@ -294,9 +294,8 @@ class MixinCocoAccessors(object):
         Returns:
             np.ndarray : the image
 
-        TODO:
-            - [ ] allow specification of multiple channels - use delayed image
-                for this.
+        Note:
+            Prefer to use the CocoImage methods instead
         """
         try:
             import kwimage
@@ -318,6 +317,9 @@ class MixinCocoAccessors(object):
             channels (str | None): if specified, return a path to data
                 containing auxiliary channels instead
 
+        Note:
+            Prefer to use the CocoImage methods instead
+
         Returns:
             PathLike: full path to the image
         """
@@ -337,7 +339,7 @@ class MixinCocoAccessors(object):
         elif 'assets' in img:
             auxlist = img['assets']
         else:
-            raise KeyError('no auxilary data')
+            raise KeyError('no auxiliary data')
         for aux in auxlist:
             if aux['channels'] == channels:
                 found = aux
@@ -355,6 +357,9 @@ class MixinCocoAccessors(object):
             gid_or_img (int | dict): an image or its id
             channels (str): the auxiliary channel to load (e.g. disparity)
 
+        Note:
+            Prefer to use the CocoImage methods instead
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
@@ -369,7 +374,7 @@ class MixinCocoAccessors(object):
         Reads the chip of an annotation. Note this is much less efficient than
         using a sampler, but it doesn't require disk cache.
 
-        Maybe depricate?
+        Maybe deprecate?
 
         Args:
             aid_or_int (int | dict): annot id or dict
@@ -777,6 +782,11 @@ class MixinCocoAccessors(object):
         return kpnames
 
     def _coco_image(self, gid):
+        ub.schedule_deprecation(
+            'kwcoco', '_coco_image', 'method',
+            migration='Use "coco_image" instead.',
+            deprecate='0.5.9', error='1.0.0', remove='1.1.0',
+        )
         return self.coco_image(gid)
 
     def coco_image(self, gid):
@@ -3052,8 +3062,18 @@ class MixinCocoDraw(object):
         """
         import kwimage
         # Load the raw image pixels
-        canvas = self.load_image(gid, channels=channels)
-        # TODO: account for auxiliary transforms if the exist
+        coco_img = self.coco_image(gid)
+        delayed = coco_img.imdelay(space='image', channels=channels)
+
+        if delayed.channels is not None and delayed.channels.numel() > 3:
+            import warnings
+            warnings.warn('Requested drawing more than 3 channels. '
+                          'Only picking first 3')
+            first_channels = coco_img.imdelay(space='image').channels.fuse()[0:3]
+            delayed = delayed.take_channels(first_channels)
+
+        canvas = delayed.finalize()
+        canvas = _normalize_intensity_if_needed(canvas)
 
         # Get annotation IDs from this image
         aids = self.index.gid_to_aids[gid]
@@ -3106,7 +3126,7 @@ class MixinCocoDraw(object):
             :func:`kwcoco.coco_dataset.MixinCocoDraw.show_image`
 
         Ignore:
-            # Programatically collect the kwargs for docs generation
+            # Programmatically collect the kwargs for docs generation
             import xinspect
             import kwcoco
             kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
@@ -3149,7 +3169,8 @@ class MixinCocoDraw(object):
         if aids is not None:
             highlight_aids.update(aids)
 
-        img = self.imgs[gid]
+        coco_img = self.coco_image(gid)
+        img = coco_img.img
         aids = self.index.gid_to_aids.get(img['id'], [])
 
         # Collect annotation overlays
@@ -3281,50 +3302,43 @@ class MixinCocoDraw(object):
                             sseg_polys.append(poly)
 
         # Show image
-        if img.get('file_name', None) is not None:
-            np_img = self.load_image(img, channels=channels)
-        else:
-            # hack for multispectral
-            coco_img = self._coco_image(gid)
-            avail_channels = coco_img.channels
+        avail_channels = coco_img.channels
 
-            if channels is None:
-                avail_spec = avail_channels.fuse().normalize()
-                num_chans = avail_spec.numel()
+        if channels is None:
+            avail_spec = avail_channels.fuse().normalize()
+            num_chans = avail_spec.numel()
 
-                if num_chans == 0:
-                    raise Exception('no channels!')
-                elif num_chans <= 2:
-                    print('Auto choosing 1 channel')
-                    channels = avail_spec.parsed[0]
-                elif num_chans > 3:
-                    print('Auto choosing 3 channel')
-                    sensible_defaults = [
-                        'red|green|blue',
-                        'r|g|b',
-                    ]
-                    chosen = None
-                    for sensible in sensible_defaults:
-                        cand = avail_spec & sensible
-                        if cand.numel() == 3:
-                            chosen = cand
-                            break
-                    if chosen is None:
-                        chosen = avail_spec[0:3]
-                    channels = chosen
+            if num_chans == 0:
+                raise Exception('no channels!')
+            elif num_chans <= 2:
+                print('Auto choosing 1 channel')
+                channels = avail_spec.parsed[0]
+            elif num_chans > 3:
+                print('Auto choosing 3 channel')
+                sensible_defaults = [
+                    'red|green|blue',
+                    'r|g|b',
+                ]
+                chosen = None
+                for sensible in sensible_defaults:
+                    cand = avail_spec & sensible
+                    if cand.numel() == 3:
+                        chosen = cand
+                        break
+                if chosen is None:
+                    chosen = avail_spec[0:3]
+                channels = chosen
 
-            print('loading image')
-            delayed = self.delayed_load(
-                img['id'], channels=channels, space='image')
-            np_img = delayed.finalize()
-            print('loaded image')
+        print('loading image')
+        delayed = coco_img.imdelay(space='image', channels=channels)
+        np_img = delayed.finalize()
+        print('loaded image')
 
         np_img = kwimage.atleast_3channels(np_img)
 
         np_img01 = None
-        if np_img.dtype.kind in {'i', 'u'}:
-            if np_img.max() > 255:
-                np_img01 = kwimage.normalize_intensity(np_img)
+        if np_img.max() > 255:
+            np_img01 = _normalize_intensity_if_needed(np_img)
 
         fig = plt.gcf()
         ax = fig.gca()
@@ -3405,6 +3419,20 @@ class MixinCocoDraw(object):
         return ax
 
 
+def _normalize_intensity_if_needed(canvas):
+    # We really need a function that can adapt to dynamic ranges
+    # in a robust way that ensures at least something is visible.
+    # Normalize intensity is pretty good, but has common edge cases.
+    import kwimage
+    max_value = canvas.max()
+    min_value = canvas.min()
+    if canvas.dtype.kind in ['u', 'i'] and max_value > 255 or min_value < 0:
+        canvas = kwimage.normalize_intensity(canvas)
+    elif max_value > 0 or min_value < 0:
+        canvas = kwimage.normalize_intensity(canvas)
+    return canvas
+
+
 class MixinCocoAddRemove(object):
     """
     Mixin functions to dynamically add / remove annotations images and
@@ -3466,7 +3494,7 @@ class MixinCocoAddRemove(object):
         Args:
             file_name (str | None): relative or absolute path to image.
                  if not given, then "name" must be specified and we will
-                 exepect that "auxiliary" assets are eventually added.
+                 expect that "auxiliary" assets are eventually added.
             id (None | int): ADVANCED. Force using this image id.
             name (str): a unique key to identify this image
             width (int): base width of the image
@@ -3554,9 +3582,9 @@ class MixinCocoAddRemove(object):
         Register a new annotation with the dataset
 
         Args:
-            image_id (int): image_id the annoatation is added to.
+            image_id (int): image_id the annotation is added to.
 
-            category_id (int | None): category_id for the new annotaiton
+            category_id (int | None): category_id for the new annotation
 
             bbox (list | kwimage.Boxes): bounding box in xywh format
 

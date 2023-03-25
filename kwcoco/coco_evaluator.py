@@ -551,7 +551,7 @@ class CocoEvaluator(object):
                     # directory of predictions
                     extra['coco_dpath'] = coco_dpath = dataset
                     pat = ub.Path(coco_dpath) / '**/*.json'
-                    coco_fpaths = sorted(glob.glob(pat, recursive=True))
+                    coco_fpaths = sorted(glob.glob(os.fspath(pat), recursive=True))
                     dets, coco_dset = _load_dets(coco_fpaths, workers=workers)
                     extra['coco_dset'] = coco_dset
                     # coco_dset = kwcoco.CocoDataset.from_coco_paths(
