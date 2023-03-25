@@ -457,15 +457,15 @@ class SqlDictProxy(DictLike):
         >>> goodkey1 = keys[1]
         >>> badkey1 = -100000000000
         >>> badkey2 = 'foobarbazbiz'
-        >>> badkey3 = object()
         >>> assert goodkey1 in proxy
         >>> assert badkey1 not in proxy
         >>> assert badkey2 not in proxy
-        >>> assert badkey3 not in proxy
         >>> with pytest.raises(KeyError):
         >>>     proxy[badkey1]
         >>> with pytest.raises(KeyError):
         >>>     proxy[badkey2]
+        >>> badkey3 = object()
+        >>> assert badkey3 not in proxy
         >>> with pytest.raises(KeyError):
         >>>     proxy[badkey3]
 
@@ -546,8 +546,12 @@ class SqlDictProxy(DictLike):
         try:
             query = proxy.session.query(proxy.cls.id).filter(keyattr == key)
             flag = query.count() > 0
-        except SQL_ERROR_TYPES as ex:
-            if 'unsupported type' in str(ex):
+        # except SQL_ERROR_TYPES as ex:
+        except Exception as ex:
+            _ex = str(ex)
+            # Fixme, on 3.11 it seems like this error still raises even though
+            # we handle it.
+            if 'unsupported type' in _ex or 'not supported' in _ex:
                 return False
             else:
                 raise
