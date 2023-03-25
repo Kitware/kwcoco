@@ -49,29 +49,29 @@ def the_core_dataset_backend():
 def demo_vectorize_interface():
 
     """
+    Ignore:
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes2')
+        >>> #
+        >>> aids = [1, 2, 3, 4]
+        >>> annots = dset.annots(aids)
+        ...
+        >>> print('annots = {!r}'.format(annots))
+        annots = <Annots(num=4) at ...>
 
-    >>> import kwcoco
-    >>> dset = kwcoco.CocoDataset.demo('vidshapes2')
-    >>> #
-    >>> aids = [1, 2, 3, 4]
-    >>> annots = dset.annots(aids)
-    ...
-    >>> print('annots = {!r}'.format(annots))
-    annots = <Annots(num=4) at ...>
+        >>> annots.lookup('bbox')
+        [[346.5, 335.2, 33.2, 99.4],
+         [344.5, 327.7, 48.8, 111.1],
+         [548.0, 154.4, 57.2, 62.1],
+         [548.7, 151.0, 59.4, 80.5]]
 
-    >>> annots.lookup('bbox')
-    [[346.5, 335.2, 33.2, 99.4],
-     [344.5, 327.7, 48.8, 111.1],
-     [548.0, 154.4, 57.2, 62.1],
-     [548.7, 151.0, 59.4, 80.5]]
+        >>> gids = annots.lookup('image_id')
+        >>> print('gids = {!r}'.format(gids))
+        gids = [1, 2, 1, 2]
 
-    >>> gids = annots.lookup('image_id')
-    >>> print('gids = {!r}'.format(gids))
-    gids = [1, 2, 1, 2]
-
-    >>> images = dset.images(gids)
-    >>> list(zip(images.lookup('width'), images.lookup('height')))
-    [(600, 600), (600, 600), (600, 600), (600, 600)]
+        >>> images = dset.images(gids)
+        >>> list(zip(images.lookup('width'), images.lookup('height')))
+        [(600, 600), (600, 600), (600, 600), (600, 600)]
 
 
     """

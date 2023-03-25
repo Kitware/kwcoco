@@ -5,7 +5,7 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.5.9 - Unreleased
+## Version 0.6.0 - Unreleased
 
 ### Changed
 * CocoImage and CocoAsset use the new AliasDictProxy interface to smoothly

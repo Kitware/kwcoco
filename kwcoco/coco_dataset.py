@@ -3304,7 +3304,7 @@ class MixinCocoDraw(object):
         # Show image
         avail_channels = coco_img.channels
 
-        if channels is None:
+        if channels is None and avail_channels is not None:
             avail_spec = avail_channels.fuse().normalize()
             num_chans = avail_spec.numel()
 

@@ -248,9 +248,13 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         img_parts = []
         for obj in self.iter_asset_objs():
             obj_parts = obj.get('channels', None)
-            # obj_chan = FusedChannelSpec.coerce(obj_parts).normalize()
-            obj_chan = FusedChannelSpec.coerce(obj_parts)
-            img_parts.append(obj_chan.spec)
+            if obj_parts is not None:
+                # obj_chan = FusedChannelSpec.coerce(obj_parts).normalize()
+                obj_chan = FusedChannelSpec.coerce(obj_parts)
+                img_parts.append(obj_chan.spec)
+        if not img_parts:
+            return None
+            # return ChannelSpec.coerce('*')
         spec = ChannelSpec(','.join(img_parts))
         return spec
 
