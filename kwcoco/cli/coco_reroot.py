@@ -101,7 +101,7 @@ class CocoRerootCLI:
             if config['inplace']:
                 config['dst'] = config['src']
             else:
-                raise Exception('must specify dest: {}'.format(config['dst']))
+                raise ValueError('must specify dst: {}'.format(config['dst']))
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
