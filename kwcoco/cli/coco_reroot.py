@@ -53,6 +53,9 @@ class CocoRerootCLI:
                     '''))),
 
             'compress': scfg.Value('auto', help='if True writes results with compression'),
+
+            'inplace': scfg.Value(False, isflag=True, help='if True and dst is unspecified then the output will overwrite the input')
+
         }
 
     @classmethod
@@ -95,7 +98,10 @@ class CocoRerootCLI:
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
         if config['dst'] is None:
-            raise Exception('must specify dest: {}'.format(config['dst']))
+            if config['inplace']:
+                config['dst'] = config['src']
+            else:
+                raise Exception('must specify dest: {}'.format(config['dst']))
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
@@ -162,8 +168,8 @@ def find_reroot_autofix(dset):
 
             if any_missing:
                 continue
-
             chosen = candidate
+
     if not chosen:
         raise RuntimeError('No candidate fixed all paths')
     return chosen
