@@ -26,16 +26,16 @@ class CocoRerootCLI:
         """
         __default__ = {
             'src': scfg.Value(None, help=(
-                'Path to the coco dataset'), position=1),
+                'Input coco dataset path'), position=1),
 
             'dst': scfg.Value(None, help=(
-                'Save the re-rooted dataset to a new file'), position=2),
+                'Output coco dataset path'), position=2),
 
             'new_prefix': scfg.Value(None, help=(
-                'Path to the new image root.')),
+                'New prefix to insert before every image file name.')),
 
             'old_prefix': scfg.Value(None, help=(
-                'Previous root to remove.')),
+                'Old prefix to remove from the start of every image file name.')),
 
             'absolute': scfg.Value(True, help=(
                 'If False, the output file uses relative paths')),
@@ -129,7 +129,7 @@ class CocoRerootCLI:
 
 def find_reroot_autofix(dset):
     import os
-    # Given a set of missing images, is there a way we can autofix them
+    # Given a set of missing images, is there a way we can autofix them?
     missing_tups = dset.missing_images()
     missing_gpaths = [t[1] for t in missing_tups]
     chosen = None
