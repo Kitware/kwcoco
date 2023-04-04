@@ -85,6 +85,8 @@ from kwcoco.coco_dataset import (  # NOQA
     MixinCocoStats, MixinCocoDraw
 )
 
+from packaging.version import parse as Version
+
 # __docstubs__ = """
 # from typing import TypeVar
 # F = TypeVar("F", bound=Callable)
@@ -101,6 +103,7 @@ class FallbackCocoBase:
 CocoBase: type
 
 try:
+    from sqlalchemy import __version__ as sqlalchemy_version_str
     from sqlalchemy.sql.schema import Column
     from sqlalchemy.sql.schema import Index
     from sqlalchemy.types import Float, Integer, String, JSON
@@ -114,9 +117,16 @@ try:
     sqlite3.register_adapter(np.int64, int)
     sqlite3.register_adapter(np.int32, int)
     CocoBase = declarative_base()
+    sqlalchemy_version = Version(sqlalchemy_version_str)
+    IS_GE_SQLALCH_2x = sqlalchemy_version >= Version('2.0.0')
 
-    SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.ProgrammingError)
-    # SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,)
+    if IS_GE_SQLALCH_2x:
+        SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,
+                           sqlalchemy.exc.ProgrammingError,
+                           sqlalchemy.exc.OperationalError)
+    else:
+        SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,
+                           sqlalchemy.exc.ProgrammingError)
     if 1:
         from sqlalchemy.dialects.postgresql import JSONB
         # References:
@@ -127,6 +137,8 @@ except ImportError:
     # Hack: xdoctest should have been able to figure out that
     # all of these tests were diabled due to the absense of sqlalchemy
     # but apparently it has a bug. We can remove this hack once that is fixed
+    sqlalchemy_version_str = None
+    sqlalchemy_version = None
     sqlalchemy = None
     Float = ub.identity
     String = ub.identity
@@ -137,6 +149,7 @@ except ImportError:
     CocoBase = FallbackCocoBase
     JSONVariant = None
     SQL_ERROR_TYPES = (Exception,)
+    IS_GE_SQLALCH_2x = False
 try:
     from psycopg2.extensions import register_adapter, AsIs
     def addapt_numpy_float64(numpy_float64):
@@ -161,9 +174,10 @@ except ImportError:
 
 # This is the column name for unstructured data that is not captured directly
 # in our sql schema. It will be stored as a json blob. The column names defined
-# in the alchemy tables must agree with this.
-UNSTRUCTURED = '__unstructured__'
-SCHEMA_VERSION = 'v010rc5'
+# in the alchemy tables must agree with this. Note: previously we used
+# a duner name, but that seems to be disallowed
+UNSTRUCTURED = '_unstructured'
+SCHEMA_VERSION = 'v011'
 
 
 class Category(CocoBase):
@@ -173,7 +187,7 @@ class Category(CocoBase):
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
 
-    __unstructured__ = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict())
 
 
 class KeypointCategory(CocoBase):
@@ -184,7 +198,7 @@ class KeypointCategory(CocoBase):
     supercategory = Column(String(256), doc='coarser category name')
     reflection_id = Column(Integer, doc='if augmentation reflects the image, change keypoint id to this')
 
-    __unstructured__ = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict())
 
 
 class Video(CocoBase):
@@ -196,7 +210,7 @@ class Video(CocoBase):
     width = Column(Integer)
     height = Column(Integer)
 
-    __unstructured__ = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict())
 
 
 class Image(CocoBase):
@@ -218,7 +232,7 @@ class Image(CocoBase):
 
     auxiliary = Column(JSON)  # TODO: change name to assets (or better yet make an assets table)
 
-    __unstructured__ = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict())
 
 
 # TODO:
@@ -236,13 +250,12 @@ class Annotation(CocoBase):
     image_id = Column(Integer, doc='', index=True, unique=False)
     category_id = Column(Integer, doc='', index=True, unique=False, nullable=True)
 
-    # track_id = Column(JSON, index=True, unique=False) # fixme: via postgresql gin index
     # track_id = Column(Integer, index=True, unique=False)
     if _USE_TRACK_LUT:
         track_id = Column(JSONVariant, index=True, unique=False)
+        # track_id = Column(JSONVariant)
     else:
         track_id = Column(JSON)
-    # track_id = Column(JSONVariant)
 
     segmentation = Column(JSON)
     keypoints = Column(JSON)
@@ -261,7 +274,7 @@ class Annotation(CocoBase):
     iscrowd = Column(Integer)
     caption = Column(JSON)
 
-    __unstructured__ = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict())
 
     # __table_args__ =  (
     #     # https://stackoverflow.com/questions/30885846/how-to-create-jsonb-index-using-gin-on-sqlalchemy
@@ -807,13 +820,19 @@ class SqlIdGroupDictProxy(DictLike):
         proxy.ALCHEMY_MODE = 0
         proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
         proxy._cache = _new_proxy_cache()
-        proxy._dialect = session.get_bind().dialect.name
 
         # Hack to do custom jsonb handling.
         proxy._is_jsonb = False
+        _dialect_name = session.get_bind().dialect.name
         try:
-            dialect_type = keyattr.expression.type.mapping[proxy._dialect]
-            if dialect_type.__class__ is JSONB:
+            if IS_GE_SQLALCH_2x:
+                dialect_type = keyattr.expression.type._variant_mapping[_dialect_name]
+            else:
+                if hasattr(keyattr.expression.type, 'mapping'):
+                    dialect_type = keyattr.expression.type.mapping[_dialect_name]
+                else:
+                    dialect_type = keyattr.expression.type
+            if dialect_type.__class__.__name__ == 'JSONB':
                 proxy._is_jsonb = True
         except Exception:
             ...
@@ -1259,6 +1278,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         self.engine = None
         self.index = CocoSqlIndex()
         self.tag = tag
+        self._dialect_name = None
 
     def __nice__(self):
         if self.dataset is None:
@@ -1424,6 +1444,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         if verbose:
             print('create_engine')
         self.engine = create_engine(uri)
+        self._dialect_name = self.engine.dialect.name
 
         # table_names = self.engine.table_names()
         table_names = sqlalchemy.inspect(self.engine).get_table_names()
@@ -1614,7 +1635,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def name_to_cat(self):
         return self.index.name_to_cat
 
-    def raw_table(self, table_name):
+    def pandas_table(self, table_name):
         """
         Loads an entire SQL table as a pandas DataFrame
 
@@ -1628,12 +1649,49 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
             >>> self, dset = demo()
-            >>> table_df = self.raw_table('annotations')
+            >>> table_df = self.pandas_table('annotations')
             >>> print(table_df)
         """
         import pandas as pd
-        table_df = pd.read_sql_table(table_name, con=self.engine)
+        # table_df = pd.read_sql_table(table_name, con=self.engine)
+        table_df = pd.read_sql_table(table_name, con=self.session.connection())
         return table_df
+
+    def raw_table(self, table_name):
+        inspector = sqlalchemy.inspect(self.engine)
+        column_infos = inspector.get_columns(table_name)
+        column_names = [d['name'] for d in column_infos]
+        stmt = ub.paragraph(
+            f'''
+            SELECT * FROM {table_name}
+            ''')
+        results = self.session.execute(text(stmt))
+        rows = []
+        for row_vals in results:
+            assert len(column_names) == len(row_vals)
+            row = dict(zip(column_names, row_vals))
+            rows.append(row)
+        return rows
+
+    def _raw_tables(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> from kwcoco.coco_sql_dataset import *  # NOQA
+            >>> import pandas as pd
+            >>> self, dset = demo()
+            >>> targets = self._raw_tables()
+            >>> for tblname, table in targets.items():
+            ...     print(f'tblname={tblname}')
+            ...     print(pd.DataFrame(table))
+        """
+        inspector = sqlalchemy.inspect(self.engine)
+        table_names = inspector.get_table_names()
+        raw_tables = {}
+        for table_name in table_names:
+            rows = self.raw_table(table_name)
+            raw_tables[table_name] = rows
+        return raw_tables
 
     def _column_lookup(self, tablename, key, rowids, default=ub.NoParam,
                        keepid=False):
@@ -1692,9 +1750,15 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
         # TODO: memoize this check
         table = CocoBase.TBLNAME_TO_CLASS[tablename]
-        needs_json_decode = (
-            table.__table__.columns[key].type.__class__.__name__ == 'JSON'
-        )
+        column = table.__table__.columns[key]
+        column_type = column.type
+        # Gotta be a better way adapt to a variant type based on the dialect
+        if IS_GE_SQLALCH_2x:
+            column_type = column_type._variant_mapping.get(self._dialect_name, column_type)
+        else:
+            if hasattr(column_type, 'mapping'):
+                column_type = column_type.mapping.get(self._dialect_name, column_type)
+
         values = [
             # self.anns[aid][key]
             # if aid in self.anns._cache else
@@ -1702,8 +1766,17 @@ class CocoSqlDatabase(AbstractCocoDataset,
             for rowid in rowids
         ]
 
+        needs_json_decode = (column_type.__class__.__name__ == 'JSON')
         if needs_json_decode:
-            values = [None if v is None else json.loads(v) for v in values]
+            if IS_GE_SQLALCH_2x:
+                # In sqlchemy 2.0 for track_ids the query seems to return them
+                # as a properly cast object, but in other cases it seems
+                # we still need to do the decoding... Not sure why...
+                # punting for now with a hack that works in most cases
+                # if you know what the problem is please FIXME
+                values = [v if not isinstance(v, str) else json.loads(v) for v in values]
+            else:
+                values = [None if v is None else json.loads(v) for v in values]
 
         if keepid:
             if default is ub.NoParam:
@@ -1790,6 +1863,11 @@ class CocoSqlDatabase(AbstractCocoDataset,
         table['img_height'] = np.array(img_hs, dtype=np.int32)
         targets = kwarray.DataFrameArray(table)
         return targets
+
+    def _table_names(self):
+        inspector = sqlalchemy.inspect(self.engine)
+        table_names = inspector.get_table_names()
+        return table_names
 
     @property
     def bundle_dpath(self):
@@ -1886,9 +1964,14 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         backend = 'sqlite'
 
     # TODO: the filename needs to include the hashed state.
+    # VERSION_PART = SCHEMA_VERSION + '.' + sqlalchemy_version
+    if IS_GE_SQLALCH_2x:
+        VERSION_PART = SCHEMA_VERSION + '_2x'
+    else:
+        VERSION_PART = SCHEMA_VERSION + '_1x'
 
     if sql_db_fpath is None:
-        ext = '.view.' + SCHEMA_VERSION + '.' + backend
+        ext = '.view.' + VERSION_PART + '.' + backend
         if backend == 'sqlite':
             sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_', ext=ext)
         elif backend == 'postgresql':
@@ -1927,7 +2010,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
 
     # Note: we don't have a way of comparing timestamps for postgresql
     # databases, but that shouldn't matter too much
-    stamp = ub.CacheStamp('kwcoco-sql-cache-' + SCHEMA_VERSION,
+    stamp = ub.CacheStamp('kwcoco-sql-cache-' + VERSION_PART,
                           dpath=_cache_dpath, depends=[dct_db_fpath],
                           product=cache_product, enabled=enable_cache,
                           hasher=None, ext='.json', verbose=4)
@@ -2289,7 +2372,7 @@ def devcheck():
     for key in table_names:
         print('\n----')
         print('key = {!r}'.format(key))
-        table_df = self.raw_table(key)
+        table_df = self.pandas_table(key)
         print(table_df)
 
     import ndsampler

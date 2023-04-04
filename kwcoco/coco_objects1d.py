@@ -237,7 +237,7 @@ class ObjectList1D(ub.NiceRepr):
                 # We can read only the unstructured bit, which is the best we
                 # can do in this case.
                 _lutv = self._dset._column_lookup(
-                    tablename=self._key, key='__unstructured__', rowids=self._ids)
+                    tablename=self._key, key='_unstructured', rowids=self._ids)
                 _lut = dict(zip(self._ids, _lutv))
             # TODO: optimize the case where default is given
         else:

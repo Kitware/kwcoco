@@ -12,11 +12,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   transition between name conventions.
 * The "assets" key is now an alias of "auxiliary" for CocoImage and we will switch to "assets" as the primary in the future.
 * Toydata now generates RGB bands independently
+* Change `__unstructured__` to `_unstructured` for sqlalchemy 2.x compat 
 
 ### Added
 * demo data now has the ability to render on top of a background image.
 
 ### Fixed
+* Fixed sqlalchemy 2.x compatability
 * The track index now works properly with SQL variants and returns ordreing
 
 

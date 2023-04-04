@@ -4959,7 +4959,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> # Use the (gid_to_aids) index to lookup annotations in the iamge
         >>> annotation_id = sorted(self.index.gid_to_aids[image_id])[0]
         >>> ann = self.index.anns[annotation_id]
-        >>> print(ub.urepr(ub.dict_diff(ann, {'segmentation'}), nl=1))
+        >>> print(ub.urepr((ub.udict(ann) - {'segmentation'}).sorted_keys(), nl=1))
         {
             'bbox': [10, 10, 360, 490],
             'category_id': 1,

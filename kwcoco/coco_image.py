@@ -169,10 +169,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         return stats
 
     def __contains__(self, key):
-        if '__unstructured__' in self._proxy:
+        if '_unstructured' in self._proxy:
             if AliasedDictProxy.__contains__(self, key):
                 return True
-            return key in self._proxy['__unstructured__']
+            return key in self._proxy['_unstructured']
         else:
             return AliasedDictProxy.__contains__(self, key)
 
@@ -189,10 +189,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         """
         Proxy getter attribute for underlying `self.img` dictionary
         """
-        if '__unstructured__' in self._proxy:
+        if '_unstructured' in self._proxy:
             # SQL compatibility
-            _keys = ub.flatten([self._proxy.keys(), self._proxy['__unstructured__'].keys()])
-            return iter((k for k in _keys if k != '__unstructured__'))
+            _keys = ub.flatten([self._proxy.keys(), self._proxy['_unstructured'].keys()])
+            return iter((k for k in _keys if k != '_unstructured'))
         else:
             return self._proxy.keys()
 
@@ -205,23 +205,23 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
         Example:
             >>> import pytest
-            >>> # without __unstructured__ populated
+            >>> # without _unstructured populated
             >>> import kwcoco
             >>> self = kwcoco.CocoImage({'foo': 1})
             >>> assert self.get('foo') == 1
             >>> assert self.get('foo', None) == 1
-            >>> # with __unstructured__ populated
-            >>> self = kwcoco.CocoImage({'__unstructured__': {'foo': 1}})
+            >>> # with _unstructured populated
+            >>> self = kwcoco.CocoImage({'_unstructured': {'foo': 1}})
             >>> assert self.get('foo') == 1
             >>> assert self.get('foo', None) == 1
-            >>> # without __unstructured__ empty
+            >>> # without _unstructured empty
             >>> self = kwcoco.CocoImage({})
             >>> print('----')
             >>> with pytest.raises(KeyError):
             >>>     self.get('foo')
             >>> assert self.get('foo', None) is None
-            >>> # with __unstructured__ empty
-            >>> self = kwcoco.CocoImage({'__unstructured__': {'bar': 1}})
+            >>> # with _unstructured empty
+            >>> self = kwcoco.CocoImage({'_unstructured': {'bar': 1}})
             >>> with pytest.raises(KeyError):
             >>>     self.get('foo')
             >>> assert self.get('foo', None) is None
@@ -230,10 +230,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
             return AliasedDictProxy.__getitem__(self, key)
         else:
             _img = self._proxy
-            if '__unstructured__' in _img:
-                # Workaround for sql-view, treat items in "__unstructured__" as
+            if '_unstructured' in _img:
+                # Workaround for sql-view, treat items in "_unstructured" as
                 # if they are in the top level image.
-                _extra = _img['__unstructured__']
+                _extra = _img['_unstructured']
                 if key in _extra:
                     return _extra[key]
                 else:
