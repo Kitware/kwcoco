@@ -104,7 +104,10 @@ try:
     from sqlalchemy.sql.schema import Column
     from sqlalchemy.sql.schema import Index
     from sqlalchemy.types import Float, Integer, String, JSON
-    from sqlalchemy.ext.declarative import declarative_base
+    try:
+        from sqlalchemy.orm import declarative_base
+    except ImportError:
+        from sqlalchemy.ext.declarative import declarative_base
     # from sqlalchemy.orm.decl_api import DeclarativeMeta
     import sqlalchemy
     import sqlite3
@@ -574,8 +577,9 @@ class SqlDictProxy(DictLike):
             session = proxy.session
             cls = proxy.cls
             if proxy.keyattr is None:
-                query = session.query(cls)
-                obj = query.get(key)
+                # query = session.query(cls)
+                # obj = query.get(key)
+                obj = session.get(cls, key)
                 if obj is None:
                     raise KeyError(key)
             else:

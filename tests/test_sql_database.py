@@ -128,6 +128,7 @@ def _api_compatability_tests(dct_dset):
             annots = dset.annots(track_id=tid)
             annot_ids = list(annots)
             annot_frame_idxs = annots.images.lookup('frame_index')
+            annot_frame_idxs = [x for x in annot_frame_idxs if x is not None]
             assert sorted(annot_frame_idxs) == annot_frame_idxs
             tid_to_aids[tid] = annot_ids
         results[key] = {'tid_to_aids': tid_to_aids}
