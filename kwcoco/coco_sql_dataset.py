@@ -112,13 +112,14 @@ try:
     sqlite3.register_adapter(np.int32, int)
     CocoBase = declarative_base()
 
-    from sqlalchemy.dialects.postgresql import JSONB
-    # References:
-    # https://github.com/sqlalchemy/sqlalchemy/discussions/9530
-    # Use JSON with SQLite and JSONB with PostgreSQL.
-    JSONVariant = JSON().with_variant(JSONB(), "postgresql")
-    # SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.ProgrammingError)
-    SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,)
+    SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.ProgrammingError)
+    # SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,)
+    if 0:
+        from sqlalchemy.dialects.postgresql import JSONB
+        # References:
+        # https://github.com/sqlalchemy/sqlalchemy/discussions/9530
+        # Use JSON with SQLite and JSONB with PostgreSQL.
+        JSONVariant = JSON().with_variant(JSONB(), "postgresql")
 except ImportError:
     # Hack: xdoctest should have been able to figure out that
     # all of these tests were diabled due to the absense of sqlalchemy
@@ -582,7 +583,10 @@ class SqlDictProxy(DictLike):
                 else:
                     obj = results[0]
         except SQL_ERROR_TYPES as ex:
-            if 'unsupported type' in str(ex):
+            exstr = str(ex)
+            if "type 'object' is not supported" in exstr:
+                raise KeyError(key)
+            elif "unsupported type" in exstr:
                 raise KeyError(key)
             else:
                 raise
