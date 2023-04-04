@@ -1079,6 +1079,15 @@ class MixinCocoExtras(object):
                     key = 'image_size'
                     value = 'random'
 
+                if key == 'amazon':
+                    # Hack to put in amazon background
+                    key = 'render'
+                    if isinstance(vidkw[key], dict):
+                        value = vidkw[key]
+                    else:
+                        value = {}
+                    value['background'] = 'amazon'
+
                 vidkw[key] = value
 
             vidkw.update(kwargs)

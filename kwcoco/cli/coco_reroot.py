@@ -112,9 +112,10 @@ class CocoRerootCLI:
 
         if config['autofix']:
             autfixer = find_reroot_autofix(dset)
-            print('Found autfixer = {}'.format(ub.urepr(autfixer, nl=1)))
-            config['new_prefix'] = autfixer['new_prefix']
-            config['old_prefix'] = autfixer['old_prefix']
+            if autfixer is not None:
+                print('Found autfixer = {}'.format(ub.urepr(autfixer, nl=1)))
+                config['new_prefix'] = autfixer['new_prefix']
+                config['old_prefix'] = autfixer['old_prefix']
 
         dset.reroot(
             new_root=new_root,
@@ -139,6 +140,10 @@ def find_reroot_autofix(dset):
     missing_tups = dset.missing_images()
     missing_gpaths = [t[1] for t in missing_tups]
     chosen = None
+    if len(missing_gpaths) == 0:
+        print('All paths look like they exist')
+        return None
+
     if len(missing_gpaths) > 0:
         bundle_dpath = ub.Path(dset.bundle_dpath)
         first = ub.Path(missing_gpaths[0])

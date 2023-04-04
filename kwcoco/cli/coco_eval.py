@@ -108,6 +108,8 @@ def main(cmdline=True, **kw):
         truth_dset = None
 
     if truth_dset is not None and getattr(results, 'cfsn_vecs', None):
+        # FIXME: results is a MultiResult, need to patch this to loop over the
+        # single results.
         print('Attempting to draw examples')
         gid_to_stats = {}
         gids, groupxs = kwarray.group_indices(results.cfsn_vecs.data['gid'])

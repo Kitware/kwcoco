@@ -11,6 +11,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * CocoImage and CocoAsset use the new AliasDictProxy interface to smoothly
   transition between name conventions.
 * The "assets" key is now an alias of "auxiliary" for CocoImage and we will switch to "assets" as the primary in the future.
+* Toydata now generates RGB bands independently
+
+### Added
+* demo data now has the ability to render on top of a background image.
 
 
 ## Version 0.5.8 - Released 2023-03-17
