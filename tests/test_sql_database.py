@@ -51,6 +51,33 @@ def test_api_compatability_msi():
     _api_compatability_tests(dct_dset)
 
 
+def test_api_compatability_msi_ooo_tracks():
+    dct_dset = kwcoco.CocoDataset.demo('vidshapes8-multisensor-msi')
+    video_id = dct_dset.add_video(name='ooo_video')
+
+    import kwarray
+    rng = kwarray.ensure_rng(0)
+    frame_order = list(range(9))
+    rng.shuffle(frame_order)
+
+    # Add images to the video out of order
+    for frame_index in frame_order:
+        frame_name = ub.hash_data(rng.rand())[0:8]
+        dct_dset.add_image(video_id=video_id, name=f'frame_{frame_name}', frame_index=frame_index)
+
+    image_ids = list(dct_dset.images(video_id=video_id))
+    rng.shuffle(image_ids)
+
+    # Add a track to the image out of order
+    for image_id in image_ids:
+        dct_dset.add_annotation(**{'image_id': image_id, 'track_id': 9001, 'bbox': [0, 0, 10, 10]})
+
+    dct_dset.fpath = ub.Path(dct_dset.fpath).augment(stemsuffix='_with_ooo_tracks', multidot=True)
+    dct_dset.dump()
+    dct_dset = kwcoco.CocoDataset(dct_dset.fpath)
+    _api_compatability_tests(dct_dset)
+
+
 def test_api_compatability_rgb():
     dct_dset = kwcoco.CocoDataset.demo('shapes8')
     _api_compatability_tests(dct_dset)
@@ -84,6 +111,45 @@ def _api_compatability_tests(dct_dset):
         result['all_gids'] = all_gids
         result['all_num_assets'] = all_num_assets
 
-    print('results = {}'.format(ub.repr2(results, nl=2)))
+    print('results = {}'.format(ub.urepr(results, nl=2)))
     for a, b in ub.iter_window(results.values(), 2):
-        assert ub.indexable_allclose(a, b)
+        assert ub.IndexableWalker(a).allclose(b)
+
+    # Test track / image ordering
+    results = {}
+    for key, dset in dset_variants.items():
+        try:
+            track_ids = dset.annots().lookup('track_id')
+        except KeyError:
+            continue
+        unique_track_ids = sorted(set(track_ids))
+        tid_to_aids = {}
+        for tid in unique_track_ids:
+            annots = dset.annots(track_id=tid)
+            annot_ids = list(annots)
+            annot_frame_idxs = annots.images.lookup('frame_index')
+            assert sorted(annot_frame_idxs) == annot_frame_idxs
+            tid_to_aids[tid] = annot_ids
+        results[key] = {'tid_to_aids': tid_to_aids}
+    print('results = {}'.format(ub.urepr(results, nl=3)))
+
+    # Test image in video ordering
+    results = {}
+    for key, dset in dset_variants.items():
+        videos = dset.videos()
+        video_images = videos.images
+        vidid_to_gids = {}
+        vidid_to_frame_idxs = {}
+        for video_id, images in zip(videos, video_images):
+            frame_idxs = images.lookup('frame_index')
+            assert list(images) == list(dset.images(video_id=video_id))
+            assert sorted(frame_idxs) == frame_idxs
+            vidid_to_frame_idxs[video_id] = frame_idxs
+            vidid_to_gids[video_id] = list(images)
+        results[key] = {
+            'vidid_to_frame_idxs': vidid_to_frame_idxs,
+            'vidid_to_gids': vidid_to_gids,
+        }
+    print('results = {}'.format(ub.urepr(results, nl=2)))
+    for a, b in ub.iter_window(results.values(), 2):
+        assert ub.IndexableWalker(a).allclose(b)

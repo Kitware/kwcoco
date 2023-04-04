@@ -93,7 +93,7 @@ def demodata_toy_dset(image_size=(600, 600),
         >>> import kwcoco
         >>> dset = demodata_toy_dset(image_size=(300, 300), aux=True, use_cache=False)
         >>> # xdoctest: +REQUIRES(--show)
-        >>> print(ub.repr2(dset.dataset, nl=2))
+        >>> print(ub.urepr(dset.dataset, nl=2))
         >>> import kwplot
         >>> kwplot.autompl()
         >>> dset.show_image(gid=1)
@@ -367,8 +367,8 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
         >>> from kwcoco.demo.toydata_image import *  # NOQA
         >>> img, anns = demodata_toy_img(image_size=(32, 32), anchors=[[.3, .3]], rng=0)
         >>> img['imdata'] = '<ndarray shape={}>'.format(img['imdata'].shape)
-        >>> print('img = {}'.format(ub.repr2(img)))
-        >>> print('anns = {}'.format(ub.repr2(anns, nl=2, cbr=True)))
+        >>> print('img = {}'.format(ub.urepr(img)))
+        >>> print('anns = {}'.format(ub.urepr(anns, nl=2, cbr=True)))
         >>> # xdoctest: +IGNORE_WANT
         img = {
             'height': 32,
@@ -395,7 +395,7 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
     Example:
         >>> # xdoctest: +REQUIRES(--show)
         >>> img, anns = demodata_toy_img(image_size=(172, 172), rng=None, aux=True)
-        >>> print('anns = {}'.format(ub.repr2(anns, nl=1)))
+        >>> print('anns = {}'.format(ub.urepr(anns, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
         >>> kwplot.imshow(img['imdata'], pnum=(1, 2, 1), fnum=1)
@@ -405,7 +405,7 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
     Example:
         >>> # xdoctest: +REQUIRES(--show)
         >>> img, anns = demodata_toy_img(image_size=(172, 172), rng=None, aux=True)
-        >>> print('anns = {}'.format(ub.repr2(anns, nl=1)))
+        >>> print('anns = {}'.format(ub.urepr(anns, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
         >>> kwplot.imshow(img['imdata'], pnum=(1, 2, 1), fnum=1)

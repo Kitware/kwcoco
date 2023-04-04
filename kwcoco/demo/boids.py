@@ -418,7 +418,7 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
         >>> conden_mat = squareform(square_mat)
         >>> conden_mat[condensed_idxs] = np.arange(len(condensed_idxs)) + 1
         >>> square_mat = squareform(conden_mat)
-        >>> print('square_mat =\n{}'.format(ub.repr2(square_mat, nl=1)))
+        >>> print('square_mat =\n{}'.format(ub.urepr(square_mat, nl=1)))
 
         >>> n = 7
         >>> symetric = True
@@ -430,7 +430,7 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
         >>> conden_mat = squareform(square_mat, checks=False)
         >>> conden_mat[condensed_idxs] = np.arange(len(condensed_idxs)) + 1
         >>> square_mat = squareform(conden_mat)
-        >>> print('square_mat =\n{}'.format(ub.repr2(square_mat, nl=1)))
+        >>> print('square_mat =\n{}'.format(ub.urepr(square_mat, nl=1)))
 
     Ignore:
         >>> import xdev

@@ -37,9 +37,9 @@ for k, v in _bits.items():
         k = ub.color_text(k, 'green')
     bits[k] = v
 
-print('candidates = {}'.format(ub.repr2(candidates, nl=1, precision=4)))
-print('entropy = {}'.format(ub.repr2(entropy, nl=1, precision=4)))
-print('bits    = {}'.format(ub.repr2(bits, nl=1, sk=1, precision=4)))
+print('candidates = {}'.format(ub.urepr(candidates, nl=1, precision=4)))
+print('entropy = {}'.format(ub.urepr(entropy, nl=1, precision=4)))
+print('bits    = {}'.format(ub.urepr(bits, nl=1, sk=1, precision=4)))
 
 # We save the following number of chars by using abc format.
 

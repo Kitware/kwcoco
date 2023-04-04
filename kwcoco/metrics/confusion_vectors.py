@@ -98,7 +98,7 @@ class ConfusionVectors(ub.NiceRepr):
             >>> from kwcoco.metrics import ConfusionVectors
             >>> self = ConfusionVectors.demo(n_imgs=1, classes=2, n_fp=0, nboxes=1)
             >>> state = self.__json__()
-            >>> print('state = {}'.format(ub.repr2(state, nl=2, precision=2, align=1)))
+            >>> print('state = {}'.format(ub.urepr(state, nl=2, precision=2, align=1)))
             >>> recon = ConfusionVectors.from_json(state)
         """
         state = {
@@ -613,7 +613,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         self.classes = classes
 
     def __nice__(self):
-        return ub.repr2(self.cx_to_binvecs, strvals=True, align=':')
+        return ub.urepr(self.cx_to_binvecs, strvals=True, align=':')
 
     @classmethod
     def demo(cls):
@@ -698,16 +698,16 @@ class BinaryConfusionVectors(ub.NiceRepr):
         >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
         >>> self = BinaryConfusionVectors.demo(n=10)
         >>> print('self = {!r}'.format(self))
-        >>> print('measures = {}'.format(ub.repr2(self.measures())))
+        >>> print('measures = {}'.format(ub.urepr(self.measures())))
 
         >>> self = BinaryConfusionVectors.demo(n=0)
-        >>> print('measures = {}'.format(ub.repr2(self.measures())))
+        >>> print('measures = {}'.format(ub.urepr(self.measures())))
 
         >>> self = BinaryConfusionVectors.demo(n=1)
-        >>> print('measures = {}'.format(ub.repr2(self.measures())))
+        >>> print('measures = {}'.format(ub.urepr(self.measures())))
 
         >>> self = BinaryConfusionVectors.demo(n=2)
-        >>> print('measures = {}'.format(ub.repr2(self.measures())))
+        >>> print('measures = {}'.format(ub.urepr(self.measures())))
     """
 
     def __init__(self, data, cx=None, classes=None):
@@ -745,7 +745,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> cfsn = BinaryConfusionVectors.demo(n=1000, p_error=0.1, p_miss=0.1)
             >>> measures = cfsn.measures()
-            >>> print('measures = {}'.format(ub.repr2(measures, nl=1)))
+            >>> print('measures = {}'.format(ub.urepr(measures, nl=1)))
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -780,7 +780,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         return self.classes[self.cx]
 
     def __nice__(self):
-        return ub.repr2({
+        return ub.urepr({
             'catname': self.catname,
             'data': self.data.__nice__(),
         }, nl=0, strvals=True, align=':')
@@ -811,15 +811,15 @@ class BinaryConfusionVectors(ub.NiceRepr):
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> self = BinaryConfusionVectors.demo(n=0)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> print('measures = {}'.format(ub.urepr(self.measures())))
             >>> self = BinaryConfusionVectors.demo(n=1, p_true=0.5, p_error=0.5)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> print('measures = {}'.format(ub.urepr(self.measures())))
             >>> self = BinaryConfusionVectors.demo(n=3, p_true=0.5, p_error=0.5)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
+            >>> print('measures = {}'.format(ub.urepr(self.measures())))
 
             >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.5, p_error=0.5, p_miss=0.3)
-            >>> print('measures = {}'.format(ub.repr2(self.measures())))
-            >>> print('measures = {}'.format(ub.repr2(ub.odict(self.measures()))))
+            >>> print('measures = {}'.format(ub.urepr(self.measures())))
+            >>> print('measures = {}'.format(ub.urepr(ub.odict(self.measures()))))
 
         References:
             https://en.wikipedia.org/wiki/Confusion_matrix
@@ -884,10 +884,10 @@ class BinaryConfusionVectors(ub.NiceRepr):
             import xdev
             globals().update(xdev.get_func_kwargs(BinaryConfusionVectors._binary_clf_curves))
             >>> self = BinaryConfusionVectors.demo(n=10, p_true=0.7, p_error=0.3, p_miss=0.2)
-            >>> print('measures = {}'.format(ub.repr2(self._binary_clf_curves())))
+            >>> print('measures = {}'.format(ub.urepr(self._binary_clf_curves())))
             >>> info = self.measures()
             >>> info = ub.dict_isect(info, ['tpr', 'fpr', 'ppv', 'fp_count'])
-            >>> print('measures = {}'.format(ub.repr2(ub.odict(i))))
+            >>> print('measures = {}'.format(ub.urepr(ub.odict(i))))
         """
         # try:
         #     from sklearn.metrics._ranking import _binary_clf_curve

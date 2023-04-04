@@ -55,7 +55,7 @@ class CocoModifyCatsCLI:
         """
         import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
@@ -70,7 +70,7 @@ class CocoModifyCatsCLI:
         if config['rename'] is not None:
             # parse rename string
             mapper = dict([p.split(':') for p in config['rename'].split(',')])
-            print('mapper = {}'.format(ub.repr2(mapper, nl=1)))
+            print('mapper = {}'.format(ub.urepr(mapper, nl=1)))
             dset.rename_categories(mapper)
 
         if config['keep'] is not None:

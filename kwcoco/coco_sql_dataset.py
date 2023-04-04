@@ -114,7 +114,7 @@ try:
 
     SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError, sqlalchemy.exc.ProgrammingError)
     # SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,)
-    if 0:
+    if 1:
         from sqlalchemy.dialects.postgresql import JSONB
         # References:
         # https://github.com/sqlalchemy/sqlalchemy/discussions/9530
@@ -160,7 +160,7 @@ except ImportError:
 # in our sql schema. It will be stored as a json blob. The column names defined
 # in the alchemy tables must agree with this.
 UNSTRUCTURED = '__unstructured__'
-SCHEMA_VERSION = 'v009rc3'
+SCHEMA_VERSION = 'v010rc5'
 
 
 class Category(CocoBase):
@@ -222,17 +222,23 @@ class Image(CocoBase):
 # Track
 # SharedPolygon?
 
+# The track LUT depends on some stuff in postgresql that I dont fully
+# understand keep the ability to turn it off if we need to.
+_USE_TRACK_LUT = 1
+
 
 class Annotation(CocoBase):
     __tablename__ = 'annotations'
     id = Column(Integer, primary_key=True)
     image_id = Column(Integer, doc='', index=True, unique=False)
-    category_id = Column(Integer, doc='', index=True, unique=False)
+    category_id = Column(Integer, doc='', index=True, unique=False, nullable=True)
 
     # track_id = Column(JSON, index=True, unique=False) # fixme: via postgresql gin index
     # track_id = Column(Integer, index=True, unique=False)
-    track_id = Column(JSON)
-    # track_id = Column(JSONVariant, index=True)
+    if _USE_TRACK_LUT:
+        track_id = Column(JSONVariant, index=True, unique=False)
+    else:
+        track_id = Column(JSON)
     # track_id = Column(JSONVariant)
 
     segmentation = Column(JSON)
@@ -432,9 +438,9 @@ class SqlDictProxy(DictLike):
         databases have much more overhead than Python dictionaries.
 
     Args:
-        session (Session): the sqlalchemy session
+        session (sqlalchemy.orm.session.Session): the sqlalchemy session
         cls (Type): the declarative sqlalchemy table class
-        keyattr : the indexed column to use as the keys
+        keyattr (Column) : the indexed column to use as the keys
         ignore_null (bool): if True, ignores any keys set to NULL, otherwise
             NULL keys are allowed.
 
@@ -473,7 +479,7 @@ class SqlDictProxy(DictLike):
         >>> # xdoctest: +SKIP
         >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
         >>> ti = _benchmark_dict_proxy_ops(proxy)
-        >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
+        >>> print('ti.measures = {}'.format(ub.urepr(ti.measures, nl=2, align=':', precision=6)))
 
     Example:
         >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -712,8 +718,9 @@ class SqlIdGroupDictProxy(DictLike):
     another table corresponding to rows where a specific column has that parent
     id.
 
-    The items in the group can be sorted by the ``group_order_attr`` if
-    specified.
+    The items in the group can be sorted by the ``order_attr`` if
+    specified. The ``order_attr`` can belong to another table
+    if ``parent_order_id`` and ``self_order_id`` are specified.
 
     For example, imagine two tables: images with one column (id) and
     annotations with two columns (id, image_id). This class can help provide a
@@ -739,7 +746,7 @@ class SqlIdGroupDictProxy(DictLike):
         >>> # xdoctest: +SKIP
         >>> from kwcoco.coco_sql_dataset import _benchmark_dict_proxy_ops
         >>> ti = _benchmark_dict_proxy_ops(proxy)
-        >>> print('ti.measures = {}'.format(ub.repr2(ti.measures, nl=2, align=':', precision=6)))
+        >>> print('ti.measures = {}'.format(ub.urepr(ti.measures, nl=2, align=':', precision=6)))
 
     Example:
         >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -765,18 +772,58 @@ class SqlIdGroupDictProxy(DictLike):
         >>> assert len(keys) == len(vals)
         >>> assert dict(zip(keys, vals)) == dict(items)
     """
-    def __init__(proxy, session, valattr, keyattr, parent_keyattr,
-                 group_order_attr=None):
+    def __init__(proxy, session, valattr, keyattr, parent_keyattr=None,
+                 order_attr=None, order_id=None):
+        """
+        Args:
+            session (sqlalchemy.orm.session.Session): the sqlalchemy session
+            valattr (InstrumentedAttribute):
+                The column to lookup as a value
+            keyattr (InstrumentedAttribute):
+                The column to use as a key
+            parent_keyattr (InstrumentedAttribute | None):
+                The column of the table corresponding to the key. If
+                unspecified the column in the indexed table is used which may
+                be less efficient.
+            order_attr (InstrumentedAttribute | None):
+                This is the attribute that the returned results will be ordered
+                by
+            order_id (InstrumentedAttribute | None):
+                if order_attr belongs to another table, then this must be a
+                column of the value table that corresponds to the primary key
+                of the table used for ordering (e.g. when ordering annotations
+                by image frame index, this must be the annotation image id)
+        """
         proxy.valattr = valattr
         proxy.keyattr = keyattr
         proxy.session = session
+        if parent_keyattr is None:
+            parent_keyattr = keyattr
         proxy.parent_keyattr = parent_keyattr
         proxy.ALCHEMY_MODE = 0
         proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
         proxy._cache = _new_proxy_cache()
+        proxy._dialect = session.get_bind().dialect.name
+
+        # Hack to do custom jsonb handling.
+        proxy._is_jsonb = False
+        try:
+            dialect_type = keyattr.expression.type.mapping[proxy._dialect]
+            if dialect_type.__class__ is JSONB:
+                proxy._is_jsonb = True
+        except Exception:
+            ...
 
         # if specified, the items within groups are ordered by this attr
-        proxy.group_order_attr = group_order_attr
+        proxy.order_attr = order_attr
+        proxy.order_id = order_id
+        if order_attr is not None:
+            if order_attr.class_ is not valattr.class_:
+                if order_id is None:
+                    raise ValueError('Must specify the id to lookup into the order table')
+                else:
+                    proxy.parent_order_id = order_attr.class_.id
+                    proxy.parent_order_table = order_attr.class_
 
     def __nice__(self):
         return str(len(self))
@@ -787,18 +834,26 @@ class SqlIdGroupDictProxy(DictLike):
 
     def _uncached_getitem(proxy, key):
         """
-        getitem without the caceh
+        getitem without the cache
         """
         session = proxy.session
         keyattr = proxy.keyattr
         valattr = proxy.valattr
         if proxy.ALCHEMY_MODE:
+            if proxy._is_jsonb:
+                # Hack for columns with JSONB indexes (e.g. track_id)
+                key = sqlalchemy.func.to_jsonb(key)
             query = session.query(valattr).filter(keyattr == key)
-            if proxy.group_order_attr is not None:
-                query = query.order_by(proxy.group_order_attr)
+            if proxy.order_attr is not None:
+                if proxy.order_id is not None:
+                    query = query.join(
+                        proxy.parent_order_table,
+                        proxy.parent_order_id == proxy.order_id
+                    )
+                query = query.order_by(proxy.order_attr)
             item = [row[0] for row in query.all()]
         else:
-            if proxy.group_order_attr is None:
+            if proxy.order_attr is None:
                 sql_expr = 'SELECT {} FROM {} WHERE {}=:key'.format(
                     proxy.valattr.name,
                     proxy.keyattr.class_.__tablename__,
@@ -809,11 +864,11 @@ class SqlIdGroupDictProxy(DictLike):
                     proxy.valattr.name,
                     proxy.keyattr.class_.__tablename__,
                     proxy.keyattr.name,
-                    proxy.group_order_attr.name,
+                    proxy.order_attr.name,
                 )
             result = proxy.session.execute(sql_expr, params={'key': key})
             item = [row[0] for row in result.fetchall()]
-        _set = set if proxy.group_order_attr is None else ub.oset
+        _set = set if proxy.order_attr is None else ub.oset
         item = _set(item)
         return item
 
@@ -859,9 +914,9 @@ class SqlIdGroupDictProxy(DictLike):
                 yield item[0]
 
     def items(proxy):
-        _set = set if proxy.group_order_attr is None else ub.oset
-        if proxy.group_order_attr is not None:
-            # print('proxy.group_order_attr = {!r}'.format(proxy.group_order_attr))
+        _set = set if proxy.order_attr is None else ub.oset
+        if proxy.order_attr is not None:
+            # print('proxy.order_attr = {!r}'.format(proxy.order_attr))
             # ALTERNATIVE MODE, EXPERIMENTAL MODE
             # groups based on post processing. this might be faster or more
             # robust than the group json array? Requires a hack to yield empty
@@ -878,23 +933,23 @@ class SqlIdGroupDictProxy(DictLike):
                 session = proxy.session
                 table = keyattr.class_.__table__
                 query = session.query(keyattr, valattr).order_by(
-                    keyattr, proxy.group_order_attr)
+                    keyattr, proxy.order_attr)
                 result = session.execute(query)
                 yielder = _raw_yielder(result)
             else:
                 table = proxy.keyattr.class_.__tablename__
                 keycol = table + '.' + proxy.keyattr.name
                 valcol = table + '.' + proxy.valattr.name
-                groupcol = table + '.' + proxy.group_order_attr.name
+                groupcol = table + '.' + proxy.order_attr.name
 
                 expr = (
                     'SELECT {keycol}, {valcol} '
                     'FROM {table} '
-                    'ORDER BY {keycol}, {group_order_attr}').format(
+                    'ORDER BY {keycol}, {order_attr}').format(
                         table=table,
                         keycol=keycol,
                         valcol=valcol,
-                        group_order_attr=groupcol,
+                        order_attr=groupcol,
                     )
                 result = proxy.session.execute(expr)
                 yielder = _raw_yielder(result)
@@ -983,7 +1038,7 @@ class SqlIdGroupDictProxy(DictLike):
         # efficient than iterating over the items and discarding the values.
         for key, val in proxy.items():
             yield val
-        # _set = set if proxy.group_order_attr is None else ub.oset
+        # _set = set if proxy.order_attr is None else ub.oset
         # if proxy.ALCHEMY_MODE:
         # else:
         #     parent_table = proxy.parent_keyattr.class_.__tablename__
@@ -1053,13 +1108,18 @@ class CocoSqlIndex(object):
         index.cid_to_gids = SqlIdGroupDictProxy(
             session, Annotation.image_id, Annotation.category_id, Category.id)
 
-        # TODO:
-        # index.trackid_to_aids = SqlIdGroupDictProxy(
-        #     session, Annotation.id, Annotation.track_id)
+        if _USE_TRACK_LUT:
+            index.trackid_to_aids = SqlIdGroupDictProxy(
+                session,
+                valattr=Annotation.id,
+                keyattr=Annotation.track_id,
+                order_attr=Image.frame_index,
+                order_id=Annotation.image_id,
+            )
 
         index.vidid_to_gids = SqlIdGroupDictProxy(
             session, Image.id, Image.video_id, Video.id,
-            group_order_attr=Image.frame_index)
+            order_attr=Image.frame_index)
 
         # Make a list like view for algorithms
         index.dataset = {
@@ -1203,7 +1263,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         parts = []
         parts.append('tag={}'.format(self.tag))
         if self.dataset is not None:
-            info = ub.repr2(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)
+            info = ub.urepr(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)
             parts.append(info)
         return ', '.join(parts)
 
@@ -1337,7 +1397,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         _uri_info = _handle_sql_uri(self.uri)
         if verbose:
             print('connecting')
-            print('_uri_info = {}'.format(ub.repr2(_uri_info, nl=1)))
+            print('_uri_info = {}'.format(ub.urepr(_uri_info, nl=1)))
         uri = _uri_info['normalized']
 
         if _uri_info['scheme'] == 'sqlite':
@@ -1396,14 +1456,14 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 for k in postgres_knobs:
                     v = self.session.execute(f'SHOW {k};').fetchone()[0]
                     current[k] = v
-                print('current = {}'.format(ub.repr2(current, nl=1)))
+                print('current = {}'.format(ub.urepr(current, nl=1)))
                 self.session.execute('SET max_parallel_workers_per_gather = 6;')
                 self.session.execute('select pg_reload_conf();')
                 current = {}
                 for k in postgres_knobs:
                     v = self.session.execute(f'SHOW {k};').fetchone()[0]
                     current[k] = v
-                print('current = {}'.format(ub.repr2(current, nl=1)))
+                print('current = {}'.format(ub.urepr(current, nl=1)))
 
         if verbose:
             print('create CocoSQLIndex')
@@ -1459,8 +1519,8 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> assert_dsets_allclose(dset1, dset2, tag1='sql', tag2='dct')
             >>> ti_sql = _benchmark_dset_readtime(dset1, 'sql')
             >>> ti_dct = _benchmark_dset_readtime(dset2, 'dct')
-            >>> print('ti_sql.rankings = {}'.format(ub.repr2(ti_sql.rankings, nl=2, precision=6, align=':')))
-            >>> print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
+            >>> print('ti_sql.rankings = {}'.format(ub.urepr(ti_sql.rankings, nl=2, precision=6, align=':')))
+            >>> print('ti_dct.rankings = {}'.format(ub.urepr(ti_dct.rankings, nl=2, precision=6, align=':')))
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -1474,8 +1534,8 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> assert_dsets_allclose(dset1, dset2, tag1='sql', tag2='dct')
             >>> ti_sql = _benchmark_dset_readtime(dset1, 'sql')
             >>> ti_dct = _benchmark_dset_readtime(dset2, 'dct')
-            >>> print('ti_sql.rankings = {}'.format(ub.repr2(ti_sql.rankings, nl=2, precision=6, align=':')))
-            >>> print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
+            >>> print('ti_sql.rankings = {}'.format(ub.urepr(ti_sql.rankings, nl=2, precision=6, align=':')))
+            >>> print('ti_dct.rankings = {}'.format(ub.urepr(ti_dct.rankings, nl=2, precision=6, align=':')))
 
         CommandLine:
             KWCOCO_WITH_POSTGRESQL=1 xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_sql_dataset.py CocoSqlDatabase.populate_from:1
@@ -1704,11 +1764,16 @@ class CocoSqlDatabase(AbstractCocoDataset,
         rows = result.fetchall()
         aids, gids, cids, cxs, cys, ws, hs, img_ws, img_hs = list(zip(*rows))
 
+        try:
+            cids = np.array(cids, dtype=np.int32)
+        except TypeError:
+            cids = np.array(cids, dtype=object)
+
         table = {
             # Annotation / Image / Category ids
             'aid': np.array(aids, dtype=np.int32),
             'gid': np.array(gids, dtype=np.int32),
-            'category_id': np.array(cids, dtype=np.int32),
+            'category_id': cids,
             # Subpixel box localizations wrt parent image
             'cx': np.array(cxs, dtype=np.float32),
             'cy': np.array(cys, dtype=np.float32),
@@ -2211,8 +2276,8 @@ def devcheck():
 
     ti_sql = _benchmark_dset_readtime(self, 'sql')
     ti_dct = _benchmark_dset_readtime(dset, 'dct')
-    print('ti_sql.rankings = {}'.format(ub.repr2(ti_sql.rankings, nl=2, precision=6, align=':')))
-    print('ti_dct.rankings = {}'.format(ub.repr2(ti_dct.rankings, nl=2, precision=6, align=':')))
+    print('ti_sql.rankings = {}'.format(ub.urepr(ti_sql.rankings, nl=2, precision=6, align=':')))
+    print('ti_dct.rankings = {}'.format(ub.urepr(ti_dct.rankings, nl=2, precision=6, align=':')))
 
     # Read the sql tables into pandas
     # table_names = self.engine.table_names()  # deprecated

@@ -104,7 +104,7 @@ class MakeCocoFromMasksCLI(object):
         """
         import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=2)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=2)))
         serialization_method = config['serialization']
 
         # Initialize an empty COCO dataset
@@ -192,7 +192,7 @@ class MakeCocoFromMasksCLI(object):
 
         # You dont have to set the fpath attr, but I tend to like it
         coco_dset.fpath = config['dst']
-        print('Writing to fpath = {}'.format(ub.repr2(coco_dset.fpath, nl=1)))
+        print('Writing to fpath = {}'.format(ub.urepr(coco_dset.fpath, nl=1)))
         coco_dset.dump(coco_dset.fpath, newlines=True)
         return coco_dset.fpath
 

@@ -37,7 +37,7 @@ class CocoGrabCLI:
         from kwcoco.data import grab_camvid
         from kwcoco.data import grab_domainnet
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         ensured = []
         names = config['names']

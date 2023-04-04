@@ -283,7 +283,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> self = dset.annots()
             >>> self.set('my-key1', 'my-scalar-value')
             >>> self.set('my-key2', np.random.rand(len(self)))
-            >>> print('dset.imgs = {}'.format(ub.repr2(dset.imgs, nl=1)))
+            >>> print('dset.imgs = {}'.format(ub.urepr(dset.imgs, nl=1)))
             >>> self.get('my-key2')
         """
         if not ub.iterable(values):
@@ -358,7 +358,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> dset = kwcoco.CocoDataset.demo()
             >>> self = dset.annots()
             >>> attrs = self.attribute_frequency()
-            >>> print('attrs = {}'.format(ub.repr2(attrs, nl=1)))
+            >>> print('attrs = {}'.format(ub.urepr(attrs, nl=1)))
         """
         attrs = ub.ddict(lambda: 0)
         for obj in self._id_to_obj.values():
@@ -540,7 +540,7 @@ class Images(ObjectList1D):
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
-            >>> print(ub.repr2(self.n_annots, nl=0))
+            >>> print(ub.urepr(self.n_annots, nl=0))
             [9, 2, 0]
         """
         return list(map(len, ub.take(self._dset.index.gid_to_aids, self._ids)))
@@ -551,7 +551,7 @@ class Images(ObjectList1D):
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
-            >>> print(ub.repr2(list(map(list, self.aids)), nl=0))
+            >>> print(ub.urepr(list(map(list, self.aids)), nl=0))
             [[1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 11], []]
         """
         return list(ub.take(self._dset.index.gid_to_aids, self._ids))
@@ -815,7 +815,7 @@ class AnnotGroups(ObjectGroups):
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('photos').images().annots
-            >>> print('self.cids = {}'.format(ub.repr2(self.cids, nl=0)))
+            >>> print('self.cids = {}'.format(ub.urepr(self.cids, nl=0)))
             self.cids = [[1, 2, 3, 4, 5, 5, 5, 5, 5], [6, 4], []]
         """
         return self.lookup('category_id')
@@ -831,7 +831,7 @@ class AnnotGroups(ObjectGroups):
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('photos').images().annots
-            >>> print('self.cnames = {}'.format(ub.repr2(self.cnames, nl=0)))
+            >>> print('self.cnames = {}'.format(ub.urepr(self.cnames, nl=0)))
             self.cnames = [['astronaut', 'rocket', 'helmet', 'mouth', 'star', 'star', 'star', 'star', 'star'], ['astronomer', 'mouth'], []]
         """
         return [getattr(group, 'cnames') for group in self._groups]

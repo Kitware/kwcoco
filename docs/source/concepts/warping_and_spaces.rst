@@ -123,7 +123,7 @@ method, which can be used to access image information in image or video space.
     self = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
 
     # Show the structure of the image and auxiliary dictionaries
-    print(ub.repr2(self.index.imgs[1], nl=-1, sort=0))
+    print(ub.urepr(self.index.imgs[1], nl=-1, sort=0))
 
     # The delayed object is a pointer to the image files that contains 
     # appropriate transformation. Additional transformations can be 

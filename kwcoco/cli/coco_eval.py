@@ -79,7 +79,7 @@ def main(cmdline=True, **kw):
     import kwimage
     import kwarray
     cli_config = CocoEvalCLIConfig.cli(cmdline=cmdline, default=kw)
-    print('cli_config = {}'.format(ub.repr2(dict(cli_config), nl=1)))
+    print('cli_config = {}'.format(ub.urepr(dict(cli_config), nl=1)))
 
     eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvaluator.Config.default)
 

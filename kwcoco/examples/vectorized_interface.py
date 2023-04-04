@@ -48,7 +48,7 @@ def demo_vectorized_interface():
     """
 
     images.objs
-    print('images.objs = {}'.format(ub.repr2(images.objs, nl=1)))
+    print('images.objs = {}'.format(ub.urepr(images.objs, nl=1)))
     """
     images.objs = [
         {'channels': 'r|g|b', 'file_name': '_assets/images/img_00001.png', 'frame_index': 0, 'height': 600, 'id': 1, 'video_id': 1, 'warp_img_to_vid': {'type': 'affine'}, 'width': 600},
@@ -88,7 +88,7 @@ def demo_vectorized_interface():
     for ann in anns:
         ann.pop('segmentation', None)
         ann.pop('keypoints', None)
-    print('annots.objs = {}'.format(ub.repr2(annots.objs, nl=1)))
+    print('annots.objs = {}'.format(ub.urepr(annots.objs, nl=1)))
     """
     annots.objs = [
         {'bbox': [-15.0, 192.4, 138.3, 50.9], 'category_id': 1, 'id': 3, 'image_id': 3, 'track_id': 0},
@@ -98,7 +98,7 @@ def demo_vectorized_interface():
 
     # Annotations have a special method that returns kwimage detection objects
     dets = annots.detections
-    print('dets.data = {}'.format(ub.repr2(dets.data, nl=1)))
+    print('dets.data = {}'.format(ub.urepr(dets.data, nl=1)))
     """
     dets.data = {
         'boxes': <Boxes(xywh,
@@ -117,7 +117,7 @@ def demo_vectorized_interface():
     # First query for images (e.g. within a video)
     images = coco_dset.images(vidid=1)
     print('images = {!r}'.format(images))
-    print('images.objs = {}'.format(ub.repr2(images.objs, nl=1)))
+    print('images.objs = {}'.format(ub.urepr(images.objs, nl=1)))
     """
     images = <Images(num=5) at 0x7f1f729bc490>
     images.objs = [

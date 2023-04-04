@@ -238,8 +238,8 @@ def _devcheck_voc_consistency2():
     if False:
         dmet_ = dmets[-1]
         dmet_ = dmets[0]
-        print('true = ' + ub.repr2(dmet_.true.dataset, nl=2, precision=2))
-        print('pred = ' + ub.repr2(dmet_.pred.dataset, nl=2, precision=2))
+        print('true = ' + ub.urepr(dmet_.true.dataset, nl=2, precision=2))
+        print('pred = ' + ub.urepr(dmet_.pred.dataset, nl=2, precision=2))
 
         dmet = DetectionMetrics()
         for gid in range(0, 5):
@@ -258,8 +258,8 @@ def _devcheck_voc_consistency2():
             print('voc_map = {!r}'.format(voc_map))
             print('coco_map = {!r}'.format(coco_map))
 
-            print('true = ' + ub.repr2(dmet.true.dataset, nl=2))
-            print('pred = ' + ub.repr2(dmet.pred.dataset, nl=2))
+            print('true = ' + ub.urepr(dmet.true.dataset, nl=2))
+            print('pred = ' + ub.urepr(dmet.pred.dataset, nl=2))
 
 
 def _devcheck_voc_consistency():

@@ -51,7 +51,7 @@ class StratifiedGroupKFold(_BaseKFold):
             >>> skf_list = list(self.split(X=X, y=y, groups=groups))
             ...
             >>> import ubelt as ub
-            >>> print(ub.repr2(skf_list, nl=1, with_dtype=False))
+            >>> print(ub.urepr(skf_list, nl=1, with_dtype=False))
             [
                 (np.array([2, 3, 4, 5, 6]), np.array([0, 1, 7, 8])),
                 (np.array([0, 1, 2, 7, 8]), np.array([3, 4, 5, 6])),
@@ -88,7 +88,7 @@ class StratifiedGroupKFold(_BaseKFold):
             grouped_splitx = []
 
             # import ubelt as ub
-            # print(ub.repr2(grouped_y_counts, nl=-1))
+            # print(ub.urepr(grouped_y_counts, nl=-1))
             # print('target_ratio = {!r}'.format(target_ratio))
 
             for count, group_idx in enumerate(sortx):

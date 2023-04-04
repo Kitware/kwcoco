@@ -43,7 +43,7 @@ def the_core_dataset_backend():
     dset.reroot(dirname(dset.fpath), absolute=False)
     dset.remove_annotations(kwarray.shuffle(list(dset.anns.keys()))[10:])
 
-    print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
+    print('dset.dataset = {}'.format(ub.urepr(dset.dataset, nl=2)))
 
 
 def demo_vectorize_interface():

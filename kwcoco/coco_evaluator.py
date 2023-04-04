@@ -636,7 +636,7 @@ class CocoEvaluator(object):
         import kwarray
         import numpy as np
         coco_eval.log('evaluating')
-        # print('coco_eval.config = {}'.format(ub.repr2(dict(coco_eval.config), nl=3)))
+        # print('coco_eval.config = {}'.format(ub.urepr(dict(coco_eval.config), nl=3)))
 
         dmet = coco_eval._build_dmet()
 
@@ -719,7 +719,7 @@ class CocoEvaluator(object):
                 nocls_measures = nocls_binvecs.measures(**measurekw)
                 ovr_measures = ovr_binvecs.measures(**measurekw)['perclass']
                 # print('minmax = {!r}'.format(minmax))
-                # print('nocls_measures = {}'.format(ub.repr2(nocls_measures, nl=1, align=':')))
+                # print('nocls_measures = {}'.format(ub.urepr(nocls_measures, nl=1, align=':')))
                 # print('ovr_measures = {!r}'.format(ovr_measures))
                 meta = base_meta.copy()
                 meta['iou_thresh'] = iou_thresh
@@ -757,7 +757,7 @@ class CocoEvaluator(object):
                     # print('ovr_measures2 = {!r}'.format(ovr_measures2))
                     result.ovr_measures2 = ovr_measures2
 
-                reskey = ub.repr2(
+                reskey = ub.urepr(
                     dict(area_range=minmax_key, iou_thresh=iou_thresh),
                     nl=0, explicit=1, itemsep='', nobr=1, sv=1)
                 resdata[reskey] = result
@@ -969,10 +969,10 @@ class CocoSingleResult(ub.NiceRepr):
         >>> results = coco_eval.evaluate()
         >>> result = ub.peek(results.values())
         >>> state = result.__json__()
-        >>> print('state = {}'.format(ub.repr2(state, nl=-1)))
+        >>> print('state = {}'.format(ub.urepr(state, nl=-1)))
         >>> recon = CocoSingleResult.from_json(state)
         >>> state = recon.__json__()
-        >>> print('state = {}'.format(ub.repr2(state, nl=-1)))
+        >>> print('state = {}'.format(ub.urepr(state, nl=-1)))
     """
 
     def __init__(result, nocls_measures, ovr_measures, cfsn_vecs, meta=None):
@@ -982,7 +982,7 @@ class CocoSingleResult(ub.NiceRepr):
         result.meta = meta
 
     def __nice__(result):
-        text = ub.repr2({
+        text = ub.urepr({
             'nocls_measures': result.nocls_measures,
             'ovr_measures': result.ovr_measures,
         }, sv=1)

@@ -335,12 +335,12 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         >>> dset._check_json_serializable()
         >>> assert dset.imgs[1]['auxiliary'][1]['channels']
         >>> # Print before and after render
-        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset['images'], nl=-2)))
-        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset, nl=-2)))
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset['images'], nl=-2)))
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset, nl=-2)))
         >>> print(ub.hash_data(dset.dataset))
         >>> # test that we can render
         >>> render_toy_dataset(dset, rng=0, dpath=None, renderkw={})
-        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset['images'], nl=-2)))
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset['images'], nl=-2)))
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> kwplot.autompl()
@@ -886,7 +886,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         >>> aux = 'mx'
         >>> dset = random_single_video_dset(
         >>>     image_size=image_size, num_frames=num_frames, verbose=verbose, aux=aux, rng=rng)
-        >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
+        >>> print('dset.dataset = {}'.format(ub.urepr(dset.dataset, nl=2)))
         >>> gid = 1
         >>> renderkw = {}
         >>> renderkw['background'] = 'parrot'
@@ -907,7 +907,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
 
         >>> # xdoctest: +REQUIRES(--show)
         >>> img, anns = demodata_toy_img(image_size=(172, 172), rng=None, aux=True)
-        >>> print('anns = {}'.format(ub.repr2(anns, nl=1)))
+        >>> print('anns = {}'.format(ub.urepr(anns, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
         >>> kwplot.imshow(img['imdata'], pnum=(1, 2, 1), fnum=1)

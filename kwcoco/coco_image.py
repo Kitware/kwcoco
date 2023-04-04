@@ -46,10 +46,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
         >>> self = kwcoco.CocoImage(dset1.imgs[1], dset1)
         >>> print('self = {!r}'.format(self))
-        >>> print('self.channels = {}'.format(ub.repr2(self.channels, nl=1)))
+        >>> print('self.channels = {}'.format(ub.urepr(self.channels, nl=1)))
 
         >>> self = kwcoco.CocoImage(dset2.imgs[1], dset2)
-        >>> print('self.channels = {}'.format(ub.repr2(self.channels, nl=1)))
+        >>> print('self.channels = {}'.format(ub.urepr(self.channels, nl=1)))
         >>> self.primary_asset()
         >>> assert 'auxiliary' in self
     """
@@ -712,7 +712,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
             >>> delayed = coco_img.imdelay()
             >>> final = delayed.finalize()
-            >>> print('final.shape = {}'.format(ub.repr2(final.shape, nl=1)))
+            >>> print('final.shape = {}'.format(ub.urepr(final.shape, nl=1)))
             >>> assert final.shape == (512, 512, 3)
 
         Example:

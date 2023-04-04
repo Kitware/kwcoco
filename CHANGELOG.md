@@ -16,6 +16,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * demo data now has the ability to render on top of a background image.
 
+### Fixed
+* The track index now works properly with SQL variants and returns ordreing
+
 
 ## Version 0.5.8 - Released 2023-03-17
 

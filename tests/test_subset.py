@@ -35,8 +35,8 @@ def test_subset_api_method():
     dset = _create_demo_dataset()
     subset_gids = list(dset.imgs.keys())[::2]
     subdset = dset.subset(subset_gids)
-    print('subdset.dataset = {}'.format(ub.repr2(subdset.dataset, nl=2)))
-    print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
+    print('subdset.dataset = {}'.format(ub.urepr(subdset.dataset, nl=2)))
+    print('dset.dataset = {}'.format(ub.urepr(dset.dataset, nl=2)))
     assert len(subdset.index.imgs) == 2
     assert ub.peek(subdset.index.anns.values())['user'] == 'me'
 
@@ -45,12 +45,12 @@ def test_subset_cli_with_gids():
     dset = _create_demo_dataset()
     subset_gids = list(dset.imgs.keys())[::2]
 
-    print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
+    print('dset.fpath = {}'.format(ub.urepr(dset.fpath, nl=1)))
     dpath = ub.Path.appdir('kwcoco/test/subset').ensuredir()
     dset.fpath = join(dpath, 'input.kwcoco.json')
-    print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
+    print('dset.fpath = {}'.format(ub.urepr(dset.fpath, nl=1)))
     dset.dump(dset.fpath)
-    print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
+    print('dset.fpath = {}'.format(ub.urepr(dset.fpath, nl=1)))
 
     dst_fpath2 = join(dpath, 'output.kwcoco.json')
     config1 = {
@@ -58,10 +58,10 @@ def test_subset_cli_with_gids():
         'dst': dst_fpath2,
         'gids': subset_gids,
     }
-    print('config1 = {}'.format(ub.repr2(config1, nl=1)))
+    print('config1 = {}'.format(ub.urepr(config1, nl=1)))
     coco_subset.CocoSubsetCLI.main(cmdline=False, **config1)
     dst_dset2 = kwcoco.CocoDataset(dst_fpath2)
-    print('dst_dset2.dataset = {}'.format(ub.repr2(dst_dset2.dataset, nl=2)))
+    print('dst_dset2.dataset = {}'.format(ub.urepr(dst_dset2.dataset, nl=2)))
     assert len(dst_dset2.index.imgs) == 2
     assert ub.peek(dst_dset2.index.anns.values())['user'] == 'me'
 
@@ -74,12 +74,12 @@ def test_subset_cli_with_jq():
         pytest.skip()
     dset = _create_demo_dataset()
 
-    print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
+    print('dset.fpath = {}'.format(ub.urepr(dset.fpath, nl=1)))
     dpath = ub.Path.appdir('kwcoco/test/subset').ensuredir()
     dset.fpath = join(dpath, 'input.kwcoco.json')
-    print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
+    print('dset.fpath = {}'.format(ub.urepr(dset.fpath, nl=1)))
     dset.dump(dset.fpath)
-    print('dset.fpath = {}'.format(ub.repr2(dset.fpath, nl=1)))
+    print('dset.fpath = {}'.format(ub.urepr(dset.fpath, nl=1)))
 
     dst_fpath1 = join(dpath, 'output.kwcoco.json')
     config2 = {
@@ -87,10 +87,10 @@ def test_subset_cli_with_jq():
         'dst': dst_fpath1,
         'select_images': '.id % 2 == 0'
     }
-    print('config2 = {}'.format(ub.repr2(config2, nl=1)))
+    print('config2 = {}'.format(ub.urepr(config2, nl=1)))
     coco_subset.CocoSubsetCLI.main(cmdline=False, **config2)
     dst_dset1 = kwcoco.CocoDataset(dst_fpath1)
 
     assert len(dst_dset1.index.imgs) == 2
     assert ub.peek(dst_dset1.index.anns.values())['user'] == 'me'
-    print('dst_dset1.dataset = {}'.format(ub.repr2(dst_dset1.dataset, nl=2)))
+    print('dst_dset1.dataset = {}'.format(ub.urepr(dst_dset1.dataset, nl=2)))

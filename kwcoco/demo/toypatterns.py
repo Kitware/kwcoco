@@ -21,7 +21,7 @@ class CategoryPatterns(object):
         >>> offset = (20, 10)
         >>> dims = (160, 140)
         >>> info = self.random_category(chip, offset, dims)
-        >>> print('info = {}'.format(ub.repr2(info, nl=1)))
+        >>> print('info = {}'.format(ub.urepr(info, nl=1)))
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> kwplot.autompl()
@@ -196,9 +196,9 @@ class CategoryPatterns(object):
             >>> self = CategoryPatterns.coerce(['superstar'])
             >>> chip = np.random.rand(64, 64)
             >>> info = self.render_category('superstar', chip, newstyle=True)
-            >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
+            >>> print('info = {}'.format(ub.urepr(info, nl=-1)))
             >>> info = self.render_category('superstar', chip, newstyle=False)
-            >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
+            >>> print('info = {}'.format(ub.urepr(info, nl=-1)))
 
         Example:
             >>> from kwcoco.demo.toypatterns import *  # NOQA
@@ -206,7 +206,7 @@ class CategoryPatterns(object):
             >>> chip = None
             >>> dims = (64, 64)
             >>> info = self.render_category('superstar', chip, newstyle=True, dims=dims, size=dims)
-            >>> print('info = {}'.format(ub.repr2(info, nl=-1)))
+            >>> print('info = {}'.format(ub.urepr(info, nl=-1)))
 
         Ignore:
             import xdev

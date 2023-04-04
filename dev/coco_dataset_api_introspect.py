@@ -54,7 +54,7 @@ for key in dir(dset):
     groups[heuristic][method_definer].append(key)
 
 print('For Reference, the following are grouped attributes/methods of a kwcoco.CocoDataset')
-print('{}'.format(ub.repr2(groups, sort=0, nl=3)))
+print('{}'.format(ub.urepr(groups, sort=0, nl=3)))
 
 # Try and make a nice RTD RST style
 

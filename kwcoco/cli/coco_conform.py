@@ -74,7 +74,7 @@ class CocoConformCLI:
         import kwcoco
 
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))

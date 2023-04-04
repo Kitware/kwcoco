@@ -293,7 +293,7 @@ def main():
         }
     config = GrabVOC_Config()
     paths = ensure_voc_coco(**config)
-    print('paths = {}'.format(ub.repr2(paths, nl=1)))
+    print('paths = {}'.format(ub.urepr(paths, nl=1)))
 
 
 if __name__ == '__main__':

@@ -16,13 +16,13 @@ def get_images_with_videoid():
     # With Object1d API
     images = dset.images(vidid=video_id)
     print('images = {!r}'.format(images))
-    print('images.objs = {}'.format(ub.repr2(images.objs, nl=1)))
+    print('images.objs = {}'.format(ub.urepr(images.objs, nl=1)))
 
     # With the index
     image_ids = dset.index.vidid_to_gids[video_id]
     imgs = [dset.index.imgs[gid] for gid in image_ids]
     print('image_ids = {!r}'.format(image_ids))
-    print('imgs = {}'.format(ub.repr2(imgs, nl=1)))
+    print('imgs = {}'.format(ub.urepr(imgs, nl=1)))
 
 
 def get_all_channels_in_dataset():
@@ -52,7 +52,7 @@ def get_all_channels_in_dataset():
     for channels in all_channels:
         hist[channels.spec] += 1
 
-    print('hist = {}'.format(ub.repr2(hist, nl=1)))
+    print('hist = {}'.format(ub.urepr(hist, nl=1)))
 
 
 def whats_the_difference_between_Images_and_CocoImage():
