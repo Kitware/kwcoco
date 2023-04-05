@@ -120,7 +120,7 @@ def main():
         tup = (key, group)
         final.append(tup)
 
-    print('final = {}'.format(ub.repr2(final, nl=1)))
+    print('final = {}'.format(ub.urepr(final, nl=1)))
 
     """
     This expands out to:
@@ -183,7 +183,7 @@ def main():
             group = set(group)
         tup = (key, group)
         final.append(tup)
-    print('final = {}'.format(ub.repr2(final, nl=1)))
+    print('final = {}'.format(ub.urepr(final, nl=1)))
 
     """
     This expands to:
@@ -265,7 +265,7 @@ def main():
             group = set(group)
         tup = (key, group)
         final.append(tup)
-    print('final = {}'.format(ub.repr2(final, nl=1)))
+    print('final = {}'.format(ub.urepr(final, nl=1)))
 
     """
 

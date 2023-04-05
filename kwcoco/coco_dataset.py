@@ -132,7 +132,7 @@ class MixinCocoDepricate(object):
             >>> hist = self.keypoint_annotation_frequency()
             >>> hist = ub.odict(sorted(hist.items()))
             >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
-            >>> print(ub.repr2(hist))  # xdoc: +IGNORE_WANT
+            >>> print(ub.urepr(hist))  # xdoc: +IGNORE_WANT
             {
                 'bot_tip': 6,
                 'left_eye': 14,
@@ -171,7 +171,7 @@ class MixinCocoDepricate(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> hist = self.category_annotation_frequency()
-            >>> print(ub.repr2(hist))
+            >>> print(ub.urepr(hist))
         """
         catname_to_nannot_types = {}
         ub.schedule_deprecation(
@@ -208,7 +208,7 @@ class MixinCocoDepricate(object):
             'kwcoco', name='imread', type='method',
             deprecate='0.3.4', error='1.0.0', remove='1.1.0',
             migration=(
-                'use `self.coco_image(gid).delay().finalize()`.'
+                'use `self.coco_image(gid).imdelay().finalize()`.'
             )
         )
         return self.load_image(gid)
@@ -279,7 +279,7 @@ class MixinCocoAccessors(object):
             >>> print('delayed = {!r}'.format(delayed))
         """
         coco_img = self.coco_image(gid)
-        delayed = coco_img.delay(channels=channels, space=space)
+        delayed = coco_img.imdelay(channels=channels, space=space)
         return delayed
 
     def load_image(self, gid_or_img, channels=None):
@@ -294,9 +294,8 @@ class MixinCocoAccessors(object):
         Returns:
             np.ndarray : the image
 
-        TODO:
-            - [ ] allow specification of multiple channels - use delayed image
-                for this.
+        Note:
+            Prefer to use the CocoImage methods instead
         """
         try:
             import kwimage
@@ -318,6 +317,9 @@ class MixinCocoAccessors(object):
             channels (str | None): if specified, return a path to data
                 containing auxiliary channels instead
 
+        Note:
+            Prefer to use the CocoImage methods instead
+
         Returns:
             PathLike: full path to the image
         """
@@ -337,7 +339,7 @@ class MixinCocoAccessors(object):
         elif 'assets' in img:
             auxlist = img['assets']
         else:
-            raise KeyError('no auxilary data')
+            raise KeyError('no auxiliary data')
         for aux in auxlist:
             if aux['channels'] == channels:
                 found = aux
@@ -355,6 +357,9 @@ class MixinCocoAccessors(object):
             gid_or_img (int | dict): an image or its id
             channels (str): the auxiliary channel to load (e.g. disparity)
 
+        Note:
+            Prefer to use the CocoImage methods instead
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8', aux=True)
@@ -369,7 +374,7 @@ class MixinCocoAccessors(object):
         Reads the chip of an annotation. Note this is much less efficient than
         using a sampler, but it doesn't require disk cache.
 
-        Maybe depricate?
+        Maybe deprecate?
 
         Args:
             aid_or_int (int | dict): annot id or dict
@@ -777,6 +782,11 @@ class MixinCocoAccessors(object):
         return kpnames
 
     def _coco_image(self, gid):
+        ub.schedule_deprecation(
+            'kwcoco', '_coco_image', 'method',
+            migration='Use "coco_image" instead.',
+            deprecate='0.5.9', error='1.0.0', remove='1.1.0',
+        )
         return self.coco_image(gid)
 
     def coco_image(self, gid):
@@ -1069,6 +1079,15 @@ class MixinCocoExtras(object):
                     key = 'image_size'
                     value = 'random'
 
+                if key == 'amazon':
+                    # Hack to put in amazon background
+                    key = 'render'
+                    if isinstance(vidkw[key], dict):
+                        value = vidkw[key]
+                    else:
+                        value = {}
+                    value['background'] = 'amazon'
+
                 vidkw[key] = value
 
             vidkw.update(kwargs)
@@ -1087,7 +1106,7 @@ class MixinCocoExtras(object):
             depends = ub.hash_data(sorted(depends_items.items()), base='abc')[0:14]
 
             if verbose > 0:
-                print('vidkw = {}'.format(ub.repr2(vidkw, nl=1)))
+                print('vidkw = {}'.format(ub.urepr(vidkw, nl=1)))
             if verbose > 3:
                 print('depends = {!r}'.format(depends))
 
@@ -1210,7 +1229,7 @@ class MixinCocoExtras(object):
             >>>     if isinstance(val, str):
             >>>         walker[path] = val[0:8]
             >>> # Note: this may change in different versions of kwcoco
-            >>> print('self.hashid_parts = ' + ub.repr2(self.hashid_parts))
+            >>> print('self.hashid_parts = ' + ub.urepr(self.hashid_parts))
             >>> print('self.hashid = {!r}'.format(self.hashid[0:8]))
             self.hashid_parts = {
                 'annotations': {
@@ -1933,8 +1952,8 @@ class MixinCocoExtras(object):
 
         if verbose:
             print('kwcoco.reroot')
-            print(' * new_bundle_dpath = {}'.format(ub.repr2(new_bundle_dpath, nl=1)))
-            print(' * cur_bundle_dpath = {}'.format(ub.repr2(cur_bundle_dpath, nl=1)))
+            print(' * new_bundle_dpath = {}'.format(ub.urepr(new_bundle_dpath, nl=1)))
+            print(' * cur_bundle_dpath = {}'.format(ub.urepr(cur_bundle_dpath, nl=1)))
             print(f' * old_prefix={old_prefix}')
             print(f' * new_prefix={new_prefix}')
             print(f' * absolute={absolute}')
@@ -1946,7 +1965,7 @@ class MixinCocoExtras(object):
                     from kwcoco.coco_image import CocoImage
                     first_image = CocoImage(self.dataset['images'][0], dset=self)
                     first_image_filepaths = list(first_image.iter_image_filepaths(with_bundle=False))
-                    print(' * first_image_filepaths = {}'.format(ub.repr2(first_image_filepaths, nl=1)))
+                    print(' * first_image_filepaths = {}'.format(ub.urepr(first_image_filepaths, nl=1)))
                 else:
                     print('No images to reroot')
 
@@ -2018,7 +2037,7 @@ class MixinCocoExtras(object):
                             aux_fname.append(_reroot_path(aux['file_name']))
                     gid_to_new[gid] = new
                 except Exception:
-                    # img_repr = ub.repr2(img)
+                    # img_repr = ub.urepr(img)
                     asset_fpaths = list(self.coco_image(img['id']).iter_image_filepaths())
                     raise Exception('Failed to reroot gid={} with fpaths={}'.format(img['id'], asset_fpaths))
 
@@ -2043,8 +2062,8 @@ class MixinCocoExtras(object):
                     for aux in img.get('assets', []):
                         aux['file_name'] = _reroot_path(aux['file_name'])
                 except Exception:
-                    # img_repr = ub.repr2(img)
-                    # raise Exception('Failed to reroot img={}'.format(ub.repr2(img)))
+                    # img_repr = ub.urepr(img)
+                    # raise Exception('Failed to reroot img={}'.format(ub.urepr(img)))
                     asset_fpaths = list(self.coco_image(img['id']).iter_image_filepaths())
                     raise Exception('Failed to reroot gid={} with fpaths={}'.format(img['id'], asset_fpaths))
 
@@ -2096,7 +2115,7 @@ class MixinCocoObjects(object):
     This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
-    def annots(self, annot_ids=None, image_id=None, trackid=None, aids=None, gid=None):
+    def annots(self, annot_ids=None, image_id=None, track_id=None, trackid=None, aids=None, gid=None):
         """
         Return vectorized annotation objects
 
@@ -2110,9 +2129,10 @@ class MixinCocoObjects(object):
                 Mutually exclusive with other arguments.
                 An alias is "gids", which may be removed in the future.
 
-            trackid (int | None):
+            track_id (int | None):
                 return all annotations that belong to this track.
                 mutually exclusive with other arguments.
+                An alias is "trackid", which may be removed in the future.
 
         Returns:
             kwcoco.coco_objects1d.Annots: vectorized annotation object
@@ -2126,7 +2146,7 @@ class MixinCocoObjects(object):
             >>> sub_annots = annots.take([1, 2, 3])
             >>> print(sub_annots)
             <Annots(num=3)>
-            >>> print(ub.repr2(sub_annots.get('bbox', None)))
+            >>> print(ub.urepr(sub_annots.get('bbox', None)))
             [
                 [350, 5, 130, 290],
                 None,
@@ -2138,11 +2158,19 @@ class MixinCocoObjects(object):
         if annot_ids is None:
             annot_ids = aids
 
+        if trackid is not None:
+            ub.schedule_deprecation(
+                'kwcoco', 'trackid', 'argument of CocoDataset.annots',
+                migration='Use "track_id" instead.',
+                deprecate='0.5.9', error='1.0.0', remove='1.1.0',
+            )
+            track_id = trackid
+
         if image_id is not None:
             annot_ids = sorted(self.index.gid_to_aids[image_id])
 
-        if trackid is not None:
-            annot_ids = self.index.trackid_to_aids[trackid]
+        if track_id is not None:
+            annot_ids = self.index.trackid_to_aids[track_id]
 
         if annot_ids is None:
             annot_ids = sorted(self.index.anns.keys())
@@ -2258,7 +2286,7 @@ class MixinCocoObjects(object):
             >>> print(videos)
             >>> videos.lookup('name')
             >>> videos.lookup('id')
-            >>> print('videos.objs = {}'.format(ub.repr2(videos.objs[0:2], nl=1)))
+            >>> print('videos.objs = {}'.format(ub.urepr(videos.objs[0:2], nl=1)))
         """
         if video_ids is None:
             video_ids = vidids
@@ -2303,7 +2331,7 @@ class MixinCocoStats(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> hist = self.category_annotation_frequency()
-            >>> print(ub.repr2(hist))
+            >>> print(ub.urepr(hist))
             {
                 'astroturf': 0,
                 'human': 0,
@@ -2753,7 +2781,7 @@ class MixinCocoStats(object):
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
-            >>> print(ub.repr2(self.basic_stats()))
+            >>> print(ub.urepr(self.basic_stats()))
             {
                 'n_anns': 11,
                 'n_imgs': 3,
@@ -2763,7 +2791,7 @@ class MixinCocoStats(object):
 
             >>> from kwcoco.demo.toydata_video import random_video_dset
             >>> dset = random_video_dset(render=True, num_frames=2, num_tracks=10, rng=0)
-            >>> print(ub.repr2(dset.basic_stats()))
+            >>> print(ub.urepr(dset.basic_stats()))
             {
                 'n_anns': 20,
                 'n_imgs': 2,
@@ -2789,7 +2817,7 @@ class MixinCocoStats(object):
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
-            >>> print(ub.repr2(self.extended_stats()))
+            >>> print(ub.urepr(self.extended_stats()))
         """
         def mapping_stats(xid_to_yids):
             import kwarray
@@ -2863,10 +2891,10 @@ class MixinCocoStats(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes32')
             >>> infos = self.boxsize_stats(anchors=4, perclass=False)
-            >>> print(ub.repr2(infos, nl=-1, precision=2))
+            >>> print(ub.urepr(infos, nl=-1, precision=2))
 
             >>> infos = self.boxsize_stats(gids=[1], statskw=dict(median=True))
-            >>> print(ub.repr2(infos, nl=-1, precision=2))
+            >>> print(ub.urepr(infos, nl=-1, precision=2))
         """
         import kwarray
         import numpy as np
@@ -3052,8 +3080,18 @@ class MixinCocoDraw(object):
         """
         import kwimage
         # Load the raw image pixels
-        canvas = self.load_image(gid, channels=channels)
-        # TODO: account for auxiliary transforms if the exist
+        coco_img = self.coco_image(gid)
+        delayed = coco_img.imdelay(space='image', channels=channels)
+
+        if delayed.channels is not None and delayed.channels.numel() > 3:
+            import warnings
+            warnings.warn('Requested drawing more than 3 channels. '
+                          'Only picking first 3')
+            first_channels = coco_img.imdelay(space='image').channels.fuse()[0:3]
+            delayed = delayed.take_channels(first_channels)
+
+        canvas = delayed.finalize()
+        canvas = _normalize_intensity_if_needed(canvas)
 
         # Get annotation IDs from this image
         aids = self.index.gid_to_aids[gid]
@@ -3106,11 +3144,11 @@ class MixinCocoDraw(object):
             :func:`kwcoco.coco_dataset.MixinCocoDraw.show_image`
 
         Ignore:
-            # Programatically collect the kwargs for docs generation
+            # Programmatically collect the kwargs for docs generation
             import xinspect
             import kwcoco
             kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
-            print(ub.repr2(list(kwargs.keys()), nl=1, si=1))
+            print(ub.urepr(list(kwargs.keys()), nl=1, si=1))
 
         Example:
             >>> # xdoctest: +REQUIRES(module:kwplot)
@@ -3149,7 +3187,8 @@ class MixinCocoDraw(object):
         if aids is not None:
             highlight_aids.update(aids)
 
-        img = self.imgs[gid]
+        coco_img = self.coco_image(gid)
+        img = coco_img.img
         aids = self.index.gid_to_aids.get(img['id'], [])
 
         # Collect annotation overlays
@@ -3281,50 +3320,43 @@ class MixinCocoDraw(object):
                             sseg_polys.append(poly)
 
         # Show image
-        if img.get('file_name', None) is not None:
-            np_img = self.load_image(img, channels=channels)
-        else:
-            # hack for multispectral
-            coco_img = self._coco_image(gid)
-            avail_channels = coco_img.channels
+        avail_channels = coco_img.channels
 
-            if channels is None:
-                avail_spec = avail_channels.fuse().normalize()
-                num_chans = avail_spec.numel()
+        if channels is None and avail_channels is not None:
+            avail_spec = avail_channels.fuse().normalize()
+            num_chans = avail_spec.numel()
 
-                if num_chans == 0:
-                    raise Exception('no channels!')
-                elif num_chans <= 2:
-                    print('Auto choosing 1 channel')
-                    channels = avail_spec.parsed[0]
-                elif num_chans > 3:
-                    print('Auto choosing 3 channel')
-                    sensible_defaults = [
-                        'red|green|blue',
-                        'r|g|b',
-                    ]
-                    chosen = None
-                    for sensible in sensible_defaults:
-                        cand = avail_spec & sensible
-                        if cand.numel() == 3:
-                            chosen = cand
-                            break
-                    if chosen is None:
-                        chosen = avail_spec[0:3]
-                    channels = chosen
+            if num_chans == 0:
+                raise Exception('no channels!')
+            elif num_chans <= 2:
+                print('Auto choosing 1 channel')
+                channels = avail_spec.parsed[0]
+            elif num_chans > 3:
+                print('Auto choosing 3 channel')
+                sensible_defaults = [
+                    'red|green|blue',
+                    'r|g|b',
+                ]
+                chosen = None
+                for sensible in sensible_defaults:
+                    cand = avail_spec & sensible
+                    if cand.numel() == 3:
+                        chosen = cand
+                        break
+                if chosen is None:
+                    chosen = avail_spec[0:3]
+                channels = chosen
 
-            print('loading image')
-            delayed = self.delayed_load(
-                img['id'], channels=channels, space='image')
-            np_img = delayed.finalize()
-            print('loaded image')
+        print('loading image')
+        delayed = coco_img.imdelay(space='image', channels=channels)
+        np_img = delayed.finalize()
+        print('loaded image')
 
         np_img = kwimage.atleast_3channels(np_img)
 
         np_img01 = None
-        if np_img.dtype.kind in {'i', 'u'}:
-            if np_img.max() > 255:
-                np_img01 = kwimage.normalize_intensity(np_img)
+        if np_img.max() > 255:
+            np_img01 = _normalize_intensity_if_needed(np_img)
 
         fig = plt.gcf()
         ax = fig.gca()
@@ -3405,6 +3437,20 @@ class MixinCocoDraw(object):
         return ax
 
 
+def _normalize_intensity_if_needed(canvas):
+    # We really need a function that can adapt to dynamic ranges
+    # in a robust way that ensures at least something is visible.
+    # Normalize intensity is pretty good, but has common edge cases.
+    import kwimage
+    max_value = canvas.max()
+    min_value = canvas.min()
+    if canvas.dtype.kind in ['u', 'i'] and max_value > 255 or min_value < 0:
+        canvas = kwimage.normalize_intensity(canvas)
+    elif max_value > 0 or min_value < 0:
+        canvas = kwimage.normalize_intensity(canvas)
+    return canvas
+
+
 class MixinCocoAddRemove(object):
     """
     Mixin functions to dynamically add / remove annotations images and
@@ -3426,23 +3472,23 @@ class MixinCocoAddRemove(object):
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset()
-            >>> print('self.index.videos = {}'.format(ub.repr2(self.index.videos, nl=1)))
-            >>> print('self.index.imgs = {}'.format(ub.repr2(self.index.imgs, nl=1)))
+            >>> print('self.index.videos = {}'.format(ub.urepr(self.index.videos, nl=1)))
+            >>> print('self.index.imgs = {}'.format(ub.urepr(self.index.imgs, nl=1)))
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
 
             >>> vidid1 = self.add_video('foo', id=3)
             >>> vidid2 = self.add_video('bar')
             >>> vidid3 = self.add_video('baz')
-            >>> print('self.index.videos = {}'.format(ub.repr2(self.index.videos, nl=1)))
-            >>> print('self.index.imgs = {}'.format(ub.repr2(self.index.imgs, nl=1)))
+            >>> print('self.index.videos = {}'.format(ub.urepr(self.index.videos, nl=1)))
+            >>> print('self.index.imgs = {}'.format(ub.urepr(self.index.imgs, nl=1)))
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
 
             >>> gid1 = self.add_image('foo1.jpg', video_id=vidid1, frame_index=0)
             >>> gid2 = self.add_image('foo2.jpg', video_id=vidid1, frame_index=1)
             >>> gid3 = self.add_image('foo3.jpg', video_id=vidid1, frame_index=2)
             >>> gid4 = self.add_image('bar1.jpg', video_id=vidid2, frame_index=0)
-            >>> print('self.index.videos = {}'.format(ub.repr2(self.index.videos, nl=1)))
-            >>> print('self.index.imgs = {}'.format(ub.repr2(self.index.imgs, nl=1)))
+            >>> print('self.index.videos = {}'.format(ub.urepr(self.index.videos, nl=1)))
+            >>> print('self.index.imgs = {}'.format(ub.urepr(self.index.imgs, nl=1)))
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
 
             >>> self.remove_images([gid2])
@@ -3466,7 +3512,7 @@ class MixinCocoAddRemove(object):
         Args:
             file_name (str | None): relative or absolute path to image.
                  if not given, then "name" must be specified and we will
-                 exepect that "auxiliary" assets are eventually added.
+                 expect that "auxiliary" assets are eventually added.
             id (None | int): ADVANCED. Force using this image id.
             name (str): a unique key to identify this image
             width (int): base width of the image
@@ -3554,9 +3600,9 @@ class MixinCocoAddRemove(object):
         Register a new annotation with the dataset
 
         Args:
-            image_id (int): image_id the annoatation is added to.
+            image_id (int): image_id the annotation is added to.
 
-            category_id (int | None): category_id for the new annotaiton
+            category_id (int | None): category_id for the new annotation
 
             bbox (list | kwimage.Boxes): bounding box in xywh format
 
@@ -3612,7 +3658,7 @@ class MixinCocoAddRemove(object):
             >>> aid = self.add_annotation(image_id, **new_ann_data)
             >>> # Lookup the annotation we just added
             >>> ann = self.index.anns[aid]
-            >>> print('ann = {}'.format(ub.repr2(ann, nl=-2)))
+            >>> print('ann = {}'.format(ub.urepr(ann, nl=-2)))
 
         Example:
             >>> # Attempt to add annot without a category or bbox
@@ -3634,21 +3680,21 @@ class MixinCocoAddRemove(object):
             >>> kw['keypoints'] = kwimage.Points.random()
             >>> aid = self.add_annotation(image_id, **kw)
             >>> ann = self.index.anns[aid]
-            >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
+            >>> print('ann = {}'.format(ub.urepr(ann, nl=2)))
             >>> #--
             >>> kw = {}
             >>> kw['segmentation'] = kwimage.Mask.random()
             >>> aid = self.add_annotation(image_id, **kw)
             >>> ann = self.index.anns[aid]
             >>> assert ann.get('segmentation', None) is not None
-            >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
+            >>> print('ann = {}'.format(ub.urepr(ann, nl=2)))
             >>> #--
             >>> kw = {}
             >>> kw['segmentation'] = kwimage.Mask.random().to_array_rle()
             >>> aid = self.add_annotation(image_id, **kw)
             >>> ann = self.index.anns[aid]
             >>> assert ann.get('segmentation', None) is not None
-            >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
+            >>> print('ann = {}'.format(ub.urepr(ann, nl=2)))
             >>> #--
             >>> kw = {}
             >>> kw['segmentation'] = kwimage.Polygon.random().to_coco()
@@ -3657,7 +3703,7 @@ class MixinCocoAddRemove(object):
             >>> ann = self.index.anns[aid]
             >>> assert ann.get('segmentation', None) is not None
             >>> assert ann.get('keypoints', None) is not None
-            >>> print('ann = {}'.format(ub.repr2(ann, nl=2)))
+            >>> print('ann = {}'.format(ub.urepr(ann, nl=2)))
         """
         try:
             import kwimage
@@ -3879,7 +3925,7 @@ class MixinCocoAddRemove(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> self.clear_images()
-            >>> print(ub.repr2(self.basic_stats(), nobr=1, nl=0, si=1))
+            >>> print(ub.urepr(self.basic_stats(), nobr=1, nl=0, si=1))
             n_anns: 0, n_imgs: 0, n_videos: 0, n_cats: 8
         """
         # self.dataset['images'].clear()
@@ -3897,7 +3943,7 @@ class MixinCocoAddRemove(object):
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> self.clear_annotations()
-            >>> print(ub.repr2(self.basic_stats(), nobr=1, nl=0, si=1))
+            >>> print(ub.urepr(self.basic_stats(), nobr=1, nl=0, si=1))
             n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8
         """
         # self.dataset['annotations'].clear()
@@ -4264,8 +4310,8 @@ class MixinCocoAddRemove(object):
             >>> cid_or_cat = new_cid = self.ensure_category('kitten')
             >>> self.set_annotation_category(aid, new_cid)
             >>> new_freq = self.category_annotation_frequency()
-            >>> print('new_freq = {}'.format(ub.repr2(new_freq, nl=1)))
-            >>> print('old_freq = {}'.format(ub.repr2(old_freq, nl=1)))
+            >>> print('new_freq = {}'.format(ub.urepr(new_freq, nl=1)))
+            >>> print('old_freq = {}'.format(ub.urepr(old_freq, nl=1)))
             >>> assert sum(new_freq.values()) == sum(old_freq.values())
             >>> assert new_freq['kitten'] == 1
         """
@@ -4903,7 +4949,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> # Start by looking up an image by it's COCO id.
         >>> image_id = 1
         >>> img = self.index.imgs[image_id]
-        >>> print(ub.repr2(img, nl=1, sort=1))
+        >>> print(ub.urepr(img, nl=1, sort=1))
         {
             'file_name': 'astro.png',
             'id': 1,
@@ -4913,7 +4959,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> # Use the (gid_to_aids) index to lookup annotations in the iamge
         >>> annotation_id = sorted(self.index.gid_to_aids[image_id])[0]
         >>> ann = self.index.anns[annotation_id]
-        >>> print(ub.repr2(ub.dict_diff(ann, {'segmentation'}), nl=1))
+        >>> print(ub.urepr((ub.udict(ann) - {'segmentation'}).sorted_keys(), nl=1))
         {
             'bbox': [10, 10, 360, 490],
             'category_id': 1,
@@ -4925,7 +4971,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> # Use annotation category id to look up that information
         >>> category_id = ann['category_id']
         >>> cat = self.index.cats[category_id]
-        >>> print('cat = {}'.format(ub.repr2(cat, nl=1, sort=1)))
+        >>> print('cat = {}'.format(ub.urepr(cat, nl=1, sort=1)))
         cat = {
             'id': 1,
             'name': 'astronaut',
@@ -4935,7 +4981,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> # Now play with some helper functions, like extended statistics
         >>> extended_stats = self.extended_stats()
         >>> # xdoctest: +IGNORE_WANT
-        >>> print('extended_stats = {}'.format(ub.repr2(extended_stats, nl=1, precision=2, sort=1)))
+        >>> print('extended_stats = {}'.format(ub.urepr(extended_stats, nl=1, precision=2, sort=1)))
         extended_stats = {
             'annots_per_img': {'mean': 3.67, 'std': 3.86, 'min': 0.00, 'max': 9.00, 'nMin': 1, 'nMax': 1, 'shape': (3,)},
             'imgs_per_cat': {'mean': 0.88, 'std': 0.60, 'min': 0.00, 'max': 2.00, 'nMin': 2, 'nMax': 1, 'shape': (8,)},
@@ -5311,7 +5357,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         parts = []
         parts.append('tag={}'.format(self.tag))
         if self.dataset is not None:
-            info = ub.repr2(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)
+            info = ub.urepr(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)
             parts.append(info)
         return ', '.join(parts)
 
@@ -5331,7 +5377,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         Note:
             Using newlines=True is similar to:
-                print(ub.repr2(dset.dataset, nl=2, trailsep=False))
+                print(ub.urepr(dset.dataset, nl=2, trailsep=False))
                 However, the above may not output valid json if it contains
                 ndarrays.
 
@@ -5530,7 +5576,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         if verbose:
             # if bad_parts:
-            #     print(ub.repr2(bad_parts))
+            #     print(ub.urepr(bad_parts))
             summary = 'There are {} total errors'.format(len(bad_parts))
             print('summary = {}'.format(summary))
         return bad_parts
@@ -5703,7 +5749,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> others = [dset1, dset2]
             >>> merged = kwcoco.CocoDataset.union(*others)
             >>> print('merged = {!r}'.format(merged))
-            >>> print('merged.imgs = {}'.format(ub.repr2(merged.imgs, nl=1)))
+            >>> print('merged.imgs = {}'.format(ub.urepr(merged.imgs, nl=1)))
             >>> assert set(merged.imgs) & set([10, 11, 12, 100, 101]) == set(merged.imgs)
 
             >>> # Test data is not preserved
@@ -5713,7 +5759,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> cls = self = kwcoco.CocoDataset
             >>> merged = cls.union(*others)
             >>> print('merged = {!r}'.format(merged))
-            >>> print('merged.imgs = {}'.format(ub.repr2(merged.imgs, nl=1)))
+            >>> print('merged.imgs = {}'.format(ub.urepr(merged.imgs, nl=1)))
             >>> assert set(merged.imgs) & set([1, 2, 3, 4, 5]) == set(merged.imgs)
 
             >>> # Test track-ids are mapped correctly
@@ -5726,10 +5772,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>>     [a.pop('keypoints', None) for a in dset.index.anns.values()]
             >>> cls = self = kwcoco.CocoDataset
             >>> merged = cls.union(*others, disjoint_tracks=1)
-            >>> print('dset1.anns = {}'.format(ub.repr2(dset1.anns, nl=1)))
-            >>> print('dset2.anns = {}'.format(ub.repr2(dset2.anns, nl=1)))
-            >>> print('dset3.anns = {}'.format(ub.repr2(dset3.anns, nl=1)))
-            >>> print('merged.anns = {}'.format(ub.repr2(merged.anns, nl=1)))
+            >>> print('dset1.anns = {}'.format(ub.urepr(dset1.anns, nl=1)))
+            >>> print('dset2.anns = {}'.format(ub.urepr(dset2.anns, nl=1)))
+            >>> print('dset3.anns = {}'.format(ub.urepr(dset3.anns, nl=1)))
+            >>> print('merged.anns = {}'.format(ub.urepr(merged.anns, nl=1)))
 
         Example:
             >>> import kwcoco

@@ -16,7 +16,7 @@ class CocoGrabCLI:
             kwcoco grab cifar10 camvid
         """
 
-        default = {
+        __default__ = {
             'names': scfg.Value([], nargs='+', position=1, help=ub.paragraph(
                 '''
                 Dataset names to grab. Valid values are cifar10, cifar100,
@@ -37,7 +37,7 @@ class CocoGrabCLI:
         from kwcoco.data import grab_camvid
         from kwcoco.data import grab_domainnet
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         ensured = []
         names = config['names']

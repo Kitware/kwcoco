@@ -54,7 +54,7 @@ class Measures(ub.NiceRepr, DictProxy):
 
     def __nice__(self):
         info = self.summary()
-        return ub.repr2(info, nl=0, precision=3, strvals=True, align=':')
+        return ub.urepr(info, nl=0, precision=3, strvals=True, align=':')
 
     def reconstruct(self):
         populate_info(info=self)
@@ -73,9 +73,9 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> binvecs = BinaryConfusionVectors.demo(n=10, p_error=0.5)
             >>> self = binvecs.measures()
             >>> info = self.__json__()
-            >>> print('info = {}'.format(ub.repr2(info, nl=1)))
+            >>> print('info = {}'.format(ub.urepr(info, nl=1)))
             >>> populate_info(info)
-            >>> print('info = {}'.format(ub.repr2(info, nl=1)))
+            >>> print('info = {}'.format(ub.urepr(info, nl=1)))
             >>> recon = Measures.from_json(info)
         """
         from kwcoco.util.util_json import ensure_json_serializable
@@ -256,9 +256,9 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> print('new_measures = {!r}'.format(new_measures))
             >>> print('measures1 = {!r}'.format(measures1))
             >>> print('measures2 = {!r}'.format(measures2))
-            >>> print(ub.repr2(measures1.__json__(), nl=1, sort=0))
-            >>> print(ub.repr2(measures2.__json__(), nl=1, sort=0))
-            >>> print(ub.repr2(new_measures.__json__(), nl=1, sort=0))
+            >>> print(ub.urepr(measures1.__json__(), nl=1, sort=0))
+            >>> print(ub.urepr(measures2.__json__(), nl=1, sort=0))
+            >>> print(ub.urepr(new_measures.__json__(), nl=1, sort=0))
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
@@ -281,7 +281,7 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> for idx, growth in enumerate([None, 'max', 'log', 'root', 'half']):
             >>>     combo = Measures.combine(tocombine, growth=growth).reconstruct()
             >>>     print('growth = {!r}'.format(growth))
-            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('combo = {}'.format(ub.urepr(combo, nl=1)))
             >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
             >>>     combo.summary_plot(fnum=idx + 1, title=str(growth))
 
@@ -314,12 +314,12 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> for precision in [6, 5, 2]:
             >>>     combo = Measures.combine(tocombine, precision=precision).reconstruct()
             >>>     print('precision = {!r}'.format(precision))
-            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('combo = {}'.format(ub.urepr(combo, nl=1)))
             >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
             >>> for growth in [None, 'max', 'log', 'root', 'half']:
             >>>     combo = Measures.combine(tocombine, growth=growth).reconstruct()
             >>>     print('growth = {!r}'.format(growth))
-            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('combo = {}'.format(ub.urepr(combo, nl=1)))
             >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
             >>>     #print(combo.counts().pandas())
 
@@ -383,23 +383,23 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> ]
             >>> thresh_bins = np.linspace(0, 1, 4)
             >>> combo = Measures.combine(tocombine, thresh_bins=thresh_bins).reconstruct()
-            >>> print('tocombine = {}'.format(ub.repr2(tocombine, nl=2)))
+            >>> print('tocombine = {}'.format(ub.urepr(tocombine, nl=2)))
             >>> print('thresh_bins = {!r}'.format(thresh_bins))
-            >>> print(ub.repr2(combo.__json__(), nl=1))
+            >>> print(ub.urepr(combo.__json__(), nl=1))
             >>> for thresh_bins in [4096, 1]:
             >>>     combo = Measures.combine(tocombine, thresh_bins=thresh_bins).reconstruct()
             >>>     print('thresh_bins = {!r}'.format(thresh_bins))
-            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('combo = {}'.format(ub.urepr(combo, nl=1)))
             >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
             >>> for precision in [6, 5, 2]:
             >>>     combo = Measures.combine(tocombine, precision=precision).reconstruct()
             >>>     print('precision = {!r}'.format(precision))
-            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('combo = {}'.format(ub.urepr(combo, nl=1)))
             >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
             >>> for growth in [None, 'max', 'log', 'root', 'half']:
             >>>     combo = Measures.combine(tocombine, growth=growth).reconstruct()
             >>>     print('growth = {!r}'.format(growth))
-            >>>     print('combo = {}'.format(ub.repr2(combo, nl=1)))
+            >>>     print('combo = {}'.format(ub.urepr(combo, nl=1)))
             >>>     print('num_thresholds = {}'.format(len(combo['thresholds'])))
         """
         if precision is not None and np.isinf(precision):
@@ -678,7 +678,7 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
         self.proxy = cx_to_info
 
     def __nice__(self):
-        return ub.repr2(self.proxy, nl=2, strvals=True, align=':')
+        return ub.urepr(self.proxy, nl=2, strvals=True, align=':')
 
     def summary(self):
         return {k: v.summary() for k, v in self.items()}
@@ -854,7 +854,7 @@ class OneVersusRestMeasureCombiner:
                 combiner.measures.reconstruct()
             for qx, measure in enumerate(combiner.queue):
                 measure.reconstruct()
-                print('  * queue[{}] = {}'.format(qx, ub.repr2(measure, nl=1)))
+                print('  * queue[{}] = {}'.format(qx, ub.urepr(measure, nl=1)))
 
     def combine(self):
         for combiner in self.catname_to_combiner.values():

@@ -10,7 +10,7 @@ Example:
     >>> from kwcoco.coco_schema import COCO_SCHEMA
     >>> import jsonschema
     >>> dset = kwcoco.CocoDataset.demo('shapes1')
-    >>> # print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
+    >>> # print('dset.dataset = {}'.format(ub.urepr(dset.dataset, nl=2)))
     >>> COCO_SCHEMA.validate(dset.dataset)
 
     >>> try:
@@ -22,7 +22,7 @@ Example:
     >>> except jsonschema.exceptions.SchemaError as ex:
     >>>     print('ex = {!r}'.format(ex))
     >>>     schema_ex = ex
-    >>>     print('schema_ex.instance = {}'.format(ub.repr2(schema_ex.instance, nl=-1)))
+    >>>     print('schema_ex.instance = {}'.format(ub.urepr(schema_ex.instance, nl=-1)))
     >>>     raise
 
     >>> # Test the multispectral image defintino
@@ -339,6 +339,6 @@ if __name__ == '__main__':
         jq . $KWCOCO_MODPATH/coco_schema.json
     """
     # import json
-    print(ub.repr2(COCO_SCHEMA, nl=-1, trailsep=False, sort=False).replace("'", '"'))
+    print(ub.urepr(COCO_SCHEMA, nl=-1, trailsep=False, sort=False).replace("'", '"'))
     # print(json.dumps(COCO_SCHEMA, indent='    '))
-    # print('COCO_SCHEMA = {}'.format(ub.repr2(COCO_SCHEMA, nl=-1)))
+    # print('COCO_SCHEMA = {}'.format(ub.urepr(COCO_SCHEMA, nl=-1)))

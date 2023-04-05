@@ -10,13 +10,13 @@ class CocoUnionCLI(object):
         """
         Combine multiple COCO datasets into a single merged dataset.
         """
-        default = {
+        __default__ = {
             'src': scfg.Value([], nargs='+', help='path to multiple input datasets', position=1),
             'dst': scfg.Value('combo.kwcoco.json', help='path to output dataset'),
             'absolute': scfg.Value(False, isflag=1, help='if True, converts paths to absolute paths before doing union'),
             'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
-        epilog = """
+        __epilog__ = """
         Example Usage:
             kwcoco union --src special:shapes8 special:shapes1 --dst=combo.kwcoco.json
         """
@@ -39,7 +39,7 @@ class CocoUnionCLI(object):
         """
         import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify sources: {}'.format(config['src']))

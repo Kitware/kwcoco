@@ -29,12 +29,12 @@ class Element(dict):
         >>> from kwcoco.coco_schema import *  # NOQA
         >>> self = Element(base={'type': 'demo'}, options={'opt1', 'opt2'})
         >>> new = self(opt1=3)
-        >>> print('self = {}'.format(ub.repr2(self, nl=1, sort=1)))
-        >>> print('new = {}'.format(ub.repr2(new, nl=1, sort=1)))
-        >>> print('new2 = {}'.format(ub.repr2(new(), nl=1, sort=1)))
-        >>> print('new3 = {}'.format(ub.repr2(new(title='myvar'), nl=1, sort=1)))
-        >>> print('new4 = {}'.format(ub.repr2(new(title='myvar')(examples=['']), nl=1, sort=1)))
-        >>> print('new5 = {}'.format(ub.repr2(new(badattr=True), nl=1, sort=1)))
+        >>> print('self = {}'.format(ub.urepr(self, nl=1, sort=1)))
+        >>> print('new = {}'.format(ub.urepr(new, nl=1, sort=1)))
+        >>> print('new2 = {}'.format(ub.urepr(new(), nl=1, sort=1)))
+        >>> print('new3 = {}'.format(ub.urepr(new(title='myvar'), nl=1, sort=1)))
+        >>> print('new4 = {}'.format(ub.urepr(new(title='myvar')(examples=['']), nl=1, sort=1)))
+        >>> print('new5 = {}'.format(ub.urepr(new(badattr=True), nl=1, sort=1)))
         self = {
             'type': 'demo',
         }
@@ -291,7 +291,7 @@ class ContainerElements:
             >>>     'key2': elem.ANY(),
             >>> }, required=['key1'], title='a title')
             >>> schema.validate()
-            >>> print('schema = {}'.format(ub.repr2(schema, sort=1, nl=-1)))
+            >>> print('schema = {}'.format(ub.urepr(schema, sort=1, nl=-1)))
             >>> jsonschema.validate({'key1': {'arr': []}}, schema)
             schema = {
                 'properties': {
@@ -356,7 +356,7 @@ class SchemaElements(
         >>>         'subprob2': NUMBER,
         >>>     }))
         >>> })
-        >>> print('schema = {}'.format(ub.repr2(schema, nl=2, sort=1)))
+        >>> print('schema = {}'.format(ub.urepr(schema, nl=2, sort=1)))
         schema = {
             'properties': {
                 'prop1': {'items': {'type': 'integer'}, 'minItems': 3, 'type': 'array'},

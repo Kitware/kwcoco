@@ -336,8 +336,8 @@ def classification_report(y_true, y_pred, target_names=None,
     sum_real_key = sum_glyph + 'r'
     sum_pred_key = sum_glyph + 'p'
 
-    confusion_df = confusion_df.append(pd.DataFrame(
-        [confusion.sum(axis=0)], columns=pred_id, index=[sum_pred_key]))
+    to_append = pd.DataFrame([confusion.sum(axis=0)], columns=pred_id, index=[sum_pred_key])
+    confusion_df = pd.concat([confusion_df, to_append], axis=0)
 
     confusion_df[sum_real_key] = np.hstack([confusion.sum(axis=1), [0]])
     confusion_df.index.name = 'real'

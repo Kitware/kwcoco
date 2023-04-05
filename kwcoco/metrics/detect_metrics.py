@@ -51,7 +51,7 @@ class DetectionMetrics(ub.NiceRepr):
             'n_pred_anns': sum(map(len, dmet.gid_to_pred_dets.values())),
             'classes': dmet.classes,
         }
-        return ub.repr2(info)
+        return ub.urepr(info)
 
     def enrich_confusion_vectors(dmet, cfsn_vecs):
         """
@@ -624,7 +624,7 @@ class DetectionMetrics(ub.NiceRepr):
             >>>     print('iou_thresh = {!r}'.format(iou_thresh))
             >>>     cfsn_vecs = iou_to_cfsn_vecs[iou_thresh]
             >>>     ovr_measures = cfsn_vecs.binarize_ovr().measures()
-            >>>     print('ovr_measures = {}'.format(ub.repr2(ovr_measures, nl=1, precision=4)))
+            >>>     print('ovr_measures = {}'.format(ub.urepr(ovr_measures, nl=1, precision=4)))
 
         Note:
             by default pycocotools computes average precision as the literal
@@ -1043,7 +1043,7 @@ class DetectionMetrics(ub.NiceRepr):
             bin_measures = bin_cfsn.measures()
             summary['bin_measures'] = bin_measures
         if plot:
-            print('summary = {}'.format(ub.repr2(summary, nl=1)))
+            print('summary = {}'.format(ub.urepr(summary, nl=1)))
             print('out_dpath = {!r}'.format(out_dpath))
 
             if with_bin:
@@ -1397,9 +1397,9 @@ def _summarize(self, ap=1, iouThr=None, areaRngLbl='all', maxDets=100):
                 catnames = [self.cocoGt.cats[cid]['name'] for cid in self.params.catIds]
                 catname_to_ap = ub.dzip(catnames, pct_perclass_ap)
                 pct_map = pct_perclass_ap.mean()
-                print('catname_to_ap = {}'.format(ub.repr2(catname_to_ap, nl=1, precision=2)))
-                # print('pct_perclass_ap = {}'.format(ub.repr2(pct_perclass_ap.tolist(), nl=1, precision=2)))
-                print('pct_map = {}'.format(ub.repr2(pct_map.tolist(), nl=0, precision=2)))
+                print('catname_to_ap = {}'.format(ub.urepr(catname_to_ap, nl=1, precision=2)))
+                # print('pct_perclass_ap = {}'.format(ub.urepr(pct_perclass_ap.tolist(), nl=1, precision=2)))
+                print('pct_map = {}'.format(ub.urepr(pct_map.tolist(), nl=0, precision=2)))
             else:
                 raise Exception('not known iou')
         if iouThr is not None:

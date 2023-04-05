@@ -36,7 +36,7 @@ class VOC_Metrics(ub.NiceRepr):
             'n_pred_anns': sum(map(len, self.cx_to_lines.values())),
             'n_pred_cats': len(self.cx_to_lines),
         }
-        return ub.repr2(info)
+        return ub.urepr(info)
 
     def add_truth(self, true_dets, gid):
         self.recs[gid] = []

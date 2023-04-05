@@ -16,7 +16,7 @@ def test_category_rename_merge_policy():
     orig_dset.add_category('a', a=1)
     orig_dset.add_category('b', b=2)
     orig_dset.add_category('c', c=3)
-    print(ub.repr2(orig_dset.cats))
+    print(ub.urepr(orig_dset.cats))
 
     # Test multiple cats map on to one existing unchanged cat
     mapping = {
@@ -28,25 +28,25 @@ def test_category_rename_merge_policy():
         print('-- test 1 --')
         dset = orig_dset.copy()
         dset.rename_categories(mapping, merge_policy='update')
-        print(ub.repr2(dset.cats, nl=1))
+        print(ub.urepr(dset.cats, nl=1))
         got = dset.name_to_cat['b']
         want = {'id': 2, 'name': 'b', 'b': 2, 'a': 1, 'c': 3}
-        print('got = {}'.format(ub.repr2(got, nl=1)))
-        print('want = {}'.format(ub.repr2(want, nl=1)))
+        print('got = {}'.format(ub.urepr(got, nl=1)))
+        print('want = {}'.format(ub.urepr(want, nl=1)))
         # assert got == want
         flag, info = util_json.indexable_allclose(got, want, return_info=True)
-        print('info = {}'.format(ub.repr2(info, nl=1)))
+        print('info = {}'.format(ub.urepr(info, nl=1)))
         assert flag
         # assert sorted(got.items()) == sorted(want.items())
 
         print('-- test 2 --')
         dset = orig_dset.copy()
         dset.rename_categories(mapping, merge_policy='ignore')
-        print(ub.repr2(dset.cats, nl=1))
+        print(ub.urepr(dset.cats, nl=1))
         got = dset.name_to_cat['b']
         want = {'id': 2, 'name': 'b', 'b': 2}
         flag, info = util_json.indexable_allclose(got, want, return_info=True)
-        print('info = {}'.format(ub.repr2(info, nl=1)))
+        print('info = {}'.format(ub.urepr(info, nl=1)))
         assert flag
 
     # Test multiple cats map on to one new cat
@@ -63,23 +63,23 @@ def test_category_rename_merge_policy():
     want = {
         1: { 'id': 1, 'name': 'd', 'b': 2, },
         2: { 'id': 2, 'name': 'e', }}
-    print('got = {}'.format(ub.repr2(got, nl=1)))
-    print('want = {}'.format(ub.repr2(want, nl=1)))
+    print('got = {}'.format(ub.urepr(got, nl=1)))
+    print('want = {}'.format(ub.urepr(want, nl=1)))
     flag, info = util_json.indexable_allclose(got, want, return_info=True)
-    print('info = {}'.format(ub.repr2(info, nl=1)))
+    print('info = {}'.format(ub.urepr(info, nl=1)))
     assert flag
 
     print('-- test 4 --')
     dset = orig_dset.copy()
     dset.rename_categories(mapping, merge_policy='update')
-    print(ub.repr2(dset.cats, nl=1))
+    print(ub.urepr(dset.cats, nl=1))
     got = dset.cats
     want = {
         1: {'id': 1, 'name': 'd', 'b': 2},
         2: {'id': 2, 'name': 'e', 'a': 1, 'c': 3},
     }
     flag, info = util_json.indexable_allclose(got, want, return_info=True)
-    print('info = {}'.format(ub.repr2(info, nl=1)))
+    print('info = {}'.format(ub.urepr(info, nl=1)))
     assert flag
 
 

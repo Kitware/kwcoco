@@ -15,8 +15,8 @@ def coco_to_kpf(coco_dset):
     domain = 0
     meta_id = {'meta': 'id{} : coco annotations'.format(domain)}
     meta_g = {'meta': 'g{} : tl_x, tl_y, br_x, br_y'.format(domain)}
-    print('{}'.format(ub.repr2(meta_g, nl=0)))
-    print('{}'.format(ub.repr2(meta_id, nl=0)))
+    print('{}'.format(ub.urepr(meta_g, nl=0)))
+    print('{}'.format(ub.urepr(meta_id, nl=0)))
 
     for ann in coco_dset.dataset['annotations']:
         geom = {}
@@ -38,7 +38,7 @@ def coco_to_kpf(coco_dset):
         geom['ts{}'.format(domain)] = ann['image_id']
 
         packet = {'geom': geom}
-        print('{}'.format(ub.repr2(packet, nl=0)))
+        print('{}'.format(ub.urepr(packet, nl=0)))
 
 
 def demo():

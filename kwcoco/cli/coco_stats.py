@@ -7,10 +7,11 @@ class CocoStatsCLI:
     name = 'stats'
 
     class CLIConfig(scfg.Config):
+        __command__ = 'stats'
         """
         Compute summary statistics about a COCO dataset
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to dataset', position=1),
             'basic': scfg.Value(True, isflag=True, help='show basic stats'),
             'extended': scfg.Value(True, isflag=True, help='show extended stats'),
@@ -46,7 +47,7 @@ class CocoStatsCLI:
         import kwcoco
         import numpy as np
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
@@ -116,27 +117,27 @@ class CocoStatsCLI:
             print('Video Attrs')
             for dset in datasets:
                 attrs = dset.videos().attribute_frequency()
-                print('video_attrs = {}'.format(ub.repr2(attrs, nl=1)))
+                print('video_attrs = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['image_attrs']:
             print('Image Attrs')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
                 attrs = dset.images().attribute_frequency()
-                print('image_attrs = {}'.format(ub.repr2(attrs, nl=1)))
+                print('image_attrs = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['annot_attrs']:
             print('Annot Attrs')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
                 attrs = dset.annots().attribute_frequency()
-                print('annot_attrs = {}'.format(ub.repr2(attrs, nl=1)))
+                print('annot_attrs = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['boxes']:
             print('Box stats')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
-                print(ub.repr2(dset.boxsize_stats(), nl=-1, precision=2))
+                print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
 
         if config['image_size']:
             print('Image size stats')
@@ -174,7 +175,7 @@ class CocoStatsCLI:
                     print('error getting max size')
 
                 # print('dset.tag = {!r}'.format(dset.tag))
-                # print(ub.repr2(dset.boxsize_stats(), nl=-1, precision=2))
+                # print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
 
         if config['embed']:
             # Hidden hack
@@ -188,11 +189,11 @@ class CocoStatsCLI:
 
         #     if config['basic']:
         #         basic = dset.basic_stats()
-        #         print('basic = {}'.format(ub.repr2(basic, nl=1)))
+        #         print('basic = {}'.format(ub.urepr(basic, nl=1)))
 
         #     if config['extended']:
         #         extended = dset.extended_stats()
-        #         print('extended = {}'.format(ub.repr2(extended, nl=1, precision=2)))
+        #         print('extended = {}'.format(ub.urepr(extended, nl=1, precision=2)))
 
         #     if config['catfreq']:
         #         print('Category frequency')
@@ -204,7 +205,7 @@ class CocoStatsCLI:
 
         #     if config['boxes']:
         #         print('Box stats')
-        #         print(ub.repr2(dset.boxsize_stats(), nl=-1, precision=2))
+        #         print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
 
 
 _CLI = CocoStatsCLI

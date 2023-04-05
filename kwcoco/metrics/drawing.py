@@ -81,7 +81,7 @@ def demo_format_options():
         fmt = '{alternate}{width}{group}{precision}{type}'.format(**kw)
         fmtstr = '{:' + fmt + '}'
         out = fmtstr.format(val)
-        print('kw = {}'.format(ub.repr2(kw, nl=0, sort=0)))
+        print('kw = {}'.format(ub.urepr(kw, nl=0, sort=0)))
         print(out)
 
 
@@ -207,7 +207,7 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
         >>> print(cfsn_vecs.data.pandas())
         >>> classes = cfsn_vecs.classes
         >>> cx_to_info = cfsn_vecs.binarize_ovr().measures()['perclass']
-        >>> print('cx_to_info = {}'.format(ub.repr2(cx_to_info, nl=1)))
+        >>> print('cx_to_info = {}'.format(ub.urepr(cx_to_info, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
         >>> draw_perclass_prcurve(cx_to_info, classes)
@@ -270,7 +270,7 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
             key: {'recall': r, 'precision': p}
             for key, (r, p) in xydata.items()
         }
-        print('data_groups = {}'.format(ub.repr2(data_groups, nl=3)))
+        print('data_groups = {}'.format(ub.urepr(data_groups, nl=3)))
 
         longform = []
         for key, subdata in data_groups.items():

@@ -12,7 +12,7 @@ import os
 import numpy as np
 from os.path import join
 from kwcoco.util.util_deprecate import deprecated_function_alias
-# from kwcoco.util.dict_like import DictLike
+from kwcoco.util.dict_proxy2 import AliasedDictProxy
 
 try:
     from xdev import profile
@@ -26,7 +26,7 @@ DEFAULT_RESOLUTION_KEYS = {
 }
 
 
-class CocoImage(ub.NiceRepr):
+class CocoImage(AliasedDictProxy, ub.NiceRepr):
     """
     An object-oriented representation of a coco image.
 
@@ -44,17 +44,24 @@ class CocoImage(ub.NiceRepr):
         >>> dset1 = kwcoco.CocoDataset.demo('shapes8')
         >>> dset2 = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
 
-        >>> self = CocoImage(dset1.imgs[1], dset1)
+        >>> self = kwcoco.CocoImage(dset1.imgs[1], dset1)
         >>> print('self = {!r}'.format(self))
-        >>> print('self.channels = {}'.format(ub.repr2(self.channels, nl=1)))
+        >>> print('self.channels = {}'.format(ub.urepr(self.channels, nl=1)))
 
-        >>> self = CocoImage(dset2.imgs[1], dset2)
-        >>> print('self.channels = {}'.format(ub.repr2(self.channels, nl=1)))
+        >>> self = kwcoco.CocoImage(dset2.imgs[1], dset2)
+        >>> print('self.channels = {}'.format(ub.urepr(self.channels, nl=1)))
         >>> self.primary_asset()
+        >>> assert 'auxiliary' in self
     """
+
+    __alias_to_primary__ = {
+        # In the future we will switch assets to be primary.
+        'assets': 'auxiliary',
+    }
 
     def __init__(self, img, dset=None):
         self.img = img
+        self._proxy = img
         self.dset = dset
         self._bundle_dpath = None
         self._video = None
@@ -111,8 +118,8 @@ class CocoImage(ub.NiceRepr):
         assets = []
         for obj in self.iter_asset_objs():
             # TODO: ducktype with an object
-            # asset = CocoAsset(obj)
-            asset = obj
+            asset = CocoAsset(obj)
+            # asset = obj
             assets.append(asset)
         return assets
 
@@ -139,12 +146,11 @@ class CocoImage(ub.NiceRepr):
         """
         from kwcoco.util.util_truncate import smart_truncate
         from functools import partial
-        stats = self.stats()
-        stats = ub.map_vals(str, stats)
-        stats = ub.map_vals(
-            partial(smart_truncate, max_length=32, trunc_loc=0.5),
-            stats)
-        return ub.repr2(stats, compact=1, nl=0, sort=0)
+        stats = ub.udict(self.stats())
+        stats = stats.map_values(str)
+        stats = stats.map_values(
+            partial(smart_truncate, max_length=32, trunc_loc=0.5))
+        return ub.urepr(stats, compact=1, nl=0)
 
     def stats(self):
         """
@@ -163,74 +169,77 @@ class CocoImage(ub.NiceRepr):
         return stats
 
     def __contains__(self, key):
-        return key in self.keys()
+        if '_unstructured' in self._proxy:
+            if AliasedDictProxy.__contains__(self, key):
+                return True
+            return key in self._proxy['_unstructured']
+        else:
+            return AliasedDictProxy.__contains__(self, key)
 
-    def __getitem__(self, key):
-        """
-        Proxy getter attribute for underlying `self.img` dictionary
-        """
-        return self.get(key)
+    def get(self, key, default=ub.NoParam):
+        try:
+            return self[key]
+        except KeyError:
+            if default is ub.NoParam:
+                raise
+            else:
+                return default
 
     def keys(self):
         """
         Proxy getter attribute for underlying `self.img` dictionary
         """
-        if 'extra' in self.img:
+        if '_unstructured' in self._proxy:
             # SQL compatibility
-            _keys = ub.flatten([self.img.keys(), self.img['extra'].keys()])
-            return iter((k for k in _keys if k != 'extra'))
+            _keys = ub.flatten([self._proxy.keys(), self._proxy['_unstructured'].keys()])
+            return iter((k for k in _keys if k != '_unstructured'))
         else:
-            return self.img.keys()
+            return self._proxy.keys()
 
-    def get(self, key, default=ub.NoParam):
+    def __getitem__(self, key):
         """
         Proxy getter attribute for underlying `self.img` dictionary
 
+        CommandLine:
+            xdoctest -m kwcoco.coco_image CocoImage.__getitem__
+
         Example:
             >>> import pytest
-            >>> # without extra populated
+            >>> # without _unstructured populated
             >>> import kwcoco
             >>> self = kwcoco.CocoImage({'foo': 1})
             >>> assert self.get('foo') == 1
             >>> assert self.get('foo', None) == 1
-            >>> # with extra populated
-            >>> self = kwcoco.CocoImage({'extra': {'foo': 1}})
+            >>> # with _unstructured populated
+            >>> self = kwcoco.CocoImage({'_unstructured': {'foo': 1}})
             >>> assert self.get('foo') == 1
             >>> assert self.get('foo', None) == 1
-            >>> # without extra empty
+            >>> # without _unstructured empty
             >>> self = kwcoco.CocoImage({})
+            >>> print('----')
             >>> with pytest.raises(KeyError):
             >>>     self.get('foo')
             >>> assert self.get('foo', None) is None
-            >>> # with extra empty
-            >>> self = kwcoco.CocoImage({'extra': {'bar': 1}})
+            >>> # with _unstructured empty
+            >>> self = kwcoco.CocoImage({'_unstructured': {'bar': 1}})
             >>> with pytest.raises(KeyError):
             >>>     self.get('foo')
             >>> assert self.get('foo', None) is None
         """
-        _img = self.img
-        if default is ub.NoParam:
-            if 'extra' in _img:
-                # Workaround for sql-view
-                if key in _img:
-                    return _img[key]
-                else:
-                    _extra = _img['extra']
-                    if key in _extra:
-                        return _extra[key]
-                    else:
-                        raise KeyError(key)
-            else:
-                return _img[key]
+        if AliasedDictProxy.__contains__(self, key):
+            return AliasedDictProxy.__getitem__(self, key)
         else:
-            if 'extra' in _img:
-                # Workaround for sql-view
-                if key in _img:
-                    return _img.get(key, default)
+            _img = self._proxy
+            if '_unstructured' in _img:
+                # Workaround for sql-view, treat items in "_unstructured" as
+                # if they are in the top level image.
+                _extra = _img['_unstructured']
+                if key in _extra:
+                    return _extra[key]
                 else:
-                    return _img['extra'].get(key, default)
+                    raise KeyError(key)
             else:
-                return _img.get(key, default)
+                raise KeyError(key)
 
     @property
     def channels(self):
@@ -239,9 +248,13 @@ class CocoImage(ub.NiceRepr):
         img_parts = []
         for obj in self.iter_asset_objs():
             obj_parts = obj.get('channels', None)
-            # obj_chan = FusedChannelSpec.coerce(obj_parts).normalize()
-            obj_chan = FusedChannelSpec.coerce(obj_parts)
-            img_parts.append(obj_chan.spec)
+            if obj_parts is not None:
+                # obj_chan = FusedChannelSpec.coerce(obj_parts).normalize()
+                obj_chan = FusedChannelSpec.coerce(obj_parts)
+                img_parts.append(obj_chan.spec)
+        if not img_parts:
+            return None
+            # return ChannelSpec.coerce('*')
         spec = ChannelSpec(','.join(img_parts))
         return spec
 
@@ -699,7 +712,7 @@ class CocoImage(ub.NiceRepr):
 
             >>> delayed = coco_img.imdelay()
             >>> final = delayed.finalize()
-            >>> print('final.shape = {}'.format(ub.repr2(final.shape, nl=1)))
+            >>> print('final.shape = {}'.format(ub.urepr(final.shape, nl=1)))
             >>> assert final.shape == (512, 512, 3)
 
         Example:
@@ -1094,24 +1107,54 @@ class CocoImage(ub.NiceRepr):
     delay = deprecated_function_alias(
         'kwcoco', 'delay', new_func=imdelay, deprecate='now')
 
+    def show(self, **kwargs):
+        """
+        Show the image with matplotlib if possible
 
-# TODO:
-# class AliasedDictProxy(DictLike):
-#     def __init__(self, _data):
-#         self._data = _data
+        SeeAlso:
+            :func:`kwcoco.CocoDataset.show_image`
 
-#     def resolve_key(self, key):
-#         return self.__key_resolver__.get(key, key)
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwplot)
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> self = dset.coco_image(1)
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autoplt()
+            >>> self.show()
 
-#     def getitem(self, key):
-#         ...
+        """
+        if self.dset is None:
+            raise Exception('Currently requires a connected dataset. '
+                            'This may be relaxed in the future')
+        return self.dset.show_image(self['id'], **kwargs)
 
-#     def keys(self, key):
-#         return map(self.resolve_key, self._data.keys())
+    def draw(self, **kwargs):
+        """
+        Draw the image on an ndarray using opencv
+
+        SeeAlso:
+            :func:`kwcoco.CocoDataset.draw_image`
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> self = dset.coco_image(1)
+            >>> canvas = self.draw()
+            >>> # xdoctest: +REQUIRES(--show)
+            >>> import kwplot
+            >>> kwplot.autompl()
+            >>> kwplot.imshow(canvas)
+
+        """
+        if self.dset is None:
+            raise Exception('Currently requires a connected dataset. '
+                            'This may be relaxed in the future')
+        return self.dset.draw_image(self['id'], **kwargs)
 
 
-# TODO:
-class CocoAsset(object):
+class CocoAsset(AliasedDictProxy, ub.NiceRepr):
     """
     A Coco Asset / Auxiliary Item
 
@@ -1122,48 +1165,36 @@ class CocoAsset(object):
 
     Initially we called these "auxiliary" items, but I think we should
     change their name to "assets", which better maps with STAC terminology.
+
+    Example:
+        >>> from kwcoco.coco_image import *  # NOQA
+        >>> self = CocoAsset({'warp_aux_to_img': 'foo'})
+        >>> assert 'warp_aux_to_img' in self
+        >>> assert 'warp_img_from_asset' in self
+        >>> assert 'warp_wld_from_asset' not in self
+        >>> assert 'warp_to_wld' not in self
+        >>> self['warp_aux_to_img'] = 'bar'
+        >>> assert self._proxy == {'warp_aux_to_img': 'bar'}
     """
 
     # To maintain backwards compatibility we register aliases of properties
     # The main key should be the primary property.
-    __key_aliases__ = {
-        'warp_img_from_asset': ['warp_aux_to_img'],
-        'warp_wld_from_asset': ['warp_to_wld'],
-    }
-    __key_resolver__ = {
-        v: k
-        for k, vs in __key_aliases__.items()
-        for v in vs
+    __alias_to_primary__ = {
+        'warp_img_from_asset': 'warp_aux_to_img',
+        'warp_wld_from_asset': 'warp_to_wld',
     }
 
-    def __init__(self, obj):
-        self.obj = obj
+    def __init__(self, asset):
+        self._proxy = asset
 
-    def __getitem__(self, key):
-        """
-        Proxy getter attribute for underlying `self.obj` dictionary
-        """
-        return self.obj[key]
-
-    def keys(self):
-        """
-        Proxy getter attribute for underlying `self.obj` dictionary
-        """
-        return self.obj.keys()
-
-    def get(self, key, default=ub.NoParam):
-        """
-        Proxy getter attribute for underlying `self.obj` dictionary
-        """
-        if default is ub.NoParam:
-            return self.obj.get(key)
-        else:
-            return self.obj.get(key, default)
+    def __nice__(self):
+        return repr(self.__json__())
 
 
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
+    from delayed_image import DelayedLoad, DelayedIdentity
     info = {}
     fname = obj.get('file_name', None)
     imdata = obj.get('imdata', None)
@@ -1179,7 +1210,6 @@ def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     else:
         info['dsize'] = dsize = (None, None)
 
-    from delayed_image import DelayedLoad, DelayedIdentity
     quantization = obj.get('quantization', None)
     if imdata is not None:
         info['chan_construct'] = (DelayedIdentity, dict(

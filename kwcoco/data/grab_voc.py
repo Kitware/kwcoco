@@ -287,13 +287,13 @@ def ensure_voc_coco(dpath=None):
 def main():
     import scriptconfig as scfg
     class GrabVOC_Config(scfg.Config):
-        default = {
+        __default__ = {
             'dpath': scfg.Path(
                 ub.expandpath('~/data/VOC'), help='download location')
         }
     config = GrabVOC_Config()
     paths = ensure_voc_coco(**config)
-    print('paths = {}'.format(ub.repr2(paths, nl=1)))
+    print('paths = {}'.format(ub.urepr(paths, nl=1)))
 
 
 if __name__ == '__main__':

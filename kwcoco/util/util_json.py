@@ -29,10 +29,10 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
         >>> data['foo']['a'] = 1
         >>> data['foo']['b'] = (1, np.array([1, 2, 3]), {3: np.int32(3), 4: np.float16(1.0)})
         >>> dict_ = data
-        >>> print(ub.repr2(data, nl=-1))
+        >>> print(ub.urepr(data, nl=-1))
         >>> assert list(find_json_unserializable(data))
         >>> result = ensure_json_serializable(data, normalize_containers=True)
-        >>> print(ub.repr2(result, nl=-1))
+        >>> print(ub.urepr(result, nl=-1))
         >>> assert not list(find_json_unserializable(result))
         >>> assert type(result) is dict
     """
@@ -119,7 +119,7 @@ def find_json_unserializable(data, quickcheck=False):
         >>> # Create a dictionary with two unserializable parts
         >>> data = [1, 2, {'nest1': [2, part]}, {frozenset({'badkey'}): 3, 2: 4}]
         >>> parts = list(find_json_unserializable(data))
-        >>> print('parts = {}'.format(ub.repr2(parts, nl=1)))
+        >>> print('parts = {}'.format(ub.urepr(parts, nl=1)))
         >>> # Check expected structure of bad parts
         >>> assert len(parts) == 2
         >>> part = parts[1]

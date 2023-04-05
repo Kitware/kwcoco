@@ -28,7 +28,7 @@ def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
         image_size=(600, 600), verbose=3, render=False, aux=None,
         multispectral=False, multisensor=False, rng=None, dpath=None,
-        max_speed=0.01, channels=None, **kwargs):
+        max_speed=0.01, channels=None, background='noise', **kwargs):
     """
     Create a toy Coco Video Dataset
 
@@ -335,12 +335,12 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         >>> dset._check_json_serializable()
         >>> assert dset.imgs[1]['auxiliary'][1]['channels']
         >>> # Print before and after render
-        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset['images'], nl=-2)))
-        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset, nl=-2)))
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset['images'], nl=-2)))
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset, nl=-2)))
         >>> print(ub.hash_data(dset.dataset))
         >>> # test that we can render
         >>> render_toy_dataset(dset, rng=0, dpath=None, renderkw={})
-        >>> #print('multisensor-images = {}'.format(ub.repr2(dset.dataset['images'], nl=-2)))
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset['images'], nl=-2)))
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
         >>> kwplot.autompl()
@@ -697,7 +697,7 @@ def _draw_video_sequence(dset, gids):
     images = dset.images(gids)
     for coco_img in images.coco_images:
         chan_names = coco_img.channels.fuse()
-        chan_hwc = coco_img.delay(space='video').finalize()
+        chan_hwc = coco_img.imdelay(space='video').finalize()
         chan_chw = chan_hwc.transpose(2, 0, 1)
         cells = []
         for raw_data, chan_name in zip(chan_chw, chan_names):
@@ -886,9 +886,10 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         >>> aux = 'mx'
         >>> dset = random_single_video_dset(
         >>>     image_size=image_size, num_frames=num_frames, verbose=verbose, aux=aux, rng=rng)
-        >>> print('dset.dataset = {}'.format(ub.repr2(dset.dataset, nl=2)))
+        >>> print('dset.dataset = {}'.format(ub.urepr(dset.dataset, nl=2)))
         >>> gid = 1
         >>> renderkw = {}
+        >>> renderkw['background'] = 'parrot'
         >>> render_toy_image(dset, gid, rng, renderkw=renderkw)
         >>> img = dset.imgs[gid]
         >>> canvas = img['imdata']
@@ -906,7 +907,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
 
         >>> # xdoctest: +REQUIRES(--show)
         >>> img, anns = demodata_toy_img(image_size=(172, 172), rng=None, aux=True)
-        >>> print('anns = {}'.format(ub.repr2(anns, nl=1)))
+        >>> print('anns = {}'.format(ub.urepr(anns, nl=1)))
         >>> import kwplot
         >>> kwplot.autompl()
         >>> kwplot.imshow(img['imdata'], pnum=(1, 2, 1), fnum=1)
@@ -929,7 +930,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     if renderkw is None:
         renderkw = {}
 
-    gray = renderkw.get('gray', 1)
+    gray = renderkw.get('gray', 0)
     fg_scale = renderkw.get('fg_scale', 0.5)
     bg_scale = renderkw.get('bg_scale', 0.8)
     bg_intensity = renderkw.get('bg_intensity', 0.1)
@@ -937,6 +938,25 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     newstyle = renderkw.get('newstyle', True)
     with_kpts = renderkw.get('with_kpts', False)
     with_sseg = renderkw.get('with_sseg', False)
+
+    background = renderkw.get('background', 'noise')
+
+    img = dset.imgs[gid]
+    gw, gh = img['width'], img['height']
+
+    coco_img = dset.coco_image(gid)
+    img_dsize = (gw, gh)
+
+    if background is None or background == 'noise':
+        imgspace_background = None
+    else:
+        vid_w = coco_img.video['width']
+        vid_h = coco_img.video['height']
+        vid_dsize = (vid_w, vid_h)
+        # Grab a background (probably amazon)
+        vidspace_background = kwimage.grab_test_image(background, dsize=vid_dsize)
+        vidspace_background = kwimage.ensure_float01(vidspace_background)
+        imgspace_background = kwimage.warp_affine(vidspace_background, coco_img.warp_img_from_vid, dsize=img_dsize)
 
     categories = list(dset.name_to_cat.keys())
     catpats = CategoryPatterns.coerce(categories, fg_scale=fg_scale,
@@ -951,12 +971,12 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
             dset.dataset['keypoint_categories'].append(kpcat)
             # kpname_to_id[kpcat['name']] = kpcat['id']
 
-    img = dset.imgs[gid]
-    gw, gh = img['width'], img['height']
     dims = (gh, gw)
     annots = dset.annots(gid=gid)
 
-    imdata, chan_to_auxinfo = render_background(img, rng, gray, bg_intensity, bg_scale)
+    imdata, chan_to_auxinfo = render_background(
+        img, rng, gray, bg_intensity, bg_scale,
+        imgspace_background=imgspace_background)
     imdata, chan_to_auxinfo = render_foreground(imdata, chan_to_auxinfo, dset,
                                                 annots, catpats, with_sseg,
                                                 with_kpts, dims, newstyle,
@@ -978,6 +998,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         import kwcoco
         chankey = auxinfo['channels']
         auxdata = chan_to_auxinfo[chankey]['imdata']
+        auxdata = kwarray.atleast_nd(auxdata, 3)
         auxchan = kwcoco.FusedChannelSpec.coerce(chankey)
         for chan_idx, chan_name in enumerate(auxchan.as_list()):
             if chan_name == 'flowx':
@@ -1093,7 +1114,7 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
 
 
 @profile
-def render_background(img, rng, gray, bg_intensity, bg_scale):
+def render_background(img, rng, gray, bg_intensity, bg_scale, imgspace_background=None):
     # This is 2x as fast for image_size=(300,300)
     gw, gh = img['width'], img['height']
     if img.get('file_name', None) is None:
@@ -1106,10 +1127,19 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
         else:
             gshape = (gh, gw, 3)
             # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
-            #                                    rng=rng, dtype=np.float32)
+            #                                  rng=rng, dtype=np.float32)
             # hack because 3 channels is slower
             imdata = kwarray.uniform(0, 1, gshape, rng=rng, dtype=np.float32)
         np.clip(imdata, 0, 1, out=imdata)
+
+        if imgspace_background is not None and imdata is not None:
+            imdata = kwarray.atleast_nd(imdata, 3)
+            imgspace_background = kwarray.atleast_nd(imgspace_background, 3)
+            n_chans1 = kwimage.num_channels(imdata)
+            n_chans2 = kwimage.num_channels(imgspace_background)
+            if n_chans1 != n_chans2:
+                imgspace_background = imgspace_background[..., 0:n_chans1]
+            imdata = (imdata + imgspace_background) / 2
 
     chan_to_auxinfo = {}
     for auxinfo in img.get('auxiliary', []):
@@ -1118,10 +1148,15 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
         aux_bands = kwcoco.ChannelSpec.coerce(chankey).numel()
         aux_width = auxinfo.get('width', gw)
         aux_height = auxinfo.get('height', gh)
-        auxshape = (aux_height, aux_width, aux_bands)
+        asset_dsize = (aux_width, aux_height)
+
+        # Generate in image space and then warp to asset-space
+        img_shape = (gh, gw, aux_bands)
+        warp_aux_from_img = kwimage.Affine.coerce(auxinfo.get('warp_aux_to_img', None)).inv()
+
         if chankey == 'gauss':
             auxdata = np.stack([
-                kwimage.gaussian_patch(auxshape[0:2])
+                kwimage.gaussian_patch(img_shape[0:2])
                 for b in range(aux_bands)], axis=2)
             auxdata = kwarray.normalize(auxdata) * rng.rand()
         elif chankey == 'distri':
@@ -1129,10 +1164,27 @@ def render_background(img, rng, gray, bg_intensity, bg_scale):
             # random_distri = kwarray.distributions.Distribution.random(rng=rng)
             # auxdata = random_distri.sample(*auxshape)
             scale = rng.randint(0, 100) * rng.rand()
-            auxdata = rng.exponential(scale, size=auxshape)
+            auxdata = rng.exponential(scale, size=img_shape)
             auxdata = kwarray.normalize(auxdata)
         else:
-            auxdata = kwarray.uniform(0, 0.4, auxshape, rng=rng, dtype=np.float32)
+            auxdata = kwarray.uniform(0, 0.4, img_shape, rng=rng, dtype=np.float32)
+
+        if imgspace_background is not None and auxdata is not None:
+            auxdata = kwarray.atleast_nd(auxdata, 3)
+            imgspace_background = kwarray.atleast_nd(imgspace_background, 3)
+            chw_aux = np.transpose(auxdata, (2, 0, 1))
+            chw_bg = np.transpose(imgspace_background, (2, 0, 1))
+            # Hack in background image data into the auxiliary bands
+            new_bands = []
+            import itertools as it
+            for noise_band, bg_band in zip(chw_aux, it.repeat(chw_bg)):
+                new = (noise_band + bg_band) / 2
+                new_bands.append(new)
+            auxdata = np.concatenate(new_bands, axis=0).transpose(1, 2, 0)
+
+        # Warp the auxiliary data into asset space
+        auxdata = kwimage.warp_affine(auxdata, warp_aux_from_img,
+                                      dsize=asset_dsize)
 
         # if True or True or True:
         #     auxdata[:] = 0

@@ -56,10 +56,10 @@ Python, this data structure is reasonably efficient.
 
         >>> # Look at data
         >>> import ubelt as ub
-        >>> print(ub.repr2(self.basic_stats(), nl=1))
-        >>> print(ub.repr2(self.extended_stats(), nl=2))
-        >>> print(ub.repr2(self.boxsize_stats(), nl=3))
-        >>> print(ub.repr2(self.category_annotation_frequency()))
+        >>> print(ub.urepr(self.basic_stats(), nl=1))
+        >>> print(ub.urepr(self.extended_stats(), nl=2))
+        >>> print(ub.urepr(self.boxsize_stats(), nl=3))
+        >>> print(ub.urepr(self.category_annotation_frequency()))
 
 
         >>> # Inspect data
@@ -85,7 +85,7 @@ Python, this data structure is reasonably efficient.
         >>> aids = self.index.gid_to_aids[2]
         >>> annots = self.annots(aids)
 
-        >>> print('annots = {}'.format(ub.repr2(annots, nl=1, sv=1)))
+        >>> print('annots = {}'.format(ub.urepr(annots, nl=1, sv=1)))
         annots = <Annots(num=2)>
 
         >>> annots.lookup('category_id')
@@ -95,7 +95,7 @@ Python, this data structure is reasonably efficient.
         [[37, 6, 230, 240], [124, 96, 45, 18]]
 
         >>> # built in conversions to efficient kwimage array DataStructures
-        >>> print(ub.repr2(annots.detections.data, sv=1))
+        >>> print(ub.urepr(annots.detections.data, sv=1))
         {
             'boxes': <Boxes(xywh,
                          array([[ 37.,   6., 230., 240.],
@@ -107,7 +107,7 @@ Python, this data structure is reasonably efficient.
 
         >>> gids = list(self.imgs.keys())
         >>> images = self.images(gids)
-        >>> print('images = {}'.format(ub.repr2(images, nl=1, sv=1)))
+        >>> print('images = {}'.format(ub.urepr(images, nl=1, sv=1)))
         images = <Images(num=3)>
 
         >>> images.lookup('file_name')
@@ -269,7 +269,7 @@ Testing:
 
 """
 
-__version__ = '0.5.8'
+__version__ = '0.6.0'
 
 
 __submodules__ = {

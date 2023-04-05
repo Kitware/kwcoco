@@ -5,7 +5,24 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.5.8 - Unreleased
+## Version 0.6.0 - Unreleased
+
+### Changed
+* CocoImage and CocoAsset use the new AliasDictProxy interface to smoothly
+  transition between name conventions.
+* The "assets" key is now an alias of "auxiliary" for CocoImage and we will switch to "assets" as the primary in the future.
+* Toydata now generates RGB bands independently
+* Change `__unstructured__` to `_unstructured` for sqlalchemy 2.x compat 
+
+### Added
+* demo data now has the ability to render on top of a background image.
+
+### Fixed
+* Fixed sqlalchemy 2.x compatability
+* The track index now works properly with SQL variants and returns ordreing
+
+
+## Version 0.5.8 - Released 2023-03-17
 
 ### Changed
 * Toydata now has better polygon generation for small image sizes, but is still
@@ -23,10 +40,10 @@ Bug in `CocoImage.add_asset` where json serialization was broken
 * Added `category_names` property to `Annots1d` object.
 * Deprecate `CocoImage.add_auxiliary_item` in favor of `CocoImage.add_asset`
 
-
 ### Added
 * Added `annots` property to CocoImge
 * Added `add_annotation` to `CocoImage`
+* Added `autofix` option `kwcoco reroot`
 
 ### Fixed 
 * Better asset space support

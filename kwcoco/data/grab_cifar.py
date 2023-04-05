@@ -123,7 +123,7 @@ def main():
         Ensure the CIFAR dataset exists in kwcoco format and prints its
         location and a bit of info.
         """
-        default = {
+        __default__ = {
             'dpath': scfg.Path(
                 ub.Path.appdir('kwcoco/data'),
                 help='download location'),

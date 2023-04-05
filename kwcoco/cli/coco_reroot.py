@@ -17,25 +17,25 @@ class CocoRerootCLI:
             - [ ] Evaluate that all tests cases work
         """
 
-        epilog = """
+        __epilog__ = """
 
         Example Usage:
             kwcoco reroot --help
             kwcoco reroot --src=special:shapes8 --dst rerooted.json
             kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rerooted.json
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(None, help=(
-                'Path to the coco dataset'), position=1),
+                'Input coco dataset path'), position=1),
 
             'dst': scfg.Value(None, help=(
-                'Save the re-rooted dataset to a new file'), position=2),
+                'Output coco dataset path'), position=2),
 
             'new_prefix': scfg.Value(None, help=(
-                'Path to the new image root.')),
+                'New prefix to insert before every image file name.')),
 
             'old_prefix': scfg.Value(None, help=(
-                'Previous root to remove.')),
+                'Old prefix to remove from the start of every image file name.')),
 
             'absolute': scfg.Value(True, help=(
                 'If False, the output file uses relative paths')),
@@ -43,7 +43,7 @@ class CocoRerootCLI:
             'check': scfg.Value(True, help=(
                 'If True, checks that all data exists')),
 
-            'autofix': scfg.Value(False, help=(
+            'autofix': scfg.Value(False, isflag=True, help=(
                 ub.paragraph(
                     '''
                     If True, attempts an automatic fix. This assumes that paths
@@ -53,6 +53,9 @@ class CocoRerootCLI:
                     '''))),
 
             'compress': scfg.Value('auto', help='if True writes results with compression'),
+
+            'inplace': scfg.Value(False, isflag=True, help='if True and dst is unspecified then the output will overwrite the input')
+
         }
 
     @classmethod
@@ -90,12 +93,15 @@ class CocoRerootCLI:
         import kwcoco
         from os.path import dirname, abspath
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
         if config['dst'] is None:
-            raise Exception('must specify dest: {}'.format(config['dst']))
+            if config['inplace']:
+                config['dst'] = config['src']
+            else:
+                raise ValueError('must specify dst: {}'.format(config['dst']))
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
@@ -106,9 +112,10 @@ class CocoRerootCLI:
 
         if config['autofix']:
             autfixer = find_reroot_autofix(dset)
-            print('Found autfixer = {}'.format(ub.urepr(autfixer, nl=1)))
-            config['new_prefix'] = autfixer['new_prefix']
-            config['old_prefix'] = autfixer['old_prefix']
+            if autfixer is not None:
+                print('Found autfixer = {}'.format(ub.urepr(autfixer, nl=1)))
+                config['new_prefix'] = autfixer['new_prefix']
+                config['old_prefix'] = autfixer['old_prefix']
 
         dset.reroot(
             new_root=new_root,
@@ -129,10 +136,14 @@ class CocoRerootCLI:
 
 def find_reroot_autofix(dset):
     import os
-    # Given a set of missing images, is there a way we can autofix them
+    # Given a set of missing images, is there a way we can autofix them?
     missing_tups = dset.missing_images()
     missing_gpaths = [t[1] for t in missing_tups]
     chosen = None
+    if len(missing_gpaths) == 0:
+        print('All paths look like they exist')
+        return None
+
     if len(missing_gpaths) > 0:
         bundle_dpath = ub.Path(dset.bundle_dpath)
         first = ub.Path(missing_gpaths[0])
@@ -162,8 +173,8 @@ def find_reroot_autofix(dset):
 
             if any_missing:
                 continue
-
             chosen = candidate
+
     if not chosen:
         raise RuntimeError('No candidate fixed all paths')
     return chosen

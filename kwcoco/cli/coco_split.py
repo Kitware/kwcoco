@@ -11,13 +11,13 @@ class CocoSplitCLI(object):
     users should opt for using ``kwcoco subset`` instead to explicitly
     construct these splits based on domain knowledge.
     """
-    name = 'split'
+    __command__ = name = 'split'
 
     class CLIConfig(scfg.Config):
         """
         Split a single COCO dataset into two sub-datasets.
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(None, help='input dataset to split', position=1),
             'dst1': scfg.Value('split1.kwcoco.json', help='output path of the larger split'),
             'dst2': scfg.Value('split2.kwcoco.json', help='output path of the smaller split'),
@@ -41,7 +41,7 @@ class CocoSplitCLI(object):
                     '''), choices=['auto', 'image', 'video']),
             'compress': scfg.Value('auto', help='if True writes results with compression'),
         }
-        epilog = """
+        __epilog__ = """
         Example Usage:
             kwcoco split --src special:shapes8 --dst1=learn.kwcoco.json --dst2=test.kwcoco.json --factor=3 --rng=42
 
@@ -67,7 +67,7 @@ class CocoSplitCLI(object):
         from kwcoco.util import util_sklearn
 
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))

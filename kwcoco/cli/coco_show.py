@@ -11,13 +11,13 @@ class CocoShowCLI:
         Visualize a COCO image using matplotlib or opencv, optionally writing
         it to disk
         """
-        epilog = """
+        __epilog__ = """
         Example Usage:
             kwcoco show --help
             kwcoco show --src=special:shapes8 --gid=1
             kwcoco show --src=special:shapes8 --gid=1 --dst out.png
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(None, help=(
                 'Path to the coco dataset'), position=1),
             'gid': scfg.Value(None, help=(
@@ -65,7 +65,7 @@ class CocoShowCLI:
         import kwplot
 
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))

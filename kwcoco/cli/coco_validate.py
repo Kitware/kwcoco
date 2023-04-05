@@ -47,7 +47,7 @@ class CocoValidateCLI:
         This also has the ability to fix corrupted assets by removing them, but
         that functionality may be moved to a new command in the future.
         """
-        default = {
+        __default__ = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to datasets', position=1),
 
             # 'schema': scfg.Value(True, help='If True check the json schema'),
@@ -146,7 +146,7 @@ class CocoValidateCLI:
         """
         import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
@@ -177,14 +177,14 @@ class CocoValidateCLI:
                     missing = result['missing']
                     bad_gids = [t[2] for t in missing]
                     status = dset.remove_images(bad_gids, verbose=1)
-                    print('status = {}'.format(ub.repr2(status, nl=1)))
+                    print('status = {}'.format(ub.urepr(status, nl=1)))
 
             if 'corrupted' in result:
                 if 'remove' in fix_strat:
                     corrupted = result['corrupted']
                     bad_gids = [t[2] for t in corrupted]
                     status = dset.remove_images(bad_gids, verbose=1)
-                    print('status = {}'.format(ub.repr2(status, nl=1)))
+                    print('status = {}'.format(ub.urepr(status, nl=1)))
 
             if config['dst']:
                 if len(fpaths) != 1:
@@ -196,7 +196,7 @@ class CocoValidateCLI:
 
         has_errors = any(ub.flatten(fpath_to_errors.values()))
         if has_errors:
-            errmsg = ub.repr2(fpath_to_errors, nl=1)
+            errmsg = ub.urepr(fpath_to_errors, nl=1)
             print('fpath_to_errors = {}'.format(errmsg))
             raise Exception(errmsg)
 

@@ -115,7 +115,7 @@ def coco_from_viame_csv(csv_fpaths, images=None):
 
 def main(cmdline=True, **kw):
     config = ConvertConfig(default=kw, cmdline=cmdline)
-    print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+    print('config = {}'.format(ub.urepr(dict(config), nl=1)))
     # TODO: ability to map image ids to agree with another coco file
     csv_fpaths = config['src']
     new_root = config['new_root']

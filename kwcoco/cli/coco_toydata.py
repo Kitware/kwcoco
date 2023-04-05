@@ -10,7 +10,7 @@ class CocoToyDataCLI(object):
         """
         Create COCO toydata for demo and testing purposes.
         """
-        default = {
+        __default__ = {
             'key': scfg.Value('shapes8', help=ub.paragraph(
                 '''
                 Special demodata code. Basic options that define which flavor
@@ -86,7 +86,7 @@ class CocoToyDataCLI(object):
         """
         import kwcoco
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.repr2(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         demo_kwargs = {
             'use_cache': config['use_cache'],

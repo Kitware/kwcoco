@@ -237,7 +237,7 @@ def sensor_channel_lark():
         tree = sensor_channel_parser_cython.parse(code)
         # print(tree.pretty())
         transformed = NormalizeTransformer().transform(tree)
-        print('transformed = {}'.format(ub.repr2(transformed, nl=1)))
+        print('transformed = {}'.format(ub.urepr(transformed, nl=1)))
         print('-----')
 
         import kwcoco

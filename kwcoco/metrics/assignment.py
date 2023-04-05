@@ -494,7 +494,7 @@ def _fast_pdist_priority(classes, prioritize, _cache={}):
     #  to descendants will be positive. Prefer matching ancestors
     #  over descendants.
     key = ub.hash_data('\n'.join(list(map(str, classes))), hasher='sha1')
-    # key = ub.repr2(classes.__json__())
+    # key = ub.urepr(classes.__json__())
     if key not in _cache:
         # classes = kwcoco.CategoryTree.from_json(classes)
         with warnings.catch_warnings():

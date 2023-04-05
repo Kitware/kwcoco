@@ -5,9 +5,9 @@ kwimage >= 0.9.12
 packaging>=21.3
 parse >= 1.14.0
 safer>=4.4.1
-scriptconfig >= 0.7.3
+scriptconfig >= 0.7.5
 sortedcontainers >= 2.3.0
-ubelt >= 1.2.3
+ubelt >= 1.2.4
 uritools >= 3.0.0
 xarray >= 0.16.0
 
