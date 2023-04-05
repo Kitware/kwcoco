@@ -1635,7 +1635,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def name_to_cat(self):
         return self.index.name_to_cat
 
-    def pandas_table(self, table_name):
+    def pandas_table(self, table_name, strict=False):
         """
         Loads an entire SQL table as a pandas DataFrame
 
@@ -1654,10 +1654,19 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> print(table_df)
         """
         import pandas as pd
-        if IS_GE_SQLALCH_2x:
-            table_df = pd.read_sql_table(table_name, con=self.session.connection())
-        else:
-            table_df = pd.read_sql_table(table_name, self.engine)
+        try:
+            if IS_GE_SQLALCH_2x:
+                # When pandas is < 1.5 and sqlalchemy is > 2.x this will fail
+                # with a type error
+                con = self.session.connection()
+                table_df = pd.read_sql_table(table_name=table_name, con=con)
+            else:
+                table_df = pd.read_sql_table(table_name, self.engine)
+        except TypeError:
+            if strict:
+                raise
+            table_df = pd.DataFrame(self.raw_table(table_name))
+
         return table_df
 
     def raw_table(self, table_name):
