@@ -175,18 +175,18 @@ class KW18(kwarray.DataFrameArray):
 
         Example:
             >>> from kwcoco.kw18 import KW18
-            >>> from os.path import join
             >>> import ubelt as ub
             >>> import kwimage
+            >>> import kwcoco
             >>> # Prep test data - autogen a demo kw18 and write it to disk
             >>> dpath = ub.Path.appdir('kwcoco/kw18').ensuredir()
-            >>> kw18_fpath = join(dpath, 'test.kw18')
+            >>> kw18_fpath = ub.Path(dpath) / 'test.kw18'
             >>> KW18.demo().dump(kw18_fpath)
             >>> #
             >>> # Load the kw18 file
             >>> self = KW18.load(kw18_fpath)
             >>> # Pretend that these image correspond to kw18 frame numbers
-            >>> frame_names = [kwimage.grab_test_image_fpath(k) for k in kwimage.grab_test_image.keys()]
+            >>> frame_names= kwcoco.CocoDataset.demo('shapes8').images().lookup('file_name')
             >>> frame_ids = sorted(set(self['frame_number']))
             >>> image_paths = dict(zip(frame_ids, frame_names))
             >>> #
@@ -200,7 +200,7 @@ class KW18(kwarray.DataFrameArray):
             >>> # Draw all iamges
             >>> for gid in coco_dset.imgs.keys():
             >>>     canvas = coco_dset.draw_image(gid)
-            >>>     fpath = join(dpath, 'gid_{}.jpg'.format(gid))
+            >>>     fpath = dpath / 'gid_{}.jpg'.format(gid)
             >>>     print('write fpath = {!r}'.format(fpath))
             >>>     kwimage.imwrite(fpath, canvas)
         """
@@ -307,7 +307,8 @@ class KW18(kwarray.DataFrameArray):
         return self
 
     def dump(self, file):
-        if isinstance(file, str):
+        import os
+        if isinstance(file, (str, os.PathLike)):
             with open(file, 'w') as fp:
                 self.dump(fp)
         else:
