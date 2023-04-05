@@ -1647,14 +1647,17 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(module:pandas)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
             >>> self, dset = demo()
             >>> table_df = self.pandas_table('annotations')
             >>> print(table_df)
         """
         import pandas as pd
-        # table_df = pd.read_sql_table(table_name, con=self.engine)
-        table_df = pd.read_sql_table(table_name, con=self.session.connection())
+        if IS_GE_SQLALCH_2x:
+            table_df = pd.read_sql_table(table_name, con=self.session.connection())
+        else:
+            table_df = pd.read_sql_table(table_name, con=self.engine)
         return table_df
 
     def raw_table(self, table_name):
