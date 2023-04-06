@@ -80,7 +80,7 @@ except Exception:
     profile = ub.identity
 
 
-class CocoEvalConfig(scfg.Config):
+class CocoEvalConfig(scfg.DataConfig):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
@@ -241,10 +241,9 @@ class CocoEvaluator(object):
         >>> coco_eval = CocoEvaluator(config)
         >>> results = coco_eval.evaluate()
     """
-    Config = CocoEvalConfig
 
     def __init__(coco_eval, config):
-        coco_eval.config = CocoEvalConfig(config)
+        coco_eval.config = CocoEvalConfig(**config)
         coco_eval._is_init = False
         coco_eval._logs = []
         coco_eval._verbose = 1

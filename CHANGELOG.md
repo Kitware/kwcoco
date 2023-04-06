@@ -7,6 +7,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.6.1 - Unreleased
 
+### Fixed:
+* Issue in detection metrics when classes was not specified. Now uses the true
+  detections to infer them if possible.
+* Detection metric assign workers was never used
+* Subsets of metrics now work when TN is not available.
+
 
 ## Version 0.6.0 - Released 2023-04-04
 

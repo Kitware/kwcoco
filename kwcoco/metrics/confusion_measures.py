@@ -887,7 +887,11 @@ def populate_info(info):
     """
     info['tp_count'] = tp = np.array(info['tp_count'])
     info['fp_count'] = fp = np.array(info['fp_count'])
-    info['tn_count'] = tn = np.array(info['tn_count'])
+
+    has_tn = 'tn_count' in info
+    if has_tn:
+        info['tn_count'] = tn = np.array(info['tn_count'])
+
     info['fn_count'] = fn = np.array(info['fn_count'])
     info['thresholds'] = thresh = np.array(info['thresholds'])
 
@@ -898,8 +902,9 @@ def populate_info(info):
 
     realneg_total = info.get('realneg_total', None)
     if realneg_total is None:
-        realneg_total = info['tn_count'][-1] + info['fp_count'][-1]
-        info['realneg_total'] = realneg_total
+        if has_tn:
+            realneg_total = info['tn_count'][-1] + info['fp_count'][-1]
+            info['realneg_total'] = realneg_total
 
     nsupport = info.get('nsupport', None)
     if nsupport is None:
@@ -997,16 +1002,18 @@ def populate_info(info):
             if np.any(tpr_denom != info['realpos_total']):
                 warnings.warn('realpos_total is inconsistent')
 
-        tnr_denom = (tn + fp)
-        tnr_denom[tnr_denom == 0] = 1
-        tnr = tn / tnr_denom
+        if has_tn:
+            tnr_denom = (tn + fp)
+            tnr_denom[tnr_denom == 0] = 1
+            tnr = tn / tnr_denom
 
-        pnv_denom = (tn + fn)
-        pnv_denom[pnv_denom == 0] = 1
-        npv = tn / pnv_denom
+            pnv_denom = (tn + fn)
+            pnv_denom[pnv_denom == 0] = 1
+            npv = tn / pnv_denom
 
         info['ppv'] = ppv
         info['tpr'] = tpr
+        ppv_mul_tpr = ppv * tpr
 
         # fpr_denom is a proxy for fp + tn as tn is generally unknown in
         # the case where all negatives are specified in the confusion
@@ -1019,32 +1026,31 @@ def populate_info(info):
         fpr = info['fp_count'] / fpr_denom
         info['fpr'] = fpr
 
-        info['bm'] = tpr + tnr - 1  # informedness
-        info['mk'] = ppv + npv - 1  # markedness
+        if has_tn:
+            info['bm'] = tpr + tnr - 1  # informedness
+            info['mk'] = ppv + npv - 1  # markedness
 
-        tp_add_tn = tp + tn
-        # info['acc'] = (tp + tn) / (tp + tn + fp + fn)
-        info['acc'] = (tp_add_tn) / (tp_add_tn + fp + fn)
+            tp_add_tn = tp + tn
+            # info['acc'] = (tp + tn) / (tp + tn + fp + fn)
+            info['acc'] = (tp_add_tn) / (tp_add_tn + fp + fn)
 
-        # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
-        # mcc_numer = (tp * tn) - (fp * fn)
-        # mcc_denom = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-        # mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
-        # info['mcc'] = mcc_numer / mcc_denom
+            # https://en.wikipedia.org/wiki/Matthews_correlation_coefficient
+            # mcc_numer = (tp * tn) - (fp * fn)
+            # mcc_denom = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+            # mcc_denom[np.isnan(mcc_denom) | (mcc_denom == 0)] = 1
+            # info['mcc'] = mcc_numer / mcc_denom
 
-        real_pos = fn + tp  # number of real positives
-        p_denom = real_pos.copy()
-        p_denom[p_denom == 0] = 1
-        fnr = fn / p_denom  # miss-rate
-        fdr  = 1 - ppv  # false discovery rate
-        fmr  = 1 - npv  # false ommision rate (for)
+            real_pos = fn + tp  # number of real positives
+            p_denom = real_pos.copy()
+            p_denom[p_denom == 0] = 1
+            fnr = fn / p_denom  # miss-rate
+            fdr  = 1 - ppv  # false discovery rate
+            fmr  = 1 - npv  # false ommision rate (for)
 
-        ppv_mul_tpr = ppv * tpr
-
-        info['tnr'] = tnr
-        info['npv'] = npv
-        # info['mcc'] = np.sqrt(ppv * tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
-        info['mcc'] = np.sqrt(ppv_mul_tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
+            info['tnr'] = tnr
+            info['npv'] = npv
+            # info['mcc'] = np.sqrt(ppv * tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
+            info['mcc'] = np.sqrt(ppv_mul_tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
 
         # f1_numer = (2 * ppv * tpr)
         f1_numer = (2 * ppv_mul_tpr)
@@ -1059,27 +1065,28 @@ def populate_info(info):
         keys = ['mcc', 'g1', 'f1', 'acc']
         finite_thresh = thresh[finite_flags]
         for key in keys:
-            measure = info[key][finite_flags]
-            try:
-                max_idx = np.nanargmax(measure)
-            except ValueError:
-                best_thresh = np.nan
-                best_measure = np.nan
-            else:
-                best_thresh = float(finite_thresh[max_idx])
-                best_measure = float(measure[max_idx])
+            if key in info:
+                measure = info[key][finite_flags]
+                try:
+                    max_idx = np.nanargmax(measure)
+                except ValueError:
+                    best_thresh = np.nan
+                    best_measure = np.nan
+                else:
+                    best_thresh = float(finite_thresh[max_idx])
+                    best_measure = float(measure[max_idx])
 
-            best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
+                best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
 
-            # if np.isinf(best_thresh) or np.isnan(best_measure):
-            #     print('key = {!r}'.format(key))
-            #     print('finite_flags = {!r}'.format(finite_flags))
-            #     print('measure = {!r}'.format(measure))
-            #     print('best_label = {!r}'.format(best_label))
-            #     import xdev
-            #     xdev.embed()
-            info['max_{}'.format(key)] = best_label
-            info['_max_{}'.format(key)] = (best_measure, best_thresh)
+                # if np.isinf(best_thresh) or np.isnan(best_measure):
+                #     print('key = {!r}'.format(key))
+                #     print('finite_flags = {!r}'.format(finite_flags))
+                #     print('measure = {!r}'.format(measure))
+                #     print('best_label = {!r}'.format(best_label))
+                #     import xdev
+                #     xdev.embed()
+                info['max_{}'.format(key)] = best_label
+                info['_max_{}'.format(key)] = (best_measure, best_thresh)
 
         import sklearn.metrics  # NOQA
         finite_trunc_fp = info['trunc_fp_count']

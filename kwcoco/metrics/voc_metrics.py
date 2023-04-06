@@ -70,16 +70,17 @@ class VOC_Metrics(ub.NiceRepr):
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics
             >>> from kwcoco.metrics.voc_metrics import *  # NOQA
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=1, nboxes=(0, 100), n_fp=(0, 30), n_fn=(0, 30), classes=2, score_noise=0.9)
+            >>>     nimgs=1, nboxes=(0, 100), n_fp=(0, 30), n_fn=(0, 30), classes=2, score_noise=0.9, newstyle=0)
+            >>> gid = ub.peek(dmet.gid_to_pred_dets)
             >>> self = VOC_Metrics(classes=dmet.classes)
-            >>> self.add_truth(dmet.true_detections(0), 0)
-            >>> self.add_predictions(dmet.pred_detections(0), 0)
+            >>> self.add_truth(dmet.true_detections(gid), gid)
+            >>> self.add_predictions(dmet.pred_detections(gid), gid)
             >>> voc_scores = self.score()
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
             >>> kwplot.autompl()
             >>> kwplot.figure(fnum=1, doclf=True)
-            >>> voc_scores['perclass'].draw()
+            >>> voc_scores['perclass'].draw(key='pr')
 
             kwplot.figure(fnum=2)
             dmet.true_detections(0).draw(color='green', labels=None)

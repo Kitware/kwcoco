@@ -8,15 +8,13 @@ import ubelt as ub
 from os.path import join
 
 
-class CocoEvalCLIConfig(scfg.Config):
-    __doc__ = coco_evaluator.CocoEvalConfig.__doc__
-
-    __default__ = ub.dict_union(coco_evaluator.CocoEvalConfig.__default__, {
+class CocoEvalCLIConfig(coco_evaluator.CocoEvalConfig):
+    __default__ = {
         # These should go into the CLI args, not the class config args
         'expt_title': scfg.Value('', type=str, help='title for plots'),
         'draw': scfg.Value(True, isflag=1, help='draw metric plots'),
-        'out_dpath': scfg.Value('./coco_metrics', type=str),
-    })
+        'out_dpath': scfg.Value('./coco_metrics', type=str, help='where to dump results'),
+    }
 
 
 class CocoEvalCLI:
@@ -79,9 +77,9 @@ def main(cmdline=True, **kw):
     import kwimage
     import kwarray
     cli_config = CocoEvalCLIConfig.cli(cmdline=cmdline, default=kw)
-    print('cli_config = {}'.format(ub.urepr(dict(cli_config), nl=1)))
+    print('cli_config = {}'.format(ub.urepr(cli_config, nl=1)))
 
-    eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvaluator.Config.default)
+    eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__)
 
     coco_eval = coco_evaluator.CocoEvaluator(eval_config)
     coco_eval._init()
