@@ -35,112 +35,168 @@ def main(cmdline=True, **kw):
 
     # Create a subparser that uses the first positional argument to run one of
     # the previous CLI interfaces.
-
-    class RawDescriptionDefaultsHelpFormatter(
-            argparse.RawDescriptionHelpFormatter,
-            argparse.ArgumentDefaultsHelpFormatter):
-        pass
-
-    parser = argparse.ArgumentParser(
-        description='The Kitware COCO CLI',
-        formatter_class=RawDescriptionDefaultsHelpFormatter,
-    )
-    parser.add_argument('--version', action='store_true',
-                        help='show version number and exit')
-    subparsers = parser.add_subparsers(help='specify a command to run')
-
-    for cli_module in cli_modules:
-        cli_cls = cli_module._CLI
-        subconfig = cli_cls.CLIConfig()
-
-        # TODO: make subparser.add_parser args consistent with what
-        # scriptconfig generates when parser=None
-        if hasattr(subconfig, '_parserkw'):
-            parserkw = subconfig._parserkw()
-        else:
-            # for older versions of scriptconfig
-            parserkw = dict(
-                description=subconfig.__class__.__doc__
-            )
-        parserkw['help'] = parserkw['description'].split('\n')[0]
-        subparser = subparsers.add_parser(cli_cls.name, **parserkw)
-        subparser = subconfig.argparse(subparser)
-        subparser.set_defaults(main=cli_cls.main)
-
-    if 0:
-        """
-        Debugging positional or keyword args
-
-            python -m kwcoco.cli.coco_stats special:shapes8
-
-            python -m kwcoco.cli.coco_stats --src=special:shapes8
-
-            >>> kw = {'src': 'special:shapes8'}
-            >>> cmdline = False
-            >>> cls = CocoStatsCLI
-
-            python -c "from kwcoco.cli.coco_stats import *; print(CocoStatsCLI.CLIConfig()._read_argv())" --src foo bar
-            python -c "from kwcoco.cli.coco_stats import *; print(CocoStatsCLI.CLIConfig()._read_argv())" a --basic=True baz biz --src f a a
-
-        """
-        for action in parser._actions:
-            print('action = {!r}'.format(action))
-            pass
-        for sub in parser._subparsers:
-            parser._subparsers._actions
-            pass
-
-    try:
-        import argcomplete
-        # Need to run: "$(register-python-argcomplete xdev)"
-        # or activate-global-python-argcomplete --dest=-
-        # mkdir -p ~/.bash_completion.d
-        # activate-global-python-argcomplete --dest ~/.bash_completion.d
-        # To enable this.
-    except ImportError:
-        argcomplete = None
-
-    if argcomplete is not None:
-        argcomplete.autocomplete(parser)
-
-    EASTER = 1
-    if EASTER:
-        if len(sys.argv) == 2 and sys.argv[1] == 'boid':
-            from kwcoco.demo.boids import _yeah_boid
-            _yeah_boid()
-
     import os
     KWCOCO_LOOSE_CLI = os.environ.get('KWCOCO_LOOSE_CLI', '')
-    if KWCOCO_LOOSE_CLI:
-        ns = parser.parse_known_args()[0]
-    else:
-        ns = parser.parse_args()
-    # print('ns = {!r}'.format(ns))
 
-    # Execute the subcommand without additional CLI parsing
-    kw = ns.__dict__
+    NEW_MODAL_CLI = 1
+    if NEW_MODAL_CLI:
+        from scriptconfig.modal import ModalCLI
+        modal = ModalCLI(description=ub.codeblock(
+            '''
+            The Kitware COCO CLI
+            '''))
 
-    if kw.pop('version'):
-        import kwcoco
-        print(kwcoco.__version__)
-        return 0
+        def get_version(self):
+            import kwcoco
+            return kwcoco.__version__
+        modal.__class__.version = property(get_version)
 
-    main = kw.pop('main', None)
-    if main is None:
-        parser.print_help()
-        raise ValueError('no command given')
-        return 1
+        for cli_module in cli_modules:
 
-    try:
-        ret = main(cmdline=False, **kw)
-    except Exception as ex:
-        print('ERROR ex = {!r}'.format(ex))
-        raise
-        return 1
-    else:
-        if ret is None:
-            ret = 0
+            cli_subconfig = None
+            cli_cls = cli_module._CLI
+            cli_cls.CLIConfig.__command__ = cli_cls.name
+
+            assert hasattr(cli_cls, 'CLIConfig'), (
+                'We are only supporting scriptconfig CLIs')
+            # scriptconfig cli pattern
+            cli_subconfig = cli_cls.CLIConfig
+
+            if not hasattr(cli_subconfig, 'main'):
+                if hasattr(cli_cls, 'main'):
+                    main_func = cli_cls.main
+                    # Hack the main function into the config
+                    cli_subconfig.main = main_func
+                else:
+                    raise AssertionError(f'No main function for {cli_module}')
+
+            # Update configs to have aliases / commands attributes
+            # cli_modname = cli_module.__name__
+            # cli_rel_modname = cli_modname.split('.')[-1]
+
+            cmdname_aliases = ub.oset()
+            alias = getattr(cli_module, '__alias__', [])
+            if isinstance(alias, str):
+                alias = [alias]
+            command = getattr(cli_module, '__command__', None)
+            if command is not None:
+                cmdname_aliases.add(command)
+            cmdname_aliases.update(alias)
+            # cmdname_aliases.update(cmd_alias.get(cli_modname, []) )
+            cmdname_aliases.add(cli_cls.CLIConfig.__command__)
+            parserkw = {}
+            primary_cmdname = cmdname_aliases[0]
+            secondary_cmdnames = cmdname_aliases[1:]
+            cli_subconfig.__command__ = primary_cmdname
+            cli_subconfig.__alias__ = secondary_cmdnames
+            modal.register(cli_subconfig)
+
+        ret = modal.run(strict=not KWCOCO_LOOSE_CLI)
         return ret
+    else:
+        class RawDescriptionDefaultsHelpFormatter(
+                argparse.RawDescriptionHelpFormatter,
+                argparse.ArgumentDefaultsHelpFormatter):
+            pass
+
+        parser = argparse.ArgumentParser(
+            description='The Kitware COCO CLI',
+            formatter_class=RawDescriptionDefaultsHelpFormatter,
+        )
+        parser.add_argument('--version', action='store_true',
+                            help='show version number and exit')
+        subparsers = parser.add_subparsers(help='specify a command to run')
+
+        for cli_module in cli_modules:
+            cli_cls = cli_module._CLI
+            subconfig = cli_cls.CLIConfig()
+
+            # TODO: make subparser.add_parser args consistent with what
+            # scriptconfig generates when parser=None
+            if hasattr(subconfig, '_parserkw'):
+                parserkw = subconfig._parserkw()
+            else:
+                # for older versions of scriptconfig
+                parserkw = dict(
+                    description=subconfig.__class__.__doc__
+                )
+            parserkw['help'] = parserkw['description'].split('\n')[0]
+            subparser = subparsers.add_parser(cli_cls.name, **parserkw)
+            subparser = subconfig.argparse(subparser)
+            subparser.set_defaults(main=cli_cls.main)
+
+        if 0:
+            """
+            Debugging positional or keyword args
+
+                python -m kwcoco.cli.coco_stats special:shapes8
+
+                python -m kwcoco.cli.coco_stats --src=special:shapes8
+
+                >>> kw = {'src': 'special:shapes8'}
+                >>> cmdline = False
+                >>> cls = CocoStatsCLI
+
+                python -c "from kwcoco.cli.coco_stats import *; print(CocoStatsCLI.CLIConfig()._read_argv())" --src foo bar
+                python -c "from kwcoco.cli.coco_stats import *; print(CocoStatsCLI.CLIConfig()._read_argv())" a --basic=True baz biz --src f a a
+
+            """
+            for action in parser._actions:
+                print('action = {!r}'.format(action))
+                pass
+            for sub in parser._subparsers:
+                parser._subparsers._actions
+                pass
+
+        try:
+            import argcomplete
+            # Need to run: "$(register-python-argcomplete xdev)"
+            # or activate-global-python-argcomplete --dest=-
+            # mkdir -p ~/.bash_completion.d
+            # activate-global-python-argcomplete --dest ~/.bash_completion.d
+            # To enable this.
+        except ImportError:
+            argcomplete = None
+
+        if argcomplete is not None:
+            argcomplete.autocomplete(parser)
+
+        EASTER = 1
+        if EASTER:
+            if len(sys.argv) == 2 and sys.argv[1] in {'boid', 'boids'}:
+                from kwcoco.demo.boids import _yeah_boid
+                _yeah_boid()
+
+        if KWCOCO_LOOSE_CLI:
+            ns = parser.parse_known_args()[0]
+        else:
+            ns = parser.parse_args()
+        # print('ns = {!r}'.format(ns))
+
+        # Execute the subcommand without additional CLI parsing
+        kw = ns.__dict__
+
+        if kw.pop('version'):
+            import kwcoco
+            print(kwcoco.__version__)
+            return 0
+
+        main = kw.pop('main', None)
+        if main is None:
+            parser.print_help()
+            raise ValueError('no command given')
+            return 1
+
+        try:
+            ret = main(cmdline=False, **kw)
+        except Exception as ex:
+            print('ERROR ex = {!r}'.format(ex))
+            raise
+            return 1
+        else:
+            if ret is None:
+                ret = 0
+            return ret
 
 
 if __name__ == '__main__':

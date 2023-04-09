@@ -13,6 +13,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Detection metric assign workers was never used
 * Subsets of metrics now work when TN is not available.
 
+### Changed
+* CLI backend changed to use scriptconfig ModalCLI
+
 
 ## Version 0.6.0 - Released 2023-04-04
 
