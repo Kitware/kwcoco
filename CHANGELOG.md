@@ -7,6 +7,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.6.1 - Unreleased
 
+### Added:
+* Add `remember_parent` option to CocoDataset.union
+* Add `CocoDataset.coerce_multiple` and `load_multiple` loader with parallel processing.
+* Add parallel IO to `kwcoco union`
+* Add util parallel and eval
+
 ### Fixed:
 * Issue in detection metrics when classes was not specified. Now uses the true
   detections to infer them if possible.
@@ -53,7 +59,7 @@ Bug in `CocoImage.add_asset` where json serialization was broken
 * Deprecate `CocoImage.add_auxiliary_item` in favor of `CocoImage.add_asset`
 
 ### Added
-* Added `annots` property to CocoImge
+* Added `annots` property to CocoImage
 * Added `add_annotation` to `CocoImage`
 * Added `autofix` option `kwcoco reroot`
 
