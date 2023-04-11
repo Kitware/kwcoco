@@ -56,8 +56,7 @@ class CocoUnionCLI(object):
         """
         config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
         import kwcoco
-        import rich
-        rich.print('config = {}'.format(ub.urepr(config, nl=1)))
+        print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config.src is None:
             raise Exception('must specify sources: {}'.format(config.src))
