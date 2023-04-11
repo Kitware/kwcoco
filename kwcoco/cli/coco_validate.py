@@ -48,7 +48,7 @@ class CocoValidateCLI:
         that functionality may be moved to a new command in the future.
         """
         __default__ = {
-            'src': scfg.Value(['special:shapes8'], nargs='+', help='path to datasets', position=1),
+            'src': scfg.Value(None, nargs='+', help='path to datasets', position=1),
 
             # 'schema': scfg.Value(True, help='If True check the json schema'),
             # 'missing': scfg.Value(True, help='If True check if all assets (e.g. images) exist'),
