@@ -52,7 +52,8 @@ class DetectionMetrics(ub.NiceRepr):
         >>> # VOC scoring
         >>> print(dmet.score_voc(bias=0))
         >>> # Original pycocotools scoring
-        >>> print(dmet.score_pycocotools())  # xdoctest: +REQUIRES(module:pycocotools)
+        >>> # xdoctest: +REQUIRES(module:pycocotools)
+        >>> print(dmet.score_pycocotools())
 
     Example:
         >>> dmet = DetectionMetrics.demo(

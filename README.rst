@@ -1,7 +1,7 @@
 KWCOCO - The Kitware COCO Module
 ================================
 
-.. # TODO Get CI services running on gitlab 
+.. # TODO Get CI services running on gitlab
 
 |GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |Downloads| |ReadTheDocs|
 
@@ -46,13 +46,13 @@ https://github.com/cocodataset/cocoapi It uses the same efficient core indexing
 data structures, but in our implementation the indexing can be optionally
 turned off, functions are silent by default (with the exception of long running
 processes, which optionally show progress by default). We support helper
-functions that add and remove images, categories, and annotations. 
+functions that add and remove images, categories, and annotations.
 
 We have reimplemented the object detection scoring code in the ``kwcoco.metrics``
-submodule.  
+submodule.
 
 The original ``pycocoutils`` API is exposed via the ``kwcoco.compat_dataset.COCO``
-class for drop-in replacement with existing tools that use ``pycocoutils``. 
+class for drop-in replacement with existing tools that use ``pycocoutils``.
 
 There is some support for kw18 files in the ``kwcoco.kw18`` module.
 
@@ -66,14 +66,42 @@ The `kwcoco <https://pypi.org/project/kwcoco/>`_.  package can be installed via 
     pip install kwcoco
 
 
+Feature Overview
+----------------
+
+At its core kwcoco's goal is to make it easy to organize, query, manipulate,
+and distribute image and video datasets. To accomplish this goal it offers
+several features.
+
+* An fast in-memory dictionary-based backend data structure with random access and indexed lookups.
+
+* An `sqlalchemy <https://www.sqlalchemy.org/>`_ backend that supports sqlite3 or postgresql (currently read-only).
+
+* Efficient random sampling of image subregions using `delayed_image <https://gitlab.kitware.com/computer-vision/delayed_image>`_.
+
+* A Command Line Interface (CLI) for manipulating / inspecting coco files using `scriptconfig <https://gitlab.kitware.com/utils/scriptconfig>`_.
+
+* Transparent coco file compression (e.g. i.e. read from / write to zipfiles)
+
+* Support for videos as lists of image frames
+
+* Support for multispectral imagery via image assets
+
+* Metrics for classification and bounding box object detection (segmentation and polygon object detection coming soon).
+
+* Toydata generation for easy CI testing and demos.
+
+* Backwards compatability with the original `cocoapi <https://github.com/cocodataset/cocoapi>`_.
+
+
 The KWCOCO CLI
 --------------
 
-After installing KWCOCO, you will also have the ``kwcoco`` command line tool. 
+After installing KWCOCO, you will also have the ``kwcoco`` command line tool.
 This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 --help`` should provide a good starting point.
 
-.. code-block:: 
+.. code-block::
 
     usage: kwcoco [-h] [--version] {stats,union,split,show,toydata,eval,conform,modify_categories,reroot,validate,subset,grab} ...
 
@@ -103,7 +131,7 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 This should help you inspect (via stats and show), combine (via union), and
 make training splits (via split) using the command line. Also ships with
 toydata, which generates a COCO file you can use for testing. The kwcoco CLI
-has tab-complete features, but requires 
+has tab-complete features, but requires
 `enabling argcomplete <docs/source/on_autocomplete.rst>`_.
 
 
@@ -116,7 +144,7 @@ Try the KWCOCO shapes demo dataset, and generate an arbitrarily large dataset.
 The toydata submodule renders simple objects on a noisy background ---
 optionally with auxiliary channels --- and provides bounding boxes,
 segmentations, and keypoint annotations. The following example illustrates a
-generated toy image with and without overlaid annotations. 
+generated toy image with and without overlaid annotations.
 
 
 ..  ..image:: https://i.imgur.com/2K17R2U.png
@@ -164,7 +192,7 @@ Python, this data structure is reasonably efficient.
 
         >>> # Remove data
         >>> self.remove_annotations([aid])
-        >>> self.remove_images([gid])  
+        >>> self.remove_images([gid])
         >>> self.remove_categories([cid])
 
         >>> # Look at data
@@ -172,7 +200,7 @@ Python, this data structure is reasonably efficient.
         >>> print(ub.urepr(self.extended_stats(), nl=2))
         >>> print(ub.urepr(self.boxsize_stats(), nl=3))
         >>> print(ub.urepr(self.category_annotation_frequency()))
-        
+
 
         >>> # Inspect data
         >>> import kwplot
@@ -215,7 +243,7 @@ Python, this data structure is reasonably efficient.
             'keypoints': <PointsList(n=2) at 0x7f07eda33220>,
             'segmentations': <PolygonList(n=2) at 0x7f086365aa60>,
         }
-        
+
         >>> gids = list(self.imgs.keys())
         >>> images = self.images(gids)
         >>> print('images = {}'.format(ub.urepr(images, nl=1, sv=1)))
@@ -252,7 +280,7 @@ An informal description of the spec given in: `kwcoco/coco_schema_informal.rst <
 
 For a formal description of the spec see the  `kwcoco/coco_schema.json <kwcoco/coco_schema.json>`_.
 
-For more information on the "warp" transforms see `warping_and_spaces <docs/source/concepts/warping_and_spaces.rst>`_. 
+For more information on the "warp" transforms see `warping_and_spaces <docs/source/concepts/warping_and_spaces.rst>`_.
 
 
 The CocoDatset API Grouped by Functinoality
@@ -376,7 +404,7 @@ a coco file using process similar to the following code:
 
 .. code-block:: python
 
-    # ASSUME INPUTS 
+    # ASSUME INPUTS
     # my_classes: a list of category names
     # my_annots: a list of annotation objects with bounding boxes, images, and categories
     # my_images: a list of image files.
@@ -495,7 +523,7 @@ Because images can be in different resolutions, we need to bring up the topic
 of "KWCOCO spaces". For full info on this, see the discussion on "KWCOCO
 spaces", but briefly, there are 3 spaces that a user of kwcoco needs to be
 concerned with: (1) video space, (2) image space, and (3) asset/auxiliary
-space, and KWCOCO will want to know how. 
+space, and KWCOCO will want to know how.
 
 As a simple example, lets assume you have a dataset containing sequences of RGB
 images, corresponding infrared images, depth estimations, and optical flow
@@ -508,7 +536,7 @@ ir have 1 channel.
 If our images on disk look like:
 
 
-.. code-block:: 
+.. code-block::
 
     - video1/vid1_frame1_rgb.tif
     - video1/vid1_frame1_ir.tif
@@ -573,7 +601,7 @@ Now lets create a kwcoco dataset to register them. We use the channel spec to de
        # Add a video and give it a name.
        vidid = dset.add_video(name=video_dpath.name)
 
-       # Parse out information that we need from the filenames. 
+       # Parse out information that we need from the filenames.
        # Lots of different ways to do this depending on the use case.
        assets = []
        for fpath in video_dpath.glob('*.tif'):
@@ -599,7 +627,7 @@ Now lets create a kwcoco dataset to register them. We use the channel spec to de
            height, width = kwimage.load_image_shape(rgbdata['fpath'])[0:2]
 
            # First add the base image. We will add this image as
-           # without a file_name because all of its data will be stored 
+           # without a file_name because all of its data will be stored
            # in its auxiliary list. We will assume all images in the
            # video are aligned, so we set `warp_img_to_vid` to be the
            # identity matrix.
@@ -608,7 +636,7 @@ Now lets create a kwcoco dataset to register them. We use the channel spec to de
                warp_img_to_vid=kwimage.Affine.eye().concise())
 
            # We could have constructed the auxiliary item dictionaries
-           # explicitly and added them in the previous step, but we 
+           # explicitly and added them in the previous step, but we
            # will use the CocoImage api to do this instead.
            coco_img = dset.coco_image(gid)
 
@@ -635,10 +663,10 @@ or a RAW format) using the delayed load interface.
     gid = 1
     coco_img = dset.coco_image(gid)
 
-    # Tell delayed load what channels we want. We can 
+    # Tell delayed load what channels we want. We can
     # also specify which "space" we want to load it in.
     # Note: that when specifying channels from multiple asset items
-    # it is not possible to sample in the the auxiliary / asset space 
+    # it is not possible to sample in the the auxiliary / asset space
     # so only image and video are allowed there.
     delayed_img = coco_img.imdelay('fx|depth|red', space='image')
 
@@ -719,7 +747,7 @@ and a ChannelSpec can be a collection of one or more FusedChannelSpecs
 separated by a comma.
 
 
-The home of the channel specification has moved to 
+The home of the channel specification has moved to
 `delayed_image <https://gitlab.kitware.com/computer-vision/delayed_image>`_.
 See the `delayed image channel spec docs <https://delayed-image.readthedocs.io/en/latest/delayed_image.channel_spec.html#>`_ for more details.
 
@@ -744,7 +772,7 @@ Tools that work with COCO files:
 .. [1] http://cocodataset.org/#format-data
 
 .. [2] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
-      
+
 
 .. |Pypi| image:: https://img.shields.io/pypi/v/kwcoco.svg
    :target: https://pypi.python.org/pypi/kwcoco
