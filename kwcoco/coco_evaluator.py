@@ -100,7 +100,7 @@ class CocoEvalConfig(scfg.DataConfig):
         'iou_thresh': scfg.Value(
             value=0.5,
             help='One or more IoU overlap threshold for detection assignment',
-            # alias=['ovthresh']
+            alias=['ovthresh']
         ),
 
         'compat': scfg.Value(
@@ -171,7 +171,7 @@ class CocoEvalConfig(scfg.DataConfig):
 
         'load_workers': scfg.Value(0, help='number of workers to load cached detections'),
 
-        'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
+        # 'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
 
         'classes_of_interest': scfg.Value(
             None, type=list,
@@ -182,9 +182,9 @@ class CocoEvalConfig(scfg.DataConfig):
     }
 
     def normalize(self):
-        if self['ovthresh'] is not None:
-            warnings.warn('ovthresh is deprecated use iou_thresh')
-            self['iou_thresh'] = self['ovthresh']
+        # if self['ovthresh'] is not None:
+        #     warnings.warn('ovthresh is deprecated use iou_thresh')
+        #     self['iou_thresh'] = self['ovthresh']
 
         if self['area_range'] is not None:
             parsed = []
