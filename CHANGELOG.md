@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * sliced getitems into a CocoObject1d (e.g. Images, Annotations, etc...) now
   returns a new CocoObject1d representing the subset instead of a list of
   integer ids.
+* reroot now ignores leading "./" when looking for `old_prefix`
 
 ### Added
 * Add id property to CocoObject1d

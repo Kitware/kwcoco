@@ -1971,6 +1971,13 @@ class MixinCocoExtras(object):
                 else:
                     print('No images to reroot')
 
+        def _normalize_prefix(path):
+            # removes leading ./ on paths
+            path = os.fspath(path)
+            while path.startswith('./'):
+                path = path[2:]
+            return path
+
         def _reroot_path(file_name):
             """ Reroot a single file """
 
@@ -1979,6 +1986,8 @@ class MixinCocoExtras(object):
             # the images based on the new root, unless we are explicitly given
             # information about new and old prefixes. Can we do better than
             # this?
+
+            file_name = _normalize_prefix(file_name)
             cur_gpath = join(cur_bundle_dpath, file_name)
 
             if old_prefix is not None:
