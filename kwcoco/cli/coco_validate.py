@@ -133,7 +133,7 @@ class CocoValidateCLI:
                 '''))
 
         }
-        epilog = """
+        __epilog__ = """
         Example Usage:
             kwcoco toydata --dst foo.json --key=special:shapes8
             kwcoco validate --src=foo.json --corrupted=True
