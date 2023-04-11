@@ -12,6 +12,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   returns a new CocoObject1d representing the subset instead of a list of
   integer ids.
 * reroot now ignores leading "./" when looking for `old_prefix`
+* `CocoDataset.corrupted_images` now defaults `check_aux` to True
+* `CocoDataset.corrupted_images` now can execute in parallel.
+* `CocoDataset.corrupted_images` now checks if it can read the entire image again.
 
 ### Added
 * Add id property to CocoObject1d

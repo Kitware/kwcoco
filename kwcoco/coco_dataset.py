@@ -73,7 +73,7 @@ from kwcoco import exceptions
 from kwcoco._helpers import (
     SortedSet, UniqueNameRemapper, _ID_Remapper, _NextId,
     _delitems, _lut_image_frame_index, _lut_annot_frame_index,
-    _load_and_postprocess,
+    _load_and_postprocess, _image_corruption_check
 )
 
 import json as pjson
@@ -1632,7 +1632,7 @@ class MixinCocoExtras(object):
                         bad_paths.append((index, gpath, gid))
         return bad_paths
 
-    def corrupted_images(self, check_aux=False, verbose=0):
+    def corrupted_images(self, check_aux=True, verbose=0, workers=0):
         """
         Check for images that don't exist or can't be opened
 
@@ -1640,41 +1640,38 @@ class MixinCocoExtras(object):
             check_aux (bool):
                 if specified also checks auxiliary images
             verbose (int): verbosity level
+            workers (int): number of background workers
 
         Returns:
             List[Tuple[int, str, int]]: bad indexes and paths and ids
         """
         bad_paths = []
+
+        jobs = ub.JobPool(mode='process', max_workers=workers)
+
         img_enum = enumerate(self.dataset['images'])
         for index, img in ub.ProgIter(img_enum,
                                       total=len(self.dataset['images']),
-                                      desc='check for corrupted images',
+                                      desc='submit corruption checks',
                                       verbose=verbose):
             gid = img.get('id', None)
             fname = img.get('file_name', None)
             if fname is not None:
                 gpath = join(self.bundle_dpath, fname)
-                if not exists(gpath):
-                    bad_paths.append((index, gpath, gid))
-                # TODO: parallelize
-                try:
-                    import kwimage
-                    # kwimage.imread(gpath)
-                    kwimage.load_image_shape(gpath)
-                except Exception:
-                    bad_paths.append((index, gpath, gid))
+                job = jobs.submit(_image_corruption_check, gpath)
+                job.input_info = (index, gpath, gid)
 
             if check_aux:
                 for aux in img.get('auxiliary', img.get('assets', [])):
                     gpath = join(self.bundle_dpath, aux['file_name'])
-                    if not exists(gpath):
-                        bad_paths.append((index, gpath, gid))
-                    try:
-                        import kwimage
-                        kwimage.load_image_shape(gpath)
-                        # kwimage.imread(gpath)
-                    except Exception:
-                        bad_paths.append((index, gpath, gid))
+                    job = jobs.submit(_image_corruption_check, gpath)
+                    job.input_info = (index, gpath, gid)
+
+        for job in jobs.as_completed(desc='check corrupted images',
+                                     progkw={'verbose': verbose}):
+            info = job.result()
+            if info['failed']:
+                bad_paths.append(job.input_info)
 
         return bad_paths
 
@@ -2513,6 +2510,8 @@ class MixinCocoStats(object):
 
                 verbose (default=1): verbosity flag
 
+                workers (int): number of workers for parallel checks. defaults to 0
+
                 fastfail (default=False): if True raise errors immediately
 
         Returns:
@@ -2697,7 +2696,8 @@ class MixinCocoStats(object):
                 result['missing'] = missing
 
         if config.get('corrupted', False):
-            corrupted = dset.corrupted_images(check_aux=True, verbose=verbose)
+            corrupted = dset.corrupted_images(check_aux=True, verbose=verbose,
+                                              workers=config.get('workers', 0))
             if corrupted:
                 msg = 'There are {} corrupted images'.format(len(corrupted))
                 _error(msg)

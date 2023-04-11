@@ -37,7 +37,7 @@ for part in sub_parts:
 class CocoValidateCLI:
     name = 'validate'
 
-    class CLIConfig(scfg.Config):
+    class CLIConfig(scfg.DataConfig):
         """
         Validates that a coco file satisfies expected properties.
 
@@ -107,6 +107,11 @@ class CocoValidateCLI:
                 if True raise errors immediately
                 ''')),
 
+            'workers': scfg.Value(0, isflag=True, help=ub.paragraph(
+                '''
+                number of workers for checks that support parallelization
+                ''')),
+
             # TODO: Move these to a different tool. This should only validate,
             # not fix anything.
 
@@ -145,8 +150,8 @@ class CocoValidateCLI:
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        config = cls.CLIConfig.cli(kw, cmdline=cmdline, strict=True)
+        print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))

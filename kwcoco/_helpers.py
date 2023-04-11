@@ -195,3 +195,24 @@ def _load_and_postprocess(data, loader, postprocess, **loadkw):
     if postprocess is not None:
         dset = postprocess(dset)
     return dset
+
+
+def _image_corruption_check(fpath, only_shape=False):
+    import kwimage
+    from os.path import exists
+    info = {'fpath': fpath}
+    if not exists(fpath):
+        info['failed'] = True
+        info['error'] = 'does not exist'
+    else:
+        try:
+            if only_shape:
+                kwimage.load_image_shape(fpath)
+            else:
+                kwimage.imread(fpath)
+            info['failed'] = False
+        except Exception as ex:
+            err = str(ex)
+            info['failed'] = True
+            info['error'] = err
+    return info
