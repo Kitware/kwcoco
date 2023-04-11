@@ -41,9 +41,9 @@ class CocoShowCLI:
                     ''')
             ),
 
-            'show_annots': scfg.Value(True, help=(
-                'Overlay annotations on dispaly')),
-            'show_labels': scfg.Value(False, help=(
+            'show_annots': scfg.Value(True, isflag=True, help=(
+                'Overlay annotations on display')),
+            'show_labels': scfg.Value(False, isflag=True, help=(
                 'Overlay labels on annotations')),
         }
 

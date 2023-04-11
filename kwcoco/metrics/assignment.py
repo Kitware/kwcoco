@@ -148,13 +148,15 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
     Example:
         >>> # xdoctest: +REQUIRES(module:pandas)
+        >>> from kwcoco.metrics.assignment import _assign_confusion_vectors
         >>> import pandas as pd
+        >>> import ubelt as ub
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(nimgs=1, nclasses=8,
         >>>                              nboxes=(0, 20), n_fp=20,
         >>>                              box_noise=.2, cls_noise=.3)
         >>> classes = dmet.classes
-        >>> gid = 0
+        >>> gid = ub.peek(dmet.gid_to_pred_dets)
         >>> true_dets = dmet.true_detections(gid)
         >>> pred_dets = dmet.pred_detections(gid)
         >>> y = _assign_confusion_vectors(true_dets, pred_dets,

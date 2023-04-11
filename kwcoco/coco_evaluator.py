@@ -80,7 +80,7 @@ except Exception:
     profile = ub.identity
 
 
-class CocoEvalConfig(scfg.Config):
+class CocoEvalConfig(scfg.DataConfig):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
@@ -100,7 +100,7 @@ class CocoEvalConfig(scfg.Config):
         'iou_thresh': scfg.Value(
             value=0.5,
             help='One or more IoU overlap threshold for detection assignment',
-            # alias=['ovthresh']
+            alias=['ovthresh']
         ),
 
         'compat': scfg.Value(
@@ -171,7 +171,7 @@ class CocoEvalConfig(scfg.Config):
 
         'load_workers': scfg.Value(0, help='number of workers to load cached detections'),
 
-        'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
+        # 'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
 
         'classes_of_interest': scfg.Value(
             None, type=list,
@@ -182,9 +182,9 @@ class CocoEvalConfig(scfg.Config):
     }
 
     def normalize(self):
-        if self['ovthresh'] is not None:
-            warnings.warn('ovthresh is deprecated use iou_thresh')
-            self['iou_thresh'] = self['ovthresh']
+        # if self['ovthresh'] is not None:
+        #     warnings.warn('ovthresh is deprecated use iou_thresh')
+        #     self['iou_thresh'] = self['ovthresh']
 
         if self['area_range'] is not None:
             parsed = []
@@ -241,10 +241,9 @@ class CocoEvaluator(object):
         >>> coco_eval = CocoEvaluator(config)
         >>> results = coco_eval.evaluate()
     """
-    Config = CocoEvalConfig
 
     def __init__(coco_eval, config):
-        coco_eval.config = CocoEvalConfig(config)
+        coco_eval.config = CocoEvalConfig(**config)
         coco_eval._is_init = False
         coco_eval._logs = []
         coco_eval._verbose = 1

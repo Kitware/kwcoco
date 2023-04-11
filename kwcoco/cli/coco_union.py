@@ -6,16 +6,33 @@ import scriptconfig as scfg
 class CocoUnionCLI(object):
     name = 'union'
 
-    class CLIConfig(scfg.Config):
+    class CLIConfig(scfg.DataConfig):
         """
         Combine multiple COCO datasets into a single merged dataset.
         """
-        __default__ = {
-            'src': scfg.Value([], nargs='+', help='path to multiple input datasets', position=1),
-            'dst': scfg.Value('combo.kwcoco.json', help='path to output dataset'),
-            'absolute': scfg.Value(False, isflag=1, help='if True, converts paths to absolute paths before doing union'),
-            'compress': scfg.Value('auto', help='if True writes results with compression'),
-        }
+        src = scfg.Value([], position=1, help='path to multiple input datasets', nargs='+')
+
+        dst = scfg.Value('combo.kwcoco.json', help='path to output dataset')
+
+        absolute = scfg.Value(False, isflag=1, help=ub.paragraph(
+                '''
+                if True, converts paths to absolute paths before doing union
+                '''))
+
+        remember_parent = scfg.Value(False, isflag=True, help=ub.paragraph(
+                '''
+                if True adds a union_parent item to each coco image and
+                video that indicate which file it is from
+                '''))
+
+        io_workers = scfg.Value('avail-2', help=ub.paragraph(
+            '''
+            number of workers to load input datasets. By default will use
+            available CPUs minus 2.
+            '''))
+
+        compress = scfg.Value('auto', help='if True writes results with compression')
+
         __epilog__ = """
         Example Usage:
             kwcoco union --src special:shapes8 special:shapes1 --dst=combo.kwcoco.json
@@ -37,30 +54,39 @@ class CocoUnionCLI(object):
             >>> cls = CocoUnionCLI
             >>> cls.main(cmdline, **kw)
         """
+        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
         import kwcoco
-        config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        print('config = {}'.format(ub.urepr(config, nl=1)))
 
-        if config['src'] is None:
-            raise Exception('must specify sources: {}'.format(config['src']))
+        if config.src is None:
+            raise Exception('must specify sources: {}'.format(config.src))
 
-        if len(config['src']) == 0:
+        if len(config.src) == 0:
             raise ValueError('Must provide at least one input dataset')
 
-        datasets = []
-        for fpath in ub.ProgIter(config['src'], desc='reading datasets',
-                                 verbose=1):
-            print('reading fpath = {!r}'.format(fpath))
-            dset = kwcoco.CocoDataset.coerce(fpath)
+        from kwcoco.util.util_parallel import coerce_num_workers
+        io_workers = config.io_workers
+        io_workers = coerce_num_workers(io_workers)
+        io_workers = min(io_workers, len(config.src))
+        if io_workers == 1:
+            io_workers = 0
 
-            if config['absolute']:
-                dset.reroot(absolute=True)
+        if config.absolute:
+            postprocess = _postprocess_absolute
+        else:
+            postprocess = None
 
-            datasets.append(dset)
+        datasets = list(kwcoco.CocoDataset.coerce_multiple(
+            config.src, postprocess=postprocess, ordered=True,
+            workers=io_workers, mode='process', autobuild=False,
+        ))
 
-        combo = kwcoco.CocoDataset.union(*datasets)
+        print('Finished loading. Starting union.')
+        combo = kwcoco.CocoDataset.union(
+            *datasets,
+            remember_parent=config.remember_parent)
 
-        out_fpath = config['dst']
+        out_fpath = config.dst
         out_dpath = ub.Path(out_fpath).parent
         if out_dpath:
             ub.ensuredir(out_dpath)
@@ -68,9 +94,13 @@ class CocoUnionCLI(object):
         combo.fpath = out_fpath
         dumpkw = {
             'newlines': True,
-            'compress': config['compress'],
+            'compress': config.compress,
         }
         combo.dump(combo.fpath, **dumpkw)
+
+
+def _postprocess_absolute(dset):
+    dset.reroot(absolute=True)
 
 _CLI = CocoUnionCLI
 

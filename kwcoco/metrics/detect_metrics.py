@@ -18,9 +18,42 @@ class DetectionMetrics(ub.NiceRepr):
     into sklearn-compatible representations for scoring.
 
     Attributes:
-        gid_to_true_dets (Dict): maps image ids to truth
-        gid_to_pred_dets (Dict): maps image ids to predictions
-        classes (kwcoco.CategoryTree): category coder
+        gid_to_true_dets (Dict[int, kwimage.Detections]):
+            maps image ids to truth
+
+        gid_to_pred_dets (Dict[int, kwimage.Detections]):
+            maps image ids to predictions
+
+        classes (kwcoco.CategoryTree | None):
+            the categories to be scored, if unspecified attempts to
+            determine these from the truth detections
+
+    Example:
+        >>> # Demo how to use detection metrics directly given detections only
+        >>> # (no kwcoco file required)
+        >>> from kwcoco.metrics import detect_metrics
+        >>> import kwimage
+        >>> # Setup random true detections (these are just boxes and scores)
+        >>> true_dets = kwimage.Detections.random(3)
+        >>> # Peek at the simple internals of a detections object
+        >>> print('true_dets.data = {}'.format(ub.urepr(true_dets.data, nl=1)))
+        >>> # Create similar but different predictions
+        >>> true_subset = true_dets.take([1, 2]).warp(kwimage.Affine.coerce({'scale': 1.1}))
+        >>> false_positive = kwimage.Detections.random(3)
+        >>> pred_dets = kwimage.Detections.concatenate([true_subset, false_positive])
+        >>> dmet = DetectionMetrics()
+        >>> dmet.add_predictions(pred_dets, imgname='image1')
+        >>> dmet.add_truth(true_dets, imgname='image1')
+        >>> # Raw confusion vectors
+        >>> cfsn_vecs = dmet.confusion_vectors()
+        >>> print(cfsn_vecs.data.pandas().to_string())
+        >>> # Our scoring definition (derived from confusion vectors)
+        >>> print(dmet.score_kwcoco())
+        >>> # VOC scoring
+        >>> print(dmet.score_voc(bias=0))
+        >>> # Original pycocotools scoring
+        >>> # xdoctest: +REQUIRES(module:pycocotools)
+        >>> print(dmet.score_pycocotools())
 
     Example:
         >>> dmet = DetectionMetrics.demo(
@@ -106,8 +139,8 @@ class DetectionMetrics(ub.NiceRepr):
         predictions.
 
         Args:
-            true_coco (kwcoco.CocoDataset):
-            pred_coco (kwcoco.CocoDataset):
+            true_coco (kwcoco.CocoDataset): coco dataset with ground truth
+            pred_coco (kwcoco.CocoDataset): coco dataset with predictions
 
         Example:
             >>> import kwcoco
@@ -191,6 +224,26 @@ class DetectionMetrics(ub.NiceRepr):
     def pred_detections(dmet, gid):
         """ gets Detections representation for predictions in an image """
         return dmet.gid_to_pred_dets[gid]
+
+    @property
+    def classes(dmet):
+        if dmet._classes is not None:
+            return dmet._classes
+        # If the detection metrics object doest have a top-level class
+        # list, then try to extract one from the ground truth.
+        # Try to grab classes from the truth if they exist
+        for dets in dmet.gid_to_true_dets.values():
+            if dets.classes is not None:
+                import kwcoco
+                classes = kwcoco.CategoryTree.coerce(dets.classes)
+                return classes
+
+    @classes.setter
+    def classes(dmet, classes):
+        import kwcoco
+        if classes is not None:
+            classes = kwcoco.CategoryTree.coerce(classes)
+        dmet._classes = classes
 
     def confusion_vectors(dmet, iou_thresh=0.5, bias=0, gids=None, compat='mutex',
                           prioritize='iou', ignore_classes='ignore',
@@ -287,21 +340,22 @@ class DetectionMetrics(ub.NiceRepr):
         if verbose == 'auto':
             verbose = 1 if len(gids) > 10 else 0
 
+        classes = dmet.classes
+
         if background_class is ub.NoParam:
             # Try to autodetermine background class name,
             # otherwise fallback to None
             background_class = None
-            if dmet.classes is not None:
-                lower_classes = [c.lower() for c in dmet.classes]
+            if classes is not None:
+                lower_classes = [c.lower() for c in classes]
                 try:
                     idx = lower_classes.index('background')
-                    background_class = dmet.classes[idx]
+                    background_class = classes[idx]
                     # TODO: if we know the background class name should we
                     # change bg_cidx in assignment?
                 except ValueError:
                     pass
 
-        workers = 0
         jobs = ub.JobPool(mode='process', max_workers=workers)
         for gid in ub.ProgIter(gids, desc='submit assign jobs',
                                verbose=verbose):
@@ -310,7 +364,7 @@ class DetectionMetrics(ub.NiceRepr):
             job = jobs.submit(
                 _assign_confusion_vectors, true_dets, pred_dets,
                 bg_weight=1, iou_thresh=iou_thresh_list, bg_cidx=-1, bias=bias,
-                classes=dmet.classes, compat=compat, prioritize=prioritize,
+                classes=classes, compat=compat, prioritize=prioritize,
                 ignore_classes=ignore_classes, max_dets=max_dets)
             job.gid = gid
 
@@ -347,7 +401,7 @@ class DetectionMetrics(ub.NiceRepr):
                         probs = np.zeros((len(pxs), pred_probs.shape[1]),
                                          dtype=np.float32)
                         if background_class is not None:
-                            bg_idx = dmet.classes.index(background_class)
+                            bg_idx = classes.index(background_class)
                             probs[:, bg_idx] = 1
                         probs[flags] = pred_probs[pxs[flags]]
                         prob_accum.append(probs)
@@ -387,7 +441,7 @@ class DetectionMetrics(ub.NiceRepr):
                 y_prob = np.vstack(prob_accum)
             else:
                 y_prob = None
-            cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes,
+            cfsn_vecs = ConfusionVectors(cfsn_data, classes=classes,
                                          probs=y_prob)
             iou_to_cfsn[t] = cfsn_vecs
 
@@ -516,7 +570,8 @@ class DetectionMetrics(ub.NiceRepr):
         if gids is None:
             gids = sorted(dmet._imgname_to_gid.values())
         # Convert true/pred detections into VOC format
-        vmet = voc_metrics.VOC_Metrics(classes=dmet.classes)
+        classes = dmet.classes
+        vmet = voc_metrics.VOC_Metrics(classes=classes)
         for gid in gids:
             true_dets = dmet.true_detections(gid)
             pred_dets = dmet.pred_detections(gid)
@@ -545,11 +600,12 @@ class DetectionMetrics(ub.NiceRepr):
 
         gt_aid_to_tx = {}
         dt_aid_to_px = {}
+        classes = dmet.classes
 
-        for node in dmet.classes:
-            # cid = dmet.classes.graph.node[node]['id']
-            cid = dmet.classes.index(node)
-            supercategory = list(dmet.classes.graph.pred[node])
+        for node in classes:
+            # cid = classes.graph.node[node]['id']
+            cid = classes.index(node)
+            supercategory = list(classes.graph.pred[node])
             if len(supercategory) == 0:
                 supercategory = None
             else:
@@ -563,8 +619,8 @@ class DetectionMetrics(ub.NiceRepr):
             pred.add_image(imgname, id=gid)
 
         idx_to_id = {
-            idx: dmet.classes.index(node)
-            for idx, node in enumerate(dmet.classes.idx_to_node)
+            idx: classes.index(node)
+            for idx, node in enumerate(classes.idx_to_node)
         }
 
         for gid, pred_dets in dmet.gid_to_pred_dets.items():
@@ -696,16 +752,16 @@ class DetectionMetrics(ub.NiceRepr):
             evaler.evaluate()
             evaler.accumulate()
 
-            if 0:
-                # Get curves at a specific pycocoutils param
-                Tx = np.where(evaler.params.iouThrs == 0.5)[0]
-                Rx = slice(0, len(evaler.params.recThrs))
-                Kx = slice(0, len(evaler.params.catIds))
-                Ax = evaler.params.areaRng.index([0, 10000000000.0])
-                Mx = evaler.params.maxDets.index(100)
-                perclass_prec = evaler.eval['precision'][Tx, Rx, Kx, Ax, Mx]
-                perclass_rec = evaler.eval['recall'][Tx, Kx, Ax, Mx]
-                perclass_score = evaler.eval['scores'][Tx, Rx, Kx, Ax, Mx]
+            # if 0:
+            #     # Get curves at a specific pycocoutils param
+            #     Tx = np.where(evaler.params.iouThrs == 0.5)[0]
+            #     Rx = slice(0, len(evaler.params.recThrs))
+            #     Kx = slice(0, len(evaler.params.catIds))
+            #     Ax = evaler.params.areaRng.index([0, 10000000000.0])
+            #     Mx = evaler.params.maxDets.index(100)
+            #     perclass_prec = evaler.eval['precision'][Tx, Rx, Kx, Ax, Mx]
+            #     perclass_rec = evaler.eval['recall'][Tx, Kx, Ax, Mx]
+            #     perclass_score = evaler.eval['scores'][Tx, Rx, Kx, Ax, Mx]
 
             pct_info = {}
 
@@ -779,6 +835,8 @@ class DetectionMetrics(ub.NiceRepr):
             with_probs (bool):
                 if True, includes per-class probabilities with predictions
                 Defaults to 1.
+
+            rng (int | None | RandomState): random seed / state
 
         CommandLine:
             xdoctest -m kwcoco.metrics.detect_metrics DetectionMetrics.demo:2 --show
@@ -861,7 +919,10 @@ class DetectionMetrics(ub.NiceRepr):
         anchors = kwargs.get('anchors', None)
         scale = 100.0
 
-        if kwargs.get('newstyle'):
+        # TODO: make newstyle False
+        newstyle = kwargs.get('newstyle', False)
+
+        if newstyle:
             perterbkw = ub.dict_isect(kwargs, {
                 'rng': 0,
                 'box_noise': 0,
@@ -875,12 +936,22 @@ class DetectionMetrics(ub.NiceRepr):
 
             # TODO: use kwcoco.demo.perterb instead of rolling the logic here
             from kwcoco.demo import perterb
-            # TODO
+            # TODO: don't do any rendering
             # true_dset = kwcoco.CocoDataset.random()  # TODO
             true_dset = kwcoco.CocoDataset.demo('shapes{}'.format(nimgs))  # FIXME
+            # true_dset = kwcoco.CocoDataset.demo(
+            #     'vidshapes', num_frames=1, num_videos=nimgs, render=False)
             pred_dset = perterb.perterb_coco(true_dset, **perterbkw)
             dmet = cls.from_coco(true_dset, pred_dset)
         else:
+            # Unfortunately this is not ready for deprecation, the above case
+            # does not handle everything yet.
+            # ub.schedule_deprecation(
+            #     'kwcoco', 'newstyle=False', 'kwarg to DetectionMetrics.demo',
+            #     migration='adapt to newstyle=True instead',
+            #     deprecate='0.6.1', error='0.7.0', remove='0.7.1'
+            # )
+
             # Build random variables
             from kwarray import distributions
             DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)
@@ -1252,8 +1323,8 @@ def pycocotools_confusion_vectors(dmet, evaler, iou_thresh=0.5, verbose=0):
         #     y_prob = np.vstack(prob_accum)
         # else:
         y_prob = None
-        cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes,
-                                     probs=y_prob)
+        cfsn_vecs = ConfusionVectors(
+            cfsn_data, classes=dmet.classes, probs=y_prob)
     return cfsn_vecs
 
 

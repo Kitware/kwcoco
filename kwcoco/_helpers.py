@@ -187,3 +187,11 @@ def _delitems(items, remove_idxs, thresh=750):
         # However, when there are a few hundred items to remove, del is faster.
         for idx in sorted(remove_idxs, reverse=True):
             del items[idx]
+
+
+def _load_and_postprocess(data, loader, postprocess, **loadkw):
+    # Helper for CocoDataset.load_multiple
+    dset = loader(data, **loadkw)
+    if postprocess is not None:
+        dset = postprocess(dset)
+    return dset

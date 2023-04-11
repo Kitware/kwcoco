@@ -218,7 +218,8 @@ class ConfusionVectors(ub.NiceRepr):
             >>> # xdoctest: +REQUIRES(module:pandas)
             >>> from kwcoco.metrics import DetectionMetrics
             >>> dmet = DetectionMetrics.demo(
-            >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), n_fn=(0, 1), classes=3, cls_noise=.2)
+            >>>     nimgs=10, nboxes=(0, 10), n_fp=(0, 1), n_fn=(0, 1),
+            >>>     classes=3, cls_noise=.2, newstyle=False)
             >>> cfsn_vecs = dmet.confusion_vectors()
             >>> cm = cfsn_vecs.confusion_matrix()
             ...
