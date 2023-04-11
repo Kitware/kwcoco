@@ -2022,6 +2022,7 @@ class MixinCocoExtras(object):
         # from kwcoco.util import util_reroot
 
         if safe:
+            # First compute all new values in memory but don't overwrite
             gid_to_new = {}
             for gid, img in self.imgs.items():
                 gname = img.get('file_name', None)

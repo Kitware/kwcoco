@@ -70,7 +70,12 @@ class ObjectList1D(ub.NiceRepr):
         return self._dset.index._id_lookup[self._key]
 
     def __getitem__(self, index):
-        return self._ids[index]
+        if isinstance(index, slice):
+            subids = self._ids[index]
+            newself = self.__class__(subids, self._dset)
+            return newself
+        else:
+            return self._ids[index]
 
     def unique(self):
         """
@@ -82,6 +87,10 @@ class ObjectList1D(ub.NiceRepr):
         subids = list(ub.unique(self._ids))
         newself = self.__class__(subids, self._dset)
         return newself
+
+    @property
+    def ids(self):
+        return self._ids
 
     @property
     def objs(self):
@@ -378,7 +387,12 @@ class ObjectGroups(ub.NiceRepr):
         return self._lookup(key)  # broken?
 
     def __getitem__(self, index):
-        return self._groups[index]
+        if isinstance(index, slice):
+            subgroups = self._groups[index]
+            newself = self.__class__(subgroups, self._dset)
+            return newself
+        else:
+            return self._groups[index]
 
     def lookup(self, key, default=ub.NoParam):
         return [group.lookup(key, default) for group in self._groups]

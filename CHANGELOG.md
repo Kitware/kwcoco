@@ -7,6 +7,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.6.2 - Unreleased
 
+### Changed
+* sliced getitems into a CocoObject1d (e.g. Images, Annotations, etc...) now
+  returns a new CocoObject1d representing the subset instead of a list of
+  integer ids.
+
+### Added
+* Add id property to CocoObject1d
+
 
 ## Version 0.6.1 - Released 2023-04-10
 
