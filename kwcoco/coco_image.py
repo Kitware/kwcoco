@@ -1191,6 +1191,53 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
         return repr(self.__json__())
 
 
+# TODO?
+# class _CocoObject(AliasedDictProxy, ub.NiceRepr):
+#     """
+#     TODO: general coco scalar object
+#     """
+#     __alias_to_primary__ = {}
+
+#     def __init__(self, obj, /, dset=None):
+#         self._proxy = obj
+#         self.dset = dset
+#         self._bundle_dpath = None
+
+#     @property
+#     def bundle_dpath(self):
+#         if self.dset is not None:
+#             return self.dset.bundle_dpath
+#         else:
+#             return self._bundle_dpath
+
+#     @bundle_dpath.setter
+#     def bundle_dpath(self, value):
+#         self._bundle_dpath = value
+
+#     def detach(self):
+#         """
+#         Removes references to the underlying coco dataset, but keeps special
+#         information such that it wont be needed.
+#         """
+#         self._bundle_dpath = self.bundle_dpath
+#         self.dset = None
+#         return self
+
+
+# class CocoVideo(_CocoObject):
+#     """
+#     TODO: general coco scalars
+#     """
+#     __alias_to_primary__ = {}
+
+
+# class CocoAnnotation(_CocoObject):
+#     """
+#     TODO: general coco scalars
+#     """
+#     __alias_to_primary__ = {}
+
+
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
