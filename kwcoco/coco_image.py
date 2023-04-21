@@ -123,6 +123,18 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
             assets.append(asset)
         return assets
 
+    @property
+    def datetime(self):
+        """
+        Try to get datetime information for this image. Not always possible.
+        """
+        img = self.img
+        if 'timestamp' in img:
+            img['timestamp']
+        if 'date_captured' in img:
+            img['date_captured']
+        raise NotImplementedError
+
     def annots(self):
         """
         Returns:
