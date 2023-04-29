@@ -19,6 +19,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Add id property to CocoObject1d
 
+### Fixed
+* Windows path fixes
+
 
 ## Version 0.6.1 - Released 2023-04-10
 

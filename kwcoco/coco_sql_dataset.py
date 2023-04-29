@@ -1169,6 +1169,25 @@ class CocoSqlIndex(object):
                 v.ALCHEMY_MODE = mode
 
 
+def is_windows_path(path):
+    """
+    Example:
+        >>> assert is_windows_path('C:')
+        >>> assert is_windows_path('C:/')
+        >>> assert is_windows_path('C:\\')
+        >>> assert is_windows_path('C:/foo')
+        >>> assert is_windows_path('C:\\foo')
+        >>> assert not is_windows_path('/foo')
+    """
+    import re
+    drive_pat = '(?P<drive>[A-Za-z])'
+    slash_pat = r'[/\\]'
+    pat1 = re.compile(f'^{drive_pat}:$')
+    pat2 = re.compile(f'^{drive_pat}:{slash_pat}.*$')
+    match = pat1.match(path) or pat2.match(path)
+    return bool(match)
+
+
 def _handle_sql_uri(uri):
     """
     Temporary function to deal with URI. Modern tools seem to use RFC 3968
@@ -1177,6 +1196,7 @@ def _handle_sql_uri(uri):
     able to be written more eloquently.
 
     Ignore:
+        from kwcoco.coco_sql_dataset import _handle_sql_uri
         _handle_sql_uri(':memory:')
         _handle_sql_uri('special:foobar')
         _handle_sql_uri('sqlite:///:memory:')
@@ -1184,8 +1204,13 @@ def _handle_sql_uri(uri):
         _handle_sql_uri('foo/bar')
         _handle_sql_uri('postgresql:///tutorial.db')
         _handle_sql_uri('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb')
+
+        _handle_sql_uri('/Users')
+        _handle_sql_uri('C:/Users')
+        _handle_sql_uri('sqlite:///C:/Users')
     """
     import uritools
+
     uri_parsed = uritools.urisplit(uri)
     normalized = None
     local_path = None
@@ -1193,6 +1218,10 @@ def _handle_sql_uri(uri):
     file_prefix = '/file:'
 
     scheme, authority, path, query, fragment = uri_parsed
+
+    if is_windows_path(uri):
+        scheme = authority = None
+        path = uri
 
     if scheme == 'special':
         pass
