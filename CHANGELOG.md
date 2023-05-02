@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.6.2 - Unreleased
+## Version 0.6.3 - Unreleased
+
+
+## Version 0.6.2 - Released 2023-05-02
 
 ### Changed
 * sliced getitems into a CocoObject1d (e.g. Images, Annotations, etc...) now
