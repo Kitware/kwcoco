@@ -22,14 +22,18 @@ def test_read_zipped_kwcoco():
 def test_compress_dump():
     import tempfile
     import kwcoco
+    import ubelt as ub
     self = kwcoco.CocoDataset.demo()
-    file = tempfile.NamedTemporaryFile('wb')
-    self.dump(file, compress=True)
+    file = tempfile.NamedTemporaryFile('wb', delete=False)
+    fpath = ub.Path(file.name)
+    with file:
+        self.dump(file, compress=True)
     import zipfile
-    assert zipfile.is_zipfile(file.name)
-    self2 = kwcoco.CocoDataset(file.name)
+    assert zipfile.is_zipfile(fpath)
+    self2 = kwcoco.CocoDataset(fpath)
     assert self2.dataset == self.dataset
     assert self2.dataset is not self.dataset
+    fpath.delete()
 
 
 def test_internal_archive_name():
