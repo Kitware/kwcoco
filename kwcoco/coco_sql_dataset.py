@@ -1169,25 +1169,6 @@ class CocoSqlIndex(object):
                 v.ALCHEMY_MODE = mode
 
 
-def is_windows_path(path):
-    """
-    Example:
-        >>> assert is_windows_path('C:')
-        >>> assert is_windows_path('C:/')
-        >>> assert is_windows_path('C:\\')
-        >>> assert is_windows_path('C:/foo')
-        >>> assert is_windows_path('C:\\foo')
-        >>> assert not is_windows_path('/foo')
-    """
-    import re
-    drive_pat = '(?P<drive>[A-Za-z])'
-    slash_pat = r'[/\\]'
-    pat1 = re.compile(f'^{drive_pat}:$')
-    pat2 = re.compile(f'^{drive_pat}:{slash_pat}.*$')
-    match = pat1.match(path) or pat2.match(path)
-    return bool(match)
-
-
 def _handle_sql_uri(uri):
     """
     Temporary function to deal with URI. Modern tools seem to use RFC 3968
@@ -1219,7 +1200,8 @@ def _handle_sql_uri(uri):
 
     scheme, authority, path, query, fragment = uri_parsed
 
-    if is_windows_path(uri):
+    from watch.util import util_windows
+    if util_windows.is_windows_path(uri):
         scheme = authority = None
         path = uri
 
