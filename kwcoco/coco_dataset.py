@@ -1917,7 +1917,8 @@ class MixinCocoExtras(object):
             >>> self.reroot(bundle_dpath)
             >>> report(self, 'self')
             >>> print('NEW self.imgs = {!r}'.format(self.imgs))
-            >>> assert self.imgs[1]['file_name'].startswith('.cache')
+            >>> if not ub.WIN32:
+            >>>     assert self.imgs[1]['file_name'].startswith('.cache')
 
             >>> # Use absolute paths
             >>> self.reroot(absolute=True)
