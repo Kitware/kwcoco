@@ -1200,7 +1200,7 @@ def _handle_sql_uri(uri):
 
     scheme, authority, path, query, fragment = uri_parsed
 
-    from watch.util import util_windows
+    from kwcoco.util import util_windows
     if util_windows.is_windows_path(uri):
         scheme = authority = None
         path = uri
