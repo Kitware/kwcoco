@@ -37,7 +37,7 @@ for part in sub_parts:
 class CocoValidateCLI:
     name = 'validate'
 
-    class CLIConfig(scfg.Config):
+    class CLIConfig(scfg.DataConfig):
         """
         Validates that a coco file satisfies expected properties.
 
@@ -48,7 +48,7 @@ class CocoValidateCLI:
         that functionality may be moved to a new command in the future.
         """
         __default__ = {
-            'src': scfg.Value(['special:shapes8'], nargs='+', help='path to datasets', position=1),
+            'src': scfg.Value(None, nargs='+', help='path to datasets', position=1),
 
             # 'schema': scfg.Value(True, help='If True check the json schema'),
             # 'missing': scfg.Value(True, help='If True check if all assets (e.g. images) exist'),
@@ -107,6 +107,11 @@ class CocoValidateCLI:
                 if True raise errors immediately
                 ''')),
 
+            'workers': scfg.Value(0, isflag=True, help=ub.paragraph(
+                '''
+                number of workers for checks that support parallelization
+                ''')),
+
             # TODO: Move these to a different tool. This should only validate,
             # not fix anything.
 
@@ -128,7 +133,7 @@ class CocoValidateCLI:
                 '''))
 
         }
-        epilog = """
+        __epilog__ = """
         Example Usage:
             kwcoco toydata --dst foo.json --key=special:shapes8
             kwcoco validate --src=foo.json --corrupted=True
@@ -145,8 +150,8 @@ class CocoValidateCLI:
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        config = cls.CLIConfig.cli(kw, cmdline=cmdline, strict=True)
+        print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))

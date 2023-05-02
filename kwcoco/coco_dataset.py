@@ -73,7 +73,7 @@ from kwcoco import exceptions
 from kwcoco._helpers import (
     SortedSet, UniqueNameRemapper, _ID_Remapper, _NextId,
     _delitems, _lut_image_frame_index, _lut_annot_frame_index,
-    _load_and_postprocess,
+    _load_and_postprocess, _image_corruption_check
 )
 
 import json as pjson
@@ -328,7 +328,7 @@ class MixinCocoAccessors(object):
             gpath = self.get_auxiliary_fpath(gid_or_img, channels)
         else:
             img = self._resolve_to_img(gid_or_img)
-            gpath = join(self.bundle_dpath, img['file_name'])
+            gpath = ub.Path(self.bundle_dpath) / img['file_name']
         return gpath
 
     def _get_img_auxiliary(self, gid_or_img, channels):
@@ -367,7 +367,7 @@ class MixinCocoAccessors(object):
             >>> self.get_auxiliary_fpath(1, 'disparity')
         """
         aux = self._get_img_auxiliary(gid_or_img, channels)
-        fpath = join(self.bundle_dpath, aux['file_name'])
+        fpath = ub.Path(self.bundle_dpath) / aux['file_name']
         return fpath
 
     def load_annot_sample(self, aid_or_ann, image=None, pad=None):
@@ -1632,7 +1632,7 @@ class MixinCocoExtras(object):
                         bad_paths.append((index, gpath, gid))
         return bad_paths
 
-    def corrupted_images(self, check_aux=False, verbose=0):
+    def corrupted_images(self, check_aux=True, verbose=0, workers=0):
         """
         Check for images that don't exist or can't be opened
 
@@ -1640,41 +1640,38 @@ class MixinCocoExtras(object):
             check_aux (bool):
                 if specified also checks auxiliary images
             verbose (int): verbosity level
+            workers (int): number of background workers
 
         Returns:
             List[Tuple[int, str, int]]: bad indexes and paths and ids
         """
         bad_paths = []
+
+        jobs = ub.JobPool(mode='process', max_workers=workers)
+
         img_enum = enumerate(self.dataset['images'])
         for index, img in ub.ProgIter(img_enum,
                                       total=len(self.dataset['images']),
-                                      desc='check for corrupted images',
+                                      desc='submit corruption checks',
                                       verbose=verbose):
             gid = img.get('id', None)
             fname = img.get('file_name', None)
             if fname is not None:
                 gpath = join(self.bundle_dpath, fname)
-                if not exists(gpath):
-                    bad_paths.append((index, gpath, gid))
-                # TODO: parallelize
-                try:
-                    import kwimage
-                    # kwimage.imread(gpath)
-                    kwimage.load_image_shape(gpath)
-                except Exception:
-                    bad_paths.append((index, gpath, gid))
+                job = jobs.submit(_image_corruption_check, gpath)
+                job.input_info = (index, gpath, gid)
 
             if check_aux:
                 for aux in img.get('auxiliary', img.get('assets', [])):
                     gpath = join(self.bundle_dpath, aux['file_name'])
-                    if not exists(gpath):
-                        bad_paths.append((index, gpath, gid))
-                    try:
-                        import kwimage
-                        kwimage.load_image_shape(gpath)
-                        # kwimage.imread(gpath)
-                    except Exception:
-                        bad_paths.append((index, gpath, gid))
+                    job = jobs.submit(_image_corruption_check, gpath)
+                    job.input_info = (index, gpath, gid)
+
+        for job in jobs.as_completed(desc='check corrupted images',
+                                     progkw={'verbose': verbose}):
+            info = job.result()
+            if info['failed']:
+                bad_paths.append(job.input_info)
 
         return bad_paths
 
@@ -1920,7 +1917,8 @@ class MixinCocoExtras(object):
             >>> self.reroot(bundle_dpath)
             >>> report(self, 'self')
             >>> print('NEW self.imgs = {!r}'.format(self.imgs))
-            >>> assert self.imgs[1]['file_name'].startswith('.cache')
+            >>> if not ub.WIN32:
+            >>>     assert self.imgs[1]['file_name'].startswith('.cache')
 
             >>> # Use absolute paths
             >>> self.reroot(absolute=True)
@@ -1928,7 +1926,8 @@ class MixinCocoExtras(object):
 
             >>> # Switch back to relative paths
             >>> self.reroot()
-            >>> assert self.imgs[1]['file_name'].startswith('.cache')
+            >>> if not ub.WIN32:
+            >>>     assert self.imgs[1]['file_name'].startswith('.cache')
 
         Example:
             >>> # demo with auxiliary data
@@ -1940,8 +1939,9 @@ class MixinCocoExtras(object):
             >>> self.reroot(new_root=bundle_dpath)
             >>> print(self.imgs[1]['file_name'])
             >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
-            >>> assert self.imgs[1]['file_name'].startswith('.cache')
-            >>> assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
+            >>> if not ub.WIN32:
+            >>>     assert self.imgs[1]['file_name'].startswith('.cache')
+            >>>     assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
 
         Ignore:
             See ~/code/kwcoco/dev/devcheck_reroot.py
@@ -1971,6 +1971,13 @@ class MixinCocoExtras(object):
                 else:
                     print('No images to reroot')
 
+        def _normalize_prefix(path):
+            # removes leading ./ on paths
+            path = os.fspath(path)
+            while path.startswith('./'):
+                path = path[2:]
+            return path
+
         def _reroot_path(file_name):
             """ Reroot a single file """
 
@@ -1979,6 +1986,8 @@ class MixinCocoExtras(object):
             # the images based on the new root, unless we are explicitly given
             # information about new and old prefixes. Can we do better than
             # this?
+
+            file_name = _normalize_prefix(file_name)
             cur_gpath = join(cur_bundle_dpath, file_name)
 
             if old_prefix is not None:
@@ -2022,6 +2031,7 @@ class MixinCocoExtras(object):
         # from kwcoco.util import util_reroot
 
         if safe:
+            # First compute all new values in memory but don't overwrite
             gid_to_new = {}
             for gid, img in self.imgs.items():
                 gname = img.get('file_name', None)
@@ -2503,6 +2513,8 @@ class MixinCocoStats(object):
 
                 verbose (default=1): verbosity flag
 
+                workers (int): number of workers for parallel checks. defaults to 0
+
                 fastfail (default=False): if True raise errors immediately
 
         Returns:
@@ -2687,7 +2699,8 @@ class MixinCocoStats(object):
                 result['missing'] = missing
 
         if config.get('corrupted', False):
-            corrupted = dset.corrupted_images(check_aux=True, verbose=verbose)
+            corrupted = dset.corrupted_images(check_aux=True, verbose=verbose,
+                                              workers=config.get('workers', 0))
             if corrupted:
                 msg = 'There are {} corrupted images'.format(len(corrupted))
                 _error(msg)
@@ -3417,7 +3430,7 @@ class MixinCocoDraw(object):
                 ax.text(x1, y1, catname, **textkw)
 
             for color, segments in colored_segments.items():
-                line_col = mpl.collections.LineCollection(segments, 2, color=color)
+                line_col = mpl.collections.LineCollection(segments, linewidths=2, color=color)
                 ax.add_collection(line_col)
 
             rect_col = mpl.collections.PatchCollection(rects, match_original=True)
@@ -5622,7 +5635,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     raise
         self._state['was_saved'] = True
 
-    def dump(self, file=None, indent=None, newlines=False, temp_file=True,
+    def dump(self, file=None, indent=None, newlines=False, temp_file='auto',
              compress='auto'):
         """
         Writes the dataset out to the json format
@@ -5641,7 +5654,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             temp_file (bool | str):
                 Argument to :func:`safer.open`.  Ignored if ``file`` is not a
-                PathLike object. Defaults to True.
+                PathLike object. Defaults to 'auto', which is False on Windows
+                and True everywhere else.
 
             compress (bool | str):
                 if True, dumps the kwcoco file as a compressed zipfile.
@@ -5703,6 +5717,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         if input_was_pathlike:
             import safer
+            if temp_file == 'auto':
+                temp_file = not ub.WIN32
+
             with safer.open(fpath, mode, temp_file=temp_file) as fp:
                 self._dump(
                     fp, indent=indent, newlines=newlines, compress=compress)

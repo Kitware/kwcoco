@@ -20,7 +20,7 @@ except Exception:
     profile = ub.identity
 
 
-TOYDATA_VIDEO_VERSION = 22
+TOYDATA_VIDEO_VERSION = 23
 
 
 @profile
@@ -831,7 +831,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
             for auxdict in auxiliaries:
                 chan_part = kwcoco.ChannelSpec.coerce(auxdict['channels']).as_path()
                 aux_dpath = ub.ensuredir(
-                    (bundle_dpath, '_assets', 'aux', 'aux_' + chan_part))
+                    (bundle_dpath, '_assets', 'auxiliary', 'aux_' + chan_part))
                 aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
                 ub.ensuredir(aux_dpath)
                 auxdict['file_name'] = os.fspath(ub.Path(aux_fpath).relative_to(bundle_dpath))

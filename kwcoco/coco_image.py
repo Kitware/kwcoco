@@ -123,6 +123,18 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
             assets.append(asset)
         return assets
 
+    @property
+    def datetime(self):
+        """
+        Try to get datetime information for this image. Not always possible.
+        """
+        img = self.img
+        if 'timestamp' in img:
+            img['timestamp']
+        if 'date_captured' in img:
+            img['date_captured']
+        raise NotImplementedError
+
     def annots(self):
         """
         Returns:
@@ -270,9 +282,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         return width, height
 
     def primary_image_filepath(self, requires=None):
-        dpath = self.bundle_dpath
+        dpath = ub.Path(self.bundle_dpath)
         fname = self.primary_asset()['file_name']
-        fpath = join(dpath, fname)
+        fpath = dpath / fname
         return fpath
 
     def primary_asset(self, requires=None):
@@ -375,11 +387,14 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                 If True, prepends the bundle dpath to fully specify the path.
                 Otherwise, just returns the registered string in the file_name
                 attribute of each asset.  Defaults to True.
+
+        Yields:
+            ub.Path
         """
-        dpath = self.bundle_dpath
+        dpath = ub.Path(self.bundle_dpath)
         for obj in self.iter_asset_objs():
             fname = obj.get('file_name')
-            fpath = join(dpath, fname)
+            fpath = dpath / fname
             yield fpath
 
     def iter_asset_objs(self):
@@ -585,7 +600,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         if file_name is not None:
             file_name = os.fspath(file_name)
 
-        # Make the aux info dict
+        # Make the asset info dict
         obj = {
             'file_name': file_name,
             'height': height,
@@ -789,10 +804,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                                        nodata_method=nodata_method)
         obj_info_list = [(img_info, img)]
         asset_list = img.get('auxiliary', img.get('assets', [])) or []
-        for aux in asset_list:
-            info = _delay_load_imglike(bundle_dpath, aux,
+        for asset in asset_list:
+            info = _delay_load_imglike(bundle_dpath, asset,
                                        nodata_method=nodata_method)
-            obj_info_list.append((info, aux))
+            obj_info_list.append((info, asset))
 
         chan_list = []
         for info, obj in obj_info_list:
@@ -1189,6 +1204,53 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
 
     def __nice__(self):
         return repr(self.__json__())
+
+
+# TODO?
+# class _CocoObject(AliasedDictProxy, ub.NiceRepr):
+#     """
+#     TODO: general coco scalar object
+#     """
+#     __alias_to_primary__ = {}
+
+#     def __init__(self, obj, /, dset=None):
+#         self._proxy = obj
+#         self.dset = dset
+#         self._bundle_dpath = None
+
+#     @property
+#     def bundle_dpath(self):
+#         if self.dset is not None:
+#             return self.dset.bundle_dpath
+#         else:
+#             return self._bundle_dpath
+
+#     @bundle_dpath.setter
+#     def bundle_dpath(self, value):
+#         self._bundle_dpath = value
+
+#     def detach(self):
+#         """
+#         Removes references to the underlying coco dataset, but keeps special
+#         information such that it wont be needed.
+#         """
+#         self._bundle_dpath = self.bundle_dpath
+#         self.dset = None
+#         return self
+
+
+# class CocoVideo(_CocoObject):
+#     """
+#     TODO: general coco scalars
+#     """
+#     __alias_to_primary__ = {}
+
+
+# class CocoAnnotation(_CocoObject):
+#     """
+#     TODO: general coco scalars
+#     """
+#     __alias_to_primary__ = {}
 
 
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):

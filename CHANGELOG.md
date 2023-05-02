@@ -5,7 +5,31 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.6.1 - Unreleased
+## Version 0.6.2 - Unreleased
+
+### Changed
+* sliced getitems into a CocoObject1d (e.g. Images, Annotations, etc...) now
+  returns a new CocoObject1d representing the subset instead of a list of
+  integer ids.
+* reroot now ignores leading "./" when looking for `old_prefix`
+* `CocoDataset.corrupted_images` now defaults `check_aux` to True
+* `CocoDataset.corrupted_images` now can execute in parallel.
+* `CocoDataset.corrupted_images` now checks if it can read the entire image again.
+* Changed the folder "aux" to "auxiliary" in test data, due to windows issues.
+* `CocoDataset.get_image_fpath` now returns a ubelt.Path object
+* `CocoDataset.get_auxiliary_fpath` now returns a ubelt.Path object
+* `CocoImage.iter_image_filepaths` now yields ubelt.Path objects
+* `CocoImage.primary_image_filepath` now returns a ubelt.Path object
+
+### Added
+* Add id property to CocoObject1d
+
+### Fixed
+* Windows path fixes
+* safer no longer tries to use temp files on windows
+
+
+## Version 0.6.1 - Released 2023-04-10
 
 ### Added:
 * Add `remember_parent` option to CocoDataset.union

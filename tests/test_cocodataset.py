@@ -141,26 +141,17 @@ def test_dump():
     import json
     import kwcoco
     self = kwcoco.CocoDataset.demo()
-    file = tempfile.NamedTemporaryFile('w')
-    self.dump(file)
-    file.seek(0)
-    text = open(file.name, 'r').read()
+    file = tempfile.NamedTemporaryFile('w', delete=False)
+    tmp_path = ub.Path(file.name)
+    with file:
+        self.dump(file, newlines=True)
+    text = tmp_path.read_text()
     print(text)
-    file.seek(0)
-    dataset = json.load(open(file.name, 'r'))
+    dataset = json.loads(text)
     self2 = kwcoco.CocoDataset(dataset, tag='demo2')
     assert self2.dataset == self.dataset
     assert self2.dataset is not self.dataset
-
-    file = tempfile.NamedTemporaryFile('w')
-    self.dump(file, newlines=True)
-    text = ub.Path(file.name).read_text()
-    print(text)
-    file.seek(0)
-    dataset = json.load(open(file.name, 'r'))
-    self2 = kwcoco.CocoDataset(dataset, tag='demo2')
-    assert self2.dataset == self.dataset
-    assert self2.dataset is not self.dataset
+    tmp_path.delete()
 
 
 def test_dump_causes_saved_status():

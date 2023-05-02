@@ -9,7 +9,7 @@ def test_union_with_aux():
         'auxiliary': [
             {
                 'channels': 'ir',
-                'file_name': 'subdir/aux/foo.png',
+                'file_name': 'subdir/assets/foo.png',
             }
         ]
     }
@@ -21,7 +21,7 @@ def test_union_with_aux():
         'auxiliary': [
             {
                 'channels': 'ir',
-                'file_name': 'aux/foo.png',
+                'file_name': 'assets/foo.png',
             }
         ]
     }
