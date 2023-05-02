@@ -26,9 +26,9 @@ def fast_confusion_matrix(y_true, y_pred, n_labels, sample_weight=None):
         >>> y_pred = np.array([0, 0, 0, 0, 0, 0, 0, 1,  1, 1])
         >>> fast_confusion_matrix(y_true, y_pred, 2)
         array([[4, 2],
-               [3, 1]])
+               [3, 1]]...)
         >>> fast_confusion_matrix(y_true, y_pred, 2).ravel()
-        array([4, 2, 3, 1])
+        array([4, 2, 3, 1]...)
     """
     if sample_weight is None:
         sample_weight = np.ones(len(y_true), dtype=np.uint8)
