@@ -1925,8 +1925,8 @@ class MixinCocoExtras(object):
 
             >>> # Switch back to relative paths
             >>> self.reroot()
-            >>> # xdoctest: +REQUIRES(POSIX)
-            >>> assert self.imgs[1]['file_name'].startswith('.cache')
+            >>> if not ub.WIN32:
+            >>>     assert self.imgs[1]['file_name'].startswith('.cache')
 
         Example:
             >>> # demo with auxiliary data
@@ -1938,9 +1938,9 @@ class MixinCocoExtras(object):
             >>> self.reroot(new_root=bundle_dpath)
             >>> print(self.imgs[1]['file_name'])
             >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
-            >>> # xdoctest: +REQUIRES(POSIX)
-            >>> assert self.imgs[1]['file_name'].startswith('.cache')
-            >>> assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
+            >>> if not ub.WIN32:
+            >>>     assert self.imgs[1]['file_name'].startswith('.cache')
+            >>>     assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
 
         Ignore:
             See ~/code/kwcoco/dev/devcheck_reroot.py
@@ -3429,7 +3429,7 @@ class MixinCocoDraw(object):
                 ax.text(x1, y1, catname, **textkw)
 
             for color, segments in colored_segments.items():
-                line_col = mpl.collections.LineCollection(segments, 2, color=color)
+                line_col = mpl.collections.LineCollection(segments, linewidths=2, color=color)
                 ax.add_collection(line_col)
 
             rect_col = mpl.collections.PatchCollection(rects, match_original=True)
