@@ -16,7 +16,7 @@ def fix_msys_path(path):
         >>> print(fix_msys_path(r'\z'))
         Z:/
         >>> import pathlib
-        >>> assert fix_msys_path(pathlib.Path(r'\z')) == pathlib.Path('Z:')
+        >>> assert fix_msys_path(pathlib.Path(r'\z')) == pathlib.Path('Z:/')
     """
     import os
     was_pathlike = isinstance(path, os.PathLike)
