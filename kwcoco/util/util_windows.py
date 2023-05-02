@@ -7,7 +7,6 @@ def fix_msys_path(path):
     location.
 
     Example:
-        >>> from watch.utils.util_windows import *  # NOQA
         >>> print(fix_msys_path('/c/Users/foobar'))
         C:/Users/foobar
         >>> print(fix_msys_path(r'\c\Users\foobar'))
@@ -43,7 +42,6 @@ def fix_msys_path(path):
 def is_windows_path(path):
     r"""
     Example:
-        >>> from watch.utils.util_windows import *  # NOQA
         >>> assert is_windows_path('C:')
         >>> assert is_windows_path('C:/')
         >>> assert is_windows_path('C:\\')
