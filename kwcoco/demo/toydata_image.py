@@ -262,7 +262,7 @@ def demodata_toy_dset(image_size=(600, 600),
             if auxiliaries is not None:
                 for auxdict in auxiliaries:
                     aux_dpath = ub.ensuredir(
-                        (assets_dpath, 'aux', auxdict['channels']))
+                        (assets_dpath, 'auxiliary', auxdict['channels']))
                     aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
                     ub.ensuredir(aux_dpath)
                     auxdata = (auxdict.pop('imdata') * 255).astype(np.uint8)

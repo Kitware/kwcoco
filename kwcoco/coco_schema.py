@@ -37,7 +37,7 @@ Example:
     >>> img['auxiliary'] = [{'file_name': 'foobar'}]
     >>> with pytest.raises(jsonschema.ValidationError):
     >>>     COCO_SCHEMA.validate(dataset)
-    >>> img['name'] = 'aux-only images must have a name'
+    >>> img['name'] = 'asset-only images must have a name'
     >>> COCO_SCHEMA.validate(dataset)
 """
 

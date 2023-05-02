@@ -1925,6 +1925,7 @@ class MixinCocoExtras(object):
 
             >>> # Switch back to relative paths
             >>> self.reroot()
+            >>> # xdoctest: +REQUIRES(POSIX)
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
 
         Example:
@@ -1937,6 +1938,7 @@ class MixinCocoExtras(object):
             >>> self.reroot(new_root=bundle_dpath)
             >>> print(self.imgs[1]['file_name'])
             >>> print(self.imgs[1]['auxiliary'][0]['file_name'])
+            >>> # xdoctest: +REQUIRES(POSIX)
             >>> assert self.imgs[1]['file_name'].startswith('.cache')
             >>> assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
 

@@ -597,7 +597,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         if file_name is not None:
             file_name = os.fspath(file_name)
 
-        # Make the aux info dict
+        # Make the asset info dict
         obj = {
             'file_name': file_name,
             'height': height,
@@ -801,10 +801,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                                        nodata_method=nodata_method)
         obj_info_list = [(img_info, img)]
         asset_list = img.get('auxiliary', img.get('assets', [])) or []
-        for aux in asset_list:
-            info = _delay_load_imglike(bundle_dpath, aux,
+        for asset in asset_list:
+            info = _delay_load_imglike(bundle_dpath, asset,
                                        nodata_method=nodata_method)
-            obj_info_list.append((info, aux))
+            obj_info_list.append((info, asset))
 
         chan_list = []
         for info, obj in obj_info_list:
