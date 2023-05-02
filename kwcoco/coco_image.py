@@ -282,9 +282,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         return width, height
 
     def primary_image_filepath(self, requires=None):
-        dpath = self.bundle_dpath
+        dpath = ub.Path(self.bundle_dpath)
         fname = self.primary_asset()['file_name']
-        fpath = join(dpath, fname)
+        fpath = dpath / fname
         return fpath
 
     def primary_asset(self, requires=None):
@@ -387,11 +387,14 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                 If True, prepends the bundle dpath to fully specify the path.
                 Otherwise, just returns the registered string in the file_name
                 attribute of each asset.  Defaults to True.
+
+        Yields:
+            ub.Path
         """
-        dpath = self.bundle_dpath
+        dpath = ub.Path(self.bundle_dpath)
         for obj in self.iter_asset_objs():
             fname = obj.get('file_name')
-            fpath = join(dpath, fname)
+            fpath = dpath / fname
             yield fpath
 
     def iter_asset_objs(self):

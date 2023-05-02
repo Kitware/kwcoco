@@ -328,7 +328,7 @@ class MixinCocoAccessors(object):
             gpath = self.get_auxiliary_fpath(gid_or_img, channels)
         else:
             img = self._resolve_to_img(gid_or_img)
-            gpath = join(self.bundle_dpath, img['file_name'])
+            gpath = ub.Path(self.bundle_dpath) / img['file_name']
         return gpath
 
     def _get_img_auxiliary(self, gid_or_img, channels):
@@ -367,7 +367,7 @@ class MixinCocoAccessors(object):
             >>> self.get_auxiliary_fpath(1, 'disparity')
         """
         aux = self._get_img_auxiliary(gid_or_img, channels)
-        fpath = join(self.bundle_dpath, aux['file_name'])
+        fpath = ub.Path(self.bundle_dpath) / aux['file_name']
         return fpath
 
     def load_annot_sample(self, aid_or_ann, image=None, pad=None):

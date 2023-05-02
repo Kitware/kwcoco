@@ -16,6 +16,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * `CocoDataset.corrupted_images` now can execute in parallel.
 * `CocoDataset.corrupted_images` now checks if it can read the entire image again.
 * Changed the folder "aux" to "auxiliary" in test data, due to windows issues.
+* `CocoDataset.get_image_fpath` now returns a ubelt.Path object
+* `CocoDataset.get_auxiliary_fpath` now returns a ubelt.Path object
+* `CocoImage.iter_image_filepaths` now yields ubelt.Path objects
+* `CocoImage.primary_image_filepath` now returns a ubelt.Path object
 
 ### Added
 * Add id property to CocoObject1d
