@@ -21,6 +21,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * Windows path fixes
+* safer no longer tries to use temp files on windows
 
 
 ## Version 0.6.1 - Released 2023-04-10

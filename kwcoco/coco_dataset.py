@@ -5632,7 +5632,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     raise
         self._state['was_saved'] = True
 
-    def dump(self, file=None, indent=None, newlines=False, temp_file=True,
+    def dump(self, file=None, indent=None, newlines=False, temp_file='auto',
              compress='auto'):
         """
         Writes the dataset out to the json format
@@ -5651,7 +5651,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             temp_file (bool | str):
                 Argument to :func:`safer.open`.  Ignored if ``file`` is not a
-                PathLike object. Defaults to True.
+                PathLike object. Defaults to 'auto', which is False on Windows
+                and True everywhere else.
 
             compress (bool | str):
                 if True, dumps the kwcoco file as a compressed zipfile.
@@ -5713,6 +5714,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         if input_was_pathlike:
             import safer
+            if temp_file == 'auto':
+                temp_file = not ub.WIN32
+
             with safer.open(fpath, mode, temp_file=temp_file) as fp:
                 self._dump(
                     fp, indent=indent, newlines=newlines, compress=compress)

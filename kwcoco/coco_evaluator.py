@@ -1024,7 +1024,7 @@ class CocoSingleResult(ub.NiceRepr):
             json.dump(state, file, indent=indent)
         else:
             import safer
-            with safer.open(fpath, 'w', temp_file=True) as fp:
+            with safer.open(fpath, 'w', temp_file=not ub.WIN32) as fp:
                 return result.dump(fp, indent=indent)
 
     @profile
