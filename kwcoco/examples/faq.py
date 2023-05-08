@@ -75,3 +75,40 @@ def whats_the_difference_between_Images_and_CocoImage():
     all of the image dictionaries in that set.
     """
     ...
+
+
+def what_order_are_images_returned_in():
+    """
+    Q. What order are images returned in? What about when using ndsampler.
+
+    A. When requesting images from a video they are ordered by their timestamp
+    / frame_index.  For ndsampler, the order is always the requested order.
+
+    """
+    import kwcoco
+    import ndsampler
+    dset = kwcoco.CocoDataset.demo('vidshapes1', num_frames=10)
+    images = dset.images()
+
+    videos = dset.videos()
+
+    # Images always ordered by timestamp/frame-index here
+    images = dset.images(video_id=videos[0])
+
+    # But you can always lookup the attribute and check yourself
+    frame_idxs = images.lookup('frame_index')
+    assert sorted(frame_idxs) == frame_idxs
+
+    gid1, gid2, gid3 = images[0:3]
+
+    sampler = ndsampler.CocoSampler(dset)
+
+    target = {'gids': [gid1, gid2, gid3]}
+    sample = sampler.load_sample(target)
+    # Data is in the requested order
+    assert sample['target']['gids'] == [gid1, gid2, gid3]
+
+    target = {'gids': [gid2, gid3, gid1]}
+    sample = sampler.load_sample(target)
+    # Data is in the requested order
+    assert sample['target']['gids'] == [gid2, gid3, gid1]

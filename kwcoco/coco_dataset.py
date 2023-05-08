@@ -2694,7 +2694,11 @@ class MixinCocoStats(object):
         if config.get('missing', True):
             missing = dset.missing_images(check_aux=True, verbose=verbose)
             if missing:
-                msg = 'There are {} missing images'.format(len(missing))
+                msg = ub.paragraph(
+                    f'''
+                    There are {len(missing)} missing images.
+                    The first one is {missing[0][1]!r}.
+                    ''')
                 _error(msg)
                 result['missing'] = missing
 
@@ -2702,7 +2706,11 @@ class MixinCocoStats(object):
             corrupted = dset.corrupted_images(check_aux=True, verbose=verbose,
                                               workers=config.get('workers', 0))
             if corrupted:
-                msg = 'There are {} corrupted images'.format(len(corrupted))
+                msg = ub.paragraph(
+                    f'''
+                    There are {len(corrupted)} corrupted images.
+                    The first one is {corrupted[0][1]!r}.
+                    ''')
                 _error(msg)
                 result['corrupted'] = corrupted
 

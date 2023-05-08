@@ -139,22 +139,31 @@ class CocoSubsetCLI(object):
         dset = kwcoco.CocoDataset.coerce(config['src'])
         dst_fpath = ub.Path(config['dst'])
 
-        if config['absolute'] == 'auto' and not config['copy_assets']:
-            src_fpath = ub.Path(dset.fpath)
+        if config['absolute'] == 'auto':
+            if not config['copy_assets']:
+                src_fpath = ub.Path(dset.fpath)
 
-            src_bundle_dpath = src_fpath.absolute().parent
-            dst_bundle_dpath = dst_fpath.absolute().parent
+                src_bundle_dpath = src_fpath.absolute().parent
+                dst_bundle_dpath = dst_fpath.absolute().parent
 
-            # Destinations are different, we will need to force a reroot
-            absolute = (src_bundle_dpath.resolve() !=
-                        dst_bundle_dpath.resolve())
+                # Destinations are different, we will need to force a reroot
+                absolute = (src_bundle_dpath.resolve() !=
+                            dst_bundle_dpath.resolve())
+            else:
+                absolute = False
         else:
             absolute = config['absolute']
+        print(f'absolute={absolute}')
 
         new_dset = query_subset(dset, config)
         if absolute:
             new_dset.reroot(absolute=absolute)
+        else:
+            if config['copy_assets']:
+                # a bit roundabout, but it seems to work
+                new_dset.reroot(absolute=False)
         new_dset.fpath = dst_fpath
+        print(f'new_dset.fpath={new_dset.fpath}')
 
         if config['copy_assets']:
             # Create a copy of the data, (currently only works for relative
@@ -165,18 +174,19 @@ class CocoSubsetCLI(object):
             # new_dset.reroot(new_dset.bundle_dpath, old_prefix=dset.bundle_dpath)
             tocopy = []
             dstdirs = set()
+            print(f'new_dset.bundle_dpath={new_dset.bundle_dpath}')
             for gid, new_img in new_dset.index.imgs.items():
                 old_img = dset.index.imgs[gid]
                 if new_img.get('file_name', None) is not None:
-                    new_fpath = join(new_dset.bundle_dpath, new_img['file_name'])
                     old_fpath = join(dset.bundle_dpath, old_img['file_name'])
+                    new_fpath = join(new_dset.bundle_dpath, new_img['file_name'])
                     dstdirs.add(dirname(new_fpath))
                     tocopy.append((old_fpath, new_fpath))
                 new_aux_list = new_img.get('auxiliary', [])
                 old_aux_list = old_img.get('auxiliary', [])
                 for old_aux, new_aux in zip(old_aux_list, new_aux_list):
-                    new_fpath = join(new_dset.bundle_dpath, new_aux['file_name'])
                     old_fpath = join(dset.bundle_dpath, old_aux['file_name'])
+                    new_fpath = join(new_dset.bundle_dpath, new_aux['file_name'])
                     dstdirs.add(dirname(new_fpath))
                     tocopy.append((old_fpath, new_fpath))
 

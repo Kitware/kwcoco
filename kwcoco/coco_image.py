@@ -118,7 +118,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         assets = []
         for obj in self.iter_asset_objs():
             # TODO: ducktype with an object
-            asset = CocoAsset(obj)
+            asset = CocoAsset(obj, bundle_dpath=self.bundle_dpath)
             # asset = obj
             assets.append(asset)
         return assets
@@ -1199,11 +1199,20 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
         'warp_wld_from_asset': 'warp_to_wld',
     }
 
-    def __init__(self, asset):
+    def __init__(self, asset, bundle_dpath=None):
         self._proxy = asset
+        self._bundle_dpath = bundle_dpath
 
     def __nice__(self):
         return repr(self.__json__())
+
+    def image_filepath(self):
+        if self._bundle_dpath is None:
+            raise Exception('Bundle dpath must be populated to use this method')
+            # return self['file_name']
+        else:
+            return ub.Path(self._bundle_dpath) / self['file_name']
+        ...
 
 
 # TODO?
@@ -1254,7 +1263,7 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
 
 
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
-    from os.path import join
+    # from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
     from delayed_image import DelayedLoad, DelayedIdentity
     info = {}
