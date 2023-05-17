@@ -167,11 +167,6 @@ try:
 except ImportError:
     text = ub.identity
 
-# TODO: is it possible to get sclalchemy to use JSON for sqlite and JSONB for
-# postgresql?
-# from sqlalchemy.dialects.postgresql import JSONB
-# JSON = JSONB
-
 # This is the column name for unstructured data that is not captured directly
 # in our sql schema. It will be stored as a json blob. The column names defined
 # in the alchemy tables must agree with this. Note: previously we used
@@ -237,10 +232,10 @@ class Image(CocoBase):
 
 # TODO:
 # Track
-# SharedPolygon?
 
 # The track LUT depends on some stuff in postgresql that I dont fully
 # understand keep the ability to turn it off if we need to.
+# It does seem stable.
 _USE_TRACK_LUT = 1
 
 
@@ -250,10 +245,9 @@ class Annotation(CocoBase):
     image_id = Column(Integer, doc='', index=True, unique=False)
     category_id = Column(Integer, doc='', index=True, unique=False, nullable=True)
 
-    # track_id = Column(Integer, index=True, unique=False)
+    # TODO: in the future we may enforce track-id is an integer
     if _USE_TRACK_LUT:
         track_id = Column(JSONVariant, index=True, unique=False)
-        # track_id = Column(JSONVariant)
     else:
         track_id = Column(JSON)
 
@@ -275,14 +269,6 @@ class Annotation(CocoBase):
     caption = Column(JSON)
 
     _unstructured = Column(JSON, default=dict())
-
-    # __table_args__ =  (
-    #     # https://stackoverflow.com/questions/30885846/how-to-create-jsonb-index-using-gin-on-sqlalchemy
-    #     Index(
-    #         "index_Annotation_on_track_id_gin", track_id,
-    #         # postgresql_using="gin",
-    #     ),
-    # )
 
 # As long as the flavor of sql conforms to our raw sql commands set
 # this to 0, which uses the faster raw variant.
