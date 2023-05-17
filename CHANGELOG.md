@@ -12,6 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 * `kwcoco validate` now reports the path to the first missing / corrupted image in the error.
+* Started work on new top-level track table.
 
 
 ## Version 0.6.2 - Released 2023-05-02

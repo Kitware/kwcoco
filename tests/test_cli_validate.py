@@ -22,5 +22,5 @@ def test_validate_missing():
 
     import pytest
     with pytest.raises(Exception) as ex:
-        coco_validate.CocoValidateCLI.main(src=[dset2])
+        coco_validate.CocoValidateCLI.main(cmdline=0, src=[dset2])
     assert 'The first one is' in ex.value.args[0]

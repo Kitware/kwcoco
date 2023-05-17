@@ -47,6 +47,8 @@ TODO:
 
     - [ ] Allow parts of the kwcoco file to be references to other json files.
 
+    - [ ] Add top-level track table (in progress)
+
 References:
     .. [CocoFormat] http://cocodataset.org/#format-data
     .. [PyCocoToolsMask] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
@@ -114,6 +116,7 @@ SPEC_KEYS = [
     'videos',
     'images',
     'annotations',
+    'tracks',
 ]
 
 
@@ -5076,6 +5079,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 'videos': [],
                 'images': [],
                 'annotations': [],
+                'tracks': [],
                 'licenses': [],
                 'info': [],
             }

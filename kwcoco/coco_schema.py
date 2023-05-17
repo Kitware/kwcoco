@@ -260,6 +260,11 @@ IMAGE = OBJECT(OrderedDict((
     title='IMAGE',
 )
 
+TRACK = OBJECT(OrderedDict((
+    ('id', INTEGER(description='A unique internal id for this track')),
+    ('name', NAME(description='A unique external name or identifier')),
+)))
+
 ANNOTATION = OBJECT(OrderedDict((
     ('id', INTEGER(description='A unique internal id for this annotation')),
     ('image_id', INTEGER(description='The image id this annotation belongs to')),
@@ -313,6 +318,8 @@ COCO_SCHEMA = OBJECT(
         ('keypoint_categories', ARRAY(KEYPOINT_CATEGORY)),
 
         ('videos', ARRAY(VIDEO)),
+
+        ('tracks', ARRAY(TRACK)),
 
         ('images', ARRAY(IMAGE)),
 
