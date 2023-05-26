@@ -6,7 +6,8 @@ import ubelt as ub
 class CocoMove(scfg.DataConfig):
     """
     Move a kwcoco file to a new location while maintaining relative paths.
-    This is equivalent to a regular move followed by ``kwcoco reroot``.
+    This is equivalent to a regular copy followed by ``kwcoco reroot`` followed
+    by a delete of the original.
     """
     __command__ = 'move'
     __alias__ = ['mv']
@@ -39,6 +40,7 @@ class CocoMove(scfg.DataConfig):
         config = CocoMove.cli(cmdline=cmdline, data=kwargs, strict=True)
         rich.print('config = ' + ub.urepr(config, nl=1))
         import kwcoco
+        print('loading = {}'.format(ub.urepr(config.src, nl=1)))
         dset = kwcoco.CocoDataset.coerce(config.src)
 
         dst = ub.Path(config.dst)
@@ -56,6 +58,7 @@ class CocoMove(scfg.DataConfig):
             check=config['check'],
             verbose=3,
         )
+        print('Finished reroot, saving')
         dumpkw = {
             'newlines': True,
         }
@@ -63,6 +66,7 @@ class CocoMove(scfg.DataConfig):
 
         old_fpath = ub.Path(dset.fpath)
         if old_fpath.resolve() != new_fpath.resolve():
+            print('Removing old file')
             old_fpath.delete()
 
 

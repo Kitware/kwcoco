@@ -1858,7 +1858,7 @@ class MixinCocoExtras(object):
                absolute=False,
                check=True,
                safe=True,
-               verbose=0):
+               verbose=1):
         """
         Modify the prefix of the image/data paths onto a new image/data root.
 
@@ -1965,7 +1965,7 @@ class MixinCocoExtras(object):
         if absolute:
             new_bundle_dpath = os.fspath(ub.Path(new_bundle_dpath).absolute())
 
-        if verbose:
+        if verbose > 1:
             print('kwcoco.reroot')
             print(' * new_bundle_dpath = {}'.format(ub.urepr(new_bundle_dpath, nl=1)))
             print(' * cur_bundle_dpath = {}'.format(ub.urepr(cur_bundle_dpath, nl=1)))
@@ -1974,7 +1974,7 @@ class MixinCocoExtras(object):
             print(f' * absolute={absolute}')
             print(f' * safe={safe}')
             print(f' * check={check}')
-            if verbose > 1:
+            if verbose > 2:
                 # First assets
                 if len(self.dataset['images']):
                     from kwcoco.coco_image import CocoImage
@@ -2049,10 +2049,14 @@ class MixinCocoExtras(object):
 
         # from kwcoco.util import util_reroot
 
+        num_images = len(self.imgs)
+        enable_prog = verbose > 0
+
         if safe:
             # First compute all new values in memory but don't overwrite
             gid_to_new = {}
-            for gid, img in self.imgs.items():
+            prog = ub.ProgIter(self.imgs.items(), total=num_images, enabled=enable_prog, desc='prepare reroot')
+            for gid, img in prog:
                 gname = img.get('file_name', None)
                 try:
                     new = {}
@@ -2073,7 +2077,8 @@ class MixinCocoExtras(object):
                     raise Exception('Failed to reroot gid={} with fpaths={}'.format(img['id'], asset_fpaths))
 
             # Overwrite old values
-            for gid, new in gid_to_new.items():
+            prog = ub.ProgIter(gid_to_new.items(), total=num_images, enabled=enable_prog, desc='finalize reroot')
+            for gid, new in prog:
                 img = self.imgs[gid]
                 img['file_name'] = new.get('file_name', None)
                 if 'auxiliary' in new:
@@ -2083,7 +2088,8 @@ class MixinCocoExtras(object):
                     for aux_fname, aux in zip(new['assets'], img['assets']):
                         aux['file_name'] = aux_fname
         else:
-            for img in self.imgs.values():
+            prog = ub.ProgIter(self.imgs.values(), total=num_images, enabled=enable_prog, desc='rerooting')
+            for img in prog:
                 try:
                     gname = img.get('file_name', None)
                     if gname is not None:
