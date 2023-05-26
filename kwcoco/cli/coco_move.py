@@ -28,6 +28,7 @@ class CocoMove(scfg.DataConfig):
             >>> from kwcoco.cli import coco_move
             >>> import kwcoco
             >>> dpath = ub.Path.appdir('kwcoco/doctest/move')
+            >>> dpath.delete().ensuredir()
             >>> dset = kwcoco.CocoDataset.demo('vidshapes2', dpath=dpath)
             >>> cmdline = 0
             >>> dst = (ub.Path(dset.bundle_dpath) / 'new_dpath').ensuredir()
@@ -52,18 +53,17 @@ class CocoMove(scfg.DataConfig):
         if not new_fpath.parent.exists():
             raise Exception('Destination directory does not exist')
 
-        import xdev
-        with xdev.embed_on_exception_context:
-            dset.reroot(
-                new_root=new_fpath.parent,
-                absolute=config.absolute,
-                check=config.check,
-                verbose=3,
-            )
-        print('Finished reroot, saving')
+        dset.reroot(
+            new_root=new_fpath.parent,
+            absolute=config.absolute,
+            check=config.check,
+            verbose=3,
+        )
+        print(f'Finished reroot, saving to: {new_fpath}')
         dumpkw = {
             'newlines': True,
         }
+        dset.fpath = new_fpath
         dset.dump(dset.fpath, **dumpkw)
 
         old_fpath = ub.Path(dset.fpath)
