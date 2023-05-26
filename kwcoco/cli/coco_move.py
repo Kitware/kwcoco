@@ -44,9 +44,11 @@ class CocoMove(scfg.DataConfig):
         print('loading = {}'.format(ub.urepr(config.src, nl=1)))
         dset = kwcoco.CocoDataset.coerce(config.src)
 
+        old_fpath = ub.Path(dset.fpath)
+
         dst = ub.Path(config.dst)
         if dst.is_dir():
-            new_fpath = dst / ub.Path(dset.fpath).name
+            new_fpath = dst / old_fpath.name
         else:
             new_fpath = dst
 
@@ -65,10 +67,8 @@ class CocoMove(scfg.DataConfig):
         }
         dset.fpath = new_fpath
         dset.dump(dset.fpath, **dumpkw)
-
-        old_fpath = ub.Path(dset.fpath)
         if old_fpath.resolve() != new_fpath.resolve():
-            print('Removing old file')
+            print(f'Removing old fpath: {old_fpath}')
             old_fpath.delete()
 
 
