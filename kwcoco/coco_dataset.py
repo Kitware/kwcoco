@@ -1863,7 +1863,7 @@ class MixinCocoExtras(object):
         Modify the prefix of the image/data paths onto a new image/data root.
 
         Args:
-            new_root (str | None):
+            new_root (str | PathLike | None):
                 New image root. If unspecified the current ``self.bundle_dpath`` is
                 used. If old_prefix and new_prefix are unspecified, they will
                 attempt to be determined based on the current root (which
@@ -1903,32 +1903,38 @@ class MixinCocoExtras(object):
 
         Example:
             >>> import kwcoco
-            >>> def report(dset, name):
+            >>> import ubelt as ub
+            >>> def report(dset):
             >>>     gid = 1
-            >>>     abs_fpath = dset.get_image_fpath(gid)
+            >>>     abs_fpath = ub.Path(dset.get_image_fpath(gid))
             >>>     rel_fpath = dset.index.imgs[gid]['file_name']
-            >>>     color = 'green' if exists(abs_fpath) else 'red'
-            >>>     print('strategy_name = {!r}'.format(name))
-            >>>     print(ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
-            >>>     print('rel_fpath = {!r}'.format(rel_fpath))
+            >>>     color = 'green' if abs_fpath.exists() else 'red'
+            >>>     print(ub.color_text(f'abs_fpath = {abs_fpath!r}', color))
+            >>>     print(f'rel_fpath = {rel_fpath!r}')
             >>> dset = self = kwcoco.CocoDataset.demo()
             >>> # Change base relative directory
             >>> bundle_dpath = ub.expandpath('~')
-            >>> print('ORIG self.imgs = {!r}'.format(self.imgs))
-            >>> print('ORIG dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
-            >>> print('NEW bundle_dpath       = {!r}'.format(bundle_dpath))
-            >>> self.reroot(bundle_dpath)
-            >>> report(self, 'self')
-            >>> print('NEW self.imgs = {!r}'.format(self.imgs))
+            >>> import rich
+            >>> rich.print('ORIG self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
+            >>> rich.print('ORIG dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
+            >>> rich.print('NEW(1) bundle_dpath       = {!r}'.format(bundle_dpath))
+            >>> # Test relative reroot
+            >>> rich.print('[blue] --- 1. RELATIVE REROOT ---')
+            >>> self.reroot(bundle_dpath, verbose=3)
+            >>> report(self)
+            >>> rich.print('NEW(1) self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
             >>> if not ub.WIN32:
             >>>     assert self.imgs[1]['file_name'].startswith('.cache')
-
-            >>> # Use absolute paths
-            >>> self.reroot(absolute=True)
+            >>> # Test absolute reroot
+            >>> rich.print('[blue] --- 2. ABSOLUTE REROOT ---')
+            >>> self.reroot(absolute=True, verbose=3)
+            >>> rich.print('NEW(2) self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
             >>> assert self.imgs[1]['file_name'].startswith(bundle_dpath)
 
             >>> # Switch back to relative paths
+            >>> rich.print('[blue] --- 3. ABS->REL REROOT ---')
             >>> self.reroot()
+            >>> rich.print('NEW(3) self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
             >>> if not ub.WIN32:
             >>>     assert self.imgs[1]['file_name'].startswith('.cache')
 
@@ -1951,6 +1957,10 @@ class MixinCocoExtras(object):
         """
         cur_bundle_dpath = self.bundle_dpath
         new_bundle_dpath = self.bundle_dpath if new_root is None else new_root
+        new_bundle_dpath = os.fspath(new_bundle_dpath)
+
+        # Find the the prefix that to make new relative paths work.
+        rel_prefix = os.path.relpath(cur_bundle_dpath, new_bundle_dpath)
 
         if absolute:
             new_bundle_dpath = os.fspath(ub.Path(new_bundle_dpath).absolute())
@@ -1989,7 +1999,7 @@ class MixinCocoExtras(object):
             # the images based on the new root, unless we are explicitly given
             # information about new and old prefixes. Can we do better than
             # this?
-
+            _old_fname = file_name
             file_name = _normalize_prefix(file_name)
             cur_gpath = join(cur_bundle_dpath, file_name)
 
@@ -2003,11 +2013,13 @@ class MixinCocoExtras(object):
             # specified then modify relative file names to be correct with
             # respect to this new root (assuming the previous root was also
             # valid)
-            if old_prefix is None and new_prefix is None:
-                # This is not a good check, fails if we want to
-                # do a relative reroot outside of the original dataset
-                if new_bundle_dpath is not None and cur_gpath.startswith(new_bundle_dpath):
-                    file_name = relpath(cur_gpath, new_bundle_dpath)
+            DO_OLD_CHECK = 0
+            if DO_OLD_CHECK:
+                if old_prefix is None and new_prefix is None:
+                    # This is not a good check, fails if we want to
+                    # do a relative reroot outside of the original dataset
+                    if new_bundle_dpath is not None and cur_gpath.startswith(new_bundle_dpath):
+                        file_name = relpath(cur_gpath, new_bundle_dpath)
 
             if new_prefix is not None:
                 file_name = join(new_prefix, file_name)
@@ -2015,13 +2027,17 @@ class MixinCocoExtras(object):
             if absolute:
                 new_file_name = join(new_bundle_dpath, file_name)
             else:
-                new_file_name = file_name
+                new_file_name = join(rel_prefix, file_name)
+                if os.path.isabs(new_file_name):
+                    # Handle absolute -> relative case
+                    new_file_name = relpath(new_file_name, new_bundle_dpath)
 
             if check:
                 new_gpath = join(new_bundle_dpath, new_file_name)
                 if not exists(new_gpath):
                     print('ERROR')
-                    print(' * file_name = {!r}'.format(file_name))
+                    print(' * file_name (old) = {!r}'.format(_old_fname))
+                    print(' * file_name (new) = {!r}'.format(file_name))
                     print(' * cur_gpath = {!r}'.format(cur_gpath))
                     print(' * new_gpath = {!r}'.format(new_gpath))
                     print(' * new_file_name = {!r}'.format(new_file_name))

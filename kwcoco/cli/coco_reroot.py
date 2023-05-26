@@ -6,7 +6,7 @@ import scriptconfig as scfg
 class CocoRerootCLI:
     name = 'reroot'
 
-    class CLIConfig(scfg.Config):
+    class CLIConfig(scfg.DataConfig):
         """
         Reroot image paths onto a new image root.
 
@@ -24,39 +24,37 @@ class CocoRerootCLI:
             kwcoco reroot --src=special:shapes8 --dst rerooted.json
             kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rerooted.json
         """
-        __default__ = {
-            'src': scfg.Value(None, help=(
-                'Input coco dataset path'), position=1),
+        src = scfg.Value(None, help=(
+            'Input coco dataset path'), position=1)
 
-            'dst': scfg.Value(None, help=(
-                'Output coco dataset path'), position=2),
+        dst = scfg.Value(None, help=(
+            'Output coco dataset path'), position=2)
 
-            'new_prefix': scfg.Value(None, help=(
-                'New prefix to insert before every image file name.')),
+        new_prefix = scfg.Value(None, help=(
+            'New prefix to insert before every image file name.'))
 
-            'old_prefix': scfg.Value(None, help=(
-                'Old prefix to remove from the start of every image file name.')),
+        old_prefix = scfg.Value(None, help=(
+            'Old prefix to remove from the start of every image file name.'))
 
-            'absolute': scfg.Value(True, help=(
-                'If False, the output file uses relative paths')),
+        absolute = scfg.Value(True, help=(
+            'If False, the output file uses relative paths'))
 
-            'check': scfg.Value(True, help=(
-                'If True, checks that all data exists')),
+        check = scfg.Value(True, help=(
+            'If True, checks that all data exists'))
 
-            'autofix': scfg.Value(False, isflag=True, help=(
-                ub.paragraph(
-                    '''
-                    If True, attempts an automatic fix. This assumes that paths
-                    are prefixed with an absolute path belonging to a different
-                    machine, and it attempts to strip off a minimal prefix to
-                    find relative paths that do exist.
-                    '''))),
+        autofix = scfg.Value(False, isflag=True, help=(
+            ub.paragraph(
+                '''
+                If True, attempts an automatic fix. This assumes that paths
+                are prefixed with an absolute path belonging to a different
+                machine, and it attempts to strip off a minimal prefix to
+                find relative paths that do exist.
+                ''')))
 
-            'compress': scfg.Value('auto', help='if True writes results with compression'),
+        compress = scfg.Value('auto', help='if True writes results with compression. DEPRECATED. Just use a .zip suffix.')
 
-            'inplace': scfg.Value(False, isflag=True, help='if True and dst is unspecified then the output will overwrite the input')
-
-        }
+        inplace = scfg.Value(False, isflag=True, help=(
+            'if True and dst is unspecified then the output will overwrite the input'))
 
     @classmethod
     def main(cls, cmdline=True, **kw):

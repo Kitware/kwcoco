@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+import scriptconfig as scfg
+import ubelt as ub
+
+
+class CocoMove(scfg.DataConfig):
+    """
+    Move a kwcoco file to a new location while maintaining relative paths.
+    This is equivalent to a regular move followed by ``kwcoco reroot``.
+    """
+    __command__ = 'move'
+    __alias__ = ['mv']
+
+    src = scfg.Value(None, help='coco file to move', position=1)
+    dst = scfg.Value(None, help='new location to move to', position=2)
+
+    absolute = scfg.Value(False, help=('If False, the output file uses relative paths'))
+
+    check = scfg.Value(True, help=(
+        'If True, checks that all data exists'))
+
+    @classmethod
+    def main(CocoMove, cmdline=1, **kwargs):
+        """
+        Example:
+            >>> import ubelt as ub
+            >>> from kwcoco.cli import coco_move
+            >>> import kwcoco
+            >>> dpath = ub.Path.appdir('kwcoco/doctest/move')
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes2', dpath=dpath)
+            >>> cmdline = 0
+            >>> dst = (ub.Path(dset.bundle_dpath) / 'new_dpath').ensuredir()
+            >>> kwargs = dict(src=dset.fpath, dst=dst)
+            >>> coco_move.CocoMove.main(cmdline=cmdline, **kwargs)
+            >>> assert dst.exists()
+            >>> assert not ub.Path(dset.fpath).exists()
+        """
+        import rich
+        config = CocoMove.cli(cmdline=cmdline, data=kwargs, strict=True)
+        rich.print('config = ' + ub.urepr(config, nl=1))
+        import kwcoco
+        dset = kwcoco.CocoDataset.coerce(config.src)
+
+        dst = ub.Path(config.dst)
+        if dst.is_dir():
+            new_fpath = dst / ub.Path(dset.fpath).name
+        else:
+            new_fpath = dst
+
+        if not new_fpath.parent.exists():
+            raise Exception('Destination directory does not exist')
+
+        dset.reroot(
+            new_root=new_fpath.parent,
+            absolute=config['absolute'],
+            check=config['check'],
+            verbose=3,
+        )
+        dumpkw = {
+            'newlines': True,
+        }
+        dset.dump(dset.fpath, **dumpkw)
+
+        old_fpath = ub.Path(dset.fpath)
+        if old_fpath.resolve() != new_fpath.resolve():
+            old_fpath.delete()
+
+
+__config__ = CocoMove
+
+if __name__ == '__main__':
+    """
+
+    CommandLine:
+        python ~/code/kwcoco/kwcoco/cli/coco_move.py
+        python -m kwcoco.cli.coco_move
+    """
+    __config__.main()
