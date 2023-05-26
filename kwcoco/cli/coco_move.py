@@ -52,6 +52,9 @@ class CocoMove(scfg.DataConfig):
         else:
             new_fpath = dst
 
+        print('old_fpath = {}'.format(ub.urepr(old_fpath, nl=1)))
+        print('new_fpath = {}'.format(ub.urepr(new_fpath, nl=1)))
+
         if not new_fpath.parent.exists():
             raise Exception('Destination directory does not exist')
 
