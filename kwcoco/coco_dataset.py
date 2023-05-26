@@ -1956,6 +1956,8 @@ class MixinCocoExtras(object):
             See ~/code/kwcoco/dev/devcheck/devcheck_reroot.py
         """
         cur_bundle_dpath = self.bundle_dpath
+        if cur_bundle_dpath == '':
+            cur_bundle_dpath = '.'
         new_bundle_dpath = self.bundle_dpath if new_root is None else new_root
         new_bundle_dpath = os.fspath(new_bundle_dpath)
 
