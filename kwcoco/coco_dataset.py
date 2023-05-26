@@ -1953,7 +1953,7 @@ class MixinCocoExtras(object):
             >>>     assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
 
         Ignore:
-            See ~/code/kwcoco/dev/devcheck_reroot.py
+            See ~/code/kwcoco/dev/devcheck/devcheck_reroot.py
         """
         cur_bundle_dpath = self.bundle_dpath
         new_bundle_dpath = self.bundle_dpath if new_root is None else new_root
