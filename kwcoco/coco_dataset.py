@@ -1864,11 +1864,11 @@ class MixinCocoExtras(object):
 
         Args:
             new_root (str | PathLike | None):
-                New image root. If unspecified the current ``self.bundle_dpath`` is
-                used. If old_prefix and new_prefix are unspecified, they will
-                attempt to be determined based on the current root (which
-                assumes the file paths exist at that root) and this new root.
-                Defaults to None.
+                New image root. If unspecified the current
+                ``self.bundle_dpath`` is used. If old_prefix and new_prefix are
+                unspecified, they will attempt to be determined based on the
+                current root (which assumes the file paths exist at that root)
+                and this new root.  Defaults to None.
 
             old_prefix (str | None):
                 If specified, removes this prefix from file names.

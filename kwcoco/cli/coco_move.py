@@ -52,12 +52,14 @@ class CocoMove(scfg.DataConfig):
         if not new_fpath.parent.exists():
             raise Exception('Destination directory does not exist')
 
-        dset.reroot(
-            new_root=new_fpath.parent,
-            absolute=config['absolute'],
-            check=config['check'],
-            verbose=3,
-        )
+        import xdev
+        with xdev.embed_on_exception_context:
+            dset.reroot(
+                new_root=new_fpath.parent,
+                absolute=config.absolute,
+                check=config.check,
+                verbose=3,
+            )
         print('Finished reroot, saving')
         dumpkw = {
             'newlines': True,
