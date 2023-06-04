@@ -5,3 +5,4 @@ kwcoco.examples.bench\_large\_hyperspectral module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

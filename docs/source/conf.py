@@ -1,13 +1,15 @@
 """
 Notes:
-    Based on template code in: ~/code/xcookie/docs/source/conf.py
+    Based on template code in:
+        ~/code/xcookie/xcookie/builders/docs_conf.py
+        ~/code/xcookie/xcookie/rc/conf_ext.py
 
     http://docs.readthedocs.io/en/latest/getting_started.html
 
     pip install sphinx sphinx-autobuild sphinx_rtd_theme sphinxcontrib-napoleon
 
     cd ~/code/kwcoco
-    mkdir docs
+    mkdir -p docs
     cd docs
 
     sphinx-quickstart
@@ -15,8 +17,10 @@ Notes:
     # need to edit the conf.py
 
     cd ~/code/kwcoco/docs
-    sphinx-apidoc -f -o ~/code/kwcoco/docs/source ~/code/kwcoco/kwcoco --separate
+    sphinx-apidoc --private -f -o ~/code/kwcoco/docs/source ~/code/kwcoco/kwcoco --separate
     make html
+
+    git add source/*.rst
 
     Also:
         To turn on PR checks
@@ -38,11 +42,23 @@ Notes:
         Make sure you have a .readthedocs.yml file
 
         Click import project: (for github you can select, but gitlab you need to import manually)
-            Set the Repository NAME: $REPO_NAME
-            Set the Repository URL: $REPO_URL
+            Set the Repository NAME: kwcoco
+            Set the Repository URL: https://gitlab.kitware.com/computer-vision/kwcoco
 
         For gitlab you also need to setup an integrations and add gitlab
-        incoming webhook Then go to $REPO_URL/hooks and add the URL
+        incoming webhook
+
+            https://readthedocs.org/dashboard/kwcoco/integrations/create/
+
+        Then go to
+
+            https://gitlab.kitware.com/computer-vision/kwcoco/hooks
+
+        and add the URL
+
+        select push, tag, and merge request
+
+        See Docs for more details https://docs.readthedocs.io/en/stable/integrations.html
 
         Will also need to activate the main branch:
             https://readthedocs.org/projects/kwcoco/versions/
@@ -92,8 +108,7 @@ def parse_version(fpath):
     return visitor.version
 
 project = 'kwcoco'
-modname = project
-copyright = '2021, Kitware Inc'
+copyright = '2023, Jon Crall'
 author = 'Jon Crall'
 modname = 'kwcoco'
 
@@ -119,7 +134,6 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
     # 'myst_parser',  # TODO
-    'sphinx-jsonschema',
 ]
 
 todo_include_todos = True
@@ -130,6 +144,7 @@ napoleon_use_ivar = True
 autodoc_inherit_docstrings = False
 
 autodoc_member_order = 'bysource'
+autoclass_content = 'both'
 # autodoc_mock_imports = ['torch', 'torchvision', 'visdom']
 
 intersphinx_mapping = {
@@ -282,8 +297,6 @@ texinfo_documents = [
 
 
 # -- Extension configuration -------------------------------------------------
-
-
 from sphinx.domains.python import PythonDomain  # NOQA
 # from sphinx.application import Sphinx  # NOQA
 from typing import Any, List  # NOQA
@@ -364,7 +377,7 @@ class GoogleStyleDocstringProcessor:
             redone = new_text.split('\n')
             new_lines.extend(redone)
             # import ubelt as ub
-            # print('new_lines = {}'.format(ub.urepr(new_lines, nl=1)))
+            # print('new_lines = {}'.format(ub.repr2(new_lines, nl=1)))
             # new_lines.append('')
             return new_lines
 
@@ -385,29 +398,27 @@ class GoogleStyleDocstringProcessor:
     def process(self, lines):
         """
         Example:
+            >>> import ubelt as ub
             >>> self = GoogleStyleDocstringProcessor()
-            >>> lines = ub.codeblock(
-            ...     '''
-            ...     Hello world
-            ...
-            ...     CommandLine:
-            ...         hi
-            ...
-            ...     CommandLine:
-            ...
-            ...         bye
-            ...
-            ...     TextArt:
-            ...
-            ...         1
-            ...         2
-            ...
-            ...         345
-            ...
-            ...     Foobar:
-            ...
-            ...     TextArt:
-            ...     ''').split(chr(10))
+            >>> lines = ['Hello world',
+            >>>              '',
+            >>>              'CommandLine:',
+            >>>              '    hi',
+            >>>              '',
+            >>>              'CommandLine:',
+            >>>              '',
+            >>>              '    bye',
+            >>>              '',
+            >>>              'TextArt:',
+            >>>              '',
+            >>>              '    1',
+            >>>              '    2',
+            >>>              '',
+            >>>              '    345',
+            >>>              '',
+            >>>              'Foobar:',
+            >>>              '',
+            >>>              'TextArt:']
             >>> new_lines = self.process(lines[:])
             >>> print(chr(10).join(new_lines))
         """
@@ -490,10 +501,10 @@ class GoogleStyleDocstringProcessor:
             https://www.sphinx-doc.org/en/1.5.1/_modules/sphinx/ext/autodoc.html
             https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
         """
-        print(f'name={name}')
+        # print(f'name={name}')
         # print('BEFORE:')
         # import ubelt as ub
-        # print('lines = {}'.format(ub.urepr(lines, nl=1)))
+        # print('lines = {}'.format(ub.repr2(lines, nl=1)))
 
         self.process(lines)
 
@@ -506,7 +517,8 @@ class GoogleStyleDocstringProcessor:
         #     import xdev
         #     xdev.embed()
 
-        if 1:
+        RENDER_IMAGES = 1
+        if RENDER_IMAGES:
             # DEVELOPING
             if any('REQUIRES(--show)' in line for line in lines):
                 # import xdev
@@ -565,7 +577,7 @@ class GoogleStyleDocstringProcessor:
                     lines[edit_slice] = new_lines
 
         # print('AFTER:')
-        # print('lines = {}'.format(ub.urepr(lines, nl=1)))
+        # print('lines = {}'.format(ub.repr2(lines, nl=1)))
 
         # if name == 'kwimage.Affine.translate':
         #     import sys
@@ -602,6 +614,7 @@ def create_doctest_figure(app, obj, name, lines):
         module = obj
     else:
         module = sys.modules[obj.__module__]
+    # TODO: read settings from pyproject.toml?
     if '--show' not in sys.argv:
         sys.argv.append('--show')
     if '--nointeract' not in sys.argv:
@@ -663,7 +676,9 @@ def create_doctest_figure(app, obj, name, lines):
         num_lines = part.count('\n')
 
         doctests = list(xdoctest.core.parse_docstr_examples(
-            part, modpath=modpath, callname=name))
+            part, modpath=modpath, callname=name,
+            # style='google'
+        ))
         # print(doctests)
 
         # doctests = list(xdoctest.core.parse_docstr_examples(
@@ -766,16 +781,17 @@ def setup(app):
     app : sphinx.application.Sphinx = app
     app.add_domain(PatchedPythonDomain, override=True)
     docstring_processor = GoogleStyleDocstringProcessor()
-    app.connect('autodoc-process-docstring', docstring_processor.process_docstring_callback)
     # https://stackoverflow.com/questions/26534184/can-sphinx-ignore-certain-tags-in-python-docstrings
+    app.connect('autodoc-process-docstring', docstring_processor.process_docstring_callback)
 
-    # Hack copy over the json schema
-    import pathlib
-    import shutil
-    doc_outdir = pathlib.Path(app.outdir)
-    doc_srcdir = pathlib.Path(app.srcdir)
-    schema_src = (doc_srcdir / '../../kwcoco/coco_schema.json')
-    shutil.copy(schema_src, doc_outdir / 'coco_schema.json')
-    shutil.copy(schema_src, doc_srcdir / 'coco_schema.json')
-
+    ### Hack for kwcoco: TODO: figure out a way for the user to configure this.
+    HACK_FOR_KWCOCO = 1
+    if HACK_FOR_KWCOCO:
+        import pathlib
+        import shutil
+        doc_outdir = pathlib.Path(app.outdir)
+        doc_srcdir = pathlib.Path(app.srcdir)
+        schema_src = (doc_srcdir / '../../kwcoco/coco_schema.json')
+        shutil.copy(schema_src, doc_outdir / 'coco_schema.json')
+        shutil.copy(schema_src, doc_srcdir / 'coco_schema.json')
     return app

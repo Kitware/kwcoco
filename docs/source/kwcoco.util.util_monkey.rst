@@ -5,3 +5,4 @@ kwcoco.util.util\_monkey module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

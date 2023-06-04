@@ -20,6 +20,8 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   kwcoco.__main__
+   kwcoco._helpers
    kwcoco.abstract_coco_dataset
    kwcoco.category_tree
    kwcoco.channel_spec
@@ -42,3 +44,4 @@ Module contents
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

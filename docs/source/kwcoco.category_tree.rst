@@ -5,3 +5,4 @@ kwcoco.category\_tree module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

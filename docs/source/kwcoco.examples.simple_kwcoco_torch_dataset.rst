@@ -5,3 +5,4 @@ kwcoco.examples.simple\_kwcoco\_torch\_dataset module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

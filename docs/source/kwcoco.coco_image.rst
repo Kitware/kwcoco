@@ -5,3 +5,4 @@ kwcoco.coco\_image module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

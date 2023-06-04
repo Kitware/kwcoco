@@ -5,3 +5,4 @@ kwcoco.util.util\_sklearn module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

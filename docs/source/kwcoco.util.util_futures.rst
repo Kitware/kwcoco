@@ -5,3 +5,4 @@ kwcoco.util.util\_futures module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

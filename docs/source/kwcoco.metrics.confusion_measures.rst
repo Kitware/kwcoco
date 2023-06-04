@@ -5,3 +5,4 @@ kwcoco.metrics.confusion\_measures module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

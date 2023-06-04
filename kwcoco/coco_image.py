@@ -291,7 +291,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         """
         Compute a "main" image asset.
 
-        Notes:
+        Note:
             Uses a heuristic.
 
             * First, try to find the auxiliary image that has with the smallest

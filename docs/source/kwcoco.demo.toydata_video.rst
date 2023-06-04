@@ -5,3 +5,4 @@ kwcoco.demo.toydata\_video module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

@@ -5,3 +5,4 @@ kwcoco.util.util\_json module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

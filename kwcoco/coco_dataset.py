@@ -6438,6 +6438,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> list(postgres_dset.anns.keys())
             >>> list(sqlite_dset.anns.keys())
 
+        Ignore:
             import timerit
             ti = timerit.Timerit(100, bestof=10, verbose=2)
             for timer in ti.reset('dct_dset'):
