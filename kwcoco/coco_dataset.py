@@ -5214,7 +5214,18 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         # Backwards compat hack, allow the coco file to specify the
         # bundle_dpath
+        # TODO: deprecate img_root
         if isinstance(data, dict) and 'img_root' in data:
+            ub.schedule_deprecation(
+                'kwcoco', name='img_root', type='dataset member',
+                deprecate='0.6.3', error='1.0.0', remove='1.1.0',
+                migration=ub.paragraph(
+                    '''
+                    Ensure the location of the saved kwcoco file encodes the
+                    bundle dpath or ensure bundle_dpath is correctly set in the
+                    in-memory CocoDataset object.
+                    ''')
+            )
             # allow image root to be specified in the dataset
             # we refer to this as a json data "body root".
             body_root = data.get('img_root', '')
@@ -5273,8 +5284,36 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     @fpath.setter
     def fpath(self, value):
-        self._fpath = value if value is None else value
+        # Cant use update fpath because of reroot checks.
+        # self._update_fpath(value)
+        self._fpath = value
         self._infer_dirs()
+
+    def _update_fpath(self, new_fpath):
+        # New method for more robustly updating the file path and bundle
+        # directory, still a WIP. Only works when the current dataset is
+        # already valid.
+        if new_fpath is None:
+            # Bundle directory is clobbered, so we should make everything
+            # absolute
+            self.reroot(absolute=True)
+        else:
+            old_fpath = self.fpath
+            if old_fpath is not None:
+                old_fpath_ = ub.Path(old_fpath)
+                new_fpath_ = ub.Path(new_fpath)
+
+                same_bundle = (
+                    (old_fpath_.parent == new_fpath_.parent) or
+                    (old_fpath_.resolve() == new_fpath_.resolve())
+                )
+                if not same_bundle:
+                    # The bundle directory has changed, so we need to reroot
+                    new_root = new_fpath_.parent
+                    self.reroot(new_root)
+
+            self._fpath = new_fpath
+            self._infer_dirs()
 
     def _infer_dirs(self):
         """
