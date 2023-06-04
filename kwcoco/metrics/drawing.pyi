@@ -1,13 +1,12 @@
-from typing import Union
 from typing import Dict
 import kwcoco
 import kwcoco.metrics.confusion_measures
+from typing import List
 from _typeshed import Incomplete
 
 
 def draw_perclass_roc(
-        cx_to_info: Union[kwcoco.metrics.confusion_measures.PerClass_Measures,
-                          Dict],
+        cx_to_info: kwcoco.metrics.confusion_measures.PerClass_Measures | Dict,
         classes: Incomplete | None = ...,
         prefix: str = ...,
         fnum: int = ...,
@@ -28,8 +27,7 @@ def concice_si_display(val,
 
 
 def draw_perclass_prcurve(
-        cx_to_info: Union[kwcoco.metrics.confusion_measures.PerClass_Measures,
-                          Dict],
+        cx_to_info: kwcoco.metrics.confusion_measures.PerClass_Measures | Dict,
         classes: Incomplete | None = ...,
         prefix: str = ...,
         fnum: int = ...,
@@ -38,8 +36,7 @@ def draw_perclass_prcurve(
 
 
 def draw_perclass_thresholds(
-        cx_to_info: Union[kwcoco.metrics.confusion_measures.PerClass_Measures,
-                          Dict],
+        cx_to_info: kwcoco.metrics.confusion_measures.PerClass_Measures | Dict,
         key: str = ...,
         classes: Incomplete | None = ...,
         prefix: str = ...,
@@ -57,8 +54,12 @@ def draw_prcurve(info, prefix: str = ..., fnum: int = ..., **kw):
 
 
 def draw_threshold_curves(info,
-                          keys: Incomplete | None = ...,
+                          keys: None | List[str] = None,
                           prefix: str = ...,
                           fnum: int = ...,
                           **kw):
+    ...
+
+
+def determenistic_colors(keys, preset_colors):
     ...

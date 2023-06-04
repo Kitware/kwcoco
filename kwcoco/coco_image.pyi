@@ -1,18 +1,23 @@
-from typing import Union
 from typing import List
+import ubelt as ub
 from os import PathLike
 import kwcoco
 from numpy import ndarray
 import kwimage
+from typing import Dict
 import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
-from typing import Any
+from kwcoco.util.dict_proxy2 import AliasedDictProxy
 
+from kwcoco.coco_objects1d import Annots
+
+__docstubs__: str
 DEFAULT_RESOLUTION_KEYS: Incomplete
 
 
-class CocoImage(ub.NiceRepr):
+class CocoImage(AliasedDictProxy, ub.NiceRepr):
+    __alias_to_primary__: Incomplete
     img: Incomplete
     dset: Incomplete
 
@@ -46,6 +51,13 @@ class CocoImage(ub.NiceRepr):
     def assets(self):
         ...
 
+    @property
+    def datetime(self) -> None:
+        ...
+
+    def annots(self) -> Annots:
+        ...
+
     def __nice__(self):
         ...
 
@@ -55,13 +67,13 @@ class CocoImage(ub.NiceRepr):
     def __contains__(self, key):
         ...
 
-    def __getitem__(self, key):
+    def get(self, key, default=...):
         ...
 
     def keys(self):
         ...
 
-    def get(self, key, default=...):
+    def __getitem__(self, key):
         ...
 
     @property
@@ -79,13 +91,12 @@ class CocoImage(ub.NiceRepr):
     def primary_image_filepath(self, requires: Incomplete | None = ...):
         ...
 
-    def primary_asset(self,
-                      requires: Union[List[str], None] = None) -> None | dict:
+    def primary_asset(self, requires: List[str] | None = None) -> None | dict:
         ...
 
     def iter_image_filepaths(self,
                              with_bundle: bool = True
-                             ) -> Generator[Any, None, None]:
+                             ) -> Generator[ub.Path, None, None]:
         ...
 
     def iter_asset_objs(self) -> Generator[dict, None, None]:
@@ -94,28 +105,28 @@ class CocoImage(ub.NiceRepr):
     def find_asset_obj(self, channels):
         ...
 
-    def add_auxiliary_item(self,
-                           file_name: Union[str, PathLike, None] = None,
-                           channels: Union[str, kwcoco.FusedChannelSpec,
-                                           None] = None,
-                           imdata: Union[ndarray, None] = None,
-                           warp_aux_to_img: Union[kwimage.Affine, None] = None,
-                           width: Union[int, None] = None,
-                           height: Union[int, None] = None,
-                           imwrite: bool = False) -> None:
+    def add_annotation(self, **ann) -> int:
         ...
 
-    add_asset: Incomplete
+    def add_asset(self,
+                  file_name: str | PathLike | None = None,
+                  channels: str | kwcoco.FusedChannelSpec | None = None,
+                  imdata: ndarray | None = None,
+                  warp_aux_to_img: kwimage.Affine | None = None,
+                  width: int | None = None,
+                  height: int | None = None,
+                  imwrite: bool = False) -> None:
+        ...
 
-    def delay(self,
-              channels: kwcoco.FusedChannelSpec = None,
-              space: str = 'image',
-              resolution: Union[None, str, float] = None,
-              bundle_dpath: Incomplete | None = ...,
-              interpolation: str = ...,
-              antialias: bool = ...,
-              nodata_method: Incomplete | None = ...,
-              RESOLUTION_KEY: Incomplete | None = ...):
+    def imdelay(self,
+                channels: kwcoco.FusedChannelSpec | None = None,
+                space: str = 'image',
+                resolution: None | str | float = None,
+                bundle_dpath: Incomplete | None = ...,
+                interpolation: str = ...,
+                antialias: bool = ...,
+                nodata_method: Incomplete | None = ...,
+                RESOLUTION_KEY: Incomplete | None = ...):
         ...
 
     def valid_region(self, space: str = ...):
@@ -128,26 +139,31 @@ class CocoImage(ub.NiceRepr):
         ...
 
     def resolution(self,
-                   space: str = ...,
-                   RESOLUTION_KEY: Incomplete | None = ...):
+                   space: str = 'image',
+                   channel: str | kwcoco.FusedChannelSpec | None = None,
+                   RESOLUTION_KEY: Incomplete | None = ...) -> Dict:
+        ...
+
+    add_auxiliary_item: Incomplete
+    delay: Incomplete
+
+    def show(self, **kwargs):
+        ...
+
+    def draw(self, **kwargs):
         ...
 
 
-class CocoAsset:
-    __key_aliases__: Incomplete
-    __key_resolver__: Incomplete
-    obj: Incomplete
+class CocoAsset(AliasedDictProxy, ub.NiceRepr):
+    __alias_to_primary__: Incomplete
 
-    def __init__(self, obj) -> None:
+    def __init__(self, asset, bundle_dpath: Incomplete | None = ...) -> None:
         ...
 
-    def __getitem__(self, key):
+    def __nice__(self):
         ...
 
-    def keys(self):
-        ...
-
-    def get(self, key, default=...):
+    def image_filepath(self):
         ...
 
 

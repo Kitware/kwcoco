@@ -1,5 +1,4 @@
 import kwarray
-from typing import Union
 from typing import Sequence
 from numpy import ndarray
 import pandas as pd
@@ -13,8 +12,8 @@ from kwcoco.category_tree import CategoryTree
 
 class ConfusionVectors(ub.NiceRepr):
     data: kwarray.DataFrameArray
-    classes: Union[Sequence, CategoryTree]
-    probs: Union[ndarray, None]
+    classes: Sequence | CategoryTree
+    probs: ndarray | None
 
     def __init__(cfsn_vecs,
                  data,
@@ -54,13 +53,13 @@ class ConfusionVectors(ub.NiceRepr):
 
     def binarize_classless(
         cfsn_vecs,
-        negative_classes: Union[List[Union[str, int]], None] = None
+        negative_classes: List[str | int] | None = None
     ) -> BinaryConfusionVectors:
         ...
 
     def binarize_ovr(cfsn_vecs,
                      mode: int = 1,
-                     keyby: Union[int, str] = 'name',
+                     keyby: int | str = 'name',
                      ignore_classes: Set[str] = ...,
                      approx: bool = False) -> OneVsRestConfusionVectors:
         ...
@@ -91,7 +90,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
 
     def measures(self,
                  stabalize_thresh: int = 7,
-                 fp_cutoff: Union[int, None] = None,
+                 fp_cutoff: int | None = None,
                  monotonic_ppv: bool = True,
                  ap_method: str = ...):
         ...
@@ -112,14 +111,12 @@ class BinaryConfusionVectors(ub.NiceRepr):
         ...
 
     @classmethod
-    def demo(
-            cls,
-            n: int = 10,
-            p_true: float = 0.5,
-            p_error: float = 0.2,
-            p_miss: float = 0.0,
-            rng: Union[int, RandomState,
-                       None] = None) -> BinaryConfusionVectors:
+    def demo(cls,
+             n: int = 10,
+             p_true: float = 0.5,
+             p_error: float = 0.2,
+             p_miss: float = 0.0,
+             rng: int | RandomState | None = None) -> BinaryConfusionVectors:
         ...
 
     @property
@@ -134,7 +131,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
     def measures(self,
                  stabalize_thresh: int = 7,
-                 fp_cutoff: Union[int, None] = None,
+                 fp_cutoff: int | None = None,
                  monotonic_ppv: bool = True,
                  ap_method: str = ...):
         ...

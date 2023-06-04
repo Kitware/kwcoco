@@ -1,10 +1,9 @@
 from typing import List
-from typing import Union
 import kwcoco
 import kwcoco.metrics.confusion_measures
 import ubelt as ub
 from _typeshed import Incomplete
-from kwcoco.metrics.util import DictProxy
+from kwcoco.util.dict_like import DictProxy
 
 
 class Measures(ub.NiceRepr, DictProxy):
@@ -56,9 +55,9 @@ class Measures(ub.NiceRepr, DictProxy):
     def combine(
         cls,
         tocombine: List[Measures],
-        precision: Union[int, None] = None,
-        growth: Union[int, None] = None,
-        thresh_bins: Union[int, None] = None
+        precision: int | None = None,
+        growth: int | None = None,
+        thresh_bins: int | None = None
     ) -> kwcoco.metrics.confusion_measures.Measures:
         ...
 

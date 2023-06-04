@@ -16,7 +16,9 @@ class CategoryTree(ub.NiceRepr):
     graph: networkx.Graph
     idx_groups: List[List[int]]
 
-    def __init__(self, graph: nx.DiGraph = None, checks: bool = True) -> None:
+    def __init__(self,
+                 graph: nx.DiGraph | None = None,
+                 checks: bool = True) -> None:
         ...
 
     def copy(self):

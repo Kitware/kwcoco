@@ -20,6 +20,11 @@ except Exception:
     profile = ub.identity
 
 
+__docstubs__ = """
+from kwcoco.coco_objects1d import Annots
+"""
+
+
 DEFAULT_RESOLUTION_KEYS = {
     'resolution',
     'target_gsd',  # only exists as a convinience for other projects. Remove in the future.
@@ -1256,6 +1261,18 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
 
 
 # class CocoAnnotation(_CocoObject):
+#     """
+#     TODO: general coco scalars
+#     """
+#     __alias_to_primary__ = {}
+
+# class CocoCategory(_CocoObject):
+#     """
+#     TODO: general coco scalars
+#     """
+#     __alias_to_primary__ = {}
+
+# class CocoTrack(_CocoObject):
 #     """
 #     TODO: general coco scalars
 #     """

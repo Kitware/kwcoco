@@ -6,7 +6,7 @@ class CocoGrabCLI:
     name: str
 
     class CLIConfig(scfg.Config):
-        default: Incomplete
+        __default__: Incomplete
 
     @classmethod
     def main(cls, cmdline: bool = ..., **kw) -> None:

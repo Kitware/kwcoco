@@ -1,5 +1,4 @@
 from typing import Tuple
-from typing import Union
 from numpy.random import RandomState
 from os import PathLike
 from numpy import ndarray
@@ -17,14 +16,15 @@ def random_video_dset(num_videos: int = 1,
                       anchors: Incomplete | None = ...,
                       image_size: Tuple[int, int] = ...,
                       verbose: int = 3,
-                      render: Union[bool, dict] = False,
-                      aux: Union[bool, None] = None,
+                      render: bool | dict = False,
+                      aux: bool | None = None,
                       multispectral: bool = False,
                       multisensor: bool = ...,
-                      rng: Union[int, None, RandomState] = None,
-                      dpath: Union[str, PathLike, None] = None,
+                      rng: int | None | RandomState = None,
+                      dpath: str | PathLike | None = None,
                       max_speed: float = 0.01,
-                      channels: Union[str, None] = None,
+                      channels: str | None = None,
+                      background: str = ...,
                       **kwargs):
     ...
 
@@ -35,34 +35,33 @@ def random_single_video_dset(image_size: Tuple[int, int] = ...,
                              tid_start: int = 1,
                              gid_start: int = 1,
                              video_id: int = 1,
-                             anchors: Union[ndarray, None] = None,
-                             rng: Union[RandomState, None, int] = None,
-                             render: Union[bool, dict] = False,
+                             anchors: ndarray | None = None,
+                             rng: RandomState | None | int = None,
+                             render: bool | dict = False,
                              dpath: Incomplete | None = ...,
                              autobuild: bool = True,
                              verbose: int = 3,
-                             aux: Union[bool, None, List[str]] = None,
+                             aux: bool | None | List[str] = None,
                              multispectral: bool = False,
                              max_speed: float = 0.01,
-                             channels: Union[str, None,
-                                             kwcoco.ChannelSpec] = None,
+                             channels: str | None | kwcoco.ChannelSpec = None,
                              multisensor: bool = False,
                              **kwargs):
     ...
 
 
 def render_toy_dataset(dset: kwcoco.CocoDataset,
-                       rng: Union[int, None, RandomState],
-                       dpath: Union[str, PathLike, None] = None,
-                       renderkw: Union[dict, None] = None,
+                       rng: int | None | RandomState,
+                       dpath: str | PathLike | None = None,
+                       renderkw: dict | None = None,
                        verbose: int = ...):
     ...
 
 
 def render_toy_image(dset: kwcoco.CocoDataset,
                      gid: int,
-                     rng: Union[int, None, RandomState] = None,
-                     renderkw: Union[dict, None] = None) -> Dict:
+                     rng: int | None | RandomState = None,
+                     renderkw: dict | None = None) -> Dict:
     ...
 
 
@@ -71,7 +70,12 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
     ...
 
 
-def render_background(img, rng, gray, bg_intensity, bg_scale):
+def render_background(img,
+                      rng,
+                      gray,
+                      bg_intensity,
+                      bg_scale,
+                      imgspace_background: Incomplete | None = ...):
     ...
 
 
@@ -89,6 +93,6 @@ def random_multi_object_path(num_objects,
 def random_path(num: int,
                 degree: int = 1,
                 dimension: int = 2,
-                rng: Union[RandomState, None, int] = None,
+                rng: RandomState | None | int = None,
                 mode: str = 'boid'):
     ...

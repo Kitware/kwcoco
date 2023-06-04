@@ -1,5 +1,4 @@
 from typing import List
-from typing import Union
 from typing import Iterable
 from typing import Dict
 from typing import Any
@@ -34,6 +33,10 @@ class ObjectList1D(ub.NiceRepr):
         ...
 
     @property
+    def ids(self):
+        ...
+
+    @property
     def objs(self) -> List[ObjT]:
         ...
 
@@ -47,7 +50,7 @@ class ObjectList1D(ub.NiceRepr):
         ...
 
     def lookup(self,
-               key: Union[str, Iterable],
+               key: str | Iterable,
                default=...,
                keepid: bool = ...) -> Dict[str, ObjT]:
         ...
@@ -58,7 +61,7 @@ class ObjectList1D(ub.NiceRepr):
             keepid: bool = ...) -> Dict[str, ObjT]:
         ...
 
-    def set(self, key: str, values: Union[Iterable, Any]) -> None:
+    def set(self, key: str, values: Iterable | Any) -> None:
         ...
 
     def attribute_frequency(self) -> Dict[str, int]:
@@ -193,6 +196,14 @@ class Annots(ObjectList1D):
 
     @cnames.setter
     def cnames(self, cnames) -> List[int]:
+        ...
+
+    @property
+    def category_names(self) -> List[int]:
+        ...
+
+    @category_names.setter
+    def category_names(self, names) -> List[int]:
         ...
 
     @property

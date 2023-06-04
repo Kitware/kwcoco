@@ -93,6 +93,9 @@ from packaging.version import parse as Version
 # """
 # https://github.com/python/mypy/issues/8016
 # https://github.com/mkorpela/overrides/issues/109
+__docstubs__ = """
+from sqlalchemy.orm import InstrumentedAttribute
+"""
 
 
 class FallbackCocoBase:
@@ -528,7 +531,7 @@ class SqlDictProxy(DictLike):
         # ONLY USE IN READONLY MODE
         proxy._cache = _new_proxy_cache()
 
-    def __len__(proxy):
+    def __len__(proxy) -> int:
         if proxy.keyattr is None:
             query = proxy.session.query(proxy.cls)
         else:
@@ -537,13 +540,13 @@ class SqlDictProxy(DictLike):
                 query = query.filter(proxy.keyattr != None)  # NOQA
         return query.count()
 
-    def __nice__(proxy):
+    def __nice__(proxy) -> str:
         if proxy.keyattr is None:
             return 'id -> {}: {}'.format(proxy.cls.__tablename__, len(proxy))
         else:
             return '{} -> {}: {}'.format(proxy.keyattr.name, proxy.cls.__tablename__, len(proxy))
 
-    def __contains__(proxy, key):
+    def __contains__(proxy, key) -> bool:
         if proxy._cache is not None:
             if key in proxy._cache:
                 return True
@@ -834,10 +837,10 @@ class SqlIdGroupDictProxy(DictLike):
                     proxy.parent_order_id = order_attr.class_.id
                     proxy.parent_order_table = order_attr.class_
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return str(len(self))
 
-    def __len__(proxy):
+    def __len__(proxy) -> int:
         query = proxy.session.query(proxy.parent_keyattr)
         return query.count()
 
@@ -890,7 +893,7 @@ class SqlIdGroupDictProxy(DictLike):
             proxy._cache[key] = item
         return item
 
-    def __contains__(proxy, key):
+    def __contains__(proxy, key) -> bool:
         if proxy._cache is not None:
             if key in proxy._cache:
                 return True

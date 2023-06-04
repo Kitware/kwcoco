@@ -7,7 +7,7 @@ class CocoConformCLI:
 
     class CLIConfig(scfg.Config):
         epilog: str
-        default: Incomplete
+        __default__: Incomplete
 
     @classmethod
     def main(cls, cmdline: bool = ..., **kw) -> None:
