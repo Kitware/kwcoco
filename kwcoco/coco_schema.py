@@ -201,6 +201,8 @@ ASSET = OBJECT(
     PROPERTIES={
         'file_name': PATH,
         'channels': CHANNELS,
+        'id': INTEGER(description='The id of the asset (option for now, but will be required in the future when assets are moved to their own table)'),
+        'image_id': INTEGER(description='The image id this asset is associated with (option for now, but will be required in the future)'),
         'width': INTEGER(description='The width in asset-space pixels'),
         'height': INTEGER(description='The height in asset-space pixels'),
     },
