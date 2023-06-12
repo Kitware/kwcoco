@@ -1430,8 +1430,11 @@ class MixinCocoExtras(object):
                     'hashid_parts': self.hashid_parts,
                     'status_key': status_key,
                 }
-                hashid_sidecar_fpath.parent.ensuredir()
-                hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+                try:
+                    hashid_sidecar_fpath.parent.ensuredir()
+                    hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+                except PermissionError as ex:
+                    warnings.warn(f'Cannot write a cached hashid: {repr(ex)}')
         return self.hashid
 
     @classmethod
