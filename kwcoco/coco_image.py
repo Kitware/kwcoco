@@ -899,6 +899,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
     def valid_region(self, space='image'):
         """
         If this image has a valid polygon, return it in image, or video space
+
+        Returns:
+            None | kwimage.MultiPolygon
         """
         import kwimage
         valid_coco_poly = self.img.get('valid_region', None)
@@ -923,6 +926,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
     def warp_vid_from_img(self):
         """
         Affine transformation that warps image space -> video space.
+
+        Returns:
+            kwimage.Affine: The transformation matrix
         """
         import kwimage
         warp_img_to_vid = kwimage.Affine.coerce(self.img.get('warp_img_to_vid', None))
@@ -935,6 +941,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
     def warp_img_from_vid(self):
         """
         Affine transformation that warps video space -> image space.
+
+        Returns:
+            kwimage.Affine: The transformation matrix
         """
         return self.warp_vid_from_img.inv()
 
