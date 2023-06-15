@@ -1584,11 +1584,16 @@ class MixinCocoExtras(object):
                     yield img
 
         def _has_download_permission(_HAS_PREMISSION=[False]):
-            # TODO: use rich
             if not _HAS_PREMISSION[0] or ub.argflag(('-y', '--yes')):
-                ans = input('is it ok to download? (enter y for yes)')
-                if ans in ['yes', 'y']:
-                    _HAS_PREMISSION[0] = True
+                try:
+                    from rich.prompt import Confirm
+                    ans = Confirm.ask('is it ok to download?')
+                    if ans:
+                        _HAS_PREMISSION[0] = True
+                except ImportError:
+                    ans = input('is it ok to download? (enter y for yes)')
+                    if ans in ['yes', 'y']:
+                        _HAS_PREMISSION[0] = True
             return _HAS_PREMISSION[0]
 
         if gids is None:
