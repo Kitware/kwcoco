@@ -1905,6 +1905,7 @@ class MixinCocoExtras(object):
             - [ ] Incorporate maximum ordered subtree embedding?
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:rich)
             >>> import kwcoco
             >>> import ubelt as ub
             >>> def report(dset):
@@ -1917,7 +1918,6 @@ class MixinCocoExtras(object):
             >>> dset = self = kwcoco.CocoDataset.demo()
             >>> # Change base relative directory
             >>> bundle_dpath = ub.expandpath('~')
-            >>> import rich
             >>> rich.print('ORIG self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
             >>> rich.print('ORIG dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
             >>> rich.print('NEW(1) bundle_dpath       = {!r}'.format(bundle_dpath))

@@ -37,9 +37,13 @@ class CocoMove(scfg.DataConfig):
             >>> assert dst.exists()
             >>> assert not ub.Path(dset.fpath).exists()
         """
-        import rich
+        try:
+            from rich import print as rich_print
+        except ImportError:
+            rich_print = print
+
         config = CocoMove.cli(cmdline=cmdline, data=kwargs, strict=True)
-        rich.print('config = ' + ub.urepr(config, nl=1))
+        rich_print('config = ' + ub.urepr(config, nl=1))
         import kwcoco
         print('loading = {}'.format(ub.urepr(config.src, nl=1)))
         dset = kwcoco.CocoDataset.coerce(config.src)
