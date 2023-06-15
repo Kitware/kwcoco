@@ -607,7 +607,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
         # Make the asset info dict
         obj = {
-            'image_id': img['id'],  # for when assets move to their own table
+            'image_id': img.get('id', None),  # for when assets move to their own table
             'file_name': file_name,
             'height': height,
             'width': width,
