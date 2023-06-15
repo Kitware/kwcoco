@@ -86,7 +86,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_full-loose_template: &test_full-loose_template
   <<: *common_test_template
@@ -134,7 +134,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_minimal-strict_template: &test_minimal-strict_template
   <<: *common_test_template
@@ -182,7 +182,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_full-strict_template: &test_full-strict_template
   <<: *common_test_template
@@ -230,7 +230,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 build/cp36-linux-x86_64:
   <<: *build_template

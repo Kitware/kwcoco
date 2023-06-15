@@ -9,7 +9,7 @@ from typing import Any
 class CocoEvalConfig(scfg.DataConfig):
     __default__: Incomplete
 
-    def normalize(self) -> None:
+    def __post_init__(self) -> None:
         ...
 
 

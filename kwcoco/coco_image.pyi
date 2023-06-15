@@ -129,13 +129,13 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                 RESOLUTION_KEY: Incomplete | None = ...):
         ...
 
-    def valid_region(self, space: str = ...):
+    def valid_region(self, space: str = ...) -> None | kwimage.MultiPolygon:
         ...
 
-    def warp_vid_from_img(self):
+    def warp_vid_from_img(self) -> kwimage.Affine:
         ...
 
-    def warp_img_from_vid(self):
+    def warp_img_from_vid(self) -> kwimage.Affine:
         ...
 
     def resolution(self,
