@@ -1908,6 +1908,7 @@ class MixinCocoExtras(object):
             >>> # xdoctest: +REQUIRES(module:rich)
             >>> import kwcoco
             >>> import ubelt as ub
+            >>> import rich
             >>> def report(dset):
             >>>     gid = 1
             >>>     abs_fpath = ub.Path(dset.get_image_fpath(gid))
