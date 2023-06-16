@@ -6,7 +6,7 @@ import scriptconfig as scfg
 class CocoRerootCLI:
     name = 'reroot'
 
-    class CLIConfig(scfg.DataConfig):
+    class CocoRerootConfig(scfg.DataConfig):
         """
         Reroot image paths onto a new image root.
 
@@ -56,6 +56,8 @@ class CocoRerootCLI:
         inplace = scfg.Value(False, isflag=True, help=(
             'if True and dst is unspecified then the output will overwrite the input'))
 
+    CLIConfig = CocoRerootConfig
+
     @classmethod
     def main(cls, cmdline=True, **kw):
         r"""
@@ -90,8 +92,8 @@ class CocoRerootCLI:
         """
         import kwcoco
         from os.path import dirname, abspath
-        config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
+        print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))

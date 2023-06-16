@@ -6,7 +6,7 @@ import scriptconfig as scfg
 class CocoSubsetCLI(object):
     name = 'subset'
 
-    class CLIConfig(scfg.Config):
+    class CocoSubetConfig(scfg.DataConfig):
         """
         Take a subset of this dataset and write it to a new file
         """
@@ -99,7 +99,7 @@ class CocoSubsetCLI(object):
 
             # 'rng': scfg.Value(None, help='random seed'),
         }
-        epilog = """
+        __epilog__ = """
         Example Usage:
             kwcoco subset --src special:shapes8 --dst=foo.kwcoco.json
 
@@ -109,6 +109,8 @@ class CocoSubsetCLI(object):
             # Take only the videos where the name ends with 2
             kwcoco subset --src special:vidshapes8 --dst=vidsub.kwcoco.json --select_videos '.name | endswith("2")'
         """
+
+    CLIConfig = CocoSubetConfig
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -126,8 +128,8 @@ class CocoSubsetCLI(object):
         """
         import kwcoco
 
-        config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline, strict=True)
+        print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify subset src: {}'.format(config['src']))
@@ -219,25 +221,25 @@ def query_subset(dset, config):
         >>> dset = kwcoco.CocoDataset.demo()
         >>> assert dset.n_images == 3
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig({'select_images': '.id < 3'})
+        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.id < 3'})
         >>> new_dset = query_subset(dset, config)
         >>> assert new_dset.n_images == 2
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig({'select_images': '.file_name | test(".*.png")'})
+        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.file_name | test(".*.png")'})
         >>> new_dset = query_subset(dset, config)
         >>> assert all(n.endswith('.png') for n in new_dset.images().lookup('file_name'))
         >>> assert new_dset.n_images == 2
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig({'select_images': '.file_name | test(".*.png") | not'})
+        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.file_name | test(".*.png") | not'})
         >>> new_dset = query_subset(dset, config)
         >>> assert not any(n.endswith('.png') for n in new_dset.images().lookup('file_name'))
         >>> assert new_dset.n_images == 1
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig({'select_images': '.id < 3 and (.file_name | test(".*.png"))'})
+        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.id < 3 and (.file_name | test(".*.png"))'})
         >>> new_dset = query_subset(dset, config)
         >>> assert new_dset.n_images == 1
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig({'select_images': '.id < 3 or (.file_name | test(".*.png"))'})
+        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.id < 3 or (.file_name | test(".*.png"))'})
         >>> new_dset = query_subset(dset, config)
         >>> assert new_dset.n_images == 3
 
@@ -248,7 +250,7 @@ def query_subset(dset, config):
         >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
         >>> assert dset.n_videos == 8
         >>> assert dset.n_images == 16
-        >>> config = CocoSubsetCLI.CLIConfig({'select_videos': '.name == "toy_video_3"'})
+        >>> config = CocoSubsetCLI.CLIConfig(**{'select_videos': '.name == "toy_video_3"'})
         >>> new_dset = query_subset(dset, config)
         >>> assert new_dset.n_images == 2
         >>> assert new_dset.n_videos == 1
