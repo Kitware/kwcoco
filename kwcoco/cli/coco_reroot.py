@@ -93,7 +93,14 @@ class CocoRerootCLI:
         import kwcoco
         from os.path import dirname, abspath
         config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
-        print('config = {}'.format(ub.urepr(config, nl=1)))
+
+        try:
+            import rich
+        except ImportError:
+            rich_print = print
+        else:
+            rich_print = rich.print
+        rich_print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
@@ -144,10 +151,14 @@ def find_reroot_autofix(dset):
         print('All paths look like they exist')
         return None
 
+    print(f'Found {len(missing_tups)} missing images')
     if len(missing_gpaths) > 0:
         bundle_dpath = ub.Path(dset.bundle_dpath)
+        print('bundle_dpath = {}'.format(ub.urepr(bundle_dpath, nl=1)))
         first = ub.Path(missing_gpaths[0])
+        print('first = {}'.format(ub.urepr(first, nl=1)))
         first_parts = first.parts
+        print('first_parts = {}'.format(ub.urepr(first_parts, nl=1)))
         candidates = []
         for i in range(len(first_parts)):
             cand_path = bundle_dpath / ub.Path(*first_parts[i:])
