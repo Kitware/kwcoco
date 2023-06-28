@@ -393,7 +393,9 @@ def draw_roc(info, prefix='', fnum=1, **kw):
         sense!
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:kwplot, module:seaborn)
+        >>> ### TODO# xdoctest: +REQUIRES(module:kwplot, module:seaborn)
+        >>> # xdoctest: +REQUIRES(module:kwplot)
+        >>> # xdoctest: +REQUIRES(module:seaborn)
         >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, classes=3,
