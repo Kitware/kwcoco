@@ -23,6 +23,7 @@ def main(cmdline=True, **kw):
         'coco_validate',
         'coco_subset',
         'coco_grab',
+        'coco_info',
     ]
     module_lut = {}
     for name in modnames:
@@ -70,6 +71,9 @@ def main(cmdline=True, **kw):
         elif hasattr(cli_module, '__config__'):
             # New way
             cli_config = cli_module.__config__
+        elif hasattr(cli_module, '__cli__'):
+            # New way
+            cli_config = cli_module.__cli__
         else:
             raise NotImplementedError
 

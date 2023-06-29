@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * New CLI script: `coco_move_assets`.
+* New CLI script: `coco_info`.
 
 ### Fixed
 * Issue in `coco_subset` CLI when copy-assets is on and the input is absolute paths.
