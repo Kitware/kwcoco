@@ -114,7 +114,7 @@ class CocoValidateCLI:
 
             # TODO: Move these to a different tool. This should only validate,
             # not fix anything.
-
+            # TODO: different tool should be called fixup
             'fix': scfg.Value(None, help=ub.paragraph(
                 '''
                 Code indicating strategy to attempt to fix the dataset.

@@ -633,6 +633,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         color=colors,
         linestyle='cycle', marker='cycle', **kw
     )
+    ax.set_ylabel('quality')
     for idx, best_pt in idx_to_best_pt.items():
         best_thresh, best_measure = best_pt
         color = idx_to_colors[idx]

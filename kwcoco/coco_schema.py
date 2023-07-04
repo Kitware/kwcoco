@@ -5,6 +5,9 @@ CommandLine:
     python -m kwcoco.coco_schema
     xdoctest -m kwcoco.coco_schema __doc__
 
+TODO:
+    - [ ] Perhaps use `voluptuous <https://pypi.org/project/voluptuous/>`_ instead?
+
 Example:
     >>> import kwcoco
     >>> from kwcoco.coco_schema import COCO_SCHEMA

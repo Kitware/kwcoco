@@ -3,6 +3,11 @@ Functional interface into defining jsonschema structures.
 
 See mixin classes for details.
 
+Perhaps [Voluptuous]_ does this better and we should switch to that?
+
+References:
+    .. [Voluptuous] https://pypi.org/project/voluptuous
+
 Example:
     >>> from kwcoco.util.jsonschema_elements import *  # NOQA
     >>> elem = SchemaElements()
