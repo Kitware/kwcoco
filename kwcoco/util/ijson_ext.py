@@ -6,7 +6,7 @@ References:
 
 Example:
     >>> import ubelt as ub
-    >>> from kwcoco.utils import ijson_ext as ijson_ext
+    >>> from kwcoco.util import ijson_ext as ijson_ext
     >>> #
     >>> import kwcoco
     >>> dset = kwcoco.CocoDataset.demo()

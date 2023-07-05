@@ -63,17 +63,23 @@ class CocoInfoCLI(scfg.DataConfig):
 
     src = scfg.Value(None, help='input kwcoco path', position=1)
 
+    first_video = scfg.Value(False, isflag=True, help='if True, show the first video dictionary')
+    first_image = scfg.Value(False, isflag=True, help='if True, show the first image dictionary')
+
     @classmethod
     def main(cls, cmdline=1, **kwargs):
         """
         Example:
-            >>> # xdoctest: +SKIP
-            >>> import sys, ubelt
-            >>> sys.path.append(ubelt.expandpath('~/code/kwcoco'))
             >>> from kwcoco.cli.coco_info import *  # NOQA
-            >>> from kwcoco.cli.coco_info import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> # test normal json
+            >>> kwargs = dict(src=dset.fpath, first_image=True, first_video=True)
+            >>> # test zipped json
+            >>> dset.fpath = dset.fpath + '.zip'
+            >>> dset.dump()
             >>> cmdline = 0
-            >>> kwargs = dict()
+            >>> kwargs = dict(src=dset.fpath, first_image=True, first_video=True)
             >>> cls = CocoInfoCLI
             >>> cls.main(cmdline=cmdline, **kwargs)
         """
@@ -88,14 +94,38 @@ class CocoInfoCLI(scfg.DataConfig):
         _cocofile = CocoFileHelper(fpath)
         try:
             file = _cocofile._open()
+            # ijson_ext.items(file)
             info_section_iter = ijson_ext.items(file, prefix='info')
             try:
                 info = next(info_section_iter)
             except StopIteration:
                 info = None
+            else:
+                rich.print('info = {}'.format(ub.urepr(info, nl=4)))
+
+            if config.first_video:
+                # TODO can we make this work without the seek?
+                file.seek(0)
+                video_section_iter = ijson_ext.items(file, prefix='videos.item')
+                try:
+                    video = next(video_section_iter)
+                except StopIteration:
+                    video = None
+                else:
+                    rich.print('video = {}'.format(ub.urepr(video, nl=4)))
+
+            if config.first_image:
+                file.seek(0)
+                image_section_iter = ijson_ext.items(file, prefix='images.item')
+                try:
+                    image = next(image_section_iter)
+                except StopIteration:
+                    image = None
+                else:
+                    rich.print('image = {}'.format(ub.urepr(image, nl=4)))
+
         finally:
             _cocofile._close()
-        rich.print('info = {}'.format(ub.urepr(info, nl=4)))
 
 
 __cli__ = CocoInfoCLI

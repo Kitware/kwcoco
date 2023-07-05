@@ -10,6 +10,8 @@ class CocoUnionCLI(object):
         """
         Combine multiple COCO datasets into a single merged dataset.
         """
+        __command__ = 'union'
+
         src = scfg.Value([], position=1, help='path to multiple input datasets', nargs='+')
 
         dst = scfg.Value('combo.kwcoco.json', help='path to output dataset')
@@ -88,6 +90,14 @@ class CocoUnionCLI(object):
 
         out_fpath = config.dst
         out_dpath = ub.Path(out_fpath).parent
+
+        if not config.absolute:
+            # Handle the case where the output is not in the same path as the
+            # inputs.
+            curr_bundle = ub.Path(combo.bundle_dpath)
+            if curr_bundle != out_dpath:
+                combo.reroot(out_dpath, check=False)
+
         if out_dpath:
             ub.ensuredir(out_dpath)
         print('Writing to out_fpath = {!r}'.format(out_fpath))

@@ -8,6 +8,8 @@ class CocoMove(scfg.DataConfig):
     Move a kwcoco file to a new location while maintaining relative paths.
     This is equivalent to a regular copy followed by ``kwcoco reroot`` followed
     by a delete of the original.
+
+    TODO: add option to move the assets as well?
     """
     __command__ = 'move'
     __alias__ = ['mv']

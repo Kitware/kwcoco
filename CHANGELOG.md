@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Issue in `coco_subset` CLI when copy-assets is on and the input is absolute paths.
 * reroot can now accept pathlib.Path arguments.
 * Improved reroot logic. 
+* fixed issue in coco union where output paths were not rerooted correctly in some cases.
 
 ### Changed
 * `kwcoco validate` now reports the path to the first missing / corrupted image in the error.

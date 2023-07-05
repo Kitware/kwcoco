@@ -31,14 +31,34 @@ console_scripts = [
 
 [tool.pytest.ini_options]
 addopts = "-p no:doctest --xdoctest --xdoctest-style=google --ignore-glob=setup.py"
-norecursedirs = ".git ignore build __pycache__ dev _skbuild docs"
-filterwarnings = [ "default", "ignore:.*No cfgstr given in Cacher constructor or call.*:Warning", "ignore:.*Define the __nice__ method for.*:Warning", "ignore:.*private pytest class or function.*:Warning",]
+norecursedirs = ".git ignore build __pycache__ dev _skbuild docs examples"
+filterwarnings = [
+ "default",
+ "ignore:.*No cfgstr given in Cacher constructor or call.*:Warning",
+ "ignore:.*Define the __nice__ method for.*:Warning",
+ "ignore:.*private pytest class or function.*:Warning",
+]
 
 [tool.coverage.run]
 branch = true
 
 [tool.coverage.report]
-exclude_lines = [ "pragma: no cover", ".*  # pragma: no cover", ".*  # nocover", "def __repr__", "raise AssertionError", "raise NotImplementedError", "if 0:", "if trace is not None", "verbose = .*", "^ *raise", "^ *pass *$", "if _debug:", "if __name__ == .__main__.:", ".*if six.PY2:",]
+exclude_lines = [
+ "pragma: no cover",
+ ".*  # pragma: no cover",
+ ".*  # nocover",
+ "def __repr__",
+ "raise AssertionError",
+ "raise NotImplementedError",
+ "if 0:",
+ "if trace is not None",
+ "verbose = .*",
+ "^ *raise",
+ "^ *pass *$",
+ "if _debug:",
+ "if __name__ == .__main__.:",
+ ".*if six.PY2:",
+]
 omit = [ "kwcoco/__main__.py", "*/setup.py",]
 
 [tool.mypy]

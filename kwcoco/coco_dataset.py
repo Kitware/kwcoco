@@ -6066,6 +6066,21 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         unique_img_names = UniqueNameRemapper()
         unique_video_names = UniqueNameRemapper()
 
+        def update_ifnotin(d1, d2):
+            """ copies keys from d2 that doent exist in d1 into d1 """
+            for k, v in d2.items():
+                if k not in d1:
+                    d1[k] = v
+            return d1
+
+        def _has_duplicates(items):
+            seen = set()
+            for item in items:
+                if item in seen:
+                    return True
+                seen.add(item)
+            return False
+
         def _coco_union(relative_dsets, common_root):
             """ union of dictionary based data structure """
             # TODO: rely on subset of SPEC keys
@@ -6079,24 +6094,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             ])
 
             # TODO: need to handle keypoint_categories
-
             merged_cat_name_to_id = {}
             merged_kp_name_to_id = {}
-
-            def update_ifnotin(d1, d2):
-                """ copies keys from d2 that doent exist in d1 into d1 """
-                for k, v in d2.items():
-                    if k not in d1:
-                        d1[k] = v
-                return d1
-
-            def _has_duplicates(items):
-                seen = set()
-                for item in items:
-                    if item in seen:
-                        return True
-                    seen.add(item)
-                return False
 
             # Check if the image-ids are unique and can be preserved
             _all_imgs = (img for _, _, d in relative_dsets for img in d['images'])
