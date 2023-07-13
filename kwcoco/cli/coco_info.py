@@ -83,9 +83,8 @@ class CocoInfoCLI(scfg.DataConfig):
             >>> cls = CocoInfoCLI
             >>> cls.main(cmdline=cmdline, **kwargs)
         """
-        import rich
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
-        rich.print('config = ' + ub.urepr(config, nl=1))
+        print('config = ' + ub.urepr(config, nl=1))
 
         # import kwcoco
         from kwcoco.util import ijson_ext
@@ -101,7 +100,7 @@ class CocoInfoCLI(scfg.DataConfig):
             except StopIteration:
                 info = None
             else:
-                rich.print('info = {}'.format(ub.urepr(info, nl=4)))
+                print('info = {}'.format(ub.urepr(info, nl=4)))
 
             if config.first_video:
                 # TODO can we make this work without the seek?
@@ -112,7 +111,7 @@ class CocoInfoCLI(scfg.DataConfig):
                 except StopIteration:
                     video = None
                 else:
-                    rich.print('video = {}'.format(ub.urepr(video, nl=4)))
+                    print('video = {}'.format(ub.urepr(video, nl=4)))
 
             if config.first_image:
                 file.seek(0)
@@ -122,7 +121,7 @@ class CocoInfoCLI(scfg.DataConfig):
                 except StopIteration:
                     image = None
                 else:
-                    rich.print('image = {}'.format(ub.urepr(image, nl=4)))
+                    print('image = {}'.format(ub.urepr(image, nl=4)))
 
         finally:
             _cocofile._close()
