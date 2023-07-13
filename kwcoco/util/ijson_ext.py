@@ -28,7 +28,7 @@ Example:
     >>> #
     >>> file = io.StringIO(text)
     >>> list(ijson_ext.items(file, 'bbox'))
-
+    >>> #
     >>> import ijson
     >>> # Regular ijson does not support NaN
     >>> text = ub.codeblock(
