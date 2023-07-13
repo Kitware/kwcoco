@@ -5,6 +5,7 @@ References:
     https://github.com/ICRAR/ijson/issues/33
 
 Example:
+    >>> # xdoctest: +REQUIRES(module:ijson)
     >>> import ubelt as ub
     >>> from kwcoco.util import ijson_ext as ijson_ext
     >>> #
