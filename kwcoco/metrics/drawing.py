@@ -393,7 +393,9 @@ def draw_roc(info, prefix='', fnum=1, **kw):
         sense!
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:kwplot, module:seaborn)
+        >>> ### TODO# xdoctest: +REQUIRES(module:kwplot, module:seaborn)
+        >>> # xdoctest: +REQUIRES(module:kwplot)
+        >>> # xdoctest: +REQUIRES(module:seaborn)
         >>> from kwcoco.metrics.drawing import *  # NOQA
         >>> from kwcoco.metrics import DetectionMetrics
         >>> dmet = DetectionMetrics.demo(nimgs=30, null_pred=1, classes=3,
@@ -631,6 +633,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         color=colors,
         linestyle='cycle', marker='cycle', **kw
     )
+    ax.set_ylabel('quality')
     for idx, best_pt in idx_to_best_pt.items():
         best_thresh, best_measure = best_pt
         color = idx_to_colors[idx]

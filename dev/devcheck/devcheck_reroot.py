@@ -107,11 +107,12 @@ def demo_reroot_bug1():
 
     # Now change the file path, which changes the bundle
     dset.fpath = dpath / 'data/repos/my_bundle2/data.kwcoco.json'
-    assert len(dset.missing_images()) == 1
+    assert len(dset.missing_images()) == 0
 
     dset.reroot(absolute=False)
     # Image should be relative, but it is not
     dset.index.imgs[1]['file_name']
+    assert len(dset.missing_images()) == 0
 
     if 0:
         # Workaround

@@ -5,3 +5,4 @@ kwcoco.metrics.sklearn\_alts module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

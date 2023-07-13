@@ -86,7 +86,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_full-loose_template: &test_full-loose_template
   <<: *common_test_template
@@ -134,7 +134,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_minimal-strict_template: &test_minimal-strict_template
   <<: *common_test_template
@@ -182,7 +182,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_full-strict_template: &test_full-strict_template
   <<: *common_test_template
@@ -230,7 +230,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 build/cp36-linux-x86_64:
   <<: *build_template
@@ -347,6 +347,29 @@ test/full-strict/cp310-linux-x86_64:
   image: python:3.10
   needs:
   - build/cp310-linux-x86_64
+build/cp311-linux-x86_64:
+  <<: *build_template
+  image: python:3.11
+test/minimal-loose/cp311-linux-x86_64:
+  <<: *test_minimal-loose_template
+  image: python:3.11
+  needs:
+  - build/cp311-linux-x86_64
+test/full-loose/cp311-linux-x86_64:
+  <<: *test_full-loose_template
+  image: python:3.11
+  needs:
+  - build/cp311-linux-x86_64
+test/minimal-strict/cp311-linux-x86_64:
+  <<: *test_minimal-strict_template
+  image: python:3.11
+  needs:
+  - build/cp311-linux-x86_64
+test/full-strict/cp311-linux-x86_64:
+  <<: *test_full-strict_template
+  image: python:3.11
+  needs:
+  - build/cp311-linux-x86_64
 gpgsign/wheels:
   <<: *common_template
   image: python:3.8
@@ -373,6 +396,8 @@ gpgsign/wheels:
   - job: build/cp39-linux-x86_64
     artifacts: true
   - job: build/cp310-linux-x86_64
+    artifacts: true
+  - job: build/cp311-linux-x86_64
     artifacts: true
   script:
   - ls dist

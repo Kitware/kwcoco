@@ -5,3 +5,4 @@ kwcoco.demo.toypatterns module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

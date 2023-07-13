@@ -5,3 +5,4 @@ kwcoco.cli.coco\_modify\_categories module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

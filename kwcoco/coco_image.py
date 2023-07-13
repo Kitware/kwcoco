@@ -20,6 +20,11 @@ except Exception:
     profile = ub.identity
 
 
+__docstubs__ = """
+from kwcoco.coco_objects1d import Annots
+"""
+
+
 DEFAULT_RESOLUTION_KEYS = {
     'resolution',
     'target_gsd',  # only exists as a convinience for other projects. Remove in the future.
@@ -118,7 +123,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         assets = []
         for obj in self.iter_asset_objs():
             # TODO: ducktype with an object
-            asset = CocoAsset(obj)
+            asset = CocoAsset(obj, bundle_dpath=self.bundle_dpath)
             # asset = obj
             assets.append(asset)
         return assets
@@ -291,7 +296,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         """
         Compute a "main" image asset.
 
-        Notes:
+        Note:
             Uses a heuristic.
 
             * First, try to find the auxiliary image that has with the smallest
@@ -602,6 +607,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
         # Make the asset info dict
         obj = {
+            'image_id': img.get('id', None),  # for when assets move to their own table
             'file_name': file_name,
             'height': height,
             'width': width,
@@ -893,6 +899,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
     def valid_region(self, space='image'):
         """
         If this image has a valid polygon, return it in image, or video space
+
+        Returns:
+            None | kwimage.MultiPolygon
         """
         import kwimage
         valid_coco_poly = self.img.get('valid_region', None)
@@ -917,6 +926,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
     def warp_vid_from_img(self):
         """
         Affine transformation that warps image space -> video space.
+
+        Returns:
+            kwimage.Affine: The transformation matrix
         """
         import kwimage
         warp_img_to_vid = kwimage.Affine.coerce(self.img.get('warp_img_to_vid', None))
@@ -929,6 +941,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
     def warp_img_from_vid(self):
         """
         Affine transformation that warps video space -> image space.
+
+        Returns:
+            kwimage.Affine: The transformation matrix
         """
         return self.warp_vid_from_img.inv()
 
@@ -1199,11 +1214,20 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
         'warp_wld_from_asset': 'warp_to_wld',
     }
 
-    def __init__(self, asset):
+    def __init__(self, asset, bundle_dpath=None):
         self._proxy = asset
+        self._bundle_dpath = bundle_dpath
 
     def __nice__(self):
         return repr(self.__json__())
+
+    def image_filepath(self):
+        if self._bundle_dpath is None:
+            raise Exception('Bundle dpath must be populated to use this method')
+            # return self['file_name']
+        else:
+            return ub.Path(self._bundle_dpath) / self['file_name']
+        ...
 
 
 # TODO?
@@ -1252,9 +1276,21 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
 #     """
 #     __alias_to_primary__ = {}
 
+# class CocoCategory(_CocoObject):
+#     """
+#     TODO: general coco scalars
+#     """
+#     __alias_to_primary__ = {}
+
+# class CocoTrack(_CocoObject):
+#     """
+#     TODO: general coco scalars
+#     """
+#     __alias_to_primary__ = {}
+
 
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
-    from os.path import join
+    # from os.path import join
     from kwcoco.channel_spec import FusedChannelSpec
     from delayed_image import DelayedLoad, DelayedIdentity
     info = {}

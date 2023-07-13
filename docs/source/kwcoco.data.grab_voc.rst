@@ -5,3 +5,4 @@ kwcoco.data.grab\_voc module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

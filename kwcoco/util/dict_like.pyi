@@ -2,8 +2,8 @@ from typing import Any
 from typing import Tuple
 from typing import Dict
 import ubelt as ub
-from _typeshed import Incomplete
 from collections.abc import Generator
+from scriptconfig.dict_like import DictLike as DictLike_
 from typing import Any
 
 
@@ -51,10 +51,25 @@ class DictLike(ub.NiceRepr):
     def to_dict(self) -> Dict:
         ...
 
-    asdict: Incomplete
+    asdict = to_dict
 
     def update(self, other) -> None:
         ...
 
-    def get(self, key: Any, default: Any = None) -> Any:
+    def get(self, key: Any, default: Any | None = None) -> Any:
+        ...
+
+
+class DictProxy(DictLike_):
+
+    def __getitem__(self, key):
+        ...
+
+    def __setitem__(self, key, value) -> None:
+        ...
+
+    def keys(self):
+        ...
+
+    def __json__(self):
         ...

@@ -5,3 +5,4 @@ kwcoco.util.util\_archive module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

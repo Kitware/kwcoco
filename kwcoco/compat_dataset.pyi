@@ -1,5 +1,4 @@
 from typing import List
-from typing import Union
 from typing import Dict
 from os import PathLike
 import kwimage
@@ -33,7 +32,7 @@ class COCO(CocoDataset):
                   imgIds: List[int] = ...,
                   catIds: List[int] = ...,
                   areaRng: List[float] = ...,
-                  iscrowd: Union[bool, None] = None) -> List[int]:
+                  iscrowd: bool | None = None) -> List[int]:
         ...
 
     def getCatIds(self,
@@ -63,7 +62,7 @@ class COCO(CocoDataset):
         ...
 
     def download(self,
-                 tarDir: Union[str, PathLike, None] = None,
+                 tarDir: str | PathLike | None = None,
                  imgIds: list = ...) -> None:
         ...
 

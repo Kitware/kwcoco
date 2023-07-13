@@ -5,3 +5,4 @@ kwcoco.util.lazy\_frame\_backends module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

@@ -1,5 +1,4 @@
 import kwcoco
-from typing import Union
 import numpy as np
 from numpy import ndarray
 from os import PathLike
@@ -15,6 +14,7 @@ from typing import Any
 from typing import IO
 import ubelt as ub
 from _typeshed import Incomplete
+from collections.abc import Generator
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from types import ModuleType
 from typing import Any
@@ -41,26 +41,26 @@ class MixinCocoAccessors:
 
     def delayed_load(self,
                      gid: int,
-                     channels: kwcoco.FusedChannelSpec = None,
+                     channels: kwcoco.FusedChannelSpec | None = None,
                      space: str = 'image'):
         ...
 
     def load_image(self,
-                   gid_or_img: Union[int, dict],
-                   channels: Union[str, None] = None) -> np.ndarray:
+                   gid_or_img: int | dict,
+                   channels: str | None = None) -> np.ndarray:
         ...
 
     def get_image_fpath(self,
-                        gid_or_img: Union[int, dict],
-                        channels: Union[str, None] = None) -> PathLike:
+                        gid_or_img: int | dict,
+                        channels: str | None = None) -> PathLike:
         ...
 
-    def get_auxiliary_fpath(self, gid_or_img: Union[int, dict], channels: str):
+    def get_auxiliary_fpath(self, gid_or_img: int | dict, channels: str):
         ...
 
     def load_annot_sample(self,
                           aid_or_ann,
-                          image: Union[ArrayLike, None] = None,
+                          image: ArrayLike | None = None,
                           pad: Incomplete | None = ...):
         ...
 
@@ -83,7 +83,7 @@ class MixinCocoExtras:
     def coerce(
         cls,
         key,
-        sqlview: Union[bool, str] = False,
+        sqlview: bool | str = False,
         **kw
     ) -> AbstractCocoDataset | kwcoco.CocoDataset | kwcoco.CocoSqlDatabase:
         ...
@@ -100,17 +100,18 @@ class MixinCocoExtras:
         ...
 
     def missing_images(self,
-                       check_aux: bool = False,
+                       check_aux: bool = True,
                        verbose: int = 0) -> List[Tuple[int, str, int]]:
         ...
 
     def corrupted_images(self,
-                         check_aux: bool = False,
-                         verbose: int = 0) -> List[Tuple[int, str, int]]:
+                         check_aux: bool = True,
+                         verbose: int = 0,
+                         workers: int = 0) -> List[Tuple[int, str, int]]:
         ...
 
     def rename_categories(self,
-                          mapper: Union[dict, Callable],
+                          mapper: dict | Callable,
                           rebuild: bool = ...,
                           merge_policy: str = 'ignore') -> None:
         ...
@@ -118,13 +119,13 @@ class MixinCocoExtras:
     bundle_dpath: Incomplete
 
     def reroot(self,
-               new_root: Union[str, None] = None,
-               old_prefix: Union[str, None] = None,
-               new_prefix: Union[str, None] = None,
+               new_root: str | PathLike | None = None,
+               old_prefix: str | None = None,
+               new_prefix: str | None = None,
                absolute: bool = False,
                check: bool = True,
                safe: bool = True,
-               verbose: int = 0):
+               verbose: int = 1):
         ...
 
     @property
@@ -155,31 +156,32 @@ class MixinCocoExtras:
 class MixinCocoObjects:
 
     def annots(self,
-               annot_ids: Union[List[int], None] = None,
-               image_id: Union[int, None] = None,
-               trackid: Union[int, None] = None,
+               annot_ids: List[int] | None = None,
+               image_id: int | None = None,
+               track_id: int | None = None,
+               trackid: Incomplete | None = ...,
                aids: Incomplete | None = ...,
                gid: Incomplete | None = ...) -> kwcoco.coco_objects1d.Annots:
         ...
 
     def images(self,
-               image_ids: Union[List[int], None] = None,
-               video_id: Union[int, None] = None,
-               names: Union[List[str], None] = None,
+               image_ids: List[int] | None = None,
+               video_id: int | None = None,
+               names: List[str] | None = None,
                gids: Incomplete | None = ...,
                vidid: Incomplete | None = ...) -> kwcoco.coco_objects1d.Images:
         ...
 
     def categories(
             self,
-            category_ids: Union[List[int], None] = None,
+            category_ids: List[int] | None = None,
             cids: Incomplete | None = ...) -> kwcoco.coco_objects1d.Categories:
         ...
 
     def videos(
             self,
-            video_ids: Union[List[int], None] = None,
-            names: Union[List[str], None] = None,
+            video_ids: List[int] | None = None,
+            names: List[str] | None = None,
             vidids: Incomplete | None = ...) -> kwcoco.coco_objects1d.Videos:
         ...
 
@@ -222,17 +224,16 @@ class MixinCocoStats:
 
     def boxsize_stats(
             self,
-            anchors: Union[int, None] = None,
+            anchors: int | None = None,
             perclass: bool = True,
-            gids: Union[List[int], None] = None,
-            aids: Union[List[int], None] = None,
+            gids: List[int] | None = None,
+            aids: List[int] | None = None,
             verbose: int = 0,
             clusterkw: dict = ...,
             statskw: dict = ...) -> Dict[str, Dict[str, Dict | ndarray]]:
         ...
 
-    def find_representative_images(self,
-                                   gids: Union[None, List] = None) -> List:
+    def find_representative_images(self, gids: None | List = None) -> List:
         ...
 
 
@@ -240,59 +241,56 @@ class MixinCocoDraw:
 
     def draw_image(self,
                    gid: int,
-                   channels: kwcoco.ChannelSpec = None) -> ndarray:
+                   channels: kwcoco.ChannelSpec | None = None) -> ndarray:
         ...
 
     def show_image(self,
-                   gid: Union[int, None] = None,
-                   aids: Union[list, None] = None,
-                   aid: Union[int, None] = None,
+                   gid: int | None = None,
+                   aids: list | None = None,
+                   aid: int | None = None,
                    channels: Incomplete | None = ...,
-                   setlim: Union[None, str] = None,
+                   setlim: None | str = None,
                    **kwargs):
         ...
 
 
 class MixinCocoAddRemove:
 
-    def add_video(self, name: str, id: Union[None, int] = None, **kw) -> int:
+    def add_video(self, name: str, id: None | int = None, **kw) -> int:
         ...
 
     def add_image(self,
-                  file_name: Union[str, None] = None,
-                  id: Union[None, int] = None,
+                  file_name: str | None = None,
+                  id: None | int = None,
                   **kw) -> int:
         ...
 
     def add_auxiliary_item(self,
                            gid: int,
-                           file_name: Union[str, None] = None,
-                           channels: Union[str,
-                                           kwcoco.FusedChannelSpec] = None,
+                           file_name: str | None = None,
+                           channels: str | kwcoco.FusedChannelSpec
+                           | None = None,
                            **kwargs) -> None:
         ...
 
     def add_annotation(self,
                        image_id: int,
-                       category_id: Union[int, None] = None,
-                       bbox: Union[list, kwimage.Boxes] = ...,
-                       segmentation: Union[Dict, List, Any] = ...,
+                       category_id: int | None = None,
+                       bbox: list | kwimage.Boxes = ...,
+                       segmentation: Dict | List | Any = ...,
                        keypoints: Any = ...,
-                       id: Union[None, int] = None,
+                       id: None | int = None,
                        **kw) -> int:
         ...
 
     def add_category(self,
                      name: str,
-                     supercategory: Union[str, None] = None,
-                     id: Union[int, None] = None,
+                     supercategory: str | None = None,
+                     id: int | None = None,
                      **kw) -> int:
         ...
 
-    def ensure_image(self,
-                     file_name: str,
-                     id: Union[None, int] = None,
-                     **kw) -> int:
+    def ensure_image(self, file_name: str, id: None | int = None, **kw) -> int:
         ...
 
     def ensure_category(self,
@@ -348,8 +346,8 @@ class MixinCocoAddRemove:
     def remove_keypoint_categories(self, kp_identifiers: List) -> Dict:
         ...
 
-    def set_annotation_category(self, aid_or_ann: Union[dict, int],
-                                cid_or_cat: Union[dict, int]) -> None:
+    def set_annotation_category(self, aid_or_ann: dict | int,
+                                cid_or_cat: dict | int) -> None:
         ...
 
 
@@ -419,19 +417,19 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                   ub.NiceRepr):
     dataset: Dict
     index: CocoIndex
-    tag: Union[str, None]
-    bundle_dpath: Union[PathLike, None]
-    hashid: Union[str, None]
+    tag: str | None
+    bundle_dpath: PathLike | None
+    hashid: str | None
     hashid_parts: Incomplete
     data_fpath: Incomplete
     cache_dpath: Incomplete
     assets_dpath: Incomplete
 
     def __init__(self,
-                 data: Union[str, PathLike, dict, None] = None,
-                 tag: Union[str, None] = None,
-                 bundle_dpath: Union[str, None] = None,
-                 img_root: Union[str, None] = None,
+                 data: str | PathLike | dict | None = None,
+                 tag: str | None = None,
+                 bundle_dpath: str | None = None,
+                 img_root: str | None = None,
                  fname: Incomplete | None = ...,
                  autobuild: bool = ...) -> None:
         ...
@@ -459,12 +457,34 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         ...
 
     @classmethod
+    def coerce_multiple(cls,
+                        datas: List,
+                        workers: int | str = 0,
+                        mode: str = 'process',
+                        verbose: int = 1,
+                        postprocess: Callable | None = None,
+                        ordered: bool = True,
+                        **kwargs) -> Generator[CocoDataset, None, None]:
+        ...
+
+    @classmethod
+    def load_multiple(cls,
+                      fpaths: List[str | PathLike],
+                      workers: int = 0,
+                      mode: str = 'process',
+                      verbose: int = 1,
+                      postprocess: Callable | None = None,
+                      ordered: bool = True,
+                      **kwargs) -> Generator[CocoDataset, None, None]:
+        ...
+
+    @classmethod
     def from_coco_paths(CocoDataset,
                         fpaths: List[str],
                         max_workers: int = 0,
                         verbose: int = 1,
                         mode: str = 'thread',
-                        union: Union[str, bool] = 'try'):
+                        union: str | bool = 'try'):
         ...
 
     def copy(self):
@@ -473,20 +493,20 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
     def __nice__(self):
         ...
 
-    def dumps(self,
-              indent: Union[int, str, None] = None,
-              newlines: bool = False):
+    def dumps(self, indent: int | str | None = None, newlines: bool = False):
         ...
 
     def dump(self,
-             file: Union[PathLike, IO, None] = None,
-             indent: Union[int, str, None] = None,
+             file: PathLike | IO | None = None,
+             indent: int | str | None = None,
              newlines: bool = False,
-             temp_file: Union[bool, str] = True) -> None:
+             temp_file: bool | str = 'auto',
+             compress: bool | str = 'auto') -> None:
         ...
 
     def union(*others,
               disjoint_tracks: bool = True,
+              remember_parent: bool = False,
               **kwargs) -> kwcoco.CocoDataset:
         ...
 
@@ -500,7 +520,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                  force_rewrite: bool = False,
                  memory: bool = False,
                  backend: str = 'sqlite',
-                 sql_db_fpath: Union[str, PathLike, None] = None):
+                 sql_db_fpath: str | PathLike | None = None):
         ...
 
 

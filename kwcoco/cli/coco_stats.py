@@ -209,6 +209,7 @@ class CocoStatsCLI:
 
 
 _CLI = CocoStatsCLI
+main = _CLI.main
 
 if __name__ == '__main__':
     """

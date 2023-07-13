@@ -5,3 +5,4 @@ kwcoco.cli.coco\_split module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

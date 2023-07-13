@@ -1,25 +1,23 @@
-from typing import Union
 from types import ModuleType
-import tarfile
 import zipfile
+import tarfile
 import tarfile
 import zipfile
 from _typeshed import Incomplete
 
 
 class Archive:
-    fpath: Union[str, None]
+    fpath: str | None
     mode: str
-    file: Union[tarfile.TarFile, zipfile.ZipFile, None]
-    backend: Union[str, ModuleType, None]
+    file: tarfile.TarFile | zipfile.ZipFile | None
+    backend: str | ModuleType | None
 
     def __init__(
             self,
-            fpath: Union[str, None] = None,
+            fpath: str | None = None,
             mode: str = 'r',
-            backend: Union[str, ModuleType, None] = None,
-            file: Union[tarfile.TarFile, zipfile.ZipFile,
-                        None] = None) -> None:
+            backend: str | ModuleType | None = None,
+            file: tarfile.TarFile | zipfile.ZipFile | None = None) -> None:
         ...
 
     def __iter__(self):

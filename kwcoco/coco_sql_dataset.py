@@ -93,6 +93,9 @@ from packaging.version import parse as Version
 # """
 # https://github.com/python/mypy/issues/8016
 # https://github.com/mkorpela/overrides/issues/109
+__docstubs__ = """
+from sqlalchemy.orm import InstrumentedAttribute
+"""
 
 
 class FallbackCocoBase:
@@ -167,11 +170,6 @@ try:
 except ImportError:
     text = ub.identity
 
-# TODO: is it possible to get sclalchemy to use JSON for sqlite and JSONB for
-# postgresql?
-# from sqlalchemy.dialects.postgresql import JSONB
-# JSON = JSONB
-
 # This is the column name for unstructured data that is not captured directly
 # in our sql schema. It will be stored as a json blob. The column names defined
 # in the alchemy tables must agree with this. Note: previously we used
@@ -237,10 +235,10 @@ class Image(CocoBase):
 
 # TODO:
 # Track
-# SharedPolygon?
 
 # The track LUT depends on some stuff in postgresql that I dont fully
 # understand keep the ability to turn it off if we need to.
+# It does seem stable.
 _USE_TRACK_LUT = 1
 
 
@@ -250,10 +248,9 @@ class Annotation(CocoBase):
     image_id = Column(Integer, doc='', index=True, unique=False)
     category_id = Column(Integer, doc='', index=True, unique=False, nullable=True)
 
-    # track_id = Column(Integer, index=True, unique=False)
+    # TODO: in the future we may enforce track-id is an integer
     if _USE_TRACK_LUT:
         track_id = Column(JSONVariant, index=True, unique=False)
-        # track_id = Column(JSONVariant)
     else:
         track_id = Column(JSON)
 
@@ -275,14 +272,6 @@ class Annotation(CocoBase):
     caption = Column(JSON)
 
     _unstructured = Column(JSON, default=dict())
-
-    # __table_args__ =  (
-    #     # https://stackoverflow.com/questions/30885846/how-to-create-jsonb-index-using-gin-on-sqlalchemy
-    #     Index(
-    #         "index_Annotation_on_track_id_gin", track_id,
-    #         # postgresql_using="gin",
-    #     ),
-    # )
 
 # As long as the flavor of sql conforms to our raw sql commands set
 # this to 0, which uses the faster raw variant.
@@ -542,7 +531,7 @@ class SqlDictProxy(DictLike):
         # ONLY USE IN READONLY MODE
         proxy._cache = _new_proxy_cache()
 
-    def __len__(proxy):
+    def __len__(proxy) -> int:
         if proxy.keyattr is None:
             query = proxy.session.query(proxy.cls)
         else:
@@ -551,13 +540,13 @@ class SqlDictProxy(DictLike):
                 query = query.filter(proxy.keyattr != None)  # NOQA
         return query.count()
 
-    def __nice__(proxy):
+    def __nice__(proxy) -> str:
         if proxy.keyattr is None:
             return 'id -> {}: {}'.format(proxy.cls.__tablename__, len(proxy))
         else:
             return '{} -> {}: {}'.format(proxy.keyattr.name, proxy.cls.__tablename__, len(proxy))
 
-    def __contains__(proxy, key):
+    def __contains__(proxy, key) -> bool:
         if proxy._cache is not None:
             if key in proxy._cache:
                 return True
@@ -848,10 +837,10 @@ class SqlIdGroupDictProxy(DictLike):
                     proxy.parent_order_id = order_attr.class_.id
                     proxy.parent_order_table = order_attr.class_
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return str(len(self))
 
-    def __len__(proxy):
+    def __len__(proxy) -> int:
         query = proxy.session.query(proxy.parent_keyattr)
         return query.count()
 
@@ -904,7 +893,7 @@ class SqlIdGroupDictProxy(DictLike):
             proxy._cache[key] = item
         return item
 
-    def __contains__(proxy, key):
+    def __contains__(proxy, key) -> bool:
         if proxy._cache is not None:
             if key in proxy._cache:
                 return True

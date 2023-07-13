@@ -53,7 +53,6 @@ class KWCocoSimpleTorchDataset(DatasetBase):
 
     Example:
         >>> # xdoctest: +REQUIRES(module:torch)
-        >>> from kwcoco.examples.simple_kwcoco_torch_dataset import *  # NOQA
         >>> import kwcoco
         >>> coco_dset = kwcoco.CocoDataset.demo('shapes8')
         >>> input_dims = (384, 384)

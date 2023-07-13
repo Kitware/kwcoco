@@ -47,6 +47,8 @@ TODO:
 
     - [ ] Allow parts of the kwcoco file to be references to other json files.
 
+    - [ ] Add top-level track table (in progress)
+
 References:
     .. [CocoFormat] http://cocodataset.org/#format-data
     .. [PyCocoToolsMask] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
@@ -114,6 +116,7 @@ SPEC_KEYS = [
     'videos',
     'images',
     'annotations',
+    'tracks',
 ]
 
 
@@ -1427,8 +1430,11 @@ class MixinCocoExtras(object):
                     'hashid_parts': self.hashid_parts,
                     'status_key': status_key,
                 }
-                hashid_sidecar_fpath.parent.ensuredir()
-                hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+                try:
+                    hashid_sidecar_fpath.parent.ensuredir()
+                    hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+                except PermissionError as ex:
+                    warnings.warn(f'Cannot write a cached hashid: {repr(ex)}')
         return self.hashid
 
     @classmethod
@@ -1578,11 +1584,16 @@ class MixinCocoExtras(object):
                     yield img
 
         def _has_download_permission(_HAS_PREMISSION=[False]):
-            # TODO: use rich
             if not _HAS_PREMISSION[0] or ub.argflag(('-y', '--yes')):
-                ans = input('is it ok to download? (enter y for yes)')
-                if ans in ['yes', 'y']:
-                    _HAS_PREMISSION[0] = True
+                try:
+                    from rich.prompt import Confirm
+                    ans = Confirm.ask('is it ok to download?')
+                    if ans:
+                        _HAS_PREMISSION[0] = True
+                except ImportError:
+                    ans = input('is it ok to download? (enter y for yes)')
+                    if ans in ['yes', 'y']:
+                        _HAS_PREMISSION[0] = True
             return _HAS_PREMISSION[0]
 
         if gids is None:
@@ -1855,17 +1866,17 @@ class MixinCocoExtras(object):
                absolute=False,
                check=True,
                safe=True,
-               verbose=0):
+               verbose=1):
         """
         Modify the prefix of the image/data paths onto a new image/data root.
 
         Args:
-            new_root (str | None):
-                New image root. If unspecified the current ``self.bundle_dpath`` is
-                used. If old_prefix and new_prefix are unspecified, they will
-                attempt to be determined based on the current root (which
-                assumes the file paths exist at that root) and this new root.
-                Defaults to None.
+            new_root (str | PathLike | None):
+                New image root. If unspecified the current
+                ``self.bundle_dpath`` is used. If old_prefix and new_prefix are
+                unspecified, they will attempt to be determined based on the
+                current root (which assumes the file paths exist at that root)
+                and this new root.  Defaults to None.
 
             old_prefix (str | None):
                 If specified, removes this prefix from file names.
@@ -1899,33 +1910,40 @@ class MixinCocoExtras(object):
             - [ ] Incorporate maximum ordered subtree embedding?
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:rich)
             >>> import kwcoco
-            >>> def report(dset, name):
+            >>> import ubelt as ub
+            >>> import rich
+            >>> def report(dset):
             >>>     gid = 1
-            >>>     abs_fpath = dset.get_image_fpath(gid)
+            >>>     abs_fpath = ub.Path(dset.get_image_fpath(gid))
             >>>     rel_fpath = dset.index.imgs[gid]['file_name']
-            >>>     color = 'green' if exists(abs_fpath) else 'red'
-            >>>     print('strategy_name = {!r}'.format(name))
-            >>>     print(ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
-            >>>     print('rel_fpath = {!r}'.format(rel_fpath))
+            >>>     color = 'green' if abs_fpath.exists() else 'red'
+            >>>     print(ub.color_text(f'abs_fpath = {abs_fpath!r}', color))
+            >>>     print(f'rel_fpath = {rel_fpath!r}')
             >>> dset = self = kwcoco.CocoDataset.demo()
             >>> # Change base relative directory
             >>> bundle_dpath = ub.expandpath('~')
-            >>> print('ORIG self.imgs = {!r}'.format(self.imgs))
-            >>> print('ORIG dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
-            >>> print('NEW bundle_dpath       = {!r}'.format(bundle_dpath))
-            >>> self.reroot(bundle_dpath)
-            >>> report(self, 'self')
-            >>> print('NEW self.imgs = {!r}'.format(self.imgs))
+            >>> rich.print('ORIG self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
+            >>> rich.print('ORIG dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
+            >>> rich.print('NEW(1) bundle_dpath       = {!r}'.format(bundle_dpath))
+            >>> # Test relative reroot
+            >>> rich.print('[blue] --- 1. RELATIVE REROOT ---')
+            >>> self.reroot(bundle_dpath, verbose=3)
+            >>> report(self)
+            >>> rich.print('NEW(1) self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
             >>> if not ub.WIN32:
             >>>     assert self.imgs[1]['file_name'].startswith('.cache')
-
-            >>> # Use absolute paths
-            >>> self.reroot(absolute=True)
+            >>> # Test absolute reroot
+            >>> rich.print('[blue] --- 2. ABSOLUTE REROOT ---')
+            >>> self.reroot(absolute=True, verbose=3)
+            >>> rich.print('NEW(2) self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
             >>> assert self.imgs[1]['file_name'].startswith(bundle_dpath)
 
             >>> # Switch back to relative paths
+            >>> rich.print('[blue] --- 3. ABS->REL REROOT ---')
             >>> self.reroot()
+            >>> rich.print('NEW(3) self.imgs = {}'.format(ub.urepr(self.imgs, nl=1)))
             >>> if not ub.WIN32:
             >>>     assert self.imgs[1]['file_name'].startswith('.cache')
 
@@ -1944,15 +1962,21 @@ class MixinCocoExtras(object):
             >>>     assert self.imgs[1]['auxiliary'][0]['file_name'].startswith('.cache')
 
         Ignore:
-            See ~/code/kwcoco/dev/devcheck_reroot.py
+            See ~/code/kwcoco/dev/devcheck/devcheck_reroot.py
         """
         cur_bundle_dpath = self.bundle_dpath
+        if cur_bundle_dpath == '':
+            cur_bundle_dpath = '.'
         new_bundle_dpath = self.bundle_dpath if new_root is None else new_root
+        new_bundle_dpath = os.fspath(new_bundle_dpath)
+
+        # Find the the prefix that to make new relative paths work.
+        rel_prefix = os.path.relpath(cur_bundle_dpath, new_bundle_dpath)
 
         if absolute:
             new_bundle_dpath = os.fspath(ub.Path(new_bundle_dpath).absolute())
 
-        if verbose:
+        if verbose > 1:
             print('kwcoco.reroot')
             print(' * new_bundle_dpath = {}'.format(ub.urepr(new_bundle_dpath, nl=1)))
             print(' * cur_bundle_dpath = {}'.format(ub.urepr(cur_bundle_dpath, nl=1)))
@@ -1961,7 +1985,7 @@ class MixinCocoExtras(object):
             print(f' * absolute={absolute}')
             print(f' * safe={safe}')
             print(f' * check={check}')
-            if verbose > 1:
+            if verbose > 2:
                 # First assets
                 if len(self.dataset['images']):
                     from kwcoco.coco_image import CocoImage
@@ -1986,7 +2010,7 @@ class MixinCocoExtras(object):
             # the images based on the new root, unless we are explicitly given
             # information about new and old prefixes. Can we do better than
             # this?
-
+            _old_fname = file_name
             file_name = _normalize_prefix(file_name)
             cur_gpath = join(cur_bundle_dpath, file_name)
 
@@ -2000,11 +2024,13 @@ class MixinCocoExtras(object):
             # specified then modify relative file names to be correct with
             # respect to this new root (assuming the previous root was also
             # valid)
-            if old_prefix is None and new_prefix is None:
-                # This is not a good check, fails if we want to
-                # do a relative reroot outside of the original dataset
-                if new_bundle_dpath is not None and cur_gpath.startswith(new_bundle_dpath):
-                    file_name = relpath(cur_gpath, new_bundle_dpath)
+            DO_OLD_CHECK = 0
+            if DO_OLD_CHECK:
+                if old_prefix is None and new_prefix is None:
+                    # This is not a good check, fails if we want to
+                    # do a relative reroot outside of the original dataset
+                    if new_bundle_dpath is not None and cur_gpath.startswith(new_bundle_dpath):
+                        file_name = relpath(cur_gpath, new_bundle_dpath)
 
             if new_prefix is not None:
                 file_name = join(new_prefix, file_name)
@@ -2012,13 +2038,17 @@ class MixinCocoExtras(object):
             if absolute:
                 new_file_name = join(new_bundle_dpath, file_name)
             else:
-                new_file_name = file_name
+                new_file_name = join(rel_prefix, file_name)
+                if os.path.isabs(new_file_name):
+                    # Handle absolute -> relative case
+                    new_file_name = relpath(new_file_name, new_bundle_dpath)
 
             if check:
                 new_gpath = join(new_bundle_dpath, new_file_name)
                 if not exists(new_gpath):
                     print('ERROR')
-                    print(' * file_name = {!r}'.format(file_name))
+                    print(' * file_name (old) = {!r}'.format(_old_fname))
+                    print(' * file_name (new) = {!r}'.format(file_name))
                     print(' * cur_gpath = {!r}'.format(cur_gpath))
                     print(' * new_gpath = {!r}'.format(new_gpath))
                     print(' * new_file_name = {!r}'.format(new_file_name))
@@ -2030,10 +2060,14 @@ class MixinCocoExtras(object):
 
         # from kwcoco.util import util_reroot
 
+        num_images = len(self.imgs)
+        enable_prog = verbose > 0
+
         if safe:
             # First compute all new values in memory but don't overwrite
             gid_to_new = {}
-            for gid, img in self.imgs.items():
+            prog = ub.ProgIter(self.imgs.items(), total=num_images, enabled=enable_prog, desc='prepare reroot')
+            for gid, img in prog:
                 gname = img.get('file_name', None)
                 try:
                     new = {}
@@ -2054,7 +2088,8 @@ class MixinCocoExtras(object):
                     raise Exception('Failed to reroot gid={} with fpaths={}'.format(img['id'], asset_fpaths))
 
             # Overwrite old values
-            for gid, new in gid_to_new.items():
+            prog = ub.ProgIter(gid_to_new.items(), total=num_images, enabled=enable_prog, desc='finalize reroot')
+            for gid, new in prog:
                 img = self.imgs[gid]
                 img['file_name'] = new.get('file_name', None)
                 if 'auxiliary' in new:
@@ -2064,7 +2099,8 @@ class MixinCocoExtras(object):
                     for aux_fname, aux in zip(new['assets'], img['assets']):
                         aux['file_name'] = aux_fname
         else:
-            for img in self.imgs.values():
+            prog = ub.ProgIter(self.imgs.values(), total=num_images, enabled=enable_prog, desc='rerooting')
+            for img in prog:
                 try:
                     gname = img.get('file_name', None)
                     if gname is not None:
@@ -2694,7 +2730,11 @@ class MixinCocoStats(object):
         if config.get('missing', True):
             missing = dset.missing_images(check_aux=True, verbose=verbose)
             if missing:
-                msg = 'There are {} missing images'.format(len(missing))
+                msg = ub.paragraph(
+                    f'''
+                    There are {len(missing)} missing images.
+                    The first one is {missing[0][1]!r}.
+                    ''')
                 _error(msg)
                 result['missing'] = missing
 
@@ -2702,7 +2742,11 @@ class MixinCocoStats(object):
             corrupted = dset.corrupted_images(check_aux=True, verbose=verbose,
                                               workers=config.get('workers', 0))
             if corrupted:
-                msg = 'There are {} corrupted images'.format(len(corrupted))
+                msg = ub.paragraph(
+                    f'''
+                    There are {len(corrupted)} corrupted images.
+                    The first one is {corrupted[0][1]!r}.
+                    ''')
                 _error(msg)
                 result['corrupted'] = corrupted
 
@@ -5068,6 +5112,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 'videos': [],
                 'images': [],
                 'annotations': [],
+                'tracks': [],
                 'licenses': [],
                 'info': [],
             }
@@ -5178,7 +5223,18 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         # Backwards compat hack, allow the coco file to specify the
         # bundle_dpath
+        # TODO: deprecate img_root
         if isinstance(data, dict) and 'img_root' in data:
+            ub.schedule_deprecation(
+                'kwcoco', name='img_root', type='dataset member',
+                deprecate='0.6.3', error='1.0.0', remove='1.1.0',
+                migration=ub.paragraph(
+                    '''
+                    Ensure the location of the saved kwcoco file encodes the
+                    bundle dpath or ensure bundle_dpath is correctly set in the
+                    in-memory CocoDataset object.
+                    ''')
+            )
             # allow image root to be specified in the dataset
             # we refer to this as a json data "body root".
             body_root = data.get('img_root', '')
@@ -5237,8 +5293,36 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     @fpath.setter
     def fpath(self, value):
-        self._fpath = value if value is None else value
+        # Cant use update fpath because of reroot checks.
+        # self._update_fpath(value)
+        self._fpath = value
         self._infer_dirs()
+
+    def _update_fpath(self, new_fpath):
+        # New method for more robustly updating the file path and bundle
+        # directory, still a WIP. Only works when the current dataset is
+        # already valid.
+        if new_fpath is None:
+            # Bundle directory is clobbered, so we should make everything
+            # absolute
+            self.reroot(absolute=True)
+        else:
+            old_fpath = self.fpath
+            if old_fpath is not None:
+                old_fpath_ = ub.Path(old_fpath)
+                new_fpath_ = ub.Path(new_fpath)
+
+                same_bundle = (
+                    (old_fpath_.parent == new_fpath_.parent) or
+                    (old_fpath_.resolve() == new_fpath_.resolve())
+                )
+                if not same_bundle:
+                    # The bundle directory has changed, so we need to reroot
+                    new_root = new_fpath_.parent
+                    self.reroot(new_root)
+
+            self._fpath = new_fpath
+            self._infer_dirs()
 
     def _infer_dirs(self):
         """
@@ -5982,6 +6066,21 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         unique_img_names = UniqueNameRemapper()
         unique_video_names = UniqueNameRemapper()
 
+        def update_ifnotin(d1, d2):
+            """ copies keys from d2 that doent exist in d1 into d1 """
+            for k, v in d2.items():
+                if k not in d1:
+                    d1[k] = v
+            return d1
+
+        def _has_duplicates(items):
+            seen = set()
+            for item in items:
+                if item in seen:
+                    return True
+                seen.add(item)
+            return False
+
         def _coco_union(relative_dsets, common_root):
             """ union of dictionary based data structure """
             # TODO: rely on subset of SPEC keys
@@ -5995,24 +6094,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             ])
 
             # TODO: need to handle keypoint_categories
-
             merged_cat_name_to_id = {}
             merged_kp_name_to_id = {}
-
-            def update_ifnotin(d1, d2):
-                """ copies keys from d2 that doent exist in d1 into d1 """
-                for k, v in d2.items():
-                    if k not in d1:
-                        d1[k] = v
-                return d1
-
-            def _has_duplicates(items):
-                seen = set()
-                for item in items:
-                    if item in seen:
-                        return True
-                    seen.add(item)
-                return False
 
             # Check if the image-ids are unique and can be preserved
             _all_imgs = (img for _, _, d in relative_dsets for img in d['images'])
@@ -6363,6 +6446,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> list(postgres_dset.anns.keys())
             >>> list(sqlite_dset.anns.keys())
 
+        Ignore:
             import timerit
             ti = timerit.Timerit(100, bestof=10, verbose=2)
             for timer in ti.reset('dct_dset'):
@@ -6408,6 +6492,7 @@ def demo_coco_data():
     from kwimage.im_demodata import _TEST_IMAGES
     from os.path import commonprefix
 
+    # FIXME: be robust to broken urls
     test_imgs_keys = ['astro', 'carl', 'stars']
     urls = {k: _TEST_IMAGES[k]['url'] for k in test_imgs_keys}
     gpaths = {k: kwimage.grab_test_image_fpath(k) for k in test_imgs_keys}

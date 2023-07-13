@@ -6,8 +6,8 @@ class CocoShowCLI:
     name: str
 
     class CLIConfig(scfg.Config):
-        epilog: str
-        default: Incomplete
+        __epilog__: str
+        __default__: Incomplete
 
     @classmethod
     def main(cls, cmdline: bool = ..., **kw) -> None:

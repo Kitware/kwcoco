@@ -5,3 +5,4 @@ kwcoco.metrics.assignment module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

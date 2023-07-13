@@ -1,2 +1,3 @@
 #!/bin/bash
-flake8 ./kwcoco --count --select=E9,F63,F7,F82 --show-source --statistics
+flake8 --count --select=E9,F63,F7,F82 --show-source --statistics kwcoco
+flake8 --count --select=E9,F63,F7,F82 --show-source --statistics ./tests

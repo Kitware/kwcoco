@@ -5,3 +5,4 @@ kwcoco.coco\_sql\_dataset module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

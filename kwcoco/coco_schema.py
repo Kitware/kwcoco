@@ -5,6 +5,9 @@ CommandLine:
     python -m kwcoco.coco_schema
     xdoctest -m kwcoco.coco_schema __doc__
 
+TODO:
+    - [ ] Perhaps use `voluptuous <https://pypi.org/project/voluptuous/>`_ instead?
+
 Example:
     >>> import kwcoco
     >>> from kwcoco.coco_schema import COCO_SCHEMA
@@ -201,6 +204,8 @@ ASSET = OBJECT(
     PROPERTIES={
         'file_name': PATH,
         'channels': CHANNELS,
+        'id': INTEGER(description='The id of the asset (option for now, but will be required in the future when assets are moved to their own table)'),
+        'image_id': INTEGER(description='The image id this asset is associated with (option for now, but will be required in the future)'),
         'width': INTEGER(description='The width in asset-space pixels'),
         'height': INTEGER(description='The height in asset-space pixels'),
     },
@@ -260,6 +265,11 @@ IMAGE = OBJECT(OrderedDict((
     title='IMAGE',
 )
 
+TRACK = OBJECT(OrderedDict((
+    ('id', INTEGER(description='A unique internal id for this track')),
+    ('name', NAME(description='A unique external name or identifier')),
+)))
+
 ANNOTATION = OBJECT(OrderedDict((
     ('id', INTEGER(description='A unique internal id for this annotation')),
     ('image_id', INTEGER(description='The image id this annotation belongs to')),
@@ -313,6 +323,8 @@ COCO_SCHEMA = OBJECT(
         ('keypoint_categories', ARRAY(KEYPOINT_CATEGORY)),
 
         ('videos', ARRAY(VIDEO)),
+
+        ('tracks', ARRAY(TRACK)),
 
         ('images', ARRAY(IMAGE)),
 

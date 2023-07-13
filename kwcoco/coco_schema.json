@@ -82,6 +82,16 @@
                 "title": "VIDEO"
             }
         },
+        "tracks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "A unique internal id for this track"},
+                    "name": {"type": "string", "pattern": "[^/]+", "description": "A unique external name or identifier"}
+                }
+            }
+        },
         "images": {
             "type": "array",
             "items": {
@@ -131,6 +141,8 @@
                             "properties": {
                                 "file_name": {"type": "string"},
                                 "channels": {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
+                                "id": {"type": "integer", "description": "The id of the asset (option for now, but will be required in the future when assets are moved to their own table)"},
+                                "image_id": {"type": "integer", "description": "The image id this asset is associated with (option for now, but will be required in the future)"},
                                 "width": {"type": "integer", "description": "The width in asset-space pixels"},
                                 "height": {"type": "integer", "description": "The height in asset-space pixels"}
                             },
@@ -147,6 +159,8 @@
                             "properties": {
                                 "file_name": {"type": "string"},
                                 "channels": {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
+                                "id": {"type": "integer", "description": "The id of the asset (option for now, but will be required in the future when assets are moved to their own table)"},
+                                "image_id": {"type": "integer", "description": "The image id this asset is associated with (option for now, but will be required in the future)"},
                                 "width": {"type": "integer", "description": "The width in asset-space pixels"},
                                 "height": {"type": "integer", "description": "The height in asset-space pixels"}
                             },

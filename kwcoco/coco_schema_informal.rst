@@ -116,6 +116,13 @@ An informal spec is as follows:
         'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
     }
 
+    # In development: tracks - an object to store properties associated with
+    # all annotations with a track-id.
+    tracks = {
+        'id': int,
+        'name': int,
+    }
+
     # A dataset bundles a manifest of all aformentioned data into one structure.
     dataset = {
         'categories': [category, ...],

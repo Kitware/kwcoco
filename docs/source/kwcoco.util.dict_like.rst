@@ -5,3 +5,4 @@ kwcoco.util.dict\_like module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

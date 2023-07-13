@@ -5,3 +5,4 @@ kwcoco.examples.vectorized\_interface module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

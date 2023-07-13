@@ -20,3 +20,7 @@ def find_json_unserializable(
 
 def indexable_allclose(dct1, dct2, return_info: bool = ...):
     ...
+
+
+def coerce_indent(indent):
+    ...

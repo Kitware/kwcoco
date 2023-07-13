@@ -5,3 +5,4 @@ kwcoco.cli.coco\_stats module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

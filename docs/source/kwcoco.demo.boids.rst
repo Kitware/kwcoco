@@ -5,3 +5,4 @@ kwcoco.demo.boids module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

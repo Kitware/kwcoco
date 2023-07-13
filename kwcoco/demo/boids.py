@@ -595,6 +595,16 @@ def _pygame_render_boids():
         python -m kwcoco.demo.boids
         pip install pygame kwcoco -U && python -m kwcoco.demo.boids
     """
+    ASK_TO_INSTALL = 1
+    if ASK_TO_INSTALL:
+        if ub.modname_to_modpath('pygame') is None:
+            from rich.prompt import Confirm
+            ans = Confirm.ask('Pygame was not detected. Do you want to install it?')
+            if ans:
+                import subprocess
+                import sys
+                subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pygame'])
+
     try:
         import pygame
     except ImportError:

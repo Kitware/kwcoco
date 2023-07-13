@@ -5,3 +5,4 @@ kwcoco.compat\_dataset module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

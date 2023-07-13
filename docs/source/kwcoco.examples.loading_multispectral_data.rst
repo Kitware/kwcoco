@@ -5,3 +5,4 @@ kwcoco.examples.loading\_multispectral\_data module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

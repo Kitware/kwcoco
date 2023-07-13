@@ -2,21 +2,18 @@ import scriptconfig as scfg
 import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
-from kwcoco.metrics.util import DictProxy
+from kwcoco.util.dict_like import DictProxy
 from typing import Any
 
-COCO_SAMPLER_CLS: Incomplete
 
+class CocoEvalConfig(scfg.DataConfig):
+    __default__: Incomplete
 
-class CocoEvalConfig(scfg.Config):
-    default: Incomplete
-
-    def normalize(self) -> None:
+    def __post_init__(self) -> None:
         ...
 
 
 class CocoEvaluator:
-    Config: Incomplete
 
     def __init__(coco_eval, config) -> None:
         ...

@@ -5,7 +5,26 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.6.2 - Unreleased
+## Version 0.6.3 - Unreleased
+
+### Added
+* New CLI script: `coco_move_assets`.
+* New CLI script: `coco_info`.
+
+### Fixed
+* Issue in `coco_subset` CLI when copy-assets is on and the input is absolute paths.
+* reroot can now accept pathlib.Path arguments.
+* Improved reroot logic. 
+* fixed issue in coco union where output paths were not rerooted correctly in some cases.
+
+### Changed
+* `kwcoco validate` now reports the path to the first missing / corrupted image in the error.
+* Started work on new top-level track table.
+* Started laying groundwork for moving assets to their own table.
+* Moved examples out of the module and into the main repo.
+
+
+## Version 0.6.2 - Released 2023-05-02
 
 ### Changed
 * sliced getitems into a CocoObject1d (e.g. Images, Annotations, etc...) now

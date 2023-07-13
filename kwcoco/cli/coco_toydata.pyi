@@ -6,7 +6,7 @@ class CocoToyDataCLI:
     name: str
 
     class CLIConfig(scfg.Config):
-        default: Incomplete
+        __default__: Incomplete
         epilog: str
 
     @classmethod

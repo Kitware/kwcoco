@@ -5,3 +5,4 @@ kwcoco.examples.faq module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:

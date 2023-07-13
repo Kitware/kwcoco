@@ -1,4 +1,6 @@
+import sqlalchemy
 import pandas
+import sqlalchemy
 import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
@@ -7,12 +9,20 @@ from kwcoco.coco_dataset import MixinCocoAccessors, MixinCocoDraw, MixinCocoObje
 from kwcoco.util.dict_like import DictLike
 from typing import Any
 
+from sqlalchemy.orm import InstrumentedAttribute
+
+__docstubs__: str
+
 
 class FallbackCocoBase:
     ...
 
 
 CocoBase: type
+sqlalchemy_version: Incomplete
+IS_GE_SQLALCH_2x: Incomplete
+SQL_ERROR_TYPES: Incomplete
+JSONVariant: Incomplete
 CocoBase = FallbackCocoBase
 
 
@@ -34,7 +44,6 @@ class Category(CocoBase):
     name: Incomplete
     alias: Incomplete
     supercategory: Incomplete
-    __unstructured__: Incomplete
 
 
 class KeypointCategory(CocoBase):
@@ -44,7 +53,6 @@ class KeypointCategory(CocoBase):
     alias: Incomplete
     supercategory: Incomplete
     reflection_id: Incomplete
-    __unstructured__: Incomplete
 
 
 class Video(CocoBase):
@@ -54,7 +62,6 @@ class Video(CocoBase):
     caption: Incomplete
     width: Incomplete
     height: Incomplete
-    __unstructured__: Incomplete
 
 
 class Image(CocoBase):
@@ -70,7 +77,6 @@ class Image(CocoBase):
     channels: Incomplete
     warp_img_to_vid: Incomplete
     auxiliary: Incomplete
-    __unstructured__: Incomplete
 
 
 class Annotation(CocoBase):
@@ -87,7 +93,6 @@ class Annotation(CocoBase):
     prob: Incomplete
     iscrowd: Incomplete
     caption: Incomplete
-    __unstructured__: Incomplete
 
 
 ALCHEMY_MODE_DEFAULT: int
@@ -140,13 +145,13 @@ class SqlDictProxy(DictLike):
                  ignore_null: bool = ...) -> None:
         ...
 
-    def __len__(proxy):
+    def __len__(proxy) -> int:
         ...
 
-    def __nice__(proxy):
+    def __nice__(proxy) -> str:
         ...
 
-    def __contains__(proxy, key):
+    def __contains__(proxy, key) -> bool:
         ...
 
     def __getitem__(proxy, key):
@@ -165,23 +170,24 @@ class SqlDictProxy(DictLike):
 class SqlIdGroupDictProxy(DictLike):
 
     def __init__(proxy,
-                 session,
-                 valattr,
-                 keyattr,
-                 parent_keyattr,
-                 group_order_attr: Incomplete | None = ...) -> None:
+                 session: sqlalchemy.orm.session.Session,
+                 valattr: InstrumentedAttribute,
+                 keyattr: InstrumentedAttribute,
+                 parent_keyattr: InstrumentedAttribute | None = None,
+                 order_attr: InstrumentedAttribute | None = None,
+                 order_id: InstrumentedAttribute | None = None) -> None:
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
-    def __len__(proxy):
+    def __len__(proxy) -> int:
         ...
 
     def __getitem__(proxy, key):
         ...
 
-    def __contains__(proxy, key):
+    def __contains__(proxy, key) -> bool:
         ...
 
     def keys(proxy) -> Generator[Any, None, None]:
@@ -263,7 +269,12 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoAccessors,
     def name_to_cat(self):
         ...
 
-    def raw_table(self, table_name: str) -> pandas.DataFrame:
+    def pandas_table(self,
+                     table_name: str,
+                     strict: bool = ...) -> pandas.DataFrame:
+        ...
+
+    def raw_table(self, table_name):
         ...
 
     def tabular_targets(self):

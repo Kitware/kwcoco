@@ -42,5 +42,6 @@ VIDEO: Incomplete
 CHANNELS: Incomplete
 ASSET: Incomplete
 IMAGE: Incomplete
+TRACK: Incomplete
 ANNOTATION: Incomplete
 COCO_SCHEMA: Incomplete

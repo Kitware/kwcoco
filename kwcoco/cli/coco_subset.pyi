@@ -6,7 +6,8 @@ class CocoSubsetCLI:
     name: str
 
     class CLIConfig(scfg.Config):
-        default: Incomplete
+        __command__: str
+        __default__: Incomplete
         epilog: str
 
     @classmethod

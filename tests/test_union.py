@@ -42,3 +42,130 @@ def test_union_with_aux():
 
     assert combo.get_image_fpath(2) == dset2.get_image_fpath(1)
     assert combo.get_image_fpath(2, channels='ir') == dset2.get_image_fpath(1, channels='ir')
+
+
+def test_union_subdirs_to_root():
+    """
+    Test case where unions kwcoco files in the subdirs and then outputs the new
+    file into a parent of the subdirs.
+    """
+    import kwcoco
+    dset1 = kwcoco.CocoDataset.demo('vidshapes1')
+    dset2 = kwcoco.CocoDataset.demo('vidshapes2')
+    dset3 = kwcoco.CocoDataset.demo('vidshapes3')
+
+    import ubelt as ub
+    dpath = ub.Path.appdir('kwcoco', 'tests', 'union', 'subdirs1')
+    dpath.ensuredir()
+
+    multi_bundle_dpath = (dpath / 'multi_bundle').delete().ensuredir()
+
+    ub.Path(dset1.fpath).parent.copy(multi_bundle_dpath / 'dset1')
+    ub.Path(dset2.fpath).parent.copy(multi_bundle_dpath / 'dset2')
+    ub.Path(dset3.fpath).parent.copy(multi_bundle_dpath / 'dset3')
+
+    src_fpaths = [
+        multi_bundle_dpath / 'dset1/data.kwcoco.json',
+        multi_bundle_dpath / 'dset2/data.kwcoco.json',
+        multi_bundle_dpath / 'dset3/data.kwcoco.json',
+    ]
+    dst_fpath = multi_bundle_dpath / 'combo.kwcoco.json'
+
+    from kwcoco.cli import coco_union
+    coco_union._CLI.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+
+    dst = kwcoco.CocoDataset(dst_fpath)
+    assert not any(dst.missing_images())
+    dst.validate()
+    assert len(dst.videos()) == 6
+
+    img_groups = dst.videos().images
+    gids = [grp[0] for grp in img_groups]
+    prefixes = {p.split('images')[0] for p in list(dst.images(gids).lookup('file_name'))}
+    assert prefixes == {'dset1/_assets/', 'dset2/_assets/', 'dset3/_assets/'}
+
+
+def test_union_subdirs_to_new_subdir():
+    """
+    Test case where unions kwcoco files in the subdirs and then outputs the new
+    file into a different subdir in the root.
+    """
+    import kwcoco
+    dset1 = kwcoco.CocoDataset.demo('vidshapes1')
+    dset2 = kwcoco.CocoDataset.demo('vidshapes2')
+    dset3 = kwcoco.CocoDataset.demo('vidshapes3')
+
+    import ubelt as ub
+    dpath = ub.Path.appdir('kwcoco', 'tests', 'union', 'subdirs2')
+    dpath.ensuredir()
+
+    multi_bundle_dpath = (dpath / 'multi_bundle').delete().ensuredir()
+
+    ub.Path(dset1.fpath).parent.copy(multi_bundle_dpath / 'dset1')
+    ub.Path(dset2.fpath).parent.copy(multi_bundle_dpath / 'dset2')
+    ub.Path(dset3.fpath).parent.copy(multi_bundle_dpath / 'dset3')
+
+    src_fpaths = [
+        multi_bundle_dpath / 'dset1/data.kwcoco.json',
+        multi_bundle_dpath / 'dset2/data.kwcoco.json',
+        multi_bundle_dpath / 'dset3/data.kwcoco.json',
+    ]
+    dst_fpath = multi_bundle_dpath / 'new_subdir/combo.kwcoco.json'
+
+    from kwcoco.cli import coco_union
+    coco_union._CLI.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+
+    dst = kwcoco.CocoDataset(dst_fpath)
+    dst.validate()
+    assert not any(dst.missing_images())
+    assert len(dst.videos()) == 6
+
+    img_groups = dst.videos().images
+    gids = [grp[0] for grp in img_groups]
+    prefixes = {p.split('images')[0] for p in list(dst.images(gids).lookup('file_name'))}
+    assert prefixes == {'../dset1/_assets/', '../dset2/_assets/', '../dset3/_assets/'}
+
+
+def test_union_subdirs_to_existing_subdir():
+    """
+    Test case where unions kwcoco files in the subdirs and then outputs the new
+    file into a different subdir in the root.
+    """
+    import kwcoco
+    dset1 = kwcoco.CocoDataset.demo('vidshapes1')
+    dset2 = kwcoco.CocoDataset.demo('vidshapes2')
+    dset3 = kwcoco.CocoDataset.demo('vidshapes3')
+
+    import ubelt as ub
+    dpath = ub.Path.appdir('kwcoco', 'tests', 'union', 'subdirs3')
+    dpath.ensuredir()
+
+    multi_bundle_dpath = (dpath / 'multi_bundle').delete().ensuredir()
+
+    ub.Path(dset1.fpath).parent.copy(multi_bundle_dpath / 'dset1')
+    ub.Path(dset2.fpath).parent.copy(multi_bundle_dpath / 'dset2')
+    ub.Path(dset3.fpath).parent.copy(multi_bundle_dpath / 'dset3')
+
+    src_fpaths = [
+        multi_bundle_dpath / 'dset1/data.kwcoco.json',
+        multi_bundle_dpath / 'dset2/data.kwcoco.json',
+        multi_bundle_dpath / 'dset3/data.kwcoco.json',
+    ]
+    dst_fpath = multi_bundle_dpath / 'dset2/combo.kwcoco.json'
+
+    from kwcoco.cli import coco_union
+    coco_union._CLI.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+
+    dst = kwcoco.CocoDataset(dst_fpath)
+    dst.validate()
+    assert not any(dst.missing_images())
+    assert len(dst.videos()) == 6
+
+    img_groups = dst.videos().images
+    gids = [grp[0] for grp in img_groups]
+    prefixes = {p.split('images')[0] for p in list(dst.images(gids).lookup('file_name'))}
+
+    # NOTE: it would be nice if we had just "_assets" instead of
+    # '../dset2/_assets/, but it is technically correct, and is what we
+    # currently get, so leaving this check in.
+    assert prefixes == {'../dset1/_assets/', '../dset2/_assets/', '../dset3/_assets/'}

@@ -1,7 +1,6 @@
 from typing import Dict
-import kwcoco
 import kwimage
-from typing import Union
+import kwcoco
 from typing import List
 from ubelt.util_const import NoParamType
 import ubelt as ub
@@ -13,9 +12,8 @@ __docstubs__: str
 
 
 class DetectionMetrics(ub.NiceRepr):
-    gid_to_true_dets: Dict
-    gid_to_pred_dets: Dict
-    classes: kwcoco.CategoryTree
+    gid_to_true_dets: Dict[int, kwimage.Detections]
+    gid_to_pred_dets: Dict[int, kwimage.Detections]
 
     def __init__(dmet, classes: Incomplete | None = ...) -> None:
         ...
@@ -24,6 +22,9 @@ class DetectionMetrics(ub.NiceRepr):
         ...
 
     def __nice__(dmet):
+        ...
+
+    def enrich_confusion_vectors(dmet, cfsn_vecs) -> None:
         ...
 
     @classmethod
@@ -36,14 +37,14 @@ class DetectionMetrics(ub.NiceRepr):
 
     def add_predictions(dmet,
                         pred_dets: kwimage.Detections,
-                        imgname: Union[str, None] = None,
-                        gid: Union[int, None] = None) -> None:
+                        imgname: str | None = None,
+                        gid: int | None = None) -> None:
         ...
 
     def add_truth(dmet,
                   true_dets: kwimage.Detections,
-                  imgname: Union[str, None] = None,
-                  gid: Union[int, None] = None) -> None:
+                  imgname: str | None = None,
+                  gid: int | None = None) -> None:
         ...
 
     def true_detections(dmet, gid):
@@ -52,16 +53,24 @@ class DetectionMetrics(ub.NiceRepr):
     def pred_detections(dmet, gid):
         ...
 
+    @property
+    def classes(dmet):
+        ...
+
+    @classes.setter
+    def classes(dmet, classes) -> None:
+        ...
+
     def confusion_vectors(
         dmet,
-        iou_thresh: Union[float, List[float]] = 0.5,
+        iou_thresh: float | List[float] = 0.5,
         bias: float = 0,
-        gids: Union[List[int], None] = None,
+        gids: List[int] | None = None,
         compat: str = 'mutex',
         prioritize: str = 'iou',
-        ignore_classes: Union[set, str] = 'ignore',
-        background_class: Union[str, NoParamType] = ...,
-        verbose: Union[int, str] = 'auto',
+        ignore_classes: set | str = 'ignore',
+        background_class: str | NoParamType = ...,
+        verbose: int | str = 'auto',
         workers: int = 0,
         track_probs: str = 'try',
         max_dets: Incomplete | None = ...
@@ -94,7 +103,7 @@ class DetectionMetrics(ub.NiceRepr):
                           iou_thresholds: Incomplete | None = ...) -> Dict:
         ...
 
-    score_coco: Incomplete
+    score_coco = score_pycocotools
 
     @classmethod
     def demo(cls, **kwargs):

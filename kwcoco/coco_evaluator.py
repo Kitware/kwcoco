@@ -181,7 +181,7 @@ class CocoEvalConfig(scfg.DataConfig):
             False, help='if True use image file_name to associate images instead of ids'),
     }
 
-    def normalize(self):
+    def __post_init__(self):
         # if self['ovthresh'] is not None:
         #     warnings.warn('ovthresh is deprecated use iou_thresh')
         #     self['iou_thresh'] = self['ovthresh']

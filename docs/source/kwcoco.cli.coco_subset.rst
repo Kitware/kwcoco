@@ -5,3 +5,4 @@ kwcoco.cli.coco\_subset module
    :members:
    :undoc-members:
    :show-inheritance:
+   :private-members:
