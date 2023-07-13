@@ -211,7 +211,6 @@ if __name__ == "__main__":
         "optional": parse_requirements("requirements/optional.txt", versions="loose"),
         "headless": parse_requirements("requirements/headless.txt", versions="loose"),
         "graphics": parse_requirements("requirements/graphics.txt", versions="loose"),
-        "postgresql": parse_requirements("requirements/postgresql.txt", versions="loose"),
         # Strict versions
         "headless-strict": parse_requirements(
             "requirements/headless.txt", versions="strict"
@@ -219,7 +218,12 @@ if __name__ == "__main__":
         "graphics-strict": parse_requirements(
             "requirements/graphics.txt", versions="strict"
         ),
-        "postgresql-strict": parse_requirements("requirements/postgresql.txt", versions="strict"),
+        "postgresql": parse_requirements(
+            "requirements/postgresql.txt", versions="loose"
+        ),
+        "postgresql-strict": parse_requirements(
+            "requirements/postgresql.txt", versions="strict"
+        ),
         "all-strict": parse_requirements("requirements.txt", versions="strict"),
         "runtime-strict": parse_requirements(
             "requirements/runtime.txt", versions="strict"

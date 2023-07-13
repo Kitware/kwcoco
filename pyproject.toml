@@ -3,13 +3,13 @@ requires = [ "setuptools>=41.0.1",]
 build-backend = "setuptools.build_meta"
 
 [tool.xcookie]
-tags = [ "gitlab", "kitware", "purepy", "cv2", "gdal"]
+tags = [ "gitlab", "kitware", "purepy", "cv2", "gdal", "postgresql"]
 mod_name = "kwcoco"
 repo_name = "kwcoco"
 rel_mod_parent_dpath = "."
 min_python = 3.6
 url = "https://gitlab.kitware.com/computer-vision/kwcoco"
-ci_cpython_versions = ["3.6", "3.7", "3.8", "3.9", "3.10"]
+ci_cpython_versions = ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
 extra_full_strict_lines = [
     "pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
 ]

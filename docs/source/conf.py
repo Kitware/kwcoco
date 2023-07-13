@@ -532,41 +532,44 @@ class GoogleStyleDocstringProcessor:
                     lines[idx] = "**Example:**"
                     lines.insert(idx + 1, "")
 
-        REFORMAT_RETURNS = 0
-        if REFORMAT_RETURNS:
-            # FORMAT THE RETURNS SECTION A BIT NICER
-            # Split by sphinx types
-            import re
-            tag_pat = re.compile(r'^:(\w*):')
-            directive_pat = re.compile(r'^.. (\w*)::\s*(\w*)')
-            sphinx_parts = []
-            for idx, line in enumerate(lines):
-                tag_match = tag_pat.search(line)
-                directive_match = directive_pat.search(line)
-                if tag_match:
-                    tag = tag_match.groups()[0]
-                    sphinx_parts.append({
-                        'tag': tag, 'start_offset': idx,
-                        'type': 'tag',
-                    })
-                elif directive_match:
-                    tag = directive_match.groups()[0]
-                    sphinx_parts.append({
-                        'tag': tag, 'start_offset': idx,
-                        'type': 'directive',
-                    })
+        REFORMAT_SECTIONS = 0
+        if REFORMAT_SECTIONS:
+            REFORMAT_RETURNS = 0
+            REFORMAT_PARAMS = 0
 
-            prev_offset = len(lines)
-            for part in sphinx_parts[::-1]:
-                part['end_offset'] = prev_offset
-                prev_offset = part['start_offset']
+            docstr = SphinxDocstring(lines)
 
-            for part in sphinx_parts[::-1]:
-                if part['tag'] == 'returns':
-                    edit_slice = slice(part['start_offset'] + 2, part['end_offset'])
-                    return_section = lines[edit_slice]
-                    text = '\n'.join(return_section)
+            if REFORMAT_PARAMS:
+                for found in docstr.find_tagged_lines('Parameters'):
+                    print(found['text'])
+                    edit_slice = found['edit_slice']
 
+                    # TODO: figure out how to do this.
+
+                    # # file = 'foo.rst'
+                    # import rstparse
+                    # rst = rstparse.Parser()
+                    # import io
+                    # rst.read(io.StringIO(found['text']))
+                    # rst.parse()
+                    # for line in rst.lines:
+                    #     print(line)
+
+                    # # found['text']
+                    # import docutils
+
+                    # settings = docutils.frontend.OptionParser(
+                    #     components=(docutils.parsers.rst.Parser,)
+                    #     ).get_default_values()
+                    # document = docutils.utils.new_document('<tempdoc>', settings)
+                    # from docutils.parsers import rst
+                    # rst.Parser().parse(found['text'], document)
+
+            if REFORMAT_RETURNS:
+                for found in docstr.find_tagged_lines('returns'):
+                    # FIXME: account for new slice with -2 offset
+                    edit_slice = found['edit_slice']
+                    text = found['text']
                     new_lines = []
                     for para in text.split('\n\n'):
                         indent = para[:len(para) - len(para.lstrip())]
@@ -582,6 +585,60 @@ class GoogleStyleDocstringProcessor:
         # if name == 'kwimage.Affine.translate':
         #     import sys
         #     sys.exit(1)
+
+
+class SphinxDocstring:
+    """
+    Helper to parse and modify sphinx docstrings
+    """
+    def __init__(docstr, lines):
+        docstr.lines = lines
+
+        # FORMAT THE RETURNS SECTION A BIT NICER
+        import re
+        tag_pat = re.compile(r'^:(\w*):')
+        directive_pat = re.compile(r'^.. (\w*)::\s*(\w*)')
+
+        # Split by sphinx types, mark the line offset where they start / stop
+        sphinx_parts = []
+        for idx, line in enumerate(lines):
+            tag_match = tag_pat.search(line)
+            directive_match = directive_pat.search(line)
+            if tag_match:
+                tag = tag_match.groups()[0]
+                sphinx_parts.append({
+                    'tag': tag, 'start_offset': idx,
+                    'type': 'tag',
+                })
+            elif directive_match:
+                tag = directive_match.groups()[0]
+                sphinx_parts.append({
+                    'tag': tag, 'start_offset': idx,
+                    'type': 'directive',
+                })
+
+        prev_offset = len(lines)
+        for part in sphinx_parts[::-1]:
+            part['end_offset'] = prev_offset
+            prev_offset = part['start_offset']
+
+        docstr.sphinx_parts = sphinx_parts
+
+        if 0:
+            for line in lines:
+                print(line)
+
+    def find_tagged_lines(docstr, tag):
+        for part in docstr.sphinx_parts[::-1]:
+            if part['tag'] == tag:
+                edit_slice = slice(part['start_offset'], part['end_offset'])
+                return_section = docstr.lines[edit_slice]
+                text = '\n'.join(return_section)
+                found = {
+                    'edit_slice': edit_slice,
+                    'text': text,
+                }
+                yield found
 
 
 def paragraph(text):
