@@ -131,6 +131,7 @@ class ConfusionVectors(ub.NiceRepr):
             ConfusionVectors
 
         Example:
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> cfsn_vecs = ConfusionVectors.demo()
             >>> print('cfsn_vecs = {!r}'.format(cfsn_vecs))
             >>> cx_to_binvecs = cfsn_vecs.binarize_ovr()
