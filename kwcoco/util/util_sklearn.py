@@ -5,6 +5,9 @@ import warnings
 import numpy as np
 from sklearn.utils.validation import check_array
 from sklearn.model_selection._split import (_BaseKFold,)
+from packaging.version import parse as Version
+
+ARGSORT_HAS_STABLE_KIND = Version(np.__version__) >= Version('1.15.0')
 
 
 class StratifiedGroupKFold(_BaseKFold):
@@ -42,6 +45,7 @@ class StratifiedGroupKFold(_BaseKFold):
             list: test_folds
 
         Example:
+            >>> from kwcoco.util.util_sklearn import *  # NOQA
             >>> import kwarray
             >>> rng = kwarray.ensure_rng(0)
             >>> groups = [1, 1, 3, 4, 2, 2, 7, 8, 8]
@@ -49,7 +53,6 @@ class StratifiedGroupKFold(_BaseKFold):
             >>> X = np.empty((len(y), 0))
             >>> self = StratifiedGroupKFold(random_state=rng, shuffle=True)
             >>> skf_list = list(self.split(X=X, y=y, groups=groups))
-            ...
             >>> import ubelt as ub
             >>> print(ub.urepr(skf_list, nl=1, with_dtype=False))
             [
@@ -68,6 +71,12 @@ class StratifiedGroupKFold(_BaseKFold):
             unique_y, y_inversed = np.unique(y, return_inverse=True)
             n_classes = max(unique_y) + 1
             unique_groups, group_idxs = kwarray.group_indices(groups)
+
+            if ARGSORT_HAS_STABLE_KIND:
+                # Fixed in latest kwarray, but this doesn't hurt.
+                for gxs in group_idxs:
+                    gxs.sort()
+
             grouped_y = kwarray.apply_grouping(y, group_idxs)
             grouped_y_counts = np.array([
                 np.bincount(y_, minlength=n_classes) for y_ in grouped_y])
@@ -76,7 +85,7 @@ class StratifiedGroupKFold(_BaseKFold):
             target_freq = target_freq.astype(float)
             target_ratio = target_freq / float(target_freq.sum())
 
-            # Greedilly choose the split assignment that minimizes the local
+            # Greedily choose the split assignment that minimizes the local
             # * squared differences in target from actual frequencies
             # * and best equalizes the number of items per fold
             # Distribute groups with most members first
@@ -84,7 +93,13 @@ class StratifiedGroupKFold(_BaseKFold):
             # split_ratios = split_freq / split_freq.sum(axis=1)
             split_ratios = np.ones(split_freq.shape) / split_freq.shape[1]
             split_diffs = ((split_freq - target_ratio) ** 2).sum(axis=1)
-            sortx = np.argsort(grouped_y_counts.sum(axis=1))[::-1]
+
+            rowsum = grouped_y_counts.sum(axis=1)
+            if ARGSORT_HAS_STABLE_KIND:
+                sortx = np.argsort(rowsum, kind='stable')[::-1]
+            else:
+                sortx = np.argsort(rowsum)[::-1]
+
             grouped_splitx = []
 
             # import ubelt as ub
