@@ -19,11 +19,19 @@ def test_cached_hashid_with_permissions():
     fpath = ub.Path(dset.fpath)
     dset = kwcoco.CocoDataset(fpath)
 
+    orig_stat = dpath.stat()
+    print(f'orig_stat={orig_stat}')
+    print(stat.filemode(dpath.stat().st_mode))
+
     ro = (
         stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH |
         stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
     )
     dpath.chmod(ro)
+
+    ro_stat = dpath.stat()
+    print(f'ro_stat={ro_stat}')
+    print(stat.filemode(dpath.stat().st_mode))
 
     import pytest
     with pytest.warns(match='Cannot write a cached hashid'):
@@ -31,7 +39,20 @@ def test_cached_hashid_with_permissions():
 
     # Set permission back to normal, writing the cache id should work
     dpath.chmod(parent_mode)
+
+    reset_stat = dpath.stat()
+    print(f'reset_stat={reset_stat}')
+    print(stat.filemode(dpath.stat().st_mode))
+
     dset._cached_hashid()
 
     # Cleanup
     dpath.delete()
+
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/tests/test_cached_hashid.py
+    """
+    test_cached_hashid_with_permissions()
