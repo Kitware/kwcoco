@@ -115,8 +115,8 @@ SPEC_KEYS = [
     'keypoint_categories',  # support only partially implemented
     'videos',
     'images',
-    'annotations',
     'tracks',
+    'annotations',
 ]
 
 

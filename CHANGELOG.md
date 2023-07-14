@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.6.4 - Unreleased
 
+### Changed
+
+* Modified `kwcoco info` script to be able to stream the first n items in each
+  table in a json compliant way.
+
 
 ## Version 0.6.3 - Released 2023-07-13
 
