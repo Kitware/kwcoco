@@ -496,7 +496,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
     def add_asset(self, file_name=None, channels=None, imdata=None,
                   warp_aux_to_img=None, width=None, height=None,
-                  imwrite=False):
+                  imwrite=False, image_id=None, **kw):
         """
         Adds an auxiliary / asset item to the image dictionary.
 
@@ -536,6 +536,13 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                 this will write the data to disk. Note: it it recommended that
                 you simply call imwrite yourself before or after calling this
                 function. This lets you better control imwrite parameters.
+
+            image_id (int | None):
+                An asset dictionary contains an image-id, but it should *not*
+                be specified here. If it is, then it *must* agree with this
+                image's id.
+
+            **kw : stores arbitrary key/value pairs in this new asset.
 
         TODO:
             - [ ] Allow imwrite to specify an executor that is used to
@@ -590,7 +597,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                 raise ValueError('Parent image canvas has an unknown size. '
                                  'Need to set width/height')
             if width is None or height is None:
-                raise ValueError('Unable to infer aux_to_img without width')
+                raise ValueError('Unable to infer warp_aux_to_img without width')
             # Assume we can just scale up the auxiliary data to match the image
             # space unless the user says otherwise
             warp_aux_to_img = kwimage.Affine.scale((
@@ -606,8 +613,18 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
             file_name = os.fspath(file_name)
 
         # Make the asset info dict
+        parent_image_id = img.get('id', None)
+        if image_id is not None:
+            if parent_image_id is not None:
+                assert image_id == parent_image_id, (
+                    f'The specified image_id ({image_id}) did not match the '
+                    f'parent image id ({parent_image_id}) proprty.'
+                )
+        else:
+            image_id = parent_image_id
+
         obj = {
-            'image_id': img.get('id', None),  # for when assets move to their own table
+            'image_id': image_id,  # for when assets move to their own table
             'file_name': file_name,
             'height': height,
             'width': width,
@@ -633,6 +650,8 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                 kwimage.imwrite(fpath, imdata)
             else:
                 obj['imdata'] = imdata
+
+        obj.update(**kw)
 
         assets_key = self._assets_key()
         asset_list = img.get(assets_key, None)

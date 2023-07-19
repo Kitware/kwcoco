@@ -60,15 +60,27 @@ class CocoInfoCLI(scfg.DataConfig):
     This is done using ijson, so it doesn't have to read the entire file.
     This is useful when you quickly want to take a peek at a larger kwcoco
     file.
+
+    Note: there are issues with this tool when the sections are not in the
+    expected order, or if the requested sections are empty. Help wanted.
     """
     __command__ = 'info'
 
     src = scfg.Value(None, help='input kwcoco path', position=1)
 
-    show_info = scfg.Value(False, isflag=True, help='if True, show the entire info section')
-    first_video = scfg.Value(False, isflag=True, help='if True, show the first video dictionary')
-    first_image = scfg.Value(False, isflag=True, help='if True, show the first image dictionary')
-    first_annot = scfg.Value(False, isflag=True, help='if True, show the first annotation dictionary')
+    show_info = scfg.Value(True, isflag=True, help='The number of info dictionaries to show. if True, show all of them', short_alias=['i'])
+    show_licenses = scfg.Value(0, isflag=True, help='The number of licenses dictionaries to show. if True, show all of them', short_alias=['l'])
+    show_categories = scfg.Value(0, isflag=True, help='The number of category dictionaries to show. if True, show all of them', short_alias=['c'])
+    show_videos = scfg.Value(0, isflag=True, help='The number of video dictionaries to show. if True, show all of them', short_alias=['v'])
+    show_images = scfg.Value(0, isflag=True, help='The number of image dictionaries to show. if True, show all of them', short_alias=['g'])
+
+    # TODO:
+    # show_tracks = scfg.Value(0, isflag=True, help='The number of track dictionaries to show. if True, show all of them', short_alias=['t'])
+
+    show_annotations = scfg.Value(0, isflag=True, help='The number of annotation dictionaries to show. if True, show all of them', short_alias=['a'])
+
+    rich = scfg.Value(True, isflag=True, help='if True, try to use rich')
+    verbose = scfg.Value(0, isflag=True, help='if True, print extra information (i.e. the configuration). If false, then stdout should be redirectable as a regular json object')
 
     @classmethod
     def main(cls, cmdline=1, **kwargs):
@@ -85,13 +97,13 @@ class CocoInfoCLI(scfg.DataConfig):
             >>> dset.fpath = ub.Path(dset.fpath).augment(prefix='infotest_')
             >>> dset.dump()
             >>> # test normal json
-            >>> kwargs = dict(src=dset.fpath, first_image=True, first_video=True, first_annot=True)
+            >>> kwargs = dict(src=dset.fpath, show_images=True, show_videos=True, show_annotations=True)
             >>> cls.main(cmdline=cmdline, **kwargs)
             >>> # test zipped json
             >>> dset_zip = dset.copy()
             >>> dset_zip.fpath = dset_zip.fpath + '.zip'
             >>> dset_zip.dump()
-            >>> kwargs = dict(src=dset_zip.fpath, first_image=True, first_video=True, first_annot=True)
+            >>> kwargs = dict(src=dset_zip.fpath, show_images=True, show_videos=True, show_annotations=True)
             >>> cls.main(cmdline=cmdline, **kwargs)
             >>> # test bad-order json
             >>> dset_bad_order = dset.copy()
@@ -99,11 +111,22 @@ class CocoInfoCLI(scfg.DataConfig):
             >>> dset_bad_order.dataset['info'] = dset_bad_order.dataset.pop('info')
             >>> dset_bad_order.fpath = ub.Path(dset_bad_order.fpath).augment(prefix='bad_order')
             >>> dset_bad_order.dump()
-            >>> kwargs = dict(src=dset_bad_order.fpath, first_image=True, first_video=True, first_annot=True)
+            >>> kwargs = dict(src=dset_bad_order.fpath, show_images=True, show_videos=True, show_annotations=True)
             >>> cls.main(cmdline=cmdline, **kwargs)
         """
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
-        print('config = ' + ub.urepr(config, nl=1))
+        try:
+            if not config.rich:
+                raise ImportError
+            from rich.markup import escape as _rich_escape
+            from rich import print as _raw_rich_print
+            def rich_print(msg):
+                _raw_rich_print(_rich_escape(msg))
+        except ImportError:
+            rich_print = print
+
+        if config.verbose:
+            rich_print('config = ' + ub.urepr(config, nl=1))
 
         # TODO:
         # This assumes json files are in a standard order, but we can probably
@@ -139,49 +162,199 @@ class CocoInfoCLI(scfg.DataConfig):
         from kwcoco.util import ijson_ext
         fpath = ub.Path(config.src)
 
+        sentinel = object()
+
         _cocofile = CocoFileHelper(fpath)
         try:
             file = _cocofile._open()
-            ijson_parser = ijson_ext.parse(file)
+            ijson_parser = ijson_ext.parse(file, use_float=True)
 
-            if config.show_info:
-                info_section_iter = ijson_ext.items(ijson_parser, prefix='info')
-                try:
-                    info = next(info_section_iter)
-                except StopIteration:
-                    info = None
-                else:
-                    print('info = {}'.format(ub.urepr(info, nl=4)))
+            num_infos = float('inf') if config.show_info is True else int(config.show_info)
+            num_videos = float('inf') if config.show_videos is True else int(config.show_videos)
+            num_images = float('inf') if config.show_images is True else int(config.show_images)
+            num_annotations = float('inf') if config.show_annotations is True else int(config.show_annotations)
+            num_categories = float('inf') if config.show_annotations is True else int(config.show_categories)
+            num_licenses = float('inf') if config.show_licenses is True else int(config.show_licenses)
 
-            if config.first_video:
-                video_section_iter = ijson_ext.items(ijson_parser, prefix='videos.item')
-                try:
-                    video = next(video_section_iter)
-                except StopIteration:
-                    video = None
-                else:
-                    print('video = {}'.format(ub.urepr(video, nl=4)))
+            parent_to_num = ub.odict([
+                ("info", num_infos),
+                ("licenses", num_licenses),
+                ("categories", num_categories),
+                ("videos", num_videos),
+                ("images", num_images),
+                ("annotations", num_annotations),
+            ])
 
-            if config.first_image:
-                image_section_iter = ijson_ext.items(ijson_parser, prefix='images.item')
-                try:
-                    image = next(image_section_iter)
-                except StopIteration:
-                    image = None
-                else:
-                    print('image = {}'.format(ub.urepr(image, nl=4)))
+            print('{')
 
-            if config.first_annot:
-                image_section_iter = ijson_ext.items(ijson_parser, prefix='annotations.item')
+            # TODO: we want a function outside the CLI that
+            # does the core of the work here.
+
+            parent = 'info'
+            if parent_to_num[parent] > 0:
+                # Hack for info, which might not exist and is enabled by default
+                info_iter = ijson_ext.items(ijson_parser, prefix=parent)
+                print(f'"{parent}": ')
                 try:
-                    annot = next(image_section_iter)
+                    info_section = next(info_iter)
                 except StopIteration:
-                    annot = None
+                    print('{}')
                 else:
-                    print('annot = {}'.format(ub.urepr(annot, nl=4)))
+                    rich_print('{}'.format(ub.urepr(info_section, nl=4, trailsep=False).replace('\'', '"')))
+
+            parent_order = [
+                'categories',
+                'videos',
+                'images',
+                'annotations',
+            ]
+            # TODO: need to be able to either:
+            # check that a parent item was seen and then use that OR skip the
+            # .item part if we detect an end_map right after the start map for
+            # the parent prefix. Currently this will fail if any requested
+            # section is empty, or if the sections are not in the same order
+            # specified in parent-order.
+            prev_parent = sentinel
+            for parent in parent_order:
+                num_objs = parent_to_num[parent]
+                if num_objs:
+                    if prev_parent is not sentinel:
+                        print(',')
+                    obj_iter = ijson_ext.items(ijson_parser, prefix=f'{parent}.item')
+                    print(f'"{parent}": [')
+                    prev_obj = sentinel
+                    for idx, obj in enumerate(obj_iter, start=1):
+                        if prev_obj is not sentinel:
+                            print(',')
+                        rich_print('{}'.format(ub.urepr(obj, nl=4, trailsep=False).replace('\'', '"')))
+                        if idx >= num_objs:
+                            break
+                        prev_obj = obj
+                    print(']')
+                    prev_parent = parent
+
+            print('}')
 
         finally:
             _cocofile._close()
+
+
+# This was a start for a fix for the different order problem, but I wasnt able
+# to finish it. I need to learn how the ijson coroutines work better.
+# def main2(config):
+#     num_infos = float('inf') if config.show_info is True else int(config.show_info)
+#     num_videos = float('inf') if config.show_videos is True else int(config.show_videos)
+#     num_images = float('inf') if config.show_images is True else int(config.show_images)
+#     num_annotations = float('inf') if config.show_annotations is True else int(config.show_annotations)
+#     num_categories = float('inf') if config.show_annotations is True else int(config.show_annotations)
+
+#     entry_iter = iterative_kwcoco_parse(fpath, num_infos, num_categories,
+#                                         num_videos, num_images,
+#                                         num_annotations)
+
+#     # import sys
+#     # write = sys.stdout.write
+#     # from rich import get_console
+#     # write_console = get_console()
+
+#     print('{')
+#     prev_parent = None
+#     for parent, item in entry_iter:
+#         if parent != prev_parent:
+#             if prev_parent is not None:
+#                 print('],')
+#             print(f'"{parent}": [')
+#         else:
+#             if prev_parent is not None:
+#                 print(',')
+#         rich_print('{}'.format(ub.urepr(item, nl=4).replace('\'', '"')))
+
+#     if prev_parent is not None:
+#         print(']')
+#     print('}')
+
+# def iterative_kwcoco_parse(fpath, num_infos, num_categories, num_videos,
+#                            num_images, num_annotations):
+#     """
+#     Iteravely generate parts of the kwcoco file for very fast response time.
+#     """
+#     from kwcoco.util import ijson_ext
+#     parent_to_num = ub.odict([
+#         ("info", num_infos),
+#         ("categories", num_categories),
+#         ("videos", num_videos),
+#         ("images", num_images),
+#         ("annotations", num_annotations),
+#     ])
+#     _cocofile = CocoFileHelper(fpath)
+#     file = _cocofile._open()
+#     try:
+#         ijson_parser = ijson_ext.parse(file, use_float=True)
+
+#         def make_backtracker(next_tuple, ijson_parser):
+#             yield next_tuple
+#             # ijson_parser.send(next_tuple)
+#             yield from ijson_parser
+
+#         trace = print
+
+#         def _section_finder(ijson_parser):
+#             # Handle items being missing or empty
+#             for prefix, event, value in ijson_parser:
+#                 # Find the start of any of the sections of interest
+#                 if prefix in parent_to_num:
+
+#                     trace(f'WE FOUND: {prefix}')
+
+#                     # Check to see if that section ends immediately
+#                     next_tuple = next(ijson_parser)
+#                     next_prefix, next_event, next_value = next_tuple
+#                     if next_event == 'end_array':
+#                         # If it does, continue on
+#                         trace(f'BUT {prefix} IT ENDED IMMEDIATELY')
+#                         continue
+#                     else:
+#                         # Otherwise we need to munge the iterateor to reverse
+#                         # itself one step, and then we parse some number of
+#                         # items from the section.
+#                         trace('AND THERE ARE ITEMS')
+#                         parent = prefix
+#                         num_objs = parent_to_num[parent]
+#                         if num_objs > 0:
+#                             backtracked = make_backtracker(next_tuple, ijson_parser)
+#                             prefix = parent + '.item'
+#                             print(f'ENUMERATING SOME OF prefix={prefix}')
+#                             obj_iter = ijson_ext.items(backtracked, prefix=prefix)
+#                             for idx, obj in enumerate(obj_iter, start=1):
+#                                 yield parent, obj
+#                                 if num_infos >= idx:
+#                                     break
+
+#         yield from list(_section_finder(ijson_parser))
+
+#         # for prefix in _section_finder(ijson_parser):
+#         #     break
+#         #     ...
+
+#         # file.seek(0)
+#         # ijson_parser = ijson_ext.parse(file, use_float=True)
+#         # obj_iter = ijson_ext.items(ijson_parser, prefix='info.item')
+#         # list(obj_iter)
+
+#         # for parent, num_objs in parent_to_num.items():
+#         #     if num_objs > 0:
+#         #         prefix = parent + '.item'
+#         #         print(f'prefix={prefix}')
+#         #         obj_iter = ijson_ext.items(ijson_parser, prefix=prefix)
+#         #         print(list(obj_iter))
+#         #         for idx, obj in enumerate(obj_iter, start=1):
+#         #             print(f'obj={obj}')
+#         #             yield parent, obj
+#         #             if num_infos >= idx:
+#         #                 break
+
+#     finally:
+#         _cocofile._close()
 
 
 __cli__ = CocoInfoCLI

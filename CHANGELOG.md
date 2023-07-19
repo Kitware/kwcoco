@@ -5,7 +5,19 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.6.3 - Unreleased
+## Version 0.6.4 - Unreleased
+
+### Fixed
+
+* `CocoImage.add_asset` can now accept an image_id property.
+
+### Changed
+
+* Modified `kwcoco info` script to be able to stream the first n items in each
+  table in a json compliant way.
+
+
+## Version 0.6.3 - Released 2023-07-13
 
 ### Added
 * New CLI script: `coco_move_assets`.
