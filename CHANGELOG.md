@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.6.4 - Unreleased
 
+### Fixed
+
+* `CocoImage.add_asset` can now accept an image_id property.
+
 ### Changed
 
 * Modified `kwcoco info` script to be able to stream the first n items in each

@@ -2366,6 +2366,15 @@ class MixinCocoStats(object):
         """ The number of categories in the dataset """
         return len(self.dataset.get('categories', []))
 
+    # @property
+    # def n_tracks(self):
+    #     """ The number of tracks in the dataset """
+    #     # TODO: full track dictionary
+    #     # return len(self.dataset.get('tracks', []))
+    #     # Note: the current len (trackid_to_aids) does not work because
+    #     # of the NONE track-id.
+    #     return len(self.index.trackid_to_aids)
+
     @property
     def n_videos(self):
         """ The number of videos in the dataset """
@@ -2863,6 +2872,8 @@ class MixinCocoStats(object):
             ('n_imgs', self.n_images),
             ('n_videos', self.n_videos),
             ('n_cats', self.n_cats),
+            # TODO: full track dictionary once available
+            # ('n_tracks', self.n_tracks),
         ])
 
     def extended_stats(self):
@@ -3579,7 +3590,7 @@ class MixinCocoAddRemove(object):
             channels (ChannelSpec): specification of base channels.
                 Only relevant if file_name is given.
             auxiliary (List[Dict]): specification of auxiliary assets.
-                See CocoImage.add_auxiliary_item for details
+                See :func:`CocoImage.add_asset` for details
             video_id (int): id of parent video, if applicable
             frame_index (int): frame index in parent video
             timestamp (number | str): timestamp of frame index
