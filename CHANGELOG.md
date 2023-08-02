@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.6.5 - Unreleased
 
+### Changed
+
+* Working towards a better and consistent CocoImage API without breaking
+  compatibility. Added `iter_assets` and added `as_dict` kwargs to
+  `primary_asset`. The goal is that these high level functions will return
+  objects instead of dictionaries.
+
 
 ## Version 0.6.4 - Released 2023-07-19
 

@@ -120,13 +120,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
     @property
     def assets(self):
-        assets = []
-        for obj in self.iter_asset_objs():
-            # TODO: ducktype with an object
-            asset = CocoAsset(obj, bundle_dpath=self.bundle_dpath)
-            # asset = obj
-            assets.append(asset)
-        return assets
+        """
+        Convinience wrapper around :func: `CocoImage.iter_assets`.
+        """
+        return list(self.iter_assets())
 
     @property
     def datetime(self):
@@ -288,11 +285,11 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
     def primary_image_filepath(self, requires=None):
         dpath = ub.Path(self.bundle_dpath)
-        fname = self.primary_asset()['file_name']
+        fname = self.rimary_asset()['file_name']
         fpath = dpath / fname
         return fpath
 
-    def primary_asset(self, requires=None):
+    def primary_asset(self, requires=None, as_dict=True):
         """
         Compute a "main" image asset.
 
@@ -312,6 +309,11 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                 list of attribute that must be non-None to consider an object
                 as the primary one.
 
+            as_dict (bool):
+                if True the return type is a raw dictionary. Otherwise use a newer
+                object-oriented wrapper that should be duck-type swappable.
+                In the future this default will change to False.
+
         Returns:
             None | dict : the asset dict or None if it is not found
 
@@ -322,24 +324,47 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
             >>> import kwarray
             >>> from kwcoco.coco_image import *  # NOQA
             >>> rng = kwarray.ensure_rng(0)
-            >>> def random_auxiliary(name, w=None, h=None):
+            >>> def random_asset(name, w=None, h=None):
             >>>     return {'file_name': name, 'width': w, 'height': h}
             >>> self = CocoImage({
             >>>     'auxiliary': [
-            >>>         random_auxiliary('1'),
-            >>>         random_auxiliary('2'),
-            >>>         random_auxiliary('3'),
+            >>>         random_asset('1'),
+            >>>         random_asset('2'),
+            >>>         random_asset('3'),
             >>>     ]
             >>> })
             >>> assert self.primary_asset()['file_name'] == '1'
             >>> self = CocoImage({
             >>>     'auxiliary': [
-            >>>         random_auxiliary('1'),
-            >>>         random_auxiliary('2', 3, 3),
-            >>>         random_auxiliary('3'),
+            >>>         random_asset('1'),
+            >>>         random_asset('2', 3, 3),
+            >>>         random_asset('3'),
             >>>     ]
             >>> })
             >>> assert self.primary_asset()['file_name'] == '2'
+            >>> #
+            >>> # Test new objct oriented output
+            >>> self = CocoImage({
+            >>>     'file_name': 'foo',
+            >>>     'assets': [
+            >>>         random_asset('1'),
+            >>>         random_asset('2'),
+            >>>         random_asset('3'),
+            >>>     ],
+            >>> })
+            >>> assert self.primary_asset(as_dict=False) is self
+            >>> self = CocoImage({
+            >>>     'assets': [
+            >>>         random_asset('1'),
+            >>>         random_asset('3'),
+            >>>     ],
+            >>>     'auxiliary': [
+            >>>         random_asset('1'),
+            >>>         random_asset('2', 3, 3),
+            >>>         random_asset('3'),
+            >>>     ]
+            >>> })
+            >>> assert self.primary_asset(as_dict=False)['file_name'] == '2'
         """
         import kwimage
         if requires is None:
@@ -352,7 +377,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
             obj = img
             if all(k in obj for k in requires):
                 # Return the base image if we can
-                return obj
+                if as_dict:
+                    return obj
+                else:
+                    return self
 
         # Choose "best" auxiliary image based on a hueristic.
         eye = kwimage.Affine.eye().matrix
@@ -381,7 +409,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                 val['fro_dist'], -val['area'], val['idx'])
         )
         obj = candidates[idx]['obj']
-        return obj
+        if as_dict:
+            return obj
+        else:
+            return CocoAsset(obj, bundle_dpath=self.bundle_dpath)
 
     def iter_image_filepaths(self, with_bundle=True):
         """
@@ -402,9 +433,42 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
             fpath = dpath / fname
             yield fpath
 
+    def iter_assets(self):
+        """
+        Iterate through assets (which could include the image itself it points to a file path).
+
+        Object-oriented alternative to :func:`CocoImage.iter_asset_objs`
+
+        Yields:
+            CocoImage | CocoAsset:
+                an asset object (or image object if it points to a file)
+
+        Example:
+            >>> import kwcoco
+            >>> coco_img = kwcoco.CocoImage({'width': 128, 'height': 128})
+            >>> assert len(list(coco_img.iter_assets())) == 0
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
+            >>> self = dset.coco_image(1)
+            >>> assert len(list(self.iter_assets())) > 1
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> self = dset.coco_image(1)
+            >>> assert list(self.iter_assets()) == [self]
+        """
+        img = self.img
+        has_base_image = img.get('file_name', None) is not None
+        if has_base_image:
+            yield self
+        for obj in img.get('auxiliary', None) or []:
+            yield CocoAsset(obj, self.bundle_dpath)
+        for obj in img.get('assets', None) or []:
+            yield CocoAsset(obj, self.bundle_dpath)
+
     def iter_asset_objs(self):
         """
         Iterate through base + auxiliary dicts that have file paths
+
+        Note:
+            In most cases prefer :func:`iter_assets` instead.
 
         Yields:
             dict: an image or auxiliary dictionary
@@ -412,18 +476,53 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         img = self.img
         has_base_image = img.get('file_name', None) is not None
         if has_base_image:
-            obj = img
-            # cant remove auxiliary otherwise inplace modification doesnt work
-            # obj = ub.dict_diff(img, {'auxiliary'})
-            yield obj
+            yield img
         for obj in img.get('auxiliary', None) or []:
             yield obj
         for obj in img.get('assets', None) or []:
             yield obj
 
+    def find_asset(self, channels):
+        """
+        Find the asset dictionary with the specified channels
+
+        Args:
+            channels (str | FusedChannelSpec):
+                channel names the asset must have.
+
+        Returns:
+            CocoImage | CocoAsset
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoImage({
+            >>>     'file_name': 'raw',
+            >>>     'channels': 'red|green|blue',
+            >>>     'assets': [
+            >>>         {'file_name': '1', 'channels': 'spam'},
+            >>>         {'file_name': '2', 'channels': 'eggs|jam'},
+            >>>     ],
+            >>>     'auxiliary': [
+            >>>         {'file_name': '3', 'channels': 'foo'},
+            >>>         {'file_name': '4', 'channels': 'bar|baz'},
+            >>>     ]
+            >>> })
+            >>> assert self.find_asset('blah') is None
+            >>> assert self.find_asset('red|green|blue') is self
+            >>> self.find_asset('foo')['file_name'] == '3'
+            >>> self.find_asset('baz')['file_name'] == '4'
+        """
+        obj = self.find_asset_obj(channels)
+        if obj is not None:
+            if obj is self.img:
+                return self
+            return CocoAsset(obj, bundle_dpath=self.bundle_dpath)
+
     def find_asset_obj(self, channels):
         """
         Find the asset dictionary with the specified channels
+
+        In most cases use :func:`CocoImge.find_asset` instead.
 
         Example:
             >>> import kwcoco
@@ -452,13 +551,10 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         """
         from kwcoco.channel_spec import FusedChannelSpec
         channels = FusedChannelSpec.coerce(channels)
-        found = None
         for obj in self.iter_asset_objs():
             obj_channels = FusedChannelSpec.coerce(obj['channels'])
             if (obj_channels & channels).numel():
-                found = obj
-                break
-        return found
+                return obj
 
     def _assets_key(self):
         """
@@ -966,19 +1062,85 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         """
         return self.warp_vid_from_img.inv()
 
-    def _annot_segmentation(self, ann, space='video'):
+    def _warp_for_resolution(self, space, resolution=None):
+        """
+        Compute a transform from image-space to the requested space at a
+        target resolution.
+        """
         import kwimage
-        warp_vid_from_img = self.warp_vid_from_img
-        img_sseg = kwimage.MultiPolygon.coerce(ann['segmentation'])
         if space == 'image':
-            warped_sseg = img_sseg
-            pass
+            warp_space_from_img = kwimage.Affine(None)
         elif space == 'video':
-            vid_sseg = img_sseg.warp(warp_vid_from_img)
-            warped_sseg = vid_sseg
+            warp_space_from_img = self.warp_vid_from_img
         else:
             raise NotImplementedError(space)  # auxiliary/asset space
+
+        if resolution is None:
+            warp_final_from_img = warp_space_from_img
+        else:
+            # Requested the annotation at a resolution, so we need to apply a
+            # scale factor
+            scale = self._scalefactor_for_resolution(space=space,
+                                                     resolution=resolution)
+            warp_final_from_space = kwimage.Affine.scale(scale)
+            warp_final_from_img = warp_final_from_space @ warp_space_from_img
+        return warp_final_from_img
+
+    def _annot_segmentation(self, ann, space='video', resolution=None):
+        """"
+        Load annotation segmentations in a requested space at a target resolution.
+
+        Example:
+            >>> from kwcoco.coco_image import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
+            >>> coco_img = dset.coco_image(1)
+            >>> coco_img.img['resolution'] = '1 meter'
+            >>> ann = coco_img.annots().objs[0]
+            >>> img_sseg = coco_img._annot_segmentation(ann, space='image')
+            >>> vid_sseg = coco_img._annot_segmentation(ann, space='video')
+            >>> img_sseg_2m = coco_img._annot_segmentation(ann, space='image', resolution='2 meter')
+            >>> vid_sseg_2m = coco_img._annot_segmentation(ann, space='video', resolution='2 meter')
+            >>> print(f'img_sseg.area    = {img_sseg.area}')
+            >>> print(f'vid_sseg.area    = {vid_sseg.area}')
+            >>> print(f'img_sseg_2m.area = {img_sseg_2m.area}')
+            >>> print(f'vid_sseg_2m.area = {vid_sseg_2m.area}')
+        """
+        import kwimage
+        warp_final_from_img = self._warp_for_resolution(space=space, resolution=resolution)
+        img_sseg = kwimage.MultiPolygon.coerce(ann['segmentation'])
+        warped_sseg = img_sseg.warp(warp_final_from_img)
         return warped_sseg
+
+    def _annot_segmentations(self, anns, space='video', resolution=None):
+        """"
+        Load multiple annotation segmentations in a requested space at a target
+        resolution.
+
+        Example:
+            >>> from kwcoco.coco_image import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
+            >>> coco_img = dset.coco_image(1)
+            >>> coco_img.img['resolution'] = '1 meter'
+            >>> ann = coco_img.annots().objs[0]
+            >>> img_sseg = coco_img._annot_segmentations([ann], space='image')
+            >>> vid_sseg = coco_img._annot_segmentations([ann], space='video')
+            >>> img_sseg_2m = coco_img._annot_segmentations([ann], space='image', resolution='2 meter')
+            >>> vid_sseg_2m = coco_img._annot_segmentations([ann], space='video', resolution='2 meter')
+            >>> print(f'img_sseg.area    = {img_sseg[0].area}')
+            >>> print(f'vid_sseg.area    = {vid_sseg[0].area}')
+            >>> print(f'img_sseg_2m.area = {img_sseg_2m[0].area}')
+            >>> print(f'vid_sseg_2m.area = {vid_sseg_2m[0].area}')
+        """
+        import kwimage
+        warp_final_from_img = self._warp_for_resolution(space=space, resolution=resolution)
+        warped_ssegs = []
+        for ann in anns:
+            img_sseg = kwimage.MultiPolygon.coerce(ann['segmentation'])
+            warped_sseg = img_sseg.warp(warp_final_from_img)
+            warped_ssegs.append(warped_sseg)
+        return warped_ssegs
 
     def resolution(self, space='image', channel=None, RESOLUTION_KEY=None):
         """
@@ -1126,12 +1288,13 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         return scale_factor
 
     def _detections_for_resolution(coco_img, space='video', resolution=None,
-                                   RESOLUTION_KEY=None):
+                                   aids=None, RESOLUTION_KEY=None):
         """
         This is slightly less than ideal in terms of API, but it will work for
         now.
         """
         import kwimage
+        assert space == 'video', 'other cases are not handled'
         # Build transform from image to requested space
         warp_vid_from_img = coco_img.warp_vid_from_img
         scale = coco_img._scalefactor_for_resolution(space='video',
@@ -1141,7 +1304,12 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         warp_req_from_img = warp_req_from_vid @ warp_vid_from_img
 
         # Get annotations in "Image Space"
-        annots = coco_img.dset.annots(image_id=coco_img.img['id'])
+        if aids is None:
+            annots = coco_img.dset.annots(image_id=coco_img.img['id'])
+        else:
+            # We already know the annots we want (assume the user
+            # specified them correctly and they belong to this image).
+            annots = coco_img.dset.annots(aids)
         imgspace_dets = annots.detections
 
         # Warp them into the requested space
