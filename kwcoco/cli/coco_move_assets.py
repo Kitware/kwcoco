@@ -28,15 +28,36 @@ class CocoMoveAssetManager:
     def __init__(self, coco_dsets):
         self.jobs = []
         self.coco_dsets = coco_dsets
+        self.impacted_assets = None
+        self.impacted_dsets = None
+        self._previous_moves = []
 
     def submit(self, src, dst):
+        assert src.exists()
+        assert not dst.exists()
         self.jobs.append({'src': src, 'dst': dst})
+
+    def mark_perviously_moved(self, src, dst):
+        """
+        Tell the manager that the src was already move to the dst, but the
+        kwcoco files may need to be updated.
+        """
+        # Note: we could have a function that chooses between a "this already
+        # moved" verus "this needs a move" based on src/dst existence.
+        assert not src.exists()
+        assert dst.exists()
+        self._previous_moves.append({'src': src, 'dst': dst})
 
     def find_impacted(self):
         impacted_assets = []
 
         src_dst_pairs = set()
         for job in self.jobs:
+            _s = job['src'].absolute()
+            _d = job['dst'].absolute()
+            src_dst_pairs.add((_s, _d))
+
+        for job in self._previous_moves:
             _s = job['src'].absolute()
             _d = job['dst'].absolute()
             src_dst_pairs.add((_s, _d))
@@ -85,8 +106,9 @@ class CocoMoveAssetManager:
 
     def dump_datasets(self):
         # Check that the kwcoco files are working
-        for dset in self.coco_dsets:
-            assert not dset.missing_images()
+        for dset in self.impacted_dsets.values():
+             assert not dset.missing_images()
+
         # Rewrite the kwcoco files
         for dset in self.impacted_dsets.values():
             dset.dump()
