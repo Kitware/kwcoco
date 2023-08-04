@@ -33,20 +33,22 @@ class CocoMoveAssetManager:
         self._previous_moves = []
 
     def submit(self, src, dst):
-        assert src.exists()
-        assert not dst.exists()
-        self.jobs.append({'src': src, 'dst': dst})
+        """
+        Enqueue a move operation, or mark that one has already occurred.
 
-    def mark_perviously_moved(self, src, dst):
+        If dst exists we assume the move has already been done, and we will
+        update any coco files that were impacted by this, but not updated.
+
+        Otherwise we assume src needs to be moved to dst.
         """
-        Tell the manager that the src was already move to the dst, but the
-        kwcoco files may need to be updated.
-        """
-        # Note: we could have a function that chooses between a "this already
-        # moved" verus "this needs a move" based on src/dst existence.
-        assert not src.exists()
-        assert dst.exists()
-        self._previous_moves.append({'src': src, 'dst': dst})
+        if dst.exists():
+            # Tell the manager that the src was already move to the dst, but
+            # the kwcoco files may need to be updated.
+            assert not src.exists()
+            self._previous_moves.append({'src': src, 'dst': dst})
+        else:
+            assert src.exists()
+            self.jobs.append({'src': src, 'dst': dst})
 
     def find_impacted(self):
         impacted_assets = []

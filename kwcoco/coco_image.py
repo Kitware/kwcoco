@@ -285,7 +285,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
     def primary_image_filepath(self, requires=None):
         dpath = ub.Path(self.bundle_dpath)
-        fname = self.rimary_asset()['file_name']
+        fname = self.primary_asset()['file_name']
         fpath = dpath / fname
         return fpath
 
