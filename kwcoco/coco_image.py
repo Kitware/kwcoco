@@ -25,6 +25,7 @@ except Exception:
 
 
 __docstubs__ = """
+from kwcoco.channel_spec import FusedChannelSpec
 from kwcoco.coco_objects1d import Annots
 """
 
@@ -41,7 +42,7 @@ class _CocoObject(AliasedDictProxy, ub.NiceRepr):
     """
     __alias_to_primary__ = {}
 
-    def __init__(self, obj, /, dset=None, bundle_dpath=None):
+    def __init__(self, obj, dset=None, bundle_dpath=None):
         self._proxy = obj
         self.dset = dset
         self._bundle_dpath = bundle_dpath

@@ -1,6 +1,5 @@
 import sqlalchemy
 import pandas
-import sqlalchemy
 import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
@@ -12,6 +11,8 @@ from typing import Any
 from sqlalchemy.orm import InstrumentedAttribute
 
 __docstubs__: str
+UNSTRUCTURED: str
+SCHEMA_VERSION: str
 
 
 class FallbackCocoBase:
@@ -32,10 +33,6 @@ def addapt_numpy_float64(numpy_float64):
 
 def addapt_numpy_int64(numpy_int64):
     ...
-
-
-UNSTRUCTURED: str
-SCHEMA_VERSION: str
 
 
 class Category(CocoBase):
@@ -77,6 +74,12 @@ class Image(CocoBase):
     channels: Incomplete
     warp_img_to_vid: Incomplete
     auxiliary: Incomplete
+
+
+class Track(CocoBase):
+    __tablename__: str
+    id: Incomplete
+    name: Incomplete
 
 
 class Annotation(CocoBase):
@@ -244,6 +247,9 @@ class CocoSqlDatabase(AbstractCocoDataset, MixinCocoAccessors,
         ...
 
     def delete(self, verbose: int = ...) -> None:
+        ...
+
+    def table_names(self):
         ...
 
     def populate_from(self, dset, verbose: int = ...) -> None:

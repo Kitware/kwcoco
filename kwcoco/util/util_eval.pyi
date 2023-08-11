@@ -1,7 +1,6 @@
 from typing import Dict
 from typing import Any
 from typing import List
-from typing import Any
 
 
 class RestrictedSyntaxError(Exception):

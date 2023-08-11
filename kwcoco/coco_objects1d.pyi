@@ -4,7 +4,6 @@ from typing import Dict
 from typing import Any
 import kwimage
 import ubelt as ub
-from typing import Any
 
 from typing import Dict
 
@@ -220,6 +219,24 @@ class Annots(ObjectList1D):
 
     @property
     def xywh(self) -> List[List[int]]:
+        ...
+
+
+class Tracks(ObjectList1D):
+
+    def __init__(self, ids, dset) -> None:
+        ...
+
+    @property
+    def track_ids(self):
+        ...
+
+    @property
+    def name(self):
+        ...
+
+    @property
+    def annots(self):
         ...
 
 

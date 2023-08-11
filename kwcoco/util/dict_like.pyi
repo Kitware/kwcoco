@@ -4,7 +4,6 @@ from typing import Dict
 import ubelt as ub
 from collections.abc import Generator
 from scriptconfig.dict_like import DictLike as DictLike_
-from typing import Any
 
 
 class DictLike(ub.NiceRepr):

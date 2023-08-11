@@ -5,27 +5,25 @@ import kwcoco
 from numpy import ndarray
 import kwimage
 from typing import Dict
-import ubelt as ub
 from _typeshed import Incomplete
 from collections.abc import Generator
 from kwcoco.util.dict_proxy2 import AliasedDictProxy
 
+from kwcoco.channel_spec import FusedChannelSpec
 from kwcoco.coco_objects1d import Annots
 
 __docstubs__: str
 DEFAULT_RESOLUTION_KEYS: Incomplete
 
 
-class CocoImage(AliasedDictProxy, ub.NiceRepr):
+class _CocoObject(AliasedDictProxy, ub.NiceRepr):
     __alias_to_primary__: Incomplete
-    img: Incomplete
     dset: Incomplete
 
-    def __init__(self, img, dset: Incomplete | None = ...) -> None:
-        ...
-
-    @classmethod
-    def from_gid(cls, dset, gid):
+    def __init__(self,
+                 obj,
+                 dset: Incomplete | None = ...,
+                 bundle_dpath: Incomplete | None = ...) -> None:
         ...
 
     @property
@@ -34,6 +32,21 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
 
     @bundle_dpath.setter
     def bundle_dpath(self, value) -> None:
+        ...
+
+    def detach(self):
+        ...
+
+
+class CocoImage(_CocoObject):
+    __alias_to_primary__: Incomplete
+    img: Incomplete
+
+    def __init__(self, img, dset: Incomplete | None = ...) -> None:
+        ...
+
+    @classmethod
+    def from_gid(cls, dset, gid):
         ...
 
     @property
@@ -91,7 +104,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
     def primary_image_filepath(self, requires: Incomplete | None = ...):
         ...
 
-    def primary_asset(self, requires: List[str] | None = None) -> None | dict:
+    def primary_asset(self,
+                      requires: List[str] | None = None,
+                      as_dict: bool = True) -> None | dict:
         ...
 
     def iter_image_filepaths(self,
@@ -99,7 +114,14 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                              ) -> Generator[ub.Path, None, None]:
         ...
 
+    def iter_assets(self) -> Generator[CocoImage | CocoAsset, None, None]:
+        ...
+
     def iter_asset_objs(self) -> Generator[dict, None, None]:
+        ...
+
+    def find_asset(self,
+                   channels: str | FusedChannelSpec) -> CocoImage | CocoAsset:
         ...
 
     def find_asset_obj(self, channels):
@@ -115,7 +137,9 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
                   warp_aux_to_img: kwimage.Affine | None = None,
                   width: int | None = None,
                   height: int | None = None,
-                  imwrite: bool = False) -> None:
+                  imwrite: bool = False,
+                  image_id: int | None = None,
+                  **kw) -> None:
         ...
 
     def imdelay(self,
@@ -154,7 +178,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         ...
 
 
-class CocoAsset(AliasedDictProxy, ub.NiceRepr):
+class CocoAsset(_CocoObject):
     __alias_to_primary__: Incomplete
 
     def __init__(self, asset, bundle_dpath: Incomplete | None = ...) -> None:
@@ -164,6 +188,37 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
         ...
 
     def image_filepath(self):
+        ...
+
+
+class CocoVideo(_CocoObject):
+    __alias_to_primary__: Incomplete
+
+    def __nice__(self):
+        ...
+
+
+class CocoAnnotation(_CocoObject):
+    __alias_to_primary__: Incomplete
+
+    def __nice__(self):
+        ...
+
+
+class CocoCategory(_CocoObject):
+    __alias_to_primary__: Incomplete
+
+    def __nice__(self):
+        ...
+
+
+class CocoTrack(_CocoObject):
+    __alias_to_primary__: Incomplete
+
+    def __nice__(self):
+        ...
+
+    def annots(self):
         ...
 
 

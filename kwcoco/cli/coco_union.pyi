@@ -6,6 +6,7 @@ class CocoUnionCLI:
     name: str
 
     class CLIConfig(scfg.DataConfig):
+        __command__: str
         src: Incomplete
         dst: Incomplete
         absolute: Incomplete

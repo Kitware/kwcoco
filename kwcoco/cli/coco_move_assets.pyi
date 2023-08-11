@@ -9,5 +9,33 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
     coco_fpaths: Incomplete
 
 
+class CocoMoveAssetManager:
+    jobs: Incomplete
+    coco_dsets: Incomplete
+    impacted_assets: Incomplete
+    impacted_dsets: Incomplete
+
+    def __init__(self, coco_dsets) -> None:
+        ...
+
+    def submit(self, src, dst) -> None:
+        ...
+
+    def find_impacted(self) -> None:
+        ...
+
+    def modify_datasets(self) -> None:
+        ...
+
+    def move_files(self) -> None:
+        ...
+
+    def dump_datasets(self) -> None:
+        ...
+
+    def run(self) -> None:
+        ...
+
+
 def main(cmdline: int = ..., **kwargs) -> None:
     ...

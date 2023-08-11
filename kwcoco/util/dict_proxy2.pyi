@@ -2,7 +2,6 @@ from typing import Any
 from typing import Tuple
 from _typeshed import Incomplete
 from collections.abc import Generator
-from typing import Any
 
 
 class DictInterface:
