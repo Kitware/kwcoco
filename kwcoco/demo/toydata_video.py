@@ -53,7 +53,7 @@ def random_video_dset(
 
         verbose (int): verbosity mode, default=3
 
-        aux (bool | None): if True generates dummy auxiliary channels
+        aux (bool | None): if True generates dummy auxiliary / asset channels
 
         multispectral (bool): similar to aux, but does not have the concept of
             a "main" image.
@@ -573,6 +573,9 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
     if verbose > 3:
         print('generate tracks')
+
+    for tid in track_ids:
+        dset.add_track(name=f'track_{tid:03d}', id=tid)
 
     for tid, path in zip(track_ids, paths):
         if anchors is None:

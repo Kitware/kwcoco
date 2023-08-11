@@ -25,3 +25,30 @@ def test_track_order():
         track_aids = list(dset.index.trackid_to_aids[new_trackid])
         frame_order = dset.annots(track_aids).images.lookup('frame_index')
         assert sorted(frame_order) == frame_order
+
+
+def test_track_structures():
+    import kwcoco
+    self = kwcoco.CocoDataset.demo('vidshapes1', use_cache=False, verbose=100)
+
+    assert len(self.dataset['tracks']) == self.n_tracks
+    assert len(self.dataset['tracks']) == self.n_tracks
+
+
+def test_add_tracks():
+    import kwcoco
+    self = kwcoco.CocoDataset()
+
+    video_id = self.add_video(name='video1', id=9001)
+
+    image_id1 = self.add_image(name='image1', video_id=video_id, frame_index=1)
+    image_id2 = self.add_image(name='image2', video_id=video_id, frame_index=2)
+    image_id3 = self.add_image(name='image3', video_id=video_id, frame_index=3)
+    image_id4 = self.add_image(name='image4', video_id=video_id, frame_index=4)
+    image_id5 = self.add_image(name='image5', video_id=video_id, frame_index=5)
+
+    track_id = self.add_track(name='track1')
+
+    self.add_annotation(image_id=image_id1, track_id=track_id)
+    self.add_annotation(image_id=image_id2, track_id=track_id)
+    self.add_annotation(image_id=image_id4, track_id=track_id)
