@@ -69,7 +69,9 @@ from os.path import (dirname, basename, join, exists, isdir, relpath)
 from functools import partial
 
 # Vectorized ORM-Like containers
-from kwcoco.coco_objects1d import Categories, Videos, Images, Annots
+from kwcoco.coco_objects1d import (
+    Categories, Videos, Images, Annots, Tracks
+)
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco import exceptions
 
@@ -103,9 +105,7 @@ else:
 if sys.version_info <= (3, 6):
     _dict = OrderedDict
 else:
-    # TODO: Ensure that switching to dict in 3.7+ doesn't change anything
     _dict = dict
-    # _dict = OrderedDict
 
 
 # These are the keys that are / should be supported by the API
@@ -2354,6 +2354,37 @@ class MixinCocoObjects:
         if names is not None:
             video_ids = [self.index.name_to_video[name]['id'] for name in names]
         return Videos(video_ids, self)
+
+    def tracks(self, track_ids=None, names=None):
+        """
+        Return vectorized track objects
+
+        Args:
+            track_ids (List[int] | None):
+                track ids to reference, if unspecified all tracks are returned.
+
+            names (List[str] | None):
+                lookup tracks by their name.
+                Mutually exclusive with other args.
+
+        Returns:
+            kwcoco.coco_objects1d.Tracks: vectorized video object
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> tracks = self.tracks()
+            >>> print(tracks)
+            >>> tracks.lookup('name')
+            >>> tracks.lookup('id')
+            >>> print('tracks.objs = {}'.format(ub.urepr(tracks.objs[0:2], nl=1)))
+        """
+        if track_ids is None:
+            track_ids = sorted(self.index.tracks.keys())
+
+        if names is not None:
+            track_ids = [self.index.name_to_track[name]['id'] for name in names]
+        return Tracks(track_ids, self)
 
 
 class MixinCocoStats:
