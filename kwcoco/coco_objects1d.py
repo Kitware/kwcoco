@@ -793,7 +793,7 @@ class Annots(ObjectList1D):
 
 class Tracks(ObjectList1D):
     """
-    Vectorized access to annotation attributes
+    Vectorized access to track attributes
 
     SeeAlso:
         :func:`kwcoco.coco_dataset.MixinCocoObjects.tracks`
@@ -804,7 +804,7 @@ class Tracks(ObjectList1D):
         >>> tracks = dset.tracks()
         >>> print('tracks = {}'.format(tracks))
         tracks = <Tracks(num=4)>
-        >>> tracks.lookup('name')
+        >>> tracks.name
         ['track_001', 'track_002', 'track_003', 'track_004']
     """
 
@@ -815,6 +815,10 @@ class Tracks(ObjectList1D):
     def track_ids(self):
         """ The annotation ids of this column of annotations """
         return self._ids
+
+    @property
+    def name(self):
+        return self.lookup('name')
 
     @property
     def annots(self):
