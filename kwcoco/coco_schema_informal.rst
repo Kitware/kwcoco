@@ -256,6 +256,9 @@ An informal spec is as follows:
             compatibility, all assets for MSI images should simply be listed
             as "auxiliary" items.
 
+        NOTE: in the future assets may be moved to a top-level table to better
+        support common relational database patterns.
+
 
     Video Sequences:
         For video sequences, we add the following video level index:
@@ -282,3 +285,16 @@ An informal spec is as follows:
         {
             'track_id': <int | str | uuid>  # optional, indicates association between annotations across frames
         }
+
+    Tracks:
+
+        Track level properties for groups of annotations can be stored in track
+        dictionaries.  Sometimes it is useful to include summary geometry in
+        track dictionaries. Unlike annotations - which store their geometry in
+        **image space**, track geometry should be specified in **video space**.
+
+        {
+            'track_id': <int | str >  # internal integer id for the track
+            'name': <str>  # external name id for the track.
+        }
+

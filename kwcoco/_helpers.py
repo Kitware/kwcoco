@@ -14,18 +14,26 @@ class _NextId(object):
 
     def __init__(self, parent):
         self.parent = parent
+
+        # TODO: use a single source of truth for what the top-level tables with
+        # ids are.
         self.unused = {
             'categories': None,
             'images': None,
             'annotations': None,
             'videos': None,
+            'tracks': None,
         }
 
     def _update_unused(self, key):
         """ Scans for what the next safe id can be for ``key`` """
-        item_list = self.parent.dataset[key]
-        max_id = max(item['id'] for item in item_list) if item_list else 0
-        next_id = max(max_id + 1, len(item_list))
+        try:
+            item_list = self.parent.dataset[key]
+            max_id = max(item['id'] for item in item_list) if item_list else 0
+            next_id = max(max_id + 1, len(item_list))
+        except KeyError:
+            # The table doesn't exist, so we can use anything
+            next_id = 1
         self.unused[key] = next_id
 
     def get(self, key):

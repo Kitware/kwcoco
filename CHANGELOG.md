@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.6.5 - Unreleased
 
+### Added
+
+* Top level track support in the dictionary dataset with `add_track`,
+  `remove_tracks`, and `index.name_to_track`.
+
 ### Changed
 
 * Working towards a better and consistent CocoImage API without breaking
