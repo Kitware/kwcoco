@@ -12,6 +12,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Top level track support in the dictionary dataset with `add_track`,
   `remove_tracks`, and `index.name_to_track`.
 
+* Single-object convinience classes for the major tables.
+
 ### Changed
 
 * Default data structure for Python versions >= 3.7 is now a regular dictionary

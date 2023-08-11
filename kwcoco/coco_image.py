@@ -6,6 +6,10 @@ Notably this provides the ``.imdelay`` method for delayed image loading ( which
 enables things like fast loading of subimage-regions / coarser scales in images
 that contain tiles / overviews - e.g. Cloud Optimized Geotiffs or COGs (Medical
 image formats may be supported in the future).
+
+TODO:
+    This file no longer is only images, it has logic for generic single-class
+    objects. It should be refactored into coco_objects0d.py or something.
 """
 import ubelt as ub
 import os
@@ -31,7 +35,39 @@ DEFAULT_RESOLUTION_KEYS = {
 }
 
 
-class CocoImage(AliasedDictProxy, ub.NiceRepr):
+class _CocoObject(AliasedDictProxy, ub.NiceRepr):
+    """
+    General coco scalar object
+    """
+    __alias_to_primary__ = {}
+
+    def __init__(self, obj, /, dset=None, bundle_dpath=None):
+        self._proxy = obj
+        self.dset = dset
+        self._bundle_dpath = bundle_dpath
+
+    @property
+    def bundle_dpath(self):
+        if self.dset is not None:
+            return self.dset.bundle_dpath
+        else:
+            return self._bundle_dpath
+
+    @bundle_dpath.setter
+    def bundle_dpath(self, value):
+        self._bundle_dpath = value
+
+    def detach(self):
+        """
+        Removes references to the underlying coco dataset, but keeps special
+        information such that it wont be needed.
+        """
+        self._bundle_dpath = self.bundle_dpath
+        self.dset = None
+        return self
+
+
+class CocoImage(_CocoObject):
     """
     An object-oriented representation of a coco image.
 
@@ -65,10 +101,8 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
     }
 
     def __init__(self, img, dset=None):
+        super().__init__(img, dset=dset)
         self.img = img
-        self._proxy = img
-        self.dset = dset
-        self._bundle_dpath = None
         self._video = None
 
     @classmethod
@@ -76,17 +110,6 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         img = dset.index.imgs[gid]
         self = cls(img, dset=dset)
         return self
-
-    @property
-    def bundle_dpath(self):
-        if self.dset is not None:
-            return self.dset.bundle_dpath
-        else:
-            return self._bundle_dpath
-
-    @bundle_dpath.setter
-    def bundle_dpath(self, value):
-        self._bundle_dpath = value
 
     @property
     def video(self):
@@ -113,10 +136,8 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         Removes references to the underlying coco dataset, but keeps special
         information such that it wont be needed.
         """
-        self._bundle_dpath = self.bundle_dpath
         self._video = self.video
-        self.dset = None
-        return self
+        return super().detach()
 
     @property
     def assets(self):
@@ -1371,7 +1392,7 @@ class CocoImage(AliasedDictProxy, ub.NiceRepr):
         return self.dset.draw_image(self['id'], **kwargs)
 
 
-class CocoAsset(AliasedDictProxy, ub.NiceRepr):
+class CocoAsset(_CocoObject):
     """
     A Coco Asset / Auxiliary Item
 
@@ -1402,8 +1423,7 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
     }
 
     def __init__(self, asset, bundle_dpath=None):
-        self._proxy = asset
-        self._bundle_dpath = bundle_dpath
+        super().__init__(asset, bundle_dpath=bundle_dpath)
 
     def __nice__(self):
         return repr(self.__json__())
@@ -1414,66 +1434,82 @@ class CocoAsset(AliasedDictProxy, ub.NiceRepr):
             # return self['file_name']
         else:
             return ub.Path(self._bundle_dpath) / self['file_name']
-        ...
 
 
-# TODO?
-# class _CocoObject(AliasedDictProxy, ub.NiceRepr):
-#     """
-#     TODO: general coco scalar object
-#     """
-#     __alias_to_primary__ = {}
+class CocoVideo(_CocoObject):
+    """
+    Object representing a single video.
 
-#     def __init__(self, obj, /, dset=None):
-#         self._proxy = obj
-#         self.dset = dset
-#         self._bundle_dpath = None
+    Example:
+        >>> from kwcoco.coco_image import *  # NOQA
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes1')
+        >>> obj = dset.videos().objs[0]
+        >>> self = CocoVideo(obj, dset)
+        >>> print(f'self={self}')
+    """
+    __alias_to_primary__ = {}
 
-#     @property
-#     def bundle_dpath(self):
-#         if self.dset is not None:
-#             return self.dset.bundle_dpath
-#         else:
-#             return self._bundle_dpath
-
-#     @bundle_dpath.setter
-#     def bundle_dpath(self, value):
-#         self._bundle_dpath = value
-
-#     def detach(self):
-#         """
-#         Removes references to the underlying coco dataset, but keeps special
-#         information such that it wont be needed.
-#         """
-#         self._bundle_dpath = self.bundle_dpath
-#         self.dset = None
-#         return self
+    def __nice__(self):
+        return repr(self.__json__())
 
 
-# class CocoVideo(_CocoObject):
-#     """
-#     TODO: general coco scalars
-#     """
-#     __alias_to_primary__ = {}
+class CocoAnnotation(_CocoObject):
+    """
+    Object representing a single annotation.
+
+    Example:
+        >>> from kwcoco.coco_image import *  # NOQA
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes1')
+        >>> obj = dset.annots().objs[0]
+        >>> self = CocoAnnotation(obj, dset)
+        >>> print(f'self={self}')
+    """
+    __alias_to_primary__ = {}
+
+    def __nice__(self):
+        return repr(self.__json__())
 
 
-# class CocoAnnotation(_CocoObject):
-#     """
-#     TODO: general coco scalars
-#     """
-#     __alias_to_primary__ = {}
+class CocoCategory(_CocoObject):
+    """
+    Object representing a single category.
 
-# class CocoCategory(_CocoObject):
-#     """
-#     TODO: general coco scalars
-#     """
-#     __alias_to_primary__ = {}
+    Example:
+        >>> from kwcoco.coco_image import *  # NOQA
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes1')
+        >>> obj = dset.categories().objs[0]
+        >>> self = CocoCategory(obj, dset)
+        >>> print(f'self={self}')
+    """
+    __alias_to_primary__ = {}
 
-# class CocoTrack(_CocoObject):
-#     """
-#     TODO: general coco scalars
-#     """
-#     __alias_to_primary__ = {}
+    def __nice__(self):
+        return repr(self.__json__())
+
+
+class CocoTrack(_CocoObject):
+    """
+    Object representing a single track.
+
+    Example:
+        >>> from kwcoco.coco_image import *  # NOQA
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes1')
+        >>> obj = dset.tracks().objs[0]
+        >>> self = CocoTrack(obj, dset)
+        >>> print(f'self={self}')
+    """
+    __alias_to_primary__ = {}
+
+    def __nice__(self):
+        return repr(self.__json__())
+
+    def annots(self):
+        assert self.dset is not None
+        return self.dset.annots(track_id=self['id'])
 
 
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
