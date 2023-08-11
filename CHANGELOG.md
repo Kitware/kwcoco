@@ -5,7 +5,7 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.6.5 - Unreleased
+## Version 0.7.0 - Unreleased
 
 ### Added
 
