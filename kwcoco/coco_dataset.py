@@ -104,8 +104,8 @@ if sys.version_info <= (3, 6):
     _dict = OrderedDict
 else:
     # TODO: Ensure that switching to dict in 3.7+ doesn't change anything
-    # _dict = dict
-    _dict = OrderedDict
+    _dict = dict
+    # _dict = OrderedDict
 
 
 # These are the keys that are / should be supported by the API
@@ -121,7 +121,7 @@ SPEC_KEYS = [
 ]
 
 
-class MixinCocoDepricate(object):
+class MixinCocoDepricate:
     """
     These functions are marked for deprication and will be removed
     """
@@ -219,7 +219,7 @@ class MixinCocoDepricate(object):
         return self.load_image(gid)
 
 
-class MixinCocoAccessors(object):
+class MixinCocoAccessors:
     """
     TODO: better name
     """
@@ -818,7 +818,7 @@ class MixinCocoAccessors(object):
         return image
 
 
-class MixinCocoExtras(object):
+class MixinCocoExtras:
     """
     Misc functions for coco
     """
@@ -999,6 +999,7 @@ class MixinCocoExtras(object):
             >>> assert len(dset.index.name_to_img) == len(dset.index.imgs) == 0
         """
         import parse
+        import re
         kwargs.pop('autobuild', None)
 
         if key.startswith('special:'):
@@ -1060,7 +1061,6 @@ class MixinCocoExtras(object):
                 'multispectral': {'msi'},
             }
             alias_to_key = {k: v for v, ks in vidkw_aliases.items() for k in ks}
-            import re
             # These are the variables the vidshapes generator accepts
             for part in suff_parts:
                 match = re.search(r'[\d]', part)
@@ -2166,7 +2166,7 @@ class MixinCocoExtras(object):
         self.fpath = value
 
 
-class MixinCocoObjects(object):
+class MixinCocoObjects:
     """
     Expose methods to construct object lists / groups.
 
@@ -2356,7 +2356,7 @@ class MixinCocoObjects(object):
         return Videos(video_ids, self)
 
 
-class MixinCocoStats(object):
+class MixinCocoStats:
     """
     Methods for getting stats about the dataset
     """
@@ -3123,7 +3123,7 @@ class MixinCocoStats(object):
         return selected_gids
 
 
-class MixinCocoDraw(object):
+class MixinCocoDraw:
     """
     Matplotlib / display functionality
     """
@@ -3527,7 +3527,7 @@ def _normalize_intensity_if_needed(canvas):
     return canvas
 
 
-class MixinCocoAddRemove(object):
+class MixinCocoAddRemove:
     """
     Mixin functions to dynamically add / remove annotations images and
     categories while maintaining lookup indexes.
@@ -4539,7 +4539,7 @@ class MixinCocoAddRemove(object):
         self._invalidate_hashid(['annotations'])
 
 
-class CocoIndex(object):
+class CocoIndex:
     """
     Fast lookup index for the COCO dataset with dynamic modification
 
@@ -5115,7 +5115,7 @@ class CocoIndex(object):
         }
 
 
-class MixinCocoIndex(object):
+class MixinCocoIndex:
     """
     Give the dataset top level access to index attributes
     """

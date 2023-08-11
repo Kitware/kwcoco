@@ -1,10 +1,4 @@
 """
-
-TODO:
-    - [ ] We get better speeds with raw SQL over alchemy. Can we mitigate the
-        speed difference so we can take advantage of alchemy's expressiveness?
-
-
 Finally got a baseline implementation of an SQLite backend for COCO
 datasets. This mostly plugs into my existing tools (as long as only read
 operations are used; haven't impelmented writing yet) by duck-typing the
@@ -70,7 +64,9 @@ unabashedly resurrected
 http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 https://web.archive.org/web/20210326010915/http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 
-
+TODO:
+    - [ ] We get better speeds with raw SQL over alchemy. Can we mitigate the
+        speed difference so we can take advantage of alchemy's expressiveness?
 """
 import json
 import numpy as np

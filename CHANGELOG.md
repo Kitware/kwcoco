@@ -14,6 +14,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+* Default data structure for Python versions >= 3.7 is now a regular dictionary
+  instead of OrderedDict. The behavior in 3.6 is unchanged.
+
 * Working towards a better and consistent CocoImage API without breaking
   compatibility. Added `iter_assets` and added `as_dict` kwargs to
   `primary_asset`. The goal is that these high level functions will return
