@@ -174,7 +174,7 @@ class CocoInfoCLI(scfg.DataConfig):
             num_videos = float('inf') if config.show_videos is True else int(config.show_videos)
             num_images = float('inf') if config.show_images is True else int(config.show_images)
             num_annotations = float('inf') if config.show_annotations is True else int(config.show_annotations)
-            num_categories = float('inf') if config.show_annotations is True else int(config.show_categories)
+            num_categories = float('inf') if config.show_categories is True else int(config.show_categories)
             num_licenses = float('inf') if config.show_licenses is True else int(config.show_licenses)
 
             parent_to_num = ub.odict([
