@@ -17,7 +17,6 @@ from _typeshed import Incomplete
 from collections.abc import Generator
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from types import ModuleType
-from typing import Any
 
 KWCOCO_USE_UJSON: Incomplete
 json_r: ModuleType
@@ -185,6 +184,11 @@ class MixinCocoObjects:
             vidids: Incomplete | None = ...) -> kwcoco.coco_objects1d.Videos:
         ...
 
+    def tracks(self,
+               track_ids: List[int] | None = None,
+               names: List[str] | None = None) -> kwcoco.coco_objects1d.Tracks:
+        ...
+
 
 class MixinCocoStats:
 
@@ -198,6 +202,10 @@ class MixinCocoStats:
 
     @property
     def n_cats(self):
+        ...
+
+    @property
+    def n_tracks(self):
         ...
 
     @property
@@ -265,13 +273,14 @@ class MixinCocoAddRemove:
                   **kw) -> int:
         ...
 
-    def add_auxiliary_item(self,
-                           gid: int,
-                           file_name: str | None = None,
-                           channels: str | kwcoco.FusedChannelSpec
-                           | None = None,
-                           **kwargs) -> None:
+    def add_asset(self,
+                  gid: int,
+                  file_name: str | None = None,
+                  channels: str | kwcoco.FusedChannelSpec | None = None,
+                  **kwargs) -> None:
         ...
+
+    add_auxiliary_item = add_asset
 
     def add_annotation(self,
                        image_id: int,
@@ -280,6 +289,7 @@ class MixinCocoAddRemove:
                        segmentation: Dict | List | Any = ...,
                        keypoints: Any = ...,
                        id: None | int = None,
+                       track_id: int | str | None = None,
                        **kw) -> int:
         ...
 
@@ -288,6 +298,9 @@ class MixinCocoAddRemove:
                      supercategory: str | None = None,
                      id: int | None = None,
                      **kw) -> int:
+        ...
+
+    def add_track(self, name: str, id: int | None = None, **kw) -> int:
         ...
 
     def ensure_image(self, file_name: str, id: None | int = None, **kw) -> int:
@@ -328,6 +341,13 @@ class MixinCocoAddRemove:
                           safe: bool = True) -> Dict:
         ...
 
+    def remove_tracks(self,
+                      track_identifiers: List,
+                      keep_annots: bool = False,
+                      verbose: int = ...,
+                      safe: bool = True) -> Dict:
+        ...
+
     def remove_images(self,
                       gids_or_imgs: List,
                       verbose: int = ...,
@@ -355,6 +375,7 @@ class CocoIndex:
     imgs: Dict[int, dict]
     anns: Dict[int, dict]
     cats: Dict[int, dict]
+    tracks: Dict[int, dict]
     kpcats: Dict[int, dict]
     gid_to_aids: Dict[int, List[int]]
     cid_to_aids: Dict[int, List[int]]
@@ -363,6 +384,7 @@ class CocoIndex:
     name_to_video: Dict[str, dict]
     name_to_cat: Dict[str, dict]
     name_to_img: Dict[str, dict]
+    name_to_track: Dict[str, dict]
     file_name_to_img: Dict[str, dict]
 
     def __init__(index) -> None:

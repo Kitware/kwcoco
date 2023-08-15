@@ -5,7 +5,7 @@ from _typeshed import Incomplete
 class CocoRerootCLI:
     name: str
 
-    class CLIConfig(scfg.DataConfig):
+    class CocoRerootConfig(scfg.DataConfig):
         __epilog__: str
         src: Incomplete
         dst: Incomplete
@@ -16,6 +16,8 @@ class CocoRerootCLI:
         autofix: Incomplete
         compress: Incomplete
         inplace: Incomplete
+
+    CLIConfig = CocoRerootConfig
 
     @classmethod
     def main(cls, cmdline: bool = ..., **kw) -> None:

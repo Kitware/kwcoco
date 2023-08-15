@@ -5,7 +5,27 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.6.4 - Unreleased
+## Version 0.7.0 - Unreleased
+
+### Added
+
+* Top level track support in the dictionary dataset with `add_track`,
+  `remove_tracks`, and `index.name_to_track`.
+
+* Single-object convenience classes for the major tables.
+
+### Changed
+
+* Default data structure for Python versions >= 3.7 is now a regular dictionary
+  instead of OrderedDict. The behavior in 3.6 is unchanged.
+
+* Working towards a better and consistent CocoImage API without breaking
+  compatibility. Added `iter_assets` and added `as_dict` kwargs to
+  `primary_asset`. The goal is that these high level functions will return
+  objects instead of dictionaries.
+
+
+## Version 0.6.4 - Released 2023-07-19
 
 ### Fixed
 

@@ -5,10 +5,12 @@ from _typeshed import Incomplete
 class CocoSubsetCLI:
     name: str
 
-    class CLIConfig(scfg.Config):
+    class CocoSubetConfig(scfg.DataConfig):
         __command__: str
         __default__: Incomplete
-        epilog: str
+        __epilog__: str
+
+    CLIConfig = CocoSubetConfig
 
     @classmethod
     def main(cls, cmdline: bool = ..., **kw) -> None:

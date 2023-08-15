@@ -73,10 +73,8 @@ class CocoInfoCLI(scfg.DataConfig):
     show_categories = scfg.Value(0, isflag=True, help='The number of category dictionaries to show. if True, show all of them', short_alias=['c'])
     show_videos = scfg.Value(0, isflag=True, help='The number of video dictionaries to show. if True, show all of them', short_alias=['v'])
     show_images = scfg.Value(0, isflag=True, help='The number of image dictionaries to show. if True, show all of them', short_alias=['g'])
-
     # TODO:
     # show_tracks = scfg.Value(0, isflag=True, help='The number of track dictionaries to show. if True, show all of them', short_alias=['t'])
-
     show_annotations = scfg.Value(0, isflag=True, help='The number of annotation dictionaries to show. if True, show all of them', short_alias=['a'])
 
     rich = scfg.Value(True, isflag=True, help='if True, try to use rich')
@@ -160,6 +158,9 @@ class CocoInfoCLI(scfg.DataConfig):
 
         # import kwcoco
         from kwcoco.util import ijson_ext
+        if config.src is None:
+            raise ValueError('A source kwcoco file is required')
+
         fpath = ub.Path(config.src)
 
         sentinel = object()

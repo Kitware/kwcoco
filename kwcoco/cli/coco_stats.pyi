@@ -13,3 +13,6 @@ class CocoStatsCLI:
     @classmethod
     def main(cls, cmdline: bool = ..., **kw):
         ...
+
+
+main: Incomplete

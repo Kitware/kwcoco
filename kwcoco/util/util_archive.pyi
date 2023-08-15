@@ -1,6 +1,4 @@
 from types import ModuleType
-import zipfile
-import tarfile
 import tarfile
 import zipfile
 from _typeshed import Incomplete

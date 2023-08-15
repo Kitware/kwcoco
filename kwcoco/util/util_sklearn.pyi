@@ -1,6 +1,8 @@
 from _typeshed import Incomplete
 from sklearn.model_selection._split import _BaseKFold
 
+ARGSORT_HAS_STABLE_KIND: Incomplete
+
 
 class StratifiedGroupKFold(_BaseKFold):
 

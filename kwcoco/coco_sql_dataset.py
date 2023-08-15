@@ -1,10 +1,4 @@
 """
-
-TODO:
-    - [ ] We get better speeds with raw SQL over alchemy. Can we mitigate the
-        speed difference so we can take advantage of alchemy's expressiveness?
-
-
 Finally got a baseline implementation of an SQLite backend for COCO
 datasets. This mostly plugs into my existing tools (as long as only read
 operations are used; haven't impelmented writing yet) by duck-typing the
@@ -70,7 +64,9 @@ unabashedly resurrected
 http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 https://web.archive.org/web/20210326010915/http://sqlite.1065341.n5.nabble.com/Feature-request-hash-index-td23367.html
 
-
+TODO:
+    - [ ] We get better speeds with raw SQL over alchemy. Can we mitigate the
+        speed difference so we can take advantage of alchemy's expressiveness?
 """
 import json
 import numpy as np
@@ -96,6 +92,13 @@ from packaging.version import parse as Version
 __docstubs__ = """
 from sqlalchemy.orm import InstrumentedAttribute
 """
+
+# This is the column name for unstructured data that is not captured directly
+# in our sql schema. It will be stored as a json blob. The column names defined
+# in the alchemy tables must agree with this. Note: previously we used
+# a duner name, but that seems to be disallowed
+UNSTRUCTURED = '_unstructured'
+SCHEMA_VERSION = 'v015'
 
 
 class FallbackCocoBase:
@@ -170,13 +173,6 @@ try:
 except ImportError:
     text = ub.identity
 
-# This is the column name for unstructured data that is not captured directly
-# in our sql schema. It will be stored as a json blob. The column names defined
-# in the alchemy tables must agree with this. Note: previously we used
-# a duner name, but that seems to be disallowed
-UNSTRUCTURED = '_unstructured'
-SCHEMA_VERSION = 'v011'
-
 
 class Category(CocoBase):
     __tablename__ = 'categories'
@@ -233,8 +229,14 @@ class Image(CocoBase):
     _unstructured = Column(JSON, default=dict())
 
 
-# TODO:
-# Track
+class Track(CocoBase):
+    __tablename__ = 'tracks'
+
+    # TODO: in the future we may enforce track-id is an integer
+    id = Column(JSONVariant, index=True, unique=False, primary_key=True, doc='unique internal id')
+    name = Column(String(512), nullable=True, index=True, unique=True)
+    _unstructured = Column(JSON, default=dict())
+
 
 # The track LUT depends on some stuff in postgresql that I dont fully
 # understand keep the ability to turn it off if we need to.
@@ -1089,13 +1091,16 @@ class CocoSqlIndex(object):
         index.imgs = None
         index.videos = None
         index.cats = None
+        index.tracks = None
         index.file_name_to_img = None
 
         index.name_to_cat = None
         index.name_to_img = None
+        index.name_to_track = None
 
         index.dataset = None
         index._id_lookup = None
+        index.trackid_to_aids = None
 
     def build(index, parent):
         session = parent.session
@@ -1104,7 +1109,9 @@ class CocoSqlIndex(object):
         index.cats = SqlDictProxy(session, Category)
         index.kpcats = SqlDictProxy(session, KeypointCategory)
         index.videos = SqlDictProxy(session, Video)
+        index.tracks = SqlDictProxy(session, Track)
         index.name_to_cat = SqlDictProxy(session, Category, Category.name)
+        index.name_to_track = SqlDictProxy(session, Track, Track.name)
 
         # These indexes are allowed to have null keys
         index.name_to_img = SqlDictProxy(session, Image, Image.name,
@@ -1136,6 +1143,7 @@ class CocoSqlIndex(object):
         # Make a list like view for algorithms
         index.dataset = {
             'annotations': SqlListProxy(session, Annotation),
+            'tracks': SqlListProxy(session, Track),
             'videos': SqlListProxy(session, Video),
             'categories': SqlListProxy(session, Category),
             'keypoint_categories': SqlListProxy(session, KeypointCategory),
@@ -1147,6 +1155,7 @@ class CocoSqlIndex(object):
             'images': index.imgs,
             'annotations': index.anns,
             'videos': index.videos,
+            'tracks': index.tracks,
         }
 
     def _set_alchemy_mode(index, mode):
@@ -1524,9 +1533,16 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 if verbose:
                     print('deleting postgresql database, doesnt exist')
 
+    def table_names(self):
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()
+        return table_names
+
     def populate_from(self, dset, verbose=1):
         """
         Copy the information in a :class:`CocoDataset` into this SQL database.
+
+        CommandLine:
+            xdoctest -m kwcoco.coco_sql_dataset CocoSqlDatabase.populate_from:1
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -1546,6 +1562,20 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> ti_dct = _benchmark_dset_readtime(dset2, 'dct')
             >>> print('ti_sql.rankings = {}'.format(ub.urepr(ti_sql.rankings, nl=2, precision=6, align=':')))
             >>> print('ti_dct.rankings = {}'.format(ub.urepr(ti_dct.rankings, nl=2, precision=6, align=':')))
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> from kwcoco.coco_sql_dataset import _benchmark_dset_readtime  # NOQA
+            >>> import kwcoco
+            >>> from kwcoco.coco_sql_dataset import *
+            >>> dset2 = dset = kwcoco.CocoDataset.demo('vidshapes1')
+            >>> dset1 = self = CocoSqlDatabase('sqlite:///:memory:')
+            >>> self.connect()
+            >>> self.populate_from(dset)
+            >>> for tablename in dset1.dataset.keys():
+            >>>     print(tablename)
+            >>>     table = dset1.pandas_table(tablename)
+            >>>     print(table)
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -1606,6 +1636,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
                     item_['_bbox_w'] = w
                     item_['_bbox_h'] = h
                 row = cls(**item_)
+                print(f'row={row}')
                 session.add(row)
 
                 if next(counter) % batch_size == 0:
@@ -1651,6 +1682,14 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
             >>> self, dset = demo()
             >>> table_df = self.pandas_table('annotations')
+            >>> print(table_df)
+            >>> table_df = self.pandas_table('categories')
+            >>> print(table_df)
+            >>> table_df = self.pandas_table('videos')
+            >>> print(table_df)
+            >>> table_df = self.pandas_table('images')
+            >>> print(table_df)
+            >>> table_df = self.pandas_table('tracks')
             >>> print(table_df)
         """
         import pandas as pd

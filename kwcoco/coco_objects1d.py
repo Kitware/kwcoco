@@ -9,6 +9,7 @@ See:
     :func:`kwcoco.coco_dataset.MixinCocoObjects.videos`
     :func:`kwcoco.coco_dataset.MixinCocoObjects.images`
     :func:`kwcoco.coco_dataset.MixinCocoObjects.annots`
+    :func:`kwcoco.coco_dataset.MixinCocoObjects.tracks`
 
 """
 from os.path import join
@@ -788,6 +789,49 @@ class Annots(ObjectList1D):
 
         xywh = self.lookup('bbox')
         return xywh
+
+
+class Tracks(ObjectList1D):
+    """
+    Vectorized access to track attributes
+
+    SeeAlso:
+        :func:`kwcoco.coco_dataset.MixinCocoObjects.tracks`
+
+    Example:
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes1', num_tracks=4)
+        >>> tracks = dset.tracks()
+        >>> print('tracks = {}'.format(tracks))
+        tracks = <Tracks(num=4)>
+        >>> tracks.name
+        ['track_001', 'track_002', 'track_003', 'track_004']
+    """
+
+    def __init__(self, ids, dset):
+        super().__init__(ids, dset, 'tracks')
+
+    @property
+    def track_ids(self):
+        """ The annotation ids of this column of annotations """
+        return self._ids
+
+    @property
+    def name(self):
+        return self.lookup('name')
+
+    @property
+    def annots(self):
+        """
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes1', num_tracks=4)
+            >>> self = dset.tracks()
+            >>> print(self.annots)
+            <AnnotGroups(n=4, m=2.0, s=0.0)>
+        """
+        aids_iter = ub.take(self._dset.index.trackid_to_aids, self._ids)
+        return AnnotGroups([self._dset.annots(aids) for aids in aids_iter], self._dset)
 
 
 class AnnotGroups(ObjectGroups):

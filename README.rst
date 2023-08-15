@@ -63,10 +63,11 @@ The `kwcoco <https://pypi.org/project/kwcoco/>`_.  package can be installed via 
 
 .. code-block:: bash
 
+    # From pypi
     pip install kwcoco
 
-    # Or bleading edge
-    pip install git+https://gitlab.kitware.com/computer-vision/kwcoco@dev/0.6.3
+    # From gitlab
+    pip install git+https://gitlab.kitware.com/computer-vision/kwcoco@main
 
 
 
