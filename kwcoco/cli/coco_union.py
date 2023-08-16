@@ -110,7 +110,9 @@ class CocoUnionCLI(object):
 
 
 def _postprocess_absolute(dset):
+    dset._build_index()
     dset.reroot(absolute=True)
+    return dset
 
 _CLI = CocoUnionCLI
 

@@ -47,7 +47,11 @@ class CocoStatsCLI:
         import kwcoco
         import numpy as np
         config = cls.CLIConfig(kw, cmdline=cmdline)
-        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        try:
+            from rich import print as rich_print
+        except ImportError:
+            rich_print = print
+        rich_print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
@@ -89,7 +93,7 @@ class CocoStatsCLI:
             for dset in datasets:
                 tag_to_stats[dset.tag] = dset.basic_stats()
             df = pd.DataFrame.from_dict(tag_to_stats)
-            print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
+            rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['extended']:
             tag_to_ext_stats = {}
@@ -104,14 +108,14 @@ class CocoStatsCLI:
                 print('\n--{!r}'.format(key))
                 df = pd.DataFrame.from_dict(
                     {k: v[key] for k, v in tag_to_ext_stats.items()})
-                print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
+                rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['catfreq']:
             tag_to_freq = {}
             for dset in datasets:
                 tag_to_freq[dset.tag] = dset.category_annotation_frequency()
             df = pd.DataFrame.from_dict(tag_to_freq)
-            print(df.to_string(float_format=lambda x: '%0.3f' % x))
+            rich_print(df.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['video_attrs']:
             print('Video Attrs')

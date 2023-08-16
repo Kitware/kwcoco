@@ -2892,6 +2892,7 @@ class MixinCocoStats:
                 'n_imgs': 3,
                 'n_videos': 0,
                 'n_cats': 8,
+                'n_tracks': 0,
             }
 
             >>> from kwcoco.demo.toydata_video import random_video_dset
@@ -2902,16 +2903,25 @@ class MixinCocoStats:
                 'n_imgs': 2,
                 'n_videos': 1,
                 'n_cats': 3,
+                'n_tracks': 10,
             }
         """
-        return ub.odict([
+
+        n_tracks = self.n_tracks
+
+        if len(self.index.trackid_to_aids) > n_tracks + 3:
+            n_tracks = len(self.index.trackid_to_aids)
+            if None in self.index.trackid_to_aids:
+                n_tracks -= 1
+
+        info =  ub.odict([
             ('n_anns', self.n_annots),
             ('n_imgs', self.n_images),
             ('n_videos', self.n_videos),
             ('n_cats', self.n_cats),
-            # TODO: full track dictionary once available
-            # ('n_tracks', self.n_tracks),
+            ('n_tracks', n_tracks),
         ])
+        return info
 
     def extended_stats(self):
         """
@@ -2953,12 +2963,14 @@ class MixinCocoStats:
             gid: list(cidfreq.keys())
             for gid, cidfreq in gid_to_cidfreq.items()
         }
+        trackid_to_aids = ub.udict(self.index.trackid_to_aids) - {None}
         return ub.odict([
             ('annots_per_img', mapping_stats(self.index.gid_to_aids)),
             ('imgs_per_cat', mapping_stats(self.index.cid_to_gids)),
             ('cats_per_img', mapping_stats(gid_to_cids)),
             ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),
             ('imgs_per_video', mapping_stats(self.index.vidid_to_gids)),
+            ('annots_per_track', mapping_stats(trackid_to_aids)),
         ])
 
     def boxsize_stats(self, anchors=None, perclass=True, gids=None, aids=None,
@@ -4086,7 +4098,7 @@ class MixinCocoAddRemove:
             >>> self = kwcoco.CocoDataset.demo()
             >>> self.clear_images()
             >>> print(ub.urepr(self.basic_stats(), nobr=1, nl=0, si=1))
-            n_anns: 0, n_imgs: 0, n_videos: 0, n_cats: 8
+            n_anns: 0, n_imgs: 0, n_videos: 0, n_cats: 8, n_tracks: 0
         """
         # self.dataset['images'].clear()
         # self.dataset['annotations'].clear()
@@ -4104,7 +4116,7 @@ class MixinCocoAddRemove:
             >>> self = kwcoco.CocoDataset.demo()
             >>> self.clear_annotations()
             >>> print(ub.urepr(self.basic_stats(), nobr=1, nl=0, si=1))
-            n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8
+            n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8, n_tracks: 0
         """
         # self.dataset['annotations'].clear()
         del self.dataset['annotations'][:]
