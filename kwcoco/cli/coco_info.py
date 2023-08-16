@@ -74,7 +74,7 @@ class CocoInfoCLI(scfg.DataConfig):
     show_videos = scfg.Value(0, isflag=True, help='The number of video dictionaries to show. if True, show all of them', short_alias=['v'])
     show_images = scfg.Value(0, isflag=True, help='The number of image dictionaries to show. if True, show all of them', short_alias=['g'])
     # TODO:
-    # show_tracks = scfg.Value(0, isflag=True, help='The number of track dictionaries to show. if True, show all of them', short_alias=['t'])
+    show_tracks = scfg.Value(0, isflag=True, help='The number of track dictionaries to show. if True, show all of them', short_alias=['t'])
     show_annotations = scfg.Value(0, isflag=True, help='The number of annotation dictionaries to show. if True, show all of them', short_alias=['a'])
 
     rich = scfg.Value(True, isflag=True, help='if True, try to use rich')
@@ -173,6 +173,7 @@ class CocoInfoCLI(scfg.DataConfig):
             num_infos = float('inf') if config.show_info is True else int(config.show_info)
             num_videos = float('inf') if config.show_videos is True else int(config.show_videos)
             num_images = float('inf') if config.show_images is True else int(config.show_images)
+            num_tracks = float('inf') if config.show_tracks is True else int(config.show_tracks)
             num_annotations = float('inf') if config.show_annotations is True else int(config.show_annotations)
             num_categories = float('inf') if config.show_categories is True else int(config.show_categories)
             num_licenses = float('inf') if config.show_licenses is True else int(config.show_licenses)
@@ -183,6 +184,7 @@ class CocoInfoCLI(scfg.DataConfig):
                 ("categories", num_categories),
                 ("videos", num_videos),
                 ("images", num_images),
+                ("tracks", num_tracks),
                 ("annotations", num_annotations),
             ])
 
@@ -207,6 +209,7 @@ class CocoInfoCLI(scfg.DataConfig):
                 'categories',
                 'videos',
                 'images',
+                'tracks',
                 'annotations',
             ]
             # TODO: need to be able to either:
