@@ -68,3 +68,52 @@ def test_coco_image_add_asset():
         coco_img.add_asset(**new_asset3)
 
     assert len(coco_img.assets) == (orig_num_assets + 2)
+
+
+def test_imdelay_with_interpolation():
+    import ubelt as ub
+    dpath = ub.Path.appdir('kwcoco/tests/imdelay-with-interp').ensuredir()
+
+    import kwimage
+    import numpy as np
+    imdata = (kwimage.checkerboard() * 255).astype(np.uint8)
+    fpath = dpath / 'checkers.png'
+    kwimage.imwrite(fpath, imdata)
+
+    import kwcoco
+    dset = kwcoco.CocoDataset()
+    gid = dset.add_image(file_name=fpath, channels='gray', resolution='10 GSD')
+    dset._ensure_imgsize()
+
+    coco_img = dset.coco_image(gid)
+
+    delayed = coco_img.imdelay(interpolation='nearest', antialias=False)
+    data = delayed.finalize()
+    assert np.all(data == imdata)
+
+    # Test to make sure imdelay respect interplation
+    # Subsequent changes are still subject to the user overwriting these defaults.
+    scaled = coco_img.imdelay(interpolation='nearest', antialias=False, resolution='33GSD')
+    data_scaled = scaled.finalize()
+    scaled.write_network_text(fields=True)
+    scaled = scaled.optimize()
+    scaled.write_network_text(fields=True)
+    assert set(imdata.ravel()) == set(data_scaled.ravel())
+
+    assert np.all(data == imdata)
+
+    # TODO: move this test to delayed image and
+    # make it such that interpolation defaults to ones that are already used.
+    # We shouldn't need to do it like this, but alas...
+    scaled = delayed.scale(0.13)
+    scaled.write_network_text(fields=True)
+    scaled = scaled.optimize()
+    scaled.write_network_text(fields=True)
+    scaled._set_nested_params(interpolation='nearest', antialias=False)
+    scaled.write_network_text(fields=True)
+
+    data_scaled = scaled.finalize()
+    data_scaled2 = scaled.finalize(interpolation='nearest', antialias=False)
+
+    assert set(imdata.ravel()) == set(data_scaled2.ravel())
+    assert set(imdata.ravel()) == set(data_scaled.ravel())

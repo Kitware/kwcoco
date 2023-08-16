@@ -2892,6 +2892,7 @@ class MixinCocoStats:
                 'n_imgs': 3,
                 'n_videos': 0,
                 'n_cats': 8,
+                'n_tracks': 0,
             }
 
             >>> from kwcoco.demo.toydata_video import random_video_dset
@@ -2902,6 +2903,7 @@ class MixinCocoStats:
                 'n_imgs': 2,
                 'n_videos': 1,
                 'n_cats': 3,
+                'n_tracks': 10,
             }
         """
 
@@ -4096,7 +4098,7 @@ class MixinCocoAddRemove:
             >>> self = kwcoco.CocoDataset.demo()
             >>> self.clear_images()
             >>> print(ub.urepr(self.basic_stats(), nobr=1, nl=0, si=1))
-            n_anns: 0, n_imgs: 0, n_videos: 0, n_cats: 8
+            n_anns: 0, n_imgs: 0, n_videos: 0, n_cats: 8, n_tracks: 0
         """
         # self.dataset['images'].clear()
         # self.dataset['annotations'].clear()
@@ -4114,7 +4116,7 @@ class MixinCocoAddRemove:
             >>> self = kwcoco.CocoDataset.demo()
             >>> self.clear_annotations()
             >>> print(ub.urepr(self.basic_stats(), nobr=1, nl=0, si=1))
-            n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8
+            n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8, n_tracks: 0
         """
         # self.dataset['annotations'].clear()
         del self.dataset['annotations'][:]

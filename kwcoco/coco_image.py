@@ -968,7 +968,9 @@ class CocoImage(_CocoObject):
                     if space not in {'auxiliary', 'asset'}:
                         aux_to_img = Affine.coerce(obj.get('warp_aux_to_img', None))
                         chan = chan.warp(
-                            aux_to_img, dsize=img_info['dsize'])
+                            aux_to_img, dsize=img_info['dsize'],
+                            interpolation=interpolation, antialias=antialias,
+                        )
                     chan_list.append(chan)
 
         if space == 'video':
