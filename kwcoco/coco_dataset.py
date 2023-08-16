@@ -2904,14 +2904,22 @@ class MixinCocoStats:
                 'n_cats': 3,
             }
         """
-        return ub.odict([
+
+        n_tracks = self.n_tracks
+
+        if len(self.index.trackid_to_aids) > n_tracks + 3:
+            n_tracks = len(self.index.trackid_to_aids)
+            if None in self.index.trackid_to_aids:
+                n_tracks -= 1
+
+        info =  ub.odict([
             ('n_anns', self.n_annots),
             ('n_imgs', self.n_images),
             ('n_videos', self.n_videos),
             ('n_cats', self.n_cats),
-            # TODO: full track dictionary once available
-            # ('n_tracks', self.n_tracks),
+            ('n_tracks', self.n_tracks),
         ])
+        return info
 
     def extended_stats(self):
         """
