@@ -30,6 +30,7 @@ class CocoInfoCLI(scfg.DataConfig):
     show_categories: Incomplete
     show_videos: Incomplete
     show_images: Incomplete
+    show_tracks: Incomplete
     show_annotations: Incomplete
     rich: Incomplete
     verbose: Incomplete
