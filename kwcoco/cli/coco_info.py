@@ -80,6 +80,9 @@ class CocoInfoCLI(scfg.DataConfig):
     rich = scfg.Value(True, isflag=True, help='if True, try to use rich')
     verbose = scfg.Value(0, isflag=True, help='if True, print extra information (i.e. the configuration). If false, then stdout should be redirectable as a regular json object')
 
+    # TODO add more ways to query what parts we want to show
+    image_name = scfg.Value(None, help='If specified, lookup and show the image with this name')
+
     @classmethod
     def main(cls, cmdline=1, **kwargs):
         """
@@ -188,6 +191,17 @@ class CocoInfoCLI(scfg.DataConfig):
                 ("annotations", num_annotations),
             ])
 
+            parent_to_request = {}
+
+            if config.image_name is not None:
+                parent_to_request['images'] = {
+                    'name': config.image_name,
+                }
+
+            if config.verbose:
+                print('parent_to_num = {}'.format(ub.urepr(parent_to_num, nl=1)))
+                print('parent_to_request = {}'.format(ub.urepr(parent_to_request, nl=1)))
+
             print('{')
 
             # TODO: we want a function outside the CLI that
@@ -220,20 +234,47 @@ class CocoInfoCLI(scfg.DataConfig):
             # specified in parent-order.
             prev_parent = sentinel
             for parent in parent_order:
-                num_objs = parent_to_num[parent]
-                if num_objs:
+
+                num_to_show = parent_to_num[parent]
+                request = parent_to_request.get(parent, {})
+
+                satisfied = num_to_show == 0 and not bool(request)
+                if not satisfied:
+
                     if prev_parent is not sentinel:
                         print(',')
+
                     obj_iter = ijson_ext.items(ijson_parser, prefix=f'{parent}.item')
+
                     print(f'"{parent}": [')
+
                     prev_obj = sentinel
-                    for idx, obj in enumerate(obj_iter, start=1):
-                        if prev_obj is not sentinel:
-                            print(',')
-                        rich_print('{}'.format(ub.urepr(obj, nl=4, trailsep=False).replace('\'', '"')))
-                        if idx >= num_objs:
+                    num_shown = 0
+
+                    for obj in obj_iter:
+
+                        want_name = request.get('name')
+
+                        show_this_one = False
+
+                        if num_shown < num_to_show:
+                            show_this_one = True
+
+                        if want_name is not None and obj['name'] == want_name:
+                            request.pop('name')  # Mark as satisfied? Probably a better way?
+                            show_this_one = True
+
+                        if show_this_one:
+                            if prev_obj is not sentinel:
+                                print(',')
+                            rich_print('{}'.format(ub.urepr(obj, nl=4, trailsep=False).replace('\'', '"')))
+                            num_shown += 1
+                            prev_obj = obj
+
+                        satisfied = num_shown >= num_to_show and not bool(request)
+                        if satisfied:
                             break
-                        prev_obj = obj
+
                     print(']')
                     prev_parent = parent
 

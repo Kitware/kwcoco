@@ -7,6 +7,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.7.2 - Unreleased
 
+### Fixed
+* `clear_annotations` now also clears tracks.
+
+### Added
+* `kwcoco info` can now query images by name.
+
 
 ## Version 0.7.1 - Released 2023-08-16
 

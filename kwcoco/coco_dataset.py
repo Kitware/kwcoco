@@ -1368,6 +1368,18 @@ class MixinCocoExtras:
             else:
                 reuse_parts.append('categories.json')
 
+            # TODO:
+            # if not hashid_parts['tracks'].get('json', None):
+            #     cids = sorted(self.index.tracks.keys())
+            #     cats_text = json_w.dumps(
+            #         [_ditems(self.index.tracks[cid]) for cid in cids])
+            #     hashid_parts['tracks']['json'] = ub.hash_data(
+            #         cats_text, hasher='sha512')
+            #     hashid_parts['tracks']['num'] = len(cids)
+            #     rebuild_parts.append('tracks.json')
+            # else:
+            #     reuse_parts.append('tracks.json')
+
         if verbose > 1:
             if reuse_parts:
                 print('Reused hashid_parts: {}'.format(reuse_parts))
@@ -4109,7 +4121,7 @@ class MixinCocoAddRemove:
 
     def clear_annotations(self):
         """
-        Removes all annotations (but not images and categories)
+        Removes all annotations and tracks (but not images and categories)
 
         Example:
             >>> import kwcoco
@@ -4119,9 +4131,11 @@ class MixinCocoAddRemove:
             n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8, n_tracks: 0
         """
         # self.dataset['annotations'].clear()
-        del self.dataset['annotations'][:]
+        self.dataset['annotations'].clear()
+        if 'tracks' in self.dataset:
+            self.dataset['tracks'].clear()
         self.index._remove_all_annotations()
-        self._invalidate_hashid(['annotations'])
+        self._invalidate_hashid(['annotations', 'tracks'])
 
     def remove_annotation(self, aid_or_ann):
         """
@@ -4861,9 +4875,12 @@ class CocoIndex:
                 _.clear()
             for _ in index.cid_to_aids.values():
                 _.clear()
-            for _ in index.trackid_to_aids.values():
-                _.clear()
+            # for _ in index.trackid_to_aids.values():
+            #     _.clear()
             index.anns.clear()
+            index.tracks.clear()
+            index.trackid_to_aids.clear()
+            index.name_to_track.clear()
 
     def _remove_all_images(index):
         # Keep the category indexes alive
