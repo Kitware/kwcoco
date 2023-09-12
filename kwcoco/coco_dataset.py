@@ -5914,6 +5914,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # more pretty.
         try:
             if newlines:
+                # TODO: make this work faster!
                 text = util_special_json._special_kwcoco_pretty_dumps_orig(self.dataset)
             else:
                 # TODO: do main key sorting here as well
@@ -5949,6 +5950,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     if not arcname.endswith('.json'):
                         arcname = arcname + '.json'
         with zipfile.ZipFile(file, 'w', **zipkw) as zfile:
+            # It would be nice if we could dump directly to a binary
+            # encoded format here. Then we could use self.dump(zfile.open())
             text = self.dumps(indent=indent, newlines=newlines)
             zfile.writestr(arcname, text.encode('utf8'))
 
