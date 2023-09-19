@@ -62,7 +62,7 @@ class CocoStatsCLI:
         else:
             fpaths = config['src']
 
-        datasets = kwcoco.CocoDataset.coerce_multiple(fpaths, workers=config.io_workers)
+        datasets = list(kwcoco.CocoDataset.coerce_multiple(fpaths, workers=config.io_workers))
         print('Finished reading datasets')
 
         # hack dataset tags
