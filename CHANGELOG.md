@@ -12,6 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * `kwcoco info` can now query images by name.
+* Add `io_workers` to kwcoco stats
 
 
 ## Version 0.7.1 - Released 2023-08-16

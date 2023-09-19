@@ -7,10 +7,10 @@ class CocoStatsCLI:
     name = 'stats'
 
     class CLIConfig(scfg.Config):
-        __command__ = 'stats'
         """
         Compute summary statistics about a COCO dataset
         """
+        __command__ = 'stats'
         __default__ = {
             'src': scfg.Value(['special:shapes8'], nargs='+', help='path to dataset', position=1),
             'basic': scfg.Value(True, isflag=True, help='show basic stats'),
@@ -26,6 +26,8 @@ class CocoStatsCLI:
             'annot_attrs': scfg.Value(False, isflag=True, help='show annotation attribute information'),
             'image_attrs': scfg.Value(False, isflag=True, help='show image attribute information'),
             'video_attrs': scfg.Value(False, isflag=True, help='show video attribute information'),
+
+            'io_workers': scfg.Value(0, help='number of workers when reading multiple kwcoco files'),
 
             'embed': scfg.Value(False, isflag=True, help='embed into interactive shell'),
         }
@@ -61,10 +63,7 @@ class CocoStatsCLI:
         else:
             fpaths = config['src']
 
-        datasets = []
-        for fpath in ub.ProgIter(fpaths, desc='reading datasets', verbose=1):
-            dset = kwcoco.CocoDataset.coerce(fpath)
-            datasets.append(dset)
+        datasets = kwcoco.CocoDataset.coerce_multiple(fpaths, workers=config.io_workers)
         print('Finished reading datasets')
 
         # hack dataset tags
@@ -81,7 +80,7 @@ class CocoStatsCLI:
             for dset in datasets:
                 print('dset = {!r}'.format(dset))
                 print('Category Heirarchy: ')
-                print(nx.forest_str(dset.object_categories().graph))
+                print(nx.write_network_text(dset.object_categories().graph))
         except Exception:
             pass
 
