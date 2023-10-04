@@ -107,6 +107,10 @@ if sys.version_info <= (3, 6):
 else:
     _dict = dict
 
+__docstubs__ = """
+from kwcoco.coco_image import CocoImage
+"""
+
 
 # These are the keys that are / should be supported by the API
 SPEC_KEYS = [
@@ -809,7 +813,7 @@ class MixinCocoAccessors:
             gid (int): image id
 
         Returns:
-            kwcoco.coco_image.CocoImage
+            CocoImage
         """
         # Experimental
         from kwcoco.coco_image import CocoImage

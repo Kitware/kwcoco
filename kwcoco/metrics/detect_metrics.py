@@ -1093,7 +1093,7 @@ class DetectionMetrics(ub.NiceRepr):
         Create summary one-versus-rest and binary metrics.
 
         Args:
-            out_dpath (Path | None):
+            out_dpath (pathlib.Path | None):
                 FIXME: not hooked up
 
             with_ovr (str | bool):

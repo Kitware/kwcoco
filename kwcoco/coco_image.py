@@ -127,14 +127,14 @@ class CocoImage(_CocoObject):
             video = self._video
         return video
 
-    @property
-    def name(self):
-        return self['name']
-
     @video.setter
     def video(self, value):
         # TODO: ducktype with an object
         self._video = value
+
+    @property
+    def name(self):
+        return self['name']
 
     def detach(self):
         """

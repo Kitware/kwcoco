@@ -18,6 +18,7 @@ import ubelt as ub
 
 
 __docstubs__ = """
+from kwcoco.coco_dataset import CocoDataset
 from typing import Dict
 ObjT = Dict
 """

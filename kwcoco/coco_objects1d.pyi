@@ -5,7 +5,7 @@ from typing import Any
 import kwimage
 import ubelt as ub
 
-from typing import Dict
+from kwcoco.coco_dataset import CocoDataset
 
 ObjT = Dict
 __docstubs__: str
@@ -13,7 +13,7 @@ __docstubs__: str
 
 class ObjectList1D(ub.NiceRepr):
 
-    def __init__(self, ids, dset, key) -> None:
+    def __init__(self, ids: List[int], dset: CocoDataset, key: str) -> None:
         ...
 
     def __nice__(self):
@@ -144,19 +144,19 @@ class Images(ObjectList1D):
         ...
 
     @property
-    def area(self):
+    def area(self) -> List[float]:
         ...
 
     @property
-    def n_annots(self):
+    def n_annots(self) -> List[int]:
         ...
 
     @property
-    def aids(self):
+    def aids(self) -> List[set]:
         ...
 
     @property
-    def annots(self):
+    def annots(self) -> AnnotGroups:
         ...
 
 

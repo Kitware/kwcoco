@@ -34,6 +34,7 @@ class CocoInfoCLI(scfg.DataConfig):
     show_annotations: Incomplete
     rich: Incomplete
     verbose: Incomplete
+    image_name: Incomplete
 
     @classmethod
     def main(cls, cmdline: int = ..., **kwargs) -> None:
