@@ -30,11 +30,6 @@ class ObjectList1D(ub.NiceRepr):
     Lightweight reference to a set of object (e.g. annotations, images) that
     allows for convenient property access.
 
-    Args:
-        ids (List[int]): list of ids
-        dset (CocoDataset): parent dataset
-        key (str): main object name (e.g. 'images', 'annotations')
-
     Types:
         ObjT = Ann | Img | Cat  # can be one of these types
         ObjectList1D gives us access to a List[ObjT]
@@ -53,6 +48,12 @@ class ObjectList1D(ub.NiceRepr):
     """
 
     def __init__(self, ids, dset, key):
+        """
+        Args:
+            ids (List[int]): list of ids
+            dset (CocoDataset): parent dataset
+            key (str): main object name (e.g. 'images', 'annotations')
+        """
         self._key = key
         self._ids = ids
         self._dset = dset
@@ -539,6 +540,9 @@ class Images(ObjectList1D):
     @property
     def area(self):
         """
+        Returns:
+            List[float]
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -552,6 +556,9 @@ class Images(ObjectList1D):
     @property
     def n_annots(self):
         """
+        Returns:
+            List[int]
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -563,6 +570,9 @@ class Images(ObjectList1D):
     @property
     def aids(self):
         """
+        Returns:
+            List[set]
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -574,14 +584,17 @@ class Images(ObjectList1D):
     @property
     def annots(self):
         """
+        Returns:
+            AnnotGroups
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
             >>> print(self.annots)
             <AnnotGroups(n=3, m=3.7, s=3.9)>
         """
-        return AnnotGroups([self._dset.annots(aids) for aids in self.aids],
-                           self._dset)
+        return AnnotGroups([self._dset.annots(sorted(aids))
+                            for aids in self.aids], self._dset)
 
 
 class Annots(ObjectList1D):

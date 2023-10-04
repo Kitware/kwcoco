@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * `clear_annotations` now also clears tracks.
+* `Images.annots` now returns `AnnotGroups` where the underlying `Annots`
+  objects use id lists instead of id sets.
 
 ### Added
 * `kwcoco info` can now query images by name.
