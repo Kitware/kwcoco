@@ -3281,6 +3281,9 @@ class MixinCocoDraw:
             kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
             print(ub.urepr(list(kwargs.keys()), nl=1, si=1))
 
+        CommandLine:
+            xdoctest -m kwcoco.coco_dataset MixinCocoDraw.show_image --show
+
         Example:
             >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> import kwcoco
@@ -3537,7 +3540,7 @@ class MixinCocoDraw:
                 sseg_polys = list(ub.take(sseg_polys, sortx))
 
             poly_col = mpl.collections.PatchCollection(
-                sseg_polys, 2, alpha=0.4)
+                sseg_polys, match_original=True, alpha=0.4)
             ax.add_collection(poly_col)
 
         # Show all annotations inside it

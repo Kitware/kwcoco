@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * `clear_annotations` now also clears tracks.
 * `Images.annots` now returns `AnnotGroups` where the underlying `Annots`
   objects use id lists instead of id sets.
+* Issue with new matplotlib 3.8 and `show_image`.
 
 ### Added
 * `kwcoco info` can now query images by name.

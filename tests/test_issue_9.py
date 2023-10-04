@@ -5,7 +5,6 @@ def test_annot_groups_use_lists():
     """
     import kwcoco
     dset = kwcoco.CocoDataset.demo()
-
     images = dset.images()
     annot_groups = images.annots
     assert isinstance(annot_groups[0]._ids, list)
