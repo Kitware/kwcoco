@@ -57,6 +57,10 @@ class CocoImage(_CocoObject):
     def video(self, value) -> None:
         ...
 
+    @property
+    def name(self):
+        ...
+
     def detach(self):
         ...
 

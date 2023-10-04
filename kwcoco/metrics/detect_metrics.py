@@ -1090,6 +1090,26 @@ class DetectionMetrics(ub.NiceRepr):
 
     def summarize(dmet, out_dpath=None, plot=False, title='', with_bin='auto', with_ovr='auto'):
         """
+        Create summary one-versus-rest and binary metrics.
+
+        Args:
+            out_dpath (pathlib.Path | None):
+                FIXME: not hooked up
+
+            with_ovr (str | bool):
+                include one-versus-rest metrics (wrt the classes). If 'auto' enables if possible.
+                FIXME: auto is not working.
+
+            with_bin (str | bool):
+                include binary classless metrics (i.e. detected or not).
+                If 'auto' enables if possible. FIXME: auto is not working.
+
+            plot (bool):
+                if true, also write plots. Defaults to False.
+
+            title (str):
+                passed if plot is given
+
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> from kwcoco.metrics.detect_metrics import DetectionMetrics

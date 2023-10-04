@@ -5,7 +5,20 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.7.1 - Unreleased
+## Version 0.7.2 - Unreleased
+
+### Fixed
+* `clear_annotations` now also clears tracks.
+* `Images.annots` now returns `AnnotGroups` where the underlying `Annots`
+  objects use id lists instead of id sets.
+* Issue with new matplotlib 3.8 and `show_image`.
+
+### Added
+* `kwcoco info` can now query images by name.
+* Add `io_workers` to kwcoco stats
+
+
+## Version 0.7.1 - Released 2023-08-16
 
 ### Fixed:
 * Fixed issue where imdelay would sometimes not respect antialias and interpolation

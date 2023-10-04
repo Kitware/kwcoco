@@ -18,6 +18,7 @@ import ubelt as ub
 
 
 __docstubs__ = """
+from kwcoco.coco_dataset import CocoDataset
 from typing import Dict
 ObjT = Dict
 """
@@ -29,11 +30,6 @@ class ObjectList1D(ub.NiceRepr):
 
     Lightweight reference to a set of object (e.g. annotations, images) that
     allows for convenient property access.
-
-    Args:
-        ids (List[int]): list of ids
-        dset (CocoDataset): parent dataset
-        key (str): main object name (e.g. 'images', 'annotations')
 
     Types:
         ObjT = Ann | Img | Cat  # can be one of these types
@@ -53,17 +49,23 @@ class ObjectList1D(ub.NiceRepr):
     """
 
     def __init__(self, ids, dset, key):
+        """
+        Args:
+            ids (List[int]): list of ids
+            dset (CocoDataset): parent dataset
+            key (str): main object name (e.g. 'images', 'annotations')
+        """
         self._key = key
         self._ids = ids
         self._dset = dset
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return 'num={!r}'.format(len(self))
 
     def __iter__(self):
         return iter(self._ids)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._ids)
 
     @property
@@ -71,6 +73,13 @@ class ObjectList1D(ub.NiceRepr):
         return self._dset.index._id_lookup[self._key]
 
     def __getitem__(self, index):
+        """
+        Args:
+            index (int | slice): positional index or slice
+
+        Returns:
+            ObjectList1D | int
+        """
         if isinstance(index, slice):
             subids = self._ids[index]
             newself = self.__class__(subids, self._dset)
@@ -91,6 +100,10 @@ class ObjectList1D(ub.NiceRepr):
 
     @property
     def ids(self):
+        """
+        Returns:
+            List[int]
+        """
         return self._ids
 
     @property
@@ -382,6 +395,11 @@ class ObjectGroups(ub.NiceRepr):
     An object for holding a groups of :class:`ObjectList1D` objects
     """
     def __init__(self, groups, dset):
+        """
+        Args:
+            groups (List[ObjectList1D]): list of object lists
+            dset (CocoDataset): parent dataset
+        """
         self._groups = groups
 
     def _lookup(self, key):
@@ -398,7 +416,7 @@ class ObjectGroups(ub.NiceRepr):
     def lookup(self, key, default=ub.NoParam):
         return [group.lookup(key, default) for group in self._groups]
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         # import timerit
         # mu = timerit.core._trychar('μ', 'm')
         # sigma = timerit.core._trychar('σ', 's')
@@ -430,6 +448,11 @@ class Categories(ObjectList1D):
         >>> print('self.supercategory = {!r}'.format(self.supercategory))
     """
     def __init__(self, ids, dset):
+        """
+        Args:
+            ids (List[int]): list of category ids
+            dset (CocoDataset): parent dataset
+        """
         super().__init__(ids, dset, 'categories')
 
     @property
@@ -462,11 +485,19 @@ class Videos(ObjectList1D):
         self = <Videos(num=5) at ...>
     """
     def __init__(self, ids, dset):
+        """
+        Args:
+            ids (List[int]): list of video ids
+            dset (CocoDataset): parent dataset
+        """
         super().__init__(ids, dset, 'videos')
 
     @property
     def images(self):
         """
+        Returns:
+            ImageGroups
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('vidshapes8').videos()
@@ -496,6 +527,11 @@ class Images(ObjectList1D):
     """
 
     def __init__(self, ids, dset):
+        """
+        Args:
+            ids (List[int]): list of image ids
+            dset (CocoDataset): parent dataset
+        """
         super().__init__(ids, dset, 'images')
 
     @property
@@ -539,6 +575,9 @@ class Images(ObjectList1D):
     @property
     def area(self):
         """
+        Returns:
+            List[float]
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -552,6 +591,9 @@ class Images(ObjectList1D):
     @property
     def n_annots(self):
         """
+        Returns:
+            List[int]
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -563,6 +605,9 @@ class Images(ObjectList1D):
     @property
     def aids(self):
         """
+        Returns:
+            List[set]
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
@@ -574,14 +619,17 @@ class Images(ObjectList1D):
     @property
     def annots(self):
         """
+        Returns:
+            AnnotGroups
+
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo().images()
             >>> print(self.annots)
             <AnnotGroups(n=3, m=3.7, s=3.9)>
         """
-        return AnnotGroups([self._dset.annots(aids) for aids in self.aids],
-                           self._dset)
+        return AnnotGroups([self._dset.annots(sorted(aids))
+                            for aids in self.aids], self._dset)
 
 
 class Annots(ObjectList1D):
@@ -603,6 +651,11 @@ class Annots(ObjectList1D):
     """
 
     def __init__(self, ids, dset):
+        """
+        Args:
+            ids (List[int]): list of annotation ids
+            dset (CocoDataset): parent dataset
+        """
         super().__init__(ids, dset, 'annotations')
 
     @property
@@ -809,6 +862,11 @@ class Tracks(ObjectList1D):
     """
 
     def __init__(self, ids, dset):
+        """
+        Args:
+            ids (List[int]): list of track ids
+            dset (CocoDataset): parent dataset
+        """
         super().__init__(ids, dset, 'tracks')
 
     @property

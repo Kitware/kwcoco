@@ -18,9 +18,12 @@ from collections.abc import Generator
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from types import ModuleType
 
+from kwcoco.coco_image import CocoImage
+
 KWCOCO_USE_UJSON: Incomplete
 json_r: ModuleType
 json_w: ModuleType
+__docstubs__: str
 SPEC_KEYS: Incomplete
 
 
@@ -72,7 +75,7 @@ class MixinCocoAccessors:
     def keypoint_categories(self) -> kwcoco.CategoryTree:
         ...
 
-    def coco_image(self, gid: int) -> kwcoco.coco_image.CocoImage:
+    def coco_image(self, gid: int) -> CocoImage:
         ...
 
 

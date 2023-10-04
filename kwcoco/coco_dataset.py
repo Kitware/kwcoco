@@ -107,6 +107,10 @@ if sys.version_info <= (3, 6):
 else:
     _dict = dict
 
+__docstubs__ = """
+from kwcoco.coco_image import CocoImage
+"""
+
 
 # These are the keys that are / should be supported by the API
 SPEC_KEYS = [
@@ -809,7 +813,7 @@ class MixinCocoAccessors:
             gid (int): image id
 
         Returns:
-            kwcoco.coco_image.CocoImage
+            CocoImage
         """
         # Experimental
         from kwcoco.coco_image import CocoImage
@@ -1367,6 +1371,18 @@ class MixinCocoExtras:
                 rebuild_parts.append('categories.json')
             else:
                 reuse_parts.append('categories.json')
+
+            # TODO:
+            # if not hashid_parts['tracks'].get('json', None):
+            #     cids = sorted(self.index.tracks.keys())
+            #     cats_text = json_w.dumps(
+            #         [_ditems(self.index.tracks[cid]) for cid in cids])
+            #     hashid_parts['tracks']['json'] = ub.hash_data(
+            #         cats_text, hasher='sha512')
+            #     hashid_parts['tracks']['num'] = len(cids)
+            #     rebuild_parts.append('tracks.json')
+            # else:
+            #     reuse_parts.append('tracks.json')
 
         if verbose > 1:
             if reuse_parts:
@@ -3269,6 +3285,9 @@ class MixinCocoDraw:
             kwargs = xinspect.get_kwargs(kwcoco.CocoDataset.show_image)
             print(ub.urepr(list(kwargs.keys()), nl=1, si=1))
 
+        CommandLine:
+            xdoctest -m kwcoco.coco_dataset MixinCocoDraw.show_image --show
+
         Example:
             >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> import kwcoco
@@ -3525,7 +3544,7 @@ class MixinCocoDraw:
                 sseg_polys = list(ub.take(sseg_polys, sortx))
 
             poly_col = mpl.collections.PatchCollection(
-                sseg_polys, 2, alpha=0.4)
+                sseg_polys, match_original=True, alpha=0.4)
             ax.add_collection(poly_col)
 
         # Show all annotations inside it
@@ -4109,7 +4128,7 @@ class MixinCocoAddRemove:
 
     def clear_annotations(self):
         """
-        Removes all annotations (but not images and categories)
+        Removes all annotations and tracks (but not images and categories)
 
         Example:
             >>> import kwcoco
@@ -4119,9 +4138,11 @@ class MixinCocoAddRemove:
             n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8, n_tracks: 0
         """
         # self.dataset['annotations'].clear()
-        del self.dataset['annotations'][:]
+        self.dataset['annotations'].clear()
+        if 'tracks' in self.dataset:
+            self.dataset['tracks'].clear()
         self.index._remove_all_annotations()
-        self._invalidate_hashid(['annotations'])
+        self._invalidate_hashid(['annotations', 'tracks'])
 
     def remove_annotation(self, aid_or_ann):
         """
@@ -4861,9 +4882,12 @@ class CocoIndex:
                 _.clear()
             for _ in index.cid_to_aids.values():
                 _.clear()
-            for _ in index.trackid_to_aids.values():
-                _.clear()
+            # for _ in index.trackid_to_aids.values():
+            #     _.clear()
             index.anns.clear()
+            index.tracks.clear()
+            index.trackid_to_aids.clear()
+            index.name_to_track.clear()
 
     def _remove_all_images(index):
         # Keep the category indexes alive
@@ -5897,6 +5921,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # more pretty.
         try:
             if newlines:
+                # TODO: make this work faster!
                 text = util_special_json._special_kwcoco_pretty_dumps_orig(self.dataset)
             else:
                 # TODO: do main key sorting here as well
@@ -5932,6 +5957,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     if not arcname.endswith('.json'):
                         arcname = arcname + '.json'
         with zipfile.ZipFile(file, 'w', **zipkw) as zfile:
+            # It would be nice if we could dump directly to a binary
+            # encoded format here. Then we could use self.dump(zfile.open())
             text = self.dumps(indent=indent, newlines=newlines)
             zfile.writestr(arcname, text.encode('utf8'))
 

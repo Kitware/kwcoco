@@ -3,6 +3,7 @@ import kwimage
 import kwcoco
 from typing import List
 from ubelt.util_const import NoParamType
+import pathlib
 import ubelt as ub
 from _typeshed import Incomplete
 
@@ -110,11 +111,11 @@ class DetectionMetrics(ub.NiceRepr):
         ...
 
     def summarize(dmet,
-                  out_dpath: Incomplete | None = ...,
-                  plot: bool = ...,
-                  title: str = ...,
-                  with_bin: str = ...,
-                  with_ovr: str = ...):
+                  out_dpath: pathlib.Path | None = None,
+                  plot: bool = False,
+                  title: str = '',
+                  with_bin: str | bool = 'auto',
+                  with_ovr: str | bool = 'auto'):
         ...
 
 

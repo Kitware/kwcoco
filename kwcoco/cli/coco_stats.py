@@ -6,30 +6,31 @@ import scriptconfig as scfg
 class CocoStatsCLI:
     name = 'stats'
 
-    class CLIConfig(scfg.Config):
-        __command__ = 'stats'
+    class CLIConfig(scfg.DataConfig):
         """
         Compute summary statistics about a COCO dataset
         """
-        __default__ = {
-            'src': scfg.Value(['special:shapes8'], nargs='+', help='path to dataset', position=1),
-            'basic': scfg.Value(True, isflag=True, help='show basic stats'),
-            'extended': scfg.Value(True, isflag=True, help='show extended stats'),
-            'catfreq': scfg.Value(True, isflag=True, help='show category frequency stats'),
-            'boxes': scfg.Value(False, isflag=True, help=ub.paragraph(
+        __command__ = 'stats'
+
+        src = scfg.Value(['special:shapes8'], position=1, help='path to dataset', nargs='+')
+        basic = scfg.Value(True, isflag=True, help='show basic stats')
+        extended = scfg.Value(True, isflag=True, help='show extended stats')
+        catfreq = scfg.Value(True, isflag=True, help='show category frequency stats')
+        boxes = scfg.Value(False, isflag=True, help=ub.paragraph(
                 '''
                 show bounding box stats in width-height format.
-                ''')),
+                '''))
+        image_size = scfg.Value(False, isflag=True, help='show image size stats')
+        annot_attrs = scfg.Value(False, isflag=True, help='show annotation attribute information')
+        image_attrs = scfg.Value(False, isflag=True, help='show image attribute information')
+        video_attrs = scfg.Value(False, isflag=True, help='show video attribute information')
+        io_workers = scfg.Value(0, help=ub.paragraph(
+                '''
+                number of workers when reading multiple kwcoco files
+                '''))
+        embed = scfg.Value(False, isflag=True, help='embed into interactive shell')
 
-            'image_size': scfg.Value(False, isflag=True, help='show image size stats'),
-
-            'annot_attrs': scfg.Value(False, isflag=True, help='show annotation attribute information'),
-            'image_attrs': scfg.Value(False, isflag=True, help='show image attribute information'),
-            'video_attrs': scfg.Value(False, isflag=True, help='show video attribute information'),
-
-            'embed': scfg.Value(False, isflag=True, help='embed into interactive shell'),
-        }
-        epilog = """
+        __epilog__ = """
         Example Usage:
             kwcoco stats --src=special:shapes8
             kwcoco stats --src=special:shapes8 --boxes=True
@@ -46,12 +47,12 @@ class CocoStatsCLI:
         """
         import kwcoco
         import numpy as np
-        config = cls.CLIConfig(kw, cmdline=cmdline)
+        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
         try:
             from rich import print as rich_print
         except ImportError:
             rich_print = print
-        rich_print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        rich_print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
@@ -61,10 +62,7 @@ class CocoStatsCLI:
         else:
             fpaths = config['src']
 
-        datasets = []
-        for fpath in ub.ProgIter(fpaths, desc='reading datasets', verbose=1):
-            dset = kwcoco.CocoDataset.coerce(fpath)
-            datasets.append(dset)
+        datasets = list(kwcoco.CocoDataset.coerce_multiple(fpaths, workers=config.io_workers))
         print('Finished reading datasets')
 
         # hack dataset tags
@@ -81,7 +79,7 @@ class CocoStatsCLI:
             for dset in datasets:
                 print('dset = {!r}'.format(dset))
                 print('Category Heirarchy: ')
-                print(nx.forest_str(dset.object_categories().graph))
+                print(nx.write_network_text(dset.object_categories().graph))
         except Exception:
             pass
 

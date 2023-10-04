@@ -5,7 +5,7 @@ from typing import Any
 import kwimage
 import ubelt as ub
 
-from typing import Dict
+from kwcoco.coco_dataset import CocoDataset
 
 ObjT = Dict
 __docstubs__: str
@@ -13,26 +13,26 @@ __docstubs__: str
 
 class ObjectList1D(ub.NiceRepr):
 
-    def __init__(self, ids, dset, key) -> None:
+    def __init__(self, ids: List[int], dset: CocoDataset, key: str) -> None:
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
     def __iter__(self):
         ...
 
-    def __len__(self):
+    def __len__(self) -> int:
         ...
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int | slice) -> ObjectList1D | int:
         ...
 
     def unique(self) -> ObjectList1D:
         ...
 
     @property
-    def ids(self):
+    def ids(self) -> List[int]:
         ...
 
     @property
@@ -69,7 +69,7 @@ class ObjectList1D(ub.NiceRepr):
 
 class ObjectGroups(ub.NiceRepr):
 
-    def __init__(self, groups, dset) -> None:
+    def __init__(self, groups: List[ObjectList1D], dset: CocoDataset) -> None:
         ...
 
     def __getitem__(self, index):
@@ -78,13 +78,13 @@ class ObjectGroups(ub.NiceRepr):
     def lookup(self, key, default=...):
         ...
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         ...
 
 
 class Categories(ObjectList1D):
 
-    def __init__(self, ids, dset) -> None:
+    def __init__(self, ids: List[int], dset: CocoDataset) -> None:
         ...
 
     @property
@@ -102,17 +102,17 @@ class Categories(ObjectList1D):
 
 class Videos(ObjectList1D):
 
-    def __init__(self, ids, dset) -> None:
+    def __init__(self, ids: List[int], dset: CocoDataset) -> None:
         ...
 
     @property
-    def images(self):
+    def images(self) -> ImageGroups:
         ...
 
 
 class Images(ObjectList1D):
 
-    def __init__(self, ids, dset) -> None:
+    def __init__(self, ids: List[int], dset: CocoDataset) -> None:
         ...
 
     @property
@@ -144,25 +144,25 @@ class Images(ObjectList1D):
         ...
 
     @property
-    def area(self):
+    def area(self) -> List[float]:
         ...
 
     @property
-    def n_annots(self):
+    def n_annots(self) -> List[int]:
         ...
 
     @property
-    def aids(self):
+    def aids(self) -> List[set]:
         ...
 
     @property
-    def annots(self):
+    def annots(self) -> AnnotGroups:
         ...
 
 
 class Annots(ObjectList1D):
 
-    def __init__(self, ids, dset) -> None:
+    def __init__(self, ids: List[int], dset: CocoDataset) -> None:
         ...
 
     @property
@@ -224,7 +224,7 @@ class Annots(ObjectList1D):
 
 class Tracks(ObjectList1D):
 
-    def __init__(self, ids, dset) -> None:
+    def __init__(self, ids: List[int], dset: CocoDataset) -> None:
         ...
 
     @property

@@ -31,8 +31,9 @@ stages:
   before_script:
   - 'python -V  # Print out python version for debugging'
   script:
-  - python -m pip install setuptools>=0.8 wheel build
+  - python -m pip install setuptools>=0.8 wheel build twine
   - python -m build --wheel --outdir dist
+  - python -m twine check ./dist/kwcoco*.whl
   artifacts:
     paths:
     - ./dist/kwcoco*.whl

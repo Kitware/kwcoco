@@ -103,7 +103,7 @@ class CocoUnionCLI(object):
         print('Writing to out_fpath = {!r}'.format(out_fpath))
         combo.fpath = out_fpath
         dumpkw = {
-            'newlines': True,
+            # 'newlines': True,
             'compress': config.compress,
         }
         combo.dump(combo.fpath, **dumpkw)

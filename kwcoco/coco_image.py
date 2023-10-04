@@ -132,6 +132,10 @@ class CocoImage(_CocoObject):
         # TODO: ducktype with an object
         self._video = value
 
+    @property
+    def name(self):
+        return self['name']
+
     def detach(self):
         """
         Removes references to the underlying coco dataset, but keeps special
@@ -195,6 +199,7 @@ class CocoImage(_CocoObject):
             ('wh', 'dsize'),
             ('n_chan', 'num_channels'),
             ('channels', 'channels'),
+            ('name', 'name'),
         ]
         stats = {}
         for key, attrname in key_attrname:
@@ -202,6 +207,8 @@ class CocoImage(_CocoObject):
                 stats[key] = getattr(self, attrname)
             except Exception as ex:
                 stats[key] = repr(ex)
+        if 'channels' in stats:
+            stats['channels'] = stats['channels'].spec
         return stats
 
     def __contains__(self, key):

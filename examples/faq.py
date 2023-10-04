@@ -112,3 +112,43 @@ def what_order_are_images_returned_in():
     sample = sampler.load_sample(target)
     # Data is in the requested order
     assert sample['target']['gids'] == [gid2, gid3, gid1]
+
+
+def remap_category_ids_demo():
+    """
+    Q: Hey! I'm using kwcoco union to combine two kwcoco files. When I run it,
+    the category ids get shifted by 1.
+
+    A: Currently not with a single operation. To keep the implementation simple
+    I opted to always reassign category ids, and by convention with the
+    original mscoco spec I start ids at 1. However, a bit of post processing
+    can fix this.
+
+    It's also worth noting that the id's in each object are meant to be internal
+    and not used by an external program expecting persistence. So in code like
+    kwcoco eval, when I have to handle categories in two coco files, I use the
+    category names to build a mapping from category ids betwen the files.
+
+
+    A bit of custom code like this should help fix the issue.  As long as you
+    change ids in the core annotation and category dictionaries that should be
+    enough. Just be sure to rebuild the index after.
+    """
+
+    import kwcoco
+    dset = kwcoco.CocoDataset.demo()
+
+    existing_cids = dset.categories().lookup('id')
+    cid_mapping = {cid: cid + 100 for cid in existing_cids}
+
+    for cat in dset.dataset['categories']:
+        old_cid = cat['id']
+        new_cid = cid_mapping[old_cid]
+        cat['id'] = new_cid
+
+    for ann in dset.dataset['annotations']:
+        old_cid = ann['category_id']
+        new_cid = cid_mapping[old_cid]
+        ann['category_id'] = new_cid
+
+    dset._build_index()
