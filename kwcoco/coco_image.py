@@ -1003,8 +1003,11 @@ class CocoImage(_CocoObject):
             if requested is not None:
                 # Handle case where the image doesnt have the requested
                 # channels.
+                # TODO: We should use a NoData node instead that
+                # can switch between nans and masked images
                 from delayed_image import DelayedNans
                 from delayed_image import DelayedChannelConcat
+                # delayed = DelayedNodata(dsize=dsize, channels=requested, nodata_method=nodata_method)
                 delayed = DelayedNans(dsize=dsize, channels=requested)
                 delayed = DelayedChannelConcat([delayed])
             else:

@@ -152,3 +152,71 @@ def remap_category_ids_demo():
         ann['category_id'] = new_cid
 
     dset._build_index()
+
+
+def filter_images_by_attribute():
+    """
+    Question:
+        I have a coco dataset example video frame image:
+
+
+                In [149]: coco.imgs[10]
+                Out[149]:
+                {'id': 10,
+                 'file_name': 'images/frame_00001.png',
+                 'video_id': 1,
+                 'frame_index': 3,
+                 'gt': 0,
+                 'pred': 0,
+                 'conf': [0.455, 0.0126]}
+
+        There are multiple videos in the coco dataset. I can filter coco.imgs for indexes with the video_id "1" like this:
+
+            coco.index.vidid_to_gids[1]
+
+        Now, how do I filter coco.imgs for indexes with gt=0, using .index?
+
+    Ansswer:
+        Unfortunately it's going to be a linear operation (As the library
+        evolves it's sql support this might change), but typically there aren't
+        so many images where that is an issue. Just access the image
+        dictionaries directly..
+
+        Here are several ways to do it:
+    """
+    import kwcoco
+    import kwarray
+    dset = kwcoco.CocoDataset.demo('vidshapes2', num_frames=10)
+
+    # Add random attributes for the demo:
+    rng = kwarray.ensure_rng(0)
+    for img in dset.dataset['images']:
+        img['gt'] = rng.randint(0, 2)
+
+    # Option 1: Direct access
+    list_of_image_ids: list[int] = dset.index.vidid_to_gids[1]
+    filtered_image_ids: list[int] = []
+    for gid in list_of_image_ids:
+        img = dset.index.imgs[gid]
+        if img.get('gt', None) == 0:
+            filtered_image_ids.append(gid)
+
+    # Option 2: Using the vectorized API (which is really doing pretty much the
+    # same thing)
+    list_of_image_ids: list[int] = dset.index.vidid_to_gids[1]
+    images = dset.images(list_of_image_ids)
+    flags : list[bool] = [x == 0 for x in images.lookup('gt', default=None)]
+    filtered_images = images.compress(flags)
+
+    filtered_image_ids: list[int] = list(filtered_images)
+    filtered_image_dicts: list[dict] = filtered_images.objs
+
+    # Option 3: Using the vectorized API at the object level
+    list_of_image_ids: list[int] = dset.index.vidid_to_gids[1]
+    images = dset.images(list_of_image_ids)
+
+    filtered_image_dicts: list[dict] =  [img for img in images.objs if img.get('gt') == 0]
+    filtered_image_ids: list[int] = [img['id'] for img in filtered_image_dicts]
+
+    # Option 4: A 1 liner
+    filtered_image_ids: list[int] = [img['id'] for img in dset.videos(video_ids=[1]).images[0].objs if img['gt'] == 0]

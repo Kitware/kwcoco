@@ -4834,8 +4834,9 @@ class CocoIndex:
             try:
                 index.trackid_to_aids[tid].add(aid)
             except KeyError:
-                msg = 'Adding annotation to non-existing track'
-                warnings.warn(msg)
+                if tid is not None:
+                    msg = 'Adding annotation to non-existing track'
+                    warnings.warn(msg)
                 # Be careful to not apply sorting to trackless annotations
                 if tid is None:
                     index.trackid_to_aids[tid] = set()
