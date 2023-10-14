@@ -3638,7 +3638,11 @@ class MixinCocoAddRemove:
         video['id'] = id
         video['name'] = name
         video.update(**kw)
-        self.dataset['videos'].append(video)
+        try:
+            self.dataset['videos'].append(video)
+        except KeyError:
+            self.dataset['videos'] = []
+            self.dataset['videos'].append(video)
         self.index._add_video(id, video)
         # self._invalidate_hashid(['videos'])
         return id
@@ -3994,6 +3998,74 @@ class MixinCocoAddRemove:
         # And add to the indexes
         index._add_track(id, name, track)
         self._invalidate_hashid(['tracks'])
+        return id
+
+    def ensure_video(self, name, id=None, **kw):
+        """
+        Register a video if it is new or returns an existing id.
+
+        Like :func:`kwcoco.coco_dataset.MixinCocoAddRemove.add_video`, but
+        returns the existing video id if it already exists instead of failing.
+        In this case all metadata is ignored.
+
+        Args:
+            file_name (str): relative or absolute path to video
+            id (None | int): ADVANCED. Force using this video id.
+            **kw : stores arbitrary key/value pairs in this new video
+
+        Returns:
+            int: the existing or new video id
+
+        SeeAlso:
+            :func:`kwcoco.coco_dataset.MixinCocoAddRemove.add_video`
+            :func:`kwcoco.coco_dataset.MixinCocoAddRemove.ensure_video`
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> id1 = self.ensure_video('video1')
+            >>> id2 = self.ensure_video('video1')
+            >>> assert id1 == id2
+        """
+        try:
+            id = self.add_video(name=name, id=id, **kw)
+        except exceptions.DuplicateAddError:
+            obj = self.index.name_to_video[name]
+            id = obj['id']
+        return id
+
+    def ensure_track(self, name, id=None, **kw):
+        """
+        Register a track if it is new or returns an existing id.
+
+        Like :func:`kwcoco.coco_dataset.MixinCocoAddRemove.add_track`, but
+        returns the existing track id if it already exists instead of failing.
+        In this case all metadata is ignored.
+
+        Args:
+            file_name (str): relative or absolute path to track
+            id (None | int): ADVANCED. Force using this track id.
+            **kw : stores arbitrary key/value pairs in this new track
+
+        Returns:
+            int: the existing or new track id
+
+        SeeAlso:
+            :func:`kwcoco.coco_dataset.MixinCocoAddRemove.add_track`
+            :func:`kwcoco.coco_dataset.MixinCocoAddRemove.ensure_track`
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> track_id1 = self.ensure_track('dog')
+            >>> track_id2 = self.ensure_track('dog')
+            >>> assert track_id1 == track_id2
+        """
+        try:
+            id = self.add_track(name=name, id=id, **kw)
+        except exceptions.DuplicateAddError:
+            obj = self.index.name_to_track[name]
+            id = obj['id']
         return id
 
     def ensure_image(self, file_name, id=None, **kw):

@@ -207,6 +207,33 @@ class ObjectList1D(ub.NiceRepr):
         else:
             return self.get(key, default=default, keepid=keepid)
 
+    def sort_values(self, by, reverse=False, key=None):
+        """
+        Reorders the items by an attribute.
+
+        Args:
+            by (str):
+                The column attribute to sort by
+
+            key (Callable | None) :
+                Apply the key function to the values before sorting.
+
+        Returns:
+            ObjectList1D : copy of this object with new ids
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> self = dset.images()
+            >>> new = self.sort_values('frame_index')
+            >>> frame_idxs = new.lookup('frame_index')
+            >>> assert sorted(frame_idxs) == frame_idxs
+        """
+        attrs = self.lookup(by)
+        sortx = ub.argsort(attrs, reverse=reverse, key=key)
+        new = self.take(sortx)
+        return new
+
     def get(self, key, default=ub.NoParam, keepid=False):
         """
         Lookup a list of object attributes
