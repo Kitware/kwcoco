@@ -151,17 +151,26 @@ class CocoImage(_CocoObject):
         """
         return list(self.iter_assets())
 
-    @property
+    @ub.memoize_property
     def datetime(self):
         """
         Try to get datetime information for this image. Not always possible.
+
+        Returns:
+            datetime.datetime | None
         """
-        img = self.img
-        if 'timestamp' in img:
-            img['timestamp']
-        if 'date_captured' in img:
-            img['date_captured']
-        raise NotImplementedError
+        from kwutil import util_time
+        candidate_keys = [
+            'datetime',
+            'timestamp',
+            'date_captured'
+        ]
+        for k in candidate_keys:
+            v = self.img.get(k)
+            if v is not None:
+                return util_time.coerce_datetime(v)
+        raise KeyError(f'No keys {candidate_keys} to coerce datetime '
+                       'found in {list(self.img.keys())}')
 
     def annots(self):
         """

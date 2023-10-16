@@ -8,6 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.7.3 - Unreleased
 
 ### Added
+* Add `datetime` attribute to `CocoImage`.
 * Add `ensure_video` method to `CocoDataset`.
 * Add `ensure_track` method to `CocoDataset`.
 * Add `sort_values` method to `ObjectList1D` (and hence vectorized `Images` and `Annots` objects).
