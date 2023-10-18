@@ -188,6 +188,8 @@ def find_reroot_autofix(dset):
         for candidate in candidates:
             errors = _check_candidates(candidate, bundle_dpath, missing_gpaths, fastfail=False)
             rich.print('candidate prefix replacement = {}'.format(ub.urepr(candidate, nl=1)))
+            error1 = errors[0]
+            print('error1 = {}'.format(ub.urepr(error1, nl=1)))
             rich.print(f'[red] Had {len(errors)} / {len(missing_gpaths)} errors')
         raise RuntimeError('No candidate fixed all paths')
     return chosen
