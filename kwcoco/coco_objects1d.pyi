@@ -1,6 +1,7 @@
 from typing import List
 from typing import Iterable
 from typing import Dict
+from typing import Callable
 from typing import Any
 import kwimage
 import ubelt as ub
@@ -54,10 +55,16 @@ class ObjectList1D(ub.NiceRepr):
                keepid: bool = ...) -> Dict[str, ObjT]:
         ...
 
+    def sort_values(self,
+                    by: str,
+                    reverse: bool = ...,
+                    key: Callable | None = None) -> ObjectList1D:
+        ...
+
     def get(self,
             key: str,
             default=...,
-            keepid: bool = ...) -> Dict[str, ObjT]:
+            keepid: bool = ...) -> Dict[int, Any] | List[Any]:
         ...
 
     def set(self, key: str, values: Iterable | Any) -> None:
@@ -190,19 +197,19 @@ class Annots(ObjectList1D):
         ...
 
     @property
-    def cnames(self) -> List[int]:
+    def cnames(self) -> List[str]:
         ...
 
     @cnames.setter
-    def cnames(self, cnames) -> List[int]:
+    def cnames(self, cnames) -> List[str]:
         ...
 
     @property
-    def category_names(self) -> List[int]:
+    def category_names(self) -> List[str]:
         ...
 
     @category_names.setter
-    def category_names(self, names) -> List[int]:
+    def category_names(self, names) -> List[str]:
         ...
 
     @property

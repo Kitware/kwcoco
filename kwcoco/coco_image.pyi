@@ -1,3 +1,4 @@
+import datetime
 from typing import List
 import ubelt as ub
 from os import PathLike
@@ -68,8 +69,7 @@ class CocoImage(_CocoObject):
     def assets(self):
         ...
 
-    @property
-    def datetime(self) -> None:
+    def datetime(self) -> datetime.datetime | None:
         ...
 
     def annots(self) -> Annots:

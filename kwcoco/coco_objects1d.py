@@ -733,7 +733,7 @@ class Annots(ObjectList1D):
         Get the column of category names
 
         Returns:
-            List[int]
+            List[str]
         """
         # TODO: deprecate cnames and use category_names instead
         return [cat['name'] for cat in ub.take(self._dset.cats, self.cids)]
@@ -765,7 +765,7 @@ class Annots(ObjectList1D):
         Get the column of category names
 
         Returns:
-            List[int]
+            List[str]
         """
         return self.cnames
 
@@ -775,7 +775,7 @@ class Annots(ObjectList1D):
         Get the column of category names
 
         Returns:
-            List[int]
+            List[str]
         """
         self.cnames = names
 
