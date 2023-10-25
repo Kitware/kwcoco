@@ -287,6 +287,11 @@ class MixinCocoAccessors:
             >>> delayed = self.delayed_load(gid, channels='B8|foo|bar|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
         """
+        ub.schedule_deprecation(
+            'kwcoco', 'delayed_load', 'method',
+            migration='Use ".coco_image(gid).imdelay(...)" instead.',
+            deprecate='0.7.3', error='1.0.0', remove='1.1.0',
+        )
         coco_img = self.coco_image(gid)
         delayed = coco_img.imdelay(channels=channels, space=space)
         return delayed
@@ -2325,6 +2330,12 @@ class MixinCocoObjects:
         """
         if category_ids is None:
             category_ids = cids
+            if cids is not None:
+                ub.schedule_deprecation(
+                    'kwcoco', 'cids', 'argument of CocoDataset.categories',
+                    migration='Use "category_ids" instead.',
+                    deprecate='0.7.3', error='1.0.0', remove='1.1.0',
+                )
         if category_ids is None:
             category_ids = sorted(self.index.cats.keys())
         return Categories(category_ids, self)

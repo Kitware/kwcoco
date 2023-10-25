@@ -247,8 +247,7 @@ class ObjectList1D(ub.NiceRepr):
             keepid: if True, return a mapping from ids to the property
 
         Returns:
-            List[ObjT]: a list of whatever type the object is
-            Dict[str, ObjT]
+            Dict[int, Any] | List[Any]: a list of whatever type the object is
 
         Example:
             >>> import kwcoco
