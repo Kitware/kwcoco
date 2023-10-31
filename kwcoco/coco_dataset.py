@@ -884,7 +884,7 @@ class MixinCocoExtras:
             if result.scheme == 'sqlite' or result.path.endswith('.sqlite'):
                 from kwcoco.coco_sql_dataset import CocoSqlDatabase
                 self = CocoSqlDatabase(dset_fpath).connect()
-            elif result.path.endswith('.json') or '.json' in result.path:
+            elif result.path.endswith('.json') or '.json' in result.path or '.kwcoco' in result.path:
                 if sqlview:
                     from kwcoco.coco_sql_dataset import CocoSqlDatabase
                     kw['backend'] = sqlview
