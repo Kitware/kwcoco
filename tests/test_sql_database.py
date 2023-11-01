@@ -181,3 +181,12 @@ def test_coerce_sql_from_zipfile():
     assert isinstance(sql_dset2, kwcoco.CocoSqlDatabase)
 
     assert sql_dset2 is not sql_dset1
+
+    for sql_dset in [sql_dset1, sql_dset2]:
+        orig_coco_fpath = sql_dset._orig_coco_fpath()
+        assert orig_coco_fpath.exists()
+        assert orig_coco_fpath == dct_dset.fpath
+
+        hashid1 = sql_dset._cached_hashid()
+        hashid2 = dct_dset._cached_hashid
+        assert hashid1 == hashid2
