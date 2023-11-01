@@ -1328,9 +1328,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         import kwcoco
         import pathlib
         if isinstance(data, (str, pathlib.Path)):
-            import os
             data = os.fspath(data)
-            if data.endswith('.json'):
+            basename = os.path.basename(data)
+            if basename.endswith('.json') or '.kwcoco' in basename:
                 dct_db_fpath = data
                 self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath,
                                             backend=backend)
@@ -1636,7 +1636,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
                     item_['_bbox_w'] = w
                     item_['_bbox_h'] = h
                 row = cls(**item_)
-                print(f'row={row}')
+                # print(f'row={row}')
                 session.add(row)
 
                 if next(counter) % batch_size == 0:

@@ -72,6 +72,7 @@ def test_api_compatability_msi_ooo_tracks():
     for image_id in image_ids:
         dct_dset.add_annotation(**{'image_id': image_id, 'track_id': 9001, 'bbox': [0, 0, 10, 10]})
 
+    dct_dset = kwcoco.CocoDataset.demo('vidshapes8-multisensor-msi')
     dct_dset.fpath = ub.Path(dct_dset.fpath).augment(stemsuffix='_with_ooo_tracks', multidot=True)
     dct_dset.dump()
     dct_dset = kwcoco.CocoDataset(dct_dset.fpath)
@@ -154,3 +155,29 @@ def _api_compatability_tests(dct_dset):
     print('results = {}'.format(ub.urepr(results, nl=2)))
     for a, b in ub.iter_window(results.values(), 2):
         assert ub.IndexableWalker(a).allclose(b)
+
+
+def test_coerce_sql_from_zipfile():
+    """
+    Check that kwcoco.CocoDataset.coerce(., sqlview='sqlite') correctly
+    converts zip files as well as json files.
+    """
+    import kwcoco
+    import ubelt as ub
+    dpath = ub.Path.appdir('kwcoco/tests/test_coerce_sql_from_zipfile')
+    dpath.delete().ensuredir()
+    dct_dset = kwcoco.CocoDataset.demo('vidshapes8-multisensor-msi')
+    dct_dset.fpath = dpath / 'data.kwcoco.zip'
+    dct_dset.dump()
+    import zipfile
+    assert zipfile.is_zipfile(dct_dset.fpath)
+
+    # Initial coerce should do conversion
+    sql_dset1 = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='sqlite')
+    assert isinstance(sql_dset1, kwcoco.CocoSqlDatabase)
+
+    # Subsequenct coerce should read from cache
+    sql_dset2 = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='sqlite')
+    assert isinstance(sql_dset2, kwcoco.CocoSqlDatabase)
+
+    assert sql_dset2 is not sql_dset1
