@@ -188,5 +188,5 @@ def test_coerce_sql_from_zipfile():
         assert orig_coco_fpath == dct_dset.fpath
 
         hashid1 = sql_dset._cached_hashid()
-        hashid2 = dct_dset._cached_hashid
+        hashid2 = dct_dset._cached_hashid()
         assert hashid1 == hashid2
