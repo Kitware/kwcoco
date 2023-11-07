@@ -20,7 +20,7 @@ class CocoConformCLI:
 
         __command__ = 'conform'
 
-        epilog = """
+        __epilog__ = """
         Example Usage:
             kwcoco conform --help
             kwcoco conform --src=special:shapes8 --dst conformed.json
