@@ -48,7 +48,9 @@ TODO:
 
     - [ ] Allow parts of the kwcoco file to be references to other json files.
 
-    - [ ] Add top-level track table (in progress)
+    - [X] Add top-level track table
+
+    - [ ] Fully transition to integer track ids (in progress)
 
 References:
     .. [CocoFormat] http://cocodataset.org/#format-data
