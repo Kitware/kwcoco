@@ -6,7 +6,7 @@ import scriptconfig as scfg
 class CocoConformCLI:
     name = 'conform'
 
-    class CLIConfig(scfg.Config):
+    class CLIConfig(scfg.DataConfig):
         """
         Infer properties to make the COCO file conform to different specs.
 
@@ -17,45 +17,51 @@ class CocoConformCLI:
         Other arguments like ``--legacy`` and ``--mmlab`` can be used to
         conform to specifications expected by external tooling.
         """
+
+        __command__ = 'conform'
+
         epilog = """
         Example Usage:
             kwcoco conform --help
             kwcoco conform --src=special:shapes8 --dst conformed.json
             kwcoco conform special:shapes8 conformed.json
         """
-        __default__ = {
-            'src': scfg.Value(None, help=(
-                'the path to the input coco dataset'),
-                position=1,
-                # FIXME: required is broken with --help
-            ),
 
-            'dst': scfg.Value(None, help=(
-                'the location to save the output dataset.'),
-                position=2,
-            ),
+        src = scfg.Value(None, position=1, help='the path to the input coco dataset')
+        # FIXME: required is broken with --help
 
-            'ensure_imgsize': scfg.Value(True, help=ub.paragraph(
+        dst = scfg.Value(None, position=2, help='the location to save the output dataset.')
+
+        ensure_imgsize = scfg.Value(True, help=ub.paragraph(
                 '''
                 ensure each image has height and width attributes
-                ''')),
+                '''))
 
-            'pycocotools_info': scfg.Value(True, help=ub.paragraph(
+        pycocotools_info = scfg.Value(True, help=ub.paragraph(
                 '''
                 ensure information needed for pycocotools
-                ''')),
+                '''))
 
-            'legacy': scfg.Value(False, help='if True tries to convert to the '
-                                 'original ms-coco format'),
+        legacy = scfg.Value(False, help=ub.paragraph(
+                '''
+                if True tries to convert to the original ms-coco format
+                '''))
 
-            'mmlab': scfg.Value(False, help='if True tries to convert data '
-                                'to be compatible with open-mmlab tooling'),
+        mmlab = scfg.Value(False, help=ub.paragraph(
+                '''
+                if True tries to convert data to be compatible with open-
+                mmlab tooling
+                '''))
 
-            'compress': scfg.Value('auto', help='if True writes results with compression'),
+        compress = scfg.Value('auto', help='if True writes results with compression')
 
-            'workers': scfg.Value(
-                8, help='number of background workers used for IO bound checks'),
-        }
+        workers = scfg.Value(8, help=ub.paragraph(
+                '''
+                number of background workers used for IO bound checks
+                '''))
+
+        inplace = scfg.Value(False, isflag=True, help=(
+            'if True and dst is unspecified then the output will overwrite the input'))
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -79,7 +85,10 @@ class CocoConformCLI:
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
         if config['dst'] is None:
-            raise Exception('must specify dest: {}'.format(config['dst']))
+            if config['inplace']:
+                config['dst'] = config['src']
+            else:
+                raise ValueError('must specify dst: {}'.format(config['dst']))
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 

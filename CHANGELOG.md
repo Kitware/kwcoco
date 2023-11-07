@@ -12,6 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add `ensure_video` method to `CocoDataset`.
 * Add `ensure_track` method to `CocoDataset`.
 * Add `sort_values` method to `ObjectList1D` (and hence vectorized `Images` and `Annots` objects).
+* Add `--inplace` to `kwcoco conform`.
 
 ### Fixed
 * kwcoco.Coerce with sqlview now works for .kwcoco.zip files.
