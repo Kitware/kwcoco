@@ -289,7 +289,7 @@ For more information on the "warp" transforms see `warping_and_spaces <docs/sour
 
 A high level overview of the structure - entities and their relationships - is shown in the following overview slide:
 
-.. image:: https://i.imgur.com/NbShgtF.png
+.. image:: https://i.imgur.com/YBIMOWM.png
 
 
 The CocoDatset API Grouped by Functinoality
