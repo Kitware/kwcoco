@@ -172,23 +172,41 @@ def find_reroot_autofix(dset):
 
         # Check that the fix fixes everything or dont do it.
         for candidate in candidates:
-            old_pref = os.fspath(candidate['old_prefix'])
-            new_pref = os.fspath(candidate['new_prefix'])
-
-            any_missing = False
-            for gpath in missing_gpaths:
-                new_gpath = bundle_dpath / ub.Path(os.fspath(gpath).replace(old_pref, new_pref))
-                if not new_gpath.exists():
-                    any_missing = True
-                    break
-
-            if any_missing:
-                continue
-            chosen = candidate
+            try:
+                _check_candidates(
+                    candidate, bundle_dpath, missing_gpaths, fastfail=True)
+            except FileNotFoundError:
+                ...
+            else:
+                chosen = candidate
+                break
 
     if not chosen:
+        import rich
+        rich.print('[red]ERROR: No candidate fixed all paths')
+        # Give the user more info
+        for candidate in candidates:
+            errors = _check_candidates(candidate, bundle_dpath, missing_gpaths, fastfail=False)
+            rich.print('candidate prefix replacement = {}'.format(ub.urepr(candidate, nl=1)))
+            error1 = errors[0]
+            print('error1 = {}'.format(ub.urepr(error1, nl=1)))
+            rich.print(f'[red] Had {len(errors)} / {len(missing_gpaths)} errors')
         raise RuntimeError('No candidate fixed all paths')
     return chosen
+
+
+def _check_candidates(candidate, bundle_dpath, missing_gpaths, fastfail=True):
+    import os
+    errors = []
+    old_pref = os.fspath(candidate['old_prefix'])
+    new_pref = os.fspath(candidate['new_prefix'])
+    for gpath in missing_gpaths:
+        new_gpath = bundle_dpath / ub.Path(os.fspath(gpath).replace(old_pref, new_pref))
+        if not new_gpath.exists():
+            errors.append(gpath)
+            if fastfail:
+                raise FileNotFoundError
+    return errors
 
 
 _CLI = CocoRerootCLI

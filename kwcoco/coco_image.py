@@ -151,17 +151,26 @@ class CocoImage(_CocoObject):
         """
         return list(self.iter_assets())
 
-    @property
+    @ub.memoize_property
     def datetime(self):
         """
         Try to get datetime information for this image. Not always possible.
+
+        Returns:
+            datetime.datetime | None
         """
-        img = self.img
-        if 'timestamp' in img:
-            img['timestamp']
-        if 'date_captured' in img:
-            img['date_captured']
-        raise NotImplementedError
+        from kwutil import util_time
+        candidate_keys = [
+            'datetime',
+            'timestamp',
+            'date_captured'
+        ]
+        for k in candidate_keys:
+            v = self.img.get(k)
+            if v is not None:
+                return util_time.coerce_datetime(v)
+        raise KeyError(f'No keys {candidate_keys} to coerce datetime '
+                       'found in {list(self.img.keys())}')
 
     def annots(self):
         """
@@ -300,6 +309,19 @@ class CocoImage(_CocoObject):
             # return ChannelSpec.coerce('*')
         spec = ChannelSpec(','.join(img_parts))
         return spec
+
+    @property
+    def n_assets(self):
+        """
+        The number of on-disk files associated with this coco image
+        """
+        # Hacked because we have too many ways of having assets right now
+        # really need a single assets table.
+        has_main = int(self.get('file_name', None) is not None)
+        num_group1 = len(self.img.get('assets', None) or [])
+        num_group2 = len(self.img.get('auxiliary', None) or [])
+        total = has_main + num_group1 + num_group2
+        return total
 
     @property
     def num_channels(self):
@@ -1003,8 +1025,11 @@ class CocoImage(_CocoObject):
             if requested is not None:
                 # Handle case where the image doesnt have the requested
                 # channels.
+                # TODO: We should use a NoData node instead that
+                # can switch between nans and masked images
                 from delayed_image import DelayedNans
                 from delayed_image import DelayedChannelConcat
+                # delayed = DelayedNodata(dsize=dsize, channels=requested, nodata_method=nodata_method)
                 delayed = DelayedNans(dsize=dsize, channels=requested)
                 delayed = DelayedChannelConcat([delayed])
             else:

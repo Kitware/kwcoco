@@ -1328,9 +1328,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         import kwcoco
         import pathlib
         if isinstance(data, (str, pathlib.Path)):
-            import os
             data = os.fspath(data)
-            if data.endswith('.json'):
+            basename = os.path.basename(data)
+            if basename.endswith('.json') or '.kwcoco' in basename:
                 dct_db_fpath = data
                 self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath,
                                             backend=backend)
@@ -1636,7 +1636,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
                     item_['_bbox_w'] = w
                     item_['_bbox_h'] = h
                 row = cls(**item_)
-                print(f'row={row}')
+                # print(f'row={row}')
                 session.add(row)
 
                 if next(counter) % batch_size == 0:
@@ -1943,14 +1943,37 @@ class CocoSqlDatabase(AbstractCocoDataset,
         naming is handled elsewhere. There should be centralized logic about
         how to construct side-car names that can be queried for inversed like
         this.
+
+        Returns:
+            ub.Path | None
         """
         # view_fpath = ub.Path(self.fpath)
         view_fpath = _handle_sql_uri(self.fpath)['parsed'].path
         view_fpath = ub.Path(view_fpath)
         if '.view' not in view_fpath.name:
             raise ValueError('We are assuming this is a view of an existing json file')
-        orig_fname = view_fpath.name[1:].split('.view')[0] + '.json'
-        coco_fpath = view_fpath.parent / orig_fname
+
+        # TODO: implement a more robust method for remembering what the
+        # original json or zip path to this sqlview is.
+        candidate_fnames = [
+            view_fpath.name[1:].split('.view')[0] + '.json',
+            view_fpath.name[1:].split('.view')[0] + '.zip',
+        ]
+        coco_fpath = None
+        for cand_fname in candidate_fnames:
+            cand_fpath = view_fpath.parent / cand_fname
+            if cand_fpath.exists():
+                coco_fpath = cand_fpath
+                break
+        if coco_fpath is None:
+            import warnings
+            warnings.warn(ub.paragraph(
+                f'''
+                Requested _orig_coco_fpath for {self} with a sqlview path of
+                {view_fpath} but no candidate json or zip path seems to exist.
+                Returning None instead. This may lead to unexpected behavior.
+                We may replace this warning with an error in the future.
+                '''))
         return coco_fpath
 
     def _cached_hashid(self):

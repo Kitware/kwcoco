@@ -207,6 +207,33 @@ class ObjectList1D(ub.NiceRepr):
         else:
             return self.get(key, default=default, keepid=keepid)
 
+    def sort_values(self, by, reverse=False, key=None):
+        """
+        Reorders the items by an attribute.
+
+        Args:
+            by (str):
+                The column attribute to sort by
+
+            key (Callable | None) :
+                Apply the key function to the values before sorting.
+
+        Returns:
+            ObjectList1D : copy of this object with new ids
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> self = dset.images()
+            >>> new = self.sort_values('frame_index')
+            >>> frame_idxs = new.lookup('frame_index')
+            >>> assert sorted(frame_idxs) == frame_idxs
+        """
+        attrs = self.lookup(by)
+        sortx = ub.argsort(attrs, reverse=reverse, key=key)
+        new = self.take(sortx)
+        return new
+
     def get(self, key, default=ub.NoParam, keepid=False):
         """
         Lookup a list of object attributes
@@ -220,8 +247,7 @@ class ObjectList1D(ub.NiceRepr):
             keepid: if True, return a mapping from ids to the property
 
         Returns:
-            List[ObjT]: a list of whatever type the object is
-            Dict[str, ObjT]
+            Dict[int, Any] | List[Any]: a list of whatever type the object is
 
         Example:
             >>> import kwcoco
@@ -707,7 +733,7 @@ class Annots(ObjectList1D):
         Get the column of category names
 
         Returns:
-            List[int]
+            List[str]
         """
         # TODO: deprecate cnames and use category_names instead
         return [cat['name'] for cat in ub.take(self._dset.cats, self.cids)]
@@ -739,7 +765,7 @@ class Annots(ObjectList1D):
         Get the column of category names
 
         Returns:
-            List[int]
+            List[str]
         """
         return self.cnames
 
@@ -749,7 +775,7 @@ class Annots(ObjectList1D):
         Get the column of category names
 
         Returns:
-            List[int]
+            List[str]
         """
         self.cnames = names
 

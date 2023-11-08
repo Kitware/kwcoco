@@ -48,7 +48,9 @@ TODO:
 
     - [ ] Allow parts of the kwcoco file to be references to other json files.
 
-    - [ ] Add top-level track table (in progress)
+    - [X] Add top-level track table
+
+    - [ ] Fully transition to integer track ids (in progress)
 
 References:
     .. [CocoFormat] http://cocodataset.org/#format-data
@@ -287,6 +289,11 @@ class MixinCocoAccessors:
             >>> delayed = self.delayed_load(gid, channels='B8|foo|bar|B1', space='video')
             >>> print('delayed = {!r}'.format(delayed))
         """
+        ub.schedule_deprecation(
+            'kwcoco', 'delayed_load', 'method',
+            migration='Use ".coco_image(gid).imdelay(...)" instead.',
+            deprecate='0.7.3', error='1.0.0', remove='1.1.0',
+        )
         coco_img = self.coco_image(gid)
         delayed = coco_img.imdelay(channels=channels, space=space)
         return delayed
@@ -879,7 +886,7 @@ class MixinCocoExtras:
             if result.scheme == 'sqlite' or result.path.endswith('.sqlite'):
                 from kwcoco.coco_sql_dataset import CocoSqlDatabase
                 self = CocoSqlDatabase(dset_fpath).connect()
-            elif result.path.endswith('.json') or '.json' in result.path:
+            elif result.path.endswith('.json') or '.json' in result.path or '.kwcoco' in result.path:
                 if sqlview:
                     from kwcoco.coco_sql_dataset import CocoSqlDatabase
                     kw['backend'] = sqlview
@@ -2325,6 +2332,12 @@ class MixinCocoObjects:
         """
         if category_ids is None:
             category_ids = cids
+            if cids is not None:
+                ub.schedule_deprecation(
+                    'kwcoco', 'cids', 'argument of CocoDataset.categories',
+                    migration='Use "category_ids" instead.',
+                    deprecate='0.7.3', error='1.0.0', remove='1.1.0',
+                )
         if category_ids is None:
             category_ids = sorted(self.index.cats.keys())
         return Categories(category_ids, self)
@@ -3638,7 +3651,11 @@ class MixinCocoAddRemove:
         video['id'] = id
         video['name'] = name
         video.update(**kw)
-        self.dataset['videos'].append(video)
+        try:
+            self.dataset['videos'].append(video)
+        except KeyError:
+            self.dataset['videos'] = []
+            self.dataset['videos'].append(video)
         self.index._add_video(id, video)
         # self._invalidate_hashid(['videos'])
         return id
@@ -3994,6 +4011,74 @@ class MixinCocoAddRemove:
         # And add to the indexes
         index._add_track(id, name, track)
         self._invalidate_hashid(['tracks'])
+        return id
+
+    def ensure_video(self, name, id=None, **kw):
+        """
+        Register a video if it is new or returns an existing id.
+
+        Like :func:`kwcoco.coco_dataset.MixinCocoAddRemove.add_video`, but
+        returns the existing video id if it already exists instead of failing.
+        In this case all metadata is ignored.
+
+        Args:
+            file_name (str): relative or absolute path to video
+            id (None | int): ADVANCED. Force using this video id.
+            **kw : stores arbitrary key/value pairs in this new video
+
+        Returns:
+            int: the existing or new video id
+
+        SeeAlso:
+            :func:`kwcoco.coco_dataset.MixinCocoAddRemove.add_video`
+            :func:`kwcoco.coco_dataset.MixinCocoAddRemove.ensure_video`
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> id1 = self.ensure_video('video1')
+            >>> id2 = self.ensure_video('video1')
+            >>> assert id1 == id2
+        """
+        try:
+            id = self.add_video(name=name, id=id, **kw)
+        except exceptions.DuplicateAddError:
+            obj = self.index.name_to_video[name]
+            id = obj['id']
+        return id
+
+    def ensure_track(self, name, id=None, **kw):
+        """
+        Register a track if it is new or returns an existing id.
+
+        Like :func:`kwcoco.coco_dataset.MixinCocoAddRemove.add_track`, but
+        returns the existing track id if it already exists instead of failing.
+        In this case all metadata is ignored.
+
+        Args:
+            file_name (str): relative or absolute path to track
+            id (None | int): ADVANCED. Force using this track id.
+            **kw : stores arbitrary key/value pairs in this new track
+
+        Returns:
+            int: the existing or new track id
+
+        SeeAlso:
+            :func:`kwcoco.coco_dataset.MixinCocoAddRemove.add_track`
+            :func:`kwcoco.coco_dataset.MixinCocoAddRemove.ensure_track`
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> track_id1 = self.ensure_track('dog')
+            >>> track_id2 = self.ensure_track('dog')
+            >>> assert track_id1 == track_id2
+        """
+        try:
+            id = self.add_track(name=name, id=id, **kw)
+        except exceptions.DuplicateAddError:
+            obj = self.index.name_to_track[name]
+            id = obj['id']
         return id
 
     def ensure_image(self, file_name, id=None, **kw):
@@ -4834,8 +4919,9 @@ class CocoIndex:
             try:
                 index.trackid_to_aids[tid].add(aid)
             except KeyError:
-                msg = 'Adding annotation to non-existing track'
-                warnings.warn(msg)
+                if tid is not None:
+                    msg = 'Adding annotation to non-existing track'
+                    warnings.warn(msg)
                 # Be careful to not apply sorting to trackless annotations
                 if tid is None:
                     index.trackid_to_aids[tid] = set()

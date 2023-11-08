@@ -65,7 +65,10 @@ class CocoModifyCatsCLI:
 
         import networkx as nx
         print('Input Categories:')
-        print(nx.forest_str(dset.object_categories().graph))
+        try:
+            print(nx.forest_str(dset.object_categories().graph))
+        except AttributeError:
+            print(nx.write_network_text(dset.object_categories().graph))
 
         if config['rename'] is not None:
             # parse rename string
@@ -98,7 +101,10 @@ class CocoModifyCatsCLI:
                 remove_cids, keep_annots=config['keep_annots'], verbose=1)
 
         print('Output Categories: ')
-        print(nx.forest_str(dset.object_categories().graph))
+        try:
+            print(nx.forest_str(dset.object_categories().graph))
+        except AttributeError:
+            print(nx.write_network_text(dset.object_categories().graph))
 
         if config['dst'] is None:
             print('dry run')

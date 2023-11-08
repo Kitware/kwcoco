@@ -167,7 +167,6 @@ class CocoInfoCLI(scfg.DataConfig):
         fpath = ub.Path(config.src)
 
         sentinel = object()
-
         _cocofile = CocoFileHelper(fpath)
         try:
             file = _cocofile._open()
