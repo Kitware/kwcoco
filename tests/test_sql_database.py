@@ -162,6 +162,9 @@ def test_coerce_sql_from_zipfile():
     Check that kwcoco.CocoDataset.coerce(., sqlview='sqlite') correctly
     converts zip files as well as json files.
     """
+    import pytest
+    if not have_sqlalchemy():
+        pytest.skip('requires sqlalchemy')
     import kwcoco
     import ubelt as ub
     dpath = ub.Path.appdir('kwcoco/tests/test_coerce_sql_from_zipfile')
