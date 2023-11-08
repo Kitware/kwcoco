@@ -79,7 +79,7 @@ class CocoConformCLI:
         """
         import kwcoco
 
-        config = cls.CLIConfig(kw, cmdline=cmdline)
+        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:

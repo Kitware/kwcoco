@@ -129,7 +129,7 @@ class CocoValidateCLI:
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        config = cls.CLIConfig.cli(kw, cmdline=cmdline, strict=True)
+        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
