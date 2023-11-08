@@ -66,9 +66,6 @@ The `kwcoco <https://pypi.org/project/kwcoco/>`_.  package can be installed via 
     # From pypi
     pip install kwcoco
 
-    # From gitlab
-    pip install git+https://gitlab.kitware.com/computer-vision/kwcoco@main
-
 
 
 Feature Overview
@@ -181,14 +178,16 @@ Python, this data structure is reasonably efficient.
         >>> import kwcoco
         >>> import json
         >>> # Create demo data
-        >>> demo = CocoDataset.demo()
+        >>> demo = kwcoco.CocoDataset.demo()
+        >>> # Modify it such that all paths are absolute wrt to your machine
+        >>> demo.reroot(absolute=True)
         >>> # could also use demo.dump / demo.dumps, but this is more explicit
         >>> text = json.dumps(demo.dataset)
         >>> with open('demo.json', 'w') as file:
         >>>    file.write(text)
 
         >>> # Read from disk
-        >>> self = CocoDataset('demo.json')
+        >>> self = kwcoco.CocoDataset('demo.json')
 
         >>> # Add data
         >>> cid = self.add_category('Cat')
@@ -462,10 +461,10 @@ a coco file using process similar to the following code:
         # One quirk of the coco format is you need to be aware that
         # boxes are in <top-left-x, top-left-y, width-w, height-h> format.
         box = annot['box']
-        # Use kwimage.Boxes to preform quick, reliable, and readable
+        # Use kwimage.Box to preform quick, reliable, and readable
         # conversions between common bounding box formats.
-        tlbr = [box['tl_x'], box['tl_y'], box['br_x'], box['br_y']]
-        xywh = kwimage.Boxes([tlbr], 'tlbr').toformat('xywh').data[0].tolist()
+        ltrb = [box['tl_x'], box['tl_y'], box['br_x'], box['br_y']]
+        xywh = kwimage.Box.coerce(ltrb, format='ltrb').to_coco()
         my_dset.add_annotation(bbox=xywh, image_id=img['id'], category_id=cat['id'])
 
     # Dump the underlying json `dataset` object to a file
@@ -508,7 +507,7 @@ parent space --- i.e. an auxiliary/asset item needs to know how to be
 transformed into image space, and an image needs to know how to be transformed
 into video space (if applicable). This warping can be as simple as a scale
 factor or as complex as a full homography matrix (and we may generalize beyond
-this), and is specified via the `TransformSpec`. When this transform is
+this), and is specified via the ``TransformSpec``. When this transform is
 unspecified it is assumed to be the identity transform, so for pre-aligned
 datasets, the user does not need to worry about the differentiation between
 spaces and simply work in "image space".
