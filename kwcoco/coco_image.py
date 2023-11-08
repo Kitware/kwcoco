@@ -311,6 +311,19 @@ class CocoImage(_CocoObject):
         return spec
 
     @property
+    def n_assets(self):
+        """
+        The number of on-disk files associated with this coco image
+        """
+        # Hacked because we have too many ways of having assets right now
+        # really need a single assets table.
+        has_main = int(self.get('file_name', None) is not None)
+        num_group1 = len(self.img.get('assets', None) or [])
+        num_group2 = len(self.img.get('auxiliary', None) or [])
+        total = has_main + num_group1 + num_group2
+        return total
+
+    @property
     def num_channels(self):
         return self.channels.numel()
         # return sum(map(len, self.channels.streams()))
