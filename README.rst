@@ -287,6 +287,10 @@ For a formal description of the spec see the  `kwcoco/coco_schema.json <kwcoco/c
 
 For more information on the "warp" transforms see `warping_and_spaces <docs/source/concepts/warping_and_spaces.rst>`_.
 
+A high level overview of the structure - entities and their relationships - is shown in the following overview slide:
+
+.. image:: https://i.imgur.com/NbShgtF.png
+
 
 The CocoDatset API Grouped by Functinoality
 -------------------------------------------
