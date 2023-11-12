@@ -21,6 +21,9 @@ else:
     OrderedDiGraph = nx.DiGraph
 
 
+RESPECT_INPUT_ORDER = 1
+
+
 class CategoryTree(ub.NiceRepr):
     """
     Wrapper that maintains flat or hierarchical category information.
@@ -560,8 +563,78 @@ class CategoryTree(ub.NiceRepr):
         """
         return self.node_to_idx[node]
 
+    def take(self, indexes):
+        """
+        Create a subgraph based on the selected class indexes
+
+        Ignore:
+            >>> self = CategoryTree.from_mutex(['c', 'b', 'a', 'd'])
+            >>> print(f'self.idx_to_node={self.idx_to_node}')
+            >>> indexes = [1, 0, 2, 3]
+            >>> print()
+        """
+        subnodes = list(ub.take(self.idx_to_node, indexes))
+        return self.subgraph(subnodes)
+
+    def subgraph(self, subnodes, closure=True):
+        """
+        Create a subgraph based on the selected class nodes (i.e. names)
+
+        Example:
+            >>> self = CategoryTree.from_coco([
+            >>>     {'id': 130, 'name': 'n3', 'supercategory': 'n1'},
+            >>>     {'id': 410, 'name': 'n1', 'supercategory': None},
+            >>>     {'id': 640, 'name': 'n4', 'supercategory': 'n3'},
+            >>>     {'id': 220, 'name': 'n2', 'supercategory': 'n1'},
+            >>>     {'id': 560, 'name': 'n6', 'supercategory': 'n2'},
+            >>>     {'id': 350, 'name': 'n5', 'supercategory': 'n2'},
+            >>> ])
+            >>> self.print_graph()
+            >>> subnodes = ['n3', 'n6', 'n4', 'n1']
+            >>> new1 = self.subgraph(subnodes, closure=1)
+            >>> new1.print_graph()
+            ...
+            >>> print('new1.idx_to_id = {}'.format(ub.urepr(new1.idx_to_id, nl=0)))
+            >>> print('new1.idx_to_node = {}'.format(ub.urepr(new1.idx_to_node, nl=0)))
+            new1.idx_to_id = [130, 560, 640, 410]
+            new1.idx_to_node = ['n3', 'n6', 'n4', 'n1']
+
+            >>> indexes = [2, 1, 0, 5]
+            >>> new2 = self.take(indexes)
+            >>> new2.print_graph()
+            ...
+            >>> print('new2.idx_to_id = {}'.format(ub.urepr(new2.idx_to_id, nl=0)))
+            >>> print('new2.idx_to_node = {}'.format(ub.urepr(new2.idx_to_node, nl=0)))
+            new2.idx_to_id = [640, 410, 130, 350]
+            new2.idx_to_node = ['n4', 'n1', 'n3', 'n5']
+
+            >>> subnodes = ['n3', 'n6', 'n4', 'n1']
+            >>> new3 = self.subgraph(subnodes, closure=0)
+            >>> new3.print_graph()
+        """
+        assert RESPECT_INPUT_ORDER, 'subgraph requires new input order logic'
+        new_graph  = self.graph.__class__()
+        for node in subnodes:
+            node_data = self.graph.nodes[node]
+            new_graph.add_node(node, **node_data)
+        if closure:
+            nbunch = set(subnodes)
+            graph_closure = nx.transitive_closure(self.graph)
+            subgraph_closure = graph_closure.subgraph(subnodes)
+            subgraph_reduction = nx.transitive_reduction(subgraph_closure)
+            for u, v, edge_data in subgraph_reduction.edges(nbunch=subnodes, data=True):
+                if u in nbunch and v in nbunch:
+                    new_graph.add_edge(u, v, **edge_data)
+        else:
+            for u, v, edge_data in self.graph.edges(nbunch=subnodes, data=True):
+                new_graph.add_edge(u, v, **edge_data)
+        new = self.__class__(new_graph)
+        return new
+
     def _build_index(self):
-        """ construct lookup tables """
+        """
+        construct lookup tables
+        """
         # Most of the categories should have been given integer ids
         max_id = max(it.chain([0], nx.get_node_attributes(self.graph, 'id').values()))
 
@@ -581,8 +654,17 @@ class CategoryTree(ub.NiceRepr):
             max_id = max(max_id, node_to_id[node])
         id_to_node = ub.invert_dict(node_to_id)
 
-        # Compress ids into a flat index space (sorted by node ids)
-        idx_to_node = ub.argsort(node_to_id)
+        if RESPECT_INPUT_ORDER:
+            # list(self.graph.nodes.items())
+            if isinstance(self.graph, OrderedDiGraph):
+                idx_to_node = list(self.graph.nodes)
+            else:
+                idx_to_node = ub.argsort(node_to_id)
+        else:
+            # TODO: respect user-given ordering over sorting by ids
+            # Compress ids into a flat index space (sorted by node ids)
+            idx_to_node = ub.argsort(node_to_id)
+
         node_to_idx = {node: idx for idx, node in enumerate(idx_to_node)}
 
         # Find the sets of nodes that need to be softmax-ed together
