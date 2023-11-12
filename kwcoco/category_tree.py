@@ -709,8 +709,11 @@ class CategoryTree(ub.NiceRepr):
 
     def print_graph(self):
         import networkx as nx
-        text = nx.write_network_text(self.graph)
-        return text
+        try:
+            nx.write_network_text(self.graph)
+        except AttributeError:
+            from kwcoco.util import util_networkx
+            util_networkx.write_network_text(self.graph)
 
     def normalize(self):
         """
