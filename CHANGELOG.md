@@ -5,7 +5,24 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.7.3 - Unreleased
+## Version 0.7.4 - Unreleased
+
+### Added
+
+* Added `take` and `subgraph` to `kwcoco.CategoryTree`.
+
+### Changed
+
+* `kwcoco.CategoryTree` no longer modifies node order to be sorted by id. If
+  this causes something to break, old behavior can be temporarily restored by
+  setting `RESPECT_INPUT_ORDER  = 0`, but this option will be removed in the
+  future.
+
+* `kwcoco.CategoryTree.from_coco` and other `CategoryTree` constructors now
+  respects the order in which the categories were given if id is not present.
+
+
+## Version 0.7.3 - Released 2023-11-08
 
 ### Added
 * Add `datetime` attribute to `CocoImage`.
