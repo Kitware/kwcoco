@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.7.4 - Unreleased
 
+### Changed
+
+* `kwcoco.CategoryTree.from_coco` and other `CategoryTree` constructors now
+  respects the order in which the categories were given if id is not present.
+
 
 ## Version 0.7.3 - Released 2023-11-08
 

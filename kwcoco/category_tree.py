@@ -12,6 +12,14 @@ import numpy as np
 
 __all__ = ['CategoryTree']
 
+if hasattr(nx, 'OrderedDiGraph'):
+    # For 3.6 compat
+    # For old versions of networkx there was a real OrderedDiGraph, but now
+    # everything is ordered
+    OrderedDiGraph = nx.OrderedDiGraph
+else:
+    OrderedDiGraph = nx.DiGraph
+
 
 class CategoryTree(ub.NiceRepr):
     """
@@ -102,7 +110,7 @@ class CategoryTree(ub.NiceRepr):
 
         """
         if graph is None:
-            graph = nx.DiGraph()
+            graph = OrderedDiGraph()
         elif checks:
             if len(graph) > 0:
                 if not nx.is_directed_acyclic_graph(graph):
@@ -137,7 +145,7 @@ class CategoryTree(ub.NiceRepr):
             <CategoryTree(nNodes=3, ...)>
         """
         nodes = list(nodes)
-        graph = nx.DiGraph()
+        graph = OrderedDiGraph()
         graph.add_nodes_from(nodes)
         start = 0
 
@@ -171,7 +179,7 @@ class CategoryTree(ub.NiceRepr):
         Args:
             List[Dict]: list of coco-style categories
         """
-        graph = nx.DiGraph()
+        graph = OrderedDiGraph()
         for cat in categories:
             graph.add_node(cat['name'], **cat)
             if cat.get('supercategory', None) is not None:
@@ -273,7 +281,7 @@ class CategoryTree(ub.NiceRepr):
         elif key == 'btree':
             r = kwargs.pop('r', 3)
             h = kwargs.pop('h', 3)
-            graph = nx.generators.balanced_tree(r=r, h=h, create_using=nx.DiGraph())
+            graph = nx.generators.balanced_tree(r=r, h=h, create_using=OrderedDiGraph())
             graph = nx.relabel_nodes(graph, {n: n + 1 for n in graph})
             if kwargs.pop('add_zero', True):
                 graph.add_node(0)
@@ -281,7 +289,7 @@ class CategoryTree(ub.NiceRepr):
         elif key == 'btree2':
             r = kwargs.pop('r', 3)
             h = kwargs.pop('h', 3)
-            graph = nx.generators.balanced_tree(r=r, h=h, create_using=nx.DiGraph())
+            graph = nx.generators.balanced_tree(r=r, h=h, create_using=OrderedDiGraph())
             graph = nx.relabel_nodes(graph, {n: str(n + 1) for n in graph})
             if kwargs.pop('add_zero', True):
                 graph.add_node(str(0))
@@ -297,7 +305,7 @@ class CategoryTree(ub.NiceRepr):
                 'dog': ['boxer', 'beagle', 'golden'],
                 'cat': ['maine coon', 'persian', 'sphynx'],
                 'reptile': ['bearded dragon', 't-rex'],
-            }, nx.DiGraph)
+            }, OrderedDiGraph)
         else:
             raise KeyError(key)
         self = cls(graph)
@@ -403,12 +411,20 @@ class CategoryTree(ub.NiceRepr):
         return pdist
 
     def __len__(self):
+        """
+        Returns:
+            int
+        """
         return len(self.graph)
 
     def __iter__(self):
         return iter(self.idx_to_node)
 
     def __getitem__(self, index):
+        """
+        Returns:
+            str
+        """
         return self.idx_to_node[index]
 
     def __contains__(self, node):
@@ -533,16 +549,34 @@ class CategoryTree(ub.NiceRepr):
         return dict(self.graph.nodes)
 
     def index(self, node):
-        """ Return the index that corresponds to the category name """
+        """
+        Return the index that corresponds to the category name
+
+        Args:
+            node (str): the name of the category
+
+        Returns:
+            int
+        """
         return self.node_to_idx[node]
 
     def _build_index(self):
         """ construct lookup tables """
         # Most of the categories should have been given integer ids
         max_id = max(it.chain([0], nx.get_node_attributes(self.graph, 'id').values()))
+
+        if isinstance(self.graph, OrderedDiGraph):
+            # Use the graph order if the graph is ordered
+            # This is the only case that will trigger on Python 3.7+
+            # with modern networkx
+            node_attrs = list(self.graph.nodes.items())
+        else:
+            # Otherwise sort (this is only the case on older networkx versions)
+            node_attrs = sorted(self.graph.nodes.items())
+
         # Fill in id-values for any node that doesn't have one
         node_to_id = {}
-        for node, attrs in sorted(self.graph.nodes.items()):
+        for node, attrs in node_attrs:
             node_to_id[node] = attrs.get('id', max_id + 1)
             max_id = max(max_id, node_to_id[node])
         id_to_node = ub.invert_dict(node_to_id)
@@ -589,6 +623,11 @@ class CategoryTree(ub.NiceRepr):
         import networkx as nx
         text = nx.forest_str(self.graph)
         # print(text)
+        return text
+
+    def print_graph(self):
+        import networkx as nx
+        text = nx.write_network_text(self.graph)
         return text
 
     def normalize(self):
@@ -753,7 +792,7 @@ def from_directed_nested_tuples(encoding):
             edges.extend(subedges)
         return nodes, edges
     nodes, edges = _traverse_recon(encoding)
-    graph = nx.DiGraph()
+    graph = OrderedDiGraph()
     graph.add_nodes_from(nodes)
     graph.add_edges_from(edges)
     for k, v in node_data_view.items():
