@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.7.5 - Unreleased
 
+### Changed
+* Added `imgs_with_annots` to extended stats.
+
 
 ## Version 0.7.4 - Released 2023-11-12
 
