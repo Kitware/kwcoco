@@ -10,6 +10,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * Added `imgs_with_annots` to extended stats.
 
+### Fixed
+* Added missing `name_to_video` index in sql dataset
+
 
 ## Version 0.7.4 - Released 2023-11-12
 

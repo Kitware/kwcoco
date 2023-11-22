@@ -34,8 +34,8 @@ def test_coerce_as_sqlite():
     if not have_sqlalchemy():
         pytest.skip()
     dct_dset = kwcoco.CocoDataset.coerce('special:shapes8')
-    psql_dset = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='sqlite')
-    assert str(psql_dset.engine.url).startswith('sqlite')
+    sql_dset = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='sqlite')
+    assert str(sql_dset.engine.url).startswith('sqlite')
 
 
 def available_sql_backends():
@@ -193,3 +193,54 @@ def test_coerce_sql_from_zipfile():
         hashid1 = sql_dset._cached_hashid()
         hashid2 = dct_dset._cached_hashid()
         assert hashid1 == hashid2
+
+
+def test_python_index_maps():
+    """
+    Check that the indexes exposed in dictionary mode
+    match the ones in sql mode
+    """
+    import kwcoco
+    import rich
+    dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
+    sql_dset = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='sqlite')
+
+    cand_attrs = [k for k in dir(dct_dset.index) if not k.startswith('_')]
+
+    # Attribute with dictionary values in the index object are the indexes
+    index_attrs = []
+    for key in cand_attrs:
+        value = getattr(dct_dset.index, key)
+        if isinstance(value, dict):
+            index_attrs.append(key)
+
+    failures = []
+    for key in index_attrs:
+        print(f'Checking key = {key}')
+        dct_index = getattr(dct_dset.index, key)
+        sql_index = getattr(sql_dset.index, key)
+        assert isinstance(dct_index, dict)
+        assert sql_index is not None
+
+        dct_keys = list(dct_index.keys())
+        sql_keys = list(sql_index.keys())
+
+        fudgable = None
+        exact_same = sorted(dct_keys) == sorted(sql_keys)
+        if not exact_same:
+            fudgable = sorted(set(dct_keys)) == sorted(set(sql_keys))
+            if fudgable:
+                rich.print(f'[yellow]WARNING index check key={key} had duplicate SQL keys, weird, FIXME')
+            else:
+                failures.append(key)
+                rich.print(f'[red]FAILED index check key={key}')
+                raise
+
+        for k in dct_keys:
+            sql_v = sql_index[k]
+            dct_v = dct_index[k]
+            if isinstance(sql_v, dict):
+                for k in dct_v.keys():
+                    assert sql_v[k] == dct_v[k]
+            else:
+                assert sql_v == dct_v
