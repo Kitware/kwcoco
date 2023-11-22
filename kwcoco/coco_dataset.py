@@ -1117,6 +1117,10 @@ class MixinCocoExtras:
                 vidkw[key] = value
 
             vidkw.update(kwargs)
+            if 'background' in vidkw:
+                vidkw['render'] = {
+                    'background': vidkw.pop('background'),
+                }
 
             if isinstance(vidkw['image_size'], int):
                 vidkw['image_size'] = (vidkw['image_size'], vidkw['image_size'])

@@ -201,7 +201,9 @@ def test_python_index_maps():
     match the ones in sql mode
     """
     import kwcoco
-    import rich
+    import pytest
+    if not have_sqlalchemy():
+        pytest.skip('requires sqlalchemy')
     dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
     sql_dset = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='sqlite')
 
@@ -230,10 +232,10 @@ def test_python_index_maps():
         if not exact_same:
             fudgable = sorted(set(dct_keys)) == sorted(set(sql_keys))
             if fudgable:
-                rich.print(f'[yellow]WARNING index check key={key} had duplicate SQL keys, weird, FIXME')
+                print(f'[yellow]WARNING index check key={key} had duplicate SQL keys, weird, FIXME')
             else:
                 failures.append(key)
-                rich.print(f'[red]FAILED index check key={key}')
+                print(f'[red]FAILED index check key={key}')
                 raise
 
         for k in dct_keys:
