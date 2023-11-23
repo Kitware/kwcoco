@@ -1003,7 +1003,7 @@ class CocoImage(_CocoObject):
                     chan_list.append(chan)
 
         if space == 'video':
-            video = self.video
+            video = self.video or {}
             width = video.get('width', img.get('width', None))
             height = video.get('height', img.get('height', None))
         elif space in {'asset', 'auxiliary'}:
