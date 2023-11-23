@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.7.5 - Unreleased
 
+### Changed
+* Added `imgs_with_annots` to extended stats.
+* Background param now works as an argument to `demo` for vidshapes
+
+### Fixed
+* Added missing `name_to_video` index in sql dataset
+
 
 ## Version 0.7.4 - Released 2023-11-12
 

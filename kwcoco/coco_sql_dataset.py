@@ -1118,6 +1118,8 @@ class CocoSqlIndex(object):
                                          ignore_null=True)
         index.file_name_to_img = SqlDictProxy(session, Image, Image.file_name,
                                               ignore_null=True)
+        index.name_to_video = SqlDictProxy(session, Video, Video.name,
+                                           ignore_null=True)
 
         index.gid_to_aids = SqlIdGroupDictProxy(
             session, Annotation.id, Annotation.image_id, Image.id)

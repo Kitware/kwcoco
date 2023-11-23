@@ -1117,6 +1117,10 @@ class MixinCocoExtras:
                 vidkw[key] = value
 
             vidkw.update(kwargs)
+            if 'background' in vidkw:
+                vidkw['render'] = {
+                    'background': vidkw.pop('background'),
+                }
 
             if isinstance(vidkw['image_size'], int):
                 vidkw['image_size'] = (vidkw['image_size'], vidkw['image_size'])
@@ -2965,8 +2969,8 @@ class MixinCocoStats:
             >>> self = kwcoco.CocoDataset.demo()
             >>> print(ub.urepr(self.extended_stats()))
         """
+        import kwarray
         def mapping_stats(xid_to_yids):
-            import kwarray
             n_yids = list(ub.map_vals(len, xid_to_yids).values())
             return kwarray.stats_dict(n_yids, n_extreme=True)
 
@@ -2993,6 +2997,10 @@ class MixinCocoStats:
             for gid, cidfreq in gid_to_cidfreq.items()
         }
         trackid_to_aids = ub.udict(self.index.trackid_to_aids) - {None}
+
+        img_has_anns = [int(len(aids) > 0) for gid, aids in self.index.gid_to_aids.items()]
+        imgs_with_annots = kwarray.stats_dict(img_has_anns, n_extreme=True, quantile=False)
+
         return ub.odict([
             ('annots_per_img', mapping_stats(self.index.gid_to_aids)),
             ('imgs_per_cat', mapping_stats(self.index.cid_to_gids)),
@@ -3000,6 +3008,7 @@ class MixinCocoStats:
             ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),
             ('imgs_per_video', mapping_stats(self.index.vidid_to_gids)),
             ('annots_per_track', mapping_stats(trackid_to_aids)),
+            ('imgs_with_annots', imgs_with_annots),
         ])
 
     def boxsize_stats(self, anchors=None, perclass=True, gids=None, aids=None,
