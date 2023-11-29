@@ -950,6 +950,10 @@ class MixinCocoExtras:
                 subset of the available options. For full details, see
                 :func:`demodata_toy_dset` and :func:`random_video_dset`.
 
+                Notable options are:
+                    bundle_dpath (PathLike): location to write the demo bundle
+                    fpath (PathLike): location to write the demo kwcoco file
+
         Kwargs:
             image_size (Tuple[int, int]): width / height size of the images
 

@@ -217,7 +217,8 @@ class CocoImage(_CocoObject):
             except Exception as ex:
                 stats[key] = repr(ex)
         if 'channels' in stats:
-            stats['channels'] = stats['channels'].spec
+            if stats['channels'] is not None:
+                stats['channels'] = stats['channels'].spec
         return stats
 
     def __contains__(self, key):
