@@ -217,7 +217,8 @@ class CocoImage(_CocoObject):
             except Exception as ex:
                 stats[key] = repr(ex)
         if 'channels' in stats:
-            stats['channels'] = stats['channels'].spec
+            if stats['channels'] is not None:
+                stats['channels'] = stats['channels'].spec
         return stats
 
     def __contains__(self, key):
@@ -1003,7 +1004,7 @@ class CocoImage(_CocoObject):
                     chan_list.append(chan)
 
         if space == 'video':
-            video = self.video
+            video = self.video or {}
             width = video.get('width', img.get('width', None))
             height = video.get('height', img.get('height', None))
         elif space in {'asset', 'auxiliary'}:
