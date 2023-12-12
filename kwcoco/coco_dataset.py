@@ -5710,6 +5710,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
     def from_data(CocoDataset, data, bundle_dpath=None, img_root=None):
         """
         Constructor from a json dictionary
+
+        Returns:
+            CocoDataset:
         """
         coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
                                 img_root=img_root)
@@ -5726,6 +5729,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         Args:
             gpaths (List[str]): list of image paths
 
+        Returns:
+            CocoDataset:
+
         Example:
             >>> import kwcoco
             >>> coco_dset = kwcoco.CocoDataset.from_image_paths(['a.png', 'b.png'])
@@ -5734,6 +5740,33 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         coco_dset = CocoDataset(bundle_dpath=bundle_dpath, img_root=img_root)
         for gpath in gpaths:
             coco_dset.add_image(gpath)
+        return coco_dset
+
+    @classmethod
+    def from_class_image_paths(CocoDataset, root):
+        """
+        Ingest classification data in the common format where images of
+        different categories are stored in folders with the category label.
+
+        Args:
+            root (str | PathLike):
+                the path to a directory containing class-subdirectories
+
+        Returns:
+            CocoDataset:
+        """
+        import kwimage
+        root = ub.Path(root)
+        subdirs = [child for child in root.glob('*') if child.is_dir()]
+        coco_dset = CocoDataset(bundle_dpath=root)
+        for subdir in subdirs:
+            catname = subdir.name
+            cat_id = coco_dset.ensure_category(catname)
+            for gpath in subdir.glob('*'):
+                h, w = kwimage.load_image_shape(gpath)[0:2]
+                image_id = coco_dset.add_image(gpath)
+                coco_dset.add_annotation(
+                    bbox=[0, 0, w, h], category_id=cat_id, image_id=image_id)
         return coco_dset
 
     @classmethod
