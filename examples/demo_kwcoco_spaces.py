@@ -75,6 +75,9 @@ def main():
     dset = setup_data()
 
     def build_space_frames(space):
+        bg_value = 'kw_green'
+        bg_value = 'white'
+
         frame_stack = []
         for coco_img in dset.images().coco_images:
             frame_index = coco_img.img['frame_index']
@@ -84,9 +87,9 @@ def main():
                 asset_data = kwimage.fill_nans_with_checkers(asset_data)
                 asset_data = kwimage.draw_header_text(asset_data, f'T={frame_index} : {chan}')
                 asset_stack.append(asset_data)
-            asset_row = kwimage.stack_images(asset_stack, axis=1, pad=10, bg_value='kitware_green')
+            asset_row = kwimage.stack_images(asset_stack, axis=1, pad=10, bg_value=bg_value)
             frame_stack.append(asset_row)
-        canvas = kwimage.stack_images(frame_stack, axis=0, pad=10, bg_value='kitware_green')
+        canvas = kwimage.stack_images(frame_stack, axis=0, pad=10, bg_value=bg_value)
         return canvas
 
     asset_canvas = build_space_frames(space='asset')
@@ -119,3 +122,30 @@ def main():
     kwplot.imshow(asset_canvas, title=asset_blurb, fnum=1)
     kwplot.imshow(image_canvas, title=image_blurb, fnum=2)
     kwplot.imshow(video_canvas, title=video_blurb, fnum=3)
+
+    h1 = asset_canvas.shape[0]
+    h2 = image_canvas.shape[0]
+    h3 = video_canvas.shape[0]
+    h = min(h1, h2, h3)
+    c1 = kwimage.imresize(asset_canvas, dsize=(None, h), letterbox=0)
+    c2 = kwimage.imresize(image_canvas, dsize=(None, h), letterbox=0)
+    c3 = kwimage.imresize(video_canvas, dsize=(None, h), letterbox=0)
+    # t1 = kwimage.draw_header_text(None, 'Asset View', color='black', bg_color='white')
+    # t2 = kwimage.draw_header_text(None, 'Image View', color='black', bg_color='white')
+    # t3 = kwimage.draw_header_text(None, 'Video View', color='black', bg_color='white')
+    c1 = kwimage.draw_header_text(c1, 'Asset View', color='black', bg_color='white', fontScale=4, thickness=10)
+    c2 = kwimage.draw_header_text(c2, 'Image View', color='black', bg_color='white', fontScale=4, thickness=10)
+    c3 = kwimage.draw_header_text(c3, 'Video View', color='black', bg_color='white', fontScale=4, thickness=10)
+
+    together = kwimage.stack_images([c1, c2, c3], axis=1, bg_value='white', pad=64)
+    kwimage.imwrite('together.jpg', kwimage.ensure_uint255(together))
+    kwplot.imshow(together, fnum=4)
+
+    kwplot.show_if_requested()
+
+if __name__ == '__main__':
+    """
+    CommandLine:
+        python ~/code/kwcoco/examples/demo_kwcoco_spaces.py
+    """
+    main()

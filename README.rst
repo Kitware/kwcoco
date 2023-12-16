@@ -772,11 +772,18 @@ There are several other COCO libraries available:
 * https://pypi.org/project/fast-coco-eval/
 * https://pypi.org/project/coco-assistant/
 * https://pypi.org/project/cocorepr/
+* https://github.com/jaspersiebring/GeoCOCO
 
 Tools that work with COCO files:
 
 * https://voxel51.com/docs/fiftyone/
 * https://labelstud.io/guide/export.html#COCO
+
+
+Projects that use the COCO format:
+
+* https://github.com/arpanmukherjee/Into-The-Wild-Animal-Detection-and-Classification
+* https://github.com/amurto/jeev-rakshak
 
 
 

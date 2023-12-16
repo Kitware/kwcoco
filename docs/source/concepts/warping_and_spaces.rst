@@ -1,14 +1,26 @@
-KWCOCO Spaces
-=============
+KWCOCO Views / Spaces
+=====================
 
-Recall that kwcoco has a list of image dictionaries. 
+NOTE:
+
+We are working on improving termonology and data structures when discussing
+this topic. Not all documentation may be up to date. There are several things
+to be aware of.
+
+* Moving forward we may replace the word "Space" with "View"
+
+* The old term is "Auxiliary", which is being replaced with "Asset"
+
+* "Assets" are currently (as of 0.7.5) stored as part of the Image table, but we will likely move them to their own Asset table in the future.
+
+Recall that kwcoco has a list of image dictionaries.
 Each image may contain a "video_id" that references a video sequence it is part of.
-Each image can contain multiple auxiliary-images. 
+Each image can contain multiple auxiliary-images (i.e. assets).
 
-In the common case, images do not contain any auxiliary files. Auxiliary files
-are mainly used in multispectral or multimodal datasets. If an image has
-auxiliary files, these will be stored as a list of auxiliary dictionaries in
-the image dictionary.
+In the common case, images do not contain any auxiliary / asset files. Assets
+(or auxiliary files) are mainly used in multispectral or multimodal datasets.
+If an image has auxiliary files, these will be stored as a list of auxiliary
+dictionaries in the image dictionary.
 
 
 For example a multispectral video with may look like this:
@@ -24,24 +36,24 @@ For example a multispectral video with may look like this:
      ]
 
     "images": [
-        { 
+        {
             "name": "TheImageName",
             "width": 600,
             "height": 800,
             "video_id": 1,
             "frame_index": 0,
             "warp_img_to_vid": {"scale": 0.5},
-            "auxiliary": [
+            "assets": [
                 {
-                    "file_name": "band1.tif", 
-                    "warp_aux_to_img": {"scale": 2.0}, 
+                    "file_name": "band1.tif",
+                    "warp_aux_to_img": {"scale": 2.0},
                     "width": 300,
                     "height": 400
                     "channels": "band1",
                     "num_bands": 1,
                 },
-                { 
-                    "file_name": "band2.tif", 
+                {
+                    "file_name": "band2.tif",
                     "warp_aux_to_img": {"scale": 1.0},
                     "channels": "band2",
                     "num_bands": 1,
@@ -50,7 +62,7 @@ For example a multispectral video with may look like this:
         },
     ]
 
-A rgb-video with no auxiliary images with may look like this:
+A rgb-video with no assets with may look like this:
 
 .. code::
 
@@ -63,7 +75,7 @@ A rgb-video with no auxiliary images with may look like this:
      ]
 
     "images": [
-        { 
+        {
             "name": "TheImageName",
             "width": 600,
             "height": 800,
@@ -112,7 +124,7 @@ The transform dictionaries can be in any format coercable by
 The :class:`kwcoco.CocoDataset<kwcoco.coco_dataset.CocoDataset>` also exposes
 the
 :func:`kwcoco.CocoDataset.delayed_load<kwcoco.coco_dataset.MixinCocoAccessors.delayed_load>`
-method, which can be used to access image information in image or video space.  
+method, which can be used to access image information in image or video space.
 
 
 .. code:: python
@@ -125,15 +137,15 @@ method, which can be used to access image information in image or video space.
     # Show the structure of the image and auxiliary dictionaries
     print(ub.urepr(self.index.imgs[1], nl=-1, sort=0))
 
-    # The delayed object is a pointer to the image files that contains 
-    # appropriate transformation. Additional transformations can be 
-    # specified. These are all fused together to reduce resampling 
+    # The delayed object is a pointer to the image files that contains
+    # appropriate transformation. Additional transformations can be
+    # specified. These are all fused together to reduce resampling
     # artifacts.
     img_delayed = self.delayed_load(gid, space='image')
     # Execture all transforms
     img_final = img_delayed.finalize()
 
-    #  
+    #
     vid_delayed = self.delayed_load(gid, space='image')
     # Execture all transforms
     vid_final = vid_delayed.finalize()

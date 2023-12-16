@@ -9,6 +9,10 @@ from os.path import join
 
 
 class CocoEvalCLIConfig(coco_evaluator.CocoEvalConfig):
+    """
+    Evaluate and score predicted versus truth detections / classifications in a
+    COCO dataset
+    """
     __default__ = {
         # These should go into the CLI args, not the class config args
         'expt_title': scfg.Value('', type=str, help='title for plots'),
