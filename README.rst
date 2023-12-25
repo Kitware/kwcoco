@@ -773,6 +773,8 @@ There are several other COCO libraries available:
 * https://pypi.org/project/coco-assistant/
 * https://pypi.org/project/cocorepr/
 * https://github.com/jaspersiebring/GeoCOCO
+* https://www.researchgate.net/figure/COCO-CameraTraps-data-format_fig5_326412262
+* https://github.com/microsoft/CameraTraps
 
 Tools that work with COCO files:
 
