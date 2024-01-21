@@ -2238,6 +2238,10 @@ class MixinCocoObjects:
                 mutually exclusive with other arguments.
                 An alias is "trackid", which may be removed in the future.
 
+            video_id (int | None):
+                return all annotations that belong to this video.
+                mutually exclusive with other arguments.
+
         Returns:
             kwcoco.coco_objects1d.Annots: vectorized annotation object
 
@@ -2275,6 +2279,11 @@ class MixinCocoObjects:
 
         if track_id is not None:
             annot_ids = self.index.trackid_to_aids[track_id]
+
+        if video_id is not None:
+            annot_ids = sorted(ub.flatten([
+                self.index.gid_to_aids[gid]
+                for gid in self.index.vidid_to_gids[video_id]]))
 
         if annot_ids is None:
             annot_ids = sorted(self.index.anns.keys())

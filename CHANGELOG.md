@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.7.6 - Unreleased
 
+### Added
+* Add `video_id` argument to `CocoDataset.annots`
+
 
 ## Version 0.7.5 - Released 2023-12-06
 
