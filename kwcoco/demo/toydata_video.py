@@ -807,6 +807,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     imwrite_ops = {'compress', 'blocksize', 'interleave', 'options'}
     if renderkw is None:
         renderkw = {}
+
     imwrite_kw = ub.dict_isect(renderkw, imwrite_ops)
     if imwrite_kw:
         # imwrite_kw['backend'] = 'gdal'
@@ -814,18 +815,21 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
         # imwrite kw requries gdal
         from osgeo import gdal  # NOQA
 
+    main_ext = renderkw.get('main_ext', '.png')
+    main_chans = renderkw.get('main_channels', 'r|g|b')
+
     for gid in ub.ProgIter(dset.imgs.keys(), desc='render gid', verbose=verbose > 2):
         # Render data inside the image
         img = render_toy_image(dset, gid, rng=rng, renderkw=renderkw)
 
         # Extract the data from memory and write it to disk
-        fname = 'img_{:05d}.png'.format(gid)
+        fname = f'img_{gid:05d}{main_ext}'
         imdata = img.pop('imdata', None)
         if imdata is not None:
             img_fpath = ub.Path(join(img_dpath, fname))
             img.update({
                 'file_name': os.fspath(img_fpath.relative_to(bundle_dpath)),
-                'channels': 'r|g|b',
+                'channels': main_chans,
             })
             kwimage.imwrite(img_fpath, imdata)
 

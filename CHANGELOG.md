@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Add `video_id` argument to `CocoDataset.annots`
+* Can now specify render dictionary with `main_ext` and `main_channels` to `random_video_dset` to control demo data file format and the channel codes that are used.
 
 ### Fixed:
 
