@@ -4,6 +4,9 @@ Vectorized ORM-like objects used in conjunction with coco_dataset.
 This powers the ``.images()``, ``.videos()``, and ``.annotation()`` methods of
 :class:`kwcoco.CocoDataset`.
 
+TODO:
+    - [ ] The use of methods vs properties is inconsistent. This needs to be fixed, but backwards compatability is a consideration.
+
 See:
     :func:`kwcoco.coco_dataset.MixinCocoObjects.categories`
     :func:`kwcoco.coco_dataset.MixinCocoObjects.videos`
