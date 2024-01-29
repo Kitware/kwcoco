@@ -2219,7 +2219,7 @@ class MixinCocoObjects:
     This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
-    def annots(self, annot_ids=None, image_id=None, track_id=None, trackid=None, aids=None, gid=None):
+    def annots(self, annot_ids=None, image_id=None, track_id=None, video_id=None, trackid=None, aids=None, gid=None):
         """
         Return vectorized annotation objects
 
