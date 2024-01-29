@@ -117,6 +117,7 @@ class CocoToyDataCLI(object):
             print('dset.fpath = {!r}'.format(dset.fpath))
             print('Writing to dset.fpath = {!r}'.format(dset.fpath))
             dset.dump(dset.fpath, newlines=True)
+        print(dset.fpath)
 
 _CLI = CocoToyDataCLI
 
