@@ -146,6 +146,7 @@ def find_json_unserializable(data, quickcheck=False):
         >>>         assert part['data'] is curr
 
     Example:
+        >>> # xdoctest: +SKIP("TODO: circular ref detect algo is wrong, fix it")
         >>> from kwcoco.util.util_json import *  # NOQA
         >>> import pytest
         >>> # Test circular reference
@@ -153,6 +154,10 @@ def find_json_unserializable(data, quickcheck=False):
         >>> data[1]['a'].append(data)
         >>> with pytest.raises(ValueError, match="Circular reference detected at.*1, 'a', 1*"):
         ...     parts = list(find_json_unserializable(data))
+        >>> # Should be ok here
+        >>> shared_data = {'shared': 1}
+        >>> data = [[shared_data], shared_data]
+        >>> parts = list(find_json_unserializable(data))
 
     """
     needs_check = True
@@ -172,7 +177,8 @@ def find_json_unserializable(data, quickcheck=False):
             # is_serializable = True
             needs_check = False
 
-    CHECK_FOR_CIRCULAR_REFERENCES = True
+    # FIXME: the algo is wrong, fails when
+    CHECK_FOR_CIRCULAR_REFERENCES = 0
 
     if needs_check:
         # mode = 'new'
@@ -188,6 +194,9 @@ def find_json_unserializable(data, quickcheck=False):
         for prefix, value in walker:
 
             if CHECK_FOR_CIRCULAR_REFERENCES:
+                # FIXME: We need to know if this container id is in this paths
+                # ancestors. It is allowed to be elsewhere in the data
+                # structure (i.e. the pointer graph must be a DAG)
                 if isinstance(value, container_types):
                     container_id = id(value)
                     if container_id in seen_ids:

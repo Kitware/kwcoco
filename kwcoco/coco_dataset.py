@@ -6136,6 +6136,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                 ensure_ascii=False)
                 except Exception as ex:
                     print('Failed to dump ex = {!r}'.format(ex))
+                    if 'Circular reference detected' in str(ex):
+                        raise
                     self._check_json_serializable()
                     raise
         self._state['was_saved'] = True

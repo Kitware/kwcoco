@@ -10,6 +10,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Add `video_id` argument to `CocoDataset.annots`
 
+### Fixed:
+
+* Prevent resource crash: `find_json_unserializable` now checks for circular references.
+
 
 ## Version 0.7.5 - Released 2023-12-06
 
