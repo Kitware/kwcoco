@@ -10,7 +10,7 @@ Subpackages
    kwcoco.cli
    kwcoco.data
    kwcoco.demo
-   kwcoco.examples
+   kwcoco.gui
    kwcoco.metrics
    kwcoco.util
 

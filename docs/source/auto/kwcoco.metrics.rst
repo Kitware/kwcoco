@@ -15,7 +15,6 @@ Submodules
    kwcoco.metrics.drawing
    kwcoco.metrics.functional
    kwcoco.metrics.sklearn_alts
-   kwcoco.metrics.util
    kwcoco.metrics.voc_metrics
 
 Module contents

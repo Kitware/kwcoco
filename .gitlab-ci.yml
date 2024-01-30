@@ -2,6 +2,7 @@
 
 stages:
 # TEMPLATES
+- lint
 - build
 - test
 - gpgsign
@@ -30,6 +31,7 @@ stages:
   stage: build
   before_script:
   - 'python -V  # Print out python version for debugging'
+  - df -h
   script:
   - python -m pip install setuptools>=0.8 wheel build twine
   - python -m build --wheel --outdir dist
@@ -371,9 +373,19 @@ test/full-strict/cp311-linux-x86_64:
   image: python:3.11
   needs:
   - build/cp311-linux-x86_64
+lint:
+  <<: *common_template
+  image: python:3.11
+  stage: lint
+  before_script:
+  - df -h
+  script:
+  - pip install -r requirements/linting.txt
+  - ./run_linter.sh
+  allow_failure: true
 gpgsign/wheels:
   <<: *common_template
-  image: python:3.8
+  image: python:3.11
   stage: gpgsign
   artifacts:
     paths:
@@ -436,7 +448,7 @@ gpgsign/wheels:
   - ls dist
 deploy/wheels:
   <<: *common_template
-  image: python:3.8
+  image: python:3.11
   stage: deploy
   only:
     refs:

@@ -188,7 +188,7 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> self.summary_plot()
             >>> kwplot.show_if_requested()
         """
-        if subplots == 'auto':
+        if subplots == 'auto' or (isinstance(subplots, int) and subplots):
             subplots = ['pr', 'roc', 'thresh']
         import kwplot
         kwplot.figure(fnum=fnum, figtitle=title)
@@ -745,7 +745,7 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
             >>> kwplot.show_if_requested()
             >>> self.summary_plot(title='demo summary_plot ovr', subplots=['mcc', 'acc'], fnum=2)
         """
-        if subplots == 'auto':
+        if subplots == 'auto' or (isinstance(subplots, int) and subplots):
             subplots = ['pr', 'roc', 'mcc', 'f1', 'acc']
         import kwplot
         pnum_ = kwplot.PlotNums(nSubplots=len(subplots))

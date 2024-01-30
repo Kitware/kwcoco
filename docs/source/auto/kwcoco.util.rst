@@ -17,6 +17,7 @@ Submodules
 
    kwcoco.util.dict_like
    kwcoco.util.dict_proxy2
+   kwcoco.util.ijson_ext
    kwcoco.util.jsonschema_elements
    kwcoco.util.lazy_frame_backends
    kwcoco.util.util_archive
@@ -25,6 +26,7 @@ Submodules
    kwcoco.util.util_futures
    kwcoco.util.util_json
    kwcoco.util.util_monkey
+   kwcoco.util.util_networkx
    kwcoco.util.util_parallel
    kwcoco.util.util_reroot
    kwcoco.util.util_sklearn
