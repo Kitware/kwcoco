@@ -1,5 +1,7 @@
 """
 Delete all kwcoco views in the global postgres datastore
+
+NOTE: This does not delete the view cache stamps!
 """
 
 

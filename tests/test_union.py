@@ -169,3 +169,62 @@ def test_union_subdirs_to_existing_subdir():
     # '../dset2/_assets/, but it is technically correct, and is what we
     # currently get, so leaving this check in.
     assert prefixes == {'../dset1/_assets/', '../dset2/_assets/', '../dset3/_assets/'}
+
+
+def test_duplicate_union_with_tracks():
+    import kwcoco
+    import ubelt as ub
+
+    # Test with disjoint_tracks=True
+    dset1 = kwcoco.CocoDataset.demo('vidshapes1')
+    combo1 = kwcoco.CocoDataset.union(dset1, dset1, disjoint_tracks=True)
+    track_names1 = combo1.tracks().lookup('name')
+    annot_trackids1 = combo1.annots().lookup('track_id')
+    print(f'track_names1 = {ub.urepr(track_names1, nl=1)}')
+    print(f'annot_trackids1 = {ub.urepr(annot_trackids1, nl=1)}')
+    assert track_names1 == ['track_001', 'track_002', 'track_001_v001', 'track_002_v001']
+    assert annot_trackids1 == [1, 1, 2, 2, 3, 3, 4, 4]
+
+    # Test with disjoint_tracks=False
+    combo2 = kwcoco.CocoDataset.union(dset1, dset1, disjoint_tracks=False)
+    track_names2 = combo2.tracks().lookup('name')
+    annot_trackids2 = combo2.annots().lookup('track_id')
+    print(f'track_names2 = {ub.urepr(track_names2, nl=1)}')
+    print(f'annot_trackids2 = {ub.urepr(annot_trackids2, nl=1)}')
+    assert track_names2 == ['track_001', 'track_002']
+    assert annot_trackids2 == [1, 1, 2, 2, 1, 1, 2, 2]
+
+
+def test_duplicate_union_with_tracks_no_tracktable():
+    """
+    Test the old case where annots only had track ids and there was no table.
+    This test case can be removed if we require that tracks exist in the track
+    table.
+    """
+    import kwcoco
+    import ubelt as ub
+
+    # Test with disjoint_tracks=True
+    dset1 = kwcoco.CocoDataset.demo('vidshapes1')
+    for ann in dset1.dataset['annotations']:
+        ann.pop('segmentation')
+        ann.pop('keypoints')
+    del dset1.dataset['tracks']
+    dset1._build_index()
+
+    combo1 = kwcoco.CocoDataset.union(dset1, dset1, disjoint_tracks=True)
+    track_names1 = combo1.tracks().lookup('name')
+    annot_trackids1 = combo1.annots().lookup('track_id')
+    print(f'track_names1 = {ub.urepr(track_names1, nl=0)}')
+    print(f'annot_trackids1 = {ub.urepr(annot_trackids1, nl=0)}')
+    assert track_names1 == []
+    assert annot_trackids1 == [0, 0, 1, 1, 2, 2, 3, 3]
+
+    # Test with disjoint_tracks=False
+    combo2 = kwcoco.CocoDataset.union(dset1, dset1, disjoint_tracks=False)
+    track_names2 = combo2.tracks().lookup('name')
+    annot_trackids2 = combo2.annots().lookup('track_id')
+    print(f'track_names2 = {ub.urepr(track_names2, nl=0)}')
+    print(f'annot_trackids2 = {ub.urepr(annot_trackids2, nl=0)}')
+    assert track_names2 == []
+    assert annot_trackids2 == [1, 1, 2, 2, 1, 1, 2, 2]

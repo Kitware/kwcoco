@@ -5,6 +5,9 @@ SeeAlso:
 
 
 def test_postgresql_cases():
+    """
+    pytest  ~/code/kwcoco/tests/test_postgresql.py -s
+    """
     import pytest
     import ubelt as ub
     try:

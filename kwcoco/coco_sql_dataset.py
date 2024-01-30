@@ -98,7 +98,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 # in the alchemy tables must agree with this. Note: previously we used
 # a duner name, but that seems to be disallowed
 UNSTRUCTURED = '_unstructured'
-SCHEMA_VERSION = 'v015'
+SCHEMA_VERSION = 'v016'
 
 
 class FallbackCocoBase:
@@ -1403,7 +1403,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         self.engine = None
         self.index = None
 
-    def connect(self, readonly=False, verbose=0):
+    def connect(self, readonly=False, verbose=0, must_exist=False):
         """
         Connects this instance to the underlying database.
 
@@ -1445,6 +1445,8 @@ class CocoSqlDatabase(AbstractCocoDataset,
             from sqlalchemy_utils import database_exists, create_database
             did_exist = database_exists(uri)
             if not did_exist:
+                if must_exist:
+                    raise Exception('Database does not exist')
                 if verbose:
                     print('checking if database exists, no, creating')
                 create_database(uri)
@@ -2091,7 +2093,6 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
                           product=cache_product, enabled=enable_cache,
                           hasher=None, ext='.json', verbose=4)
     if stamp.expired():
-        # TODO: use a CacheStamp instead
         self.delete()
         self.connect()
         if dset is None:
@@ -2107,7 +2108,23 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         if stamp.cacher.enabled:
             stamp.renew()
     else:
-        self.connect()
+        try:
+            self.connect(must_exist=True)
+        except Exception:
+            self.delete()
+            self.connect()
+            if dset is None:
+                print('Loading json dataset for SQL conversion')
+                dset = kwcoco.CocoDataset(dct_db_fpath)
+
+            # Write the cacheid when making a view, so the view can access it
+            dset._cached_hashid()
+
+            # Convert a coco file to an sql database
+            print(f'Start SQL({backend}_ conversion')
+            self.populate_from(dset, verbose=1)
+            if stamp.cacher.enabled:
+                stamp.renew()
     return self
 
 

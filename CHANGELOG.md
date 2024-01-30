@@ -15,6 +15,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * Prevent resource crash: `find_json_unserializable` now checks for circular references.
 
+* Coco union now handles tracks.
+
+### Changed
+
+* The `disjoint_tracks` in `CocoDataset.union` now works on a "track-name"
+  level. Old behavior where track-ids did not need a corresponding "track"
+  entry is still preserved but may be removed in the future.
+
 
 ## Version 0.7.5 - Released 2023-12-06
 

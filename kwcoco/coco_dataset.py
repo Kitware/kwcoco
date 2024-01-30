@@ -78,10 +78,11 @@ from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco import exceptions
 
 from kwcoco._helpers import (
-    SortedSet, UniqueNameRemapper, _ID_Remapper, _NextId,
+    SortedSet, UniqueNameRemapper, _NextId,
     _delitems, _lut_image_frame_index, _lut_annot_frame_index,
     _load_and_postprocess, _image_corruption_check
 )
+from kwcoco._helpers import _ID_Remapper
 
 import json as pjson
 from types import ModuleType
@@ -6403,9 +6404,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 like a classmethod, "others" will be empty by default.
 
             disjoint_tracks (bool):
-                if True, we will assume track-ids are disjoint and if two
-                datasets share the same track-id, we will disambiguate them.
+                if True, we will assume track-names are disjoint and if two
+                datasets share the same track-name, we will disambiguate them.
                 Otherwise they will be copied over as-is. Defaults to True.
+                In most cases you do not want to set this to False.
 
             remember_parent (bool):
                 if True, videos and images will save information about their
@@ -6517,6 +6519,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # mean that they are the same image.
         unique_img_names = UniqueNameRemapper()
         unique_video_names = UniqueNameRemapper()
+        unique_track_names = UniqueNameRemapper()
 
         def update_ifnotin(d1, d2):
             """ copies keys from d2 that doent exist in d1 into d1 """
@@ -6542,6 +6545,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 ('categories', []),
                 ('videos', []),
                 ('images', []),
+                ('tracks', []),
                 ('annotations', []),
             ])
 
@@ -6560,16 +6564,30 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             _all_vidids = (video['id'] for video in _all_videos)
             preserve_vidids = not _has_duplicates(_all_vidids)
 
+            _all_tracks = (track for _, _, d in relative_dsets
+                           for track in (d.get('tracks', None) or []))
+            _all_trackids = (track['id'] for track in _all_tracks)
+            preserve_trackids = not _has_duplicates(_all_trackids)
+
+            if not disjoint_tracks:
+                # Only relevant if we are not changing track names
+                merged_track_name_to_id = {}
+
+            # Only useful while we still support the case where a track-ids
+            # doesn't have an associated track.
+            hacked_track_id_map = _ID_Remapper(reuse=False)
+
             # If disjoint_tracks is True keep track of track-ids we've seen in
             # so far in previous datasets and ensure we dont reuse them.
             # TODO: do this Remapper class with other ids?
-            track_id_map = _ID_Remapper(reuse=False)
+            # track_id_map = _ID_Remapper(reuse=False)
 
             for subdir, old_fpath, old_dset in relative_dsets:
                 # Create temporary indexes to map from old to new
                 cat_id_map = {None: None}
                 img_id_map = {}
                 video_id_map = {}
+                track_id_map = {}
                 kpcat_id_map = {}
 
                 # Add the licenses / info into the merged dataset
@@ -6631,7 +6649,48 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         new_reflect_id = merged_kp_name_to_id.get(reflect_name, None)
                         kpcat['reflection_id'] = new_reflect_id
 
-                # Add the videos into the merged dataset
+                # Add the tracks into the merged dataset
+                for old_track in old_dset.get('tracks', []):
+                    if preserve_trackids:
+                        new_id = old_track['id']
+                    else:
+                        new_id = len(merged['tracks']) + 1
+
+                    if disjoint_tracks:
+                        # Tracks with the same name are considered distinct
+                        # and given new non-conflicting names
+                        new_trackname = unique_track_names.remap(old_track['name'])
+                        new_track = _dict([
+                            ('id', new_id),
+                            ('name', new_trackname),
+                        ])
+                        # copy over other metadata
+                        update_ifnotin(new_track, old_track)
+                        track_id_map[old_track['id']] = new_track['id']
+                        if remember_parent:
+                            new_track['union_parent'] = old_fpath
+                        merged['tracks'].append(new_track)
+                    else:
+                        # Tracks with the same name are considered the same
+                        # across datasets.
+                        if old_track['name'] not in unique_track_names:
+                            new_trackname = unique_track_names.remap(old_track['name'])
+                            new_track = _dict([
+                                ('id', new_id),
+                                ('name', new_trackname),
+                            ])
+                            # copy over other metadata
+                            update_ifnotin(new_track, old_track)
+                            track_id_map[old_track['id']] = new_track['id']
+                            if remember_parent:
+                                new_track['union_parent'] = old_fpath
+                            merged['tracks'].append(new_track)
+                            merged_track_name_to_id[new_trackname] = new_id
+                        else:
+                            new_id = merged_track_name_to_id[old_track['name']]
+                            track_id_map[old_track['id']] = new_id
+
+                # Add the tracks into the merged dataset
                 for old_video in old_dset.get('videos', []):
                     if preserve_vidids:
                         new_id = old_video['id']
@@ -6701,21 +6760,37 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
                     if new_cat_id is ub.NoParam:
                         # NOTE: category_id is allowed to be None
-                        warnings.warn('annot {} in {} has bad category-id {}'.format(
-                            old_annot, subdir, old_cat_id))
+                        warnings.warn(f'annot {old_annot} in {subdir} has bad category-id {old_cat_id}')
                     if new_img_id is None:
-                        warnings.warn('annot {} in {} has bad image-id {}'.format(
-                            old_annot, subdir, old_img_id))
+                        warnings.warn(f'annot {old_annot} in {subdir} has bad image-id {old_img_id}')
                     new_annot = _dict([
                         ('id', len(merged['annotations']) + 1),
                         ('image_id', new_img_id),
                         ('category_id', new_cat_id),
                     ])
-                    if disjoint_tracks:
-                        old_track_id = old_annot.get('track_id', None)
-                        if old_track_id is not None:
-                            new_track_id = track_id_map.remap(old_track_id)
-                            new_annot['track_id'] = new_track_id
+
+                    old_track_id = old_annot.get('track_id')
+                    if old_track_id is not None:
+                        new_track_id = track_id_map.get(old_track_id, None)
+                        if new_track_id is None:
+                            warnings.warn(ub.paragraph(
+                                f'''
+                                annot {old_annot} in {subdir} has track_id
+                                {old_track_id} that does not have an associated
+                                entry in the tracks table
+                                '''))
+                            if disjoint_tracks:
+                                new_track_id = hacked_track_id_map.remap(old_track_id)
+                            else:
+                                new_track_id = old_track_id
+                        new_annot['track_id'] = new_track_id
+
+                    # if disjoint_tracks:
+                    #     old_track_id = old_annot.get('track_id', None)
+                    #     if old_track_id is not None:
+                    #         new_track_id = track_id_map.remap(old_track_id)
+                    #         new_annot['track_id'] = new_track_id
+
                     update_ifnotin(new_annot, old_annot)
 
                     if kpcat_id_map:
@@ -6730,8 +6805,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                             new_annot['keypoints'] = new_keypoints
                     merged['annotations'].append(new_annot)
 
-                # Mark that we are not allowed to use the same track-ids again
-                track_id_map.block_seen()
+                # Mark that we are not allowed to use the same hacked track-ids
+                # again
+                if disjoint_tracks:
+                    hacked_track_id_map.block_seen()
             return merged
 
         # New behavior is simplified and I believe it is correct
