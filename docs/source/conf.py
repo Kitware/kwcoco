@@ -437,6 +437,7 @@ class GoogleStyleDocstringProcessor:
     """
 
     def __init__(self, autobuild=1):
+        self.debug = 1
         self.registry = {}
         if autobuild:
             self._register_builtins()
@@ -504,6 +505,17 @@ class GoogleStyleDocstringProcessor:
             new_lines.append('')
             new_lines.extend(lines[1:])
             return new_lines
+
+        # @self.register_section(tag='TODO', alias=['.. todo::'])
+        # def todo_section(lines):
+        #     """
+        #     Fixup todo sections
+        #     """
+        #     import xdev
+        #     xdev.embed()
+        #     import ubelt as ub
+        #     print('lines = {}'.format(ub.urepr(lines, nl=1)))
+        #     return new_lines
 
         @self.register_section(tag='Ignore')
         def ignore(lines):
@@ -615,10 +627,16 @@ class GoogleStyleDocstringProcessor:
             https://www.sphinx-doc.org/en/1.5.1/_modules/sphinx/ext/autodoc.html
             https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
         """
-        # print(f'name={name}')
+        if self.debug:
+            print(f'ProcessDocstring: name={name}, what_={what_}, num_lines={len(lines)}')
+
+        # if name == 'kwcoco.coco_dataset':
+        #     import xdev
+        #     xdev.embed()
+
         # print('BEFORE:')
-        # import ubelt as ub
-        # print('lines = {}'.format(ub.urepr(lines, nl=1)))
+        import ubelt as ub
+        print('lines = {}'.format(ub.urepr(lines, nl=1)))
 
         self.process(lines)
 
