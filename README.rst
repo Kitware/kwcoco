@@ -136,7 +136,7 @@ This should help you inspect (via stats and show), combine (via union), and
 make training splits (via split) using the command line. Also ships with
 toydata, which generates a COCO file you can use for testing. The kwcoco CLI
 has tab-complete features, but requires
-`enabling argcomplete <docs/source/on_autocomplete.rst>`_.
+`enabling argcomplete <docs/source/manual/on_autocomplete.rst>`_.
 
 
 Toy Data
@@ -286,7 +286,7 @@ An informal description of the spec given in: `kwcoco/coco_schema_informal.rst <
 
 For a formal description of the spec see the  `kwcoco/coco_schema.json <kwcoco/coco_schema.json>`_.
 
-For more information on the "warp" transforms see `warping_and_spaces <docs/source/concepts/warping_and_spaces.rst>`_.
+For more information on the "warp" transforms see `warping_and_spaces <docs/source/manual/concepts/warping_and_spaces.rst>`_.
 
 A high level overview of the structure - entities and their relationships - is shown in the following overview slide:
 
