@@ -76,3 +76,26 @@ def test_frames_are_in_order():
             'the probability we randomly have ordered image ids is low, '
             'and 0 when we seed the rng'
         )
+
+
+def test_lookup_annots_from_video():
+    # TODO: check this in SQL as well
+    import kwcoco
+    import ubelt as ub
+    dset = kwcoco.CocoDataset.demo('vidshapes8')
+
+    # Run lookup from video id
+    video_id = list(dset.videos())[0]
+    video_annots = dset.annots(video_id=video_id)
+
+    # Check all annots are indeed from that video
+    assert set(video_annots.images.lookup('video_id')) == {video_id}, (
+        'annots not from the right video'
+    )
+
+    # Check against lookup with brute force and assert no annots are missing.
+    annots = dset.annots()
+    vid_to_naids = ub.dict_hist(annots.images.lookup('video_id'))
+    assert len(video_annots) == vid_to_naids[video_id], (
+        'lookup did not return all annots',
+    )

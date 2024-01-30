@@ -5,7 +5,26 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.7.5 - Unreleased
+## Version 0.7.6 - Unreleased
+
+### Added
+* Add `video_id` argument to `CocoDataset.annots`
+* Can now specify render dictionary with `main_ext` and `main_channels` to `random_video_dset` to control demo data file format and the channel codes that are used.
+
+### Fixed:
+
+* Prevent resource crash: `find_json_unserializable` now checks for circular references.
+
+* Coco union now handles tracks.
+
+### Changed
+
+* The `disjoint_tracks` in `CocoDataset.union` now works on a "track-name"
+  level. Old behavior where track-ids did not need a corresponding "track"
+  entry is still preserved but may be removed in the future.
+
+
+## Version 0.7.5 - Released 2023-12-06
 
 ### Changed
 * Added `imgs_with_annots` to extended stats.

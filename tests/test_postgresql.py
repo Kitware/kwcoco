@@ -5,6 +5,9 @@ SeeAlso:
 
 
 def test_postgresql_cases():
+    """
+    pytest  ~/code/kwcoco/tests/test_postgresql.py -s
+    """
     import pytest
     import ubelt as ub
     try:
@@ -18,10 +21,12 @@ def test_postgresql_cases():
     from kwcoco.coco_sql_dataset import text, IS_GE_SQLALCH_2x
     dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
     # Add annots so there is an out of order track
-    dct_dset.add_annotation(**{'image_id': 6, 'track_id': 9001, 'bbox': [0, 0, 10, 10], 'category_id': 1})
-    dct_dset.add_annotation(**{'image_id': 3, 'track_id': 9001, 'bbox': [0, 0, 10, 10], 'category_id': 1})
-    dct_dset.add_annotation(**{'image_id': 5, 'track_id': 9001, 'bbox': [0, 0, 10, 10], 'category_id': 1})
-    dct_dset.add_annotation(**{'image_id': 4, 'track_id': 9001, 'bbox': [0, 0, 10, 10], 'category_id': 1})
+    ooo_track_id = 9001
+    dct_dset.add_track(name="ooo_track", id=ooo_track_id)
+    dct_dset.add_annotation(**{'image_id': 6, 'track_id': ooo_track_id, 'bbox': [0, 0, 10, 10], 'category_id': 1})
+    dct_dset.add_annotation(**{'image_id': 3, 'track_id': ooo_track_id, 'bbox': [0, 0, 10, 10], 'category_id': 1})
+    dct_dset.add_annotation(**{'image_id': 5, 'track_id': ooo_track_id, 'bbox': [0, 0, 10, 10], 'category_id': 1})
+    dct_dset.add_annotation(**{'image_id': 4, 'track_id': ooo_track_id, 'bbox': [0, 0, 10, 10], 'category_id': 1})
 
     new_fpath = ub.Path(dct_dset.fpath).augment(stemsuffix='_with_ooo_track', multidot=True)
     dct_dset.fpath = new_fpath
@@ -35,25 +40,33 @@ def test_postgresql_cases():
 
     annots = psql_dset.annots()
     track_ids = annots.lookup('track_id')
-    assert 0 in set(track_ids)
+    main_track_id = track_ids[0]
+    assert main_track_id in set(track_ids)
 
     ann1 = annots.objs[0]
     ann2 = psql_dset.index.anns._uncached_getitem(1)
     assert ann1['track_id'] == ann2.track_id
     assert ann1['track_id'] == track_ids[0]
 
-    # Target for aids with trackid=0
-    aids1 = dct_dset.annots(track_id=0)._ids
+    # Target for aids with main_track_id
+    aids1 = dct_dset.annots(track_id=main_track_id)._ids
+    aids2 = psql_dset.annots(track_id=main_track_id)._ids
+    assert list(aids2) == list(aids1)
 
     table = psql_dset.tabular_targets().pandas()
     table['track_ids'] = track_ids
     print(table)
 
+    # if 0:
+    #     import pandas as pd
+    #     raw_tables = psql_dset._raw_tables()
+    #     raw_annot_table = pd.DataFrame(raw_tables['annotations'])
+
     # Check that raw lookups work where we explicitly cast the key (v1)
     result = psql_dset.session.execute(text(ub.codeblock(
-        '''
+        f'''
         SELECT annotations.id FROM annotations
-        WHERE CAST(annotations.track_id as int) = 0
+        WHERE CAST(annotations.track_id as int) = {main_track_id}
         '''
     )))
     aids2 = [f[0] for f in result]
@@ -61,9 +74,9 @@ def test_postgresql_cases():
 
     # Check that raw lookups work where we explicitly cast the key (v2)
     result = psql_dset.session.execute(text(ub.codeblock(
-        '''
+        F'''
         SELECT annotations.id FROM annotations
-        WHERE annotations.track_id::int = 0
+        WHERE annotations.track_id::int = {main_track_id}
         '''
     )))
     aids2 = [f[0] for f in result]
@@ -71,9 +84,9 @@ def test_postgresql_cases():
 
     # Check that raw lookups work where we explicitly cast the query
     result = psql_dset.session.execute(text(ub.codeblock(
-        '''
+        f'''
         SELECT annotations.id FROM annotations
-        WHERE annotations.track_id = to_jsonb(0)
+        WHERE annotations.track_id = to_jsonb({main_track_id})
         '''
     )))
     psql_dset.session.rollback()
@@ -82,7 +95,7 @@ def test_postgresql_cases():
 
     id_group_dict_proxy = psql_dset.index.trackid_to_aids
     # This works ok  (before and after fix)
-    track_id_int = 0
+    track_id_int = main_track_id
     track_id_jsonb = sqlalchemy.func.to_jsonb(track_id_int)
     aids2 = id_group_dict_proxy._uncached_getitem(track_id_jsonb)
     assert list(aids2) == list(aids1)
@@ -92,7 +105,7 @@ def test_postgresql_cases():
     session = proxy.session
     keyattr = proxy.keyattr
     valattr = proxy.valattr
-    key = 9001
+    key = ooo_track_id
     from sqlalchemy.dialects.postgresql import JSONB
     dialect_name = session.get_bind().dialect.name
 
@@ -115,15 +128,15 @@ def test_postgresql_cases():
     HAS_FIX = 1
     if HAS_FIX:
         # Does not work before fix, but now does
-        track_id_int = 0
+        track_id_int = main_track_id
         aids2 = id_group_dict_proxy._uncached_getitem(track_id_int)
         assert list(aids2) == list(aids1)
 
-        aids2 = psql_dset.annots(track_id=0)._ids
+        aids2 = psql_dset.annots(track_id=main_track_id)._ids
         assert list(aids2) == list(aids1)
 
         # Does not work before fix, but now does
-        track_id_int = 9001
+        track_id_int = ooo_track_id
         ooo_aids2 = list(psql_dset.annots(track_id=track_id_int))
         ooo_aids1 = list(dct_dset.annots(track_id=track_id_int))
         assert list(ooo_aids2) == list(ooo_aids1)

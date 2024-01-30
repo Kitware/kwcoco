@@ -127,11 +127,15 @@ class UniqueNameRemapper(object):
         >>> assert self.remap('foo') == 'foo_v001'
         >>> assert self.remap('foo') == 'foo_v002'
         >>> assert self.remap('foo_v001') == 'foo_v003'
+        >>> assert 'foo' in self
     """
     def __init__(self):
         import re
         self._seen = set()
         self.suffix_pat = re.compile(r'(.*)_v(\d+)')
+
+    def __contains__(self, name):
+        return name in self._seen
 
     def remap(self, name):
         suffix_pat = self.suffix_pat

@@ -144,20 +144,41 @@ def find_json_unserializable(data, quickcheck=False):
         >>>         assert part['data'] is key[1]
         >>>     else:
         >>>         assert part['data'] is curr
+
+    Example:
+        >>> # xdoctest: +SKIP("TODO: circular ref detect algo is wrong, fix it")
+        >>> from kwcoco.util.util_json import *  # NOQA
+        >>> import pytest
+        >>> # Test circular reference
+        >>> data = [[], {'a': []}]
+        >>> data[1]['a'].append(data)
+        >>> with pytest.raises(ValueError, match="Circular reference detected at.*1, 'a', 1*"):
+        ...     parts = list(find_json_unserializable(data))
+        >>> # Should be ok here
+        >>> shared_data = {'shared': 1}
+        >>> data = [[shared_data], shared_data]
+        >>> parts = list(find_json_unserializable(data))
+
     """
     needs_check = True
+
     if quickcheck:
         try:
             # Might be a more efficient way to do this check. We duplicate a lot of
             # work by doing the check for unserializable data this way.
             json.dumps(data)
         except Exception:
+            # if 'Circular reference detected' in str(ex):
+            #     has_circular_reference = True
             # If there is unserializable data, find out where it is.
             # is_serializable = False
             pass
         else:
             # is_serializable = True
             needs_check = False
+
+    # FIXME: the algo is wrong, fails when
+    CHECK_FOR_CIRCULAR_REFERENCES = 0
 
     if needs_check:
         # mode = 'new'
@@ -166,7 +187,23 @@ def find_json_unserializable(data, quickcheck=False):
         container_types = (tuple, list, dict)
         serializable_types = scalar_types + container_types
         walker = ub.IndexableWalker(data)
+
+        if CHECK_FOR_CIRCULAR_REFERENCES:
+            seen_ids = set()
+
         for prefix, value in walker:
+
+            if CHECK_FOR_CIRCULAR_REFERENCES:
+                # FIXME: We need to know if this container id is in this paths
+                # ancestors. It is allowed to be elsewhere in the data
+                # structure (i.e. the pointer graph must be a DAG)
+                if isinstance(value, container_types):
+                    container_id = id(value)
+                    if container_id in seen_ids:
+                        circ_loc = {'loc': prefix, 'data': value}
+                        raise ValueError(f'Circular reference detected at {circ_loc}')
+                    seen_ids.add(container_id)
+
             *root, key = prefix
             if not isinstance(key, scalar_types):
                 # Special case where a dict key is the error value

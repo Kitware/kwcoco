@@ -68,7 +68,7 @@ class CocoInfoCLI(scfg.DataConfig):
 
     src = scfg.Value(None, help='input kwcoco path', position=1)
 
-    show_info = scfg.Value(True, isflag=True, help='The number of info dictionaries to show. if True, show all of them', short_alias=['i'])
+    show_info = scfg.Value('auto', isflag=True, help='The number of info dictionaries to show. if True, show all of them. The default of "auto" works around an issue. It is set to True if no other table is shown and 0 otherwise', short_alias=['i'])
     show_licenses = scfg.Value(0, isflag=True, help='The number of licenses dictionaries to show. if True, show all of them', short_alias=['l'])
     show_categories = scfg.Value(0, isflag=True, help='The number of category dictionaries to show. if True, show all of them', short_alias=['c'])
     show_videos = scfg.Value(0, isflag=True, help='The number of video dictionaries to show. if True, show all of them', short_alias=['v'])
@@ -172,23 +172,42 @@ class CocoInfoCLI(scfg.DataConfig):
             file = _cocofile._open()
             ijson_parser = ijson_ext.parse(file, use_float=True)
 
-            num_infos = float('inf') if config.show_info is True else int(config.show_info)
-            num_videos = float('inf') if config.show_videos is True else int(config.show_videos)
-            num_images = float('inf') if config.show_images is True else int(config.show_images)
-            num_tracks = float('inf') if config.show_tracks is True else int(config.show_tracks)
-            num_annotations = float('inf') if config.show_annotations is True else int(config.show_annotations)
-            num_categories = float('inf') if config.show_categories is True else int(config.show_categories)
-            num_licenses = float('inf') if config.show_licenses is True else int(config.show_licenses)
+            config_table_keys = {
+                'show_info': 'info',
+                'show_licenses': 'licenses',
+                'show_categories': 'categories',
+                'show_videos': 'videos',
+                'show_images': 'images',
+                'show_tracks': 'tracks',
+                'show_annotations': 'annotations',
+            }
+            parent_to_num = {}
+            max_value = 0
+            auto_keys = []
+            for config_key, table_name in config_table_keys.items():
+                value = config[config_key]
+                if value is True:
+                    value = float('inf')
+                elif value == 'auto':
+                    auto_keys.append(config_key)
+                    continue
+                else:
+                    try:
+                        value = int(value)
+                    except Exception:
+                        value = float(value)
 
-            parent_to_num = ub.odict([
-                ("info", num_infos),
-                ("licenses", num_licenses),
-                ("categories", num_categories),
-                ("videos", num_videos),
-                ("images", num_images),
-                ("tracks", num_tracks),
-                ("annotations", num_annotations),
-            ])
+                max_value = max(max_value, value)
+                parent_to_num[table_name] = value
+
+            # If any table is set to a non-zero number of rows to show, then
+            # set all auto values to zero, otherwise set them to inf.
+            for config_key in auto_keys:
+                table_name = config_table_keys[config_key]
+                if max_value > 0:
+                    parent_to_num[table_name] = 0
+                else:
+                    parent_to_num[table_name] = float('inf')
 
             parent_to_request = {}
 

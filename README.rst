@@ -3,7 +3,7 @@ KWCOCO - The Kitware COCO Module
 
 .. # TODO Get CI services running on gitlab
 
-|GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |Downloads| |ReadTheDocs|
+|GitlabCIPipeline| |GitlabCICoverage| |Appveyor| |Pypi| |PypiDownloads| |ReadTheDocs|
 
 +------------------+------------------------------------------------------------------------------------------------------------+
 | Read the docs    | https://kwcoco.readthedocs.io                                                                              |
@@ -772,10 +772,20 @@ There are several other COCO libraries available:
 * https://pypi.org/project/fast-coco-eval/
 * https://pypi.org/project/coco-assistant/
 * https://pypi.org/project/cocorepr/
+* https://github.com/jaspersiebring/GeoCOCO
+* https://www.researchgate.net/figure/COCO-CameraTraps-data-format_fig5_326412262
+* https://github.com/microsoft/CameraTraps
 
 Tools that work with COCO files:
 
 * https://voxel51.com/docs/fiftyone/
+* https://labelstud.io/guide/export.html#COCO
+
+
+Projects that use the COCO format:
+
+* https://github.com/arpanmukherjee/Into-The-Wild-Animal-Detection-and-Classification
+* https://github.com/amurto/jeev-rakshak
 
 
 
@@ -787,18 +797,18 @@ Tools that work with COCO files:
 .. |Pypi| image:: https://img.shields.io/pypi/v/kwcoco.svg
    :target: https://pypi.python.org/pypi/kwcoco
 
-.. |Downloads| image:: https://img.shields.io/pypi/dm/kwcoco.svg
+.. |PypiDownloads| image:: https://img.shields.io/pypi/dm/kwcoco.svg
    :target: https://pypistats.org/packages/kwcoco
 
 .. |ReadTheDocs| image:: https://readthedocs.org/projects/kwcoco/badge/?version=release
     :target: https://kwcoco.readthedocs.io/en/release/
 
 .. # See: https://ci.appveyor.com/project/jon.crall/kwcoco/settings/badges
-.. |Appveyor| image:: https://ci.appveyor.com/api/projects/status/py3s2d6tyfjc8lm3/branch/master?svg=true
-   :target: https://ci.appveyor.com/project/jon.crall/kwcoco/branch/master
+.. |Appveyor| image:: https://ci.appveyor.com/api/projects/status/py3s2d6tyfjc8lm3/branch/main?svg=true
+   :target: https://ci.appveyor.com/project/jon.crall/kwcoco/branch/main
 
-.. |GitlabCIPipeline| image:: https://gitlab.kitware.com/computer-vision/kwcoco/badges/master/pipeline.svg
+.. |GitlabCIPipeline| image:: https://gitlab.kitware.com/computer-vision/kwcoco/badges/main/pipeline.svg
    :target: https://gitlab.kitware.com/computer-vision/kwcoco/-/jobs
 
-.. |GitlabCICoverage| image:: https://gitlab.kitware.com/computer-vision/kwcoco/badges/master/coverage.svg
-    :target: https://gitlab.kitware.com/computer-vision/kwcoco/commits/master
+.. |GitlabCICoverage| image:: https://gitlab.kitware.com/computer-vision/kwcoco/badges/main/coverage.svg
+    :target: https://gitlab.kitware.com/computer-vision/kwcoco/commits/main

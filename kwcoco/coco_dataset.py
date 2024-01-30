@@ -78,10 +78,11 @@ from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco import exceptions
 
 from kwcoco._helpers import (
-    SortedSet, UniqueNameRemapper, _ID_Remapper, _NextId,
+    SortedSet, UniqueNameRemapper, _NextId,
     _delitems, _lut_image_frame_index, _lut_annot_frame_index,
     _load_and_postprocess, _image_corruption_check
 )
+from kwcoco._helpers import _ID_Remapper
 
 import json as pjson
 from types import ModuleType
@@ -829,9 +830,9 @@ class MixinCocoAccessors:
         return image
 
 
-class MixinCocoExtras:
+class MixinCocoConstructors:
     """
-    Misc functions for coco
+    Classmethods for constructing CocoDataset objects
     """
 
     @classmethod
@@ -1196,6 +1197,25 @@ class MixinCocoExtras:
             raise KeyError(key)
         return self
 
+    @classmethod
+    def random(cls, rng=None):
+        """
+        Creates a random CocoDataset according to distribution parameters
+
+        TODO:
+            - [ ] parametarize
+        """
+        from kwcoco.demo.toydata_video import random_single_video_dset
+        dset = random_single_video_dset(num_frames=5, num_tracks=3,
+                                        tid_start=1, rng=rng)
+        return dset
+
+
+class MixinCocoExtras:
+    """
+    Misc functions for coco
+    """
+
     def _tree(self):
         """
         developer helper
@@ -1222,299 +1242,6 @@ class MixinCocoExtras:
         if not self.bundle_dpath:
             raise Exception('We dont have a bundle')
         _ = ub.cmd('tree {}'.format(self.bundle_dpath), verbose=2)  # NOQA
-
-    @classmethod
-    def random(cls, rng=None):
-        """
-        Creates a random CocoDataset according to distribution parameters
-
-        TODO:
-            - [ ] parametarize
-        """
-        from kwcoco.demo.toydata_video import random_single_video_dset
-        dset = random_single_video_dset(num_frames=5, num_tracks=3,
-                                        tid_start=1, rng=rng)
-        return dset
-
-    def _build_hashid(self, hash_pixels=False, verbose=0):
-        """
-        Construct a hash that uniquely identifies the state of this dataset.
-
-        Args:
-            hash_pixels (bool):
-                If False the image data is not included in the hash, which can
-                speed up computation, but is not 100% robust. Defaults to
-                False.
-
-            verbose (int): verbosity level
-
-        Returns:
-            str: the hashid
-
-        Example:
-            >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
-            >>> self._build_hashid(hash_pixels=True, verbose=3)
-            ...
-            >>> # Shorten hashes for readability
-            >>> import ubelt as ub
-            >>> walker = ub.IndexableWalker(self.hashid_parts)
-            >>> for path, val in walker:
-            >>>     if isinstance(val, str):
-            >>>         walker[path] = val[0:8]
-            >>> # Note: this may change in different versions of kwcoco
-            >>> print('self.hashid_parts = ' + ub.urepr(self.hashid_parts))
-            >>> print('self.hashid = {!r}'.format(self.hashid[0:8]))
-            self.hashid_parts = {
-                'annotations': {
-                    'json': 'c1d1b9c3',
-                    'num': 11,
-                },
-                'images': {
-                    'pixels': '88e37cc3',
-                    'json': '9b8e8be3',
-                    'num': 3,
-                },
-                'categories': {
-                    'json': '82d22e00',
-                    'num': 8,
-                },
-            }
-            self.hashid = 'bf69bf15'
-
-        Example:
-            >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
-            >>> self._build_hashid(hash_pixels=True, verbose=3)
-            >>> self.hashid_parts
-            >>> # Test that when we modify the dataset only the relevant
-            >>> # hashid parts are recomputed.
-            >>> orig = self.hashid_parts['categories']['json']
-            >>> self.add_category('foobar')
-            >>> assert 'categories' not in self.hashid_parts
-            >>> self.hashid_parts
-            >>> self.hashid_parts['images']['json'] = 'should not change'
-            >>> self._build_hashid(hash_pixels=True, verbose=3)
-            >>> assert self.hashid_parts['categories']['json']
-            >>> assert self.hashid_parts['categories']['json'] != orig
-            >>> assert self.hashid_parts['images']['json'] == 'should not change'
-        """
-        # Construct nested container that we will populate with hashable
-        # info corresponding to each type of data that we track.
-        hashid_parts = self.hashid_parts
-        if hashid_parts is None:
-            hashid_parts = OrderedDict()
-
-        # TODO: hashid for videos? Maybe?
-
-        # Ensure hashid_parts has the proper root structure
-        # TODO: rely on subet of SPEC_KEYS
-        parts = ['annotations', 'images', 'categories']
-        for part in parts:
-            if not hashid_parts.get(part, None):
-                hashid_parts[part] = OrderedDict()
-
-        rebuild_parts = []
-        reuse_parts = []
-
-        gids = None
-        if hash_pixels:
-            if not hashid_parts['images'].get('pixels', None):
-                gids = sorted(self.imgs.keys())
-                gpaths = [join(self.bundle_dpath, gname)
-                          for gname in self.images(gids).lookup('file_name')]
-                gpath_sha512s = [
-                    ub.hash_file(gpath, hasher='sha512')
-                    for gpath in ub.ProgIter(gpaths, desc='hashing images',
-                                             verbose=verbose)
-                ]
-                hashid_parts['images']['pixels'] = ub.hash_data(gpath_sha512s)
-                rebuild_parts.append('images.pixels')
-            else:
-                reuse_parts.append('images.pixels')
-
-        # Hash individual components
-        with ub.Timer(label='hash coco parts', verbose=verbose > 1):
-            # Dumping annots to json takes the longest amount of time
-            # However, its faster than hashing the data directly
-            def _ditems(d):
-                # return sorted(d.items())
-                return list(d.items()) if isinstance(d, OrderedDict) else sorted(d.items())
-
-            if not hashid_parts['annotations'].get('json', None):
-                aids = sorted(self.anns.keys())
-                _anns_ordered = (self.anns[aid] for aid in aids)
-                anns_ordered = [_ditems(ann) for ann in _anns_ordered]
-                try:
-                    anns_text = json_w.dumps(anns_ordered)
-                except TypeError:
-                    if __debug__:
-                        for ann in anns_ordered:
-                            try:
-                                json_w.dumps(ann)
-                            except TypeError:
-                                print('FAILED TO ENCODE ann = {!r}'.format(ann))
-                                break
-                    raise
-
-                hashid_parts['annotations']['json'] = ub.hash_data(
-                    anns_text, hasher='sha512')
-                hashid_parts['annotations']['num'] = len(aids)
-                rebuild_parts.append('annotations.json')
-            else:
-                reuse_parts.append('annotations.json')
-
-            if not hashid_parts['images'].get('json', None):
-                if gids is None:
-                    gids = sorted(self.imgs.keys())
-                imgs_text = json_w.dumps(
-                    [_ditems(self.imgs[gid]) for gid in gids])
-                hashid_parts['images']['json'] = ub.hash_data(
-                    imgs_text, hasher='sha512')
-                hashid_parts['images']['num'] = len(gids)
-                rebuild_parts.append('images.json')
-            else:
-                reuse_parts.append('images.json')
-
-            if not hashid_parts['categories'].get('json', None):
-                cids = sorted(self.cats.keys())
-                cats_text = json_w.dumps(
-                    [_ditems(self.cats[cid]) for cid in cids])
-                hashid_parts['categories']['json'] = ub.hash_data(
-                    cats_text, hasher='sha512')
-                hashid_parts['categories']['num'] = len(cids)
-                rebuild_parts.append('categories.json')
-            else:
-                reuse_parts.append('categories.json')
-
-            # TODO:
-            # if not hashid_parts['tracks'].get('json', None):
-            #     cids = sorted(self.index.tracks.keys())
-            #     cats_text = json_w.dumps(
-            #         [_ditems(self.index.tracks[cid]) for cid in cids])
-            #     hashid_parts['tracks']['json'] = ub.hash_data(
-            #         cats_text, hasher='sha512')
-            #     hashid_parts['tracks']['num'] = len(cids)
-            #     rebuild_parts.append('tracks.json')
-            # else:
-            #     reuse_parts.append('tracks.json')
-
-        if verbose > 1:
-            if reuse_parts:
-                print('Reused hashid_parts: {}'.format(reuse_parts))
-                print('Rebuilt hashid_parts: {}'.format(rebuild_parts))
-
-        hashid = ub.hash_data(hashid_parts)
-        self.hashid = hashid
-        self.hashid_parts = hashid_parts
-        return hashid
-
-    def _invalidate_hashid(self, parts=None):
-        """
-        Called whenever the coco dataset is modified. It is possible to specify
-        which parts were modified so unmodified parts can be reused next time
-        the hash is constructed.
-
-        TODO:
-            - [ ] Rename to _notify_modification --- or something like that
-        """
-        self._state['was_modified'] = True
-        self.hashid = None
-        if parts is not None and self.hashid_parts is not None:
-            for part in parts:
-                self.hashid_parts.pop(part, None)
-        else:
-            self.hashid_parts = None
-
-    def _cached_hashid(self):
-        """
-        Under Construction.
-
-        The idea is to cache the hashid when we are sure that the dataset was
-        loaded from a file and has not been modified.  We can record the
-        modification time of the file (because we know it hasn't changed in
-        memory), and use that as a key to the cache. If the modification time
-        on the file is different than the one recorded in the cache, we know
-        the cache could be invalid, so we recompute the hashid.
-        """
-        cache_miss = True
-        enable_cache = (
-            self._state['was_loaded'] and
-            not self._state['was_modified']
-        )
-        if enable_cache:
-            coco_fpath = ub.Path(self.fpath)
-            enable_cache = coco_fpath.exists()
-
-        if enable_cache:
-            cache_dpath = (coco_fpath.parent / '_cache')
-            cache_fname = coco_fpath.name + '.hashid.cache'
-            hashid_sidecar_fpath = cache_dpath / cache_fname
-            # Generate current lookup key
-            fpath_stat = coco_fpath.stat()
-            status_key = {
-                'st_size': fpath_stat.st_size,
-                'st_mtime': fpath_stat.st_mtime
-            }
-            if hashid_sidecar_fpath.exists():
-                cached_data = json_r.loads(hashid_sidecar_fpath.read_text())
-                if cached_data['status_key'] == status_key:
-                    self.hashid = cached_data['hashid']
-                    self.hashid_parts = cached_data['hashid_parts']
-                    cache_miss = False
-
-        if cache_miss:
-            self._build_hashid()
-            if enable_cache:
-                hashid_cache_data = {
-                    'hashid': self.hashid,
-                    'hashid_parts': self.hashid_parts,
-                    'status_key': status_key,
-                }
-                try:
-                    hashid_sidecar_fpath.parent.ensuredir()
-                    hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
-                except PermissionError as ex:
-                    warnings.warn(f'Cannot write a cached hashid: {repr(ex)}')
-        return self.hashid
-
-    @classmethod
-    def _cached_hashid_for(cls, fpath):
-        """
-        Lookup the cached hashid for a kwcoco json file if it exists.
-        """
-        coco_fpath = ub.Path(fpath)
-        enable_cache = coco_fpath.exists()
-
-        if enable_cache:
-            cache_dpath = (coco_fpath.parent / '_cache')
-            cache_fname = coco_fpath.name + '.hashid.cache'
-            hashid_sidecar_fpath = cache_dpath / cache_fname
-            # Generate current lookup key
-            fpath_stat = coco_fpath.stat()
-            status_key = {
-                'st_size': fpath_stat.st_size,
-                'st_mtime': fpath_stat.st_mtime
-            }
-            if hashid_sidecar_fpath.exists():
-                cached_data = json_r.loads(hashid_sidecar_fpath.read_text())
-                if cached_data['status_key'] == status_key:
-                    cached_data['hashid']
-                    cached_data['hashid_parts']
-                    cache_miss = False
-
-        if cache_miss:
-            raise Exception("cache miss")
-            # TODO: fixme?
-            # self._build_hashid()
-            # if enable_cache:
-            #     hashid_cache_data = {
-            #         'hashid': self.hashid,
-            #         'hashid_parts': self.hashid_parts,
-            #         'status_key': status_key,
-            #     }
-            #     hashid_sidecar_fpath.parent.ensuredir()
-            #     hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
 
     def _dataset_id(self):
         """
@@ -2197,6 +1924,295 @@ class MixinCocoExtras:
         self.fpath = value
 
 
+class MixinCocoHashing:
+    """
+    Mixin for creating and maintaining hashids (i.e. content identifiers)
+    """
+
+    def _build_hashid(self, hash_pixels=False, verbose=0):
+        """
+        Construct a hash that uniquely identifies the state of this dataset.
+
+        Args:
+            hash_pixels (bool):
+                If False the image data is not included in the hash, which can
+                speed up computation, but is not 100% robust. Defaults to
+                False.
+
+            verbose (int): verbosity level
+
+        Returns:
+            str: the hashid
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> self._build_hashid(hash_pixels=True, verbose=3)
+            ...
+            >>> # Shorten hashes for readability
+            >>> import ubelt as ub
+            >>> walker = ub.IndexableWalker(self.hashid_parts)
+            >>> for path, val in walker:
+            >>>     if isinstance(val, str):
+            >>>         walker[path] = val[0:8]
+            >>> # Note: this may change in different versions of kwcoco
+            >>> print('self.hashid_parts = ' + ub.urepr(self.hashid_parts))
+            >>> print('self.hashid = {!r}'.format(self.hashid[0:8]))
+            self.hashid_parts = {
+                'annotations': {
+                    'json': 'c1d1b9c3',
+                    'num': 11,
+                },
+                'images': {
+                    'pixels': '88e37cc3',
+                    'json': '9b8e8be3',
+                    'num': 3,
+                },
+                'categories': {
+                    'json': '82d22e00',
+                    'num': 8,
+                },
+            }
+            self.hashid = 'bf69bf15'
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> self._build_hashid(hash_pixels=True, verbose=3)
+            >>> self.hashid_parts
+            >>> # Test that when we modify the dataset only the relevant
+            >>> # hashid parts are recomputed.
+            >>> orig = self.hashid_parts['categories']['json']
+            >>> self.add_category('foobar')
+            >>> assert 'categories' not in self.hashid_parts
+            >>> self.hashid_parts
+            >>> self.hashid_parts['images']['json'] = 'should not change'
+            >>> self._build_hashid(hash_pixels=True, verbose=3)
+            >>> assert self.hashid_parts['categories']['json']
+            >>> assert self.hashid_parts['categories']['json'] != orig
+            >>> assert self.hashid_parts['images']['json'] == 'should not change'
+        """
+        # Construct nested container that we will populate with hashable
+        # info corresponding to each type of data that we track.
+        hashid_parts = self.hashid_parts
+        if hashid_parts is None:
+            hashid_parts = OrderedDict()
+
+        # TODO: hashid for videos? Maybe?
+
+        # Ensure hashid_parts has the proper root structure
+        # TODO: rely on subet of SPEC_KEYS
+        parts = ['annotations', 'images', 'categories']
+        for part in parts:
+            if not hashid_parts.get(part, None):
+                hashid_parts[part] = OrderedDict()
+
+        rebuild_parts = []
+        reuse_parts = []
+
+        gids = None
+        if hash_pixels:
+            if not hashid_parts['images'].get('pixels', None):
+                gids = sorted(self.imgs.keys())
+                gpaths = [join(self.bundle_dpath, gname)
+                          for gname in self.images(gids).lookup('file_name')]
+                gpath_sha512s = [
+                    ub.hash_file(gpath, hasher='sha512')
+                    for gpath in ub.ProgIter(gpaths, desc='hashing images',
+                                             verbose=verbose)
+                ]
+                hashid_parts['images']['pixels'] = ub.hash_data(gpath_sha512s)
+                rebuild_parts.append('images.pixels')
+            else:
+                reuse_parts.append('images.pixels')
+
+        # Hash individual components
+        with ub.Timer(label='hash coco parts', verbose=verbose > 1):
+            # Dumping annots to json takes the longest amount of time
+            # However, its faster than hashing the data directly
+            def _ditems(d):
+                # return sorted(d.items())
+                return list(d.items()) if isinstance(d, OrderedDict) else sorted(d.items())
+
+            if not hashid_parts['annotations'].get('json', None):
+                aids = sorted(self.anns.keys())
+                _anns_ordered = (self.anns[aid] for aid in aids)
+                anns_ordered = [_ditems(ann) for ann in _anns_ordered]
+                try:
+                    anns_text = json_w.dumps(anns_ordered)
+                except TypeError:
+                    if __debug__:
+                        for ann in anns_ordered:
+                            try:
+                                json_w.dumps(ann)
+                            except TypeError:
+                                print('FAILED TO ENCODE ann = {!r}'.format(ann))
+                                break
+                    raise
+
+                hashid_parts['annotations']['json'] = ub.hash_data(
+                    anns_text, hasher='sha512')
+                hashid_parts['annotations']['num'] = len(aids)
+                rebuild_parts.append('annotations.json')
+            else:
+                reuse_parts.append('annotations.json')
+
+            if not hashid_parts['images'].get('json', None):
+                if gids is None:
+                    gids = sorted(self.imgs.keys())
+                imgs_text = json_w.dumps(
+                    [_ditems(self.imgs[gid]) for gid in gids])
+                hashid_parts['images']['json'] = ub.hash_data(
+                    imgs_text, hasher='sha512')
+                hashid_parts['images']['num'] = len(gids)
+                rebuild_parts.append('images.json')
+            else:
+                reuse_parts.append('images.json')
+
+            if not hashid_parts['categories'].get('json', None):
+                cids = sorted(self.cats.keys())
+                cats_text = json_w.dumps(
+                    [_ditems(self.cats[cid]) for cid in cids])
+                hashid_parts['categories']['json'] = ub.hash_data(
+                    cats_text, hasher='sha512')
+                hashid_parts['categories']['num'] = len(cids)
+                rebuild_parts.append('categories.json')
+            else:
+                reuse_parts.append('categories.json')
+
+            # TODO:
+            # if not hashid_parts['tracks'].get('json', None):
+            #     cids = sorted(self.index.tracks.keys())
+            #     cats_text = json_w.dumps(
+            #         [_ditems(self.index.tracks[cid]) for cid in cids])
+            #     hashid_parts['tracks']['json'] = ub.hash_data(
+            #         cats_text, hasher='sha512')
+            #     hashid_parts['tracks']['num'] = len(cids)
+            #     rebuild_parts.append('tracks.json')
+            # else:
+            #     reuse_parts.append('tracks.json')
+
+        if verbose > 1:
+            if reuse_parts:
+                print('Reused hashid_parts: {}'.format(reuse_parts))
+                print('Rebuilt hashid_parts: {}'.format(rebuild_parts))
+
+        hashid = ub.hash_data(hashid_parts)
+        self.hashid = hashid
+        self.hashid_parts = hashid_parts
+        return hashid
+
+    def _invalidate_hashid(self, parts=None):
+        """
+        Called whenever the coco dataset is modified. It is possible to specify
+        which parts were modified so unmodified parts can be reused next time
+        the hash is constructed.
+
+        TODO:
+            - [ ] Rename to _notify_modification --- or something like that
+        """
+        self._state['was_modified'] = True
+        self.hashid = None
+        if parts is not None and self.hashid_parts is not None:
+            for part in parts:
+                self.hashid_parts.pop(part, None)
+        else:
+            self.hashid_parts = None
+
+    def _cached_hashid(self):
+        """
+        Under Construction.
+
+        The idea is to cache the hashid when we are sure that the dataset was
+        loaded from a file and has not been modified.  We can record the
+        modification time of the file (because we know it hasn't changed in
+        memory), and use that as a key to the cache. If the modification time
+        on the file is different than the one recorded in the cache, we know
+        the cache could be invalid, so we recompute the hashid.
+
+        TODO:
+            - [ ] This is reasonably stable, elevate this to a public API function.
+        """
+        cache_miss = True
+        enable_cache = (
+            self._state['was_loaded'] and
+            not self._state['was_modified']
+        )
+        if enable_cache:
+            coco_fpath = ub.Path(self.fpath)
+            enable_cache = coco_fpath.exists()
+
+        if enable_cache:
+            cache_dpath = (coco_fpath.parent / '_cache')
+            cache_fname = coco_fpath.name + '.hashid.cache'
+            hashid_sidecar_fpath = cache_dpath / cache_fname
+            # Generate current lookup key
+            fpath_stat = coco_fpath.stat()
+            status_key = {
+                'st_size': fpath_stat.st_size,
+                'st_mtime': fpath_stat.st_mtime
+            }
+            if hashid_sidecar_fpath.exists():
+                cached_data = json_r.loads(hashid_sidecar_fpath.read_text())
+                if cached_data['status_key'] == status_key:
+                    self.hashid = cached_data['hashid']
+                    self.hashid_parts = cached_data['hashid_parts']
+                    cache_miss = False
+
+        if cache_miss:
+            self._build_hashid()
+            if enable_cache:
+                hashid_cache_data = {
+                    'hashid': self.hashid,
+                    'hashid_parts': self.hashid_parts,
+                    'status_key': status_key,
+                }
+                try:
+                    hashid_sidecar_fpath.parent.ensuredir()
+                    hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+                except PermissionError as ex:
+                    warnings.warn(f'Cannot write a cached hashid: {repr(ex)}')
+        return self.hashid
+
+    @classmethod
+    def _cached_hashid_for(cls, fpath):
+        """
+        Lookup the cached hashid for a kwcoco json file if it exists.
+        """
+        coco_fpath = ub.Path(fpath)
+        enable_cache = coco_fpath.exists()
+
+        if enable_cache:
+            cache_dpath = (coco_fpath.parent / '_cache')
+            cache_fname = coco_fpath.name + '.hashid.cache'
+            hashid_sidecar_fpath = cache_dpath / cache_fname
+            # Generate current lookup key
+            fpath_stat = coco_fpath.stat()
+            status_key = {
+                'st_size': fpath_stat.st_size,
+                'st_mtime': fpath_stat.st_mtime
+            }
+            if hashid_sidecar_fpath.exists():
+                cached_data = json_r.loads(hashid_sidecar_fpath.read_text())
+                if cached_data['status_key'] == status_key:
+                    cached_data['hashid']
+                    cached_data['hashid_parts']
+                    cache_miss = False
+
+        if cache_miss:
+            # TODO: fixme?
+            # self._build_hashid()
+            # if enable_cache:
+            #     hashid_cache_data = {
+            #         'hashid': self.hashid,
+            #         'hashid_parts': self.hashid_parts,
+            #         'status_key': status_key,
+            #     }
+            #     hashid_sidecar_fpath.parent.ensuredir()
+            #     hashid_sidecar_fpath.write_text(json_w.dumps(hashid_cache_data))
+            raise Exception("cache miss")
+
+
 class MixinCocoObjects:
     """
     Expose methods to construct object lists / groups.
@@ -2204,7 +2220,7 @@ class MixinCocoObjects:
     This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
-    def annots(self, annot_ids=None, image_id=None, track_id=None, trackid=None, aids=None, gid=None):
+    def annots(self, annot_ids=None, image_id=None, track_id=None, video_id=None, trackid=None, aids=None, gid=None):
         """
         Return vectorized annotation objects
 
@@ -2222,6 +2238,10 @@ class MixinCocoObjects:
                 return all annotations that belong to this track.
                 mutually exclusive with other arguments.
                 An alias is "trackid", which may be removed in the future.
+
+            video_id (int | None):
+                return all annotations that belong to this video.
+                mutually exclusive with other arguments.
 
         Returns:
             kwcoco.coco_objects1d.Annots: vectorized annotation object
@@ -2260,6 +2280,11 @@ class MixinCocoObjects:
 
         if track_id is not None:
             annot_ids = self.index.trackid_to_aids[track_id]
+
+        if video_id is not None:
+            annot_ids = sorted(ub.flatten([
+                self.index.gid_to_aids[gid]
+                for gid in self.index.vidid_to_gids[video_id]]))
 
         if annot_ids is None:
             annot_ids = sorted(self.index.anns.keys())
@@ -5317,8 +5342,9 @@ class MixinCocoIndex:
 
 class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                   MixinCocoObjects, MixinCocoDraw,
-                  MixinCocoAccessors, MixinCocoExtras, MixinCocoIndex,
-                  MixinCocoDepricate, ub.NiceRepr):
+                  MixinCocoAccessors, MixinCocoConstructors, MixinCocoExtras,
+                  MixinCocoHashing, MixinCocoIndex, MixinCocoDepricate,
+                  ub.NiceRepr):
     """
     The main coco dataset class with a json dataset backend.
 
@@ -5710,6 +5736,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
     def from_data(CocoDataset, data, bundle_dpath=None, img_root=None):
         """
         Constructor from a json dictionary
+
+        Returns:
+            CocoDataset:
         """
         coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
                                 img_root=img_root)
@@ -5726,6 +5755,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         Args:
             gpaths (List[str]): list of image paths
 
+        Returns:
+            CocoDataset:
+
         Example:
             >>> import kwcoco
             >>> coco_dset = kwcoco.CocoDataset.from_image_paths(['a.png', 'b.png'])
@@ -5734,6 +5766,33 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         coco_dset = CocoDataset(bundle_dpath=bundle_dpath, img_root=img_root)
         for gpath in gpaths:
             coco_dset.add_image(gpath)
+        return coco_dset
+
+    @classmethod
+    def from_class_image_paths(CocoDataset, root):
+        """
+        Ingest classification data in the common format where images of
+        different categories are stored in folders with the category label.
+
+        Args:
+            root (str | PathLike):
+                the path to a directory containing class-subdirectories
+
+        Returns:
+            CocoDataset:
+        """
+        import kwimage
+        root = ub.Path(root)
+        subdirs = [child for child in root.glob('*') if child.is_dir()]
+        coco_dset = CocoDataset(bundle_dpath=root)
+        for subdir in subdirs:
+            catname = subdir.name
+            cat_id = coco_dset.ensure_category(catname)
+            for gpath in subdir.glob('*'):
+                h, w = kwimage.load_image_shape(gpath)[0:2]
+                image_id = coco_dset.add_image(gpath)
+                coco_dset.add_annotation(
+                    bbox=[0, 0, w, h], category_id=cat_id, image_id=image_id)
         return coco_dset
 
     @classmethod
@@ -6078,6 +6137,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                 ensure_ascii=False)
                 except Exception as ex:
                     print('Failed to dump ex = {!r}'.format(ex))
+                    if 'Circular reference detected' in str(ex):
+                        raise
                     self._check_json_serializable()
                     raise
         self._state['was_saved'] = True
@@ -6343,9 +6404,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 like a classmethod, "others" will be empty by default.
 
             disjoint_tracks (bool):
-                if True, we will assume track-ids are disjoint and if two
-                datasets share the same track-id, we will disambiguate them.
+                if True, we will assume track-names are disjoint and if two
+                datasets share the same track-name, we will disambiguate them.
                 Otherwise they will be copied over as-is. Defaults to True.
+                In most cases you do not want to set this to False.
 
             remember_parent (bool):
                 if True, videos and images will save information about their
@@ -6457,6 +6519,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # mean that they are the same image.
         unique_img_names = UniqueNameRemapper()
         unique_video_names = UniqueNameRemapper()
+        unique_track_names = UniqueNameRemapper()
 
         def update_ifnotin(d1, d2):
             """ copies keys from d2 that doent exist in d1 into d1 """
@@ -6482,6 +6545,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 ('categories', []),
                 ('videos', []),
                 ('images', []),
+                ('tracks', []),
                 ('annotations', []),
             ])
 
@@ -6500,16 +6564,30 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             _all_vidids = (video['id'] for video in _all_videos)
             preserve_vidids = not _has_duplicates(_all_vidids)
 
+            _all_tracks = (track for _, _, d in relative_dsets
+                           for track in (d.get('tracks', None) or []))
+            _all_trackids = (track['id'] for track in _all_tracks)
+            preserve_trackids = not _has_duplicates(_all_trackids)
+
+            if not disjoint_tracks:
+                # Only relevant if we are not changing track names
+                merged_track_name_to_id = {}
+
+            # Only useful while we still support the case where a track-ids
+            # doesn't have an associated track.
+            hacked_track_id_map = _ID_Remapper(reuse=False)
+
             # If disjoint_tracks is True keep track of track-ids we've seen in
             # so far in previous datasets and ensure we dont reuse them.
             # TODO: do this Remapper class with other ids?
-            track_id_map = _ID_Remapper(reuse=False)
+            # track_id_map = _ID_Remapper(reuse=False)
 
             for subdir, old_fpath, old_dset in relative_dsets:
                 # Create temporary indexes to map from old to new
                 cat_id_map = {None: None}
                 img_id_map = {}
                 video_id_map = {}
+                track_id_map = {}
                 kpcat_id_map = {}
 
                 # Add the licenses / info into the merged dataset
@@ -6571,7 +6649,48 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         new_reflect_id = merged_kp_name_to_id.get(reflect_name, None)
                         kpcat['reflection_id'] = new_reflect_id
 
-                # Add the videos into the merged dataset
+                # Add the tracks into the merged dataset
+                for old_track in old_dset.get('tracks', []):
+                    if preserve_trackids:
+                        new_id = old_track['id']
+                    else:
+                        new_id = len(merged['tracks']) + 1
+
+                    if disjoint_tracks:
+                        # Tracks with the same name are considered distinct
+                        # and given new non-conflicting names
+                        new_trackname = unique_track_names.remap(old_track['name'])
+                        new_track = _dict([
+                            ('id', new_id),
+                            ('name', new_trackname),
+                        ])
+                        # copy over other metadata
+                        update_ifnotin(new_track, old_track)
+                        track_id_map[old_track['id']] = new_track['id']
+                        if remember_parent:
+                            new_track['union_parent'] = old_fpath
+                        merged['tracks'].append(new_track)
+                    else:
+                        # Tracks with the same name are considered the same
+                        # across datasets.
+                        if old_track['name'] not in unique_track_names:
+                            new_trackname = unique_track_names.remap(old_track['name'])
+                            new_track = _dict([
+                                ('id', new_id),
+                                ('name', new_trackname),
+                            ])
+                            # copy over other metadata
+                            update_ifnotin(new_track, old_track)
+                            track_id_map[old_track['id']] = new_track['id']
+                            if remember_parent:
+                                new_track['union_parent'] = old_fpath
+                            merged['tracks'].append(new_track)
+                            merged_track_name_to_id[new_trackname] = new_id
+                        else:
+                            new_id = merged_track_name_to_id[old_track['name']]
+                            track_id_map[old_track['id']] = new_id
+
+                # Add the tracks into the merged dataset
                 for old_video in old_dset.get('videos', []):
                     if preserve_vidids:
                         new_id = old_video['id']
@@ -6641,21 +6760,37 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
                     if new_cat_id is ub.NoParam:
                         # NOTE: category_id is allowed to be None
-                        warnings.warn('annot {} in {} has bad category-id {}'.format(
-                            old_annot, subdir, old_cat_id))
+                        warnings.warn(f'annot {old_annot} in {subdir} has bad category-id {old_cat_id}')
                     if new_img_id is None:
-                        warnings.warn('annot {} in {} has bad image-id {}'.format(
-                            old_annot, subdir, old_img_id))
+                        warnings.warn(f'annot {old_annot} in {subdir} has bad image-id {old_img_id}')
                     new_annot = _dict([
                         ('id', len(merged['annotations']) + 1),
                         ('image_id', new_img_id),
                         ('category_id', new_cat_id),
                     ])
-                    if disjoint_tracks:
-                        old_track_id = old_annot.get('track_id', None)
-                        if old_track_id is not None:
-                            new_track_id = track_id_map.remap(old_track_id)
-                            new_annot['track_id'] = new_track_id
+
+                    old_track_id = old_annot.get('track_id')
+                    if old_track_id is not None:
+                        new_track_id = track_id_map.get(old_track_id, None)
+                        if new_track_id is None:
+                            warnings.warn(ub.paragraph(
+                                f'''
+                                annot {old_annot} in {subdir} has track_id
+                                {old_track_id} that does not have an associated
+                                entry in the tracks table
+                                '''))
+                            if disjoint_tracks:
+                                new_track_id = hacked_track_id_map.remap(old_track_id)
+                            else:
+                                new_track_id = old_track_id
+                        new_annot['track_id'] = new_track_id
+
+                    # if disjoint_tracks:
+                    #     old_track_id = old_annot.get('track_id', None)
+                    #     if old_track_id is not None:
+                    #         new_track_id = track_id_map.remap(old_track_id)
+                    #         new_annot['track_id'] = new_track_id
+
                     update_ifnotin(new_annot, old_annot)
 
                     if kpcat_id_map:
@@ -6670,8 +6805,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                             new_annot['keypoints'] = new_keypoints
                     merged['annotations'].append(new_annot)
 
-                # Mark that we are not allowed to use the same track-ids again
-                track_id_map.block_seen()
+                # Mark that we are not allowed to use the same hacked track-ids
+                # again
+                if disjoint_tracks:
+                    hacked_track_id_map.block_seen()
             return merged
 
         # New behavior is simplified and I believe it is correct
