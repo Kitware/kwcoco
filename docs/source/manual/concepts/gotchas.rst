@@ -1,3 +1,6 @@
+Gotchas
+-------
+
 These are the gotchas that people have encounted when using the library. We
 will document, and then maybe fix them.
 
