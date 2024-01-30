@@ -985,17 +985,28 @@ def setup(app):
     # https://stackoverflow.com/questions/26534184/can-sphinx-ignore-certain-tags-in-python-docstrings
     app.connect('autodoc-process-docstring', docstring_processor.process_docstring_callback)
 
+    def copy(src, dst):
+        import shutil
+        print(f'Copy {src} -> {dst}')
+        assert src.exists()
+        if not dst.parent.exists():
+            dst.parent.mkdir()
+        shutil.copy(src, dst)
+
     ### Hack for kwcoco: TODO: figure out a way for the user to configure this.
     HACK_FOR_KWCOCO = 1
     if HACK_FOR_KWCOCO:
         import pathlib
-        import shutil
         doc_outdir = pathlib.Path(app.outdir) / 'auto'
-        doc_srcdir = pathlib.Path(app.srcdir)
-        schema_src = (doc_srcdir / '../../kwcoco/coco_schema.json')
-        shutil.copy(schema_src, doc_outdir / 'coco_schema.json')
-        shutil.copy(schema_src, doc_srcdir / 'coco_schema.json')
+        doc_srcdir = pathlib.Path(app.srcdir) / 'auto'
 
-        src_fpath = (doc_srcdir / '../../kwcoco/coco_schema_informal.rst')
-        shutil.copy(src_fpath, doc_outdir / src_fpath.name)
+        mod_dpath = doc_srcdir / '../../../kwcoco'
+
+        src_fpath = (mod_dpath / 'coco_schema.json')
+        copy(src_fpath, doc_outdir / src_fpath.name)
+        copy(src_fpath, doc_srcdir / src_fpath.name)
+
+        src_fpath = (mod_dpath / 'coco_schema_informal.rst')
+        copy(src_fpath, doc_outdir / src_fpath.name)
+        copy(src_fpath, doc_srcdir / src_fpath.name)
     return app

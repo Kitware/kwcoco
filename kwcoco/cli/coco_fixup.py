@@ -54,10 +54,9 @@ class CocoFixup(scfg.DataConfig):
             else:
                 raise ValueError('must specify dst: {}'.format(config['dst']))
 
-        remove_missing_images(dset)
-
-        corrupted = dset.corrupted_images(check_aux=True, verbose=verbose,
-                                          workers=config.get('workers', 0))
+        # remove_missing_assets(dset)
+        # corrupted = dset.corrupted_images(check_aux=True, verbose=verbose,
+        #                                   workers=config.get('workers', 0))
 
 
 def coco_img_remove_empty_assets(coco_img, missing):

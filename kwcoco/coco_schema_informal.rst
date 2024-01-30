@@ -1,6 +1,6 @@
 An informal spec is as follows:
 
-.. code:: python
+.. code::
 
     # All object categories are defined here.
     category = {
