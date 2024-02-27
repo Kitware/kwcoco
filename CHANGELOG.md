@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.7.7 - Unreleased
 
+### Added
+* Add CLI for `find_unregistered_images`
+
 
 ## Version 0.7.6 - Released 2024-01-29
 

@@ -24,6 +24,7 @@ def main(cmdline=True, **kw):
         'coco_subset',
         'coco_grab',
         'coco_info',
+        'find_unregistered_images',
     ]
     module_lut = {}
     for name in modnames:
