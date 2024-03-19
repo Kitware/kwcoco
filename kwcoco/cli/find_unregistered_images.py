@@ -5,6 +5,7 @@ TODO:
     - [ ] Should this be renamed to find_unregsitered_assets?
 
 Example:
+    >>> # xdoctest: +REQUIRES(module:kwutil)
     >>> import ubelt as ub
     >>> import kwcoco
     >>> dpath = ub.Path.appdir('kwcoco/tests/cli/find_unregistered_images')
@@ -75,7 +76,7 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
             >>> cls.main(cmdline=cmdline, **kwargs)
         """
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
-        from kwutil.util_rich import rich_print
+        from kwutil.utils.util_rich import rich_print
         if config.verbose:
             rich_print('config = ' + ub.urepr(config, nl=1))
         import os

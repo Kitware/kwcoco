@@ -109,7 +109,7 @@ class CocoMoveAssetManager:
     def dump_datasets(self):
         # Check that the kwcoco files are working
         for dset in self.impacted_dsets.values():
-             assert not dset.missing_images()
+            assert not dset.missing_images()
 
         # Rewrite the kwcoco files
         for dset in self.impacted_dsets.values():
@@ -131,6 +131,7 @@ def main(cmdline=1, **kwargs):
     """
     Example:
         >>> # xdoctest: +SKIP
+        >>> # xdoctest: +REQUIRES(module:kwutil)
         >>> cmdline = 0
         >>> kwargs = dict(
         >>>     coco_fpaths=['*_E.kwcoco.zip', '*_mae.kwcoco.zip'],
@@ -151,7 +152,7 @@ def main(cmdline=1, **kwargs):
     import rich
     config = CocoMoveAssetsCLI.cli(cmdline=cmdline, data=kwargs, strict=True)
     rich.print('config = ' + ub.urepr(config, nl=1))
-    from watch.utils import util_path
+    from kwutil.utils import util_path
     import kwcoco
     coco_fpaths = util_path.coerce_patterned_paths(config.coco_fpaths)
     dsets = list(kwcoco.CocoDataset.coerce_multiple(coco_fpaths, workers=config.io_workers))
