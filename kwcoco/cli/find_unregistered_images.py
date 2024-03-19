@@ -74,17 +74,17 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
             >>> cls = FindUnregisteredImagesCLI
             >>> cls.main(cmdline=cmdline, **kwargs)
         """
-        import rich
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
+        from kwutil.util_rich import rich_print
         if config.verbose:
-            rich.print('config = ' + ub.urepr(config, nl=1))
+            rich_print('config = ' + ub.urepr(config, nl=1))
         import os
         import kwcoco
         from kwutil import util_path
         fpaths = util_path.coerce_patterned_paths(config.src)
 
         if config.verbose:
-            rich.print('Will read fpaths = {}'.format(ub.urepr(fpaths, nl=1)))
+            rich_print('Will read fpaths = {}'.format(ub.urepr(fpaths, nl=1)))
         datasets = list(kwcoco.CocoDataset.coerce_multiple(
             fpaths, workers=config.io_workers, verbose=config.verbose))
 
@@ -108,15 +108,15 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
         fpath_sets = ub.udict(fpath_sets)
         fpath_set_sizes = fpath_sets.map_values(len)
         if config.verbose:
-            rich.print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))
+            rich_print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))
 
         unregistered_fpaths = fpath_sets['unregistered']
 
         if len(unregistered_fpaths) > 0:
             import rich.prompt
             if config.verbose:
-                rich.print('unregistered_fpaths = {}'.format(ub.urepr([os.fspath(f) for f in unregistered_fpaths], nl=1)))
-                rich.print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))
+                rich_print('unregistered_fpaths = {}'.format(ub.urepr([os.fspath(f) for f in unregistered_fpaths], nl=1)))
+                rich_print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))
             else:
                 for f in unregistered_fpaths:
                     print(os.fspath(f))
