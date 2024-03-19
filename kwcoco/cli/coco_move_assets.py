@@ -152,7 +152,7 @@ def main(cmdline=1, **kwargs):
     import rich
     config = CocoMoveAssetsCLI.cli(cmdline=cmdline, data=kwargs, strict=True)
     rich.print('config = ' + ub.urepr(config, nl=1))
-    from kwutil.utils import util_path
+    from kwutil import util_path
     import kwcoco
     coco_fpaths = util_path.coerce_patterned_paths(config.coco_fpaths)
     dsets = list(kwcoco.CocoDataset.coerce_multiple(coco_fpaths, workers=config.io_workers))

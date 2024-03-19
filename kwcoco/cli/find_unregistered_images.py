@@ -76,7 +76,7 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
             >>> cls.main(cmdline=cmdline, **kwargs)
         """
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
-        from kwutil.utils.util_rich import rich_print
+        from kwcoco.utils.util_rich import rich_print
         if config.verbose:
             rich_print('config = ' + ub.urepr(config, nl=1))
         import os
