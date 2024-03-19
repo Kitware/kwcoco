@@ -1,6 +1,6 @@
 delayed_image >= 0.2.7
 jsonschema >= 3.2.0
-kwarray >= 0.6.7
+kwarray >= 0.6.12
 kwimage >= 0.9.19
 packaging>=21.3
 parse >= 1.14.0
