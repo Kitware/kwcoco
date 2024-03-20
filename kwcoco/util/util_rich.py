@@ -1,7 +1,9 @@
-import functools
+# import functools
+import ubelt as ub
 
 
-@functools.cache
+# @functools.cache
+@ub.memoize
 def _get_rich_print():
     try:
         import rich
