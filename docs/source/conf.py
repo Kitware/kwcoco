@@ -437,7 +437,7 @@ class GoogleStyleDocstringProcessor:
     """
 
     def __init__(self, autobuild=1):
-        self.debug = 1
+        self.debug = 0
         self.registry = {}
         if autobuild:
             self._register_builtins()
@@ -630,13 +630,9 @@ class GoogleStyleDocstringProcessor:
         if self.debug:
             print(f'ProcessDocstring: name={name}, what_={what_}, num_lines={len(lines)}')
 
-        # if name == 'kwcoco.coco_dataset':
-        #     import xdev
-        #     xdev.embed()
-
         # print('BEFORE:')
-        import ubelt as ub
-        print('lines = {}'.format(ub.urepr(lines, nl=1)))
+        # import ubelt as ub
+        # print('lines = {}'.format(ub.urepr(lines, nl=1)))
 
         self.process(lines)
 
@@ -990,6 +986,13 @@ def postprocess_hyperlinks(app, doctree, docname):
                         node.attributes['refuri'] = refuri.replace('.rst', '.html')
                 else:
                     raise AssertionError
+
+
+def fix_rst_todo_section(lines):
+    new_lines = []
+    for line in lines:
+        ...
+    ...
 
 
 def setup(app):

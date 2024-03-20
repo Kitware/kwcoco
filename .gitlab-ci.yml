@@ -80,6 +80,7 @@ stages:
   - ls -altr
   - '# Get the path to the installed package and run the tests'
   - export MOD_DPATH=$(python -c "import kwcoco, os; print(os.path.dirname(kwcoco.__file__))")
+  - export MOD_NAME=kwcoco
   - |-
     echo "
     ---
@@ -89,7 +90,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --durations=100 --cov="$MOD_NAME" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_full-loose_template: &test_full-loose_template
   <<: *common_test_template
@@ -128,6 +129,7 @@ stages:
   - ls -altr
   - '# Get the path to the installed package and run the tests'
   - export MOD_DPATH=$(python -c "import kwcoco, os; print(os.path.dirname(kwcoco.__file__))")
+  - export MOD_NAME=kwcoco
   - |-
     echo "
     ---
@@ -137,7 +139,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --durations=100 --cov="$MOD_NAME" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_minimal-strict_template: &test_minimal-strict_template
   <<: *common_test_template
@@ -176,6 +178,7 @@ stages:
   - ls -altr
   - '# Get the path to the installed package and run the tests'
   - export MOD_DPATH=$(python -c "import kwcoco, os; print(os.path.dirname(kwcoco.__file__))")
+  - export MOD_NAME=kwcoco
   - |-
     echo "
     ---
@@ -185,7 +188,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --durations=100 --cov="$MOD_NAME" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 .test_full-strict_template: &test_full-strict_template
   <<: *common_test_template
@@ -224,6 +227,7 @@ stages:
   - ls -altr
   - '# Get the path to the installed package and run the tests'
   - export MOD_DPATH=$(python -c "import kwcoco, os; print(os.path.dirname(kwcoco.__file__))")
+  - export MOD_NAME=kwcoco
   - |-
     echo "
     ---
@@ -233,7 +237,7 @@ stages:
     ---
     "
   - |-
-    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --cov="kwcoco" "$MOD_DPATH" ../tests
+    python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --durations=100 --cov="$MOD_NAME" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
 build/cp36-linux-x86_64:
   <<: *build_template
@@ -390,7 +394,8 @@ gpgsign/wheels:
   artifacts:
     paths:
     - dist/*.asc
-
+    - dist/*.whl
+    - dist/*.ots
   only:
     refs:
         # Gitlab will only expose protected variables on protected branches
@@ -446,6 +451,8 @@ gpgsign/wheels:
         $GPG_EXECUTABLE --verify $WHEEL_PATH.asc $WHEEL_PATH
     done
   - ls dist
+  - python -m pip install opentimestamps-client
+  - ots stamp dist/*.whl dist/*.asc
 deploy/wheels:
   <<: *common_template
   image: python:3.11
@@ -493,6 +500,26 @@ deploy/wheels:
         git tag $TAG_NAME -m "tarball tag $VERSION"
         git push --tags "https://git-push-token:${PUSH_TOKEN}@${URL_HOST}"
     fi
+  - |-
+    # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+    echo "CI_PROJECT_URL=$CI_PROJECT_URL"
+    echo "CI_PROJECT_ID=$CI_PROJECT_ID"
+    echo "CI_PROJECT_NAME=$CI_PROJECT_NAME"
+    echo "CI_PROJECT_NAMESPACE=$CI_PROJECT_NAMESPACE"
+    echo "CI_API_V4_URL=$CI_API_V4_URL"
+
+    export PROJECT_VERSION=$(python -c "import setup; print(setup.VERSION)")
+    echo "PROJECT_VERSION=$PROJECT_VERSION"
+
+    # --header "PRIVATE-TOKEN: $PRIVATE_GITLAB_TOKEN" \
+    for FPATH in "dist"/*; do
+        FNAME=$(basename $FPATH)
+        echo $FNAME
+        curl \
+            --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+            --upload-file $FPATH \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_PROJECT_NAME/$PROJECT_VERSION/$FNAME"
+    done
 
 
 # end
