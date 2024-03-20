@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.7.7 - Unreleased
+## Version 0.7.8 - Unreleased
+
+
+## Version 0.7.7 - Released 2024-03-19
 
 ### Added
 * Add CLI for `find_unregistered_images`
