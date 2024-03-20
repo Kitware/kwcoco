@@ -16,6 +16,8 @@ six
 
 sphinx-jsonschema>=1.19.1
 
+docutils>=0.20.1
+
 -r tests.txt
 -r headless.txt
 -r optional.txt

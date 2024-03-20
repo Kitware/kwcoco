@@ -99,3 +99,8 @@ docs/source/autoapi/
 
 docs/source/images
 docs/source/_static
+
+docs/source/auto/coco_schema.json
+docs/source/auto/coco_schema_informal.rst
+docs/source/coco_schema.json
+

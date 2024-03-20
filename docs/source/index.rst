@@ -11,12 +11,12 @@ Welcome to kwcoco's documentation!
 ==================================
 
 
-If you are new, please see our getting started document: :doc:`getting_started <getting_started>` 
+If you are new, please see our getting started document: `getting_started <manual/getting_started.rst>`_.
 
-Please also see information in the repo `README <https://github.com/Kitware/kwcoco#readme>`_, which 
+Please also see information in the repo `README <https://github.com/Kitware/kwcoco#readme>`_, which
 contains similar but complementary information.
 
-Documentation about higher level kwcoco concepts can be found :doc:`here <concepts/index.rst>`.
+Documentation about higher level kwcoco concepts can be found `here <manual/concepts/index.rst>`_.
 
 
 .. The __init__ files contains the top-level documentation overview
@@ -28,4 +28,5 @@ Documentation about higher level kwcoco concepts can be found :doc:`here <concep
    :maxdepth: 8
    :caption: Package Layout
 
-   modules
+   auto/modules.rst
+   manual/manual

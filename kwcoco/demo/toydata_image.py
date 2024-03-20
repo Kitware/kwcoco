@@ -97,12 +97,12 @@ def demodata_toy_dset(image_size=(600, 600),
         >>> import kwplot
         >>> kwplot.autompl()
         >>> dset.show_image(gid=1)
-        >>> ub.startfile(dset.bundle_dpath)
 
+        xdev.startfile(dset.bundle_dpath)
         dset._tree()
 
-        >>> from kwcoco.demo.toydata_image import *
-        >>> import kwcoco
+        # >>> from kwcoco.demo.toydata_image import *
+        # >>> import kwcoco
 
         dset = demodata_toy_dset(image_size=(300, 300), aux=True, use_cache=False)
         print(dset.imgs[1])

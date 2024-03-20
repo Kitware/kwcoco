@@ -891,7 +891,6 @@ class DetectionMetrics(ub.NiceRepr):
             >>> import kwplot
             >>> kwplot.autompl()
             >>> summary = dmet.summarize(plot=True, title='DetectionMetrics summary demo', with_ovr=True, with_bin=False)
-            >>> summary['bin_measures']
             >>> kwplot.show_if_requested()
         """
         import kwimage

@@ -1,3 +1,6 @@
+KWCoco Argcomplete
+******************
+
 The kwcoco CLI uses `argcomplete <https://pypi.org/project/argcomplete/>`_.
 To gain the tab-complete feature in bash run:
 

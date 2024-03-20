@@ -18,7 +18,7 @@ def classification_report(y_true, y_pred, target_names=None,
     r"""
     Computes a classification report which is a collection of various metrics
     commonly used to evaulate classification quality. This can handle binary
-    and multiclass settings.
+    and multiclass settings [MulticlassMCC]_.
 
     Note that this function does not accept probabilities or scores and must
     instead act on final decisions. See ovr_classification_report for a

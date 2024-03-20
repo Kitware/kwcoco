@@ -1,3 +1,6 @@
+The Bundle Directory
+====================
+
 A KWCOCO "bundle_dpath" or "bundle directory" is a directory that a kwcoco file
 exists in.
 
