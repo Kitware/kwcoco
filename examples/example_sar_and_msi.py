@@ -2,6 +2,15 @@
 Small demo that shows how you can index and access multi-band images (e.g. SAR
 / MSI) via kwcoco, especially in the case where those bands have differing
 resolutions on disk.
+
+
+SeeAlso:
+
+    More geospatial aware kwcoco logic can be found in
+    https://gitlab.kitware.com/computer-vision/geowatch/-/blob/main/geowatch/utils/kwcoco_extensions.py
+
+    Specifically, coco_populate_geo_heuristics will attempt to use geotiff
+    metadata to populate the warp_aux_to_img transforms correctly.
 """
 import kwcoco
 import kwimage
