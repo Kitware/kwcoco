@@ -10,6 +10,7 @@ def main():
         pip install finch-clust
         pip install pynndescent
     """
+    import kwcoco
     # hard coded path
     self = kwcoco.CocoDataset('/data/joncrall/dvc-repos/smart_phase3_data/Aligned-Drop8-ARA/KR_R002/imganns-KR_R002-rawbands.kwcoco.zip')
 
@@ -86,3 +87,7 @@ def main():
 
     ax1.scatter(*np.array(kmeans_centroids).T, s=300, color='orange')
     ax2.scatter(*np.array(finch_centroids).T, s=300, color='orange')
+
+
+if __name__ == '__main__':
+    main()
