@@ -1912,7 +1912,15 @@ class CocoSqlDatabase(AbstractCocoDataset,
             if 0:
                 self.session.rollback()
             column_name = key
-            rowids_text = str(rowids)
+            # if isinstance(rowids, list):
+            #     rowids_text = str(rowids)
+            # else:
+            rowids_text = '[' + ','.join([str(t) for t in rowids]) + ']'
+            # %timeit '[' + ','.join([str(t) for t in rowids]) + ']'
+            # %timeit '[' + ','.join([str(t) for t in rowids_text]) + ']'
+            # %timeit isinstance(rowids, list)
+            # %timeit str(rowids)
+            # Statement generated with help from ChatGPT3.5
             stmt = text(ub.paragraph(
                 '''
                 WITH tmp_id_list AS (
