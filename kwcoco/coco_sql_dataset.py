@@ -1757,6 +1757,24 @@ class CocoSqlDatabase(AbstractCocoDataset,
             Using default has a quirk here and can produce wrong results
             if None is a valid value for the table to have.
 
+        TODO:
+            - [ ] if rowids is large (e.g. > 10000) it may be more efficient to
+                   create a temporary table and execute a JOIN. ChatGPT gives
+                   this example:
+
+            .. code::
+
+                WITH id_list AS (
+                    SELECT unnest(:list_of_row_ids) AS row_id
+                )
+                SELECT t.column_name
+                FROM table_name t
+                JOIN id_list ON t.row_id = id_list.row_id;
+
+            In this example, :list_of_row_ids is a placeholder for your list of
+            row IDs. This query will retrieve the values of column_name for
+            each row with a matching row_id from the list.
+
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
