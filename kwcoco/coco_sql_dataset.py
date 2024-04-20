@@ -1749,7 +1749,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         return raw_tables
 
     def _column_lookup(self, tablename, key, rowids, default=ub.NoParam,
-                       keepid=False):
+                       keepid=False, _join_optimize=1):
         """
         Convinience method to lookup only a single column of information
 
@@ -1816,13 +1816,65 @@ class CocoSqlDatabase(AbstractCocoDataset,
                     anns = [self.anns[aid] for aid in rowids]
                     cids = [ann[key] for ann in anns]
 
+        Ignore:
+            # Future benchmark
+            from kwcoco.coco_sql_dataset import *  # NOQA
+            import kwcoco
+            dct_dset = kwcoco.CocoDataset.demo('vidshapes800')
+            coco_img = dct_dset.coco_image(1)
+            img_fpath = coco_img.primary_image_filepath()
+            fpath2 = ub.Path(dct_dset.fpath).augment(stemsuffix='_mod_for_sql')
+            dct_dset.fpath = fpath2
+            dct_dset.add_image(name='foobar', file_name=img_fpath)
+            dct_dset.dump()
+            dct_images = dct_dset.images()
+            dct_vidid_values = dct_images.get('video_id', default="MISSING")
+            print(f'dct_vidid_values = {ub.urepr(dct_vidid_values, nl=0)}')
+            sql_dset = dct_dset.view_sql(backend='postgresql')
+            sql_images = sql_dset.images()
+            self = sql_dset
+
+            tablename = sql_images._key
+            key = 'video_id'
+            rowids = list(sql_images)
+            default = None
+            assert result2 == result1
+
+            import timerit
+            ti = timerit.Timerit(10, bestof=3, verbose=2)
+            for timer in ti.reset(f'orig-{len(rowids)}'):
+                with timer:
+                    result1 = sql_dset._column_lookup(tablename, key, rowids, _join_optimize=0)
+
+            for timer in ti.reset(f'optimized-{len(rowids)}'):
+                with timer:
+                    result2 = sql_dset._column_lookup(tablename, key, rowids, _join_optimize=1)
+
+            for timer in ti.reset('orig-1'):
+                with timer:
+                    result1 = sql_dset._column_lookup(tablename, key, rowids[0:1], _join_optimize=0)
+
+            for timer in ti.reset('optmized-1'):
+                with timer:
+                    result2 = sql_dset._column_lookup(tablename, key, rowids[0:1], _join_optimize=1)
+
+            for timer in ti.reset('orig-10'):
+                with timer:
+                    result1 = sql_dset._column_lookup(tablename, key, rowids[0:10], _join_optimize=0)
+
+            for timer in ti.reset('optmized-10'):
+                with timer:
+                    result2 = sql_dset._column_lookup(tablename, key, rowids[0:10], _join_optimize=1)
+
+            print('ti.rankings = {}'.format(ub.urepr(ti.rankings, nl=2, align=':')))
+
         Example:
             >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> # xdoctest: +REQUIRES(module:psycopg2)
             >>> import kwcoco
             >>> # Test of the default kwarg
-            >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes800')
             >>> coco_img = dct_dset.coco_image(1)
             >>> # Create a dictionary coco dataset where one image doesnt have
             >>> # a video id.
@@ -1847,32 +1899,59 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> assert sql_vidid_values2 == sql_vidid_values1
             >>> assert sql_vidid_values2 == dct_vidid_values
         """
-        # FIXME: Make this work for columns that need json decoding
-        stmt = text(ub.paragraph(
-            '''
-            SELECT
-                {tablename}.{key}
-            FROM {tablename}
-            WHERE {tablename}.id = :rowid
-            ''').format(tablename=tablename, key=key))
-
         # TODO: memoize this check
         table = CocoBase.TBLNAME_TO_CLASS[tablename]
         column = table.__table__.columns[key]
         column_type = column.type
-        # Gotta be a better way adapt to a variant type based on the dialect
-        if IS_GE_SQLALCH_2x:
-            column_type = column_type._variant_mapping.get(self._dialect_name, column_type)
-        else:
-            if hasattr(column_type, 'mapping'):
-                column_type = column_type.mapping.get(self._dialect_name, column_type)
 
-        values = [
-            # self.anns[aid][key]
-            # if aid in self.anns._cache else
-            self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
-            for rowid in rowids
-        ]
+        if self._dialect_name == 'postgresql' and _join_optimize:
+            # Optimization for large numbers of rows
+            # Create a temp-table with the row-ids to query and do a JOIN
+            # TODO:
+            # It seems like this is just faster in general?
+            if 0:
+                self.session.rollback()
+            column_name = key
+            rowids_text = str(rowids)
+            stmt = text(ub.paragraph(
+                '''
+                WITH tmp_id_list AS (
+                    SELECT unnest(array{rowids_text}) AS row_id
+                )
+                SELECT t.{column_name}
+                FROM {tablename} t
+                JOIN tmp_id_list ON t.id = tmp_id_list.row_id;
+                ''').format(tablename=tablename, rowids_text=rowids_text, column_name=column_name))
+            # print(stmt)
+            resp = self.session.execute(stmt)
+            values = [r[0] for r in resp.fetchall()]
+            # resp.fetchone()[0]
+            # attr_list = None
+            # return attr_list
+            # self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
+        else:
+            # FIXME: Make this work for columns that need json decoding
+            stmt = text(ub.paragraph(
+                '''
+                SELECT
+                    {tablename}.{key}
+                FROM {tablename}
+                WHERE {tablename}.id = :rowid
+                ''').format(tablename=tablename, key=key))
+
+            # Gotta be a better way adapt to a variant type based on the dialect
+            if IS_GE_SQLALCH_2x:
+                column_type = column_type._variant_mapping.get(self._dialect_name, column_type)
+            else:
+                if hasattr(column_type, 'mapping'):
+                    column_type = column_type.mapping.get(self._dialect_name, column_type)
+
+            values = [
+                # self.anns[aid][key]
+                # if aid in self.anns._cache else
+                self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
+                for rowid in rowids
+            ]
 
         needs_json_decode = (column_type.__class__.__name__ == 'JSON')
         if needs_json_decode:

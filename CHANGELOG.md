@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 * Optimize CocoObject1D get calls with SQL backends
+* CocoObject1D.lookup with default now "works"-ish with SQL. Still experimental.
 
 ### Fixed
 

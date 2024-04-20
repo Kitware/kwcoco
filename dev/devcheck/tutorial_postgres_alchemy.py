@@ -34,6 +34,11 @@ def install_postgres_instructions():
         sudo systemctl status postgresql.service
         ''')
 
+    parts['setup_env'] = ub.codeblock(
+        '''
+        sudo -u postgres psql -c "CREATE EXTENSION btree_gist;"
+        ''')
+
     # FIXME: I'm not sure what best practice is here.
     parts['create_users'] = ub.codeblock(
         '''
