@@ -173,9 +173,13 @@ def test_postgresql_can_remember_original_filename():
     dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
     sql_dset = dct_dset.view_sql(backend='postgresql')
 
+    dct_coco_fpath = ub.Path(dct_dset.fpath)
+    print(f'dct_coco_fpath = {ub.urepr(dct_coco_fpath, nl=1)}')
+    print(f'orig_coco_fpath = {ub.urepr(orig_coco_fpath, nl=1)}')
+
     orig_coco_fpath = sql_dset._orig_coco_fpath()
     assert orig_coco_fpath is not None, 'could not get original fpath'
-    assert orig_coco_fpath == ub.Path(dct_dset.fpath)
+    assert orig_coco_fpath == dct_coco_fpath
 
     sql_hashid = sql_dset._cached_hashid()
     dct_hashid = dct_dset._cached_hashid()

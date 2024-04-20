@@ -2025,6 +2025,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 self.hashid = cached_data['hashid']
                 self.hashid_parts = cached_data['hashid_parts']
                 cache_miss = False
+            else:
+                print('Status keys disagree')
+                print(f'status_key = {ub.urepr(status_key, nl=1)}')
+                print(f'cached_data = {ub.urepr(cached_data, nl=1)}')
+                print(f'coco_fpath = {ub.urepr(coco_fpath, nl=1)}')
+                print(f'hashid_sidecar_fpath = {ub.urepr(hashid_sidecar_fpath, nl=1)}')
 
         if cache_miss:
             raise AssertionError('The cache id should have been written already')
