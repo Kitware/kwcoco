@@ -170,7 +170,7 @@ def test_postgresql_can_remember_original_filename():
         pytest.skip()
 
     import kwcoco
-    dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes21')
+    dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes2')
     # pre 0.7.9 we would need to load the demo data from disk for this to work
     # But we hack the dct_dset._state to make this work in the demo method.
     # dct_dset = kwcoco.CocoDataset(dct_dset.fpath)

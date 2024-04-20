@@ -1753,6 +1753,10 @@ class CocoSqlDatabase(AbstractCocoDataset,
         """
         Convinience method to lookup only a single column of information
 
+        Note:
+            Using default has a quirk here and can produce wrong results
+            if None is a valid value for the table to have.
+
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
             >>> from kwcoco.coco_sql_dataset import *  # NOQA
@@ -1793,6 +1797,37 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 with timer:
                     anns = [self.anns[aid] for aid in rowids]
                     cids = [ann[key] for ann in anns]
+
+        Example:
+            >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(module:psycopg2)
+            >>> import kwcoco
+            >>> # Test of the default kwarg
+            >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> coco_img = dct_dset.coco_image(1)
+            >>> # Create a dictionary coco dataset where one image doesnt have
+            >>> # a video id.
+            >>> img_fpath = coco_img.primary_image_filepath()
+            >>> fpath2 = ub.Path(dct_dset.fpath).augment(stemsuffix='_mod_for_sql')
+            >>> dct_dset.fpath = fpath2
+            >>> dct_dset.add_image(name='foobar', file_name=img_fpath)
+            >>> dct_dset.dump()
+            >>> dct_images = dct_dset.images()
+            >>> dct_vidid_values = dct_images.get('video_id', default="MISSING")
+            >>> print(f'dct_vidid_values = {ub.urepr(dct_vidid_values, nl=0)}')
+            >>> sql_dset = dct_dset.view_sql(backend='postgresql')
+            >>> sql_images = sql_dset.images()
+            >>> sql_vidid_values1 = sql_images.get('video_id', default="MISSING")
+            >>> print(f'sql_vidid_values1 = {ub.urepr(sql_vidid_values1, nl=0)}')
+            >>> tablename = sql_images._key
+            >>> key = 'video_id'
+            >>> rowids = list(sql_images)
+            >>> default = "MISSING"
+            >>> sql_vidid_values2 = sql_dset._column_lookup(tablename, key, rowids, default=default)
+            >>> print(f'sql_vidid_values2 = {ub.urepr(sql_vidid_values2, nl=0)}')
+            >>> assert sql_vidid_values2 == sql_vidid_values1
+            >>> assert sql_vidid_values2 == dct_vidid_values
         """
         # FIXME: Make this work for columns that need json decoding
         stmt = text(ub.paragraph(
@@ -1820,6 +1855,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
             self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
             for rowid in rowids
         ]
+        print(f'values={values}')
 
         needs_json_decode = (column_type.__class__.__name__ == 'JSON')
         if needs_json_decode:
@@ -1833,16 +1869,24 @@ class CocoSqlDatabase(AbstractCocoDataset,
             else:
                 values = [None if v is None else json.loads(v) for v in values]
 
-        if keepid:
-            if default is ub.NoParam:
-                attr_list = ub.dzip(rowids, values)
-            else:
-                raise NotImplementedError('cannot use default')
+        print(f'default={default}')
+        if default is ub.NoParam or default is None:
+            ...
         else:
-            if default is ub.NoParam:
-                attr_list = values
-            else:
-                raise NotImplementedError('cannot use default')
+            # TODO: surpress the warning if we can determine that the column is
+            # safe.
+            import warnings
+            warnings.warn(ub.paragraph(
+                '''
+                non-None defaults can be inconsistent with dictionary coco
+                tables if None is a valid column value.
+                '''))
+            values = [default if v is None else v for v in values]
+
+        if keepid:
+            attr_list = ub.dzip(rowids, values)
+        else:
+            attr_list = values
         return attr_list
 
     def _all_rows_column_lookup(self, tablename, keys):

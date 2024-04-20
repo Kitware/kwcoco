@@ -2142,17 +2142,17 @@ class MixinCocoHashing:
             self._state['was_loaded'] and
             not self._state['was_modified']
         )
-        print(f'[kwcoco-dct-cache] self._state={self._state}')
+        # print(f'[kwcoco-dct-cache] self._state={self._state}')
         if enable_cache:
             coco_fpath = ub.Path(self.fpath)
             enable_cache = coco_fpath.exists()
 
-        print(f'[kwcoco-dct-cache] enable_cache={enable_cache}')
+        # print(f'[kwcoco-dct-cache] enable_cache={enable_cache}')
         if enable_cache:
             cache_dpath = (coco_fpath.parent / '_cache')
             cache_fname = coco_fpath.name + '.hashid.cache'
             hashid_sidecar_fpath = cache_dpath / cache_fname
-            print(f'[kwcoco-dct-cache] hashid_sidecar_fpath={hashid_sidecar_fpath}')
+            # print(f'[kwcoco-dct-cache] hashid_sidecar_fpath={hashid_sidecar_fpath}')
             # Generate current lookup key
             fpath_stat = coco_fpath.stat()
             status_key = {
@@ -2166,7 +2166,7 @@ class MixinCocoHashing:
                     self.hashid_parts = cached_data['hashid_parts']
                     cache_miss = False
 
-        print(f'[kwcoco-dct-cache] cache_miss={cache_miss}')
+        # print(f'[kwcoco-dct-cache] cache_miss={cache_miss}')
         if cache_miss:
             self._build_hashid()
             if enable_cache:

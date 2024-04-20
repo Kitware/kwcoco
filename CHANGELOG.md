@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.7.9 - Unreleased
 
+### Changed
+* Optimize CocoObject1D get calls with SQL backends
+
 ### Fixed
 
 * Added workaround for an issue where a postgresql cache of a coco dataset is unable to remember its original json filepath.
