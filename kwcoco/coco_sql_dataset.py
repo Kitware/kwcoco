@@ -1904,7 +1904,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         column = table.__table__.columns[key]
         column_type = column.type
 
-        if self._dialect_name == 'postgresql' and _join_optimize:
+        if self._dialect_name == 'postgresql' and _join_optimize and len(rowids) > 1:
             # Optimization for large numbers of rows
             # Create a temp-table with the row-ids to query and do a JOIN
             # TODO:
