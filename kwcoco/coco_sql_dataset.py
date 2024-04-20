@@ -1855,7 +1855,6 @@ class CocoSqlDatabase(AbstractCocoDataset,
             self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
             for rowid in rowids
         ]
-        print(f'values={values}')
 
         needs_json_decode = (column_type.__class__.__name__ == 'JSON')
         if needs_json_decode:
@@ -1869,7 +1868,6 @@ class CocoSqlDatabase(AbstractCocoDataset,
             else:
                 values = [None if v is None else json.loads(v) for v in values]
 
-        print(f'default={default}')
         if default is ub.NoParam or default is None:
             ...
         else:
