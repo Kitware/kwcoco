@@ -2026,10 +2026,11 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 self.hashid_parts = cached_data['hashid_parts']
                 cache_miss = False
             else:
-                print('Status keys disagree')
+                print('Status keys disagree. The cached hashid may be out of date')
                 print(f'status_key = {ub.urepr(status_key, nl=1)}')
                 print(f'cached_data = {ub.urepr(cached_data, nl=1)}')
                 print(f'coco_fpath = {ub.urepr(coco_fpath, nl=1)}')
+                print('You can try deleting this path:')
                 print(f'hashid_sidecar_fpath = {ub.urepr(hashid_sidecar_fpath, nl=1)}')
 
         if cache_miss:
