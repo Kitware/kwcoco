@@ -2032,6 +2032,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 print(f'coco_fpath = {ub.urepr(coco_fpath, nl=1)}')
                 print('You can try deleting this path:')
                 print(f'hashid_sidecar_fpath = {ub.urepr(hashid_sidecar_fpath, nl=1)}')
+        else:
+            print('Could not find hashid sidecar')
+            print(f'hashid_sidecar_fpath = {ub.urepr(hashid_sidecar_fpath, nl=1)}')
 
         if cache_miss:
             raise AssertionError('The cache id should have been written already')
@@ -2111,6 +2114,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
                 'dct_db_fpath': os.fspath(dct_db_fpath),
                 'sql_db_fpath': os.fspath(sql_db_fpath),
             })
+
         else:
             raise KeyError(backend)
 
@@ -2153,10 +2157,12 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
             dset = kwcoco.CocoDataset(dct_db_fpath)
 
         # Write the cacheid when making a view, so the view can access it
-        dset._cached_hashid()
+        print(f'Write sidecar hashid for {type(dset)}: {dset.fpath} before we convert to SQL')
+        hashid = dset._cached_hashid()
+        print(f'hashid = {ub.urepr(hashid, nl=1)}')
 
         # Convert a coco file to an sql database
-        print(f'Start SQL({backend}_ conversion')
+        print(f'Start SQL({backend}) conversion')
         self.populate_from(dset, verbose=1)
         if stamp.cacher.enabled:
             stamp.renew()

@@ -170,17 +170,23 @@ def test_postgresql_can_remember_original_filename():
         pytest.skip()
 
     import kwcoco
-    dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
+    dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes21')
+    # pre 0.7.9 we would need to load the demo data from disk for this to work
+    # But we hack the dct_dset._state to make this work in the demo method.
+    # dct_dset = kwcoco.CocoDataset(dct_dset.fpath)
     sql_dset = dct_dset.view_sql(backend='postgresql')
 
     dct_coco_fpath = ub.Path(dct_dset.fpath)
-    print(f'dct_coco_fpath = {ub.urepr(dct_coco_fpath, nl=1)}')
-    print(f'orig_coco_fpath = {ub.urepr(orig_coco_fpath, nl=1)}')
+    print(f'dct_coco_fpath  = {ub.urepr(dct_coco_fpath, nl=1)}')
 
     orig_coco_fpath = sql_dset._orig_coco_fpath()
+    print(f'orig_coco_fpath = {ub.urepr(orig_coco_fpath, nl=1)}')
+
     assert orig_coco_fpath is not None, 'could not get original fpath'
     assert orig_coco_fpath == dct_coco_fpath
 
-    sql_hashid = sql_dset._cached_hashid()
     dct_hashid = dct_dset._cached_hashid()
+    print(f'dct_hashid = {ub.urepr(dct_hashid, nl=1)}')
+    sql_hashid = sql_dset._cached_hashid()
+    print(f'sql_hashid = {ub.urepr(sql_hashid, nl=1)}')
     assert dct_hashid == sql_hashid

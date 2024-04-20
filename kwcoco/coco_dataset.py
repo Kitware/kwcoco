@@ -1184,6 +1184,13 @@ class MixinCocoConstructors:
                     ub.Path(fpath).parent.ensuredir()
                     self.dump(fpath, newlines=True)
                     stamp.renew()
+                    # Mark the state as if this file was loaded from disk This
+                    # is ok, because we know the disk state exactly agrees with
+                    # the current in-memory state (we just saved the dataset).
+                    # TODO: might be a better idea to have a state flag that
+                    # indicates if the in memory dataset is in-sync with the
+                    # on-disk dataset.
+                    self._state['was_loaded'] = True
             else:
                 self = cls(data=fpath, bundle_dpath=bundle_dpath)
 
@@ -2135,14 +2142,17 @@ class MixinCocoHashing:
             self._state['was_loaded'] and
             not self._state['was_modified']
         )
+        print(f'[kwcoco-dct-cache] self._state={self._state}')
         if enable_cache:
             coco_fpath = ub.Path(self.fpath)
             enable_cache = coco_fpath.exists()
 
+        print(f'[kwcoco-dct-cache] enable_cache={enable_cache}')
         if enable_cache:
             cache_dpath = (coco_fpath.parent / '_cache')
             cache_fname = coco_fpath.name + '.hashid.cache'
             hashid_sidecar_fpath = cache_dpath / cache_fname
+            print(f'[kwcoco-dct-cache] hashid_sidecar_fpath={hashid_sidecar_fpath}')
             # Generate current lookup key
             fpath_stat = coco_fpath.stat()
             status_key = {
@@ -2156,6 +2166,7 @@ class MixinCocoHashing:
                     self.hashid_parts = cached_data['hashid_parts']
                     cache_miss = False
 
+        print(f'[kwcoco-dct-cache] cache_miss={cache_miss}')
         if cache_miss:
             self._build_hashid()
             if enable_cache:
