@@ -48,6 +48,10 @@ Initialize the Global PostgreSQL database and server:
     sudo -u postgres psql -c "ALTER USER kwcoco_rw WITH PASSWORD 'kwcoco_pw';"
     sudo -u postgres psql -c "ALTER USER kwcoco_ro WITH PASSWORD 'kwcoco_pw';"
 
+    sudo -u postgres createuser --role=Maintainer admin
+    sudo -u postgres psql -c "ALTER USER admin WITH PASSWORD 'admin';"
+    sudo -u postgres psql -c "ALTER USER admin WITH SUPERUSER;"
+
     sudo -u postgres createdb kwcocodb
     python -c "from sqlalchemy import create_engine; create_engine('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/kwcocodb').connect()"
 
