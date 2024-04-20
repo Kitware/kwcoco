@@ -154,3 +154,29 @@ def test_postgresql_cases():
     # dialect = engine.dialect
     # dialect_type = keyattr.expression.type.mapping[engine.dialect.name]
     # impl = dialect_type.dialect_impl(dialect)
+
+def test_postgresql_can_remember_original_filename():
+    """
+    A PostgreSQL view should be able to remember the filename it was populated
+    from. This is important for interoperability with sidecar-file based hashes
+    as well as relative pathing.
+    """
+    import pytest
+    import ubelt as ub
+    try:
+        import psycopg2  # NOQA
+        import sqlalchemy  # NOQA
+    except ImportError:
+        pytest.skip()
+
+    import kwcoco
+    dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
+    sql_dset = dct_dset.view_sql(backend='postgresql')
+
+    orig_coco_fpath = sql_dset._orig_coco_fpath()
+    assert orig_coco_fpath is not None, 'could not get original fpath'
+    assert orig_coco_fpath == ub.Path(dct_dset.fpath)
+
+    sql_hashid = sql_dset._cached_hashid()
+    dct_hashid = dct_dset._cached_hashid()
+    assert dct_hashid == sql_hashid

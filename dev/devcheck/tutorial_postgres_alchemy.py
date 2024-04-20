@@ -77,7 +77,7 @@ def use_postgresql_with_python():
     # Install Python tools
     pip install psycopg2-binary sqlalchemy_utils sqlalchemy
 
-    xdoctest ~/code/kwcoco/dev/tutorial_postgres_alchemy.py use_postgresql_with_python
+    xdoctest ~/code/kwcoco/dev/devcheck/tutorial_postgres_alchemy.py use_postgresql_with_python
     """
     from sqlalchemy import create_engine
     from sqlalchemy_utils import database_exists, create_database

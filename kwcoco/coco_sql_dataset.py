@@ -1970,6 +1970,19 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 coco_fpath = cand_fpath
                 break
         if coco_fpath is None:
+
+            # Workaround for postgres where we cant reconstruct the name based
+            # on database URI alone. This pairs with the cacher in
+            # :func:`cached_sql_coco_view`.
+            orig_name_cacher = ub.Cacher(fname='postgress-original-name',
+                                         depends=[self.fpath],
+                                         appname='kwcoco/postgres-fpath-lut',
+                                         ext='.json')
+            cache_info = orig_name_cacher.tryload()
+            if cache_info is not None:
+                coco_fpath = ub.Path(cache_info['dct_db_fpath'])
+
+        if coco_fpath is None:
             import warnings
             warnings.warn(ub.paragraph(
                 f'''
@@ -1987,6 +2000,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
         change (and need optimization).
         """
         coco_fpath = self._orig_coco_fpath()
+        if coco_fpath is None:
+            raise Exception(ub.paragraph(
+                '''
+                There was a problem associating this SQL view back to the
+                original coco filepath
+                '''))
 
         # Logic to construct the cache name
         cache_miss = True
@@ -2023,6 +2042,8 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     """
     # import os
     import kwcoco
+    from kwcoco.util.util_truncate import smart_truncate
+    import os
 
     if dct_db_fpath is not None:
         if dset is not None:
@@ -2052,7 +2073,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         ext = '.view.' + VERSION_PART + '.' + backend
         if backend == 'sqlite':
             sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_', ext=ext)
-        elif backend == 'postgresql':
+        elif backend in {'postgresql', 'postgres'}:
             # TODO: better way of handling authentication
             # prefix = 'postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432'
 
@@ -2063,13 +2084,26 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
 
             # Note: a postgres database name can only be 63 characters at most.
             # Very annoying.
-            from kwcoco.util.util_truncate import smart_truncate
             postgres_name = smart_truncate(
                 ub.augpath(dct_db_fpath, ext=ext),
                 trunc_loc=0, max_length=60, trunc_char='_').lstrip('/')
             prefix = f'postgresql+psycopg2://{user}:{passwd}@{host}:{port}'
             sql_db_fpath = prefix + '/' + postgres_name
             # ub.augpath(dct_db_fpath, prefix='_', ext=ext)
+
+            # Workaround to help remember the original filepath of a POSTGRESQL
+            # view. This is not a perfect solution, it would be nice if the
+            # database itself stored the relevant information about what source
+            # it was populated from (as well as if there have been
+            # modifications).
+            orig_name_cacher = ub.Cacher(fname='postgress-original-name',
+                                         depends=[sql_db_fpath],
+                                         appname='kwcoco/postgres-fpath-lut',
+                                         ext='.json')
+            orig_name_cacher.save({
+                'dct_db_fpath': os.fspath(dct_db_fpath),
+                'sql_db_fpath': os.fspath(sql_db_fpath),
+            })
         else:
             raise KeyError(backend)
 
@@ -2080,11 +2114,14 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
 
     self = CocoSqlDatabase(sql_db_fpath, img_root=bundle_dpath, tag=tag)
 
-    _cache_dpath = (ub.Path(bundle_dpath) / '_cache').ensuredir()
-
     enable_cache = not force_rewrite
     if os.fspath(sql_db_fpath) == ':memory:':
         enable_cache = False
+
+    _cache_dpath = (ub.Path(bundle_dpath) / '_cache')
+
+    if enable_cache:
+        _cache_dpath.ensuredir()
 
     # Note: we don't have a way of comparing timestamps for postgresql
     # databases, but that shouldn't matter too much
@@ -2092,7 +2129,16 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
                           dpath=_cache_dpath, depends=[dct_db_fpath],
                           product=cache_product, enabled=enable_cache,
                           hasher=None, ext='.json', verbose=4)
-    if stamp.expired():
+
+    try:
+        if stamp.expired():
+            raise Exception('Cache stamp expired, need to rebuild the SQL view')
+        else:
+            # If the stamp is not expired try to connect.
+            self.connect(must_exist=True)
+    except Exception:
+        # If the stamp is expired, or there was a problem connecting, then
+        # delete and regenerate the database.
         self.delete()
         self.connect()
         if dset is None:
@@ -2107,24 +2153,6 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         self.populate_from(dset, verbose=1)
         if stamp.cacher.enabled:
             stamp.renew()
-    else:
-        try:
-            self.connect(must_exist=True)
-        except Exception:
-            self.delete()
-            self.connect()
-            if dset is None:
-                print('Loading json dataset for SQL conversion')
-                dset = kwcoco.CocoDataset(dct_db_fpath)
-
-            # Write the cacheid when making a view, so the view can access it
-            dset._cached_hashid()
-
-            # Convert a coco file to an sql database
-            print(f'Start SQL({backend}_ conversion')
-            self.populate_from(dset, verbose=1)
-            if stamp.cacher.enabled:
-                stamp.renew()
     return self
 
 
