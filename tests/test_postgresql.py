@@ -155,11 +155,29 @@ def test_postgresql_cases():
     # dialect_type = keyattr.expression.type.mapping[engine.dialect.name]
     # impl = dialect_type.dialect_impl(dialect)
 
-def test_postgresql_can_remember_original_filename():
+
+def _process_worker(sql_dset, image_id):
+    # if hasattr(sql_dset, 'connect'):
+    #     # Reconnect to the backend if we are using SQL
+    #     sql_dset.connect(readonly=True)
+
+    img = sql_dset.index.imgs[image_id]
+    anns = []
+    for annot_id in sql_dset.index.gid_to_aids[image_id]:
+        ann = sql_dset.index.anns[annot_id]
+        anns.append(ann)
+
+    return (img, anns)
+
+
+def test_postgresql_in_process_worker():
     """
     A PostgreSQL view should be able to remember the filename it was populated
     from. This is important for interoperability with sidecar-file based hashes
     as well as relative pathing.
+
+    CommandLine:
+        xdoctest ~/code/kwcoco/tests/test_postgresql.py test_postgresql_in_process_worker
     """
     import pytest
     import ubelt as ub
@@ -170,23 +188,27 @@ def test_postgresql_can_remember_original_filename():
         pytest.skip()
 
     import kwcoco
-    dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes2')
-    # pre 0.7.9 we would need to load the demo data from disk for this to work
-    # But we hack the dct_dset._state to make this work in the demo method.
-    # dct_dset = kwcoco.CocoDataset(dct_dset.fpath)
-    sql_dset = dct_dset.view_sql(backend='postgresql')
-
-    dct_coco_fpath = ub.Path(dct_dset.fpath)
-    print(f'dct_coco_fpath  = {ub.urepr(dct_coco_fpath, nl=1)}')
-
-    orig_coco_fpath = sql_dset._orig_coco_fpath()
-    print(f'orig_coco_fpath = {ub.urepr(orig_coco_fpath, nl=1)}')
-
-    assert orig_coco_fpath is not None, 'could not get original fpath'
-    assert orig_coco_fpath == dct_coco_fpath
-
-    dct_hashid = dct_dset._cached_hashid()
-    print(f'dct_hashid = {ub.urepr(dct_hashid, nl=1)}')
-    sql_hashid = sql_dset._cached_hashid()
-    print(f'sql_hashid = {ub.urepr(sql_hashid, nl=1)}')
-    assert dct_hashid == sql_hashid
+    dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
+    # sql_dset = dct_dset.view_sql(backend='postgresql')
+    sql_dset = dct_dset.view_sql(backend='sqlite')
+    executor = ub.Executor(mode='process', max_workers=8)
+    print('Build executor')
+    with executor:
+        jobs = []
+        images = sql_dset.images()
+        print('Submit jobs')
+        for image_id in list(images):
+            job = executor.submit(_process_worker, sql_dset, image_id)
+            jobs.append(job)
+        print('Collect jobs')
+        sql_results = [job.result() for job in jobs]
+        print('Build expected results')
+        dct_results = [_process_worker(dct_dset, image_id) for image_id in images]
+    print('Compare results')
+    assert len(dct_results) == len(sql_results)
+    for tup1, tup2 in zip(dct_results, sql_results):
+        img1, anns1 = tup1
+        img2, anns2 = tup1
+        assert img1 == img2
+        assert len(anns1) == len(anns2)
+        assert [a['id'] for a in anns1] == [a['id'] for a in anns2]

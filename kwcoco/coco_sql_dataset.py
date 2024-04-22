@@ -1977,13 +1977,14 @@ class CocoSqlDatabase(AbstractCocoDataset,
             ...
         else:
             # TODO: surpress the warning if we can determine that the column is
-            # safe.
-            import warnings
-            warnings.warn(ub.paragraph(
-                '''
-                non-None defaults can be inconsistent with dictionary coco
-                tables if None is a valid column value.
-                '''))
+            # safe. Or rather, its really annoying so maybe figure out when to
+            # enable it instead? Or can we fix it in general?
+            # import warnings
+            # warnings.warn(ub.paragraph(
+            #     f'''
+            #     The non-None default {default!r} can be inconsistent with
+            #     dictionary coco tables if None is a valid column value.
+            #     '''))
             values = [default if v is None else v for v in values]
 
         if keepid:
