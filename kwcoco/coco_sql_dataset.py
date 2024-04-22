@@ -1353,8 +1353,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
             "spawn".
 
             This object is NOT pickled when the multiprocessing context is
-            "fork".  In this case the user needs to be careful to create new
-            connections in the forked subprocesses.
+            "fork".  In this case the user needs to be careful to disconnect
+            before forking, and then create new connections in the forked
+            subprocesses.
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -1397,8 +1398,11 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
     def disconnect(self):
         """
-        Drop references to any SQL or cache objects
+        Disconnect from an existing session and drop references to SQL / cache
+        objects.
         """
+        if self.session is not None:
+            self.session.close()
         self.session = None
         self.engine = None
         self.index = None
