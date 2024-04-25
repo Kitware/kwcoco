@@ -116,24 +116,24 @@ class CocoStatsCLI:
             rich_print(df.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['video_attrs']:
-            print('Video Attrs')
+            print('Video Attribute Histogram')
             for dset in datasets:
                 attrs = dset.videos().attribute_frequency()
-                print('video_attrs = {}'.format(ub.urepr(attrs, nl=1)))
+                print('hist(video_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['image_attrs']:
-            print('Image Attrs')
+            print('Image Attribute Histogram')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
                 attrs = dset.images().attribute_frequency()
-                print('image_attrs = {}'.format(ub.urepr(attrs, nl=1)))
+                print('hist(image_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['annot_attrs']:
-            print('Annot Attrs')
+            print('Annot Attribute Histogram')
             for dset in datasets:
                 print('dset.tag = {!r}'.format(dset.tag))
                 attrs = dset.annots().attribute_frequency()
-                print('annot_attrs = {}'.format(ub.urepr(attrs, nl=1)))
+                print('hist(annot_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['boxes']:
             print('Box stats')
