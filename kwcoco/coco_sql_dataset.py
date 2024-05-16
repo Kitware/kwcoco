@@ -1973,7 +1973,25 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 # we still need to do the decoding... Not sure why...
                 # punting for now with a hack that works in most cases
                 # if you know what the problem is please FIXME
-                values = [v if not isinstance(v, str) else json.loads(v) for v in values]
+                ADDITIONAL_HACK = True
+                if ADDITIONAL_HACK:
+                    # Not sure what is going on here, the alternate else block
+                    # should be sufficient, but it started to cause errors.
+                    # Hacking it to force it to work.
+                    def _hack_loads(v):
+                        if not isinstance(v, str):
+                            return v
+                        else:
+                            try:
+                                return json.loads(v)
+                            except json.decoder.JSONDecodeError:
+                                # I've countered the case where "v" is already
+                                # decoded string and not a json string.
+                                return v
+                    values = [_hack_loads(v) for v in values]
+                else:
+                    values = [v if not isinstance(v, str) else json.loads(v)
+                              for v in values]
             else:
                 values = [None if v is None else json.loads(v) for v in values]
 

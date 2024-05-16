@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * Added workaround for an issue where a postgresql cache of a coco dataset is unable to remember its original json filepath.
 * Fixed issue with `CocoSqlDatabase.disconnect` where a session would be dereferenced, but not closed.
+* Worked around issue in postgresql backend where track-ids were not decoded properly in their string form.
 
 
 ## Version 0.7.8 - Released 2024-03-20
