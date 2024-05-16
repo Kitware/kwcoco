@@ -1993,7 +1993,22 @@ class CocoSqlDatabase(AbstractCocoDataset,
                     values = [v if not isinstance(v, str) else json.loads(v)
                               for v in values]
             else:
-                values = [None if v is None else json.loads(v) for v in values]
+                ADDITIONAL_HACK = True
+                if ADDITIONAL_HACK:
+                    # We need this here too!!!???
+                    def _hack_loads(v):
+                        if not isinstance(v, str):
+                            return v
+                        else:
+                            try:
+                                return json.loads(v)
+                            except json.decoder.JSONDecodeError:
+                                # I've countered the case where "v" is already
+                                # decoded string and not a json string.
+                                return v
+                    values = [_hack_loads(v) for v in values]
+                else:
+                    values = [None if v is None else json.loads(v) for v in values]
 
         if default is ub.NoParam or default is None:
             ...
