@@ -16,6 +16,8 @@ KWCOCO - The Kitware COCO Module
 +------------------+------------------------------------------------------------------------------------------------------------+
 | Slides           | https://docs.google.com/presentation/d/1OqljzzaZdjzmMg9876J4wFOmdFlJsH2Lc8_7tcqAPUE/edit                   |
 +------------------+------------------------------------------------------------------------------------------------------------+
+| Blog             | https://www.kitware.com/introducing-kwcoco/                                                                |
++------------------+------------------------------------------------------------------------------------------------------------+
 
 The main webpage for this project is: https://gitlab.kitware.com/computer-vision/kwcoco
 
