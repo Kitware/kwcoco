@@ -1,7 +1,7 @@
 delayed_image >= 0.2.7
 jsonschema >= 3.2.0
-kwarray >= 0.6.12
-kwimage >= 0.9.19
+kwarray >= 0.7.0
+kwimage >= 0.10.0
 packaging>=21.3
 parse >= 1.14.0
 safer>=4.4.1
@@ -18,8 +18,18 @@ networkx>=2.7           ; python_version < '3.11'  and python_version >= '3.8'  
 networkx>=2.6.2         ; python_version < '3.8'   and python_version >= '3.7'    # Python 3.7
 networkx>=2.2.0,<=2.5.1 ; python_version < '3.7.0' and python_version >= '3.6.0'  # Python 3.6
 
+# xdev availpkg scipy
+scipy>=1.11.2    ; python_version < '4.0'  and python_version >= '3.12'    # Python 3.12+
+scipy>=1.9.2     ; python_version < '3.12' and python_version >= '3.11'    # Python 3.11
+scipy>=1.8.0     ; python_version < '3.11' and python_version >= '3.10'  # Python 3.10
+scipy>=1.8.0     ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
+scipy>=1.8.0     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
+scipy>=1.6.0     ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
+scipy>=1.5.4     ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
+
 # 1.19.2 is the tensorflow minimum
-numpy>=1.23.2  ; python_version < '4.0'  and python_version >= '3.11'  # Python 3.11
+numpy>=1.26.0  ; python_version < '4.0'  and python_version >= '3.12'    # Python 3.12+
+numpy>=1.23.2  ; python_version < '3.12' and python_version >= '3.11'    # Python 3.11
 numpy>=1.21.6  ; python_version < '3.11' and python_version >= '3.10'  # Python 3.10
 numpy>=1.19.3  ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
 numpy>=1.19.2  ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
@@ -41,15 +51,6 @@ scikit-learn>=1.0.2     ; python_version < '3.10' and python_version >= '3.9'   
 scikit-learn>=1.0.2     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
 scikit-learn>=0.24.1    ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
 scikit-learn>=0.24.1    ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
-
-
-# xdev availpkg scipy
-scipy>=1.9.2     ; python_version < '4.0'  and python_version >= '3.11'  # Python 3.11+
-scipy>=1.8.0     ; python_version < '3.11' and python_version >= '3.10'  # Python 3.10
-scipy>=1.8.0     ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
-scipy>=1.8.0     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
-scipy>=1.6.0     ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
-scipy>=1.5.4     ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
 
 psutil>=5.9.1     ; python_version < '4.0'  and python_version >= '3.11'    # Python 3.11+
 psutil>=5.9.1     ; python_version < '3.11' and python_version >= '3.10'    # Python 3.10
