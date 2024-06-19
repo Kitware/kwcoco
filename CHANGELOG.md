@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.7.9 - Unreleased
+## Version 0.8.0 - Unreleased
+
+### Removed
+* Drop 3.6 and 3.7 support
 
 ### Changed
 * Optimize CocoObject1D get calls with SQL backends
