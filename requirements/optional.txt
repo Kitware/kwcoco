@@ -1,7 +1,7 @@
 affine>=2.3.0
 colormath>=3.0.0
 
-kwimage_ext>=0.2.1     ; python_version < '4.0'  and python_version >= '3.11'    # Python 3.11+
+kwimage_ext>=0.2.1     ; python_version < '3.12' and python_version >= '3.11'    # Python 3.11+
 kwimage_ext>=0.2.0     ; python_version < '3.11' and python_version >= '3.6'     # Python 3.10
 
 kwplot>=0.4.13
