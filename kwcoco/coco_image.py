@@ -1224,8 +1224,7 @@ class CocoImage(_CocoObject):
             >>> self.img['resolution'] = 1
             >>> self.resolution()
             >>> self.img['resolution'] = '1 meter'
-            >>> self.resolution(space='video')
-            {'mag': (1.0, 1.0), 'unit': 'meter'}
+            >>> assert self.resolution(space='video') == {'mag': (1.0, 1.0), 'unit': 'meter'}
             >>> self.resolution(space='asset', channel='B11')
             >>> self.resolution(space='asset', channel='B1')
         """

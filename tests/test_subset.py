@@ -71,7 +71,7 @@ def test_subset_cli_with_jq():
         import jq  # NOQA
     except Exception:
         import pytest
-        pytest.skip()
+        pytest.skip('test requires jq')
     dset = _create_demo_dataset()
 
     print('dset.fpath = {}'.format(ub.urepr(dset.fpath, nl=1)))

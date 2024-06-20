@@ -30,8 +30,6 @@ def test_track_order():
 def test_track_structures():
     import kwcoco
     self = kwcoco.CocoDataset.demo('vidshapes1', use_cache=False, verbose=100)
-
-    assert len(self.dataset['tracks']) == self.n_tracks
     assert len(self.dataset['tracks']) == self.n_tracks
 
 

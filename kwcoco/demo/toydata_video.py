@@ -596,8 +596,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         min_ar = 0.25
         max_ar = 1 / min_ar
 
-        wh['w'][ar < min_ar] = wh['h'] * 0.25
-        wh['h'][ar > max_ar] = wh['w'] * 0.25
+        # wh['w'][ar < min_ar] = wh['h'] * 0.25
+        # wh['h'][ar > max_ar] = wh['w'] * 0.25
+        wh.loc[ar < min_ar, 'w'] = wh['h'] * 0.25
+        wh.loc[ar > max_ar, 'h'] = wh['w'] * 0.25
 
         box_dims = wh.ewm(alpha=alpha, adjust=False).mean()
 
