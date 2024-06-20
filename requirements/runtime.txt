@@ -1,4 +1,4 @@
-delayed_image >= 0.2.7
+delayed_image >= 0.3.0
 jsonschema >= 3.2.0
 kwarray >= 0.6.19
 kwimage >= 0.10.0
@@ -33,8 +33,9 @@ numpy>=1.23.2  ; python_version < '3.12' and python_version >= '3.11'    # Pytho
 numpy>=1.21.6  ; python_version < '3.11' and python_version >= '3.10'  # Python 3.10
 numpy>=1.19.3  ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
 numpy>=1.19.2  ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
-numpy>=1.19.2  ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
-numpy>=1.19.2  ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
+numpy>=1.19.2,<2.0  ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
+numpy>=1.19.2,<2.0  ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
+
 
 # xdev availpkg pandas --request_min=1.1.4
 pandas>=1.5.0  ; python_version < '4.0'  and python_version >= '3.11'  # Python 3.11+
