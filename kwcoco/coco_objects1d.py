@@ -245,7 +245,9 @@ class ObjectList1D(ub.NiceRepr):
             key (str): name of the property you want to lookup
 
             default : if specified, uses this value if it doesn't exist
-                in an ObjT.
+                in an ObjT. Note: there are differences in behavior
+                if between dict and sql backends for default behavior.
+                todo: document / or fix.
 
             keepid: if True, return a mapping from ids to the property
 
@@ -279,19 +281,21 @@ class ObjectList1D(ub.NiceRepr):
             >>> dset.annots().lookup('wizard')
             >>> #self = dset.annots()
         """
-        if hasattr(self._dset, '_column_lookup') and default is ub.NoParam:
+        has_sql_backend = hasattr(self._dset, '_column_lookup')
+        if has_sql_backend:
             # Special case for SQL speed. This only works on schema columns.
             try:
                 # TODO: check if the column is in the stuctured schema
                 return self._dset._column_lookup(
-                    tablename=self._key, key=key, rowids=self._ids)
+                    tablename=self._key, key=key, rowids=self._ids,
+                    default=default)
             except KeyError:
                 # We can read only the unstructured bit, which is the best we
                 # can do in this case.
                 _lutv = self._dset._column_lookup(
-                    tablename=self._key, key='_unstructured', rowids=self._ids)
+                    tablename=self._key, key='_unstructured', rowids=self._ids,
+                    default=default)
                 _lut = dict(zip(self._ids, _lutv))
-            # TODO: optimize the case where default is given
         else:
             _lut = self._id_to_obj
 

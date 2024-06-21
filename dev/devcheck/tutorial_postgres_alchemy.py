@@ -34,6 +34,11 @@ def install_postgres_instructions():
         sudo systemctl status postgresql.service
         ''')
 
+    parts['setup_env'] = ub.codeblock(
+        '''
+        sudo -u postgres psql -c "CREATE EXTENSION btree_gist;"
+        ''')
+
     # FIXME: I'm not sure what best practice is here.
     parts['create_users'] = ub.codeblock(
         '''
@@ -77,7 +82,7 @@ def use_postgresql_with_python():
     # Install Python tools
     pip install psycopg2-binary sqlalchemy_utils sqlalchemy
 
-    xdoctest ~/code/kwcoco/dev/tutorial_postgres_alchemy.py use_postgresql_with_python
+    xdoctest ~/code/kwcoco/dev/devcheck/tutorial_postgres_alchemy.py use_postgresql_with_python
     """
     from sqlalchemy import create_engine
     from sqlalchemy_utils import database_exists, create_database

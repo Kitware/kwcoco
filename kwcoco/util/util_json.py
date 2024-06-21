@@ -6,6 +6,7 @@ from collections import OrderedDict
 import decimal
 import fractions
 import pathlib
+from typing import NamedTuple, Tuple, Any
 
 # backwards compat
 IndexableWalker = ub.IndexableWalker
@@ -286,6 +287,103 @@ def indexable_allclose(dct1, dct2, return_info=False):
         return final_flag, info
     else:
         return final_flag
+
+
+class Difference(NamedTuple):
+    """
+    A result class of indexable_diff that organizes what the difference between
+    the indexables is.
+    """
+    path: Tuple
+    value1: Any
+    value2: Any
+
+
+def indexable_diff(dct1, dct2, rtol=1e-05, atol=1e-08, equal_nan=False):
+    """
+    Walks through two nested data structures finds differences in the
+    structures.
+
+    Args:
+        dct1: a nested indexable item
+        dct2: a nested indexable item
+
+    Returns:
+        dict: information about the diff with
+            "similarity": a score between 0 and 1
+            "num_differences" being the number of paths not common plus the
+                number of common paths with differing values.
+            "unique1": being the paths that were unique to dct1
+            "unique2": being the paths that were unique to dct2
+            "faillist": a list 3-tuples of common path and differing values
+            "approximations":
+                is the number of approximately equal items (i.e. floats) there were
+
+    Example:
+        >>> from kwcoco.util.util_json import indexable_diff
+        >>> dct1 = {
+        >>>     'foo': [1.222222, 1.333],
+        >>>     'bar': 1,
+        >>>     'baz': [],
+        >>>     'top': [1, 2, 3],
+        >>>     'L0': {'L1': {'L2': {'K1': 'V1', 'K2': 'V2', 'D1': 1, 'D2': 2}}},
+        >>> }
+        >>> dct2 = {
+        >>>     'foo': [1.22222, 1.333],
+        >>>     'bar': 1,
+        >>>     'baz': [],
+        >>>     'buz': {1: 2},
+        >>>     'top': [1, 1, 2],
+        >>>     'L0': {'L1': {'L2': {'K1': 'V1', 'K2': 'V2', 'D1': 10, 'D2': 20}}},
+        >>> }
+        >>> info = indexable_diff(dct1, dct2)
+        >>> print(f'info = {ub.urepr(info, nl=2)}')
+    """
+    walker1 = ub.IndexableWalker(dct1)
+    walker2 = ub.IndexableWalker(dct2)
+    flat_items1 = {
+        tuple(path): value for path, value in walker1
+        if not isinstance(value, walker1.indexable_cls) or len(value) == 0}
+    flat_items2 = {
+        tuple(path): value for path, value in walker2
+        if not isinstance(value, walker1.indexable_cls) or len(value) == 0}
+
+    common = flat_items1.keys() & flat_items2.keys()
+    unique1 = flat_items1.keys() - flat_items2.keys()
+    unique2 = flat_items2.keys() - flat_items1.keys()
+
+    approximations = 0
+
+    faillist = []
+    passlist = []
+    for key in common:
+        v1 = flat_items1[key]
+        v2 = flat_items2[key]
+        flag = (v1 == v2)
+        if not flag:
+            if isinstance(v1, float) and isinstance(v2, float) and np.isclose(v1, v2, rtol=rtol, atol=atol, equal_nan=equal_nan):
+                approximations += 1
+                flag = True
+        if flag:
+            passlist.append(key)
+        else:
+            faillist.append(Difference(key, v1, v2))
+
+    num_differences = len(unique1) + len(unique2) + len(faillist)
+    num_similarities = len(passlist)
+
+    similarity = num_similarities / (num_similarities + num_differences)
+    info = {
+        'similarity': similarity,
+        'approximations': approximations,
+        'num_differences': num_differences,
+        'num_similarities': num_similarities,
+        'unique1': unique1,
+        'unique2': unique2,
+        'faillist': faillist,
+        'passlist': passlist,
+    }
+    return info
 
 
 def coerce_indent(indent):

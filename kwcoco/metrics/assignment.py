@@ -647,7 +647,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
                 cand_pred = pred_boxes.take(ignore_idxs)
 
                 # Refine overlap estimates
-                cand_regions = cand_pred.to_shapley()
+                cand_regions = cand_pred.to_shapely()
                 for idx, pred_region in zip(ignore_idxs, cand_regions):
                     try:
                         isect = ignore_region.intersection(pred_region)

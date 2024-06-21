@@ -1353,8 +1353,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
             "spawn".
 
             This object is NOT pickled when the multiprocessing context is
-            "fork".  In this case the user needs to be careful to create new
-            connections in the forked subprocesses.
+            "fork".  In this case the user needs to be careful to disconnect
+            before forking, and then create new connections in the forked
+            subprocesses.
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -1397,8 +1398,11 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
     def disconnect(self):
         """
-        Drop references to any SQL or cache objects
+        Disconnect from an existing session and drop references to SQL / cache
+        objects.
         """
+        if self.session is not None:
+            self.session.close()
         self.session = None
         self.engine = None
         self.index = None
@@ -1749,9 +1753,31 @@ class CocoSqlDatabase(AbstractCocoDataset,
         return raw_tables
 
     def _column_lookup(self, tablename, key, rowids, default=ub.NoParam,
-                       keepid=False):
+                       keepid=False, _join_optimize=1):
         """
         Convinience method to lookup only a single column of information
+
+        Note:
+            Using default has a quirk here and can produce wrong results
+            if None is a valid value for the table to have.
+
+        TODO:
+            - [ ] if rowids is large (e.g. > 10000) it may be more efficient to
+                   create a temporary table and execute a JOIN. ChatGPT gives
+                   this example:
+
+            .. code::
+
+                WITH id_list AS (
+                    SELECT unnest(:list_of_row_ids) AS row_id
+                )
+                SELECT t.column_name
+                FROM table_name t
+                JOIN id_list ON t.row_id = id_list.row_id;
+
+            In this example, :list_of_row_ids is a placeholder for your list of
+            row IDs. This query will retrieve the values of column_name for
+            each row with a matching row_id from the list.
 
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -1793,33 +1819,151 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 with timer:
                     anns = [self.anns[aid] for aid in rowids]
                     cids = [ann[key] for ann in anns]
-        """
-        # FIXME: Make this work for columns that need json decoding
-        stmt = text(ub.paragraph(
-            '''
-            SELECT
-                {tablename}.{key}
-            FROM {tablename}
-            WHERE {tablename}.id = :rowid
-            ''').format(tablename=tablename, key=key))
 
+        Ignore:
+            # Future benchmark
+            from kwcoco.coco_sql_dataset import *  # NOQA
+            import kwcoco
+            dct_dset = kwcoco.CocoDataset.demo('vidshapes800')
+            coco_img = dct_dset.coco_image(1)
+            img_fpath = coco_img.primary_image_filepath()
+            fpath2 = ub.Path(dct_dset.fpath).augment(stemsuffix='_mod_for_sql')
+            dct_dset.fpath = fpath2
+            dct_dset.add_image(name='foobar', file_name=img_fpath)
+            dct_dset.dump()
+            dct_images = dct_dset.images()
+            dct_vidid_values = dct_images.get('video_id', default="MISSING")
+            print(f'dct_vidid_values = {ub.urepr(dct_vidid_values, nl=0)}')
+            sql_dset = dct_dset.view_sql(backend='postgresql')
+            sql_images = sql_dset.images()
+            self = sql_dset
+
+            tablename = sql_images._key
+            key = 'video_id'
+            rowids = list(sql_images)
+            default = None
+            assert result2 == result1
+
+            import timerit
+            ti = timerit.Timerit(10, bestof=3, verbose=2)
+            for timer in ti.reset(f'orig-{len(rowids)}'):
+                with timer:
+                    result1 = sql_dset._column_lookup(tablename, key, rowids, _join_optimize=0)
+
+            for timer in ti.reset(f'optimized-{len(rowids)}'):
+                with timer:
+                    result2 = sql_dset._column_lookup(tablename, key, rowids, _join_optimize=1)
+
+            for timer in ti.reset('orig-1'):
+                with timer:
+                    result1 = sql_dset._column_lookup(tablename, key, rowids[0:1], _join_optimize=0)
+
+            for timer in ti.reset('optmized-1'):
+                with timer:
+                    result2 = sql_dset._column_lookup(tablename, key, rowids[0:1], _join_optimize=1)
+
+            for timer in ti.reset('orig-10'):
+                with timer:
+                    result1 = sql_dset._column_lookup(tablename, key, rowids[0:10], _join_optimize=0)
+
+            for timer in ti.reset('optmized-10'):
+                with timer:
+                    result2 = sql_dset._column_lookup(tablename, key, rowids[0:10], _join_optimize=1)
+
+            print('ti.rankings = {}'.format(ub.urepr(ti.rankings, nl=2, align=':')))
+
+        Example:
+            >>> # xdoctest: +REQUIRES(env:KWCOCO_WITH_POSTGRESQL)
+            >>> # xdoctest: +REQUIRES(module:sqlalchemy)
+            >>> # xdoctest: +REQUIRES(module:psycopg2)
+            >>> import kwcoco
+            >>> # Test of the default kwarg
+            >>> dct_dset = kwcoco.CocoDataset.demo('vidshapes800')
+            >>> coco_img = dct_dset.coco_image(1)
+            >>> # Create a dictionary coco dataset where one image doesnt have
+            >>> # a video id.
+            >>> img_fpath = coco_img.primary_image_filepath()
+            >>> fpath2 = ub.Path(dct_dset.fpath).augment(stemsuffix='_mod_for_sql')
+            >>> dct_dset.fpath = fpath2
+            >>> dct_dset.add_image(name='foobar', file_name=img_fpath)
+            >>> dct_dset.dump()
+            >>> dct_images = dct_dset.images()
+            >>> dct_vidid_values = dct_images.get('video_id', default="MISSING")
+            >>> print(f'dct_vidid_values = {ub.urepr(dct_vidid_values, nl=0)}')
+            >>> sql_dset = dct_dset.view_sql(backend='postgresql')
+            >>> sql_images = sql_dset.images()
+            >>> sql_vidid_values1 = sql_images.get('video_id', default="MISSING")
+            >>> print(f'sql_vidid_values1 = {ub.urepr(sql_vidid_values1, nl=0)}')
+            >>> tablename = sql_images._key
+            >>> key = 'video_id'
+            >>> rowids = list(sql_images)
+            >>> default = "MISSING"
+            >>> sql_vidid_values2 = sql_dset._column_lookup(tablename, key, rowids, default=default)
+            >>> print(f'sql_vidid_values2 = {ub.urepr(sql_vidid_values2, nl=0)}')
+            >>> assert sql_vidid_values2 == sql_vidid_values1
+            >>> assert sql_vidid_values2 == dct_vidid_values
+        """
         # TODO: memoize this check
         table = CocoBase.TBLNAME_TO_CLASS[tablename]
         column = table.__table__.columns[key]
         column_type = column.type
-        # Gotta be a better way adapt to a variant type based on the dialect
-        if IS_GE_SQLALCH_2x:
-            column_type = column_type._variant_mapping.get(self._dialect_name, column_type)
-        else:
-            if hasattr(column_type, 'mapping'):
-                column_type = column_type.mapping.get(self._dialect_name, column_type)
 
-        values = [
-            # self.anns[aid][key]
-            # if aid in self.anns._cache else
-            self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
-            for rowid in rowids
-        ]
+        if self._dialect_name == 'postgresql' and _join_optimize and len(rowids) > 1:
+            # Optimization for large numbers of rows
+            # Create a temp-table with the row-ids to query and do a JOIN
+            # TODO:
+            # It seems like this is just faster in general?
+            if 0:
+                self.session.rollback()
+            column_name = key
+            # if isinstance(rowids, list):
+            #     rowids_text = str(rowids)
+            # else:
+            rowids_text = '[' + ','.join([str(t) for t in rowids]) + ']'
+            # %timeit '[' + ','.join([str(t) for t in rowids]) + ']'
+            # %timeit '[' + ','.join([str(t) for t in rowids_text]) + ']'
+            # %timeit isinstance(rowids, list)
+            # %timeit str(rowids)
+            # Statement generated with help from ChatGPT3.5
+            stmt = text(ub.paragraph(
+                '''
+                WITH tmp_id_list AS (
+                    SELECT unnest(array{rowids_text}) AS row_id
+                )
+                SELECT t.{column_name}
+                FROM {tablename} t
+                JOIN tmp_id_list ON t.id = tmp_id_list.row_id;
+                ''').format(tablename=tablename, rowids_text=rowids_text, column_name=column_name))
+            # print(stmt)
+            resp = self.session.execute(stmt)
+            values = [r[0] for r in resp.fetchall()]
+            # resp.fetchone()[0]
+            # attr_list = None
+            # return attr_list
+            # self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
+        else:
+            # FIXME: Make this work for columns that need json decoding
+            stmt = text(ub.paragraph(
+                '''
+                SELECT
+                    {tablename}.{key}
+                FROM {tablename}
+                WHERE {tablename}.id = :rowid
+                ''').format(tablename=tablename, key=key))
+
+            # Gotta be a better way adapt to a variant type based on the dialect
+            if IS_GE_SQLALCH_2x:
+                column_type = column_type._variant_mapping.get(self._dialect_name, column_type)
+            else:
+                if hasattr(column_type, 'mapping'):
+                    column_type = column_type.mapping.get(self._dialect_name, column_type)
+
+            values = [
+                # self.anns[aid][key]
+                # if aid in self.anns._cache else
+                self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
+                for rowid in rowids
+            ]
 
         needs_json_decode = (column_type.__class__.__name__ == 'JSON')
         if needs_json_decode:
@@ -1829,20 +1973,61 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 # we still need to do the decoding... Not sure why...
                 # punting for now with a hack that works in most cases
                 # if you know what the problem is please FIXME
-                values = [v if not isinstance(v, str) else json.loads(v) for v in values]
+                ADDITIONAL_HACK = True
+                if ADDITIONAL_HACK:
+                    # Not sure what is going on here, the alternate else block
+                    # should be sufficient, but it started to cause errors.
+                    # Hacking it to force it to work.
+                    def _hack_loads(v):
+                        if not isinstance(v, str):
+                            return v
+                        else:
+                            try:
+                                return json.loads(v)
+                            except json.decoder.JSONDecodeError:
+                                # I've countered the case where "v" is already
+                                # decoded string and not a json string.
+                                return v
+                    values = [_hack_loads(v) for v in values]
+                else:
+                    values = [v if not isinstance(v, str) else json.loads(v)
+                              for v in values]
             else:
-                values = [None if v is None else json.loads(v) for v in values]
+                ADDITIONAL_HACK = True
+                if ADDITIONAL_HACK:
+                    # We need this here too!!!???
+                    def _hack_loads(v):
+                        if not isinstance(v, str):
+                            return v
+                        else:
+                            try:
+                                return json.loads(v)
+                            except json.decoder.JSONDecodeError:
+                                # I've countered the case where "v" is already
+                                # decoded string and not a json string.
+                                return v
+                    values = [_hack_loads(v) for v in values]
+                else:
+                    values = [None if v is None else json.loads(v) for v in values]
+
+        if default is ub.NoParam or default is None:
+            ...
+        else:
+            # TODO: surpress the warning if we can determine that the column is
+            # safe. Or rather, its really annoying so maybe figure out when to
+            # enable it instead? Or can we fix it in general?
+            # import warnings
+            # warnings.warn(ub.paragraph(
+            #     f'''
+            #     The non-None default {default!r} can be inconsistent with
+            #     dictionary coco tables if None is a valid column value.
+            #     '''))
+            values = [default if v is None else v for v in values]
 
         if keepid:
-            if default is ub.NoParam:
-                attr_list = ub.dzip(rowids, values)
-            else:
-                raise NotImplementedError('cannot use default')
+            attr_list = ub.dzip(rowids, values)
         else:
-            if default is ub.NoParam:
-                attr_list = values
-            else:
-                raise NotImplementedError('cannot use default')
+            attr_list = values
         return attr_list
 
     def _all_rows_column_lookup(self, tablename, keys):
@@ -1970,6 +2155,19 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 coco_fpath = cand_fpath
                 break
         if coco_fpath is None:
+
+            # Workaround for postgres where we cant reconstruct the name based
+            # on database URI alone. This pairs with the cacher in
+            # :func:`cached_sql_coco_view`.
+            orig_name_cacher = ub.Cacher(fname='postgress-original-name',
+                                         depends=[self.fpath],
+                                         appname='kwcoco/postgres-fpath-lut',
+                                         ext='.json')
+            cache_info = orig_name_cacher.tryload()
+            if cache_info is not None:
+                coco_fpath = ub.Path(cache_info['dct_db_fpath'])
+
+        if coco_fpath is None:
             import warnings
             warnings.warn(ub.paragraph(
                 f'''
@@ -1987,6 +2185,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
         change (and need optimization).
         """
         coco_fpath = self._orig_coco_fpath()
+        if coco_fpath is None:
+            raise Exception(ub.paragraph(
+                '''
+                There was a problem associating this SQL view back to the
+                original coco filepath
+                '''))
 
         # Logic to construct the cache name
         cache_miss = True
@@ -2006,6 +2210,16 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 self.hashid = cached_data['hashid']
                 self.hashid_parts = cached_data['hashid_parts']
                 cache_miss = False
+            else:
+                print('Status keys disagree. The cached hashid may be out of date')
+                print(f'status_key = {ub.urepr(status_key, nl=1)}')
+                print(f'cached_data = {ub.urepr(cached_data, nl=1)}')
+                print(f'coco_fpath = {ub.urepr(coco_fpath, nl=1)}')
+                print('You can try deleting this path:')
+                print(f'hashid_sidecar_fpath = {ub.urepr(hashid_sidecar_fpath, nl=1)}')
+        else:
+            print('Could not find hashid sidecar')
+            print(f'hashid_sidecar_fpath = {ub.urepr(hashid_sidecar_fpath, nl=1)}')
 
         if cache_miss:
             raise AssertionError('The cache id should have been written already')
@@ -2023,6 +2237,8 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     """
     # import os
     import kwcoco
+    from kwcoco.util.util_truncate import smart_truncate
+    import os
 
     if dct_db_fpath is not None:
         if dset is not None:
@@ -2052,7 +2268,7 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
         ext = '.view.' + VERSION_PART + '.' + backend
         if backend == 'sqlite':
             sql_db_fpath = ub.augpath(dct_db_fpath, prefix='_', ext=ext)
-        elif backend == 'postgresql':
+        elif backend in {'postgresql', 'postgres'}:
             # TODO: better way of handling authentication
             # prefix = 'postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432'
 
@@ -2063,13 +2279,27 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
 
             # Note: a postgres database name can only be 63 characters at most.
             # Very annoying.
-            from kwcoco.util.util_truncate import smart_truncate
             postgres_name = smart_truncate(
                 ub.augpath(dct_db_fpath, ext=ext),
                 trunc_loc=0, max_length=60, trunc_char='_').lstrip('/')
             prefix = f'postgresql+psycopg2://{user}:{passwd}@{host}:{port}'
             sql_db_fpath = prefix + '/' + postgres_name
             # ub.augpath(dct_db_fpath, prefix='_', ext=ext)
+
+            # Workaround to help remember the original filepath of a POSTGRESQL
+            # view. This is not a perfect solution, it would be nice if the
+            # database itself stored the relevant information about what source
+            # it was populated from (as well as if there have been
+            # modifications).
+            orig_name_cacher = ub.Cacher(fname='postgress-original-name',
+                                         depends=[sql_db_fpath],
+                                         appname='kwcoco/postgres-fpath-lut',
+                                         ext='.json')
+            orig_name_cacher.save({
+                'dct_db_fpath': os.fspath(dct_db_fpath),
+                'sql_db_fpath': os.fspath(sql_db_fpath),
+            })
+
         else:
             raise KeyError(backend)
 
@@ -2080,11 +2310,14 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
 
     self = CocoSqlDatabase(sql_db_fpath, img_root=bundle_dpath, tag=tag)
 
-    _cache_dpath = (ub.Path(bundle_dpath) / '_cache').ensuredir()
-
     enable_cache = not force_rewrite
     if os.fspath(sql_db_fpath) == ':memory:':
         enable_cache = False
+
+    _cache_dpath = (ub.Path(bundle_dpath) / '_cache')
+
+    if enable_cache:
+        _cache_dpath.ensuredir()
 
     # Note: we don't have a way of comparing timestamps for postgresql
     # databases, but that shouldn't matter too much
@@ -2092,7 +2325,16 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
                           dpath=_cache_dpath, depends=[dct_db_fpath],
                           product=cache_product, enabled=enable_cache,
                           hasher=None, ext='.json', verbose=4)
-    if stamp.expired():
+
+    try:
+        if stamp.expired():
+            raise Exception('Cache stamp expired, need to rebuild the SQL view')
+        else:
+            # If the stamp is not expired try to connect.
+            self.connect(must_exist=True)
+    except Exception:
+        # If the stamp is expired, or there was a problem connecting, then
+        # delete and regenerate the database.
         self.delete()
         self.connect()
         if dset is None:
@@ -2100,31 +2342,15 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
             dset = kwcoco.CocoDataset(dct_db_fpath)
 
         # Write the cacheid when making a view, so the view can access it
-        dset._cached_hashid()
+        print(f'Write sidecar hashid for {type(dset)}: {dset.fpath} before we convert to SQL')
+        hashid = dset._cached_hashid()
+        print(f'hashid = {ub.urepr(hashid, nl=1)}')
 
         # Convert a coco file to an sql database
-        print(f'Start SQL({backend}_ conversion')
+        print(f'Start SQL({backend}) conversion')
         self.populate_from(dset, verbose=1)
         if stamp.cacher.enabled:
             stamp.renew()
-    else:
-        try:
-            self.connect(must_exist=True)
-        except Exception:
-            self.delete()
-            self.connect()
-            if dset is None:
-                print('Loading json dataset for SQL conversion')
-                dset = kwcoco.CocoDataset(dct_db_fpath)
-
-            # Write the cacheid when making a view, so the view can access it
-            dset._cached_hashid()
-
-            # Convert a coco file to an sql database
-            print(f'Start SQL({backend}_ conversion')
-            self.populate_from(dset, verbose=1)
-            if stamp.cacher.enabled:
-                stamp.renew()
     return self
 
 

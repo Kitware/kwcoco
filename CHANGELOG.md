@@ -5,7 +5,23 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.7.8 - Unreleased
+## Version 0.8.0 - Unreleased
+
+### Removed
+* Drop 3.6 and 3.7 support
+
+### Changed
+* Optimize CocoObject1D get calls with SQL backends
+* CocoObject1D.lookup with default now "works"-ish with SQL. Still experimental.
+
+### Fixed
+
+* Added workaround for an issue where a postgresql cache of a coco dataset is unable to remember its original json filepath.
+* Fixed issue with `CocoSqlDatabase.disconnect` where a session would be dereferenced, but not closed.
+* Worked around issue in postgresql backend where track-ids were not decoded properly in their string form.
+
+
+## Version 0.7.8 - Released 2024-03-20
 
 
 ## Version 0.7.7 - Released 2024-03-19

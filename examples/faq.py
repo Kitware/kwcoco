@@ -220,3 +220,41 @@ def filter_images_by_attribute():
 
     # Option 4: A 1 liner
     filtered_image_ids: list[int] = [img['id'] for img in dset.videos(video_ids=[1]).images[0].objs if img['gt'] == 0]
+
+
+def convert_mscoco_dataset():
+    """
+    Question:
+
+        How do I convert my mscoco file into kwcoco?
+
+    Answer:
+
+        It likely already is converted.
+
+        Kwcoco is a superset of most mscoco functionality. There isn't explicit
+        support for some tasks (e.g. dense pose), but kwcoco is flexible in
+        that it won't care if your dictionaries contain arbitrary keys as long
+        as they don't conflict with anything else.
+
+        If you want to check if your mscoco file is well formed you can use the
+        "kwcoco validate" tool:
+
+        ```
+        kwcoco validate <path-to-mscoco.json>
+        ```
+
+        If you want to introspect to add additional fields that might be needed by some tools, you can use the "kwcoco conform" tool:
+
+        ```
+        kwcoco conform --src <path-to-mscoco.json> --dst <path-to-kwcoco.zip>
+        ```
+
+        You can add flags like `--legacy=True` to force it to be compatible with mscoco. Similarly `--mmlab=True` will force compatibility with mmdetection coco variants.
+
+        Note, if you write an output kwcoco file with a ".zip" extension (I
+        typically will use a double extension: e.g. "filename.kwcoco.zip"),
+        then it will compress the json in a zipfile, which can save a lot of
+        space on disk. The kwcoco tool will read these zip files as if they
+        were uncompressed json files.
+    """
