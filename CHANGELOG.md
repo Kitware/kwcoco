@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.8.1 - Unreleased
 
+### Fixed
+
+* CIFAR grabdata now converts train and test variants of the dataset.
+
 
 ## Version 0.8.0 - Released 2024-06-20
 

@@ -19,7 +19,7 @@ from kwcoco.util.util_deprecate import deprecated_function_alias
 from kwcoco.util.dict_proxy2 import AliasedDictProxy
 
 try:
-    from xdev import profile
+    from line_profiler import profile
 except Exception:
     profile = ub.identity
 

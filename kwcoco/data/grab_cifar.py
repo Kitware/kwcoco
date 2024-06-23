@@ -11,16 +11,15 @@ import kwimage
 def _convert_cifar_x(dpath, cifar_dset, cifar_name, classes):
     import kwcoco
 
-    bundle_dpath = ub.ensuredir((dpath, cifar_name))
-    img_dpath = ub.ensuredir((bundle_dpath, 'images'))
+    bundle_dpath = (ub.Path(dpath) / cifar_name).ensuredir()
+    img_dpath = (bundle_dpath / 'images').ensuredir()
 
     stamp = ub.CacheStamp('convert_cifar', dpath=dpath,
                           depends=[cifar_name], verbose=3)
     if stamp.expired():
 
         coco_dset = kwcoco.CocoDataset(bundle_dpath=bundle_dpath)
-        coco_dset.fpath = os.path.join(
-            bundle_dpath, '{}.kwcoco.json'.format(cifar_name))
+        coco_dset.fpath = bundle_dpath / '{}.kwcoco.json'.format(cifar_name)
 
         for cx, catname in enumerate(classes):
             cid = cifar_dset.class_to_idx[catname]
@@ -67,21 +66,31 @@ def _convert_cifar_x(dpath, cifar_dset, cifar_name, classes):
 def convert_cifar10(dpath=None):
     if dpath is None:
         dpath = ub.Path.appdir('kwcoco/data').ensuredir()
+    else:
+        dpath = ub.Path(dpath)
     # For some reason the torchvision objects dont have the label names
     # in the dataset. But the download directory will have them.
-    # classes = [
-    #     'airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog',
-    #     'horse', 'ship', 'truck',
-    # ]
+    expected_classes = [
+        'airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog',
+        'horse', 'ship', 'truck',
+    ]
     DATASET = torchvision.datasets.CIFAR10
-    cifar_dset = DATASET(
-        root=ub.ensuredir((dpath, 'download')), download=True)
-    meta_fpath = os.path.join(cifar_dset.root, cifar_dset.base_folder, 'batches.meta')
-    meta_dict = pickle.load(open(meta_fpath, 'rb'))
+
+    cifar_train_dset = DATASET(
+        root=ub.ensuredir((dpath, 'download')), download=True, train=True)
+    meta_fpath = os.path.join(cifar_train_dset.root, cifar_train_dset.base_folder, 'batches.meta')
+    with open(meta_fpath, 'rb') as file:
+        meta_dict = pickle.load(file)
     classes = meta_dict['label_names']
-    cifar_name = 'cifar10'
-    coco_dset = _convert_cifar_x(dpath, cifar_dset, cifar_name, classes)
-    return coco_dset
+    assert classes == expected_classes
+    cifar_name = 'cifar10-train'
+    train_coco_dset = _convert_cifar_x(dpath, cifar_train_dset, cifar_name, classes)
+
+    cifar_test_dset = DATASET(
+        root=(dpath / 'download').ensuredir(), download=True, train=False)
+    cifar_name = 'cifar10-test'
+    test_coco_dset = _convert_cifar_x(dpath, cifar_test_dset, cifar_name, classes)
+    return train_coco_dset, test_coco_dset
 
 
 def convert_cifar100(dpath=None):
@@ -105,15 +114,24 @@ def convert_cifar100(dpath=None):
     #     'television', 'tiger', 'tractor', 'train', 'trout', 'tulip',
     #     'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman',
     #     'worm']
-    cifar_name = 'cifar100'
+    cifar_name = 'cifar100-train'
     DATASET = torchvision.datasets.CIFAR100
     cifar_dset = DATASET(
-        root=ub.ensuredir((dpath, 'download')), download=True)
+        root=ub.ensuredir((dpath, 'download')), download=True, train=True)
     meta_fpath = os.path.join(cifar_dset.root, cifar_dset.base_folder, 'meta')
     meta_dict = pickle.load(open(meta_fpath, 'rb'))
     classes = meta_dict['fine_label_names']
-    coco_dset = _convert_cifar_x(dpath, cifar_dset, cifar_name, classes)
-    return coco_dset
+    train_coco_dset = _convert_cifar_x(dpath, cifar_dset, cifar_name, classes)
+
+    cifar_name = 'cifar100-test'
+    DATASET = torchvision.datasets.CIFAR100
+    cifar_dset = DATASET(
+        root=ub.ensuredir((dpath, 'download')), download=True, train=False)
+    meta_fpath = os.path.join(cifar_dset.root, cifar_dset.base_folder, 'meta')
+    meta_dict = pickle.load(open(meta_fpath, 'rb'))
+    classes = meta_dict['fine_label_names']
+    test_coco_dset = _convert_cifar_x(dpath, cifar_dset, cifar_name, classes)
+    return [train_coco_dset, test_coco_dset]
 
 
 def main():
@@ -141,11 +159,13 @@ def main():
         coco_cifar100 = convert_cifar100(dpath)
         items['cifar100'] = coco_cifar100
 
-    for key, dset in items.items():
-        print('dset = {!r}'.format(dset))
+    for key, dsets in items.items():
+        for dset in dsets:
+            print('dset = {!r}'.format(dset))
 
-    for key, dset in items.items():
-        print('{} dset.fpath = {!r}'.format(key, dset.fpath))
+    for key, dsets in items.items():
+        for dset in dsets:
+            print('{} dset.fpath = {!r}'.format(key, dset.fpath))
 
     return items
 

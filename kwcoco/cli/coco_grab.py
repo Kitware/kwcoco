@@ -33,9 +33,6 @@ class CocoGrabCLI:
 
     @classmethod
     def main(cls, cmdline=True, **kw):
-        from kwcoco.data import grab_cifar
-        from kwcoco.data import grab_camvid
-        from kwcoco.data import grab_domainnet
         config = cls.CLIConfig(kw, cmdline=cmdline)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
@@ -46,28 +43,35 @@ class CocoGrabCLI:
         # TODO: standardize this interface, allow specificaiton of dpath
         # everywhere
 
-        if 'camvid' in names:
-            dset = grab_camvid.grab_coco_camvid()
-            ensured.append(dset)
-
-        if 'cifar10' in names:
-            dset = grab_cifar.convert_cifar10()
-            ensured.append(dset)
-
-        if 'cifar100' in names:
-            dset = grab_cifar.convert_cifar100()
-            ensured.append(dset)
-
-        if 'domainnet' in names:
-            dsets = grab_domainnet.grab_domain_net()
-            for dset in dsets:
+        for name in names:
+            if 'camvid' == name:
+                from kwcoco.data import grab_camvid
+                dset = grab_camvid.grab_coco_camvid()
                 ensured.append(dset)
 
-        if 'spacenet7' in names:
-            from kwcoco.data import grab_spacenet
-            dsets = grab_spacenet.grab_spacenet7(config['dpath'])
-            for dset in dsets:
-                ensured.append(dset)
+            elif 'cifar10' == name:
+                from kwcoco.data import grab_cifar
+                dsets = grab_cifar.convert_cifar10()
+                ensured.extend(dsets)
+
+            elif 'cifar100' == name:
+                from kwcoco.data import grab_cifar
+                dsets = grab_cifar.convert_cifar100()
+                ensured.extend(dsets)
+
+            elif 'domainnet' == name:
+                from kwcoco.data import grab_domainnet
+                dsets = grab_domainnet.grab_domain_net()
+                for dset in dsets:
+                    ensured.append(dset)
+
+            elif 'spacenet7' == name:
+                from kwcoco.data import grab_spacenet
+                dsets = grab_spacenet.grab_spacenet7(config['dpath'])
+                for dset in dsets:
+                    ensured.append(dset)
+            else:
+                raise Exception(f'Unknown name: {name}')
 
         # if config['voc']:
         #     from kwcoco.data import grab_voc

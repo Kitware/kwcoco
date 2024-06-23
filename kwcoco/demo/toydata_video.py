@@ -15,7 +15,7 @@ from kwcoco.demo.toypatterns import CategoryPatterns
 
 
 try:
-    from xdev import profile
+    from line_profiler import profile
 except Exception:
     profile = ub.identity
 

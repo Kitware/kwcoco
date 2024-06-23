@@ -23,7 +23,7 @@ from kwcoco.util.dict_like import DictProxy
 
 
 try:
-    from xdev import profile
+    from line_profiler import profile
 except Exception:
     profile = ub.identity
 
