@@ -1,4 +1,4 @@
-delayed_image >= 0.3.0
+delayed_image >= 0.3.1
 jsonschema >= 3.2.0
 kwarray >= 0.6.19
 kwimage >= 0.10.0

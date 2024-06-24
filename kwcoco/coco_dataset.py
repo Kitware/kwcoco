@@ -7044,6 +7044,11 @@ def demo_coco_data():
     gname3 = relpath(gpath3, img_root)
 
     dataset = {
+        # TODO: need to deprecate this somehow?
+        # It probably does make sense to allow this to be specified in the
+        # dictionary itself if we are constructing a CocoDataset class from it,
+        # but we likely don't want to save it (or if we do it must be
+        # constantly updated to be corret)
         'img_root': img_root,
 
         'categories': [

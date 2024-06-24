@@ -12,7 +12,7 @@ from kwcoco.metrics.confusion_measures import (
     Measures, PerClass_Measures, populate_info)
 
 try:
-    from xdev import profile
+    from line_profiler import profile
 except Exception:
     profile = ub.identity
 
