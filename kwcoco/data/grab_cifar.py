@@ -14,8 +14,10 @@ def _convert_cifar_x(dpath, cifar_dset, cifar_name, classes):
     bundle_dpath = (ub.Path(dpath) / cifar_name).ensuredir()
     img_dpath = (bundle_dpath / 'images').ensuredir()
 
+    CONVERSION_VERSION = 3
+
     stamp = ub.CacheStamp('convert_cifar', dpath=dpath,
-                          depends=[cifar_name], verbose=3)
+                          depends=[cifar_name, CONVERSION_VERSION], verbose=3)
     if stamp.expired():
 
         coco_dset = kwcoco.CocoDataset(bundle_dpath=bundle_dpath)
@@ -30,23 +32,25 @@ def _convert_cifar_x(dpath, cifar_dset, cifar_name, classes):
             cifar_dset.targets)
 
         prog = ub.ProgIter(data_label_iter, total=len(cifar_dset.targets),
-                           desc='convert {}'.format(cifar_name))
+                           desc=f'convert {cifar_name}')
 
         for gx, (imdata, cidx) in enumerate(prog):
             catname = classes[cidx]
-            name = 'img_{:08d}'.format(gx)
-            subdir = ub.ensuredir((img_dpath, catname))
-            fpath = os.path.join(subdir, '{}.png'.format(name))
+            name = f'img_{gx:08d}'
+            subdir = (img_dpath / catname).ensuredir()
+            fpath = subdir / f'{name}.png'
 
-            fname = os.path.relpath(fpath, bundle_dpath)
+            fname = fpath.relative_to(bundle_dpath)
 
-            if not os.path.exists(fpath):
+            if not fpath.exists():
                 kwimage.imwrite(fpath, imdata)
 
             height, width = imdata.shape[0:2]
 
             gid = coco_dset.add_image(file_name=fname, id=gx, name=name,
-                                      width=width, height=height)
+                                      channels='red|green|blue',
+                                      num_overviews=0, width=width,
+                                      height=height)
 
             cid = coco_dset.index.name_to_cat[catname]['id']
             coco_dset.add_annotation(image_id=gid, bbox=[0, 0, width, height],
@@ -56,7 +60,7 @@ def _convert_cifar_x(dpath, cifar_dset, cifar_name, classes):
         stamp.renew()
         coco_dset.dump(coco_dset.fpath, newlines=True)
     else:
-        fpath = os.path.join(bundle_dpath, '{}.kwcoco.json'.format(cifar_name))
+        fpath = bundle_dpath / f'{cifar_name}.kwcoco.json'
         coco_dset = kwcoco.CocoDataset(fpath)
 
     coco_dset.tag = cifar_name
@@ -96,24 +100,24 @@ def convert_cifar10(dpath=None):
 def convert_cifar100(dpath=None):
     if dpath is None:
         dpath = ub.Path.appdir('kwcoco/data').ensuredir()
-    # classes = [
-    #     'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee',
-    #     'beetle', 'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus',
-    #     'butterfly', 'camel', 'can', 'castle', 'caterpillar', 'cattle',
-    #     'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch',
-    #     'crab', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant',
-    #     'flatfish', 'forest', 'fox', 'girl', 'hamster', 'house',
-    #     'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion',
-    #     'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain',
-    #     'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid', 'otter',
-    #     'palm_tree', 'pear', 'pickup_truck', 'pine_tree', 'plain', 'plate',
-    #     'poppy', 'porcupine', 'possum', 'rabbit', 'raccoon', 'ray', 'road',
-    #     'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk',
-    #     'skyscraper', 'snail', 'snake', 'spider', 'squirrel', 'streetcar',
-    #     'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone',
-    #     'television', 'tiger', 'tractor', 'train', 'trout', 'tulip',
-    #     'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman',
-    #     'worm']
+    expected_classes = [
+        'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee',
+        'beetle', 'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus',
+        'butterfly', 'camel', 'can', 'castle', 'caterpillar', 'cattle',
+        'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch',
+        'crab', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant',
+        'flatfish', 'forest', 'fox', 'girl', 'hamster', 'house',
+        'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion',
+        'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain',
+        'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid', 'otter',
+        'palm_tree', 'pear', 'pickup_truck', 'pine_tree', 'plain', 'plate',
+        'poppy', 'porcupine', 'possum', 'rabbit', 'raccoon', 'ray', 'road',
+        'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk',
+        'skyscraper', 'snail', 'snake', 'spider', 'squirrel', 'streetcar',
+        'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone',
+        'television', 'tiger', 'tractor', 'train', 'trout', 'tulip',
+        'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman',
+        'worm']
     cifar_name = 'cifar100-train'
     DATASET = torchvision.datasets.CIFAR100
     cifar_dset = DATASET(
@@ -121,6 +125,7 @@ def convert_cifar100(dpath=None):
     meta_fpath = os.path.join(cifar_dset.root, cifar_dset.base_folder, 'meta')
     meta_dict = pickle.load(open(meta_fpath, 'rb'))
     classes = meta_dict['fine_label_names']
+    assert classes == expected_classes
     train_coco_dset = _convert_cifar_x(dpath, cifar_dset, cifar_name, classes)
 
     cifar_name = 'cifar100-test'

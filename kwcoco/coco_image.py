@@ -25,7 +25,7 @@ except Exception:
 
 
 __docstubs__ = """
-from kwcoco.channel_spec import FusedChannelSpec
+from delayed_image.channel_spec import FusedChannelSpec
 from kwcoco.coco_objects1d import Annots
 """
 
@@ -296,8 +296,8 @@ class CocoImage(_CocoObject):
 
     @property
     def channels(self):
-        from kwcoco.channel_spec import FusedChannelSpec
-        from kwcoco.channel_spec import ChannelSpec
+        from delayed_image.channel_spec import FusedChannelSpec
+        from delayed_image.channel_spec import ChannelSpec
         img_parts = []
         for obj in self.iter_asset_objs():
             obj_parts = obj.get('channels', None)
@@ -441,8 +441,8 @@ class CocoImage(_CocoObject):
             # Take frobenius norm to get "distance" between transform and
             # the identity. We want to find the auxiliary closest to the
             # identity transform.
-            warp_aux_to_img = kwimage.Affine.coerce(obj.get('warp_aux_to_img', None))
-            fro_dist = np.linalg.norm(warp_aux_to_img - eye, ord='fro')
+            warp_img_from_asset = kwimage.Affine.coerce(obj.get('warp_aux_to_img', None))
+            fro_dist = np.linalg.norm(warp_img_from_asset - eye, ord='fro')
             w = obj.get('width', None) or 0
             h = obj.get('height', None) or 0
             if all(k in obj for k in requires):
@@ -601,7 +601,7 @@ class CocoImage(_CocoObject):
             >>> assert coco_img.find_asset_obj('foo.3:5') is not None
             >>> assert coco_img.find_asset_obj('foo.3000') is None
         """
-        from kwcoco.channel_spec import FusedChannelSpec
+        from delayed_image.channel_spec import FusedChannelSpec
         channels = FusedChannelSpec.coerce(channels)
         for obj in self.iter_asset_objs():
             obj_channels = FusedChannelSpec.coerce(obj['channels'])
@@ -715,9 +715,9 @@ class CocoImage(_CocoObject):
             >>> coco_img.add_asset('path/img1_B2.tif', channels='B2', width=200, height=200)
             >>> coco_img.add_asset('path/img1_TCI.tif', channels='r|g|b', width=200, height=200)
         """
-        from os.path import isabs, join  # NOQA
         import kwimage
-        from kwcoco.channel_spec import FusedChannelSpec
+        from os.path import isabs, join  # NOQA
+        from delayed_image.channel_spec import FusedChannelSpec
 
         img = self.img
 
@@ -961,15 +961,16 @@ class CocoImage(_CocoObject):
             >>> np.ceil(img_delayed1.shape[0] / 3.1) == img_delayed2.shape[0]
             >>> np.ceil(vid_delayed1.shape[0] / 3.1) == vid_delayed2.shape[0]
         """
-        from kwimage.transform import Affine
-        from kwcoco.channel_spec import FusedChannelSpec
+        # from kwimage.transform import Affine
+        from delayed_image.channel_spec import FusedChannelSpec
         if bundle_dpath is None:
             bundle_dpath = self.bundle_dpath
 
         img = self.img
         requested = channels
         if requested is not None:
-            requested = FusedChannelSpec.coerce(requested).normalize()
+            requested = FusedChannelSpec.coerce(requested)
+            requested = requested.normalize()
 
         # Get info about the primary image and check if its channels are
         # requested (if it even has any)
@@ -996,10 +997,12 @@ class CocoImage(_CocoObject):
                     if quant is not None:
                         chan = chan.dequantize(quant)
                     if space not in {'auxiliary', 'asset'}:
-                        aux_to_img = Affine.coerce(obj.get('warp_aux_to_img', None))
+                        warp_img_from_asset = obj.get('warp_aux_to_img', None)
+                        # warp_img_from_asset = Affine.coerce(warp_img_from_asset)
                         chan = chan.warp(
-                            aux_to_img, dsize=img_info['dsize'],
+                            warp_img_from_asset, dsize=img_info['dsize'],
                             interpolation=interpolation, antialias=antialias,
+                            lazy=True,
                         )
                     chan_list.append(chan)
 
@@ -1050,10 +1053,12 @@ class CocoImage(_CocoObject):
             if space in {'image', 'auxiliary', 'asset'}:
                 pass
             elif space == 'video':
-                img_to_vid = self.warp_vid_from_img
-                delayed = delayed.warp(img_to_vid, dsize=dsize,
-                                       interpolation=interpolation,
-                                       antialias=antialias)
+                warp_vid_from_img = self.img.get('warp_img_to_vid', None)
+                delayed = delayed.warp(
+                    warp_vid_from_img, dsize=dsize,
+                    interpolation=interpolation,
+                    antialias=antialias,
+                    lazy=True)
             else:
                 raise KeyError('space = {}'.format(space))
 
@@ -1547,9 +1552,10 @@ class CocoTrack(_CocoObject):
         return self.dset.annots(track_id=self['id'])
 
 
+@profile
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     # from os.path import join
-    from kwcoco.channel_spec import FusedChannelSpec
+    from delayed_image.channel_spec import FusedChannelSpec
     from delayed_image import DelayedLoad, DelayedIdentity
     info = {}
     fname = obj.get('file_name', None)
@@ -1561,6 +1567,7 @@ def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     info['channels'] = channels_
     width = obj.get('width', None)
     height = obj.get('height', None)
+    num_overviews = obj.get('num_overviews', None)
     if height is not None and width is not None:
         info['dsize'] = dsize = (width, height)
     else:
@@ -1575,7 +1582,8 @@ def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
         info['chan_construct'] = (
             DelayedLoad,
             dict(fpath=fpath, channels=channels_, dsize=dsize,
-                 nodata_method=nodata_method))
+                 nodata_method=nodata_method,
+                 num_overviews=num_overviews))
     info['quantization'] = quantization
 
     return info

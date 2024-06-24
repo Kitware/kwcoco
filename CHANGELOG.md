@@ -9,7 +9,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
-* CIFAR grabdata now converts train and test variants of the dataset.
+* CIFAR grabdata now converts train and test variants of the dataset and
+  includes channel information.
 
 
 ## Version 0.8.0 - Released 2024-06-20
