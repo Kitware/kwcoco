@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.8.2 - Unreleased
 
+### Fixed
+* Handle deprecated `scipy.integrate.trapz`
+
 
 ## Version 0.8.1 - Released 2024-06-24
 
