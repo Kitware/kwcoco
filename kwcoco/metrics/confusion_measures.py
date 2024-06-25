@@ -1240,7 +1240,10 @@ def populate_info(info):
                 # Not sure which is beset here, we no longer have
                 # assumption of max-tpr = 1
                 # ap = float(np.sum(diff_items * prec_items))
-                info['sklearn_ap'] = integrate.trapz(y=prec, x=rec)
+                try:
+                    info['sklearn_ap'] = integrate.trapezoid(y=prec, x=rec)
+                except AttributeError:
+                    info['sklearn_ap'] = integrate.trapz(y=prec, x=rec)
 
         info['ap_method'] = info.get('ap_method', 'pycocotools')
         if info['ap_method'] == 'pycocotools':

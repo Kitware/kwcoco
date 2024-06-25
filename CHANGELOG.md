@@ -5,7 +5,13 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.1 - Unreleased
+## Version 0.8.2 - Unreleased
+
+### Fixed
+* Handle deprecated `scipy.integrate.trapz`
+
+
+## Version 0.8.1 - Released 2024-06-24
 
 ### Fixed
 
