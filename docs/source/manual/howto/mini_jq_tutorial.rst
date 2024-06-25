@@ -25,4 +25,3 @@ uses it to show the json data structure.
 
     # List only the first image in the image table
     jq '.images[0]' ./my_demo_bundle/data.kwcoco.json
-
