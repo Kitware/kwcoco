@@ -3,8 +3,8 @@ Mini JQ Tutorial
 
 The ``jq`` tool is very helpful in navigating json files, and some of the
 kwcoco commands will use its query language, so it is a good idea to become
-familiar with it. The following bash code generates a demo kwcoco json file
-and
+familiar with it. The following bash code generates a demo kwcoco json file and
+uses it to show the json data structure.
 
 .. code:: bash
 
