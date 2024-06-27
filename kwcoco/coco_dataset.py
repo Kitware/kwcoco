@@ -5467,6 +5467,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 containing the actual coco json structure. For a more generally
                 coercable constructor see func:`CocoDataset.coerce`.
 
+                Note: in the future, we may only accept construction from a
+                data dictionary, and use a `.load` classmethod to handle
+                reading data from a file. This will simplify (and accelerate)
+                the code in the constructor.
+
             tag (str | None) :
                 Name of the dataset for display purposes, and does not
                 influence behavior of the underlying data structure, although
@@ -5739,6 +5744,46 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             self.bundle_dpath = bundle_dpath
             self.assets_dpath = assets_dpath
             self.cache_dpath = cache_dpath
+
+    @classmethod
+    def load(CocoDataset, file, bundle_dpath=None, autobuild=True):
+        """
+        Constructor from a open file or file path.
+
+        Args:
+            file (PathLike | IO):
+                Where to read the data. Can either be a path to a file or an
+                open file pointer / stream.
+
+        Returns:
+            CocoDataset: the loaded dataset
+
+        Example:
+            >>> import kwcoco
+            >>> # Create demo data to load
+            >>> demo_dset = kwcoco.CocoDataset.demo('shapes1')
+            >>> fpath = demo_dset.fpath
+            >>> bundle_dpath = demo_dset.bundle_dpath
+            >>> # Create a CocoDataset from the filepath
+            >>> dset1 = kwcoco.CocoDataset.load(fpath)
+            >>> # Create a CocoDataset from an open file
+            >>> with open(fpath, 'r') as file:
+            >>>     dset2 = kwcoco.CocoDataset.load(file, bundle_dpath=bundle_dpath)
+        """
+        try:
+            fpath = os.fspath(file)
+        except TypeError:
+            input_was_pathlike = False
+        else:
+            input_was_pathlike = True
+        if input_was_pathlike:
+            coco_dset = CocoDataset(fpath, bundle_dpath=bundle_dpath,
+                                    autobuild=autobuild)
+        else:
+            data = json_r.load(file)
+            coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
+                                    autobuild=autobuild)
+        return coco_dset
 
     @classmethod
     def from_data(CocoDataset, data, bundle_dpath=None, img_root=None):
