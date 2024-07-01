@@ -18,6 +18,13 @@ from os.path import join
 from kwcoco.util.util_deprecate import deprecated_function_alias
 from kwcoco.util.dict_proxy2 import AliasedDictProxy
 
+
+from delayed_image.channel_spec import FusedChannelSpec
+from delayed_image.channel_spec import ChannelSpec
+from delayed_image import DelayedNans
+from delayed_image import DelayedChannelConcat
+from delayed_image import DelayedLoad, DelayedIdentity
+
 try:
     from line_profiler import profile
 except Exception:
@@ -296,8 +303,8 @@ class CocoImage(_CocoObject):
 
     @property
     def channels(self):
-        from delayed_image.channel_spec import FusedChannelSpec
-        from delayed_image.channel_spec import ChannelSpec
+        # from delayed_image.channel_spec import FusedChannelSpec
+        # from delayed_image.channel_spec import ChannelSpec
         img_parts = []
         for obj in self.iter_asset_objs():
             obj_parts = obj.get('channels', None)
@@ -601,7 +608,7 @@ class CocoImage(_CocoObject):
             >>> assert coco_img.find_asset_obj('foo.3:5') is not None
             >>> assert coco_img.find_asset_obj('foo.3000') is None
         """
-        from delayed_image.channel_spec import FusedChannelSpec
+        # from delayed_image.channel_spec import FusedChannelSpec
         channels = FusedChannelSpec.coerce(channels)
         for obj in self.iter_asset_objs():
             obj_channels = FusedChannelSpec.coerce(obj['channels'])
@@ -717,7 +724,7 @@ class CocoImage(_CocoObject):
         """
         import kwimage
         from os.path import isabs, join  # NOQA
-        from delayed_image.channel_spec import FusedChannelSpec
+        # from delayed_image.channel_spec import FusedChannelSpec
 
         img = self.img
 
@@ -962,7 +969,7 @@ class CocoImage(_CocoObject):
             >>> np.ceil(vid_delayed1.shape[0] / 3.1) == vid_delayed2.shape[0]
         """
         # from kwimage.transform import Affine
-        from delayed_image.channel_spec import FusedChannelSpec
+        # from delayed_image.channel_spec import FusedChannelSpec
         if bundle_dpath is None:
             bundle_dpath = self.bundle_dpath
 
@@ -1006,12 +1013,14 @@ class CocoImage(_CocoObject):
                         )
                     chan_list.append(chan)
 
+        num_parts = len(chan_list)
+
         if space == 'video':
             video = self.video or {}
             width = video.get('width', img.get('width', None))
             height = video.get('height', img.get('height', None))
         elif space in {'asset', 'auxiliary'}:
-            if len(chan_list) == 0:
+            if num_parts == 0:
                 width = img.get('width', None)
                 height = img.get('height', None)
             else:
@@ -1025,21 +1034,37 @@ class CocoImage(_CocoObject):
 
         dsize = (width, height)
 
-        if len(chan_list) == 0:
+        if num_parts == 0:
             if requested is not None:
                 # Handle case where the image doesnt have the requested
                 # channels.
                 # TODO: We should use a NoData node instead that
                 # can switch between nans and masked images
-                from delayed_image import DelayedNans
-                from delayed_image import DelayedChannelConcat
+                # from delayed_image import DelayedNans
+                # from delayed_image import DelayedChannelConcat
                 # delayed = DelayedNodata(dsize=dsize, channels=requested, nodata_method=nodata_method)
                 delayed = DelayedNans(dsize=dsize, channels=requested)
                 delayed = DelayedChannelConcat([delayed])
             else:
                 raise ValueError('no data registered in kwcoco image')
+        elif num_parts == 1:
+            delayed = chan_list[0]
+            # Reorder channels in the requested order
+            delayed = delayed.take_channels(requested, lazy=True)
+
+            if space in {'image', 'auxiliary', 'asset'}:
+                pass
+            elif space == 'video':
+                warp_vid_from_img = self.img.get('warp_img_to_vid', None)
+                delayed = delayed.warp(
+                    warp_vid_from_img, dsize=dsize,
+                    interpolation=interpolation,
+                    antialias=antialias,
+                    lazy=True)
+            else:
+                raise KeyError('space = {}'.format(space))
         else:
-            from delayed_image import DelayedChannelConcat
+            # from delayed_image import DelayedChannelConcat
             delayed = DelayedChannelConcat(chan_list)
 
             # Reorder channels in the requested order
@@ -1555,8 +1580,8 @@ class CocoTrack(_CocoObject):
 @profile
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     # from os.path import join
-    from delayed_image.channel_spec import FusedChannelSpec
-    from delayed_image import DelayedLoad, DelayedIdentity
+    # from delayed_image.channel_spec import FusedChannelSpec
+    # from delayed_image import DelayedLoad, DelayedIdentity
     info = {}
     fname = obj.get('file_name', None)
     imdata = obj.get('imdata', None)
@@ -1575,17 +1600,15 @@ def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
 
     quantization = obj.get('quantization', None)
     if imdata is not None:
-        info['chan_construct'] = (DelayedIdentity, dict(
-            data=imdata, channels=channels_, dsize=dsize))
+        _kwargs = dict(data=imdata, channels=channels_, dsize=dsize)
+        info['chan_construct'] = (DelayedIdentity, _kwargs)
     elif fname is not None:
-        info['fpath'] = fpath = join(bundle_dpath, fname)
-        info['chan_construct'] = (
-            DelayedLoad,
-            dict(fpath=fpath, channels=channels_, dsize=dsize,
-                 nodata_method=nodata_method,
-                 num_overviews=num_overviews))
+        fpath = join(bundle_dpath, fname)
+        _kwargs = dict(fpath=fpath, channels=channels_, dsize=dsize,
+                       nodata_method=nodata_method,
+                       num_overviews=num_overviews)
+        info['chan_construct'] = (DelayedLoad, _kwargs)
     info['quantization'] = quantization
-
     return info
 
 

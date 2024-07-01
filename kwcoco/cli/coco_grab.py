@@ -8,7 +8,7 @@ class CocoGrabCLI:
     """
     name = 'grab'
 
-    class CLIConfig(scfg.Config):
+    class CLIConfig(scfg.DataConfig):
         """
         Grab standard datasets.
 
@@ -33,7 +33,7 @@ class CocoGrabCLI:
 
     @classmethod
     def main(cls, cmdline=True, **kw):
-        config = cls.CLIConfig(kw, cmdline=cmdline)
+        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         ensured = []
@@ -51,12 +51,12 @@ class CocoGrabCLI:
 
             elif 'cifar10' == name:
                 from kwcoco.data import grab_cifar
-                dsets = grab_cifar.convert_cifar10()
+                dsets = grab_cifar.convert_cifar10(dpath=config.dpath)
                 ensured.extend(dsets)
 
             elif 'cifar100' == name:
                 from kwcoco.data import grab_cifar
-                dsets = grab_cifar.convert_cifar100()
+                dsets = grab_cifar.convert_cifar100(dpath=config.dpath)
                 ensured.extend(dsets)
 
             elif 'domainnet' == name:

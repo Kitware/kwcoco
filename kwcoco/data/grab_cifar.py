@@ -8,7 +8,7 @@ import torchvision
 import kwimage
 
 
-def _convert_cifar_x(dpath, cifar_dset, cifar_name, classes):
+def _convert_cifar_to_kwcoco(dpath, cifar_dset, cifar_name, classes):
     import kwcoco
 
     bundle_dpath = (ub.Path(dpath) / cifar_name).ensuredir()
@@ -71,7 +71,7 @@ def convert_cifar10(dpath=None):
     if dpath is None:
         dpath = ub.Path.appdir('kwcoco/data').ensuredir()
     else:
-        dpath = ub.Path(dpath)
+        dpath = ub.Path(dpath).ensuredir()
     # For some reason the torchvision objects dont have the label names
     # in the dataset. But the download directory will have them.
     expected_classes = [
@@ -80,20 +80,22 @@ def convert_cifar10(dpath=None):
     ]
     DATASET = torchvision.datasets.CIFAR10
 
-    cifar_train_dset = DATASET(
-        root=ub.ensuredir((dpath, 'download')), download=True, train=True)
-    meta_fpath = os.path.join(cifar_train_dset.root, cifar_train_dset.base_folder, 'batches.meta')
+    download_dpath = (dpath / 'download').ensuredir()
+
+    cifar_train_dset = DATASET(root=download_dpath, download=True, train=True)
+    meta_fpath = ub.Path(cifar_train_dset.root) / cifar_train_dset.base_folder / 'batches.meta'
     with open(meta_fpath, 'rb') as file:
         meta_dict = pickle.load(file)
     classes = meta_dict['label_names']
     assert classes == expected_classes
     cifar_name = 'cifar10-train'
-    train_coco_dset = _convert_cifar_x(dpath, cifar_train_dset, cifar_name, classes)
+    train_coco_dset = _convert_cifar_to_kwcoco(dpath, cifar_train_dset,
+                                               cifar_name, classes)
 
-    cifar_test_dset = DATASET(
-        root=(dpath / 'download').ensuredir(), download=True, train=False)
+    cifar_test_dset = DATASET(root=download_dpath, download=True, train=False)
     cifar_name = 'cifar10-test'
-    test_coco_dset = _convert_cifar_x(dpath, cifar_test_dset, cifar_name, classes)
+    test_coco_dset = _convert_cifar_to_kwcoco(dpath, cifar_test_dset,
+                                              cifar_name, classes)
     return train_coco_dset, test_coco_dset
 
 
@@ -126,8 +128,8 @@ def convert_cifar100(dpath=None):
     meta_dict = pickle.load(open(meta_fpath, 'rb'))
     classes = meta_dict['fine_label_names']
     assert classes == expected_classes
-    train_coco_dset = _convert_cifar_x(dpath, cifar_dset, cifar_name, classes)
-
+    train_coco_dset = _convert_cifar_to_kwcoco(dpath, cifar_dset, cifar_name,
+                                               classes)
     cifar_name = 'cifar100-test'
     DATASET = torchvision.datasets.CIFAR100
     cifar_dset = DATASET(
@@ -135,7 +137,8 @@ def convert_cifar100(dpath=None):
     meta_fpath = os.path.join(cifar_dset.root, cifar_dset.base_folder, 'meta')
     meta_dict = pickle.load(open(meta_fpath, 'rb'))
     classes = meta_dict['fine_label_names']
-    test_coco_dset = _convert_cifar_x(dpath, cifar_dset, cifar_name, classes)
+    test_coco_dset = _convert_cifar_to_kwcoco(dpath, cifar_dset, cifar_name,
+                                              classes)
     return [train_coco_dset, test_coco_dset]
 
 

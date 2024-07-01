@@ -11,6 +11,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * New `load` classmethod (analogous to `dump`) as a placeholder for a potential
   future refactor.
 
+### Fixed
+* CIFAR grabdata now respects dpath
+
 
 ## Version 0.8.2 - Released 2024-06-24
 
