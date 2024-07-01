@@ -1047,22 +1047,22 @@ class CocoImage(_CocoObject):
                 delayed = DelayedChannelConcat([delayed])
             else:
                 raise ValueError('no data registered in kwcoco image')
-        elif num_parts == 1:
-            delayed = chan_list[0]
-            # Reorder channels in the requested order
-            delayed = delayed.take_channels(requested, lazy=True)
+        # elif num_parts == 1:
+        #     delayed = chan_list[0]
+        #     # Reorder channels in the requested order
+        #     delayed = delayed.take_channels(requested, lazy=True)
 
-            if space in {'image', 'auxiliary', 'asset'}:
-                pass
-            elif space == 'video':
-                warp_vid_from_img = self.img.get('warp_img_to_vid', None)
-                delayed = delayed.warp(
-                    warp_vid_from_img, dsize=dsize,
-                    interpolation=interpolation,
-                    antialias=antialias,
-                    lazy=True)
-            else:
-                raise KeyError('space = {}'.format(space))
+        #     if space in {'image', 'auxiliary', 'asset'}:
+        #         pass
+        #     elif space == 'video':
+        #         warp_vid_from_img = self.img.get('warp_img_to_vid', None)
+        #         delayed = delayed.warp(
+        #             warp_vid_from_img, dsize=dsize,
+        #             interpolation=interpolation,
+        #             antialias=antialias,
+        #             lazy=True)
+        #     else:
+        #         raise KeyError('space = {}'.format(space))
         else:
             # from delayed_image import DelayedChannelConcat
             delayed = DelayedChannelConcat(chan_list)
