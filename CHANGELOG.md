@@ -10,6 +10,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * New `load` classmethod (analogous to `dump`) as a placeholder for a potential
   future refactor.
+* Ported segmentation metrics from geowatch. Eventually metrics may be ported
+  to a new package: kwmetrics in order to improve modularity and keep
+  components well-scoped.
 
 ### Fixed
 * CIFAR grabdata now respects dpath
