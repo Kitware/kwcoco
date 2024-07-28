@@ -5,7 +5,6 @@ Wraps the logic in kwcoco/coco_evaluator.py with a command line script
 from kwcoco import coco_evaluator
 import scriptconfig as scfg
 import ubelt as ub
-from os.path import join
 
 
 class CocoEvalCLIConfig(coco_evaluator.CocoEvalConfig):
@@ -18,6 +17,11 @@ class CocoEvalCLIConfig(coco_evaluator.CocoEvalConfig):
         'expt_title': scfg.Value('', type=str, help='title for plots'),
         'draw': scfg.Value(True, isflag=1, help='draw metric plots'),
         'out_dpath': scfg.Value('./coco_metrics', type=str, help='where to dump results'),
+        'out_fpath': scfg.Value('auto', type=str, help=ub.paragraph(
+            '''
+            Where to dump the json file containing result.
+            If "auto", defaults to out_dpath / "metrics.json"
+            ''')),
     }
 
 
@@ -90,15 +94,19 @@ def main(cmdline=True, **kw):
 
     results = coco_eval.evaluate()
 
-    ub.ensuredir(cli_config['out_dpath'])
+    out_dpath = ub.Path(cli_config['out_dpath'])
 
-    metrics_fpath = join(cli_config['out_dpath'], 'metrics.json')
+    if cli_config['out_dpath'] == 'auto':
+        metrics_fpath = out_dpath / 'metrics.json'
+    else:
+        metrics_fpath = ub.Path(cli_config['out_fpath'])
+
     print('dumping metrics_fpath = {!r}'.format(metrics_fpath))
     results.dump(metrics_fpath, indent='    ')
 
     if cli_config['draw']:
         results.dump_figures(
-            cli_config['out_dpath'],
+            out_dpath,
             expt_title=cli_config['expt_title']
         )
 
@@ -148,19 +156,19 @@ def main(cmdline=True, **kw):
             canvas = truth_dets.draw_on(canvas, color='green', sseg=False)
             canvas = pred_dets.draw_on(canvas, color='blue', sseg=False)
 
-            viz_dpath = ub.ensuredir((cli_config['out_dpath'], 'viz'))
-            fig_fpath = join(viz_dpath, 'eval-gid={}.jpg'.format(gid))
+            viz_dpath = (out_dpath / 'viz').ensuredir()
+            fig_fpath = viz_dpath / 'eval-gid={}.jpg'.format(gid)
             kwimage.imwrite(fig_fpath, canvas)
 
 
-_CLI = CocoEvalCLI
+__cli__ = _CLI = CocoEvalCLI
 
 
 if __name__ == '__main__':
-    """
+    r"""
     kwcoco eval \
         --true_dataset=$HOME/.cache/kwcoco/tests/eval/true.mscoco.json \
         --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
         --out_dpath=$HOME/.cache/kwcoco/tests/eval/out
     """
-    _CLI._main()
+    __cli__._main()

@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Ported segmentation metrics from geowatch. Eventually metrics may be ported
   to a new package: kwmetrics in order to improve modularity and keep
   components well-scoped.
+* Added `out_fpath` to `coco_eval` CLI signature. 
 
 ### Fixed
 * CIFAR grabdata now respects dpath
