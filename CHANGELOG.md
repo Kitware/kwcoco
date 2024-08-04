@@ -15,6 +15,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   components well-scoped.
 * Added `out_fpath` to `coco_eval` CLI signature. 
 * Added `video_ids` argument to `CocoDataset.subset`
+* Added `objs_iter` property to `ObjectList1D` as an alternative to `.objs`
+* Added `get_iter` method to `ObjectList1D` as an alternative to `.get`
 
 ### Changed
 * `CocoDataset.add_track` will now pick a name using a uuid if one is unspecified.

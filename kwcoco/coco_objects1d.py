@@ -73,6 +73,10 @@ class ObjectList1D(ub.NiceRepr):
 
     @property
     def _id_to_obj(self):
+        """
+        Maps the table id to a dictionary (or dict-like) containing the row
+        data for that id.
+        """
         return self._dset.index._id_lookup[self._key]
 
     def __getitem__(self, index):
@@ -104,10 +108,30 @@ class ObjectList1D(ub.NiceRepr):
     @property
     def ids(self):
         """
+        The row ids corresponding to this object
+
         Returns:
             List[int]
         """
         return self._ids
+
+    @property
+    def objs_iter(self):
+        """
+        Iterate over the underlying object dictionary for each object.
+
+        Returns:
+            Generator[ObjT]: all object dictionaries
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> self = dset.images()
+            >>> objs_iter = self.objs_iter
+            >>> assert self.objs == list(objs_iter)
+            >>> assert len(list(objs_iter)) == 0, 'should be exhausted'
+        """
+        return ub.take(self._id_to_obj, self._ids)
 
     @property
     def objs(self):
@@ -116,6 +140,13 @@ class ObjectList1D(ub.NiceRepr):
 
         Returns:
             List[ObjT]: all object dictionaries
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> self = dset.images()
+            >>> objs = self.objs
+            >>> assert len(objs) == len(self)
         """
         return list(ub.take(self._id_to_obj, self._ids))
 
@@ -311,9 +342,22 @@ class ObjectList1D(ub.NiceRepr):
                 attr_list = [_lut[_id].get(key, default) for _id in self._ids]
         return attr_list
 
-    def _iter_get(self, key, default=ub.NoParam):
+    def get_iter(self, key, default=ub.NoParam):
         """
         Iterator version of get, not in stable API yet.
+
+        Returns:
+            Generator[Any]: a generator over the requested column property
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo()
+            >>> self = dset.annots()
+            >>> image_ids = self.get('image_id')
+            >>> image_ids_iter = self.get_iter('image_id')
+            >>> hasattr(image_ids_iter, 'send')
+            >>> assert image_ids == list(image_ids_iter)
+            >>> assert len(list(image_ids_iter)) == 0, 'should be exhausted'
         """
         # TODO: sql variant
         _lut = self._id_to_obj
@@ -322,6 +366,8 @@ class ObjectList1D(ub.NiceRepr):
         else:
             attr_iter = (_lut[_id].get(key, default) for _id in self._ids)
         return attr_iter
+
+    _iter_get = get_iter  # backwards compat
 
     def set(self, key, values):
         """
