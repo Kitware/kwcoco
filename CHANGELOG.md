@@ -14,6 +14,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   to a new package: kwmetrics in order to improve modularity and keep
   components well-scoped.
 * Added `out_fpath` to `coco_eval` CLI signature. 
+* Added `video_ids` argument to `CocoDataset.subset`
+
+### Changed
+* `CocoDataset.add_track` will now pick a name using a uuid if one is unspecified.
 
 ### Fixed
 * CIFAR grabdata now respects dpath

@@ -163,6 +163,7 @@ class ConfusionVectors(ub.NiceRepr):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:pandas)
+            >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> import kwarray
             >>> classes = ['person', 'vehicle', 'object']
             >>> rng = kwarray.ensure_rng(0)

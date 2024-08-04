@@ -7,9 +7,6 @@ Compute semantic segmentation evaluation metrics
 TODO::
 - RRMSE (relative root mean squared error) RMSE normalized by root mean sqare value where each residual is scaled against the actual value
   sqrt((1 / n) * sum((y - y_hat) ** 2) / sum(y ** 2))
-
-TODO:
-    - [ ] Move to kwcoco proper
 """
 import json
 import kwarray
@@ -31,10 +28,6 @@ from kwcoco.metrics.confusion_measures import Measures
 from typing import Dict
 import scriptconfig as scfg
 from shapely.ops import unary_union
-
-from kwutil import process_context
-from kwutil import util_progress
-from kwutil import util_parallel
 
 # from geowatch.utils import kwcoco_extensions
 # from geowatch import heuristics
@@ -908,6 +901,7 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
         - [ ] Fold non-critical options into the config
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:kwutil)
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> from kwcoco.demo.perterb import perterb_coco
         >>> import kwcoco
@@ -942,6 +936,7 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
 
     Example:
         >>> # xdoctest: +REQUIRES(env:SLOW_DOCTEST)
+        >>> # xdoctest: +REQUIRES(module:kwutil)
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> from kwcoco.demo.perterb import perterb_coco
         >>> import kwcoco
@@ -972,6 +967,9 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
         >>> evaluate_segmentations(true_coco, pred_coco, eval_dpath, config=config)
     """
     import rich
+    from kwutil import process_context
+    from kwutil import util_progress
+    from kwutil import util_parallel
 
     if config is None:
         config = {}
@@ -1650,6 +1648,7 @@ def ensure_heuristic_category_tree_colors(classes, force=False):
         - [ ] Consolidate with ~/code/watch/geowatch/heuristics.py :: ensure_heuristic_coco_colors
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:kwutil)
         >>> import kwcoco
         >>> classes = kwcoco.CategoryTree.coerce(['ignore', 'positive', 'Active Construction', 'foobar', 'Unknown', 'baz'])
         >>> ensure_heuristic_category_tree_colors(classes)
