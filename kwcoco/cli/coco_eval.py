@@ -102,6 +102,7 @@ def main(cmdline=True, **kw):
         metrics_fpath = ub.Path(cli_config['out_fpath'])
 
     print('dumping metrics_fpath = {!r}'.format(metrics_fpath))
+    metrics_fpath.parent.ensuredir()
     results.dump(metrics_fpath, indent='    ')
 
     if cli_config['draw']:
