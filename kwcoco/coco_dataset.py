@@ -3329,10 +3329,10 @@ class MixinCocoDraw:
             gid (int | None):
                 image id to show
             aids (list | None):
-                aids to highlight within the image
+                annotation ids to highlight within the image
             aid (int | None):
-                a specific aid to focus on. If gid is not give, look up gid
-                based on this aid.
+                a specific annotation id to focus on. If gid is not give, look
+                up gid based on this aid.
             setlim (None | str):
                 if 'image' sets the limit to the image extent
             **kwargs:
@@ -3360,7 +3360,7 @@ class MixinCocoDraw:
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi')
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
-            >>> kwplot.autompl()
+            >>> kwplot.autompl(verbose=3)
             >>> # xdoctest: -REQUIRES(--show)
             >>> dset.show_image(gid=1, channels='B8')
             >>> # xdoctest: +REQUIRES(--show)
