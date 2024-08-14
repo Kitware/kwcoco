@@ -74,9 +74,13 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - export WHEEL_FPATH=$(python -c "import pathlib; print(str(sorted(pathlib.Path('dist').glob('kwcoco*.whl'))[-1]).replace(chr(92),
-    chr(47)))")
-  - export MOD_VERSION=$(python -c "from pkginfo import Wheel; print(Wheel('$WHEEL_FPATH').version)")
+  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
+    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
+    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
+    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
+  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
+    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
+    \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
   - echo "$WHEEL_FPATH=WHEEL_FPATH"
   - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
@@ -126,9 +130,13 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - export WHEEL_FPATH=$(python -c "import pathlib; print(str(sorted(pathlib.Path('dist').glob('kwcoco*.whl'))[-1]).replace(chr(92),
-    chr(47)))")
-  - export MOD_VERSION=$(python -c "from pkginfo import Wheel; print(Wheel('$WHEEL_FPATH').version)")
+  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
+    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
+    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
+    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
+  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
+    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
+    \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
   - echo "$WHEEL_FPATH=WHEEL_FPATH"
   - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
@@ -178,9 +186,13 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - export WHEEL_FPATH=$(python -c "import pathlib; print(str(sorted(pathlib.Path('dist').glob('kwcoco*.whl'))[-1]).replace(chr(92),
-    chr(47)))")
-  - export MOD_VERSION=$(python -c "from pkginfo import Wheel; print(Wheel('$WHEEL_FPATH').version)")
+  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
+    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
+    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
+    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
+  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
+    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
+    \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
   - echo "$WHEEL_FPATH=WHEEL_FPATH"
   - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
@@ -230,9 +242,13 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - export WHEEL_FPATH=$(python -c "import pathlib; print(str(sorted(pathlib.Path('dist').glob('kwcoco*.whl'))[-1]).replace(chr(92),
-    chr(47)))")
-  - export MOD_VERSION=$(python -c "from pkginfo import Wheel; print(Wheel('$WHEEL_FPATH').version)")
+  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
+    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
+    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
+    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
+  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
+    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
+    \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
   - echo "$WHEEL_FPATH=WHEEL_FPATH"
   - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
