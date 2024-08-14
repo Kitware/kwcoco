@@ -401,6 +401,7 @@ gpgsign/wheels:
   artifacts:
     paths:
     - dist/*.asc
+    - dist/*.tar.gz
     - dist/*.whl
     - dist/*.ots
   only:
@@ -433,7 +434,7 @@ gpgsign/wheels:
   - GPG_SIGN_CMD="$GPG_EXECUTABLE --batch --yes --detach-sign --armor --local-user
     $GPG_KEYID"
   - |-
-    WHEEL_PATHS=(dist/*.whl)
+    WHEEL_PATHS=(dist/*.whl dist/*.tar.gz)
     WHEEL_PATHS_STR=$(printf '"%s" ' "${WHEEL_PATHS[@]}")
     echo "$WHEEL_PATHS_STR"
     for WHEEL_PATH in "${WHEEL_PATHS[@]}"
@@ -446,7 +447,7 @@ gpgsign/wheels:
     done
   - ls dist
   - python -m pip install opentimestamps-client
-  - ots stamp dist/*.whl dist/*.asc
+  - ots stamp dist/*.tar.gz dist/*.whl dist/*.asc
   needs:
   - job: build/sdist
     artifacts: true
@@ -471,7 +472,7 @@ deploy/wheels:
   - pip install pyopenssl ndg-httpsclient pyasn1 requests[security] twine -U
   - ls dist
   - |-
-    WHEEL_PATHS=(dist/*.whl)
+    WHEEL_PATHS=(dist/*.whl dist/*.tar.gz)
     WHEEL_PATHS_STR=$(printf '"%s" ' "${WHEEL_PATHS[@]}")
     source dev/secrets_configuration.sh
     TWINE_PASSWORD=${!VARNAME_TWINE_PASSWORD}
@@ -480,7 +481,7 @@ deploy/wheels:
     for WHEEL_PATH in "${WHEEL_PATHS[@]}"
     do
         twine check $WHEEL_PATH.asc $WHEEL_PATH
-        twine upload --username $TWINE_USERNAME --password $TWINE_PASSWORD $WHEEL_PATH.asc $WHEEL_PATH || echo "upload already exists"
+        twine upload --username $TWINE_USERNAME --password $TWINE_PASSWORD $WHEEL_PATH || echo "upload already exists"
     done
   - |-
     # Have the server git-tag the release and push the tags
