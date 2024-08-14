@@ -4,8 +4,8 @@ stages:
 # TEMPLATES
 - lint
 - build
-- test
 - gpgsign
+- test
 - deploy
 .common_template: &common_template
   tags:
@@ -26,7 +26,17 @@ stages:
   cache:
     paths:
     - .cache/pip
-.build_template: &build_template
+.build_sdist_template: &build_sdist_template
+  <<: *common_template
+  stage: build
+  script:
+  - python -m pip install setuptools>=0.8 wheel build twine
+  - python -m build --sdist --outdir dist
+  - python -m twine check ./dist/kwcoco*.tar.gz
+  artifacts:
+    paths:
+    - ./dist/kwcoco*.tar.gz
+.build_wheel_template: &build_wheel_template
   <<: *common_template
   stage: build
   before_script:
@@ -251,8 +261,16 @@ stages:
   - |-
     python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --durations=100 --cov="$MOD_NAME" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
+build/sdist:
+  <<: *build_sdist_template
+  image: python:3.11
+test/sdist/minimal-loose/cp311-linux-x86_64:
+  <<: *test_minimal-loose_template
+  image: python:3.11
+  needs:
+  - build/sdist
 build/cp38-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.8
 test/minimal-loose/cp38-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -275,7 +293,7 @@ test/full-strict/cp38-linux-x86_64:
   needs:
   - build/cp38-linux-x86_64
 build/cp39-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.9
 test/minimal-loose/cp39-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -298,7 +316,7 @@ test/full-strict/cp39-linux-x86_64:
   needs:
   - build/cp39-linux-x86_64
 build/cp310-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.10
 test/minimal-loose/cp310-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -321,7 +339,7 @@ test/full-strict/cp310-linux-x86_64:
   needs:
   - build/cp310-linux-x86_64
 build/cp311-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.11
 test/minimal-loose/cp311-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -344,7 +362,7 @@ test/full-strict/cp311-linux-x86_64:
   needs:
   - build/cp311-linux-x86_64
 build/cp312-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.12
 test/minimal-loose/cp312-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -393,17 +411,6 @@ gpgsign/wheels:
     - master
     - main
     - release
-  needs:
-  - job: build/cp38-linux-x86_64
-    artifacts: true
-  - job: build/cp39-linux-x86_64
-    artifacts: true
-  - job: build/cp310-linux-x86_64
-    artifacts: true
-  - job: build/cp311-linux-x86_64
-    artifacts: true
-  - job: build/cp312-linux-x86_64
-    artifacts: true
   script:
   - ls dist
   - export GPG_EXECUTABLE=gpg
@@ -440,6 +447,19 @@ gpgsign/wheels:
   - ls dist
   - python -m pip install opentimestamps-client
   - ots stamp dist/*.whl dist/*.asc
+  needs:
+  - job: build/sdist
+    artifacts: true
+  - job: build/cp38-linux-x86_64
+    artifacts: true
+  - job: build/cp39-linux-x86_64
+    artifacts: true
+  - job: build/cp310-linux-x86_64
+    artifacts: true
+  - job: build/cp311-linux-x86_64
+    artifacts: true
+  - job: build/cp312-linux-x86_64
+    artifacts: true
 deploy/wheels:
   <<: *common_template
   image: python:3.11
