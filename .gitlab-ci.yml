@@ -82,9 +82,9 @@ stages:
     \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
     \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
-  - echo "$WHEEL_FPATH=WHEEL_FPATH"
-  - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
-  - echo "$MOD_VERSION=MOD_VERSION"
+  - echo "WHEEL_FPATH=$WHEEL_FPATH"
+  - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "MOD_VERSION=$MOD_VERSION"
   - pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
@@ -138,9 +138,9 @@ stages:
     \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
     \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
-  - echo "$WHEEL_FPATH=WHEEL_FPATH"
-  - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
-  - echo "$MOD_VERSION=MOD_VERSION"
+  - echo "WHEEL_FPATH=$WHEEL_FPATH"
+  - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "MOD_VERSION=$MOD_VERSION"
   - pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
@@ -194,9 +194,9 @@ stages:
     \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
     \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
-  - echo "$WHEEL_FPATH=WHEEL_FPATH"
-  - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
-  - echo "$MOD_VERSION=MOD_VERSION"
+  - echo "WHEEL_FPATH=$WHEEL_FPATH"
+  - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "MOD_VERSION=$MOD_VERSION"
   - pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
@@ -250,9 +250,9 @@ stages:
     \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
     \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
-  - echo "$WHEEL_FPATH=WHEEL_FPATH"
-  - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
-  - echo "$MOD_VERSION=MOD_VERSION"
+  - echo "WHEEL_FPATH=$WHEEL_FPATH"
+  - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "MOD_VERSION=$MOD_VERSION"
   - pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
