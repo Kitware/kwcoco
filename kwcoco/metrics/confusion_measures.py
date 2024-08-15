@@ -492,6 +492,7 @@ class Measures(ub.NiceRepr, DictProxy):
             'fn_count': new_fn,
             'thresholds': new_thresh,
         }
+
         new_info.update(summable)
 
         other = {
@@ -504,6 +505,7 @@ class Measures(ub.NiceRepr, DictProxy):
         }
         rest = ub.dict_isect(tocombine[0], other)
         new_info.update(rest)
+
         new_measures = Measures(new_info)
         return new_measures
 

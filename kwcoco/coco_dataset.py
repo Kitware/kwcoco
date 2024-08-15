@@ -5612,9 +5612,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             if not exists(fpath):
                 raise Exception(ub.paragraph(
                     '''
-                    Specified fpath={} does not exist. If you are trying
-                    to create a new dataset fist create a CocoDataset without
-                    any arguments, and then set the fpath attribute.
+                    You cannot construct a KWCocoDataset from a non-existing
+                    file: fpath={!r}.
+                    If you are trying to create a new dataset fist create a
+                    CocoDataset without arguments: `dset = kwcoco.CocoDataset`,
+                    and then set the fpath attribute:
+                    `dset.fpath = 'your-file-path.kwcoco.zip'`
                     ''').format(fpath))
 
             self._state['was_loaded'] = True
