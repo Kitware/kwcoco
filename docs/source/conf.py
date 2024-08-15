@@ -17,7 +17,7 @@ Notes:
     # need to edit the conf.py
 
     cd ~/code/kwcoco/docs
-    sphinx-apidoc --private --separate -f -o ~/code/kwcoco/docs/source/auto ~/code/kwcoco/kwcoco
+    sphinx-apidoc --private --separate --force --output-dir ~/code/kwcoco/docs/source/auto ~/code/kwcoco/kwcoco
 
     # Note: the module should importable before running this
     # (e.g. install it in developer mode or munge the PYTHONPATH)

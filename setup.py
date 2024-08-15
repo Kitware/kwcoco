@@ -207,33 +207,43 @@ if __name__ == "__main__":
     )
     setupkw["extras_require"] = {
         "all": parse_requirements("requirements.txt", versions="loose"),
-        "tests": parse_requirements("requirements/tests.txt", versions="loose"),
-        "optional": parse_requirements("requirements/optional.txt", versions="loose"),
         "headless": parse_requirements("requirements/headless.txt", versions="loose"),
         "graphics": parse_requirements("requirements/graphics.txt", versions="loose"),
-        # Strict versions
+        "postgresql": parse_requirements(
+            "requirements/postgresql.txt", versions="loose"
+        ),
+        "docs": parse_requirements("requirements/docs.txt", versions="loose"),
+        "gdal-strict": parse_requirements("requirements/gdal.txt", versions="strict"),
+        "gdal": parse_requirements("requirements/gdal.txt", versions="loose"),
+        "linting": parse_requirements("requirements/linting.txt", versions="loose"),
+        "optional": parse_requirements("requirements/optional.txt", versions="loose"),
+        "runtime": parse_requirements("requirements/runtime.txt", versions="loose"),
+        "tests": parse_requirements("requirements/tests.txt", versions="loose"),
+        "all-strict": parse_requirements("requirements.txt", versions="strict"),
         "headless-strict": parse_requirements(
             "requirements/headless.txt", versions="strict"
         ),
         "graphics-strict": parse_requirements(
             "requirements/graphics.txt", versions="strict"
         ),
-        "postgresql": parse_requirements(
-            "requirements/postgresql.txt", versions="loose"
-        ),
         "postgresql-strict": parse_requirements(
             "requirements/postgresql.txt", versions="strict"
         ),
-        "all-strict": parse_requirements("requirements.txt", versions="strict"),
+        "docs-strict": parse_requirements("requirements/docs.txt", versions="strict"),
+        "gdal-strict-strict": parse_requirements(
+            "requirements/gdal-strict.txt", versions="strict"
+        ),
+        "linting-strict": parse_requirements(
+            "requirements/linting.txt", versions="strict"
+        ),
+        "optional-strict": parse_requirements(
+            "requirements/optional.txt", versions="strict"
+        ),
         "runtime-strict": parse_requirements(
             "requirements/runtime.txt", versions="strict"
         ),
         "tests-strict": parse_requirements("requirements/tests.txt", versions="strict"),
-        "optional-strict": parse_requirements(
-            "requirements/optional.txt", versions="strict"
-        ),
     }
-
     setupkw["name"] = NAME
     setupkw["version"] = VERSION
     setupkw["author"] = "Jon Crall"
@@ -257,7 +267,10 @@ if __name__ == "__main__":
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
     ]
-    setupkw["package_data"] = {"kwcoco": ["py.typed", "*.pyi"]}
+    setupkw["package_data"] = {
+        "": ["requirements/*.txt"],
+        "kwcoco": ["py.typed", "*.pyi"],
+    }
     setupkw["entry_points"] = {
         "console_scripts": [
             "kwcoco = kwcoco.cli.__main__:main",
