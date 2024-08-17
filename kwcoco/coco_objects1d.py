@@ -145,7 +145,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
             >>> self = dset.images()
-            >>> objs_iter = self.objs_iter
+            >>> objs_iter = self.objs_iter()
             >>> assert self.objs == list(objs_iter)
             >>> assert len(list(objs_iter)) == 0, 'should be exhausted'
         """

@@ -1079,7 +1079,7 @@ def populate_info(info):
                 except ValueError:
                     best_thresh = np.nan
                     best_measure = np.nan
-                    best_submeasures = {k: np.nan for k, in sub_keys}
+                    best_submeasures = {k: np.nan for k in sub_keys}
                     best_submeasures['thresh'] = best_thresh
                 else:
                     best_thresh = float(finite_thresh[max_idx])
