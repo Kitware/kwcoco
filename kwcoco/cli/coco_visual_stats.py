@@ -26,10 +26,10 @@ except ImportError:
 
 class CocoVisualStats(scfg.DataConfig):
     """
-    Inspect properties of annotations write stdout and programatic reports.
+    Inspect properties of dataset and write raw data tables and visual plots.
     """
     __command__ = 'visual_stats'
-    __alias__ = ['']
+    __alias__ = ['plot_stats']
 
     src = scfg.Value(None, help='path to kwcoco file', position=1)
     dst_fpath = scfg.Value('auto', help='manifest of results. If unspecfied defaults to dst_dpath / "stats.json"')

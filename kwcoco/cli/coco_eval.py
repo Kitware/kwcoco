@@ -16,6 +16,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
         python -m kwcoco.metrics.segmentation_metrics --help
     """
     __command__ = 'eval'
+    __alias__ = ['eval_detections']
 
     # These should go into the CLI args, not the class config args
     expt_title = scfg.Value('', type=str, help='title for plots')
@@ -60,7 +61,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
         main(cmdline=cmdline, **kw)
 
 
-__cli__ = _CLI = CocoEvalCLI
+__cli__ = CocoEvalCLI
 
 
 def main(cmdline=True, **kw):
