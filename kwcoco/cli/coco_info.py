@@ -55,7 +55,11 @@ class CocoFileHelper:
 
 class CocoInfoCLI(scfg.DataConfig):
     """
-    Parse the "info" section of the coco json and print it.
+    Print the first few rows from specified tables. Tries to avoid reading the
+    entire file.
+
+    This is named info because originally it just parsed the "info" section of
+    the coco json and print it. But it can parse all the tables.
 
     This is done using ijson, so it doesn't have to read the entire file.
     This is useful when you quickly want to take a peek at a larger kwcoco
@@ -65,6 +69,7 @@ class CocoInfoCLI(scfg.DataConfig):
     expected order, or if the requested sections are empty. Help wanted.
     """
     __command__ = 'info'
+    __alias__ = ['tables']
 
     src = scfg.Value(None, help='input kwcoco path', position=1)
 

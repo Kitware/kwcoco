@@ -94,6 +94,25 @@ class ObjectList1D(ub.NiceRepr):
         else:
             return self._ids[index]
 
+    if 0:
+        # Do we want this?
+        def __call__(self):
+            """
+            The current convention on when to access vectorized objects (e.g.
+            annots / images) as methods or properties is confusing and
+            inconsistent. By adding a __call__ method that simply returns the
+            object, the user can treat properties as if they were methods.
+
+            Example:
+                >>> import kwcoco
+                >>> dset = kwcoco.CocoDataset.demo()
+                >>> # Access as a property or method
+                >>> result1 = dset.annots().images
+                >>> result2 = dset.annots().images()
+                >>> assert list(result1) == list(result2)
+            """
+            return self
+
     def unique(self):
         """
         Removes any duplicates entries in this object
@@ -115,7 +134,6 @@ class ObjectList1D(ub.NiceRepr):
         """
         return self._ids
 
-    @property
     def objs_iter(self):
         """
         Iterate over the underlying object dictionary for each object.
@@ -613,8 +631,23 @@ class Images(ObjectList1D):
         """
         super().__init__(ids, dset, 'images')
 
+    def coco_images_iter(self):
+        """
+        Access the enriched coco image objects.
+
+        Yields:
+            CocoImage
+        """
+        yield from (self._dset.coco_image(gid) for gid in self)
+
     @property
     def coco_images(self):
+        """
+        Access the enriched coco image objects.
+
+        Returns:
+            List[CocoImage]:
+        """
         return [self._dset.coco_image(gid) for gid in self]
 
     @property
@@ -1061,3 +1094,16 @@ class ImageGroups(ObjectGroups):
         [[0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1]]
     """
     ...
+
+
+if 0:
+    # Do we want this?
+    # If so changelog note will be:
+    # * Vectorized objects can that were previously only accessible as properties,
+    #   can now be accessed as methods.
+    class CallableList(list):
+        """
+        Allows properties that return a list to behave like methods.
+        """
+        def __call__(self):
+            return self

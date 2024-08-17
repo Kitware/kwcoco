@@ -36,6 +36,8 @@ class Measures(ub.NiceRepr, DictProxy):
         >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors  # NOQA
         >>> binvecs = BinaryConfusionVectors.demo(n=100, p_error=0.5)
         >>> self = binvecs.measures()
+        >>> summary = self.summary()
+        >>> print(f'summary = {ub.urepr(summary, nl=1)}')
         >>> print('self = {!r}'.format(self))
         >>> # xdoctest: +REQUIRES(--show)
         >>> import kwplot
@@ -1064,7 +1066,10 @@ def populate_info(info):
         # info['g1'] = np.sqrt(ppv * tpr)
         info['g1'] = np.sqrt(ppv_mul_tpr)
 
+        # Report the threshold that maximizes wholistic quality metrics as well
+        # as the contextural metrics at that threshold.
         keys = ['mcc', 'g1', 'f1', 'acc']
+        sub_keys = ['ppv', 'tpr', 'fpr', 'tnr', 'bm', 'mk']
         finite_thresh = thresh[finite_flags]
         for key in keys:
             if key in info:
@@ -1074,20 +1079,17 @@ def populate_info(info):
                 except ValueError:
                     best_thresh = np.nan
                     best_measure = np.nan
+                    best_submeasures = {k: np.nan for k, in sub_keys}
+                    best_submeasures['thresh'] = best_thresh
                 else:
                     best_thresh = float(finite_thresh[max_idx])
                     best_measure = float(measure[max_idx])
+                    best_submeasures = {k: info[k][finite_flags][max_idx] for k in sub_keys}
+                    best_submeasures['thresh'] = best_thresh
 
                 best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
-
-                # if np.isinf(best_thresh) or np.isnan(best_measure):
-                #     print('key = {!r}'.format(key))
-                #     print('finite_flags = {!r}'.format(finite_flags))
-                #     print('measure = {!r}'.format(measure))
-                #     print('best_label = {!r}'.format(best_label))
-                #     import xdev
-                #     xdev.embed()
                 info['max_{}'.format(key)] = best_label
+                info['max_{}_submeasures'.format(key)] = best_submeasures
                 info['_max_{}'.format(key)] = (best_measure, best_thresh)
 
         import sklearn.metrics  # NOQA
