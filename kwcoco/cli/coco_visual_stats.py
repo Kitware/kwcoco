@@ -302,60 +302,6 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         'rt_area': 'Polygon sqrt(Area)'
     })
 
-    def _split_histplot(data, x):
-        """
-        TODO: generalize, if there is not a huge delta between histogram
-        values, then fallback to just a single histogram plot.
-        Need to figure out:
-        is it possible to pass this an existing figure, so we don't always
-        create a new one with plt.subplots?
-
-        References:
-            https://stackoverflow.com/questions/32185411/break-in-x-axis-of-matplotlib
-            https://stackoverflow.com/questions/63726234/how-to-draw-a-broken-y-axis-catplot-graphes-with-seaborn
-        """
-        plt = kwplot.plt
-
-        split_point = 'auto'
-        if split_point == 'auto':
-            histogram = data[x].value_counts()
-            small_values = histogram[histogram < histogram.mean()]
-            try:
-                split_point = int(small_values.max() * 1.5)
-            except ValueError:
-                split_point = None
-
-        if split_point is None:
-            ax = plt.figure().gca()
-            ax_top = ax_bottom = ax
-            return ax_top, ax_bottom
-
-        fig, (ax_top, ax_bottom) = plt.subplots(ncols=1, nrows=2, sharex=True, gridspec_kw={'hspace': 0.05})
-
-        sns.histplot(data=data, x=x, ax=ax_top, binwidth=1, discrete=True)
-        sns.histplot(data=data, x=x, ax=ax_bottom, binwidth=1, discrete=True)
-
-        sns.despine(ax=ax_bottom)
-        sns.despine(ax=ax_top, bottom=True)
-        ax = ax_top
-        d = .015  # how big to make the diagonal lines in axes coordinates
-        # arguments to pass to plot, just so we don't keep repeating them
-        kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
-        ax.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
-
-        ax2 = ax_bottom
-        kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
-        ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
-
-        #remove one of the legend
-        if ax_bottom.legend_ is not None:
-            ax_bottom.legend_.remove()
-
-        ax_top.set_ylabel('')
-        ax_top.set_ylim(bottom=split_point)   # those limits are fake
-        ax_bottom.set_ylim(0, split_point)
-        return ax_top, ax_bottom
-
     @register
     def polygon_centroid_distribution():
         ax = figman.figure(fnum=1, doclf=True).gca()
@@ -374,18 +320,17 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
 
     @register
     def image_size_distribution():
-        # ax = figman.figure(fnum=1, doclf=True).gca()
+        figman.figure(fnum=1, doclf=True).gca()
         img_dsizes = [f'{w}✕{h}' for w, h in zip(perimage_data['width'], perimage_data['height'])]
         perimage_data['img_dsizes'] = img_dsizes
         # sns.histplot(data=perimage_data, x='img_dsizes', ax=ax)
         data = perimage_data
         x = 'img_dsizes'
-        ax_top, ax_bottom = _split_histplot(data=data, x=x)
+        ax_top, ax_bottom, split_point = _split_histplot(data=data, x=x)
         ax_bottom.set_xlabel('Image Width ✕ Height')
         ax_bottom.set_ylabel('Number of Images')
-        # ax.set_aspect('equal')
         ax_top.set_title('Image Size Histogram')
-        figman.finalize('image_size_distribution.png')
+        figman.finalize('image_size_distribution.png', fig=ax_top.figure)
 
     @register
     def obox_size_distribution():
@@ -437,10 +382,7 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
     @register
     def anns_per_image_histogram():
         ax = figman.figure(fnum=1, doclf=True).gca()
-        try:
-            sns.histplot(data=perimage_data, x='anns_per_image', ax=ax, binwidth=1)
-        except ValueError:
-            sns.histplot(data=perimage_data, x='anns_per_image', ax=ax)
+        sns.histplot(data=perimage_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True)
         ax.set_yscale('linear')
         ax.set_xlabel('Number of Annotations')
         ax.set_ylabel('Number of Images')
@@ -453,36 +395,10 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
 
     @register
     def anns_per_image_histogram_splity():
-        # References:
-        # https://stackoverflow.com/questions/32185411/break-in-x-axis-of-matplotlib
-        # https://stackoverflow.com/questions/63726234/how-to-draw-a-broken-y-axis-catplot-graphes-with-seaborn
-
-        # ax = figman.figure(fnum=1, doclf=True).gca()
-        plt = kwplot.plt
-        fig, (ax_top, ax_bottom) = plt.subplots(ncols=1, nrows=2, sharex=True, gridspec_kw={'hspace': 0.05})
-
-        # ax_top, ax_bottom = _split_histplot(data=data, x=x)
-
-        sns.histplot(data=perimage_data, x='anns_per_image', ax=ax_top, binwidth=1, discrete=True)
-        sns.histplot(data=perimage_data, x='anns_per_image', ax=ax_bottom, binwidth=1, discrete=True)
-
-        sns.despine(ax=ax_bottom)
-        sns.despine(ax=ax_top, bottom=True)
+        split_point = 'auto'
+        ax_top, ax_bottom, split_point = _split_histplot(perimage_data, 'anns_per_image', split_point)
         ax = ax_top
-        d = .015  # how big to make the diagonal lines in axes coordinates
-        # arguments to pass to plot, just so we don't keep repeating them
-        kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
-        ax.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
-
-        ax2 = ax_bottom
-        kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
-        ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
-
-        split_point = 20
-
-        #remove one of the legend
-        if ax_bottom.legend_ is not None:
-            ax_bottom.legend_.remove()
+        fig = ax.figure
 
         ax.set_yscale('linear')
         ax_bottom.set_xlabel('Number of Annotations')
@@ -490,7 +406,6 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         ax_top.set_ylabel('')
         ax_top.set_title('Number of Annotations per Image')
         ax_bottom.set_xlim(0 - 0.5, max_anns_per_image + 1.5)
-        # figman.labels.relabel(ax)
 
         ax_top.set_ylim(bottom=split_point)   # those limits are fake
         ax_bottom.set_ylim(0, split_point)
@@ -596,6 +511,63 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         figman.finalize('all_polygons.png', tight_layout=0)  # tight layout seems to cause issues here
 
     return plot_functions
+
+
+def _split_histplot(data, x, split_point='auto'):
+    """
+    TODO: generalize, if there is not a huge delta between histogram
+    values, then fallback to just a single histogram plot.
+    Need to figure out:
+    is it possible to pass this an existing figure, so we don't always
+    create a new one with plt.subplots?
+
+    References:
+        https://stackoverflow.com/questions/32185411/break-in-x-axis-of-matplotlib
+        https://stackoverflow.com/questions/63726234/how-to-draw-a-broken-y-axis-catplot-graphes-with-seaborn
+    """
+    import kwplot
+    sns = kwplot.sns
+    plt = kwplot.plt
+
+    if split_point == 'auto':
+        histogram = data[x].value_counts()
+        small_values = histogram[histogram < histogram.mean()]
+        try:
+            split_point = int(small_values.max() * 1.5)
+        except ValueError:
+            split_point = None
+
+    if split_point is None:
+        ax = kwplot.figure(fnum=1, doclf=True).gca()
+        ax_top = ax_bottom = ax
+        sns.histplot(data=data, x=x, ax=ax_top, binwidth=1, discrete=True)
+        return ax_top, ax_bottom, split_point
+
+    fig, (ax_top, ax_bottom) = plt.subplots(ncols=1, nrows=2, sharex=True, gridspec_kw={'hspace': 0.05})
+
+    sns.histplot(data=data, x=x, ax=ax_top, binwidth=1, discrete=True)
+    sns.histplot(data=data, x=x, ax=ax_bottom, binwidth=1, discrete=True)
+
+    sns.despine(ax=ax_bottom)
+    sns.despine(ax=ax_top, bottom=True)
+    ax = ax_top
+    d = .015  # how big to make the diagonal lines in axes coordinates
+    # arguments to pass to plot, just so we don't keep repeating them
+    kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
+    ax.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
+
+    ax2 = ax_bottom
+    kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
+    ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
+
+    #remove one of the legend
+    if ax_bottom.legend_ is not None:
+        ax_bottom.legend_.remove()
+
+    ax_top.set_ylabel('')
+    ax_top.set_ylim(bottom=split_point)   # those limits are fake
+    ax_bottom.set_ylim(0, split_point)
+    return ax_top, ax_bottom, split_point
 
 
 def polygon_shape_stats(df):
