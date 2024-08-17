@@ -90,8 +90,10 @@ def run(config):
         perannot_data = dataframes['perannot_data']
         perannot_summary = json.loads(perannot_data.describe().to_json())
         perimage_summary = json.loads(perimage_data.describe().to_json())
-        rich.print(ub.urepr(perannot_summary, nl=-1, align=':'))
-        rich.print(ub.urepr(perimage_summary, nl=-1, align=':'))
+        rich.print('perannot_summary:')
+        rich.print(ub.urepr(perannot_summary, nl=-1, align=':', precision=2))
+        rich.print('perimage_summary:')
+        rich.print(ub.urepr(perimage_summary, nl=-1, align=':', precision=2))
 
     print('Preparing plots')
     rich.print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
@@ -110,8 +112,10 @@ def run(config):
             try:
                 func()
             except Exception as ex:
-                rich.print('[red] ERROR:')
+                rich.print(f'[red] ERROR: in {func}')
                 rich.print(f'ex = {ub.urepr(ex, nl=1)}')
+                import traceback
+                traceback.print_exc()
                 if 0:
                     raise
     rich.print(f'Finished writing plots to: [link={plots_dpath}]{plots_dpath}[/link]')
@@ -154,7 +158,6 @@ def build_stats_data(config):
     import kwimage
     import numpy as np
     import pandas as pd
-    import geopandas as gpd
     import json
 
     print('Loading kwcoco file')
@@ -202,7 +205,14 @@ def build_stats_data(config):
         ...
         # TODO: medical stats / other domain stats
 
-    perannot_data = gpd.GeoDataFrame({
+    # try:
+    #     # We dont want to require geopandas
+    #     import geopandas as gpd
+    #     _DataFrame = gpd.GeoDataFrame
+    # except Exception:
+    _DataFrame = pd.DataFrame
+
+    perannot_data = _DataFrame({
         'geometry': [p.to_shapely() for p in polys],
         'annot_id': annots.ids,
         'image_id': annots.image_id,
@@ -214,10 +224,11 @@ def build_stats_data(config):
     })
     perannot_data['num_vertices'] = perannot_data.geometry.apply(geometry_length)
     perannot_data = polygon_shape_stats(perannot_data)
-    perannot_data['centroid_x'] = perannot_data.geometry.centroid.x
-    perannot_data['centroid_y'] = perannot_data.geometry.centroid.y
-    perannot_data['rel_centroid_x'] = perannot_data.geometry.centroid.x / box_canvas_width
-    perannot_data['rel_centroid_y'] = perannot_data.geometry.centroid.y / box_canvas_height
+    geometry = perannot_data['geometry']
+    perannot_data['centroid_x'] = geometry.apply(lambda s: s.centroid.x)
+    perannot_data['centroid_y'] = geometry.apply(lambda s: s.centroid.y)
+    perannot_data['rel_centroid_x'] = perannot_data['centroid_x'] / box_canvas_width
+    perannot_data['rel_centroid_y'] = perannot_data['centroid_y'] / box_canvas_height
 
     _summary_data = ub.udict(perannot_data.to_dict()) - {'geometry'}
     _summary_df = pd.DataFrame(_summary_data)
@@ -281,6 +292,7 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         dpi=dpi,
         verbose=1
     )
+    # define label mappings for humans
     figman.labels.add_mapping({
         'num_vertices': 'Num Polygon Vertices',
         'centroid_x': 'Polygon Centroid X',
@@ -425,12 +437,15 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
     @register
     def anns_per_image_histogram():
         ax = figman.figure(fnum=1, doclf=True).gca()
-        sns.histplot(data=perimage_data, x='anns_per_image', ax=ax, binwidth=1)
+        try:
+            sns.histplot(data=perimage_data, x='anns_per_image', ax=ax, binwidth=1)
+        except ValueError:
+            sns.histplot(data=perimage_data, x='anns_per_image', ax=ax)
         ax.set_yscale('linear')
         ax.set_xlabel('Number of Annotations')
         ax.set_ylabel('Number of Images')
         ax.set_title('Number of Annotations per Image')
-        ax.set_xlim(0, max_anns_per_image)
+        ax.set_xlim(0 - 0.5, max_anns_per_image + 1.5)
         figman.labels.relabel(ax)
         # ax.set_yscale('symlog', linthresh=10)
         figman.labels.force_integer_xticks()
@@ -474,7 +489,7 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_ylabel('')
         ax_top.set_title('Number of Annotations per Image')
-        ax_bottom.set_xlim(0 - 0.5, max_anns_per_image + 0.5)
+        ax_bottom.set_xlim(0 - 0.5, max_anns_per_image + 1.5)
         # figman.labels.relabel(ax)
 
         ax_top.set_ylim(bottom=split_point)   # those limits are fake
@@ -522,32 +537,38 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         import pandas as pd
         import numpy as np
         import kwutil
-
+        import kwimage
         img_df = perimage_data.sort_values('datetime')
         img_df['pd_datetime'] = pd.to_datetime(img_df.datetime)
         img_df['collection_size'] = np.arange(1, len(img_df) + 1)
         datetimes = [kwutil.datetime.coerce(x) for x in img_df['datetime']]
-        img_df['timestamp'] = [x.timestamp() for x in datetimes]
-        img_df['date'] = [x.date() for x in datetimes]
-        img_df['time'] = [x.time() for x in datetimes]
-        img_df['year_month'] = [x.strftime('%Y-%m') for x in datetimes]
-        img_df['day_of_year'] = [x.timetuple().tm_yday for x in datetimes]
-        img_df['month'] = [x.strftime('%m') for x in datetimes]
-        img_df['hour_of_day'] = [z.hour + z.minute / 60 + z.second / 3600 for z in img_df['time']]
+        # img_df['timestamp'] = [x.timestamp() for x in datetimes]
+        # img_df['date'] = [x.date() for x in datetimes]
+        # img_df['year_month'] = [x.strftime('%Y-%m') for x in datetimes]
+        # img_df['month'] = [x.strftime('%m') for x in datetimes]
+        img_df['time'] = [x.time() if not pd.isnull(x) else None for x in datetimes]
+        img_df['day_of_year'] = [x.timetuple().tm_yday if not pd.isnull(x) else None for x in datetimes]
+        img_df['hour_of_day'] = [None if z is None else z.hour + z.minute / 60 + z.second / 3600 for z in img_df['time']]
+
+        snskw = {}
+        has_sunlight = 'sunlight' in img_df.columns
+        if has_sunlight:
+            snskw['hue'] = 'sunlight'
+
         ax = figman.figure(fnum=1, doclf=True).gca()
         # sns.histplot(data=img_df, x='month', ax=ax)
         # sns.kdeplot(data=img_df, x='day_of_year', y='hour_of_day')
         # sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight_values')
         palette = sns.color_palette("flare", n_colors=4, as_cmap=True).reversed()
         sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day')
-        sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight', palette=palette, legend=False)
+        sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', **snskw, palette=palette, legend=False)
         # sns.kdeplot(data=img_df, x='hour_of_day', y='day_of_year')
-        import kwimage
-        kwplot.phantom_legend({
-            'Night': kwimage.Color.coerce(palette.colors[0]).as255(),
-            'Day': kwimage.Color.coerce(palette.colors[-1]).as255(),
-            'nan': 'blue',
-        }, mode='circle')
+        if has_sunlight:
+            kwplot.phantom_legend({
+                'Night': kwimage.Color.coerce(palette.colors[0]).as255(),
+                'Day': kwimage.Color.coerce(palette.colors[-1]).as255(),
+                'nan': 'blue',
+            }, mode='circle')
         ax.set_title('Time Captured')
         ax.set_xlabel('Day of Year')
         ax.set_ylabel('Hour of Day')
@@ -583,8 +604,9 @@ def polygon_shape_stats(df):
     """
     import numpy as np
     import kwimage
-    df['hull_rt_area'] = np.sqrt(df.geometry.convex_hull.area)
-    df['rt_area'] = np.sqrt(df.geometry.area)
+    geometry = df['geometry']
+    df['hull_rt_area'] = np.sqrt(geometry.apply(lambda s: s.convex_hull.area))
+    df['rt_area'] = np.sqrt(geometry.apply(lambda s: s.area))
 
     obox_whs = [kwimage.MultiPolygon.from_shapely(s).oriented_bounding_box().extent
                 for s in df.geometry]
