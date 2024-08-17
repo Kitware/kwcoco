@@ -94,24 +94,24 @@ class ObjectList1D(ub.NiceRepr):
         else:
             return self._ids[index]
 
-    if 0:
-        # Do we want this?
-        def __call__(self):
-            """
-            The current convention on when to access vectorized objects (e.g.
-            annots / images) as methods or properties is confusing and
-            inconsistent. By adding a __call__ method that simply returns the
-            object, the user can treat properties as if they were methods.
+    # if 0:
+    #     # Do we want this?
+    #     def __call__(self):
+    #         """
+    #         The current convention on when to access vectorized objects (e.g.
+    #         annots / images) as methods or properties is confusing and
+    #         inconsistent. By adding a __call__ method that simply returns the
+    #         object, the user can treat properties as if they were methods.
 
-            Example:
-                >>> import kwcoco
-                >>> dset = kwcoco.CocoDataset.demo()
-                >>> # Access as a property or method
-                >>> result1 = dset.annots().images
-                >>> result2 = dset.annots().images()
-                >>> assert list(result1) == list(result2)
-            """
-            return self
+    #         Example:
+    #             >>> import kwcoco
+    #             >>> dset = kwcoco.CocoDataset.demo()
+    #             >>> # Access as a property or method
+    #             >>> result1 = dset.annots().images
+    #             >>> #result2 = dset.annots().images()
+    #             >>> #assert list(result1) == list(result2)
+    #         """
+    #         return self
 
     def unique(self):
         """

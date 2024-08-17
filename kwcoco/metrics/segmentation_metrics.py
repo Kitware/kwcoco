@@ -90,6 +90,7 @@ class SegmentationEvalConfig(scfg.DataConfig):
     balance_area = scfg.Value(False, isflag=True, help='upweight small instances, downweight large instances')
     # thresh_bins = scfg.Value(128 * 128, help='threshold resolution, default is high, generally ok to lower')
     thresh_bins = scfg.Value(32 * 32, help='threshold resolution.')
+    salient_channel = scfg.Value('salient', help='channel that is the positive class')
 
 
 def main(cmdline=True, **kwargs):
@@ -118,8 +119,7 @@ def main(cmdline=True, **kwargs):
 @profile
 def single_image_segmentation_metrics(pred_coco_img, true_coco_img,
                                       true_classes, true_dets, video1=None,
-                                      thresh_bins=None, config=None,
-                                      salient_channel='salient'):
+                                      thresh_bins=None, config=None):
     """
     Args:
         true_coco_img (kwcoco.CocoImage): detatched true coco image
@@ -129,11 +129,13 @@ def single_image_segmentation_metrics(pred_coco_img, true_coco_img,
         thresh_bins (int): if specified rounds scores into this many bins
             to make calculating metrics more efficient
 
+        config (None | dict): see usage
+
     CommandLine:
         xdoctest -m geowatch.tasks.fusion.evaluate single_image_segmentation_metrics
 
     Example:
-        >>> from geowatch.tasks.fusion.evaluate import *  # NOQA
+        >>> from kwcoco.metrics.segmentation_metrics import *  # NOQA
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> from kwcoco.demo.perterb import perterb_coco
         >>> import kwcoco
@@ -146,12 +148,11 @@ def single_image_segmentation_metrics(pred_coco_img, true_coco_img,
         >>> true_dets = true_coco_img.annots().detections
         >>> video1 = true_coco_img.video
         >>> true_classes = true_coco.object_categories()
-        >>> salient_channel = 'r'  # pretend red is the salient channel
+        >>> config['salient_channel'] = 'r'  # pretend red is the salient channel
         >>> thresh_bins = np.linspace(0, 255, 1024)
         >>> info = single_image_segmentation_metrics(
         >>>    pred_coco_img, true_coco_img, true_classes, true_dets,
-        >>>    thresh_bins=thresh_bins, config=config, video1=video1, salient_channel=salient_channel)
-
+        >>>    thresh_bins=thresh_bins, config=config, video1=video1)
     """
     if config is None:
         config = {}
@@ -244,7 +245,7 @@ def single_image_segmentation_metrics(pred_coco_img, true_coco_img,
         undistinguished_classes)
 
     # Determine if saliency has been predicted
-    salient_class = salient_channel
+    salient_class = config.get('salient_channel', 'salient')
     has_saliency = salient_class in pred_coco_img.channels
 
     # Load ground truth annotations
@@ -1172,7 +1173,7 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
     # as it takes longer to draw than it does to score. For this reason, block
     # if the draw queue gets too big.
     metrics_executor = _DelayedBlockingJobQueue(max_unhandled_jobs=workers, mode='process', max_workers=workers)
-    draw_executor = MaxQueuePool(mode='process', max_workers=draw_workers, max_queue_size=draw_workers * 4)
+    draw_executor = _MaxQueuePool(mode='process', max_workers=draw_workers, max_queue_size=draw_workers * 4)
 
     prog = ub.ProgIter(total=total_images, desc='submit scoring jobs', adjust=False, freq=1)
     prog.begin()
@@ -1459,6 +1460,8 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
 
 class _DelayedFuture:
     """
+    todo: move to kwutil
+
     Wraps a future object so we can execute logic when its result has been
     accessed.
     """
@@ -1480,6 +1483,7 @@ class _DelayedFuture:
 
 class _DelayedBlockingJobQueue:
     """
+    todo: move to kwutil
 
     References:
         .. [GISTnoxdafoxMaxQueuePool] https://gist.github.com/noxdafox/4150eff0059ea43f6adbdd66e5d5e87e
@@ -1552,8 +1556,11 @@ class _DelayedBlockingJobQueue:
         return self.pool.shutdown()
 
 
-class MaxQueuePool:
+class _MaxQueuePool:
     """
+
+    todo: move to kwutil
+
     This Class wraps a concurrent.futures.Executor
     limiting the size of its task queue.
     If `max_queue_size` tasks are submitted, the next call to submit will block
@@ -1567,7 +1574,7 @@ class MaxQueuePool:
         sys.path.append(ubelt.expandpath('~/code/geowatch'))
         from geowatch.tasks.fusion.evaluate import *  # NOQA
         from geowatch.tasks.fusion.evaluate import _memo_legend, _redraw_measures
-        self = MaxQueuePool(max_queue_size=0)
+        self = _MaxQueuePool(max_queue_size=0)
 
         dpath = ub.Path.appdir('kwutil/doctests/maxpoolqueue')
         dpath.delete().ensuredir()
