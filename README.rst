@@ -109,29 +109,36 @@ This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
 
 .. code-block::
 
-    usage: kwcoco [-h] [--version] {stats,union,split,show,toydata,eval,conform,modify_categories,reroot,validate,subset,grab} ...
+    usage: kwcoco [-h] [--version] {stats,union,split,show,toydata,eval,conform,modify_categories,reroot,move,validate,subset,grab,info,visual_stats,find_unregistered_images} ...
 
     The Kitware COCO CLI
 
-    positional arguments:
-      {stats,union,split,show,toydata,eval,conform,modify_categories,reroot,validate,subset,grab}
+    options:
+      -h, --help            show this help message and exit
+      --version             show version number and exit (default: False)
+
+    commands:
+      {stats,union,split,show,toydata,eval,conform,modify_categories,reroot,move,validate,subset,grab,info,visual_stats,find_unregistered_images}
                             specify a command to run
         stats               Compute summary statistics about a COCO dataset
         union               Combine multiple COCO datasets into a single merged dataset.
         split               Split a single COCO dataset into two sub-datasets.
         show                Visualize a COCO image using matplotlib or opencv, optionally writing
-        toydata             Create COCO toydata for demo and testing purposes.
-        eval                Evaluate and score predicted versus truth detections / classifications in a COCO dataset
+        toydata (demodata)  Create COCO toydata for demo and testing purposes.
+        eval (eval_detections)
+                            Evaluate and score predicted versus truth detections / classifications in a
         conform             Infer properties to make the COCO file conform to different specs.
         modify_categories   Rename or remove categories
         reroot              Reroot image paths onto a new image root.
+        move (mv)           Move a kwcoco file to a new location while maintaining relative paths.
         validate            Validates that a coco file satisfies expected properties.
         subset              Take a subset of this dataset and write it to a new file
         grab                Grab standard datasets.
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      --version             show version number and exit (default: False)
+        info (tables)       Print the first few rows from specified tables. Tries to avoid reading the
+        visual_stats (plot_stats)
+                            Inspect properties of dataset and write raw data tables and visual plots.
+        find_unregistered_images
+                            Find images in a kwcoco bundle that are not registered in a kwcoco file.
 
 
 This should help you inspect (via stats and show), combine (via union), and
