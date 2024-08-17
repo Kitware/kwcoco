@@ -84,102 +84,87 @@ class CocoEvalConfig(scfg.DataConfig):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
-    __default__ = {
-        'true_dataset': scfg.Value(None, type=str, help='coercable true detections', position=1),
-        'pred_dataset': scfg.Value(None, type=str, help='coercable predicted detections', position=2),
-
-        'ignore_classes': scfg.Value(
-            None, type=list, help='classes to ignore (give them zero weight)'),
-
-        'implicit_negative_classes': scfg.Value(['background']),
-
-        'implicit_ignore_classes': scfg.Value(['ignore']),
-
-        'fp_cutoff': scfg.Value(float('inf'), help='False positive cutoff for ROC'),
-
-        'iou_thresh': scfg.Value(
-            value=0.5,
-            help='One or more IoU overlap threshold for detection assignment',
-            alias=['ovthresh']
-        ),
-
-        'compat': scfg.Value(
-            value='mutex',
-            choices=['all', 'mutex', 'ancestors'],
-            help=ub.paragraph(
-                '''
-                Matching strategy for which true annots are allowed to match
-                which predicted annots.
-                `mutex` means true boxes can only match predictions where the
-                true class has highest probability (pycocotools setting).
-                `all` means any class can match any other class.
-                Dont use `ancestors`, it is broken.
-                ''')),
-
-        'monotonic_ppv': scfg.Value(True, help=ub.paragraph(
+    true_dataset = scfg.Value(None, type=str, position=1, help='coercable true detections')
+    pred_dataset = scfg.Value(None, type=str, position=2, help='coercable predicted detections')
+    ignore_classes = scfg.Value(None, type=list, help=ub.paragraph(
             '''
-            if True forces precision to be monotonic. Defaults to True for
-            compatibility with pycocotools, but that might not be the best
-            option.
-            ''')),
-
-        'ap_method': scfg.Value('pycocotools', help=ub.paragraph(
+            classes to ignore (give them zero weight)
+            '''))
+    implicit_negative_classes = scfg.Value(['background'], help=None)
+    implicit_ignore_classes = scfg.Value(['ignore'], help=None)
+    fp_cutoff = scfg.Value(float('inf'), help='False positive cutoff for ROC')
+    iou_thresh = scfg.Value(0.5, alias=['ovthresh'], help=ub.paragraph(
+            '''
+            One or more IoU overlap threshold for detection assignment
+            '''))
+    compat = scfg.Value('mutex', help=ub.paragraph(
+            '''
+            Matching strategy for which true annots are allowed to match
+            which predicted annots. `mutex` means true boxes can only
+            match predictions where the true class has highest
+            probability (pycocotools setting). `all` means any class can
+            match any other class. Dont use `ancestors`, it is broken.
+            '''), choices=['all', 'mutex', 'ancestors'])
+    monotonic_ppv = scfg.Value(True, help=ub.paragraph(
+            '''
+            if True forces precision to be monotonic. Defaults to True
+            for compatibility with pycocotools, but that might not be
+            the best option.
+            '''))
+    ap_method = scfg.Value('pycocotools', help=ub.paragraph(
             '''
             Method for computing AP. Defaults to a setting comparable to
             pycocotools. Can also be set to sklearn to use an alterative
             method.
-            ''')),
-
-        'use_area_attr': scfg.Value(
-            'try', help=ub.paragraph(
-                '''
-                if True (pycocotools setting) uses the area coco attribute to
-                filter area range instead of bbox area. Otherwise just filters
-                based on bbox area. If 'try' then it tries to use it but will
-                fallback if it does not exist.
-                ''')),
-
-        'area_range': scfg.Value(
-            value=['all'],
-            help=ub.paragraph(
-                '''
-                Minimum and maximum object areas to consider.  May specified as
-                a comma-separated code: '<min>-<max>'.  These ranges are
-                inclusive.  Also accepts scientific notation, inf, and special
-                keys all, small, medium, and large, which are equivalent to
-                small='0-1024', medium='1024-9216', large='9216-1e10', and
-                all='0-inf'. Note these are areas, e.g. 16x16 boxes are
-                considered small, but 17x16 boxes are medium. These can be
-                mixed an matched, e.g.: `--area_range=0-4e3,small,1024-inf`.
-                '''
-            )),
-
-        # TODO options:
-        'max_dets': scfg.Value(float('inf'), help=(
-            'maximum number of predictions to consider')),
-
-        'iou_bias': scfg.Value(1, help=(
-            'pycocotools setting is 1, but 0 may be better')),
-
-        # Extra options
-        'force_pycocoutils': scfg.Value(False, help=(
-            'ignore all other options and just use pycocoutils to score')),
-
-        # 'discard_classes': scfg.Value(None, type=list, help='classes to completely remove'),  # TODO
-
-        'assign_workers': scfg.Value(8, help='number of background workers for assignment'),
-
-        'load_workers': scfg.Value(0, help='number of workers to load cached detections'),
-
-        # 'ovthresh': scfg.Value(None, help='deprecated, alias for iou_thresh'),
-
-        'classes_of_interest': scfg.Value(
-            None, type=list,
-            help='if specified only these classes are given weight'),
-
-        'use_image_names': scfg.Value(
-            False, help='if True use image file_name to associate images instead of ids'),
-    }
+            '''))
+    use_area_attr = scfg.Value('try', help=ub.paragraph(
+            '''
+            if True (pycocotools setting) uses the area coco attribute
+            to filter area range instead of bbox area. Otherwise just
+            filters based on bbox area. If 'try' then it tries to use it
+            but will fallback if it does not exist.
+            '''))
+    area_range = scfg.Value(['all'], help=ub.paragraph(
+            '''
+            Minimum and maximum object areas to consider. May specified
+            as a comma-separated code: '<min>-<max>'. These ranges are
+            inclusive. Also accepts scientific notation, inf, and
+            special keys all, small, medium, and large, which are
+            equivalent to small='0-1024', medium='1024-9216',
+            large='9216-1e10', and all='0-inf'. Note these are areas,
+            e.g. 16x16 boxes are considered small, but 17x16 boxes are
+            medium. These can be mixed an matched, e.g.:
+            `--area_range=0-4e3,small,1024-inf`.
+            '''))
+    max_dets = scfg.Value(float('inf'), help=ub.paragraph(
+            '''
+            maximum number of predictions to consider
+            '''))
+    iou_bias = scfg.Value(1, help=ub.paragraph(
+            '''
+            pycocotools setting is 1, but 0 may be better
+            '''))
+    force_pycocoutils = scfg.Value(False, help=ub.paragraph(
+            '''
+            ignore all other options and just use pycocoutils to score
+            '''))
+    assign_workers = scfg.Value(8, help=ub.paragraph(
+            '''
+            number of background workers for assignment
+            '''))
+    load_workers = scfg.Value(0, help=ub.paragraph(
+            '''
+            number of workers to load cached detections
+            '''))
+    classes_of_interest = scfg.Value(None, type=list, help=ub.paragraph(
+            '''
+            if specified only these classes are given weight
+            '''))
+    use_image_names = scfg.Value(False, help=ub.paragraph(
+            '''
+            if True use image file_name to associate images instead of
+            ids
+            '''))
 
     def __post_init__(self):
         # if self['ovthresh'] is not None:
@@ -212,7 +197,7 @@ class CocoEvalConfig(scfg.DataConfig):
             self['area_range'] = parsed
 
 
-class CocoEvaluator(object):
+class CocoEvaluator:
     """
     Abstracts the evaluation process to execute on two coco datasets.
 

@@ -7,28 +7,25 @@ import scriptconfig as scfg
 import ubelt as ub
 
 
-class CocoEvalCLIConfig(coco_evaluator.CocoEvalConfig):
+class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     """
     Evaluate and score predicted versus truth detections / classifications in a
-    COCO dataset
+    COCO dataset.
+
+    SeeAlso:
+        python -m kwcoco.metrics.segmentation_metrics --help
     """
-    __default__ = {
-        # These should go into the CLI args, not the class config args
-        'expt_title': scfg.Value('', type=str, help='title for plots'),
-        'draw': scfg.Value(True, isflag=1, help='draw metric plots'),
-        'out_dpath': scfg.Value('./coco_metrics', type=str, help='where to dump results'),
-        'out_fpath': scfg.Value('auto', type=str, help=ub.paragraph(
-            '''
-            Where to dump the json file containing result.
-            If "auto", defaults to out_dpath / "metrics.json"
-            ''')),
-    }
+    __command__ = 'eval'
 
-
-class CocoEvalCLI:
-    name = 'eval'
-
-    CLIConfig = CocoEvalCLIConfig
+    # These should go into the CLI args, not the class config args
+    expt_title = scfg.Value('', type=str, help='title for plots')
+    draw = scfg.Value(True, isflag=1, help='draw metric plots')
+    out_dpath = scfg.Value('./coco_metrics', type=str, help='where to dump results')
+    out_fpath = scfg.Value('auto', type=str, help=ub.paragraph(
+        '''
+        Where to dump the json file containing result. If "auto",
+        defaults to out_dpath / "metrics.json"
+        '''))
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -63,6 +60,9 @@ class CocoEvalCLI:
         main(cmdline=cmdline, **kw)
 
 
+__cli__ = _CLI = CocoEvalCLI
+
+
 def main(cmdline=True, **kw):
     r"""
     TODO:
@@ -84,7 +84,7 @@ def main(cmdline=True, **kw):
     """
     import kwimage
     import kwarray
-    cli_config = CocoEvalCLIConfig.cli(cmdline=cmdline, default=kw)
+    cli_config = CocoEvalCLI.cli(cmdline=cmdline, data=kw)
     print('cli_config = {}'.format(ub.urepr(cli_config, nl=1)))
 
     eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__)
@@ -160,9 +160,6 @@ def main(cmdline=True, **kw):
             viz_dpath = (out_dpath / 'viz').ensuredir()
             fig_fpath = viz_dpath / 'eval-gid={}.jpg'.format(gid)
             kwimage.imwrite(fig_fpath, canvas)
-
-
-__cli__ = _CLI = CocoEvalCLI
 
 
 if __name__ == '__main__':
