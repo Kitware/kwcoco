@@ -59,10 +59,13 @@ class CocoVisualStats(scfg.DataConfig):
 
     @classmethod
     def main(cls, cmdline=1, **kwargs):
-        import rich
-        from rich.markup import escape
+        from kwcoco.util.util_rich import rich_print
+        try:
+            from rich.markup import escape
+        except ImportError:
+            from ubelt import identity as escape
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
-        rich.print('config = ' + escape(ub.urepr(config, nl=1)))
+        rich_print('config = ' + escape(ub.urepr(config, nl=1)))
         run(config)
 
 __cli__ = CocoVisualStats
@@ -80,8 +83,8 @@ def run(config):
         dst_fpath = ub.Path(config['dst_fpath'])
     dst_dpath.ensuredir()
 
-    import rich
-    rich.print(f'Destination Path: [link={dst_dpath}]{dst_dpath}[/link]')
+    from kwcoco.util.util_rich import rich_print
+    rich_print(f'Destination Path: [link={dst_dpath}]{dst_dpath}[/link]')
 
     if config.with_process_context:
         from kwutil.process_context import ProcessContext
@@ -99,7 +102,7 @@ def run(config):
     tables_fpath = dst_dpath / 'stats_tables.json'
 
     tables_data, nonsaved_data, dataframes = build_stats_data(config)
-    rich.print(f'Write {tables_fpath}')
+    rich_print(f'Write {tables_fpath}')
     with safer.open(tables_fpath, 'w', temp_file=not ub.WIN32) as fp:
         json.dump(tables_data, fp, indent='  ')
 
@@ -108,13 +111,13 @@ def run(config):
         perannot_data = dataframes['perannot_data']
         perannot_summary = json.loads(perannot_data.describe().to_json())
         perimage_summary = json.loads(perimage_data.describe().to_json())
-        rich.print('perannot_summary:')
-        rich.print(ub.urepr(perannot_summary, nl=-1, align=':', precision=2))
-        rich.print('perimage_summary:')
-        rich.print(ub.urepr(perimage_summary, nl=-1, align=':', precision=2))
+        rich_print('perannot_summary:')
+        rich_print(ub.urepr(perannot_summary, nl=-1, align=':', precision=2))
+        rich_print('perimage_summary:')
+        rich_print(ub.urepr(perimage_summary, nl=-1, align=':', precision=2))
 
     print('Preparing plots')
-    rich.print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
+    rich_print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
     plot_functions = _define_plot_functions(
         plots_dpath, tables_data, nonsaved_data, dpi=config.dpi)
 
@@ -130,13 +133,13 @@ def run(config):
             try:
                 func()
             except Exception as ex:
-                rich.print(f'[red] ERROR: in {func}')
-                rich.print(f'ex = {ub.urepr(ex, nl=1)}')
+                rich_print(f'[red] ERROR: in {func}')
+                rich_print(f'ex = {ub.urepr(ex, nl=1)}')
                 import traceback
                 traceback.print_exc()
                 if 0:
                     raise
-    rich.print(f'Finished writing plots to: [link={plots_dpath}]{plots_dpath}[/link]')
+    rich_print(f'Finished writing plots to: [link={plots_dpath}]{plots_dpath}[/link]')
 
     # Write manifest of all data written to disk
     summary_data = {}
@@ -154,7 +157,7 @@ def run(config):
     # summary_data['perimage_summary'] = perimage_summary
     # Write file to indicate the process has completed correctly
     # TODO: Use safer
-    rich.print(f'Write {dst_fpath}')
+    rich_print(f'Write {dst_fpath}')
     with safer.open(dst_fpath, 'w', temp_file=not ub.WIN32) as fp:
         json.dump(summary_data, fp, indent='    ')
 
