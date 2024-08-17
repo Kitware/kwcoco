@@ -4,11 +4,29 @@ CommandLine:
     xdoctest -m kwcoco.cli.coco_visual_stats __doc__
 
 Example:
+    >>> # Stats on a simple dataset
     >>> from kwcoco.cli.coco_visual_stats import *  # NOQA
     >>> from kwcoco.cli.coco_visual_stats import _define_plot_functions
     >>> import kwcoco
     >>> dpath = ub.Path.appdir('kwcoco/tests/vis_stats').ensuredir()
     >>> coco_fpath = kwcoco.CocoDataset.demo('vidshapes8').fpath
+    >>> cmdline = 0
+    >>> kwargs = dict(src=coco_fpath, dst_dpath=dpath)
+    >>> cls = CocoVisualStats
+    >>> cls.main(cmdline=cmdline, **kwargs)
+
+Example:
+    >>> # Stats on a more complex dataset
+    >>> from kwcoco.cli.coco_visual_stats import *  # NOQA
+    >>> from kwcoco.cli.coco_visual_stats import _define_plot_functions
+    >>> import kwcoco
+    >>> import kwarray.distributions
+    >>> import kwarray
+    >>> rng = kwarray.ensure_rng(0)
+    >>> dpath = ub.Path.appdir('kwcoco/tests/vis_stats2').ensuredir()
+    >>> dset = kwcoco.CocoDataset.demo('vidshapes8', image_size='random',
+    >>>                                timestamps=True, rng=rng)
+    >>> coco_fpath = dset.fpath
     >>> cmdline = 0
     >>> kwargs = dict(src=coco_fpath, dst_dpath=dpath)
     >>> cls = CocoVisualStats
@@ -192,11 +210,18 @@ def build_stats_data(config):
         'frac_images_with_eq0_anns': images_with_eq0_anns / len(images),
     }
     print(f'scalar_stats = {ub.urepr(scalar_stats, nl=1)}')
+
+    # Fixme, standardize timestamp field
+    datetime = [
+        a or b for a, b in zip(images.get('timestamp', None),
+                               images.get('datetime', None))
+    ]
+
     perimage_data = pd.DataFrame({
         'anns_per_image': anns_per_image,
         'width': image_widths,
         'height': image_heights,
-        'datetime': images.get('datetime', None),
+        'datetime': datetime,
     })
 
     try:
@@ -319,7 +344,7 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         figman.finalize('centroid_absolute_distribution.png')
 
     @register
-    def image_size_distribution():
+    def image_size_histogram():
         figman.figure(fnum=1, doclf=True).gca()
         img_dsizes = [f'{w}✕{h}' for w, h in zip(perimage_data['width'], perimage_data['height'])]
         perimage_data['img_dsizes'] = img_dsizes
@@ -330,7 +355,21 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         ax_bottom.set_xlabel('Image Width ✕ Height')
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_title('Image Size Histogram')
-        figman.finalize('image_size_distribution.png', fig=ax_top.figure)
+        figman.finalize('image_size_histogram.png', fig=ax_top.figure)
+
+    @register
+    def image_size_scatter():
+        ax = figman.figure(fnum=1, doclf=True).gca()
+        figman.figure(fnum=1, doclf=True).gca()
+        sns.scatterplot(data=perimage_data, x='width', y='height', ax=ax)
+        ax.set_title('Image Size Distribution')
+        # ax.set_aspect('equal')
+        ax.set_ylabel('Image Height')
+        ax.set_ylabel('Image Width')
+        # ax.set_xlim(0, ax.get_xlim()[1])
+        # ax.set_ylim(0, ax.get_ylim()[1])
+        figman.labels.relabel(ax)
+        figman.finalize('image_size_scatter.png')
 
     @register
     def obox_size_distribution():
@@ -468,15 +507,16 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         snskw = {}
         has_sunlight = 'sunlight' in img_df.columns
         if has_sunlight:
+            palette = sns.color_palette("flare", n_colors=4, as_cmap=True).reversed()
             snskw['hue'] = 'sunlight'
+            snskw['palette'] = palette
 
         ax = figman.figure(fnum=1, doclf=True).gca()
         # sns.histplot(data=img_df, x='month', ax=ax)
         # sns.kdeplot(data=img_df, x='day_of_year', y='hour_of_day')
         # sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight_values')
-        palette = sns.color_palette("flare", n_colors=4, as_cmap=True).reversed()
         sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day')
-        sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', **snskw, palette=palette, legend=False)
+        sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', **snskw, legend=False)
         # sns.kdeplot(data=img_df, x='hour_of_day', y='day_of_year')
         if has_sunlight:
             kwplot.phantom_legend({

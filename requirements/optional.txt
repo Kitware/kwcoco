@@ -8,7 +8,8 @@ kwplot>=0.5.0
 lark>=1.1.2
 lark_cython>=0.0.12
 
-seaborn>=0.9.0
+seaborn>=0.10.0    ;                            python_version >= '3.6'    # Python 3.6+
+seaborn>=0.9.1     ; python_version < '3.6' and python_version >= '2.7'    # Python 2.7
 
 matplotlib>=3.7.3     ; python_version < '4.0'  and python_version >= '3.12'    # Python 3.12+
 matplotlib>=3.6.2     ; python_version < '3.12' and python_version >= '3.11'    # Python 3.11+

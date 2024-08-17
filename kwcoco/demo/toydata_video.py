@@ -28,7 +28,8 @@ def random_video_dset(
         num_videos=1, num_frames=2, num_tracks=2, anchors=None,
         image_size=(600, 600), verbose=3, render=False, aux=None,
         multispectral=False, multisensor=False, rng=None, dpath=None,
-        max_speed=0.01, channels=None, background='noise', **kwargs):
+        max_speed=0.01, channels=None, background='noise',
+        timestamps=False, **kwargs):
     """
     Create a toy Coco Video Dataset
 
@@ -142,7 +143,8 @@ def random_video_dset(
             num_tracks=num_tracks, tid_start=tid_start, anchors=anchors,
             gid_start=gid_start, video_id=vidid, render=False, autobuild=False,
             aux=aux, multispectral=multispectral, multisensor=multisensor,
-            max_speed=max_speed, channels=channels, rng=rng, verbose=verbose)
+            timestamps=timestamps, max_speed=max_speed, channels=channels,
+            rng=rng, verbose=verbose)
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
             tid_start = dset.dataset['annotations'][-1]['track_id'] + 1
@@ -198,7 +200,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
                              video_id=1, anchors=None, rng=None, render=False,
                              dpath=None, autobuild=True, verbose=3, aux=None,
                              multispectral=False, max_speed=0.01,
-                             channels=None, multisensor=False, **kwargs):
+                             channels=None, multisensor=False, timestamps=False,
+                             **kwargs):
     """
     Create the video scene layout of object positions.
 
@@ -665,6 +668,9 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
                     kp_catname = kpt.pop('keypoint_category')
                     kpt['keypoint_category_id'] = kpt_cats.node_to_id[kp_catname]
 
+    if timestamps:
+        populate_random_timestamps(dset, timestamps=timestamps, rng=rng)
+
     # The dataset has been prepared, now we just render it and we have
     # a nice video dataset.
     renderkw = {
@@ -683,6 +689,43 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     if autobuild:
         dset._build_index()
     return dset
+
+
+def populate_random_timestamps(coco_dset, timestamps=True, rng=None):
+    """
+    Adds date_captured fields to demo toydata
+    """
+    from kwarray.distributions import Uniform
+    from kwutil import util_time
+    tskw = ub.udict({
+        'start_time': '1970-01-01',
+        'end_time': '2101-01-01',
+        'enabled': True,
+    })
+    if not isinstance(timestamps, dict):
+        timestamps = {}
+
+    if isinstance(timestamps, dict):
+        extra = timestamps - tskw
+        if extra:
+            raise ValueError(f'Unexepcted date kwargs: {extra}')
+        tskw.update(timestamps)
+
+    rng = kwarray.ensure_rng(rng)
+    min_time = util_time.datetime.coerce(tskw['start_time'])
+    max_time = util_time.datetime.coerce(tskw['end_time'])
+    time_distri = Uniform(min_time.timestamp(), max_time.timestamp(), rng=rng)
+
+    # Hack in other metadata
+    vidid_to_imgs = ub.group_items(
+        coco_dset.dataset['images'], key=lambda x: x['video_id'])
+
+    for vidid, imgs in vidid_to_imgs.items():
+        imgs = sorted(imgs, key=lambda g: g.get('frame_index', None))
+        new_times = sorted(time_distri.sample(len(imgs)))
+        for img, timestamp in zip(imgs, new_times):
+            ts = util_time.datetime.fromtimestamp(timestamp)
+            img['timestamp'] = ts.isoformat()
 
 
 def _draw_video_sequence(dset, gids):

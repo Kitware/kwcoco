@@ -1057,6 +1057,7 @@ class MixinCocoConstructors:
                 'num_videos': 1,
                 'num_frames': 2,
                 'num_tracks': 2,
+                'timestamps': False,
                 'anchors': None,
                 'image_size': (600, 600),
                 'aux': None,

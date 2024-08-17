@@ -23,6 +23,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * `CocoDataset.add_track` will now pick a name using a uuid if one is unspecified.
 * Added more metrics to outputs in coco eval
+* demodata can now be populated with random timestamps
 
 ### Fixed
 * CIFAR grabdata now respects dpath
