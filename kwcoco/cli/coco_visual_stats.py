@@ -234,17 +234,40 @@ def build_stats_data(config):
 
         annots = dset.annots()
         print('Building stats')
-        detections : kwimage.Detections = annots.detections
-        boxes : kwimage.Boxes = detections.boxes
-        polys : kwimage.PolygonList = detections.data['segmentations']
+        # detections : kwimage.Detections = annots.detections
+        # boxes : kwimage.Boxes = detections.boxes
+        # polys : kwimage.PolygonList = detections.data['segmentations']
+
+        alt_boxes = []
+        alt_polys = []
+        alt_geoms = []
+        for ann in ub.ProgIter(annots.objs):
+            box = kwimage.Box.coerce(ann['bbox'], 'xywh')
+            alt_boxes.append(box)
+            try:
+                poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
+                geom = poly.to_shapely()
+            except Exception:
+                # Fallback onto the box if the polygon broken
+                poly = box.to_polygon()
+                geom = poly.to_shapely()
+            alt_polys.append(poly)
+            alt_geoms.append(geom)
+
+        boxes = kwimage.Boxes.concatenate(alt_boxes)
+        polys = kwimage.PolygonList(alt_polys)
+
         box_width =  boxes.width.ravel()
         box_height = boxes.height.ravel()
 
         box_canvas_width = np.array(annots.images.get('width'))
         box_canvas_height = np.array(annots.images.get('height'))
 
+        # geoms = [p.to_shapely() for p in polys]
+        geoms = alt_geoms
+
         perannot_data = _DataFrame({
-            'geometry': [p.to_shapely() for p in polys],
+            'geometry': geoms,
             'annot_id': annots.ids,
             'image_id': annots.image_id,
             'box_rt_area': np.sqrt(boxes.area.ravel()),
