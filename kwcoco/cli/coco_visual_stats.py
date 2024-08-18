@@ -4,9 +4,9 @@ CommandLine:
     xdoctest -m kwcoco.cli.coco_visual_stats __doc__
 
 Example:
+    >>> # xdoctest: +REQUIRES(module:kwutil)
     >>> # Stats on a simple dataset
     >>> from kwcoco.cli.coco_visual_stats import *  # NOQA
-    >>> from kwcoco.cli.coco_visual_stats import _define_plot_functions
     >>> import kwcoco
     >>> dpath = ub.Path.appdir('kwcoco/tests/vis_stats').ensuredir()
     >>> coco_fpath = kwcoco.CocoDataset.demo('vidshapes8').fpath
@@ -16,9 +16,9 @@ Example:
     >>> cls.main(cmdline=cmdline, **kwargs)
 
 Example:
+    >>> # xdoctest: +REQUIRES(module:kwutil)
     >>> # Stats on a more complex dataset
     >>> from kwcoco.cli.coco_visual_stats import *  # NOQA
-    >>> from kwcoco.cli.coco_visual_stats import _define_plot_functions
     >>> import kwcoco
     >>> import kwarray.distributions
     >>> import kwarray
@@ -81,6 +81,7 @@ def run(config):
         dst_fpath = dst_dpath / 'stats.json'
     else:
         dst_fpath = ub.Path(config['dst_fpath'])
+    dst_dpath = dst_dpath.absolute()
     dst_dpath.ensuredir()
 
     from kwcoco.util.util_rich import rich_print
@@ -101,7 +102,7 @@ def run(config):
     plots_dpath = dst_dpath / 'annot_stat_plots'
     tables_fpath = dst_dpath / 'stats_tables.json'
 
-    tables_data, nonsaved_data, dataframes = build_stats_data(config)
+    scalar_stats, tables_data, nonsaved_data, dataframes = build_stats_data(config)
     rich_print(f'Write {tables_fpath}')
     with safer.open(tables_fpath, 'w', temp_file=not ub.WIN32) as fp:
         json.dump(tables_data, fp, indent='  ')
@@ -118,27 +119,27 @@ def run(config):
 
     print('Preparing plots')
     rich_print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
-    plot_functions = _define_plot_functions(
-        plots_dpath, tables_data, nonsaved_data, dpi=config.dpi)
+    plots = Plots(plots_dpath, tables_data, nonsaved_data, dpi=config.dpi)
 
-    pman = kwutil.util_progress.ProgressManager()
-    with pman:
-        plot_func_keys = list(plot_functions.keys())
-        # plot_func_keys = [
-        #     # 'images_over_time',
-        #     'images_timeofday_distribution',
-        # ]
-        for key in pman.ProgIter(plot_func_keys, desc='plot'):
-            func = plot_functions[key]
-            try:
-                func()
-            except Exception as ex:
-                rich_print(f'[red] ERROR: in {func}')
-                rich_print(f'ex = {ub.urepr(ex, nl=1)}')
-                import traceback
-                traceback.print_exc()
-                if 0:
-                    raise
+    with ub.Timer(label='Plotting') as plot_timer:
+        pman = kwutil.util_progress.ProgressManager()
+        with pman:
+            # plot_func_keys = [
+            #     # 'images_over_time',
+            #     'images_timeofday_distribution',
+            # ]
+            for key in pman.ProgIter(list(plots.plot_functions.keys()), desc='plot'):
+                func = plots.plot_functions[key]
+                try:
+                    func(plots)
+                except Exception as ex:
+                    rich_print(f'[red] ERROR: in {func}')
+                    rich_print(f'ex = {ub.urepr(ex, nl=1)}')
+                    import traceback
+                    traceback.print_exc()
+                    if 0:
+                        raise
+    scalar_stats['plottime_seconds'] = plot_timer.elapsed
     rich_print(f'Finished writing plots to: [link={plots_dpath}]{plots_dpath}[/link]')
 
     # Write manifest of all data written to disk
@@ -148,6 +149,7 @@ def run(config):
         obj = proc_context.stop()
         obj = kwutil.Json.ensure_serializable(obj)
         summary_data['info'] = [obj]
+    summary_data['scalar_stats'] = kwutil.Json.ensure_serializable(scalar_stats)
 
     print('Finalizing manifest')
     summary_data['src'] = str(config['src'])
@@ -165,7 +167,8 @@ def run(config):
 def geospatial_stats(dset, images, perimage_data):
     ESTIMATE_SUNLIGHT = 1
     if ESTIMATE_SUNLIGHT:
-        from shitspotter.util.util_gis import coco_estimate_sunlight
+        # from shitspotter.util.util_gis import coco_estimate_sunlight
+        from kwgis.util_sunlight import coco_estimate_sunlight
         try:
             sunlight_values = coco_estimate_sunlight(dset, image_ids=images)
             perimage_data['sunlight'] = sunlight_values
@@ -181,264 +184,302 @@ def build_stats_data(config):
     import pandas as pd
     import json
 
-    print('Loading kwcoco file')
-    dset = kwcoco.CocoDataset.coerce(config['src'])
+    with ub.Timer(label='Loading kwcoco file') as load_timer:
+        dset = kwcoco.CocoDataset.coerce(config['src'])
 
-    annots = dset.annots()
-    print('Building stats')
-    detections : kwimage.Detections = annots.detections
-    boxes : kwimage.Boxes = detections.boxes
-    polys : kwimage.PolygonList = detections.data['segmentations']
+    with ub.Timer(label='Building tables for stats') as stats_timer:
+        images = dset.images()
+        image_widths = images.get('width')
+        image_heights = images.get('height')
+        max_width = max(image_widths)  # NOQA
+        max_height = max(image_heights)  # NOQA
 
-    box_width =  boxes.width.ravel()
-    box_height = boxes.height.ravel()
+        anns_per_image = np.array(images.n_annots)
+        images_with_eq0_anns = (anns_per_image == 0).sum()
+        images_with_ge1_anns = (anns_per_image >= 1).sum()
+        scalar_stats = {
+            **dset.basic_stats(),
+            'images_with_eq0_anns': images_with_eq0_anns,
+            'images_with_ge1_anns': images_with_ge1_anns,
+            'frac_images_with_ge1_anns': images_with_ge1_anns / len(images),
+            'frac_images_with_eq0_anns': images_with_eq0_anns / len(images),
+        }
+        print(f'scalar_stats = {ub.urepr(scalar_stats, nl=1)}')
 
-    box_canvas_width = np.array(annots.images.get('width'))
-    box_canvas_height = np.array(annots.images.get('height'))
+        # Fixme, standardize timestamp field
+        datetime = [
+            a or b for a, b in zip(images.get('timestamp', None),
+                                   images.get('datetime', None))
+        ]
 
-    images = dset.images()
-    image_widths = images.get('width')
-    image_heights = images.get('height')
-    max_width = max(image_widths)  # NOQA
-    max_height = max(image_heights)  # NOQA
+        perimage_data = pd.DataFrame({
+            'anns_per_image': anns_per_image,
+            'width': image_widths,
+            'height': image_heights,
+            'datetime': datetime,
+        })
 
-    anns_per_image = np.array(images.n_annots)
-    images_with_eq0_anns = (anns_per_image == 0).sum()
-    images_with_ge1_anns = (anns_per_image >= 1).sum()
-    scalar_stats = {
-        **dset.basic_stats(),
-        'images_with_eq0_anns': images_with_eq0_anns,
-        'images_with_ge1_anns': images_with_ge1_anns,
-        'frac_images_with_ge1_anns': images_with_ge1_anns / len(images),
-        'frac_images_with_eq0_anns': images_with_eq0_anns / len(images),
-    }
-    print(f'scalar_stats = {ub.urepr(scalar_stats, nl=1)}')
+        try:
+            geospatial_stats(dset, images, perimage_data)
+        except Exception:
+            ...
+            # TODO: medical stats / other domain stats
 
-    # Fixme, standardize timestamp field
-    datetime = [
-        a or b for a, b in zip(images.get('timestamp', None),
-                               images.get('datetime', None))
-    ]
+        # try:
+        #     # We dont want to require geopandas
+        #     import geopandas as gpd
+        #     _DataFrame = gpd.GeoDataFrame
+        # except Exception:
+        _DataFrame = pd.DataFrame
 
-    perimage_data = pd.DataFrame({
-        'anns_per_image': anns_per_image,
-        'width': image_widths,
-        'height': image_heights,
-        'datetime': datetime,
-    })
+        annots = dset.annots()
+        print('Building stats')
+        detections : kwimage.Detections = annots.detections
+        boxes : kwimage.Boxes = detections.boxes
+        polys : kwimage.PolygonList = detections.data['segmentations']
+        box_width =  boxes.width.ravel()
+        box_height = boxes.height.ravel()
 
-    try:
-        geospatial_stats(dset, images, perimage_data)
-    except Exception:
-        ...
-        # TODO: medical stats / other domain stats
+        box_canvas_width = np.array(annots.images.get('width'))
+        box_canvas_height = np.array(annots.images.get('height'))
 
-    # try:
-    #     # We dont want to require geopandas
-    #     import geopandas as gpd
-    #     _DataFrame = gpd.GeoDataFrame
-    # except Exception:
-    _DataFrame = pd.DataFrame
+        perannot_data = _DataFrame({
+            'geometry': [p.to_shapely() for p in polys],
+            'annot_id': annots.ids,
+            'image_id': annots.image_id,
+            'box_rt_area': np.sqrt(boxes.area.ravel()),
+            'box_width': box_height,
+            'box_height': box_height,
+            'rel_box_width': box_width / box_canvas_width,
+            'rel_box_height': box_height / box_canvas_height,
+        })
+        perannot_data['num_vertices'] = perannot_data.geometry.apply(geometry_length)
+        perannot_data = polygon_shape_stats(perannot_data)
+        geometry = perannot_data['geometry']
+        perannot_data['centroid_x'] = geometry.apply(lambda s: s.centroid.x)
+        perannot_data['centroid_y'] = geometry.apply(lambda s: s.centroid.y)
+        perannot_data['rel_centroid_x'] = perannot_data['centroid_x'] / box_canvas_width
+        perannot_data['rel_centroid_y'] = perannot_data['centroid_y'] / box_canvas_height
 
-    perannot_data = _DataFrame({
-        'geometry': [p.to_shapely() for p in polys],
-        'annot_id': annots.ids,
-        'image_id': annots.image_id,
-        'box_rt_area': np.sqrt(boxes.area.ravel()),
-        'box_width': box_height,
-        'box_height': box_height,
-        'rel_box_width': box_width / box_canvas_width,
-        'rel_box_height': box_height / box_canvas_height,
-    })
-    perannot_data['num_vertices'] = perannot_data.geometry.apply(geometry_length)
-    perannot_data = polygon_shape_stats(perannot_data)
-    geometry = perannot_data['geometry']
-    perannot_data['centroid_x'] = geometry.apply(lambda s: s.centroid.x)
-    perannot_data['centroid_y'] = geometry.apply(lambda s: s.centroid.y)
-    perannot_data['rel_centroid_x'] = perannot_data['centroid_x'] / box_canvas_width
-    perannot_data['rel_centroid_y'] = perannot_data['centroid_y'] / box_canvas_height
+        _summary_data = ub.udict(perannot_data.to_dict()) - {'geometry'}
+        _summary_df = pd.DataFrame(_summary_data)
+        tables_data = {}
+        tables_data['perannot_data'] = json.loads(_summary_df.to_json(orient='table'))
+        tables_data['perimage_data'] = json.loads(perimage_data.to_json(orient='table'))
 
-    _summary_data = ub.udict(perannot_data.to_dict()) - {'geometry'}
-    _summary_df = pd.DataFrame(_summary_data)
-    tables_data = {}
-    tables_data['perannot_data'] = json.loads(_summary_df.to_json(orient='table'))
-    tables_data['perimage_data'] = json.loads(perimage_data.to_json(orient='table'))
+        # Data that we don't serialize, but some plots depend on.
+        nonsaved_data = {
+            'boxes': boxes,
+            'polys': polys,
+        }
 
-    # Data that we don't serialize, but some plots depend on.
-    nonsaved_data = {
-        'boxes': boxes,
-        'polys': polys,
-    }
+        dataframes = {
+            'perannot_data': perannot_data,
+            'perimage_data': perimage_data,
+        }
 
-    dataframes = {
-        'perannot_data': perannot_data,
-        'perimage_data': perimage_data,
-    }
-
+    scalar_stats['kwcoco_loadtime_seconds'] = load_timer.elapsed
+    scalar_stats['table_buildtime_seconds'] = stats_timer.elapsed
     # if 0:
     #     import io
     #     import pandas as pd
     #     perimage_data = pd.read_json(io.StringIO(json.dumps(tables_data['perimage_data'])), orient='table')
     #     perannot_data = pd.read_json(io.StringIO(json.dumps(tables_data['perannot_data'])), orient='table')
-    return tables_data, nonsaved_data, dataframes
+    return scalar_stats, tables_data, nonsaved_data, dataframes
 
 
-@profile
-def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
+class Plots:
     """
-    Defines plot functions as closures, to make it easier to share common
+    Defines plot functions as a class, to make it easier to share common
     data and write the functions in a more concise manner. This also
     makes it easier to enable / disable plots.
-
-    Unfortunately we do lose some static analysis due to use of closures.
     """
-    import kwplot
-    import pandas as pd
-    import json
-    sns = kwplot.autosns(verbose=3)
 
-    polys = nonsaved_data['polys']
-    boxes = nonsaved_data['boxes']
+    _plot_function_registery = {}
 
-    perannot_data = pd.read_json(json.dumps(tables_data['perannot_data']), orient='table')
-    perimage_data = pd.read_json(json.dumps(tables_data['perimage_data']), orient='table')
+    @profile
+    def __init__(self, plots_dpath, tables_data, nonsaved_data, dpi=300):
+        self.plots_dpath = plots_dpath
+        self.tables_data = tables_data
+        self.nonsaved_data = nonsaved_data
+        self.dpi = dpi
 
-    plot_functions = {}
-    def register(func):
+        import kwplot
+        import pandas as pd
+        import json
+        sns = kwplot.autosns(verbose=3)
+
+        self.polys = nonsaved_data['polys']
+        boxes = nonsaved_data['boxes']
+
+        self.perannot_data = pd.read_json(json.dumps(tables_data['perannot_data']), orient='table')
+        self.perimage_data = pd.read_json(json.dumps(tables_data['perimage_data']), orient='table')
+
+        self.plot_functions = {}
+
+        self.annot_max_x = boxes.br_x.max()
+        self.annot_max_y = boxes.br_y.max()
+        self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
+
+        figman = kwplot.FigureManager(
+            dpath=plots_dpath,
+            dpi=dpi,
+            verbose=1
+        )
+        # define label mappings for humans
+        figman.labels.add_mapping({
+            'num_vertices': 'Num Polygon Vertices',
+            'centroid_x': 'Polygon Centroid X',
+            'centroid_y': 'Polygon Centroid Y',
+            'obox_major': 'OBox Major Axes Length',
+            'obox_minor': 'OBox Minor Axes Length',
+            'rt_area': 'Polygon sqrt(Area)'
+        })
+        self.figman = figman
+        self.sns = sns
+        self.perimage_data = self.perimage_data
+
+        import inspect
+        unbound_methods = inspect.getmembers(BuiltinPlots, predicate=inspect.isfunction)
+        for name, func in unbound_methods:
+            self.register(func)
+
+    def register(self, func):
         key = func.__name__
-        if key in plot_functions:
+        if key in self.plot_functions:
             raise AssertionError('duplicate plot name')
-        plot_functions[key] = func
+        self.plot_functions[key] = func
 
-    annot_max_x = boxes.br_x.max()
-    annot_max_y = boxes.br_y.max()
+    def run(self, plot_keys):
+        from kwcoco.util.util_rich import rich_print
+        import kwutil
+        pman = kwutil.util_progress.ProgressManager()
+        with pman:
+            # plot_func_keys = [
+            #     # 'images_over_time',
+            #     'images_timeofday_distribution',
+            # ]
+            if plot_keys is None:
+                plot_keys = list(self.plot_functions.keys())
+            for key in pman.ProgIter(plot_keys, desc='plot'):
+                func = self.plot_functions[key]
+                try:
+                    func(self)
+                except Exception as ex:
+                    rich_print(f'[red] ERROR: in {func}')
+                    rich_print(f'ex = {ub.urepr(ex, nl=1)}')
+                    import traceback
+                    traceback.print_exc()
+                    if 0:
+                        raise
 
-    max_anns_per_image = perimage_data['anns_per_image'].max()
 
-    figman = kwplot.FigureManager(
-        dpath=plots_dpath,
-        dpi=dpi,
-        verbose=1
-    )
-    # define label mappings for humans
-    figman.labels.add_mapping({
-        'num_vertices': 'Num Polygon Vertices',
-        'centroid_x': 'Polygon Centroid X',
-        'centroid_y': 'Polygon Centroid Y',
-        'obox_major': 'OBox Major Axes Length',
-        'obox_minor': 'OBox Minor Axes Length',
-        'rt_area': 'Polygon sqrt(Area)'
-    })
+class BuiltinPlots:
+    """
+    A class that ONLY contains methods that will produce a plot.
+    This is used to regeister them with :class:`Plots`.
+    """
 
-    @register
-    def polygon_centroid_distribution():
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        sns.kdeplot(data=perannot_data, x='centroid_x', y='centroid_y', ax=ax)
-        sns.scatterplot(data=perannot_data, x='centroid_x', y='centroid_y', ax=ax, hue='rt_area', alpha=0.8)
+    def polygon_centroid_distribution(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.kdeplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax)
+        self.sns.scatterplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax, hue='rt_area', alpha=0.8)
         ax.set_aspect('equal')
         ax.set_title('Polygon Absolute Centroid Positions')
         #ax.set_xlim(0, max_width)
         #ax.set_ylim(0, max_height)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
-        figman.labels.relabel(ax)
+        self.figman.labels.relabel(ax)
         ax.set_aspect('equal')
         ax.invert_yaxis()
-        figman.finalize('centroid_absolute_distribution.png')
+        self.figman.finalize('centroid_absolute_distribution.png')
 
-    @register
-    def image_size_histogram():
-        figman.figure(fnum=1, doclf=True).gca()
-        img_dsizes = [f'{w}✕{h}' for w, h in zip(perimage_data['width'], perimage_data['height'])]
-        perimage_data['img_dsizes'] = img_dsizes
-        # sns.histplot(data=perimage_data, x='img_dsizes', ax=ax)
-        data = perimage_data
+    def image_size_histogram(self):
+        self.figman.figure(fnum=1, doclf=True).gca()
+        img_dsizes = [f'{w}✕{h}' for w, h in zip(self.perimage_data['width'], self.perimage_data['height'])]
+        self.perimage_data['img_dsizes'] = img_dsizes
+        # self.sns.histplot(data=perimage_data, x='img_dsizes', ax=ax)
+        data = self.perimage_data
         x = 'img_dsizes'
         ax_top, ax_bottom, split_point = _split_histplot(data=data, x=x)
         ax_bottom.set_xlabel('Image Width ✕ Height')
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_title('Image Size Histogram')
-        figman.finalize('image_size_histogram.png', fig=ax_top.figure)
+        self.figman.finalize('image_size_histogram.png', fig=ax_top.figure)
 
-    @register
-    def image_size_scatter():
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        figman.figure(fnum=1, doclf=True).gca()
-        sns.scatterplot(data=perimage_data, x='width', y='height', ax=ax)
+    def image_size_scatter(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.scatterplot(data=self.perimage_data, x='width', y='height', ax=ax)
         ax.set_title('Image Size Distribution')
         # ax.set_aspect('equal')
         ax.set_ylabel('Image Height')
         ax.set_ylabel('Image Width')
         # ax.set_xlim(0, ax.get_xlim()[1])
         # ax.set_ylim(0, ax.get_ylim()[1])
-        figman.labels.relabel(ax)
-        figman.finalize('image_size_scatter.png')
+        self.figman.labels.relabel(ax)
+        self.figman.finalize('image_size_scatter.png')
 
-    @register
-    def obox_size_distribution():
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        sns.kdeplot(data=perannot_data, x='obox_major', y='obox_minor', ax=ax)
-        sns.scatterplot(data=perannot_data, x='obox_major', y='obox_minor', ax=ax)
+    def obox_size_distribution(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
+        self.sns.scatterplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
         #ax.set_xscale('log')
         #ax.set_yscale('log')
         ax.set_title('Oriented Bounding Box Sizes')
         ax.set_aspect('equal')
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
-        figman.labels.relabel(ax)
-        figman.finalize('obox_size_distribution.png')
+        self.figman.labels.relabel(ax)
+        self.figman.finalize('obox_size_distribution.png')
 
-    @register
-    def polygon_area_vs_num_verts():
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        sns.kdeplot(data=perannot_data, x='rt_area', y='num_vertices', ax=ax)
-        sns.scatterplot(data=perannot_data, x='rt_area', y='num_vertices', ax=ax)
-        figman.labels.relabel(ax)
+    def polygon_area_vs_num_verts(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.kdeplot(data=self.perannot_data, x='rt_area', y='num_vertices', ax=ax)
+        self.sns.scatterplot(data=self.perannot_data, x='rt_area', y='num_vertices', ax=ax)
+        self.figman.labels.relabel(ax)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
         ax.set_title('Polygon Area vs Num Vertices')
-        figman.finalize('polygon_area_vs_num_verts.png')
+        self.figman.finalize('polygon_area_vs_num_verts.png')
 
-    @register
-    def polygon_area_histogram():
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        sns.histplot(data=perannot_data, x='rt_area', ax=ax, kde=True)
-        figman.labels.relabel(ax)
+    def polygon_area_histogram(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True)
+        self.figman.labels.relabel(ax)
         ax.set_title('Polygon sqrt(Area) Histogram')
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylabel('Number of Annotations')
         ax.set_yscale('symlog')
-        figman.finalize('polygon_area_histogram.png')
+        self.figman.finalize('polygon_area_histogram.png')
 
-    @register
-    def polygon_num_vertices_histogram():
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        sns.histplot(data=perannot_data, x='num_vertices', ax=ax)
+    def polygon_num_vertices_histogram(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.histplot(data=self.perannot_data, x='num_vertices', ax=ax)
         ax.set_title('Polygon Number of Vertices Histogram')
         ax.set_ylabel('Number of Annotations')
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_yscale('linear')
-        figman.labels.relabel(ax)
-        figman.finalize('polygon_num_vertices_histogram.png')
+        self.figman.labels.relabel(ax)
+        self.figman.finalize('polygon_num_vertices_histogram.png')
 
-    @register
-    def anns_per_image_histogram():
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        sns.histplot(data=perimage_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True)
+    def anns_per_image_histogram(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.histplot(data=self.perimage_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True)
         ax.set_yscale('linear')
         ax.set_xlabel('Number of Annotations')
         ax.set_ylabel('Number of Images')
         ax.set_title('Number of Annotations per Image')
-        ax.set_xlim(0 - 0.5, max_anns_per_image + 1.5)
-        figman.labels.relabel(ax)
+        ax.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
+        self.figman.labels.relabel(ax)
         # ax.set_yscale('symlog', linthresh=10)
-        figman.labels.force_integer_xticks()
-        figman.finalize('anns_per_image_histogram.png')
+        self.figman.labels.force_integer_xticks()
+        self.figman.finalize('anns_per_image_histogram.png')
 
-    @register
-    def anns_per_image_histogram_splity():
+    def anns_per_image_histogram_splity(self):
         split_point = 'auto'
-        ax_top, ax_bottom, split_point = _split_histplot(perimage_data, 'anns_per_image', split_point)
+        ax_top, ax_bottom, split_point = _split_histplot(self.perimage_data, 'anns_per_image', split_point)
         ax = ax_top
         fig = ax.figure
 
@@ -447,55 +488,54 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_ylabel('')
         ax_top.set_title('Number of Annotations per Image')
-        ax_bottom.set_xlim(0 - 0.5, max_anns_per_image + 1.5)
+        ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
 
         ax_top.set_ylim(bottom=split_point)   # those limits are fake
         ax_bottom.set_ylim(0, split_point)
 
-        # figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
-        figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)
-        figman.finalize('anns_per_image_histogram_splity.png', fig=fig)
+        # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
+        self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)
+        self.figman.finalize('anns_per_image_histogram_splity.png', fig=fig)
 
-    @register
-    def anns_per_image_histogram_ge1():
-        ax = figman.figure(fnum=1, doclf=True).gca()
+    def anns_per_image_histogram_ge1(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        perimage_data = self.perimage_data
         perimage_ge1_data = perimage_data[perimage_data['anns_per_image'] >= 1]
-        sns.histplot(data=perimage_ge1_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True)
+        self.sns.histplot(data=perimage_ge1_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True)
         ax.set_yscale('linear')
         ax.set_xlabel('Number of Annotations')
         ax.set_ylabel('Number of Images')
         ax.set_title('Number of Annotations per Image\n(with at least 1 annotation)')
-        figman.labels.relabel(ax)
-        ax.set_xlim(1 - 0.5, max_anns_per_image + 0.5)
-        # figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax)
-        figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax, hack_labels=0)
+        self.figman.labels.relabel(ax)
+        ax.set_xlim(1 - 0.5, self.max_anns_per_image + 0.5)
+        # self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax)
+        self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax, hack_labels=0)
         # ax.set_xticks(ax.get_xticks().astype(int))
 
         # ax.set_yscale('symlog', linthresh=10)
-        figman.finalize('anns_per_image_histogram_ge1.png')
+        self.figman.finalize('anns_per_image_histogram_ge1.png')
 
-    @register
-    def images_over_time():
+    def images_over_time(self):
         import pandas as pd
         import numpy as np
-        img_df = perimage_data.sort_values('datetime')
+        img_df = self.perimage_data.sort_values('datetime')
         img_df['pd_datetime'] = pd.to_datetime(img_df.datetime)
         img_df['collection_size'] = np.arange(1, len(img_df) + 1)
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        sns.histplot(data=img_df, x='pd_datetime', ax=ax, cumulative=True)
-        sns.lineplot(data=img_df, x='pd_datetime', y='collection_size')
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.histplot(data=img_df, x='pd_datetime', ax=ax, cumulative=True)
+        self.sns.lineplot(data=img_df, x='pd_datetime', y='collection_size')
         ax.set_title('Images collected over time')
         ax.set_xlabel('Datetime')
         ax.set_ylabel('Number of Images Collected')
-        figman.finalize('images_over_time.png')
+        self.figman.finalize('images_over_time.png')
 
-    @register
-    def images_timeofday_distribution():
+    def images_timeofday_distribution(self):
         import pandas as pd
         import numpy as np
         import kwutil
         import kwimage
-        img_df = perimage_data.sort_values('datetime')
+        import kwplot
+        img_df = self.perimage_data.sort_values('datetime')
         img_df['pd_datetime'] = pd.to_datetime(img_df.datetime)
         img_df['collection_size'] = np.arange(1, len(img_df) + 1)
         datetimes = [kwutil.datetime.coerce(x) for x in img_df['datetime']]
@@ -507,20 +547,20 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         img_df['day_of_year'] = [x.timetuple().tm_yday if not pd.isnull(x) else None for x in datetimes]
         img_df['hour_of_day'] = [None if z is None else z.hour + z.minute / 60 + z.second / 3600 for z in img_df['time']]
 
-        snskw = {}
+        self.snskw = {}
         has_sunlight = 'sunlight' in img_df.columns
         if has_sunlight:
-            palette = sns.color_palette("flare", n_colors=4, as_cmap=True).reversed()
-            snskw['hue'] = 'sunlight'
-            snskw['palette'] = palette
+            palette = self.sns.color_palette("flare", n_colors=4, as_cmap=True).reversed()
+            self.snskw['hue'] = 'sunlight'
+            self.snskw['palette'] = palette
 
-        ax = figman.figure(fnum=1, doclf=True).gca()
-        # sns.histplot(data=img_df, x='month', ax=ax)
-        # sns.kdeplot(data=img_df, x='day_of_year', y='hour_of_day')
-        # sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight_values')
-        sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day')
-        sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', **snskw, legend=False)
-        # sns.kdeplot(data=img_df, x='hour_of_day', y='day_of_year')
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        # self.sns.histplot(data=img_df, x='month', ax=ax)
+        # self.sns.kdeplot(data=img_df, x='day_of_year', y='hour_of_day')
+        # self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight_values')
+        self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day')
+        self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', **self.snskw, legend=False)
+        # self.sns.kdeplot(data=img_df, x='hour_of_day', y='day_of_year')
         if has_sunlight:
             kwplot.phantom_legend({
                 'Night': kwimage.Color.coerce(palette.colors[0]).as255(),
@@ -530,30 +570,27 @@ def _define_plot_functions(plots_dpath, tables_data, nonsaved_data, dpi=300):
         ax.set_title('Time Captured')
         ax.set_xlabel('Day of Year')
         ax.set_ylabel('Hour of Day')
-        figman.finalize('images_timeofday_distribution.png')
+        self.figman.finalize('images_timeofday_distribution.png')
 
-    @register
-    def all_polygons():
-        ax = figman.figure(fnum=1, doclf=True).gca()
+    def all_polygons(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
         edgecolor = 'black'
         facecolor = 'baby shit brown'  # its a real color!
         #edgecolor = 'darkblue'
         #facecolor = 'lawngreen'
         #edgecolor = kwimage.Color.coerce('kitware_darkblue').as01()
         #facecolor = kwimage.Color.coerce('kitware_green').as01()
-        polys.draw(alpha=0.5, edgecolor=edgecolor, facecolor=facecolor)
+        self.polys.draw(alpha=0.5, edgecolor=edgecolor, facecolor=facecolor)
         ax.set_xlabel('Image X Coordinate')
         ax.set_ylabel('Image Y Coordinate')
-        ax.set_title(f'All {len(polys)} Polygons')
+        ax.set_title(f'All {len(self.polys)} Polygons')
         ax.set_aspect('equal')
-        ax.set_xlim(0, annot_max_x)
-        ax.set_ylim(0, annot_max_y)
-        figman.labels.relabel(ax)
-        ax.set_ylim(0, annot_max_y)  # not sure why this needs to be after the relabel, should ideally fix that.
+        ax.set_xlim(0, self.annot_max_x)
+        ax.set_ylim(0, self.annot_max_y)
+        self.figman.labels.relabel(ax)
+        ax.set_ylim(0, self.annot_max_y)  # not sure why this needs to be after the relabel, should ideally fix that.
         ax.invert_yaxis()
-        figman.finalize('all_polygons.png', tight_layout=0)  # tight layout seems to cause issues here
-
-    return plot_functions
+        self.figman.finalize('all_polygons.png', tight_layout=0)  # tight layout seems to cause issues here
 
 
 def _split_histplot(data, x, split_point='auto'):

@@ -1,3 +1,6 @@
+"""
+Deprecated: use kwutil.Json instead
+"""
 import copy
 import numpy as np
 import ubelt as ub

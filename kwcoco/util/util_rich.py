@@ -1,7 +1,13 @@
-import functools
+"""
+Deprecated: use the one in kwutil instead
+"""
+try:
+    from functools import cache
+except ImportError:
+    from ubelt import memoize as cache
 
 
-@functools.cache
+@cache
 def _get_rich_print():
     try:
         import rich
