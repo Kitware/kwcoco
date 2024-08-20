@@ -241,16 +241,21 @@ def build_stats_data(config):
         alt_boxes = []
         alt_polys = []
         alt_geoms = []
-        for ann in ub.ProgIter(annots.objs):
+        for ann in ub.ProgIter(annots.objs, desc='gather annotation polygons'):
             box = kwimage.Box.coerce(ann['bbox'], 'xywh')
             alt_boxes.append(box)
             try:
                 poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
                 geom = poly.to_shapely()
             except Exception:
-                # Fallback onto the box if the polygon broken
-                poly = box.to_polygon()
+                # Masks with linestrings can get misinterpreted, but we can fix
+                # them by considering pixels as areas isntead of points
+                mask = kwimage.Mask.coerce(ann['segmentation'])
+                poly = mask.to_multi_polygon(pixels_are='areas')
                 geom = poly.to_shapely()
+                # # Fallback onto the box if the polygon broken
+                # poly = box.to_polygon()
+                # geom = poly.to_shapely()
             alt_polys.append(poly)
             alt_geoms.append(geom)
 
@@ -277,7 +282,12 @@ def build_stats_data(config):
             'rel_box_height': box_height / box_canvas_height,
         })
         perannot_data['num_vertices'] = perannot_data.geometry.apply(geometry_length)
-        perannot_data = polygon_shape_stats(perannot_data)
+
+        try:
+            perannot_data = polygon_shape_stats(perannot_data)
+        except Exception as ex:
+            print(f'ERROR: ex={ex}')
+
         geometry = perannot_data['geometry']
         perannot_data['centroid_x'] = geometry.apply(lambda s: s.centroid.x)
         perannot_data['centroid_y'] = geometry.apply(lambda s: s.centroid.y)
@@ -403,7 +413,7 @@ class BuiltinPlots:
     This is used to regeister them with :class:`Plots`.
     """
 
-    def polygon_centroid_distribution(self):
+    def polygon_centroid_absolute_distribution(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax)
         self.sns.scatterplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax, hue='rt_area', alpha=0.8)
@@ -416,7 +426,24 @@ class BuiltinPlots:
         self.figman.labels.relabel(ax)
         ax.set_aspect('equal')
         ax.invert_yaxis()
-        self.figman.finalize('centroid_absolute_distribution.png')
+        self.figman.finalize('polygon_centroid_absolute_distribution.png')
+
+    def polygon_centroid_relative_distribution(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.kdeplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax)
+        self.sns.scatterplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax, hue='rt_area', alpha=0.8)
+        ax.set_aspect('equal')
+        ax.set_title('Polygon Relative Centroid Positions')
+        #ax.set_xlim(0, max_width)
+        #ax.set_ylim(0, max_height)
+        ax.set_xlim(0, ax.get_xlim()[1])
+        ax.set_ylim(0, ax.get_ylim()[1])
+        ax.set_xlabel('Polygon X Centroid')
+        ax.set_ylabel('Polygon Y Centroid')
+        self.figman.labels.relabel(ax)
+        ax.set_aspect('equal')
+        ax.invert_yaxis()
+        self.figman.finalize('polygon_centroid_relative_distribution.png')
 
     def image_size_histogram(self):
         self.figman.figure(fnum=1, doclf=True).gca()
@@ -433,7 +460,7 @@ class BuiltinPlots:
 
     def image_size_scatter(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)
         self.sns.scatterplot(data=self.perimage_data, x='width', y='height', ax=ax)
         ax.set_title('Image Size Distribution')
         # ax.set_aspect('equal')
