@@ -11,10 +11,11 @@ TODO:
 
 
 class CocoFixup(scfg.DataConfig):
+    __name__ = 'fixup'
 
     src = scfg.Value(None, position=1, help='path to input dataset')
 
-    dst = scfg.Value(None, position=1, help='path to output dataset')
+    dst = scfg.Value(None, position=2, help='path to output dataset')
 
     missing_assets = scfg.Value(False, help='if True remove missing assets')
 
