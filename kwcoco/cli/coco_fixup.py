@@ -11,15 +11,15 @@ TODO:
 
 
 class CocoFixup(scfg.DataConfig):
-    __name__ = 'fixup'
+    __command__ = 'fixup'
 
     src = scfg.Value(None, position=1, help='path to input dataset')
 
     dst = scfg.Value(None, position=2, help='path to output dataset')
 
-    missing_assets = scfg.Value(False, help='if True remove missing assets')
+    missing_assets = scfg.Value(True, help='if True remove missing assets')
 
-    corrupted_assets = scfg.Value(False, help='if True remove corrupted assets')
+    corrupted_assets = scfg.Value(True, help='if True remove corrupted assets')
 
     inplace = scfg.Value(False, isflag=True, help=(
         'if True and dst is unspecified then the output will overwrite the input'))
@@ -30,12 +30,29 @@ class CocoFixup(scfg.DataConfig):
     def main(cls, cmdline=1, **kwargs):
         """
         Example:
-            >>> # xdoctest: +SKIP
             >>> from kwcoco.cli.coco_fixup import *  # NOQA
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/coco_fixup')
+            >>> dpath.delete().ensuredir()
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes2', image_size=(64, 64), rng=0, dpath=dpath)
+            >>> fpath1 = dset.coco_image(1).primary_image_filepath()
+            >>> fpath2 = dset.coco_image(2).primary_image_filepath()
+            >>> fpath1.delete()  # remove an asset
+            >>> fpath2.write_bytes(fpath2.read_bytes()[0::2])  # corrupt an asset
+            >>> src = ub.Path(dset.fpath)
             >>> cmdline = 0
-            >>> kwargs = dict()
-            >>> cls = CocoFixupCLI
+            >>> cls = CocoFixup
+            >>> dst = src.augment(prefix='fixed-')
+            >>> kwargs = dict(
+            >>>     src=src,
+            >>>     dst=dst,
+            >>>     missing_assets=True,
+            >>>     corrupted_assets=True,
+            >>> )
             >>> cls.main(cmdline=cmdline, **kwargs)
+            >>> assert dst.exists()
+            >>> dst_dset = kwcoco.CocoDataset(dst)
         """
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
 
@@ -55,9 +72,72 @@ class CocoFixup(scfg.DataConfig):
             else:
                 raise ValueError('must specify dst: {}'.format(config['dst']))
 
-        # remove_missing_assets(dset)
+        print('reading fpath = {!r}'.format(config['src']))
+        import kwcoco
+        dset = kwcoco.CocoDataset.coerce(config['src'])
+        dst_fpath = ub.Path(config['dst'])
+
+        workers = config.workers
+        check_aux = True
+
+        if config.missing_assets:
+            remove_missing_assets(dset)
+
+        if config.corrupted_assets:
+            find_and_remove_corrupted_assets(dset, check_aux, workers)
+
+        remove_empty_videos(dset)
+
         # corrupted = dset.corrupted_images(check_aux=True, verbose=verbose,
         #                                   workers=config.get('workers', 0))
+        dset.fpath = dst_fpath
+        print(f'Write dset.fpath={dset.fpath}')
+        dset.dump()
+
+
+def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0):
+    from kwcoco._helpers import _image_corruption_check
+
+    jobs = ub.JobPool(mode='process', max_workers=workers)
+
+    bundle_dpath = ub.Path(dset.bundle_dpath)
+
+    img_enum = enumerate(dset.dataset['images'])
+    for img_idx, img in ub.ProgIter(img_enum,
+                                    total=len(dset.dataset['images']),
+                                    desc='submit corruption checks',
+                                    verbose=1):
+        gid = img.get('id', None)
+        fname = img.get('file_name', None)
+        if fname is not None:
+            gpath = bundle_dpath / fname
+            job = jobs.submit(_image_corruption_check, gpath)
+            job.input_info = (img_idx, gpath, gid)
+
+        if check_aux:
+            for asset_idx, aux in img.get('auxiliary', []):
+                gpath = bundle_dpath / aux['file_name']
+                job = jobs.submit(_image_corruption_check, gpath)
+                job.input_info = (img_idx, gpath, gid, 'auxiliary', asset_idx)
+            for asset_idx, aux in enumerate(img.get('assets', [])):
+                gpath = bundle_dpath / aux['file_name']
+                job = jobs.submit(_image_corruption_check, gpath)
+                job.input_info = (img_idx, gpath, gid, 'assets', asset_idx)
+
+    corrupted_info = []
+    for job in jobs.as_completed(desc='check corrupted images',
+                                 progkw={'verbose': 1}):
+        info = job.result()
+        if info['failed']:
+            corrupted_info.append(job.input_info)
+
+    gid_to_missing = ub.group_items(corrupted_info, key=lambda t: t[2])
+    empty_gids = []
+    for gid, missing in ub.ProgIter(gid_to_missing.items(), desc='removing corrupted'):
+        coco_img = dset.coco_image(gid)
+        remove_main = coco_img_remove_empty_assets(coco_img, missing)
+        if remove_main or coco_img.n_assets == 0:
+            empty_gids.append(gid)
 
 
 def coco_img_remove_empty_assets(coco_img, missing):
@@ -88,9 +168,7 @@ def coco_img_remove_empty_assets(coco_img, missing):
             to_remove_assets.append(idx)
 
     if remove_main:
-        remove_main['file_name'] = None
-        remove_main['channels'] = None
-        raise NotImplementedError
+        img['file_name'] = None
 
     auxiliary = img.get('auxiliary', [])
     for idx in sorted(to_remove_auxiliary)[::-1]:
@@ -99,6 +177,15 @@ def coco_img_remove_empty_assets(coco_img, missing):
     assets = img.get('assets', [])
     for idx in sorted(to_remove_assets)[::-1]:
         del assets[idx]
+
+    return remove_main
+
+
+def remove_empty_videos(dset):
+    videos = dset.videos()
+    empty_vidids = [v for v, gids in zip(videos, videos.images) if len(gids) == 0]
+    if empty_vidids:
+        dset.remove_videos(empty_vidids, verbose=3)
 
 
 def remove_missing_assets(dset):
@@ -111,18 +198,13 @@ def remove_missing_assets(dset):
     empty_gids = []
     for gid, missing in ub.ProgIter(gid_to_missing.items(), desc='removing missing'):
         coco_img = dset.coco_image(gid)
-        coco_img_remove_empty_assets(coco_img, missing)
-        if coco_img.n_assets == 0:
+        remove_main = coco_img_remove_empty_assets(coco_img, missing)
+        if remove_main or coco_img.n_assets == 0:
             empty_gids.append(gid)
 
     if empty_gids:
         print(f'Found {len(empty_gids)} images without assets, removing')
         dset.remove_images(empty_gids, verbose=3)
-
-    videos = dset.videos()
-    empty_vidids = [v for v, gids in zip(videos, videos.images) if len(gids) == 0]
-    if empty_vidids:
-        dset.remove_videos(empty_gids, verbose=3)
 
 
 __cli__ = CocoFixup
