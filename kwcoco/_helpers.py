@@ -210,6 +210,9 @@ def _load_and_postprocess(data, loader, postprocess, **loadkw):
 
 
 def _image_corruption_check(fpath, only_shape=False):
+    """
+    Helper that checks if an image is readable or not
+    """
     import kwimage
     from os.path import exists
     info = {'fpath': fpath}

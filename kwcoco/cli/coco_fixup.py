@@ -19,7 +19,8 @@ class CocoFixup(scfg.DataConfig):
 
     missing_assets = scfg.Value(True, help='if True remove missing assets')
 
-    corrupted_assets = scfg.Value(True, help='if True remove corrupted assets')
+    corrupted_assets = scfg.Value(True, help=('if True remove corrupted assets. '
+                                              'Can also be only_shape for a quicker check.'))
 
     inplace = scfg.Value(False, isflag=True, help=(
         'if True and dst is unspecified then the output will overwrite the input'))
@@ -79,6 +80,12 @@ class CocoFixup(scfg.DataConfig):
             else:
                 raise ValueError('must specify dst: {}'.format(config['dst']))
 
+        try:
+            from osgeo import gdal
+            gdal.UseExceptions()
+        except Exception:
+            ...
+
         print('reading fpath = {!r}'.format(config['src']))
         import kwcoco
         dset = kwcoco.CocoDataset.coerce(config['src'])
@@ -91,7 +98,7 @@ class CocoFixup(scfg.DataConfig):
             remove_missing_assets(dset)
 
         if config.corrupted_assets:
-            find_and_remove_corrupted_assets(dset, check_aux, workers)
+            find_and_remove_corrupted_assets(dset, check_aux, workers, config.corrupted_assets)
 
         remove_empty_videos(dset)
 
@@ -102,8 +109,19 @@ class CocoFixup(scfg.DataConfig):
         dset.dump()
 
 
-def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0):
+def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0,
+                                     corrupted_assets='full'):
     from kwcoco._helpers import _image_corruption_check
+
+    if corrupted_assets is True:
+        corrupted_assets = 'full'
+
+    if corrupted_assets == 'only_shape':
+        only_shape = True
+    elif corrupted_assets == 'full':
+        only_shape = False
+    else:
+        raise Exception
 
     jobs = ub.JobPool(mode='process', max_workers=workers)
 
@@ -119,7 +137,8 @@ def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0):
         fname = img.get('file_name', None)
         if fname is not None:
             gpath = bundle_dpath / fname
-            job = jobs.submit(_image_corruption_check, gpath)
+            job = jobs.submit(_image_corruption_check, gpath,
+                              only_shape=only_shape)
             job.input_info = (img_idx, gpath, gid)
 
         if check_aux:
