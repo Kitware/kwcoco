@@ -139,6 +139,10 @@ def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0):
         if remove_main or coco_img.n_assets == 0:
             empty_gids.append(gid)
 
+    if empty_gids:
+        print(f'Found {len(empty_gids)} images without assets, removing')
+        dset.remove_images(empty_gids, verbose=3)
+
 
 def coco_img_remove_empty_assets(coco_img, missing):
     from os.path import join
