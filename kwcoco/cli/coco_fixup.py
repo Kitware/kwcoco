@@ -38,13 +38,13 @@ class CocoFixup(scfg.DataConfig):
             >>> import ubelt as ub
             >>> dpath = ub.Path.appdir('kwcoco/tests/coco_fixup')
             >>> dpath.delete().ensuredir()
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes2', image_size=(64, 64), rng=0, dpath=dpath)
-            >>> fpath1 = dset.coco_image(1).primary_image_filepath()
-            >>> fpath2 = dset.coco_image(2).primary_image_filepath()
+            >>> src_dset = kwcoco.CocoDataset.demo('vidshapes2', image_size=(64, 64), rng=0, dpath=dpath)
+            >>> fpath1 = src_dset.coco_image(1).primary_image_filepath()
+            >>> fpath2 = src_dset.coco_image(2).primary_image_filepath()
             >>> fpath1.delete()  # remove an asset
             >>> fpath2.write_bytes(fpath2.read_bytes()[0::2])  # corrupt an asset
-            >>> src = ub.Path(dset.fpath)
-            >>> print(f'dset={dset}')
+            >>> src = ub.Path(src_dset.fpath)
+            >>> print(f'src_dset={src_dset}')
             >>> cmdline = 0
             >>> cls = CocoFixup
             >>> dst = src.augment(prefix='fixed-')
@@ -58,6 +58,8 @@ class CocoFixup(scfg.DataConfig):
             >>> assert dst.exists()
             >>> dst_dset = kwcoco.CocoDataset(dst)
             >>> print(f'dst_dset={dst_dset}')
+            >>> assert dst_dset.n_images < src_dset.n_images
+            >>> assert dst_dset.n_videos < src_dset.n_videos
         """
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
 
