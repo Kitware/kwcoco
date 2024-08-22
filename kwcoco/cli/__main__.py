@@ -19,6 +19,7 @@ def main(cmdline=True, **kw):
         'coco_conform',
         'coco_modify_categories',
         'coco_reroot',
+        'coco_fixup',
         'coco_move',
         'coco_validate',
         'coco_subset',
