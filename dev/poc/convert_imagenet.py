@@ -109,6 +109,7 @@ def convert_imagenet(ilsvrc_dpath, split, workers=0):
 
         for job in ub.ProgIter(jobs, desc=f'collect {split} jobs', homogeneous=False):
             img, anns = job.result()
+            img['channels'] = 'red|green|blue'  # hack in channels to make geowatch happy
             image_id = dset.add_image(**img)
             for ann in anns:
                 ann['image_id'] = image_id

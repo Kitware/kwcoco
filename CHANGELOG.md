@@ -24,6 +24,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * `CocoDataset.add_track` will now pick a name using a uuid if one is unspecified.
 * Added more metrics to outputs in coco eval
 * demodata can now be populated with random timestamps
+* dict proxy items can now use the pop and delitem methods
 
 ### Fixed
 * CIFAR grabdata now respects dpath
