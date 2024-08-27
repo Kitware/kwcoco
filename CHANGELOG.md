@@ -25,6 +25,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Added more metrics to outputs in coco eval
 * demodata can now be populated with random timestamps
 * dict proxy items can now use the pop and delitem methods
+* scriptconfig CLI interfaces have been modernized.
 
 ### Fixed
 * CIFAR grabdata now respects dpath

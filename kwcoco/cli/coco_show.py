@@ -79,7 +79,7 @@ class CocoShowCLI(scfg.DataConfig):
         import kwimage
         import kwplot
 
-        config = cls.cli(data=kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:

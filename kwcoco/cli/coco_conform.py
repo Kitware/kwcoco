@@ -75,7 +75,7 @@ class CocoConformCLI(scfg.DataConfig):
         """
         import kwcoco
 
-        config = cls.cli(data=kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:

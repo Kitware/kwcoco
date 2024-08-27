@@ -76,7 +76,7 @@ class CocoToyDataCLI(scfg.DataConfig):
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        config = cls.cli(data=kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         demo_kwargs = {

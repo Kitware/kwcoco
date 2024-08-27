@@ -59,7 +59,7 @@ def main(cmdline=True, **kw):
             # New way
             cli_config = cli_module.__cli__
         else:
-            raise NotImplementedError
+            raise NotImplementedError('modules must define the __cli__ attribute to be registered')
 
         # Update configs to have aliases / commands attributes
         # cli_modname = cli_module.__name__

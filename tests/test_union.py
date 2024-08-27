@@ -72,7 +72,7 @@ def test_union_subdirs_to_root():
     dst_fpath = multi_bundle_dpath / 'combo.kwcoco.json'
 
     from kwcoco.cli import coco_union
-    coco_union._CLI.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+    coco_union.__cli__.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
 
     dst = kwcoco.CocoDataset(dst_fpath)
     assert not any(dst.missing_images())
@@ -113,7 +113,7 @@ def test_union_subdirs_to_new_subdir():
     dst_fpath = multi_bundle_dpath / 'new_subdir/combo.kwcoco.json'
 
     from kwcoco.cli import coco_union
-    coco_union._CLI.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+    coco_union.__cli__.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
 
     dst = kwcoco.CocoDataset(dst_fpath)
     dst.validate()
@@ -154,7 +154,7 @@ def test_union_subdirs_to_existing_subdir():
     dst_fpath = multi_bundle_dpath / 'dset2/combo.kwcoco.json'
 
     from kwcoco.cli import coco_union
-    coco_union._CLI.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+    coco_union.__cli__.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
 
     dst = kwcoco.CocoDataset(dst_fpath)
     dst.validate()
