@@ -1,39 +1,57 @@
 #!/usr/bin/env python
+"""
+TODO:
+    - [ ] Access to data via multiple mirrors and a distributed option
+    - [ ] Integrate ImageNet ISLVRC 2017
+    - [ ] Integrate Tiny-ImageNet
+    - [ ] Integrate Mini-ImageNet
+    - [ ] Integrate TACO
+    - [ ] Integrate ZeroWaste
+    - [ ] Integrate ZeroWaste
+    - [ ] Integrate MSCOCO 2017
+    - [ ] Integrate MNIST
+    - [ ] Integrate KITTI
+    - [ ] Integrate Cityscapes
+    - [ ] Integrate FashionMNIST
+    - [ ] Integrate Oxford 102 Flower
+    - [ ] Integrate VQA
+    - [ ] Integrate LFW
+    - [ ] Integrate Urban100
+    - [ ] Integrate EruoSAT
+    - [ ] Integrate TrackingNet
+    - [ ] Integrate MOTChallenge
+"""
 import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoGrabCLI:
+class CocoGrabCLI(scfg.DataConfig):
     """
+    Grab standard datasets in kwcoco form.
+
+    Example:
+        kwcoco grab cifar10 camvid
     """
-    name = 'grab'
+    __command__ = 'grab'
 
-    class CLIConfig(scfg.DataConfig):
-        """
-        Grab standard datasets.
+    __default__ = {
+        'names': scfg.Value([], nargs='+', position=1, help=ub.paragraph(
+            '''
+            Dataset names to grab. Valid values are cifar10, cifar100,
+            domainnet, spacenet7, and camvid.
+            '''
+        )),
 
-        Example:
-            kwcoco grab cifar10 camvid
-        """
-
-        __default__ = {
-            'names': scfg.Value([], nargs='+', position=1, help=ub.paragraph(
+        'dpath': scfg.Path(
+            ub.Path.appdir('kwcoco', 'data', type='cache'), help=ub.paragraph(
                 '''
-                Dataset names to grab. Valid values are cifar10, cifar100,
-                domainnet, spacenet7, and camvid.
-                '''
-            )),
-
-            'dpath': scfg.Path(
-                ub.Path.appdir('kwcoco', 'data', type='cache'), help=ub.paragraph(
-                    '''
-                    Download directory
-                    '''))
-        }
+                Download directory
+                '''))
+    }
 
     @classmethod
     def main(cls, cmdline=True, **kw):
-        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         ensured = []
@@ -83,7 +101,7 @@ class CocoGrabCLI:
             print('dset.fpath = {!r}'.format(dset.fpath))
 
 
-_CLI = CocoGrabCLI
+__cli__ = CocoGrabCLI
 
 if __name__ == '__main__':
-    _CLI.main()
+    __cli__.main()

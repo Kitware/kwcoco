@@ -3,54 +3,55 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoSplitCLI(object):
+class CocoSplitCLI(scfg.DataConfig):
     """
-    Splits a coco files into two parts base on some criteria.
+    Splits a COCO files into two or more parts base on some criteria.
 
     Useful for generating quick and dirty train/test splits, but in general
     users should opt for using ``kwcoco subset`` instead to explicitly
     construct these splits based on domain knowledge.
+
+    NOTE:
+        This may currently have a bug with split sizes. Help wanted.
     """
-    __command__ = name = 'split'
-
-    class CLIConfig(scfg.Config):
-        """
-        Split a single COCO dataset into two sub-datasets.
-        """
-        __default__ = {
-            'src': scfg.Value(None, help='input dataset to split', position=1),
-            'dst1': scfg.Value('split1.kwcoco.json', help='output path of the larger split'),
-            'dst2': scfg.Value('split2.kwcoco.json', help='output path of the smaller split'),
-            'factor': scfg.Value(3, help='number of items in dset1 for each item in dset2. Also defines the maximum number of splits that could be written.'),
-            'rng': scfg.Value(None, help='A random seed for reproducible splits'),
-            'balance_categories': scfg.Value(True, help='if True tries to balance annotation categories across splits'),
-            'num_write': scfg.Value(1, isflag=True, help=ub.paragraph(
+    __command__ = 'split'
+    __default__ = {
+        'src': scfg.Value(None, help='input dataset to split', position=1),
+        'dst1': scfg.Value('split1.kwcoco.json', help='output path of the larger split'),
+        'dst2': scfg.Value('split2.kwcoco.json', help='output path of the smaller split'),
+        'factor': scfg.Value(3, help='number of items in dset1 for each item in dset2. Also defines the maximum number of splits that could be written.'),
+        'rng': scfg.Value(None, help='A random seed for reproducible splits'),
+        'balance_categories': scfg.Value(True, help='if True tries to balance annotation categories across splits'),
+        'num_write': scfg.Value(1, isflag=True, help=ub.paragraph(
+            '''
+            The number of splits to write. Can be between 1 and ``factor``.
+            In the case that ``num_write > ``, then dst1 and dst2 datasets
+            must contain a {} format string specifier so each of the output
+            filesnames can be indexed.
+            ''')),
+        'splitter': scfg.Value(
+            'auto', help=ub.paragraph(
                 '''
-                The number of splits to write. Can be between 1 and ``factor``.
-                In the case that ``num_write > ``, then dst1 and dst2 datasets
-                must contain a {} format string specifier so each of the output
-                filesnames can be indexed.
-                ''')),
-            'splitter': scfg.Value(
-                'auto', help=ub.paragraph(
-                    '''
-                    Split method to use.
-                    Using "image" will randomly assign each image to a partition.
-                    Using "video" will randomly assign each video to a partition.
-                    Using "auto" chooses "video" if there are any, otherwise "image".
-                    '''), choices=['auto', 'image', 'video']),
-            'compress': scfg.Value('auto', help='if True writes results with compression'),
-        }
-        __epilog__ = """
-        Example Usage:
-            kwcoco split --src special:shapes8 --dst1=learn.kwcoco.json --dst2=test.kwcoco.json --factor=3 --rng=42
+                Split method to use.
+                Using "image" will randomly assign each image to a partition.
+                Using "video" will randomly assign each video to a partition.
+                Using "auto" chooses "video" if there are any, otherwise "image".
+                '''), choices=['auto', 'image', 'video']),
+        'compress': scfg.Value('auto', help='if True writes results with compression'),
+    }
+    __epilog__ = """
+    Example Usage:
+        kwcoco split --src special:shapes8 --dst1=learn.kwcoco.json --dst2=test.kwcoco.json --factor=3 --rng=42
 
-            kwcoco split --src special:shapes8 --dst1="train_{03:d}.kwcoco.json" --dst2="vali_{0:3d}.kwcoco.json" --factor=3 --rng=42
-        """
+        kwcoco split --src special:shapes8 --dst1="train_{03:d}.kwcoco.json" --dst2="vali_{0:3d}.kwcoco.json" --factor=3 --rng=42
+    """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
+        CommandLine:
+            xdoctest -m kwcoco.cli.coco_split CocoSplitCLI.main
+
         Example:
             >>> from kwcoco.cli.coco_split import *  # NOQA
             >>> import ubelt as ub
@@ -66,7 +67,7 @@ class CocoSplitCLI(object):
         import kwarray
         from kwcoco.util import util_sklearn
 
-        config = cls.CLIConfig(kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
@@ -156,7 +157,7 @@ class CocoSplitCLI(object):
                 break
 
 
-_CLI = CocoSplitCLI
+__cli__ = CocoSplitCLI
 
 if __name__ == '__main__':
-    _CLI.main()
+    __cli__.main()

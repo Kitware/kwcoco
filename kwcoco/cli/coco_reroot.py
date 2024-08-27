@@ -3,64 +3,81 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoRerootCLI:
-    name = 'reroot'
+class CocoRerootCLI(scfg.DataConfig):
+    """
+    Reroot image paths onto a new image root.
 
-    class CocoRerootConfig(scfg.DataConfig):
-        """
-        Reroot image paths onto a new image root.
+    Modify the root of a coco dataset such to either make paths relative to a
+    new root or make paths absolute.
 
-        Modify the root of a coco dataset such to either make paths relative to a
-        new root or make paths absolute.
+    TODO:
+        - [ ] Evaluate that all tests cases work
+    """
+    __command__ = 'reroot'
 
-        TODO:
-            - [ ] Evaluate that all tests cases work
-        """
+    __epilog__ = """
 
-        __epilog__ = """
+    Example Usage:
+        kwcoco reroot --help
+        kwcoco reroot --src=special:shapes8 --dst rerooted.json
+        kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rerooted.json
+    """
+    src = scfg.Value(None, help=(
+        'Input coco dataset path'), position=1)
 
-        Example Usage:
-            kwcoco reroot --help
-            kwcoco reroot --src=special:shapes8 --dst rerooted.json
-            kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rerooted.json
-        """
-        src = scfg.Value(None, help=(
-            'Input coco dataset path'), position=1)
+    dst = scfg.Value(None, help=(
+        'Output coco dataset path'), position=2)
 
-        dst = scfg.Value(None, help=(
-            'Output coco dataset path'), position=2)
+    new_prefix = scfg.Value(None, help=(
+        'New prefix to insert before every image file name.'))
 
-        new_prefix = scfg.Value(None, help=(
-            'New prefix to insert before every image file name.'))
+    old_prefix = scfg.Value(None, help=(
+        'Old prefix to remove from the start of every image file name.'))
 
-        old_prefix = scfg.Value(None, help=(
-            'Old prefix to remove from the start of every image file name.'))
+    absolute = scfg.Value(True, help=(
+        'If False, the output file uses relative paths'))
 
-        absolute = scfg.Value(True, help=(
-            'If False, the output file uses relative paths'))
+    check = scfg.Value(True, help=(
+        'If True, checks that all data exists'))
 
-        check = scfg.Value(True, help=(
-            'If True, checks that all data exists'))
+    autofix = scfg.Value(False, isflag=True, help=(
+        ub.paragraph(
+            '''
+            If True, attempts an automatic fix. This assumes that paths
+            are prefixed with an absolute path belonging to a different
+            machine, and it attempts to strip off a minimal prefix to
+            find relative paths that do exist.
+            ''')))
 
-        autofix = scfg.Value(False, isflag=True, help=(
-            ub.paragraph(
-                '''
-                If True, attempts an automatic fix. This assumes that paths
-                are prefixed with an absolute path belonging to a different
-                machine, and it attempts to strip off a minimal prefix to
-                find relative paths that do exist.
-                ''')))
+    compress = scfg.Value('auto', help='if True writes results with compression. DEPRECATED. Just use a .zip suffix.')
 
-        compress = scfg.Value('auto', help='if True writes results with compression. DEPRECATED. Just use a .zip suffix.')
-
-        inplace = scfg.Value(False, isflag=True, help=(
-            'if True and dst is unspecified then the output will overwrite the input'))
-
-    CLIConfig = CocoRerootConfig
+    inplace = scfg.Value(False, isflag=True, help=(
+        'if True and dst is unspecified then the output will overwrite the input'))
 
     @classmethod
     def main(cls, cmdline=True, **kw):
         r"""
+        CommandLine:
+            xdoctest -m kwcoco.cli.coco_reroot CocoRerootCLI.main:0
+
+        Example:
+            >>> from kwcoco.cli.coco_reroot import *  # NOQA
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/coco_reroot').ensuredir()
+            >>> old_dset = kwcoco.CocoDataset.demo('special:shapes8')
+            >>> dst_fpath = dpath / 'reroot_output.kwcoco.zip'
+            >>> kw = {'src': old_dset.fpath, 'dst': dst_fpath, 'absolute': False}
+            >>> cmdline = False
+            >>> cls = CocoRerootCLI
+            >>> cls.main(cmdline=cmdline, **kw)
+            >>> assert dst_fpath.exists()
+            >>> new_dset = kwcoco.CocoDataset(dst_fpath)
+            >>> assert new_dset.dataset != old_dset.dataset
+            >>> gpath1 = new_dset.coco_image(1).primary_image_filepath()
+            >>> gpath2 = old_dset.coco_image(1).primary_image_filepath()
+            >>> assert gpath1.samefile(gpath2)
+
         Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}
@@ -92,7 +109,7 @@ class CocoRerootCLI:
         """
         import kwcoco
         from os.path import dirname, abspath
-        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
 
         try:
             import rich
@@ -209,7 +226,7 @@ def _check_candidates(candidate, bundle_dpath, missing_gpaths, fastfail=True):
     return errors
 
 
-_CLI = CocoRerootCLI
+__cli__ = CocoRerootCLI
 
 if __name__ == '__main__':
-    _CLI.main()
+    __cli__.main()
