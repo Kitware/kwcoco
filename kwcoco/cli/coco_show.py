@@ -56,6 +56,7 @@ class CocoShowCLI(scfg.DataConfig):
 
         Example:
             >>> # xdoctest: +REQUIRES(module:cv2)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_show import *  # NOQA
             >>> import kwcoco
             >>> import ubelt as ub
