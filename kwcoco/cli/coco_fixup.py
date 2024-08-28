@@ -46,15 +46,10 @@ class CocoFixup(scfg.DataConfig):
             >>> fpath2.write_bytes(fpath2.read_bytes()[0::2])  # corrupt an asset
             >>> src = ub.Path(src_dset.fpath)
             >>> print(f'src_dset={src_dset}')
+            >>> dst = src.augment(prefix='fixed-')
+            >>> kwargs = dict(src=src, dst=dst)
             >>> cmdline = 0
             >>> cls = CocoFixup
-            >>> dst = src.augment(prefix='fixed-')
-            >>> kwargs = dict(
-            >>>     src=src,
-            >>>     dst=dst,
-            >>>     missing_assets=True,
-            >>>     corrupted_assets=True,
-            >>> )
             >>> cls.main(cmdline=cmdline, **kwargs)
             >>> assert dst.exists()
             >>> dst_dset = kwcoco.CocoDataset(dst)
@@ -109,8 +104,8 @@ class CocoFixup(scfg.DataConfig):
         dset.dump()
 
 
-def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0,
-                                     corrupted_assets='full'):
+def find_corrupted_assets(dset, check_aux=True, workers=0,
+                          corrupted_assets='full'):
     from kwcoco._helpers import _image_corruption_check
 
     if corrupted_assets is True:
@@ -128,6 +123,11 @@ def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0,
     bundle_dpath = ub.Path(dset.bundle_dpath)
     verbose = 3
 
+    # imread_kwargs = dict(backend='auto')
+    # imread_kwargs = dict(backend='gdal')
+    # imread_kwargs = dict(backend='gdal', overview='coarsest')
+    imread_kwargs = {}
+
     img_enum = enumerate(dset.dataset['images'])
     for img_idx, img in ub.ProgIter(img_enum,
                                     total=len(dset.dataset['images']),
@@ -138,17 +138,18 @@ def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0,
         if fname is not None:
             gpath = bundle_dpath / fname
             job = jobs.submit(_image_corruption_check, gpath,
+                              imread_kwargs=imread_kwargs,
                               only_shape=only_shape)
             job.input_info = (img_idx, gpath, gid)
 
         if check_aux:
             for asset_idx, aux in img.get('auxiliary', []):
                 gpath = bundle_dpath / aux['file_name']
-                job = jobs.submit(_image_corruption_check, gpath)
+                job = jobs.submit(_image_corruption_check, gpath, imread_kwargs=imread_kwargs)
                 job.input_info = (img_idx, gpath, gid, 'auxiliary', asset_idx)
             for asset_idx, aux in enumerate(img.get('assets', [])):
                 gpath = bundle_dpath / aux['file_name']
-                job = jobs.submit(_image_corruption_check, gpath)
+                job = jobs.submit(_image_corruption_check, gpath, imread_kwargs=imread_kwargs)
                 job.input_info = (img_idx, gpath, gid, 'assets', asset_idx)
 
     corrupted_info = []
@@ -158,6 +159,18 @@ def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0,
         if info['failed']:
             corrupted_info.append(job.input_info)
 
+    return corrupted_info
+
+
+def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0,
+                                     corrupted_assets='full'):
+
+    # FIND PART
+    corrupted_info = find_corrupted_assets(
+        dset, check_aux=check_aux, workers=workers,
+        corrupted_assets=corrupted_assets)
+
+    # REMOVE PART
     gid_to_missing = ub.group_items(corrupted_info, key=lambda t: t[2])
     # print(f'gid_to_missing = {ub.urepr(gid_to_missing, nl=1)}')
     empty_gids = []
