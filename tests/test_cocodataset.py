@@ -163,3 +163,12 @@ def test_dump_causes_saved_status():
     dset.dump(fpath)
     dpath.delete()
     assert dset._state['was_saved']
+
+
+def test_ensure_video_does_not_duplicate():
+    import kwcoco
+    dset = kwcoco.CocoDataset()
+    dset.ensure_video(name='foo')
+    dset.ensure_video(name='foo')
+    print(dset.dataset['videos'])
+    assert len(dset.dataset['videos']) == 1

@@ -3699,8 +3699,13 @@ class MixinCocoAddRemove:
             >>> self.remove_images([gid2])
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
         """
+        index = self.index
         if id is None:
             id = self._next_ids.get('videos')
+        elif index.videos is not None and id in index.videos:
+            raise exceptions.DuplicateAddError(f'Video id={id} already exists')
+        if index.videos is not None and name in index.name_to_video:
+            raise exceptions.DuplicateAddError(f'Video name={name} already exists')
         video = ub.odict()
         video['id'] = id
         video['name'] = name

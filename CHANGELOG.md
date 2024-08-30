@@ -29,6 +29,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * CIFAR grabdata now respects dpath
+* `CocoDataset.ensure_video` properly checks for duplicate video names now.
 
 
 ## Version 0.8.2 - Released 2024-06-24
