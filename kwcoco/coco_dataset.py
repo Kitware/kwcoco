@@ -2,9 +2,9 @@
 An implementation and extension of the original MS-COCO API [CocoFormat]_.
 
 The KWCoco format is backwards compatible with MS-COCO. It adds support for
-line annotations, multispectral imagery, videos in the form of images
-sequences, annotation tracks, and defines alternative (and often more
-intuitive) encodings of keypoint and segmentation data structure.
+multispectral imagery, videos in the form of images sequences, annotation
+tracks, line annotations, and defines alternative (and often more intuitive)
+encodings of keypoint and segmentation data structure.
 
 An informal description of the spec is given in:
  `coco_schema_informal.rst <coco_schema_informal.rst>`_.
@@ -5883,7 +5883,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             workers (int | str): number of worker threads / processes.
                 Can also accept coerceable workers.
 
-            mode (str): thread, process, or serial. Defaults to process.
+            mode (str):
+                Parallelism type, can be: 'thread', 'process', or 'serial'.
+                Defaults to 'process'.
 
             verbose (int): verbosity level
 
@@ -5950,7 +5952,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             workers (int): number of worker threads / processes
 
-            mode (str): thread, process, or serial. Defaults to process.
+            mode (str):
+                Parallelism type, can be: 'thread', 'process', or 'serial'.
+                Defaults to 'process'.
 
             verbose (int): verbosity level
 
