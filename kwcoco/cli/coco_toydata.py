@@ -3,74 +3,65 @@ import scriptconfig as scfg
 import ubelt as ub
 
 
-class CocoToyDataCLI(object):
-    name = 'toydata'
+class CocoToyDataCLI(scfg.DataConfig):
+    """
+    Create COCO toydata for demo and testing purposes.
+    """
+    __command__ = 'toydata'
+    __alias__ = ['demodata']
+    key = scfg.Value('shapes8', position=1, help=ub.paragraph(
+            '''
+            Special demodata code. Basic options that define which
+            flavor of demodata to generate are: `photos`, `shapes`, and
+            `vidshapes`. A numeric suffix e.g. `vidshapes8` can be
+            specified to indicate the size of the generated demo
+            dataset. There are other special suffixes that are
+            available. See the code in :method:`kwcoco.CocoDataset.demo`
+            for details on what is allowed. As a quick summary: the
+            vidshapes key is the most robust and mature demodata set,
+            and here are several useful variants of the vidshapes key.
+            (1) vidshapes8 - the 8 suffix is the number of videos in
+            this case. (2) vidshapes8-multispectral - generate 8
+            multispectral videos. (3) vidshapes8-msi - msi is an alias
+            for multispectral. (4) vidshapes8-frames5 - generate 8
+            videos with 5 frames each. (4) vidshapes2-speed0.1-frames7 -
+            generate 2 videos with 7 frames where the objects move with
+            with a speed of 0.1.
+            '''))
+    dst = scfg.Value(None, help=ub.paragraph(
+            '''
+            Output path for the final kwcoco json file. Note, that even
+            when given, a data.kwcoco.json file will also be generated
+            in a bundle_dpath.
+            '''))
+    bundle_dpath = scfg.Value(None, help=ub.paragraph(
+            '''
+            Creates a bundled dataset in the specified location. If
+            unspecified, a bundle name is generated based on the toydata
+            config.
+            '''))
+    use_cache = scfg.Value(True, isflag=1, help=ub.paragraph(
+            '''
+            if False, this will force the dataset to be regenerated.
+            Otherwise, it will only regenerate the data if it doesn't
+            already exist.
+            '''))
+    verbose = scfg.Value(False, help='Verbosity')
 
-    class CLIConfig(scfg.Config):
-        """
-        Create COCO toydata for demo and testing purposes.
-        """
-        __default__ = {
-            'key': scfg.Value('shapes8', help=ub.paragraph(
-                '''
-                Special demodata code. Basic options that define which flavor
-                of demodata to generate are: `photos`, `shapes`, and
-                `vidshapes`. A numeric suffix e.g. `vidshapes8` can be
-                specified to indicate the size of the generated demo dataset.
-                There are other special suffixes that are available.
-                See the code in :method:`kwcoco.CocoDataset.demo` for details
-                on what is allowed.
+    __epilog__ = r"""
+    Example Usage:
+        kwcoco toydata --key=shapes8 --dst=toydata.kwcoco.json
 
-                As a quick summary: the vidshapes key is the most robust and
-                mature demodata set, and here are several useful variants of
-                the vidshapes key.
+        kwcoco toydata --key=shapes8 --bundle_dpath=my_test_bundle_v1
+        kwcoco toydata --key=shapes8 --bundle_dpath=my_test_bundle_v1
 
-                (1) vidshapes8 - the 8 suffix is the number of videos in this case.
-                (2) vidshapes8-multispectral - generate 8 multispectral videos.
-                (3) vidshapes8-msi - msi is an alias for multispectral.
-                (4) vidshapes8-frames5 - generate 8 videos with 5 frames each.
-                (4) vidshapes2-speed0.1-frames7 - generate 2 videos with 7
-                    frames where the objects move with with a speed of 0.1.
-                '''), position=1),
+        kwcoco toydata \
+            --key=vidshapes1-frames32 \
+            --dst=./mytoybundle/dataset.kwcoco.json
 
-            'dst': scfg.Value(None, help=ub.paragraph(
-                '''
-                Output path for the final kwcoco json file.
-                Note, that even when given, a data.kwcoco.json file
-                will also be generated in a bundle_dpath.
-                ''')),
-
-            'bundle_dpath': scfg.Value(None, help=ub.paragraph(
-                '''
-                Creates a bundled dataset in the specified location.
-                If unspecified, a bundle name is generated based on the
-                toydata config.
-                ''')),
-
-            'use_cache': scfg.Value(True, isflag=1, help=ub.paragraph(
-                '''
-                if False, this will force the dataset to be regenerated.
-                Otherwise, it will only regenerate the data if it doesn't
-                already exist.
-                ''')),
-
-            'verbose': scfg.Value(False, help=ub.paragraph(
-                ''' Verbosity ''')),
-        }
-        epilog = r"""
-        Example Usage:
-            kwcoco toydata --key=shapes8 --dst=toydata.kwcoco.json
-
-            kwcoco toydata --key=shapes8 --bundle_dpath=my_test_bundle_v1
-            kwcoco toydata --key=shapes8 --bundle_dpath=my_test_bundle_v1
-
-            kwcoco toydata \
-                --key=vidshapes1-frames32 \
-                --dst=./mytoybundle/dataset.kwcoco.json
-
-        TODO:
-            - [ ] allow specification of images directory
-        """
+    TODO:
+        - [ ] allow specification of images directory
+    """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -85,7 +76,7 @@ class CocoToyDataCLI(object):
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        config = cls.CLIConfig(kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         demo_kwargs = {
@@ -119,7 +110,7 @@ class CocoToyDataCLI(object):
             dset.dump(dset.fpath, newlines=True)
         print(dset.fpath)
 
-_CLI = CocoToyDataCLI
+__cli__ = CocoToyDataCLI
 
 if __name__ == '__main__':
-    _CLI._main()
+    __cli__._main()

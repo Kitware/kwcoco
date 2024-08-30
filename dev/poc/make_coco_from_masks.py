@@ -48,39 +48,37 @@ def _make_intmask_demodata(rng=None):
     return dpath
 
 
-class MakeCocoFromMasksCLI(object):
-    name = 'toydata'
+class MakeCocoFromMasksCLI(scfg.Config):
+    """
+    Create a COCO file from bitmasks
+    """
+    __command__ = 'coco_from_masks'
+    default = {
+        'src': scfg.PathList(help='a file, globstr, or comma-separated list of files'),
+        'dst': scfg.Value('masks.mscoco.json', help='output path'),
+        'serialization': scfg.Value('vector', help='can be raster or vector'),
+    }
+    epilog = r"""
+    Example Usage:
+        # hack to make the demo data
+        python -c "import make_coco_from_masks; print(make_coco_from_masks._make_intmask_demodata())"
 
-    class CLIConfig(scfg.Config):
-        """
-        Create a COCO file from bitmasks
-        """
-        default = {
-            'src': scfg.PathList(help='a file, globstr, or comma-separated list of files'),
-            'dst': scfg.Value('masks.mscoco.json', help='output path'),
-            'serialization': scfg.Value('vector', help='can be raster or vector'),
-        }
-        epilog = r"""
-        Example Usage:
-            # hack to make the demo data
-            python -c "import make_coco_from_masks; print(make_coco_from_masks._make_intmask_demodata())"
+        # Run the conversion tool in vector mode
+        python make_coco_from_masks.py \
+            --src=$HOME/.cache/kwcoco/tests/masks/*.png \
+            --dst vector.kwcoco.json --serialization=vector
 
-            # Run the conversion tool in vector mode
-            python make_coco_from_masks.py \
-                --src=$HOME/.cache/kwcoco/tests/masks/*.png \
-                --dst vector.kwcoco.json --serialization=vector
+        # Run the conversion tool in raster mode
+        python make_coco_from_masks.py \
+            --src=$HOME/.cache/kwcoco/tests/masks/*.png \
+            --dst raster.kwcoco.json --serialization=raster
 
-            # Run the conversion tool in raster mode
-            python make_coco_from_masks.py \
-                --src=$HOME/.cache/kwcoco/tests/masks/*.png \
-                --dst raster.kwcoco.json --serialization=raster
+        # Visualize the results of vector mode
+        kwcoco show --src vector.kwcoco.json --gid 2
 
-            # Visualize the results of vector mode
-            kwcoco show --src vector.kwcoco.json --gid 2
-
-            # Visualize the results of raster mode
-            kwcoco show --src raster.kwcoco.json --gid 2
-        """
+        # Visualize the results of raster mode
+        kwcoco show --src raster.kwcoco.json --gid 2
+    """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -103,7 +101,7 @@ class MakeCocoFromMasksCLI(object):
             >>> dset.annots().detections.data['segmentations'][0].data
         """
         import kwcoco
-        config = cls.CLIConfig(kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=2)))
         serialization_method = config['serialization']
 
@@ -197,7 +195,7 @@ class MakeCocoFromMasksCLI(object):
         return coco_dset.fpath
 
 
-_CLI = MakeCocoFromMasksCLI
+__cli__ = MakeCocoFromMasksCLI
 
 if __name__ == '__main__':
-    _CLI.main()
+    __cli__.main()

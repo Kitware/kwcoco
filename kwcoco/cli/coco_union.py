@@ -3,42 +3,39 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoUnionCLI(object):
-    name = 'union'
+class CocoUnionCLI(scfg.DataConfig):
+    """
+    Combine multiple COCO datasets into a single merged dataset.
+    """
+    __command__ = 'union'
 
-    class CLIConfig(scfg.DataConfig):
-        """
-        Combine multiple COCO datasets into a single merged dataset.
-        """
-        __command__ = 'union'
+    src = scfg.Value([], position=1, help='path to multiple input datasets', nargs='+')
 
-        src = scfg.Value([], position=1, help='path to multiple input datasets', nargs='+')
+    dst = scfg.Value('combo.kwcoco.json', help='path to output dataset')
 
-        dst = scfg.Value('combo.kwcoco.json', help='path to output dataset')
-
-        absolute = scfg.Value(False, isflag=1, help=ub.paragraph(
-                '''
-                if True, converts paths to absolute paths before doing union
-                '''))
-
-        remember_parent = scfg.Value(False, isflag=True, help=ub.paragraph(
-                '''
-                if True adds a union_parent item to each coco image and
-                video that indicate which file it is from
-                '''))
-
-        io_workers = scfg.Value('avail-2', help=ub.paragraph(
+    absolute = scfg.Value(False, isflag=1, help=ub.paragraph(
             '''
-            number of workers to load input datasets. By default will use
-            available CPUs minus 2.
+            if True, converts paths to absolute paths before doing union
             '''))
 
-        compress = scfg.Value('auto', help='if True writes results with compression')
+    remember_parent = scfg.Value(False, isflag=True, help=ub.paragraph(
+            '''
+            if True adds a union_parent item to each coco image and
+            video that indicate which file it is from
+            '''))
 
-        __epilog__ = """
-        Example Usage:
-            kwcoco union --src special:shapes8 special:shapes1 --dst=combo.kwcoco.json
-        """
+    io_workers = scfg.Value('avail-2', help=ub.paragraph(
+        '''
+        number of workers to load input datasets. By default will use
+        available CPUs minus 2.
+        '''))
+
+    compress = scfg.Value('auto', help='if True writes results with compression')
+
+    __epilog__ = """
+    Example Usage:
+        kwcoco union --src special:shapes8 special:shapes1 --dst=combo.kwcoco.json
+    """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -56,7 +53,7 @@ class CocoUnionCLI(object):
             >>> cls = CocoUnionCLI
             >>> cls.main(cmdline, **kw)
         """
-        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         import kwcoco
         print('config = {}'.format(ub.urepr(config, nl=1)))
 
@@ -114,11 +111,11 @@ def _postprocess_absolute(dset):
     dset.reroot(absolute=True)
     return dset
 
-_CLI = CocoUnionCLI
+__cli__ = CocoUnionCLI
 
 if __name__ == '__main__':
     """
     CommandLine:
         python -m kwcoco.cli.coco_union
     """
-    _CLI._main()
+    __cli__._main()

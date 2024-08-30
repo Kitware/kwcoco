@@ -3,49 +3,60 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoModifyCatsCLI:
+class CocoModifyCatsCLI(scfg.DataConfig):
     """
     Remove, rename, or coarsen categories.
     """
-    name = 'modify_categories'
+    __command__ = 'modify_categories'
+    __epilog__ = """
+    Example Usage:
+        kwcoco modify_categories --help
+        kwcoco modify_categories --src=special:shapes8 --dst modcats.json
+        kwcoco modify_categories --src=special:shapes8 --dst modcats.json --rename eff:F,star:sun
+        kwcoco modify_categories --src=special:shapes8 --dst modcats.json --remove eff,star
+        kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep eff,
 
-    class CLIConfig(scfg.Config):
-        """
-        Rename or remove categories
-        """
-        epilog = """
-        Example Usage:
-            kwcoco modify_categories --help
-            kwcoco modify_categories --src=special:shapes8 --dst modcats.json
-            kwcoco modify_categories --src=special:shapes8 --dst modcats.json --rename eff:F,star:sun
-            kwcoco modify_categories --src=special:shapes8 --dst modcats.json --remove eff,star
-            kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep eff,
+        kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep=[] --keep_annots=True
+    """
+    __default__ = {
+        'src': scfg.Value(None, help=(
+            'Path to the coco dataset'), position=1),
 
-            kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep=[] --keep_annots=True
-        """
-        __default__ = {
-            'src': scfg.Value(None, help=(
-                'Path to the coco dataset'), position=1),
+        'dst': scfg.Value(None, help=(
+            'Save the modified dataset to a new file')),
 
-            'dst': scfg.Value(None, help=(
-                'Save the rebased dataset to a new file')),
+        'keep_annots': scfg.Value(False, help=(
+            'if False, removes annotations when categories are removed, '
+            'otherwise the annotations category is simply unset')),
 
-            'keep_annots': scfg.Value(False, help=(
-                'if False, removes annotations when categories are removed, '
-                'otherwise the annotations category is simply unset')),
+        'remove': scfg.Value(None, help='Category names to remove. Mutex with keep.'),
 
-            'remove': scfg.Value(None, help='Category names to remove. Mutex with keep.'),
+        'keep': scfg.Value(None, help='If specified, remove all other categories. Mutex with remove.'),
 
-            'keep': scfg.Value(None, help='If specified, remove all other categories. Mutex with remove.'),
+        'rename': scfg.Value(None, type=str, help='category mapping in the format. "old1:new1,old2:new2"'),
 
-            'rename': scfg.Value(None, type=str, help='category mapping in the format. "old1:new1,old2:new2"'),
-
-            'compress': scfg.Value('auto', help='if True writes results with compression'),
-        }
+        'compress': scfg.Value('auto', help='if True writes results with compression'),
+    }
 
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
+
+        Example:
+            >>> from kwcoco.cli.coco_modify_categories import *  # NOQA
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/coco_modify_categories').ensuredir()
+            >>> old_dset = kwcoco.CocoDataset.demo('special:shapes8')
+            >>> dst_fpath = dpath / 'modified_category.kwcoco.zip'
+            >>> kw = {'src': old_dset.fpath, 'dst': dst_fpath, 'keep': []}
+            >>> cmdline = False
+            >>> cls = CocoModifyCatsCLI
+            >>> cls.main(cmdline=cmdline, **kw)
+            >>> assert dst_fpath.exists()
+            >>> new_dset = kwcoco.CocoDataset(dst_fpath)
+            >>> assert len(new_dset.cats) == 0
+
         Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}
@@ -54,7 +65,7 @@ class CocoModifyCatsCLI:
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        config = cls.CLIConfig(kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
@@ -118,7 +129,7 @@ class CocoModifyCatsCLI:
             dset.dump(dset.fpath, **dumpkw)
 
 
-_CLI = CocoModifyCatsCLI
+__cli__ = CocoModifyCatsCLI
 
 if __name__ == '__main__':
-    _CLI.main()
+    __cli__.main()

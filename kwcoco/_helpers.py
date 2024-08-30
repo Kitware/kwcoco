@@ -209,9 +209,14 @@ def _load_and_postprocess(data, loader, postprocess, **loadkw):
     return dset
 
 
-def _image_corruption_check(fpath, only_shape=False):
+def _image_corruption_check(fpath, only_shape=False, imread_kwargs=None):
+    """
+    Helper that checks if an image is readable or not
+    """
     import kwimage
     from os.path import exists
+
+    imread_kwargs = imread_kwargs or {}
     info = {'fpath': fpath}
     if not exists(fpath):
         info['failed'] = True
@@ -221,7 +226,7 @@ def _image_corruption_check(fpath, only_shape=False):
             if only_shape:
                 kwimage.load_image_shape(fpath)
             else:
-                kwimage.imread(fpath)
+                kwimage.imread(fpath, **imread_kwargs)
             info['failed'] = False
         except Exception as ex:
             err = str(ex)

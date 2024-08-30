@@ -1,3 +1,5 @@
+from ubelt import NoParam
+
 
 # Another variant of DictLike Circa 2023
 class DictInterface:
@@ -137,16 +139,91 @@ class DictInterface:
         except KeyError:
             return default
 
+    def pop(self, key, default=NoParam):
+        """
+        Remove specified key and return the corresponding value.
+
+        If the key is not found, return the default if given; otherwise, raise
+        a KeyError.
+
+        Args:
+            key (Any):
+            default (Any):
+
+        Returns:
+            Any:
+        """
+        try:
+            value = self[key]
+            del self[key]
+        except KeyError:
+            if default is NoParam:
+                raise
+            return default
+        else:
+            return value
+
 
 class DictProxy2(DictInterface):
     """
-    Allows an object to proxy the behavior of a _proxy dict attribute
+    Allows an object to proxy the behavior of a _proxy dict attribute.
+
+    Inheriting classes must define a ``self._proxy`` attriute as a dictionary.
+    Given that, this class will give the inheriting class methods such that the
+    user can treat it like a dictionary and all dictionary operations are
+    simply forwarded to proxy. In other words, you can make a class that wraps
+    a dictionary, still makes it behave like a dictionary, but you can do fancy
+    things with other methods and attributes, while still maintaing the core
+    underlying dictionary.
+
+    Example:
+        >>> from kwcoco.util.dict_proxy2 import *  # NOQA
+        >>> import math
+        >>> class MyClass(DictProxy2):
+        >>>     def __init__(self):
+        >>>         self._proxy = {}
+        >>> # The instance ``self`` now behaves like a dictionary.
+        >>> self = MyClass()
+        >>> self['a'] = 1
+        >>> self['b'] = 2
+        >>> self['cc'] = self['a'] ** 2 + self['b'] ** 2
+        >>> self['c'] = math.sqrt(self.pop('cc'))
+        >>> assert dict(self) == self._proxy
+        >>> assert 'cc' not in self
+        >>> assert 'c' in self
+        >>> #
+        >>> # Check that the class provides the same API as the underlying
+        >>> # dictionary.
+        >>> self_attrs = set(dir(self))
+        >>> proxy_attrs = set(dir(self._proxy))
+        >>> proxy_only = proxy_attrs - self_attrs
+        >>> self_only = self_attrs - proxy_attrs
+        >>> print(f'proxy_only={proxy_only}')
+        >>> print(f'self_only={self_only}')
+        >>> #
+        >>> # We dont quite do everything yet
+        >>> CURRENTLY_UNSUPPORTED = {
+        >>>      '__class_getitem__',
+        >>>      '__ior__',
+        >>>      '__or__',
+        >>>      '__reversed__',
+        >>>      '__ror__',
+        >>>      'clear',
+        >>>      'copy',
+        >>>      'fromkeys',
+        >>>      'popitem',
+        >>>      'setdefault'}
+        >>> assert len(proxy_only - CURRENTLY_UNSUPPORTED) == 0
+
     """
     def __getitem__(self, key):
         return self._proxy[key]
 
     def __setitem__(self, key, value):
         self._proxy[key] = value
+
+    def __delitem__(self, key):
+        del self._proxy[key]
 
     def keys(self):
         return self._proxy.keys()

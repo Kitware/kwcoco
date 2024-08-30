@@ -1,3 +1,6 @@
+"""
+Deprecated: use kwutil.Json instead
+"""
 import copy
 import numpy as np
 import ubelt as ub
@@ -22,6 +25,10 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
         normalize_containers (bool):
             if True, normalizes dict containers to be standard python
             structures. Defaults to False.
+
+    Note:
+        This function is now in kwutil. Might be best to use that variant.
+        See :func:`kwutil.util_json.ensure_json_serializable`.
 
     Example:
         >>> data = ub.ddict(lambda: int)
@@ -95,6 +102,10 @@ def find_json_unserializable(data, quickcheck=False):
     Recurse through json datastructure and find any component that
     causes a serialization error. Record the location of these errors
     in the datastructure as we recurse through the call tree.
+
+    Note:
+        This function is now in kwutil. Might be best to use that variant.
+        See :func:`kwutil.util_json.find_json_unserializable`.
 
     Args:
         data (object): data that should be json serializable
@@ -221,8 +232,9 @@ def indexable_allclose(dct1, dct2, return_info=False):
     Walks through two nested data structures and ensures that everything is
     roughly the same.
 
-    NOTE:
-        Use the version in ubelt instead
+    Note:
+        DEPRECATED.
+        Use :func:`ubelt.IndexableWalker.allclose` instead.
 
     Args:
         dct1: a nested indexable item
@@ -242,6 +254,16 @@ def indexable_allclose(dct1, dct2, return_info=False):
         >>> }
         >>> assert indexable_allclose(dct1, dct2)
     """
+    ub.schedule_deprecation(
+        modname='kwcoco',
+        name='indexable_allclose',
+        type='function',
+        migration='Use ubelt.IndexableWalker.allclose instead',
+        deprecate='0.8.3',
+        error='1.0.0',
+        remove='1.1.0',
+        warncls=Warning,
+    )
     walker1 = ub.IndexableWalker(dct1)
     walker2 = ub.IndexableWalker(dct2)
     flat_items1 = [
@@ -308,6 +330,10 @@ def indexable_diff(dct1, dct2, rtol=1e-05, atol=1e-08, equal_nan=False):
         dct1: a nested indexable item
         dct2: a nested indexable item
 
+    Note:
+        DEPRECATED.
+        Use :func:`ubelt.IndexableWalker.diff` instead.
+
     Returns:
         dict: information about the diff with
             "similarity": a score between 0 and 1
@@ -339,6 +365,16 @@ def indexable_diff(dct1, dct2, rtol=1e-05, atol=1e-08, equal_nan=False):
         >>> info = indexable_diff(dct1, dct2)
         >>> print(f'info = {ub.urepr(info, nl=2)}')
     """
+    ub.schedule_deprecation(
+        modname='kwcoco',
+        name='indexable_diff',
+        type='function',
+        migration='Use ubelt.IndexableWalker.diff instead',
+        deprecate='0.8.3',
+        error='1.0.0',
+        remove='1.1.0',
+        warncls=Warning,
+    )
     walker1 = ub.IndexableWalker(dct1)
     walker2 = ub.IndexableWalker(dct2)
     flat_items1 = {

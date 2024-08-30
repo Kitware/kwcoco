@@ -81,7 +81,7 @@ class CocoMove(scfg.DataConfig):
             old_fpath.delete()
 
 
-__config__ = CocoMove
+__cli__ = CocoMove
 
 if __name__ == '__main__':
     """
@@ -90,4 +90,4 @@ if __name__ == '__main__':
         python ~/code/kwcoco/kwcoco/cli/coco_move.py
         python -m kwcoco.cli.coco_move
     """
-    __config__.main()
+    __cli__.main()

@@ -316,6 +316,34 @@ class DetectionMetrics(ub.NiceRepr):
             ...     print(cfsn.binarize_ovr().measures())
             ...     print(cfsn.binarize_classless().measures())
 
+        Example:
+            >>> from kwcoco.metrics.detect_metrics import *  # NOQA
+            >>> dmet = DetectionMetrics.demo(nimgs=30, classes=3,
+            >>>                              nboxes=10, n_fp=3, box_noise=10,
+            >>>                              with_probs=True, rng=0)
+            >>> iou_thresh = 0.3
+            >>> # When matching boxes, we can specify compat='all' to allow
+            >>> # predicted boxes of one class to match true boxes of a
+            >>> # different class. Setting compat='mutex' forces hard category
+            >>> # decisions.
+            >>> # In this case you should also set track_probs='force' so
+            >>> # subsequent analysis can give credit for cases where the
+            >>> # correct answer has a high, but not top probability
+            >>> # Also, setting prioritize=class instead of the default
+            >>> # prioritize=iou will choose compatible classes instead of
+            >>> # higher overlaps, as long as the iou is still above a threshold
+            >>> iou_to_cfsn = dmet.confusion_vectors(iou_thresh=[iou_thresh],
+            >>>                                      compat='all',
+            >>>                                      prioritize='class',
+            >>>                                      track_probs='force')
+            >>> cfsn = iou_to_cfsn[iou_thresh]  # NOQA
+            >>> # Print the confusion assignment
+            >>> print(cfsn.data.pandas())
+            >>> # Doing a OVR binarization will score each class such that
+            >>> # a box gets some credit if its second highest score is the
+            >>> # correct class.
+            >>> print(cfsn.binarize_ovr().measures())
+
         Ignore:
             globals().update(xdev.get_func_kwargs(dmet.confusion_vectors))
         """
@@ -519,18 +547,18 @@ class DetectionMetrics(ub.NiceRepr):
         }
 
         if False:
-            import kwil
-            kwil.autompl()
-            kwil.multi_plot(roc_info['fa'], roc_info['pd'],
-                            xlabel='fa (fp count)',
-                            ylabel='pd (tpr)', fnum=1,
-                            title='kwant roc_auc={:.4f}'.format(roc_auc))
+            import kwplot
+            kwplot.autompl()
+            kwplot.multi_plot(roc_info['fa'], roc_info['pd'],
+                              xlabel='fa (fp count)',
+                              ylabel='pd (tpr)', fnum=1,
+                              title='kwant roc_auc={:.4f}'.format(roc_auc))
 
-            kwil.multi_plot(tpr, ppv,
-                            xlabel='recall (fpr)',
-                            ylabel='precision (tpr)',
-                            fnum=2,
-                            title='kwant ap={:.4f}'.format(ap))
+            kwplot.multi_plot(tpr, ppv,
+                              xlabel='recall (fpr)',
+                              ylabel='precision (tpr)',
+                              fnum=2,
+                              title='kwant ap={:.4f}'.format(ap))
 
         return info
 
@@ -564,7 +592,6 @@ class DetectionMetrics(ub.NiceRepr):
             >>> print(dmet.score_voc()['mAP'])
             0.9399...
         """
-        # from . import voc_metrics
         from kwcoco.metrics.assignment import _filter_ignore_regions
         from kwcoco.metrics import voc_metrics
         if gids is None:

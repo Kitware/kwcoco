@@ -44,7 +44,7 @@ An informal spec is as follows:
         'channels': <ChannelSpec>,   # a string encoding of the channels in the main image (optional if auxiliary items are specified)
         'resolution': int | str,  # indicates the size of a pixel in image space
 
-        'auxiliary': [  # information about any auxiliary channels / bands
+        'assets': [  # information about any auxiliary channels / bands
             {
                 'file_name': str,     # relative path to associated file
                 'channels': <ChannelSpec>,   # a string encoding

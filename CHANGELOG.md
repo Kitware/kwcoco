@@ -5,7 +5,34 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.2 - Unreleased
+## Version 0.8.3 - Unreleased
+
+### Added
+* New `load` classmethod (analogous to `dump`) as a placeholder for a potential
+  future refactor.
+* Ported segmentation metrics from geowatch. Eventually metrics may be ported
+  to a new package: kwmetrics in order to improve modularity and keep
+  components well-scoped.
+* Added `out_fpath` to `coco_eval` CLI signature. 
+* Added `video_ids` argument to `CocoDataset.subset`
+* Added `.objs_iter()` method to `ObjectList1D` as an alternative to `.objs`
+* Added `.get_iter(...)` method to `ObjectList1D` as an alternative to `.get(...)`
+* Added `.coco_images_iter()` method to `Images` as an alternative to `.coco_images`
+* `kwcoco/cli/coco_visual_stats.py`
+
+### Changed
+* `CocoDataset.add_track` will now pick a name using a uuid if one is unspecified.
+* Added more metrics to outputs in coco eval
+* demodata can now be populated with random timestamps
+* dict proxy items can now use the pop and delitem methods
+* scriptconfig CLI interfaces have been modernized.
+
+### Fixed
+* CIFAR grabdata now respects dpath
+* `CocoDataset.ensure_video` properly checks for duplicate video names now.
+
+
+## Version 0.8.2 - Released 2024-06-24
 
 ### Fixed
 * Handle deprecated `scipy.integrate.trapz`

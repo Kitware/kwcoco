@@ -148,6 +148,20 @@ def concice_si_display(val, eps=1e-8, precision=2, si_thresh=4):
     return val_str
 
 
+def format_scientific_notation(val, precision=2):
+    # Test this better
+    val_str = ('{:.' + str(precision) + 'e}').format(val)
+    lhs, rhs = val_str.split('e')
+    import re
+    trailing_zeros = re.compile(r'\.0*$')
+    rhs = rhs.replace('+', '')
+    rhs = rhs.lstrip('0')
+    rhs = rhs.replace('-0', '-')
+    lhs = trailing_zeros.sub('', lhs)
+    rhs = trailing_zeros.sub('', rhs)
+    return val_str
+
+
 def _realpos_label_suffix(info):
     """
     Creates a label suffix that indicates the number of real positive cases

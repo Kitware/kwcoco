@@ -4,8 +4,8 @@ stages:
 # TEMPLATES
 - lint
 - build
-- test
 - gpgsign
+- test
 - deploy
 .common_template: &common_template
   tags:
@@ -26,7 +26,17 @@ stages:
   cache:
     paths:
     - .cache/pip
-.build_template: &build_template
+.build_sdist_template: &build_sdist_template
+  <<: *common_template
+  stage: build
+  script:
+  - python -m pip install setuptools>=0.8 wheel build twine
+  - python -m build --sdist --outdir dist
+  - python -m twine check ./dist/kwcoco*.tar.gz
+  artifacts:
+    paths:
+    - ./dist/kwcoco*.tar.gz
+.build_wheel_template: &build_wheel_template
   <<: *common_template
   stage: build
   before_script:
@@ -64,13 +74,17 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - export WHEEL_FPATH=$(python -c "import pathlib; print(str(sorted(pathlib.Path('dist').glob('kwcoco*.whl'))[-1]).replace(chr(92),
-    chr(47)))")
-  - export MOD_VERSION=$(python -c "from pkginfo import Wheel; print(Wheel('$WHEEL_FPATH').version)")
+  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
+    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
+    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
+    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
+  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
+    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
+    \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
-  - echo "$WHEEL_FPATH=WHEEL_FPATH"
-  - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
-  - echo "$MOD_VERSION=MOD_VERSION"
+  - echo "WHEEL_FPATH=$WHEEL_FPATH"
+  - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "MOD_VERSION=$MOD_VERSION"
   - pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
@@ -116,13 +130,17 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - export WHEEL_FPATH=$(python -c "import pathlib; print(str(sorted(pathlib.Path('dist').glob('kwcoco*.whl'))[-1]).replace(chr(92),
-    chr(47)))")
-  - export MOD_VERSION=$(python -c "from pkginfo import Wheel; print(Wheel('$WHEEL_FPATH').version)")
+  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
+    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
+    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
+    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
+  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
+    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
+    \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
-  - echo "$WHEEL_FPATH=WHEEL_FPATH"
-  - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
-  - echo "$MOD_VERSION=MOD_VERSION"
+  - echo "WHEEL_FPATH=$WHEEL_FPATH"
+  - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "MOD_VERSION=$MOD_VERSION"
   - pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
@@ -168,13 +186,17 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - export WHEEL_FPATH=$(python -c "import pathlib; print(str(sorted(pathlib.Path('dist').glob('kwcoco*.whl'))[-1]).replace(chr(92),
-    chr(47)))")
-  - export MOD_VERSION=$(python -c "from pkginfo import Wheel; print(Wheel('$WHEEL_FPATH').version)")
+  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
+    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
+    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
+    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
+  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
+    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
+    \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
-  - echo "$WHEEL_FPATH=WHEEL_FPATH"
-  - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
-  - echo "$MOD_VERSION=MOD_VERSION"
+  - echo "WHEEL_FPATH=$WHEEL_FPATH"
+  - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "MOD_VERSION=$MOD_VERSION"
   - pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
@@ -220,13 +242,17 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - export WHEEL_FPATH=$(python -c "import pathlib; print(str(sorted(pathlib.Path('dist').glob('kwcoco*.whl'))[-1]).replace(chr(92),
-    chr(47)))")
-  - export MOD_VERSION=$(python -c "from pkginfo import Wheel; print(Wheel('$WHEEL_FPATH').version)")
+  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
+    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
+    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
+    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
+  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
+    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
+    \    print(cls(fpath).version)\n\")"
   - pip install -r requirements/gdal.txt
-  - echo "$WHEEL_FPATH=WHEEL_FPATH"
-  - echo "$INSTALL_EXTRAS=INSTALL_EXTRAS"
-  - echo "$MOD_VERSION=MOD_VERSION"
+  - echo "WHEEL_FPATH=$WHEEL_FPATH"
+  - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "MOD_VERSION=$MOD_VERSION"
   - pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
@@ -251,8 +277,16 @@ stages:
   - |-
     python -m pytest --verbose -p pytester -p no:doctest --xdoctest --cov-config ../pyproject.toml --cov-report term --durations=100 --cov="$MOD_NAME" "$MOD_DPATH" ../tests
   - echo "pytest command finished, moving the coverage file to the repo root"
+build/sdist:
+  <<: *build_sdist_template
+  image: python:3.11
+test/sdist/minimal-loose/cp311-linux-x86_64:
+  <<: *test_minimal-loose_template
+  image: python:3.11
+  needs:
+  - build/sdist
 build/cp38-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.8
 test/minimal-loose/cp38-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -275,7 +309,7 @@ test/full-strict/cp38-linux-x86_64:
   needs:
   - build/cp38-linux-x86_64
 build/cp39-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.9
 test/minimal-loose/cp39-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -298,7 +332,7 @@ test/full-strict/cp39-linux-x86_64:
   needs:
   - build/cp39-linux-x86_64
 build/cp310-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.10
 test/minimal-loose/cp310-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -321,7 +355,7 @@ test/full-strict/cp310-linux-x86_64:
   needs:
   - build/cp310-linux-x86_64
 build/cp311-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.11
 test/minimal-loose/cp311-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -344,7 +378,7 @@ test/full-strict/cp311-linux-x86_64:
   needs:
   - build/cp311-linux-x86_64
 build/cp312-linux-x86_64:
-  <<: *build_template
+  <<: *build_wheel_template
   image: python:3.12
 test/minimal-loose/cp312-linux-x86_64:
   <<: *test_minimal-loose_template
@@ -383,6 +417,7 @@ gpgsign/wheels:
   artifacts:
     paths:
     - dist/*.asc
+    - dist/*.tar.gz
     - dist/*.whl
     - dist/*.ots
   only:
@@ -393,17 +428,6 @@ gpgsign/wheels:
     - master
     - main
     - release
-  needs:
-  - job: build/cp38-linux-x86_64
-    artifacts: true
-  - job: build/cp39-linux-x86_64
-    artifacts: true
-  - job: build/cp310-linux-x86_64
-    artifacts: true
-  - job: build/cp311-linux-x86_64
-    artifacts: true
-  - job: build/cp312-linux-x86_64
-    artifacts: true
   script:
   - ls dist
   - export GPG_EXECUTABLE=gpg
@@ -426,7 +450,7 @@ gpgsign/wheels:
   - GPG_SIGN_CMD="$GPG_EXECUTABLE --batch --yes --detach-sign --armor --local-user
     $GPG_KEYID"
   - |-
-    WHEEL_PATHS=(dist/*.whl)
+    WHEEL_PATHS=(dist/*.whl dist/*.tar.gz)
     WHEEL_PATHS_STR=$(printf '"%s" ' "${WHEEL_PATHS[@]}")
     echo "$WHEEL_PATHS_STR"
     for WHEEL_PATH in "${WHEEL_PATHS[@]}"
@@ -439,7 +463,20 @@ gpgsign/wheels:
     done
   - ls dist
   - python -m pip install opentimestamps-client
-  - ots stamp dist/*.whl dist/*.asc
+  - ots stamp dist/*.tar.gz dist/*.whl dist/*.asc
+  needs:
+  - job: build/sdist
+    artifacts: true
+  - job: build/cp38-linux-x86_64
+    artifacts: true
+  - job: build/cp39-linux-x86_64
+    artifacts: true
+  - job: build/cp310-linux-x86_64
+    artifacts: true
+  - job: build/cp311-linux-x86_64
+    artifacts: true
+  - job: build/cp312-linux-x86_64
+    artifacts: true
 deploy/wheels:
   <<: *common_template
   image: python:3.11
@@ -451,7 +488,7 @@ deploy/wheels:
   - pip install pyopenssl ndg-httpsclient pyasn1 requests[security] twine -U
   - ls dist
   - |-
-    WHEEL_PATHS=(dist/*.whl)
+    WHEEL_PATHS=(dist/*.whl dist/*.tar.gz)
     WHEEL_PATHS_STR=$(printf '"%s" ' "${WHEEL_PATHS[@]}")
     source dev/secrets_configuration.sh
     TWINE_PASSWORD=${!VARNAME_TWINE_PASSWORD}
@@ -460,7 +497,7 @@ deploy/wheels:
     for WHEEL_PATH in "${WHEEL_PATHS[@]}"
     do
         twine check $WHEEL_PATH.asc $WHEEL_PATH
-        twine upload --username $TWINE_USERNAME --password $TWINE_PASSWORD $WHEEL_PATH.asc $WHEEL_PATH || echo "upload already exists"
+        twine upload --username $TWINE_USERNAME --password $TWINE_PASSWORD $WHEEL_PATH || echo "upload already exists"
     done
   - |-
     # Have the server git-tag the release and push the tags

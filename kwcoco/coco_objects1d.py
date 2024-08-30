@@ -73,6 +73,10 @@ class ObjectList1D(ub.NiceRepr):
 
     @property
     def _id_to_obj(self):
+        """
+        Maps the table id to a dictionary (or dict-like) containing the row
+        data for that id.
+        """
         return self._dset.index._id_lookup[self._key]
 
     def __getitem__(self, index):
@@ -90,6 +94,25 @@ class ObjectList1D(ub.NiceRepr):
         else:
             return self._ids[index]
 
+    # if 0:
+    #     # Do we want this?
+    #     def __call__(self):
+    #         """
+    #         The current convention on when to access vectorized objects (e.g.
+    #         annots / images) as methods or properties is confusing and
+    #         inconsistent. By adding a __call__ method that simply returns the
+    #         object, the user can treat properties as if they were methods.
+
+    #         Example:
+    #             >>> import kwcoco
+    #             >>> dset = kwcoco.CocoDataset.demo()
+    #             >>> # Access as a property or method
+    #             >>> result1 = dset.annots().images
+    #             >>> #result2 = dset.annots().images()
+    #             >>> #assert list(result1) == list(result2)
+    #         """
+    #         return self
+
     def unique(self):
         """
         Removes any duplicates entries in this object
@@ -104,10 +127,29 @@ class ObjectList1D(ub.NiceRepr):
     @property
     def ids(self):
         """
+        The row ids corresponding to this object
+
         Returns:
             List[int]
         """
         return self._ids
+
+    def objs_iter(self):
+        """
+        Iterate over the underlying object dictionary for each object.
+
+        Returns:
+            Generator[ObjT]: all object dictionaries
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> self = dset.images()
+            >>> objs_iter = self.objs_iter()
+            >>> assert self.objs == list(objs_iter)
+            >>> assert len(list(objs_iter)) == 0, 'should be exhausted'
+        """
+        return ub.take(self._id_to_obj, self._ids)
 
     @property
     def objs(self):
@@ -116,6 +158,13 @@ class ObjectList1D(ub.NiceRepr):
 
         Returns:
             List[ObjT]: all object dictionaries
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> self = dset.images()
+            >>> objs = self.objs
+            >>> assert len(objs) == len(self)
         """
         return list(ub.take(self._id_to_obj, self._ids))
 
@@ -311,9 +360,22 @@ class ObjectList1D(ub.NiceRepr):
                 attr_list = [_lut[_id].get(key, default) for _id in self._ids]
         return attr_list
 
-    def _iter_get(self, key, default=ub.NoParam):
+    def get_iter(self, key, default=ub.NoParam):
         """
         Iterator version of get, not in stable API yet.
+
+        Returns:
+            Generator[Any]: a generator over the requested column property
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo()
+            >>> self = dset.annots()
+            >>> image_ids = self.get('image_id')
+            >>> image_ids_iter = self.get_iter('image_id')
+            >>> hasattr(image_ids_iter, 'send')
+            >>> assert image_ids == list(image_ids_iter)
+            >>> assert len(list(image_ids_iter)) == 0, 'should be exhausted'
         """
         # TODO: sql variant
         _lut = self._id_to_obj
@@ -322,6 +384,8 @@ class ObjectList1D(ub.NiceRepr):
         else:
             attr_iter = (_lut[_id].get(key, default) for _id in self._ids)
         return attr_iter
+
+    _iter_get = get_iter  # backwards compat
 
     def set(self, key, values):
         """
@@ -567,8 +631,23 @@ class Images(ObjectList1D):
         """
         super().__init__(ids, dset, 'images')
 
+    def coco_images_iter(self):
+        """
+        Access the enriched coco image objects.
+
+        Yields:
+            CocoImage
+        """
+        yield from (self._dset.coco_image(gid) for gid in self)
+
     @property
     def coco_images(self):
+        """
+        Access the enriched coco image objects.
+
+        Returns:
+            List[CocoImage]:
+        """
         return [self._dset.coco_image(gid) for gid in self]
 
     @property
@@ -1015,3 +1094,16 @@ class ImageGroups(ObjectGroups):
         [[0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1]]
     """
     ...
+
+
+if 0:
+    # Do we want this?
+    # If so changelog note will be:
+    # * Vectorized objects can that were previously only accessible as properties,
+    #   can now be accessed as methods.
+    class CallableList(list):
+        """
+        Allows properties that return a list to behave like methods.
+        """
+        def __call__(self):
+            return self

@@ -3,118 +3,116 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoSubsetCLI(object):
-    name = 'subset'
-
-    class CocoSubetConfig(scfg.DataConfig):
-        """
-        Take a subset of this dataset and write it to a new file
-        """
-        __command__ = 'subset'
-        __default__ = {
-            'src': scfg.Value(None, help='input dataset path', position=1),
-            'dst': scfg.Value(None, help='output dataset path', position=2),
-            'include_categories': scfg.Value(
-                None, type=str, help=ub.paragraph(
-                    '''
-                    a comma separated list of categories, if specified only
-                    images containing these categories will be included.
-                    ''')),  # TODO: pattern matching?
-
-            'gids': scfg.Value(
-                None, help=ub.paragraph(
-                    '''
-                    A comma separated list of image ids.
-                    If specified, only consider these image ids
-                    ''')),
-
-            'select_images': scfg.Value(
-                None, type=str, help=ub.paragraph(
-                    '''
-                    A json query (via the jq spec) that specifies which images
-                    belong in the subset. Note, this is a passed as the body of
-                    the following jq query format string to filter valid ids
-                    '.images[] | select({select_images}) | .id'.
-
-                    Examples for this argument are as follows:
-                    '.id < 3' will select all image ids less than 3.
-                    '.file_name | test(".*png")' will select only images with
-                    file names that end with png.
-                    '.file_name | test(".*png") | not' will select only images
-                    with file names that do not end with png.
-                    '.myattr == "foo"' will select only image dictionaries
-                    where the value of myattr is "foo".
-                    '.id < 3 and (.file_name | test(".*png"))' will select only
-                    images with id less than 3 that are also pngs.
-                    .myattr | in({"val1": 1, "val4": 1}) will take images
-                    where myattr is either val1 or val4.
-
-                    Requries the "jq" python library is installed.
-                    ''')),
-
-            'channels': scfg.Value(
-                None, help=ub.paragraph(
-                    '''
-                    if specified select only images that contain these channels
-                    (specified as a kwcoco channel spec)
-                    ''')),
-
-            'select_videos': scfg.Value(
-                None, help=ub.paragraph(
-                    '''
-                    A json query (via the jq spec) that specifies which videos
-                    belong in the subset. Note, this is a passed as the body of
-                    the following jq query format string to filter valid ids
-                    '.videos[] | select({select_images}) | .id'.
-
-                    Examples for this argument are as follows:
-                    '.file_name | startswith("foo")' will select only videos
-                    where the name starts with foo.
-
-                    Only applicable for dataset that contain videos.
-
-                    Requries the "jq" python library is installed.
-                    ''')),
-
-            'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
-
-            'compress': scfg.Value('auto', help='if True writes results with compression'),
-
-            'absolute': scfg.Value('auto', help=ub.paragraph(
+class CocoSubsetCLI(scfg.DataConfig):
+    """
+    Take a subset of this dataset and write it to a new file
+    """
+    __command__ = 'subset'
+    __default__ = {
+        'src': scfg.Value(None, help='input dataset path', position=1),
+        'dst': scfg.Value(None, help='output dataset path', position=2),
+        'include_categories': scfg.Value(
+            None, type=str, help=ub.paragraph(
                 '''
-                if True will reroot all paths to be absolute before writing. If
-                "auto", becomes True if the dest dataset is written outside of
-                the source bundle directory and copy_assets is False.
+                a comma separated list of categories, if specified only
+                images containing these categories will be included.
+                ''')),  # TODO: pattern matching?
+
+        'gids': scfg.Value(
+            None, help=ub.paragraph(
                 '''
-            ))
+                A comma separated list of image ids.
+                If specified, only consider these image ids
+                '''), alias=['image_ids']),
 
-            # TODO: Add more filter criteria
-            #
-            # image size
-            # image timestamp
-            # image file name matches
-            # annotations with segmentations / keypoints?
-            # iamges/annotations that contain a special attribute?
-            # images with a maximum / minimum number of annotations?
+        'select_images': scfg.Value(
+            None, type=str, help=ub.paragraph(
+                '''
+                A json query (via the jq spec) that specifies which images
+                belong in the subset. Note, this is a passed as the body of
+                the following jq query format string to filter valid ids
+                '.images[] | select({select_images}) | .id'.
 
-            # 'rng': scfg.Value(None, help='random seed'),
-        }
-        __epilog__ = """
-        Example Usage:
-            kwcoco subset --src special:shapes8 --dst=foo.kwcoco.json
+                Examples for this argument are as follows:
+                '.id < 3' will select all image ids less than 3.
+                '.file_name | test(".*png")' will select only images with
+                file names that end with png.
+                '.file_name | test(".*png") | not' will select only images
+                with file names that do not end with png.
+                '.myattr == "foo"' will select only image dictionaries
+                where the value of myattr is "foo".
+                '.id < 3 and (.file_name | test(".*png"))' will select only
+                images with id less than 3 that are also pngs.
+                .myattr | in({"val1": 1, "val4": 1}) will take images
+                where myattr is either val1 or val4.
 
-            # Take only the even image-ids
-            kwcoco subset --src special:shapes8 --dst=foo-even.kwcoco.json --select_images '.id % 2 == 0'
+                Requries the "jq" python library is installed.
+                ''')),
 
-            # Take only the videos where the name ends with 2
-            kwcoco subset --src special:vidshapes8 --dst=vidsub.kwcoco.json --select_videos '.name | endswith("2")'
-        """
+        'channels': scfg.Value(
+            None, help=ub.paragraph(
+                '''
+                if specified select only images that contain these channels
+                (specified as a delayed-image channel spec)
+                ''')),
 
-    CLIConfig = CocoSubetConfig
+        'select_videos': scfg.Value(
+            None, help=ub.paragraph(
+                '''
+                A json query (via the jq spec) that specifies which videos
+                belong in the subset. Note, this is a passed as the body of
+                the following jq query format string to filter valid ids
+                '.videos[] | select({select_images}) | .id'.
+
+                Examples for this argument are as follows:
+                '.file_name | startswith("foo")' will select only videos
+                where the name starts with foo.
+
+                Only applicable for dataset that contain videos.
+
+                Requries the "jq" python library is installed.
+                ''')),
+
+        'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
+
+        'compress': scfg.Value('auto', help='if True writes results with compression'),
+
+        'absolute': scfg.Value('auto', help=ub.paragraph(
+            '''
+            if True will reroot all paths to be absolute before writing. If
+            "auto", becomes True if the dest dataset is written outside of
+            the source bundle directory and copy_assets is False.
+            '''
+        ))
+
+        # TODO: Add more filter criteria
+        #
+        # image size
+        # image timestamp
+        # image file name matches
+        # annotations with segmentations / keypoints?
+        # iamges/annotations that contain a special attribute?
+        # images with a maximum / minimum number of annotations?
+
+        # 'rng': scfg.Value(None, help='random seed'),
+    }
+    __epilog__ = """
+    Example Usage:
+        kwcoco subset --src special:shapes8 --dst=foo.kwcoco.json
+
+        # Take only the even image-ids
+        kwcoco subset --src special:shapes8 --dst=foo-even.kwcoco.json --select_images '.id % 2 == 0'
+
+        # Take only the videos where the name ends with 2
+        kwcoco subset --src special:vidshapes8 --dst=vidsub.kwcoco.json --select_videos '.name | endswith("2")'
+    """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
+        CommandLine:
+            xdoctest -m kwcoco.cli.coco_subset CocoSubsetCLI.main
+
         Example:
             >>> from kwcoco.cli.coco_subset import *  # NOQA
             >>> import ubelt as ub
@@ -128,7 +126,7 @@ class CocoSubsetCLI(object):
         """
         import kwcoco
 
-        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
@@ -211,6 +209,9 @@ class CocoSubsetCLI(object):
         new_dset.dump(new_dset.fpath, **dumpkw)
 
 
+__cli__ = CocoSubsetCLI
+
+
 def query_subset(dset, config):
     """
 
@@ -221,25 +222,25 @@ def query_subset(dset, config):
         >>> dset = kwcoco.CocoDataset.demo()
         >>> assert dset.n_images == 3
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.id < 3'})
+        >>> config = CocoSubsetCLI(**{'select_images': '.id < 3'})
         >>> new_dset = query_subset(dset, config)
         >>> assert new_dset.n_images == 2
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.file_name | test(".*.png")'})
+        >>> config = CocoSubsetCLI(**{'select_images': '.file_name | test(".*.png")'})
         >>> new_dset = query_subset(dset, config)
         >>> assert all(n.endswith('.png') for n in new_dset.images().lookup('file_name'))
         >>> assert new_dset.n_images == 2
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.file_name | test(".*.png") | not'})
+        >>> config = CocoSubsetCLI(**{'select_images': '.file_name | test(".*.png") | not'})
         >>> new_dset = query_subset(dset, config)
         >>> assert not any(n.endswith('.png') for n in new_dset.images().lookup('file_name'))
         >>> assert new_dset.n_images == 1
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.id < 3 and (.file_name | test(".*.png"))'})
+        >>> config = CocoSubsetCLI(**{'select_images': '.id < 3 and (.file_name | test(".*.png"))'})
         >>> new_dset = query_subset(dset, config)
         >>> assert new_dset.n_images == 1
         >>> #
-        >>> config = CocoSubsetCLI.CLIConfig(**{'select_images': '.id < 3 or (.file_name | test(".*.png"))'})
+        >>> config = CocoSubsetCLI(**{'select_images': '.id < 3 or (.file_name | test(".*.png"))'})
         >>> new_dset = query_subset(dset, config)
         >>> assert new_dset.n_images == 3
 
@@ -250,7 +251,7 @@ def query_subset(dset, config):
         >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
         >>> assert dset.n_videos == 8
         >>> assert dset.n_images == 16
-        >>> config = CocoSubsetCLI.CLIConfig(**{'select_videos': '.name == "toy_video_3"'})
+        >>> config = CocoSubsetCLI(**{'select_videos': '.name == "toy_video_3"'})
         >>> new_dset = query_subset(dset, config)
         >>> assert new_dset.n_images == 2
         >>> assert new_dset.n_videos == 1
@@ -327,8 +328,5 @@ def query_subset(dset, config):
     new_dset = dset.subset(valid_gids)
     return new_dset
 
-
-_CLI = CocoSubsetCLI
-
 if __name__ == '__main__':
-    _CLI.main()
+    __cli__.main()

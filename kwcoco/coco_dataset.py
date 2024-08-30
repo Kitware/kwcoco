@@ -2,9 +2,9 @@
 An implementation and extension of the original MS-COCO API [CocoFormat]_.
 
 The KWCoco format is backwards compatible with MS-COCO. It adds support for
-line annotations, multispectral imagery, videos in the form of images
-sequences, annotation tracks, and defines alternative (and often more
-intuitive) encodings of keypoint and segmentation data structure.
+multispectral imagery, videos in the form of images sequences, annotation
+tracks, line annotations, and defines alternative (and often more intuitive)
+encodings of keypoint and segmentation data structure.
 
 An informal description of the spec is given in:
  `coco_schema_informal.rst <coco_schema_informal.rst>`_.
@@ -1057,6 +1057,7 @@ class MixinCocoConstructors:
                 'num_videos': 1,
                 'num_frames': 2,
                 'num_tracks': 2,
+                'timestamps': False,
                 'anchors': None,
                 'image_size': (600, 600),
                 'aux': None,
@@ -2896,6 +2897,11 @@ class MixinCocoStats:
             annot_attrs(bool): return annotation attribute information', default=True
             image_attrs(bool): return image attribute information', default=True
 
+        SeeAlso:
+            :func:`kwcoco.coco_dataset.MixinCocoStats.stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.basic_stats`
+            :func:`kwcoco.coco_dataset.MixinCocoStats.extended_stats`
+
         Returns:
             dict: info
         """
@@ -2950,6 +2956,7 @@ class MixinCocoStats:
         Reports number of images, annotations, and categories.
 
         SeeAlso:
+            :func:`kwcoco.coco_dataset.MixinCocoStats.stats`
             :func:`kwcoco.coco_dataset.MixinCocoStats.basic_stats`
             :func:`kwcoco.coco_dataset.MixinCocoStats.extended_stats`
 
@@ -2998,6 +3005,7 @@ class MixinCocoStats:
         Reports number of images, annotations, and categories.
 
         SeeAlso:
+            :func:`kwcoco.coco_dataset.MixinCocoStats.stats`
             :func:`kwcoco.coco_dataset.MixinCocoStats.basic_stats`
             :func:`kwcoco.coco_dataset.MixinCocoStats.extended_stats`
 
@@ -3322,10 +3330,10 @@ class MixinCocoDraw:
             gid (int | None):
                 image id to show
             aids (list | None):
-                aids to highlight within the image
+                annotation ids to highlight within the image
             aid (int | None):
-                a specific aid to focus on. If gid is not give, look up gid
-                based on this aid.
+                a specific annotation id to focus on. If gid is not give, look
+                up gid based on this aid.
             setlim (None | str):
                 if 'image' sets the limit to the image extent
             **kwargs:
@@ -3353,7 +3361,7 @@ class MixinCocoDraw:
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi')
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
-            >>> kwplot.autompl()
+            >>> kwplot.autompl(verbose=3)
             >>> # xdoctest: -REQUIRES(--show)
             >>> dset.show_image(gid=1, channels='B8')
             >>> # xdoctest: +REQUIRES(--show)
@@ -3691,8 +3699,13 @@ class MixinCocoAddRemove:
             >>> self.remove_images([gid2])
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
         """
+        index = self.index
         if id is None:
             id = self._next_ids.get('videos')
+        elif index.videos is not None and id in index.videos:
+            raise exceptions.DuplicateAddError(f'Video id={id} already exists')
+        if index.videos is not None and name in index.name_to_video:
+            raise exceptions.DuplicateAddError(f'Video name={name} already exists')
         video = ub.odict()
         video['id'] = id
         video['name'] = name
@@ -4011,13 +4024,16 @@ class MixinCocoAddRemove:
         self._invalidate_hashid(['categories'])
         return id
 
-    def add_track(self, name, id=None, **kw):
+    def add_track(self, name=None, id=None, **kw):
         """
         Register a new track with the dataset
 
         Args:
-            name (str): name of the new track
+            name (str | None): Name of the new track.
+                If unspecified one is created based on a uuid.
+
             id (int | None): use this track id, if it was not taken
+
             **kw : stores arbitrary key/value pairs in this new image
 
         Returns:
@@ -4035,6 +4051,16 @@ class MixinCocoAddRemove:
             >>>     self.add_track('dog')
         """
         index = self.index
+
+        if name is None:
+            # auto choose name
+            import uuid
+            name = str(uuid.uuid4())
+            while index.tracks and name in index.name_to_track:
+                # This will never happen, but my brain is irrationally
+                # insisting on writing the check anyway.
+                name = str(uuid.uuid4())
+
         if index.tracks and name in index.name_to_track:
             raise exceptions.DuplicateAddError('Track name={!r} already exists'.format(name))
 
@@ -5467,6 +5493,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 containing the actual coco json structure. For a more generally
                 coercable constructor see func:`CocoDataset.coerce`.
 
+                Note: in the future, we may only accept construction from a
+                data dictionary, and use a `.load` classmethod to handle
+                reading data from a file. This will simplify (and accelerate)
+                the code in the constructor.
+
             tag (str | None) :
                 Name of the dataset for display purposes, and does not
                 influence behavior of the underlying data structure, although
@@ -5587,10 +5618,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             if not exists(fpath):
                 raise Exception(ub.paragraph(
                     '''
-                    Specified fpath={} does not exist. If you are trying
-                    to create a new dataset fist create a CocoDataset without
-                    any arguments, and then set the fpath attribute.
-                    We may loosen this requirement in the future.
+                    You cannot construct a KWCocoDataset from a non-existing
+                    file: fpath={!r}.
+                    If you are trying to create a new dataset fist create a
+                    CocoDataset without arguments: `dset = kwcoco.CocoDataset`,
+                    and then set the fpath attribute:
+                    `dset.fpath = 'your-file-path.kwcoco.zip'`
                     ''').format(fpath))
 
             self._state['was_loaded'] = True
@@ -5741,6 +5774,46 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             self.cache_dpath = cache_dpath
 
     @classmethod
+    def load(CocoDataset, file, bundle_dpath=None, autobuild=True):
+        """
+        Constructor from a open file or file path.
+
+        Args:
+            file (PathLike | IO):
+                Where to read the data. Can either be a path to a file or an
+                open file pointer / stream.
+
+        Returns:
+            CocoDataset: the loaded dataset
+
+        Example:
+            >>> import kwcoco
+            >>> # Create demo data to load
+            >>> demo_dset = kwcoco.CocoDataset.demo('shapes1')
+            >>> fpath = demo_dset.fpath
+            >>> bundle_dpath = demo_dset.bundle_dpath
+            >>> # Create a CocoDataset from the filepath
+            >>> dset1 = kwcoco.CocoDataset.load(fpath)
+            >>> # Create a CocoDataset from an open file
+            >>> with open(fpath, 'r') as file:
+            >>>     dset2 = kwcoco.CocoDataset.load(file, bundle_dpath=bundle_dpath)
+        """
+        try:
+            fpath = os.fspath(file)
+        except TypeError:
+            input_was_pathlike = False
+        else:
+            input_was_pathlike = True
+        if input_was_pathlike:
+            coco_dset = CocoDataset(fpath, bundle_dpath=bundle_dpath,
+                                    autobuild=autobuild)
+        else:
+            data = json_r.load(file)
+            coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
+                                    autobuild=autobuild)
+        return coco_dset
+
+    @classmethod
     def from_data(CocoDataset, data, bundle_dpath=None, img_root=None):
         """
         Constructor from a json dictionary
@@ -5815,7 +5888,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             workers (int | str): number of worker threads / processes.
                 Can also accept coerceable workers.
 
-            mode (str): thread, process, or serial. Defaults to process.
+            mode (str):
+                Parallelism type, can be: 'thread', 'process', or 'serial'.
+                Defaults to 'process'.
 
             verbose (int): verbosity level
 
@@ -5882,7 +5957,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             workers (int): number of worker threads / processes
 
-            mode (str): thread, process, or serial. Defaults to process.
+            mode (str):
+                Parallelism type, can be: 'thread', 'process', or 'serial'.
+                Defaults to 'process'.
 
             verbose (int): verbosity level
 
@@ -6867,14 +6944,19 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dset = cls(merged, **kwargs)
         return new_dset
 
-    def subset(self, gids, copy=False, autobuild=True):
+    def subset(self, gids=None, video_ids=None, copy=False, autobuild=True):
         """
         Return a subset of the larger coco dataset by specifying which images
         to port. All annotations in those images will be taken.
 
         Args:
-            gids (List[int]):
-                image-ids to copy into a new dataset
+            gids (List[int] | None):
+                image-ids to copy into a new dataset.
+
+            video_ids (List[int] | None):
+                list of video ids to copy into the new dataset.
+                This is a convinience argument that simply selects all image
+                ids associated with the given videos.
 
             copy (bool):
                 if True, makes a deep copy of all nested attributes, otherwise
@@ -6902,6 +6984,13 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         Example:
             >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> sub_dset = self.subset(video_ids=[1], copy=True)
+            >>> assert len(sub_dset.index.videos) == 1
+            >>> assert len(self.index.videos) == 2
+
+        Example:
+            >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
             >>> sub1 = self.subset([1])
             >>> sub2 = self.subset([2])
@@ -6917,6 +7006,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dataset['categories'] = self.dataset['categories']
         new_dataset['info'] = self.dataset.get('info', [])
         new_dataset['licenses'] = self.dataset.get('licenses', [])
+
+        if gids is None:
+            gids = []
+
+        if video_ids is not None:
+            gids = gids + list(ub.flatten(self.videos(video_ids).images.lookup('id')))
 
         chosen_gids = sorted(set(gids))
 
@@ -6937,6 +7032,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                            for aid in self.index.gid_to_aids.get(gid, [])])
         new_dataset['annotations'] = list(ub.take(self.index.anns, sub_aids))
         new_dataset['img_root'] = self.dataset.get('img_root', None)
+
+        # TODO: handle tracks table.
 
         if copy:
             from copy import deepcopy

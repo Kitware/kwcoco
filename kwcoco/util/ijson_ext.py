@@ -2,7 +2,7 @@
 Add NaN parsing to normal ijson pure-python parsing backend.
 
 References:
-    https://github.com/ICRAR/ijson/issues/33
+    .. [ijson33] https://github.com/ICRAR/ijson/issues/33
 
 Example:
     >>> # xdoctest: +REQUIRES(module:ijson)

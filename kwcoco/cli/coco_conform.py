@@ -3,65 +3,61 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoConformCLI:
-    name = 'conform'
+class CocoConformCLI(scfg.DataConfig):
+    """
+    Infer properties to make the COCO file conform to different specs.
 
-    class CLIConfig(scfg.DataConfig):
-        """
-        Infer properties to make the COCO file conform to different specs.
+    Arguments can be used to control which information is inferred.  By
+    default, information such as image size, annotation area, are added to
+    the file.
 
-        Arguments can be used to control which information is inferred.  By
-        default, information such as image size, annotation area, are added to
-        the file.
+    Other arguments like ``--legacy`` and ``--mmlab`` can be used to
+    conform to specifications expected by external tooling.
+    """
+    __command__ = 'conform'
 
-        Other arguments like ``--legacy`` and ``--mmlab`` can be used to
-        conform to specifications expected by external tooling.
-        """
+    __epilog__ = """
+    Example Usage:
+        kwcoco conform --help
+        kwcoco conform --src=special:shapes8 --dst conformed.json
+        kwcoco conform special:shapes8 conformed.json
+    """
 
-        __command__ = 'conform'
+    src = scfg.Value(None, position=1, help='the path to the input coco dataset')
+    # FIXME: required is broken with --help
 
-        __epilog__ = """
-        Example Usage:
-            kwcoco conform --help
-            kwcoco conform --src=special:shapes8 --dst conformed.json
-            kwcoco conform special:shapes8 conformed.json
-        """
+    dst = scfg.Value(None, position=2, help='the location to save the output dataset.')
 
-        src = scfg.Value(None, position=1, help='the path to the input coco dataset')
-        # FIXME: required is broken with --help
+    ensure_imgsize = scfg.Value(True, help=ub.paragraph(
+            '''
+            ensure each image has height and width attributes
+            '''))
 
-        dst = scfg.Value(None, position=2, help='the location to save the output dataset.')
+    pycocotools_info = scfg.Value(True, help=ub.paragraph(
+            '''
+            ensure information needed for pycocotools
+            '''))
 
-        ensure_imgsize = scfg.Value(True, help=ub.paragraph(
-                '''
-                ensure each image has height and width attributes
-                '''))
+    legacy = scfg.Value(False, help=ub.paragraph(
+            '''
+            if True tries to convert to the original ms-coco format
+            '''))
 
-        pycocotools_info = scfg.Value(True, help=ub.paragraph(
-                '''
-                ensure information needed for pycocotools
-                '''))
+    mmlab = scfg.Value(False, help=ub.paragraph(
+            '''
+            if True tries to convert data to be compatible with open-
+            mmlab tooling
+            '''))
 
-        legacy = scfg.Value(False, help=ub.paragraph(
-                '''
-                if True tries to convert to the original ms-coco format
-                '''))
+    compress = scfg.Value('auto', help='if True writes results with compression')
 
-        mmlab = scfg.Value(False, help=ub.paragraph(
-                '''
-                if True tries to convert data to be compatible with open-
-                mmlab tooling
-                '''))
+    workers = scfg.Value(8, help=ub.paragraph(
+            '''
+            number of background workers used for IO bound checks
+            '''))
 
-        compress = scfg.Value('auto', help='if True writes results with compression')
-
-        workers = scfg.Value(8, help=ub.paragraph(
-                '''
-                number of background workers used for IO bound checks
-                '''))
-
-        inplace = scfg.Value(False, isflag=True, help=(
-            'if True and dst is unspecified then the output will overwrite the input'))
+    inplace = scfg.Value(False, isflag=True, help=(
+        'if True and dst is unspecified then the output will overwrite the input'))
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -79,7 +75,7 @@ class CocoConformCLI:
         """
         import kwcoco
 
-        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
@@ -104,7 +100,7 @@ class CocoConformCLI:
         dset.dump(dset.fpath, **dumpkw)
 
 
-_CLI = CocoConformCLI
+__cli__ = CocoConformCLI
 
 if __name__ == '__main__':
-    _CLI.main()
+    __cli__.main()

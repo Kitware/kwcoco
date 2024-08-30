@@ -9,7 +9,9 @@ scriptconfig >= 0.7.7
 sortedcontainers >= 2.3.0
 ubelt >= 1.3.6
 uritools >= 3.0.0
-xarray >= 0.16.0
+
+xarray>=2023.10.0  ; python_version < '4.0' and python_version >= '3.12'    # Python 3.12+
+xarray>=0.16.0     ; python_version < '3.12' and python_version >= '3.8'    # Python 3.8-3.12
 
 # xdev availpkg networkx --request_min=2.2.0
 # xdev availpkg imageio
@@ -55,7 +57,7 @@ scikit-learn>=1.0.2     ; python_version < '3.9' and python_version >= '3.8'    
 scikit-learn>=0.24.1    ; python_version < '3.8' and python_version >= '3.7'    # Python 3.7
 scikit-learn>=0.24.1    ; python_version < '3.7' and python_version >= '3.6'    # Python 3.6
 
-psutil>=5.9.1     ; python_version < '4.0'  and python_version >= '3.11'    # Python 3.11+
+psutil>=5.9.6     ; python_version < '4.0'  and python_version >= '3.11'    # Python 3.11+
 psutil>=5.9.1     ; python_version < '3.11' and python_version >= '3.10'    # Python 3.10
 psutil>=5.7.3     ; python_version < '3.10' and python_version >= '3.9'     # Python 3.9
 psutil>=5.6.3     ; python_version < '3.9'  and python_version >= '3.8'     # Python 3.8

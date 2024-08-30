@@ -57,6 +57,7 @@ class DemoTorchDataset(DatasetBase):
 
 
 def worker_init_fn(worker_id):
+    import torch.utils
     worker_info = torch.utils.data.get_worker_info()
     worker_id = worker_info.id
     print(f'[Worker {worker_id}] Initialize')
@@ -74,11 +75,13 @@ def test_torch_dataset_with_sql():
         xdoctest -m ~/code/kwcoco/tests/test_sql_with_torch_datasets.py test_torch_dataset_with_sql
     """
     import pytest
+    if torch is None:
+        pytest.skip('requires torch')
     try:
         import psycopg2  # NOQA
         import sqlalchemy  # NOQA
     except ImportError:
-        pytest.skip()
+        pytest.skip('psycopg2 and sqlalchemy')
 
     dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes800')
     sql_dset = dct_dset.view_sql(backend='postgresql')

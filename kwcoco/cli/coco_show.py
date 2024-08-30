@@ -3,68 +3,84 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoShowCLI:
-    name = 'show'
+class CocoShowCLI(scfg.DataConfig):
+    """
+    Visualize a COCO image using matplotlib or opencv, optionally writing
+    it to disk.
+    """
+    __command__ = 'show'
+    __epilog__ = """
+    Example Usage:
+        kwcoco show --help
+        kwcoco show --src=special:shapes8 --gid=1
+        kwcoco show --src=special:shapes8 --gid=1 --dst out.png
+    """
+    __default__ = {
+        'src': scfg.Value(None, help=(
+            'Path to the coco dataset'), position=1),
+        'gid': scfg.Value(None, help=(
+            'Image id to show, if unspecified the first image is shown')),
+        'aid': scfg.Value(None, help=(
+            'Annotation id to show, mutually exclusive with gid')),
+        'dst': scfg.Value(None, help=(
+            'Save the image to the specified file. '
+            'If unspecified, the image is shown with pyplot')),
 
-    class CLIConfig(scfg.Config):
-        """
-        Visualize a COCO image using matplotlib or opencv, optionally writing
-        it to disk
-        """
-        __epilog__ = """
-        Example Usage:
-            kwcoco show --help
-            kwcoco show --src=special:shapes8 --gid=1
-            kwcoco show --src=special:shapes8 --gid=1 --dst out.png
-        """
-        __default__ = {
-            'src': scfg.Value(None, help=(
-                'Path to the coco dataset'), position=1),
-            'gid': scfg.Value(None, help=(
-                'Image id to show, if unspecified the first image is shown')),
-            'aid': scfg.Value(None, help=(
-                'Annotation id to show, mutually exclusive with gid')),
-            'dst': scfg.Value(None, help=(
-                'Save the image to the specified file. '
-                'If unspecified, the image is shown with pyplot')),
+        'mode': scfg.Value(
+            'matplotlib', choices=['matplotlib', 'opencv'],
+            help='method used to draw the image'
+        ),
 
-            'mode': scfg.Value(
-                'matplotlib', choices=['matplotlib', 'opencv'],
-                help='method used to draw the image'
-            ),
+        'channels': scfg.Value(
+            None, type=str, help=ub.paragraph(
+                '''
+                By default uses the default channels (usually this is rgb),
+                otherwise specify the name of an auxiliary channels
+                ''')
+        ),
 
-            'channels': scfg.Value(
-                None, type=str, help=ub.paragraph(
-                    '''
-                    By default uses the default channels (usually this is rgb),
-                    otherwise specify the name of an auxiliary channels
-                    ''')
-            ),
-
-            'show_annots': scfg.Value(True, isflag=True, help=(
-                'Overlay annotations on display')),
-            'show_labels': scfg.Value(False, isflag=True, help=(
-                'Overlay labels on annotations')),
-        }
+        'show_annots': scfg.Value(True, isflag=True, help=(
+            'Overlay annotations on display')),
+        'show_labels': scfg.Value(False, isflag=True, help=(
+            'Overlay labels on annotations')),
+    }
 
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
         TODO:
-            - [ ] Visualize auxiliary data
+            - [ ] Visualize multispectral data with assets
+
+        CommandLine:
+            xdoctest -m kwcoco.cli.coco_show CocoShowCLI.main:0
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:cv2)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
+            >>> from kwcoco.cli.coco_show import *  # NOQA
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/coco_show/').ensuredir()
+            >>> dset = kwcoco.CocoDataset.demo('special:shapes8')
+            >>> fpath = dpath / 'show_output.png'
+            >>> kw = {'src': dset.fpath, 'mode': 'opencv', 'dst': fpath}
+            >>> cmdline = False
+            >>> cls = CocoShowCLI
+            >>> cls.main(cmdline=cmdline, **kw)
+            >>> assert fpath.exists()
 
         Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}
             >>> cmdline = False
             >>> cls = CocoShowCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(cmdline=cmdline, **kw)
         """
         import kwcoco
         import kwimage
         import kwplot
 
-        config = cls.CLIConfig(kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:
@@ -126,7 +142,7 @@ class CocoShowCLI:
             raise KeyError(config['mode'])
 
 
-_CLI = CocoShowCLI
+__cli__ = CocoShowCLI
 
 if __name__ == '__main__':
     """
@@ -135,4 +151,4 @@ if __name__ == '__main__':
         python -m kwcoco.cli.coco_show --src=special:shapes8 --gid=1
         python -m kwcoco.cli.coco_show --src=special:shapes8 --gid=1 --dst out.png
     """
-    _CLI.main()
+    __cli__.main()

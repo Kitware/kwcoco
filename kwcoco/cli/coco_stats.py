@@ -3,42 +3,48 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-class CocoStatsCLI:
-    name = 'stats'
+class CocoStatsCLI(scfg.DataConfig):
+    """
+    Compute summary statistics about a COCO dataset.
 
-    class CLIConfig(scfg.DataConfig):
-        """
-        Compute summary statistics about a COCO dataset
-        """
-        __command__ = 'stats'
+    Basic stats are the number of images, annotations, categories, videos, and
+    tracks. Extended stats are also available.
 
-        src = scfg.Value(['special:shapes8'], position=1, help='path to dataset', nargs='+')
-        basic = scfg.Value(True, isflag=True, help='show basic stats')
-        extended = scfg.Value(True, isflag=True, help='show extended stats')
-        catfreq = scfg.Value(True, isflag=True, help='show category frequency stats')
-        boxes = scfg.Value(False, isflag=True, help=ub.paragraph(
-                '''
-                show bounding box stats in width-height format.
-                '''))
-        image_size = scfg.Value(False, isflag=True, help='show image size stats')
-        annot_attrs = scfg.Value(False, isflag=True, help='show annotation attribute information')
-        image_attrs = scfg.Value(False, isflag=True, help='show image attribute information')
-        video_attrs = scfg.Value(False, isflag=True, help='show video attribute information')
-        io_workers = scfg.Value(0, help=ub.paragraph(
-                '''
-                number of workers when reading multiple kwcoco files
-                '''))
-        embed = scfg.Value(False, isflag=True, help='embed into interactive shell')
+    SeeAlso:
+        kwcoco visual_stats --help
+    """
+    __command__ = 'stats'
 
-        __epilog__ = """
-        Example Usage:
-            kwcoco stats --src=special:shapes8
-            kwcoco stats --src=special:shapes8 --boxes=True
-        """
+    src = scfg.Value(['special:shapes8'], position=1, help='path to dataset', nargs='+')
+    basic = scfg.Value(True, isflag=True, help='show basic stats')
+    extended = scfg.Value(True, isflag=True, help='show extended stats')
+    catfreq = scfg.Value(True, isflag=True, help='show category frequency stats')
+    boxes = scfg.Value(False, isflag=True, help=ub.paragraph(
+            '''
+            show bounding box stats in width-height format.
+            '''))
+    image_size = scfg.Value(False, isflag=True, help='show image size stats')
+    annot_attrs = scfg.Value(False, isflag=True, help='show annotation attribute information')
+    image_attrs = scfg.Value(False, isflag=True, help='show image attribute information')
+    video_attrs = scfg.Value(False, isflag=True, help='show video attribute information')
+    io_workers = scfg.Value(0, help=ub.paragraph(
+            '''
+            number of workers when reading multiple kwcoco files
+            '''))
+    embed = scfg.Value(False, isflag=True, help='embed into interactive shell')
+
+    __epilog__ = """
+    Example Usage:
+        kwcoco stats --src=special:shapes8
+        kwcoco stats --src=special:shapes8 --boxes=True
+    """
 
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
+        CommandLine:
+            xdoctest -m kwcoco.cli.coco_stats CocoStatsCLI.main
+
         Example:
             >>> kw = {'src': 'special:shapes8'}
             >>> cmdline = False
@@ -47,7 +53,7 @@ class CocoStatsCLI:
         """
         import kwcoco
         import numpy as np
-        config = cls.CLIConfig.cli(data=kw, cmdline=cmdline)
+        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         try:
             from rich import print as rich_print
         except ImportError:
@@ -210,12 +216,11 @@ class CocoStatsCLI:
         #         print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
 
 
-_CLI = CocoStatsCLI
-main = _CLI.main
+__cli__ = CocoStatsCLI
 
 if __name__ == '__main__':
     """
     CommandLine:
         python -m kwcoco.cli.coco_stats --src=special:shapes8
     """
-    _CLI.main()
+    __cli__.main()
