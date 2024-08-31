@@ -50,6 +50,8 @@ class CocoVisualStats(scfg.DataConfig):
     __alias__ = ['plot_stats']
 
     src = scfg.Value(None, help='path to kwcoco file', position=1)
+    plots = scfg.Value(None, help='names of specific plots to create', nargs='+', position=2)
+
     dst_fpath = scfg.Value('auto', help='manifest of results. If unspecfied defaults to dst_dpath / "stats.json"')
     dst_dpath = scfg.Value('./coco_annot_stats', help='directory to dump results')
 
@@ -75,6 +77,7 @@ __cli__ = CocoVisualStats
 def run(config):
     import json
     import kwutil
+    import kwcoco
 
     dst_dpath = ub.Path(config['dst_dpath'])
     if config['dst_fpath'] == 'auto':
@@ -98,11 +101,14 @@ def run(config):
         proc_context = None
 
     import safer
-
     plots_dpath = dst_dpath / 'annot_stat_plots'
     tables_fpath = dst_dpath / 'stats_tables.json'
 
-    scalar_stats, tables_data, nonsaved_data, dataframes = build_stats_data(config)
+    with ub.Timer(label='Loading kwcoco file') as load_timer:
+        dset = kwcoco.CocoDataset.coerce(config['src'])
+
+    scalar_stats, tables_data, nonsaved_data, dataframes = build_stats_data(dset)
+    scalar_stats['kwcoco_loadtime_seconds'] = load_timer.elapsed
     rich_print(f'Write {tables_fpath}')
     with safer.open(tables_fpath, 'w', temp_file=not ub.WIN32) as fp:
         json.dump(tables_data, fp, indent='  ')
@@ -121,6 +127,18 @@ def run(config):
     rich_print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
     plots = Plots(plots_dpath, tables_data, nonsaved_data, dpi=config.dpi)
 
+    available_plots = list(plots.plot_functions.keys())
+    if config.plots is not None:
+        user_requested_plots = ub.oset(config.plots)
+        requested_plots = list(user_requested_plots & set(available_plots))
+        unknown = user_requested_plots - set(available_plots)
+        if unknown:
+            print(f'WARNING: ignoring unknown plots unknown={unknown}')
+    else:
+        requested_plots = available_plots
+    print(f'requested_plots = {ub.urepr(requested_plots, nl=1)}')
+
+    rich_print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
     with ub.Timer(label='Plotting') as plot_timer:
         pman = kwutil.util_progress.ProgressManager()
         with pman:
@@ -128,7 +146,8 @@ def run(config):
             #     # 'images_over_time',
             #     'images_timeofday_distribution',
             # ]
-            for key in pman.ProgIter(list(plots.plot_functions.keys()), desc='plot'):
+            for key in pman.ProgIter(requested_plots, desc='plot'):
+                pman.update_info(f'Plotting: {key}')
                 func = plots.plot_functions[key]
                 try:
                     func(plots)
@@ -164,28 +183,90 @@ def run(config):
         json.dump(summary_data, fp, indent='    ')
 
 
+def rerun_plots(tables_fpath):
+    """
+    TODO:
+        - [ ] Easy CLI / IPython mechanism to rerun plots with precompiled stat tables
+
+    from kwcoco.cli.coco_visual_stats import *  # NOQA
+    tables_fpath = './coco_annot_stats2/stats_tables.json'
+    import kwplot
+    import kwplot
+    kwplot.autosns()
+    """
+    import kwutil
+    tables_data = kwutil.Json.load(tables_fpath)
+    plots_dpath = None
+    nonsaved_data = None
+    dpi = None
+    plots = Plots(plots_dpath, tables_data, nonsaved_data, dpi=dpi)
+    self = plots  # NOQA
+    BuiltinPlots.polygon_area_vs_num_verts(self)
+    # plots.plot_functions['polygon_area_vs_num_verts'](self)
+
+
 def geospatial_stats(dset, images, perimage_data):
+    import math
+    import warnings
+    import numpy as np
     ESTIMATE_SUNLIGHT = 1
     if ESTIMATE_SUNLIGHT:
-        # from shitspotter.util.util_gis import coco_estimate_sunlight
-        from kwgis.util_sunlight import coco_estimate_sunlight
+        # This might be more of a domain-specific plugin feature, than
+        # something that kwcoco should be concerned with.
+
+        def coco_estimate_sunlight(dset, image_ids=None):
+            try:
+                from kwgis.utils.util_sunlight import estimate_sunlight
+                import suntime  # NOQA
+                import timezonefinder  # NOQA
+                import pytz  # NOQA
+            except ImportError as ex:
+                from kwutil.util_exception import add_exception_note
+                raise add_exception_note(ex, ub.codeblock(
+                    f'''
+                    Missing requirements, please:
+                    pip install suntime timezonefinder pytz kwgis:
+                    {ex}
+                    '''))
+            else:
+                from kwutil.util_math import Rational
+                sunlight_values = []
+                images = dset.images(image_ids)
+                for img in images.objs_iter():
+                    if 'geos_point' not in img:
+                        sunlight = math.nan
+                    else:
+                        geos_point = img['geos_point']
+                        if isinstance(geos_point, float) and math.isnan(geos_point):
+                            sunlight = math.nan
+                        elif not isinstance(geos_point, dict):
+                            warnings.warn(f'Warning: unknown geos_point format {geos_point!r} in {img!r}')
+                            sunlight = np.nan
+                        else:
+                            coords = geos_point['coordinates']
+                            point = [Rational.coerce(x) for x in coords]
+                            lon, lat = point
+                            datetime = img['datetime']
+                            sunlight = estimate_sunlight(lat, lon, datetime)
+                    sunlight_values.append(sunlight)
+                sunlight_values = np.array(sunlight_values)
+                return sunlight_values
+
         try:
             sunlight_values = coco_estimate_sunlight(dset, image_ids=images)
+            print(f'sunlight_values={sunlight_values}')
             perimage_data['sunlight'] = sunlight_values
         except ImportError:
             print('Unable to estimate sunlight')
+            raise
 
 
 @profile
-def build_stats_data(config):
-    import kwcoco
+def build_stats_data(dset):
     import kwimage
     import numpy as np
     import pandas as pd
     import json
-
-    with ub.Timer(label='Loading kwcoco file') as load_timer:
-        dset = kwcoco.CocoDataset.coerce(config['src'])
 
     with ub.Timer(label='Building tables for stats') as stats_timer:
         images = dset.images()
@@ -221,8 +302,11 @@ def build_stats_data(config):
 
         try:
             geospatial_stats(dset, images, perimage_data)
-        except Exception:
-            ...
+        except Exception as ex:
+            raise
+            print(f'Failed to build domain (geospatial) stats: ex={ex}')
+        else:
+            print('Built domain (goespatial) stats')
             # TODO: medical stats / other domain stats
 
         # try:
@@ -311,7 +395,6 @@ def build_stats_data(config):
             'perimage_data': perimage_data,
         }
 
-    scalar_stats['kwcoco_loadtime_seconds'] = load_timer.elapsed
     scalar_stats['table_buildtime_seconds'] = stats_timer.elapsed
     # if 0:
     #     import io
@@ -342,17 +425,17 @@ class Plots:
         import json
         sns = kwplot.autosns(verbose=3)
 
-        self.polys = nonsaved_data['polys']
-        boxes = nonsaved_data['boxes']
+        if nonsaved_data is not None:
+            self.polys = nonsaved_data['polys']
+            boxes = nonsaved_data['boxes']
+            self.annot_max_x = boxes.br_x.max()
+            self.annot_max_y = boxes.br_y.max()
 
         self.perannot_data = pd.read_json(json.dumps(tables_data['perannot_data']), orient='table')
         self.perimage_data = pd.read_json(json.dumps(tables_data['perimage_data']), orient='table')
+        self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
 
         self.plot_functions = {}
-
-        self.annot_max_x = boxes.br_x.max()
-        self.annot_max_y = boxes.br_y.max()
-        self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
 
         figman = kwplot.FigureManager(
             dpath=plots_dpath,
@@ -373,6 +456,8 @@ class Plots:
         self.perimage_data = self.perimage_data
 
         import inspect
+        # Might want to modify to make this nicer for interactive / reloading
+        # use cases
         unbound_methods = inspect.getmembers(BuiltinPlots, predicate=inspect.isfunction)
         for name, func in unbound_methods:
             self.register(func)
@@ -446,13 +531,14 @@ class BuiltinPlots:
         self.figman.finalize('polygon_centroid_relative_distribution.png')
 
     def image_size_histogram(self):
-        self.figman.figure(fnum=1, doclf=True).gca()
+        # self.figman.figure(fnum=1, doclf=True).gca()
         img_dsizes = [f'{w}✕{h}' for w, h in zip(self.perimage_data['width'], self.perimage_data['height'])]
         self.perimage_data['img_dsizes'] = img_dsizes
         # self.sns.histplot(data=perimage_data, x='img_dsizes', ax=ax)
         data = self.perimage_data
         x = 'img_dsizes'
-        ax_top, ax_bottom, split_point = _split_histplot(data=data, x=x)
+        snskw = dict(binwidth=1, discrete=True)
+        ax_top, ax_bottom, split_point = _split_histplot(data=data, x=x, snskw=snskw)
         ax_bottom.set_xlabel('Image Width ✕ Height')
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_title('Image Size Histogram')
@@ -460,12 +546,13 @@ class BuiltinPlots:
 
     def image_size_scatter(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)
-        self.sns.scatterplot(data=self.perimage_data, x='width', y='height', ax=ax)
+        # self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)
+        self.sns.stripplot(data=self.perimage_data, x='width', y='height', ax=ax)
+        # self.sns.swarmplot(data=self.perimage_data, x='width', y='height', ax=ax)
         ax.set_title('Image Size Distribution')
         # ax.set_aspect('equal')
         ax.set_ylabel('Image Height')
-        ax.set_ylabel('Image Width')
+        ax.set_xlabel('Image Width')
         # ax.set_xlim(0, ax.get_xlim()[1])
         # ax.set_ylim(0, ax.get_ylim()[1])
         self.figman.labels.relabel(ax)
@@ -484,25 +571,160 @@ class BuiltinPlots:
         self.figman.labels.relabel(ax)
         self.figman.finalize('obox_size_distribution.png')
 
+    def obox_size_distribution_jointplot(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        with MonkeyPatchPyPlotFigureContext(self.figman.fig):
+            self.figman.fig.clf()
+            marginal_kws = dict()
+            joint_kws = dict()
+            # marginal_kws['log_scale'] = True
+            # joint_kws['log_scale'] = True
+            jointplot_kws = dict(
+                joint_kws=joint_kws,
+                marginal_kws=marginal_kws,
+                kind='hist',
+            )
+            self.sns.jointplot(data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws)
+            ax = self.figman.fig.gca()
+            # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
+        #ax.set_xscale('log')
+        #ax.set_yscale('log')
+        ax.set_title('Oriented Bounding Box Sizes')
+        # ax.set_aspect('equal')
+        ax.set_xlim(0, ax.get_xlim()[1])
+        ax.set_ylim(0, ax.get_ylim()[1])
+        self.figman.labels.relabel(ax)
+        self.figman.finalize('obox_size_distribution_jointplot.png')
+
+    def obox_size_distribution_logscale(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
+        # self.sns.scatterplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
+
+        with MonkeyPatchPyPlotFigureContext(self.figman.fig):
+            # TODO: logscale on boxes
+            self.figman.fig.clf()
+            marginal_kws = dict()
+            joint_kws = dict()
+            marginal_kws['log_scale'] = True
+            joint_kws['log_scale'] = True
+            jointplot_kws = dict(
+                joint_kws=joint_kws,
+                marginal_kws=marginal_kws,
+                kind='hist',
+                # kind='hex',
+                # kind='scatter',
+                # hue='num_vertices'
+            )
+            self.sns.jointplot(data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws)
+            ax = self.figman.fig.gca()
+
+        ax.set_xscale('symlog')
+        ax.set_yscale('symlog')
+        ax.set_title('Oriented Bounding Box Sizes')
+        # ax.set_aspect('equal')
+        # TODO: set better min
+        minx = self.perannot_data['obox_major'].min()
+        miny = self.perannot_data['obox_minor'].min()
+        ax.set_xlim(minx, ax.get_xlim()[1])
+        ax.set_ylim(miny, ax.get_ylim()[1])
+        self.figman.labels.relabel(ax)
+        self.figman.finalize('obox_size_distribution_logscale.png')
+
     def polygon_area_vs_num_verts(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='rt_area', y='num_vertices', ax=ax)
         self.sns.scatterplot(data=self.perannot_data, x='rt_area', y='num_vertices', ax=ax)
+        # self.sns.jointplot(data=self.perannot_data, x='rt_area', y='num_vertices')
         self.figman.labels.relabel(ax)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
         ax.set_title('Polygon Area vs Num Vertices')
         self.figman.finalize('polygon_area_vs_num_verts.png')
 
+    def polygon_area_vs_num_verts_jointplot(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        with MonkeyPatchPyPlotFigureContext(self.figman.fig):
+            self.figman.fig.clf()
+            marginal_kws = dict()
+            joint_kws = dict()
+            # marginal_kws['log_scale'] = True
+            # joint_kws['log_scale'] = True
+            jointplot_kws = dict(
+                joint_kws=joint_kws,
+                marginal_kws=marginal_kws,
+                kind='hist',
+                # kind='scatter',
+            )
+            self.sns.jointplot(data=self.perannot_data, x='rt_area', y='num_vertices', **jointplot_kws)
+            ax = self.figman.fig.gca()
+        # self.sns.kdeplot(data=self.perannot_data, x='rt_area', y='num_vertices', ax=ax)
+        self.figman.labels.relabel(ax)
+
+        minx = self.perannot_data['rt_area'].min()
+        miny = self.perannot_data['num_vertices'].min()
+        ax.set_xlim(minx, ax.get_xlim()[1])
+        ax.set_ylim(miny, ax.get_ylim()[1])
+
+        # ax.set_xlim(0, ax.get_xlim()[1])
+        # ax.set_ylim(0, ax.get_ylim()[1])
+        ax.set_title('Polygon Area vs Num Vertices')
+        self.figman.finalize('polygon_area_vs_num_verts_jointplot.png')
+
+    def polygon_area_histogram_logscale(self):
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True, log_scale=True)
+        # self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True)
+        self.figman.labels.relabel(ax)
+        ax.set_title('Polygon sqrt(Area) Histogram')
+        # TODO: better min. Figman needs a good way of helping with this.
+        ax.set_xlim(10, ax.get_xlim()[1])
+        ax.set_ylabel('Number of Annotations')
+        # ax.set_yscale('symlog')
+        # ax.set_xscale('symlog')
+        self.figman.finalize('polygon_area_histogram_logscale.png')
+
     def polygon_area_histogram(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
+        # self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True, binwidth=32, log_scale=True)
         self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True)
         self.figman.labels.relabel(ax)
         ax.set_title('Polygon sqrt(Area) Histogram')
-        ax.set_xlim(0, ax.get_xlim()[1])
+        ax.set_xlim(10, ax.get_xlim()[1])
         ax.set_ylabel('Number of Annotations')
-        ax.set_yscale('symlog')
+        # ax.set_yscale('symlog')
+        # ax.set_xscale('symlog')
         self.figman.finalize('polygon_area_histogram.png')
+
+    def polygon_area_histogram_splity(self):
+        # ax = self.figman.figure(fnum=1, doclf=True).gca()
+        # self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True)
+        # self.figman.labels.relabel(ax)
+        # ax.set_title('Polygon sqrt(Area) Histogram')
+        # ax.set_xlim(0, ax.get_xlim()[1])
+        # ax.set_ylabel('Number of Annotations')
+        # ax.set_yscale('symlog')
+        # self.figman.finalize('polygon_area_histogram.png')
+
+        split_point = 'auto'
+        snskw = dict(binwidth=50, discrete=False, kde=True)
+        ax_top, ax_bottom, split_point = _split_histplot(self.perannot_data, 'rt_area', split_point, snskw=snskw)
+        ax = ax_top
+        fig = ax.figure
+
+        ax.set_yscale('linear')
+        ax_bottom.set_ylabel('Number of Annotations')
+        ax_top.set_ylabel('')
+        ax_top.set_title('Polygon sqrt(Area) Histogram')
+        # ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
+        ax.set_xlim(0, ax.get_xlim()[1])
+
+        ax_top.set_ylim(bottom=split_point)   # those limits are fake
+        ax_bottom.set_ylim(0, split_point)
+
+        # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
+        # self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)
+        self.figman.finalize('polygon_area_histogram_splity.png', fig=fig)
 
     def polygon_num_vertices_histogram(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
@@ -529,7 +751,8 @@ class BuiltinPlots:
 
     def anns_per_image_histogram_splity(self):
         split_point = 'auto'
-        ax_top, ax_bottom, split_point = _split_histplot(self.perimage_data, 'anns_per_image', split_point)
+        snskw = dict(binwidth=1, discrete=True)
+        ax_top, ax_bottom, split_point = _split_histplot(self.perimage_data, 'anns_per_image', split_point, snskw=snskw)
         ax = ax_top
         fig = ax.figure
 
@@ -643,13 +866,93 @@ class BuiltinPlots:
         self.figman.finalize('all_polygons.png', tight_layout=0)  # tight layout seems to cause issues here
 
 
-def _split_histplot(data, x, split_point='auto'):
+class MonkeyPatchPyPlotFigureContext:
+    """
+    😢 🙈 😭
+
+    Forces all calls of plt.figure to return a specific figure in this context.
+
+    References:
+        ..[Seaborn2830] https://github.com/mwaskom/seaborn/issues/2830
+
+    CommandLine:
+        TEST_MONKEY=1 xdoctest -m kwcoco.cli.coco_visual_stats MonkeyPatchPyPlotFigureContext
+
+    Example:
+        >>> # xdoctest: +REQUIRES(env:TEST_MONKEY)
+        >>> from kwcoco.cli.coco_visual_stats import *  # NOQA
+        >>> import matplotlib.pyplot as plt
+        >>> func1 = plt.figure
+        >>> self = MonkeyPatchPyPlotFigureContext('mockfig')
+        >>> with self:
+        >>>     func2 = plt.figure
+        >>> func3 = plt.figure
+        >>> print(f'func1={func1}')
+        >>> print(f'func2={func2}')
+        >>> print(f'func3={func3}')
+        >>> assert func1 is func3
+        >>> assert func1 is not func2
+    """
+    def __init__(self, fig):
+        from matplotlib import pyplot as plt
+        self.fig = fig
+        self.plt = plt
+        self._monkey_attrname = '__monkey_for_seaborn_issue_2830__'
+        self._orig_figure = None
+
+    def figure(self, *args, **kwargs):
+        """
+        Our hacked version of the figure function
+        """
+        return self.fig
+
+    def _getmonkey(self):
+        """
+        Check if there is a monkey attached to pyplot
+        """
+        return getattr(self.plt, self._monkey_attrname, None)
+
+    def _setmonkey(self):
+        """
+        We are the monkey now
+        """
+        assert self._getmonkey() is None
+        assert self._orig_figure is None
+        # TODO: make thread safe?
+        setattr(self.plt, self._monkey_attrname, 'setting-monkey')
+        self._orig_figure = self.plt.figure
+        self.plt.figure = self.figure
+        setattr(self.plt, self._monkey_attrname, self)
+
+    def _delmonkey(self):
+        """
+        Get outta here monkey
+        """
+        assert self._getmonkey() is self
+        assert self._orig_figure is not None
+        setattr(self.plt, self._monkey_attrname, 'removing-monkey')
+        self.plt.figure = self._orig_figure
+        setattr(self.plt, self._monkey_attrname, None)
+
+    def __enter__(self):
+        current_monkey = self._getmonkey()
+        if current_monkey is None:
+            self._setmonkey()
+        else:
+            raise NotImplementedError('no reentrancy for now')
+
+    def __exit__(self, ex_type, ex_value, ex_traceback):
+        if ex_traceback is not None:
+            return False
+        self._delmonkey()
+
+
+def _split_histplot(data, x, split_point='auto', snskw=None):
     """
     TODO: generalize, if there is not a huge delta between histogram
     values, then fallback to just a single histogram plot.
     Need to figure out:
-    is it possible to pass this an existing figure, so we don't always
-    create a new one with plt.subplots?
+
 
     References:
         https://stackoverflow.com/questions/32185411/break-in-x-axis-of-matplotlib
@@ -664,6 +967,8 @@ def _split_histplot(data, x, split_point='auto'):
         small_values = histogram[histogram < histogram.mean()]
         try:
             split_point = int(small_values.max() * 1.5)
+            if split_point < 20:
+                split_point = 20
         except ValueError:
             split_point = None
 
@@ -673,10 +978,19 @@ def _split_histplot(data, x, split_point='auto'):
         sns.histplot(data=data, x=x, ax=ax_top, binwidth=1, discrete=True)
         return ax_top, ax_bottom, split_point
 
-    fig, (ax_top, ax_bottom) = plt.subplots(ncols=1, nrows=2, sharex=True, gridspec_kw={'hspace': 0.05})
+    # Q: is it possible to pass this an existing figure, so we don't always
+    # create a new one with plt.subplots?
+    # A: No, but we can specify keyword args
+    fig_kw = {'num': 1, 'clear': True}
+    fig, (ax_top, ax_bottom) = plt.subplots(ncols=1, nrows=2, sharex=True,
+                                            gridspec_kw={'hspace': 0.05},
+                                            **fig_kw)
 
-    sns.histplot(data=data, x=x, ax=ax_top, binwidth=1, discrete=True)
-    sns.histplot(data=data, x=x, ax=ax_bottom, binwidth=1, discrete=True)
+    if snskw is None:
+        snskw = dict(binwidth=1, discrete=True)
+
+    sns.histplot(data=data, x=x, ax=ax_top, **snskw)
+    sns.histplot(data=data, x=x, ax=ax_bottom, **snskw)
 
     sns.despine(ax=ax_bottom)
     sns.despine(ax=ax_top, bottom=True)
