@@ -3273,7 +3273,7 @@ class MixinCocoDraw:
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo('shapes8')
-            >>> self.draw_image(1)
+            >>> canvas = self.draw_image(1)
             >>> # Now you can dump the annotated image to disk / whatever
             >>> # xdoctest: +REQUIRES(--show)
             >>> import kwplot
