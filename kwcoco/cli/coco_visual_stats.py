@@ -225,7 +225,7 @@ def geospatial_stats(dset, images, perimage_data):
                 raise add_exception_note(ex, ub.codeblock(
                     f'''
                     Missing requirements, please:
-                    pip install suntime timezonefinder pytz kwgis:
+                    pip install suntime timezonefinder pytz kwgis
                     {ex}
                     '''))
             else:
