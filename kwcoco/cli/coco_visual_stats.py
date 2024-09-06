@@ -334,12 +334,15 @@ def build_stats_data(dset):
             except Exception:
                 # Masks with linestrings can get misinterpreted, but we can fix
                 # them by considering pixels as areas isntead of points
-                mask = kwimage.Mask.coerce(ann['segmentation'])
-                poly = mask.to_multi_polygon(pixels_are='areas')
-                geom = poly.to_shapely()
-                # # Fallback onto the box if the polygon broken
-                # poly = box.to_polygon()
-                # geom = poly.to_shapely()
+                sseg = ann.get('segmentation', None)
+                if sseg is not None:
+                    mask = kwimage.Mask.coerce()
+                    poly = mask.to_multi_polygon(pixels_are='areas')
+                    geom = poly.to_shapely()
+                else:
+                    # Fallback onto the box if the polygon broken
+                    poly = box.to_polygon()
+                    geom = poly.to_shapely()
             alt_polys.append(poly)
             alt_geoms.append(geom)
 
