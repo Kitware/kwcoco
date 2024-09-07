@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.8.4 - Unreleased
 
+### Changed
+
+* Changed `visual_stats` to `plot_stats`.
+* Moved kw18 and kpf to a new `formats` submodule.
+
 
 ## Version 0.8.3 - Released 2024-08-30
 

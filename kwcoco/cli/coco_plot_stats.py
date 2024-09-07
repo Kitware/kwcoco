@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 CommandLine:
-    xdoctest -m kwcoco.cli.coco_visual_stats __doc__
+    xdoctest -m kwcoco.cli.coco_plot_stats __doc__
 
 Example:
     >>> # xdoctest: +REQUIRES(module:kwutil)
     >>> # Stats on a simple dataset
-    >>> from kwcoco.cli.coco_visual_stats import *  # NOQA
+    >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
     >>> import kwcoco
     >>> dpath = ub.Path.appdir('kwcoco/tests/vis_stats').ensuredir()
     >>> coco_fpath = kwcoco.CocoDataset.demo('vidshapes8').fpath
@@ -18,7 +18,7 @@ Example:
 Example:
     >>> # xdoctest: +REQUIRES(module:kwutil)
     >>> # Stats on a more complex dataset
-    >>> from kwcoco.cli.coco_visual_stats import *  # NOQA
+    >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
     >>> import kwcoco
     >>> import kwarray.distributions
     >>> import kwarray
@@ -46,8 +46,8 @@ class CocoVisualStats(scfg.DataConfig):
     """
     Inspect properties of dataset and write raw data tables and visual plots.
     """
-    __command__ = 'visual_stats'
-    __alias__ = ['plot_stats']
+    __command__ = 'plot_stats'
+    __alias__ = ['visual_stats']
 
     src = scfg.Value(None, help='path to kwcoco file', position=1)
     plots = scfg.Value(None, help='names of specific plots to create', nargs='+', position=2)
@@ -93,7 +93,7 @@ def run(config):
     if config.with_process_context:
         from kwutil.process_context import ProcessContext
         proc_context = ProcessContext(
-            name='kwcoco.cli.coco_visual_stats',
+            name='kwcoco.cli.coco_plot_stats',
             config=kwutil.Json.ensure_serializable(config.to_dict())
         )
         proc_context.start()
@@ -188,7 +188,7 @@ def rerun_plots(tables_fpath):
     TODO:
         - [ ] Easy CLI / IPython mechanism to rerun plots with precompiled stat tables
 
-    from kwcoco.cli.coco_visual_stats import *  # NOQA
+    from kwcoco.cli.coco_plot_stats import *  # NOQA
     tables_fpath = './coco_annot_stats2/stats_tables.json'
     import kwplot
     import kwplot
@@ -263,6 +263,10 @@ def geospatial_stats(dset, images, perimage_data):
 
 @profile
 def build_stats_data(dset):
+    """
+    Build a table of perimage and perannotation as well as a summary table of
+    higher level results.
+    """
     import kwimage
     import numpy as np
     import pandas as pd
@@ -300,6 +304,17 @@ def build_stats_data(dset):
             'datetime': datetime,
         })
 
+        area = (perimage_data['width'] * perimage_data['height'])
+        img_dsizes = perimage_data.loc[area.sort_values().index][['width', 'height']].values
+        img_dsize_tuples = list(map(tuple, img_dsizes.tolist()))
+        dsize_hist = ub.udict(ub.dict_hist(img_dsize_tuples))
+        median_area_image_size = img_dsize_tuples[len(img_dsize_tuples) // 2]
+        most_frequent_image_size = '{} x {}'.format(*list(dsize_hist.items())[-1][0])
+        scalar_stats['median_area_image_size'] = median_area_image_size
+        scalar_stats['most_frequent_image_size'] = most_frequent_image_size
+        print(f'scalar_stats = {ub.urepr(scalar_stats, nl=1)}')
+        # scalar_stats['table_buildtime_seconds'] = stats_timer.elapsed
+
         try:
             geospatial_stats(dset, images, perimage_data)
         except Exception as ex:
@@ -336,7 +351,7 @@ def build_stats_data(dset):
                 # them by considering pixels as areas isntead of points
                 sseg = ann.get('segmentation', None)
                 if sseg is not None:
-                    mask = kwimage.Mask.coerce()
+                    mask = kwimage.Mask.coerce(sseg)
                     poly = mask.to_multi_polygon(pixels_are='areas')
                     geom = poly.to_shapely()
                 else:
@@ -825,7 +840,7 @@ class BuiltinPlots:
 
         self.snskw = {}
         has_sunlight = 'sunlight' in img_df.columns
-        if has_sunlight:
+        if has_sunlight and not img_df['sunlight'].isna().all():
             palette = self.sns.color_palette("flare", n_colors=4, as_cmap=True).reversed()
             self.snskw['hue'] = 'sunlight'
             self.snskw['palette'] = palette
@@ -875,15 +890,17 @@ class MonkeyPatchPyPlotFigureContext:
 
     Forces all calls of plt.figure to return a specific figure in this context.
 
+    TODO: move to kwplot or hope seaborn updates its API.
+
     References:
         ..[Seaborn2830] https://github.com/mwaskom/seaborn/issues/2830
 
     CommandLine:
-        TEST_MONKEY=1 xdoctest -m kwcoco.cli.coco_visual_stats MonkeyPatchPyPlotFigureContext
+        TEST_MONKEY=1 xdoctest -m kwcoco.cli.coco_plot_stats MonkeyPatchPyPlotFigureContext
 
     Example:
         >>> # xdoctest: +REQUIRES(env:TEST_MONKEY)
-        >>> from kwcoco.cli.coco_visual_stats import *  # NOQA
+        >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
         >>> import matplotlib.pyplot as plt
         >>> func1 = plt.figure
         >>> self = MonkeyPatchPyPlotFigureContext('mockfig')
@@ -956,6 +973,7 @@ def _split_histplot(data, x, split_point='auto', snskw=None):
     values, then fallback to just a single histogram plot.
     Need to figure out:
 
+    TODO: move to kwplot.
 
     References:
         https://stackoverflow.com/questions/32185411/break-in-x-axis-of-matplotlib
@@ -1064,7 +1082,7 @@ if __name__ == '__main__':
     r"""
 
     CommandLine:
-        LINE_PROFILE=1 python -m kwcoco.cli.coco_visual_stats $HOME/data/dvc-repos/kwcoco/data.kwcoco.json \
+        LINE_PROFILE=1 python -m kwcoco.cli.coco_plot_stats $HOME/data/dvc-repos/kwcoco/data.kwcoco.json \
             --dst_fpath $HOME/code/kwcoco/coco_annot_stats/stats.json \
             --dst_dpath $HOME/code/kwcoco/coco_annot_stats
     """
