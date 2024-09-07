@@ -96,8 +96,14 @@ class CocoShowCLI(scfg.DataConfig):
 
         out_fpath = config['dst']
 
+        gid_sequence = None
+
         if gid is None and aid is None:
             gid = ub.peek(dset.imgs)
+            if dset.n_videos > 0:
+                gid_sequence = list(ub.flatten(dset.videos().images))
+                if len(gid_sequence):
+                    gid = gid_sequence[0]
 
         if config['mode'] == 'matplotlib':
             show_kw = {
@@ -122,8 +128,9 @@ class CocoShowCLI(scfg.DataConfig):
                     except Exception:
                         pass
                     else:
-                        gids = [gid] + list(set(dset.imgs.keys()) - {gid})
-                        for gid in xdev.InteractiveIter(gids):
+                        if gid_sequence is None:
+                            gid_sequence = [gid] + list(set(dset.imgs.keys()) - {gid})
+                        for gid in xdev.InteractiveIter(gid_sequence):
                             ax = dset.show_image(gid=gid, aid=aid, **show_kw)
                             xdev.InteractiveIter.draw()
                             plt.show(block=False)

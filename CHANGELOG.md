@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 * Changed `visual_stats` to `plot_stats`.
 * Moved kw18 and kpf to a new `formats` submodule.
+* kwcoco show now respects video frame order if available
 
 
 ## Version 0.8.3 - Released 2024-08-30

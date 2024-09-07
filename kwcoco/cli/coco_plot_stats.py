@@ -109,6 +109,7 @@ def run(config):
 
     scalar_stats, tables_data, nonsaved_data, dataframes = build_stats_data(dset)
     scalar_stats['kwcoco_loadtime_seconds'] = load_timer.elapsed
+    print(f'scalar_stats = {ub.urepr(scalar_stats, nl=1)}')
     rich_print(f'Write {tables_fpath}')
     with safer.open(tables_fpath, 'w', temp_file=not ub.WIN32) as fp:
         json.dump(tables_data, fp, indent='  ')
@@ -254,8 +255,9 @@ def geospatial_stats(dset, images, perimage_data):
 
         try:
             sunlight_values = coco_estimate_sunlight(dset, image_ids=images)
-            print(f'sunlight_values={sunlight_values}')
-            perimage_data['sunlight'] = sunlight_values
+            # print(f'sunlight_values={sunlight_values}')
+            if not np.isnan(sunlight_values).all():
+                perimage_data['sunlight'] = sunlight_values
         except ImportError:
             print('Unable to estimate sunlight')
             raise
@@ -289,7 +291,6 @@ def build_stats_data(dset):
             'frac_images_with_ge1_anns': images_with_ge1_anns / len(images),
             'frac_images_with_eq0_anns': images_with_eq0_anns / len(images),
         }
-        print(f'scalar_stats = {ub.urepr(scalar_stats, nl=1)}')
 
         # Fixme, standardize timestamp field
         datetime = [
@@ -305,8 +306,9 @@ def build_stats_data(dset):
         })
 
         area = (perimage_data['width'] * perimage_data['height'])
-        img_dsizes = perimage_data.loc[area.sort_values().index][['width', 'height']].values
-        img_dsize_tuples = list(map(tuple, img_dsizes.tolist()))
+        area_sorted_idxs = area.sort_values().index
+        img_dsizes = perimage_data.loc[area_sorted_idxs, ['width', 'height']]
+        img_dsize_tuples = list(map(tuple, img_dsizes.values.tolist()))
         dsize_hist = ub.udict(ub.dict_hist(img_dsize_tuples))
         median_area_image_size = img_dsize_tuples[len(img_dsize_tuples) // 2]
         most_frequent_image_size = '{} x {}'.format(*list(dsize_hist.items())[-1][0])
@@ -385,10 +387,22 @@ def build_stats_data(dset):
         })
         perannot_data['num_vertices'] = perannot_data.geometry.apply(geometry_length)
 
+        sorted_box_rt_area = perannot_data['box_rt_area'].sort_values()
+        mean_box_rt_area_idx = sorted_box_rt_area.index[len(sorted_box_rt_area) // 2]
+        scalar_stats['median_box_rt_area'] = perannot_data.loc[mean_box_rt_area_idx, 'box_rt_area']
+        scalar_stats['median_box_dsize'] = tuple(map(float, perannot_data.loc[mean_box_rt_area_idx, ['box_width', 'box_height']]))
+
         try:
             perannot_data = polygon_shape_stats(perannot_data)
         except Exception as ex:
             print(f'ERROR: ex={ex}')
+        else:
+            perannot_data['sseg_rt_area'].median()
+            sorted_sseg_rt_area = perannot_data['sseg_rt_area'].sort_values()
+            mean_sseg_rt_area_idx = sorted_sseg_rt_area.index[len(sorted_sseg_rt_area) // 2]
+            scalar_stats['median_sseg_rt_area'] = perannot_data.loc[mean_sseg_rt_area_idx, 'sseg_rt_area']
+            scalar_stats['median_sseg_box_dsize'] = tuple(map(float, perannot_data.loc[mean_box_rt_area_idx, ['box_width', 'box_height']]))
+            scalar_stats['median_sseg_obox_dsize'] = tuple(map(float, perannot_data.loc[mean_box_rt_area_idx, ['obox_major', 'obox_minor']]))
 
         geometry = perannot_data['geometry']
         perannot_data['centroid_x'] = geometry.apply(lambda s: s.centroid.x)
@@ -467,7 +481,7 @@ class Plots:
             'centroid_y': 'Polygon Centroid Y',
             'obox_major': 'OBox Major Axes Length',
             'obox_minor': 'OBox Minor Axes Length',
-            'rt_area': 'Polygon sqrt(Area)'
+            'sseg_rt_area': 'Polygon sqrt(Area)'
         })
         self.figman = figman
         self.sns = sns
@@ -519,7 +533,7 @@ class BuiltinPlots:
     def polygon_centroid_absolute_distribution(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax)
-        self.sns.scatterplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax, hue='rt_area', alpha=0.8)
+        self.sns.scatterplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)
         ax.set_aspect('equal')
         ax.set_title('Polygon Absolute Centroid Positions')
         #ax.set_xlim(0, max_width)
@@ -534,7 +548,7 @@ class BuiltinPlots:
     def polygon_centroid_relative_distribution(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax)
-        self.sns.scatterplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax, hue='rt_area', alpha=0.8)
+        self.sns.scatterplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)
         ax.set_aspect('equal')
         ax.set_title('Polygon Relative Centroid Positions')
         #ax.set_xlim(0, max_width)
@@ -651,9 +665,9 @@ class BuiltinPlots:
 
     def polygon_area_vs_num_verts(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.kdeplot(data=self.perannot_data, x='rt_area', y='num_vertices', ax=ax)
-        self.sns.scatterplot(data=self.perannot_data, x='rt_area', y='num_vertices', ax=ax)
-        # self.sns.jointplot(data=self.perannot_data, x='rt_area', y='num_vertices')
+        self.sns.kdeplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
+        self.sns.scatterplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
+        # self.sns.jointplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices')
         self.figman.labels.relabel(ax)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
@@ -674,12 +688,12 @@ class BuiltinPlots:
                 kind='hist',
                 # kind='scatter',
             )
-            self.sns.jointplot(data=self.perannot_data, x='rt_area', y='num_vertices', **jointplot_kws)
+            self.sns.jointplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', **jointplot_kws)
             ax = self.figman.fig.gca()
-        # self.sns.kdeplot(data=self.perannot_data, x='rt_area', y='num_vertices', ax=ax)
+        # self.sns.kdeplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
         self.figman.labels.relabel(ax)
 
-        minx = self.perannot_data['rt_area'].min()
+        minx = self.perannot_data['sseg_rt_area'].min()
         miny = self.perannot_data['num_vertices'].min()
         ax.set_xlim(minx, ax.get_xlim()[1])
         ax.set_ylim(miny, ax.get_ylim()[1])
@@ -691,8 +705,8 @@ class BuiltinPlots:
 
     def polygon_area_histogram_logscale(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True, log_scale=True)
-        # self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True)
+        self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, log_scale=True)
+        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
         self.figman.labels.relabel(ax)
         ax.set_title('Polygon sqrt(Area) Histogram')
         # TODO: better min. Figman needs a good way of helping with this.
@@ -704,8 +718,8 @@ class BuiltinPlots:
 
     def polygon_area_histogram(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        # self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True, binwidth=32, log_scale=True)
-        self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True)
+        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, binwidth=32, log_scale=True)
+        self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
         self.figman.labels.relabel(ax)
         ax.set_title('Polygon sqrt(Area) Histogram')
         ax.set_xlim(10, ax.get_xlim()[1])
@@ -716,7 +730,7 @@ class BuiltinPlots:
 
     def polygon_area_histogram_splity(self):
         # ax = self.figman.figure(fnum=1, doclf=True).gca()
-        # self.sns.histplot(data=self.perannot_data, x='rt_area', ax=ax, kde=True)
+        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
         # self.figman.labels.relabel(ax)
         # ax.set_title('Polygon sqrt(Area) Histogram')
         # ax.set_xlim(0, ax.get_xlim()[1])
@@ -726,7 +740,7 @@ class BuiltinPlots:
 
         split_point = 'auto'
         snskw = dict(binwidth=50, discrete=False, kde=True)
-        ax_top, ax_bottom, split_point = _split_histplot(self.perannot_data, 'rt_area', split_point, snskw=snskw)
+        ax_top, ax_bottom, split_point = _split_histplot(self.perannot_data, 'sseg_rt_area', split_point, snskw=snskw)
         ax = ax_top
         fig = ax.figure
 
@@ -962,9 +976,9 @@ class MonkeyPatchPyPlotFigureContext:
             raise NotImplementedError('no reentrancy for now')
 
     def __exit__(self, ex_type, ex_value, ex_traceback):
+        self._delmonkey()
         if ex_traceback is not None:
             return False
-        self._delmonkey()
 
 
 def _split_histplot(data, x, split_point='auto', snskw=None):
@@ -1043,7 +1057,7 @@ def polygon_shape_stats(df):
     import kwimage
     geometry = df['geometry']
     df['hull_rt_area'] = np.sqrt(geometry.apply(lambda s: s.convex_hull.area))
-    df['rt_area'] = np.sqrt(geometry.apply(lambda s: s.area))
+    df['sseg_rt_area'] = np.sqrt(geometry.apply(lambda s: s.area))
 
     obox_whs = [kwimage.MultiPolygon.from_shapely(s).oriented_bounding_box().extent
                 for s in df.geometry]
