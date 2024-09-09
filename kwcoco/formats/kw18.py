@@ -46,7 +46,7 @@ class KW18(kwarray.DataFrameArray):
 
     Example:
         >>> import kwcoco
-        >>> from kwcoco.kw18 import KW18
+        >>> from kwcoco.formats.kw18 import KW18
         >>> coco_dset = kwcoco.CocoDataset.demo('shapes')
         >>> kw18_dset = KW18.from_coco(coco_dset)
         >>> print(kw18_dset.pandas())
@@ -174,7 +174,7 @@ class KW18(kwarray.DataFrameArray):
             - [X] allow kwargs to specify path to frames / videos
 
         Example:
-            >>> from kwcoco.kw18 import KW18
+            >>> from kwcoco.formats.kw18 import KW18
             >>> import ubelt as ub
             >>> import kwimage
             >>> import kwcoco
@@ -268,7 +268,7 @@ class KW18(kwarray.DataFrameArray):
         """
         Example:
             >>> import kwcoco
-            >>> from kwcoco.kw18 import KW18
+            >>> from kwcoco.formats.kw18 import KW18
             >>> coco_dset = kwcoco.CocoDataset.demo('shapes')
             >>> kw18_dset = KW18.from_coco(coco_dset)
             >>> print(kw18_dset.pandas())

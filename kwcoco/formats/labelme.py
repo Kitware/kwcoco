@@ -10,7 +10,7 @@ def labelme_to_coco_structure(labelme_data):
     CocoDataset.
 
     Example:
-        >>> from kwcoco.labelme import *  # NOQA
+        >>> from kwcoco.formats.labelme import *  # NOQA
         >>> labelme_data = {
         >>>     'flags': {},
         >>>     'imageData': None,

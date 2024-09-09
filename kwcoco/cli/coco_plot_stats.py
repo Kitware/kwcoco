@@ -483,6 +483,10 @@ class Plots:
         import json
         import inspect
 
+        # kwplot 0.5.3 doesnt provide util_seaborn access via lazy loading
+        # work around this
+        import kwplot.util_seaborn
+
         self.plots_dpath = plots_dpath
         self.tables_data = tables_data
         self.nonsaved_data = nonsaved_data
