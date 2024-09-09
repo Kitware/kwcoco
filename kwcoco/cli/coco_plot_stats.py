@@ -471,6 +471,7 @@ class Plots:
         Helper for tweaking visualizations
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> self = Plots.demo(timestamps=True)
             >>> self.perimage_data
             >>> self.perannot_data
@@ -611,6 +612,7 @@ class BuiltinPlots:
     def polygon_centroid_absolute_distribution_jointplot(self):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_centroid_absolute_distribution_jointplot'](self)
@@ -642,6 +644,7 @@ class BuiltinPlots:
     def polygon_centroid_relative_distribution_jointplot(self):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_centroid_relative_distribution_jointplot'](self)
@@ -679,6 +682,7 @@ class BuiltinPlots:
     def image_size_histogram(self):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True, image_size='random', num_frames=100)
             >>> self['image_size_histogram'](self)
@@ -701,6 +705,7 @@ class BuiltinPlots:
     def image_size_scatter(self):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True, image_size='random', num_frames=100)
             >>> self['image_size_scatter'](self)
@@ -835,6 +840,7 @@ class BuiltinPlots:
     def polygon_area_vs_num_verts_jointplot_logscale(self):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_area_vs_num_verts_jointplot_logscale'](self)
@@ -998,6 +1004,7 @@ class BuiltinPlots:
     def images_over_time(self):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['images_over_time'](self)
@@ -1061,6 +1068,7 @@ class BuiltinPlots:
     def all_polygons(self):
         """
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['all_polygons'](self)
