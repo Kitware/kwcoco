@@ -7,7 +7,7 @@ import ubelt as ub
 __dev_notes__ = """
 SeeAlso:
     ~/code/graphid/graphid/cli/finish_install.py
-    ~/code/geowatch/geowatch/cli/special/finish_install.py
+    ~/code/kwcoco/kwcoco/cli/finish_install.py
 """
 
 
@@ -15,7 +15,7 @@ class FinishInstallCLI(scfg.DataConfig):
     """
     Finish the install of kwcoco.
 
-    This is a special script that handles install logic that could not be added
+    This is a script that handles install logic that could not be added
     to the setup.py
     """
     __command__ = 'finish_install'
@@ -30,7 +30,7 @@ class FinishInstallCLI(scfg.DataConfig):
         """
         Example:
             >>> # xdoctest: +SKIP
-            >>> from geowatch.cli.special.finish_install import *  # NOQA
+            >>> from kwcoco.cli.finish_install import *  # NOQA
             >>> cmdline = 0
             >>> kwargs = dict()
             >>> main(cmdline=cmdline, **kwargs)
@@ -70,7 +70,7 @@ class FinishInstallCLI(scfg.DataConfig):
 
 def get_optional_requirements(name, strict=False):
     try:
-        from geowatch.rc.registry import requirement_path
+        from kwcoco.rc.registry import requirement_path
     except Exception:
         raise
         requirement_path = None
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     """
 
     CommandLine:
-        python ~/code/watch/geowatch/cli/special/finish_install.py
-        python -m geowatch.cli.special.finish_install
+        python ~/code/watch/kwcoco/cli/finish_install.py
+        python -m kwcoco.cli.finish_install
     """
     main()
