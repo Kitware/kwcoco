@@ -17,6 +17,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 
 * Added basic helpers for converting from labelme and voc annotations
+* Added finish-install helper script.
 
 
 

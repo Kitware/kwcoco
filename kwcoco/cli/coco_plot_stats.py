@@ -238,12 +238,15 @@ def geospatial_stats(dset, images, perimage_data):
                 import pytz  # NOQA
             except ImportError as ex:
                 from kwutil.util_exception import add_exception_note
-                raise add_exception_note(ex, ub.codeblock(
-                    f'''
+                msg = f'''
                     Missing requirements, please:
                     pip install suntime timezonefinder pytz kwgis
                     {ex}
-                    '''))
+                    '''
+                if 0:
+                    raise add_exception_note(ex, ub.codeblock(msg))
+                else:
+                    warnings.warn(msg)
             else:
                 from kwutil.util_math import Rational
                 sunlight_values = []
