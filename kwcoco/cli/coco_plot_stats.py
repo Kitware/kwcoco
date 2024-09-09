@@ -279,6 +279,8 @@ def geospatial_stats(dset, images, perimage_data):
         except ImportError:
             print('Unable to estimate sunlight')
             raise
+        except Exception:
+            print('Unable to estimate sunlight')
 
 
 @profile
