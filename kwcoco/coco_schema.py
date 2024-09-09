@@ -143,6 +143,7 @@ SEGMENTATION = ANYOF(POLYGON, RUN_LENGTH_ENCODING)
 
 # Names cannot contain certain special characters
 NAME = STRING(pattern='[^/]+')
+EMPTY = STRING(pattern='^$')
 
 
 CATEGORY = OBJECT({
@@ -151,7 +152,7 @@ CATEGORY = OBJECT({
 
     'alias': ARRAY(NAME, description='A list of alternate names that should be resolved to this category'),
 
-    'supercategory': ANYOF(NAME(description='A coarser category name'), NULL),
+    'supercategory': ANYOF(NAME(description='A coarser category name'), NULL, EMPTY),
     'parents': ARRAY(NAME, description='Used for multiple inheritance'),
 
     # Legacy
@@ -166,7 +167,7 @@ KEYPOINT_CATEGORY = OBJECT(
     PROPERTIES={
         'name': NAME(description='The name of the keypoint category'),
         'id': INTEGER,
-        'supercategory': ANYOF(NAME, NULL),
+        'supercategory': ANYOF(NAME, NULL, EMPTY),
         # TODO: should have this name changed to reflect the fact it is horizontal.
         # TODO: should add a variant of this for vertical or other transforms.
         'reflection_id': ANYOF(INTEGER, NULL)(

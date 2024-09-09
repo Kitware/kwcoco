@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 CommandLine:
-    xdoctest -m kwcoco.cli.coco_plot_stats __doc__
+    xdoctest -m kwcoco.cli.coco_plot_stats __doc__:0
+    xdoctest -m kwcoco.cli.coco_plot_stats __doc__:1
 
 Example:
     >>> # xdoctest: +REQUIRES(module:kwutil)
@@ -12,7 +13,7 @@ Example:
     >>> coco_fpath = kwcoco.CocoDataset.demo('vidshapes8').fpath
     >>> cmdline = 0
     >>> kwargs = dict(src=coco_fpath, dst_dpath=dpath)
-    >>> cls = CocoVisualStats
+    >>> cls = PlotStatsCLI
     >>> cls.main(cmdline=cmdline, **kwargs)
 
 Example:
@@ -29,7 +30,7 @@ Example:
     >>> coco_fpath = dset.fpath
     >>> cmdline = 0
     >>> kwargs = dict(src=coco_fpath, dst_dpath=dpath)
-    >>> cls = CocoVisualStats
+    >>> cls = PlotStatsCLI
     >>> cls.main(cmdline=cmdline, **kwargs)
 """
 import scriptconfig as scfg
@@ -42,7 +43,7 @@ except ImportError:
     profile = ub.identity
 
 
-class CocoVisualStats(scfg.DataConfig):
+class PlotStatsCLI(scfg.DataConfig):
     """
     Inspect properties of dataset and write raw data tables and visual plots.
     """
@@ -70,14 +71,41 @@ class CocoVisualStats(scfg.DataConfig):
         rich_print('config = ' + escape(ub.urepr(config, nl=1)))
         run(config)
 
-__cli__ = CocoVisualStats
+__cli__ = PlotStatsCLI
+
+
+def prep_plots(src, plots_dpath=None, dpi=300):
+    import kwcoco
+    import json
+    from kwcoco.util.util_rich import rich_print
+
+    with ub.Timer(label='Loading kwcoco file') as load_timer:
+        dset = kwcoco.CocoDataset.coerce(src)
+
+    scalar_stats, tables_data, nonsaved_data, dataframes = build_stats_data(dset)
+    scalar_stats['kwcoco_loadtime_seconds'] = load_timer.elapsed
+
+    if 1:
+        perimage_data = dataframes['perimage_data']
+        perannot_data = dataframes['perannot_data']
+        perannot_summary = json.loads(perannot_data.describe().to_json())
+        perimage_summary = json.loads(perimage_data.describe().to_json())
+        rich_print('perannot_summary:')
+        rich_print(ub.urepr(perannot_summary, nl=-1, align=':', precision=2))
+        rich_print('perimage_summary:')
+        rich_print(ub.urepr(perimage_summary, nl=-1, align=':', precision=2))
+
+    print('Preparing plots')
+    plots = Plots(plots_dpath, tables_data, nonsaved_data, dpi=dpi)
+    plots.scalar_stats = scalar_stats
+    return plots
 
 
 @profile
 def run(config):
     import json
+    import safer
     import kwutil
-    import kwcoco
 
     dst_dpath = ub.Path(config['dst_dpath'])
     if config['dst_fpath'] == 'auto':
@@ -86,6 +114,9 @@ def run(config):
         dst_fpath = ub.Path(config['dst_fpath'])
     dst_dpath = dst_dpath.absolute()
     dst_dpath.ensuredir()
+    plots_dpath = dst_dpath / 'annot_stat_plots'
+    tables_fpath = dst_dpath / 'stats_tables.json'
+    tables_fpath = dst_dpath / 'stats_tables.json'
 
     from kwcoco.util.util_rich import rich_print
     rich_print(f'Destination Path: [link={dst_dpath}]{dst_dpath}[/link]')
@@ -100,33 +131,17 @@ def run(config):
     else:
         proc_context = None
 
-    import safer
-    plots_dpath = dst_dpath / 'annot_stat_plots'
-    tables_fpath = dst_dpath / 'stats_tables.json'
+    src = config['src']
+    dpi = config.dpi
+    plots = prep_plots(src, plots_dpath, dpi=dpi)
+    tables_data = plots.tables_data
+    rich_print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
+    scalar_stats = plots.scalar_stats
 
-    with ub.Timer(label='Loading kwcoco file') as load_timer:
-        dset = kwcoco.CocoDataset.coerce(config['src'])
-
-    scalar_stats, tables_data, nonsaved_data, dataframes = build_stats_data(dset)
-    scalar_stats['kwcoco_loadtime_seconds'] = load_timer.elapsed
     print(f'scalar_stats = {ub.urepr(scalar_stats, nl=1)}')
     rich_print(f'Write {tables_fpath}')
     with safer.open(tables_fpath, 'w', temp_file=not ub.WIN32) as fp:
         json.dump(tables_data, fp, indent='  ')
-
-    if 1:
-        perimage_data = dataframes['perimage_data']
-        perannot_data = dataframes['perannot_data']
-        perannot_summary = json.loads(perannot_data.describe().to_json())
-        perimage_summary = json.loads(perimage_data.describe().to_json())
-        rich_print('perannot_summary:')
-        rich_print(ub.urepr(perannot_summary, nl=-1, align=':', precision=2))
-        rich_print('perimage_summary:')
-        rich_print(ub.urepr(perimage_summary, nl=-1, align=':', precision=2))
-
-    print('Preparing plots')
-    rich_print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
-    plots = Plots(plots_dpath, tables_data, nonsaved_data, dpi=config.dpi)
 
     available_plots = list(plots.plot_functions.keys())
     if config.plots is not None:
@@ -396,8 +411,8 @@ def build_stats_data(dset):
             perannot_data = polygon_shape_stats(perannot_data)
         except Exception as ex:
             print(f'ERROR: ex={ex}')
+            raise
         else:
-            perannot_data['sseg_rt_area'].median()
             sorted_sseg_rt_area = perannot_data['sseg_rt_area'].sort_values()
             mean_sseg_rt_area_idx = sorted_sseg_rt_area.index[len(sorted_sseg_rt_area) // 2]
             scalar_stats['median_sseg_rt_area'] = perannot_data.loc[mean_sseg_rt_area_idx, 'sseg_rt_area']
@@ -445,16 +460,34 @@ class Plots:
 
     _plot_function_registery = {}
 
+    @classmethod
+    def demo(cls, **kwargs):
+        """
+        Helper for tweaking visualizations
+
+        Example:
+            >>> self = Plots.demo(timestamps=True)
+            >>> self.perimage_data
+            >>> self.perannot_data
+        """
+        import kwcoco
+        dpath = ub.Path.appdir('kwcoco/demo/vis_stats').ensuredir()
+        src = kwcoco.CocoDataset.demo('vidshapes8', **kwargs)
+        plots = prep_plots(src, plots_dpath=dpath)
+        return plots
+
     @profile
     def __init__(self, plots_dpath, tables_data, nonsaved_data, dpi=300):
+        import kwplot
+        import pandas as pd
+        import json
+        import inspect
+
         self.plots_dpath = plots_dpath
         self.tables_data = tables_data
         self.nonsaved_data = nonsaved_data
         self.dpi = dpi
 
-        import kwplot
-        import pandas as pd
-        import json
         sns = kwplot.autosns(verbose=3)
 
         if nonsaved_data is not None:
@@ -466,7 +499,6 @@ class Plots:
         self.perannot_data = pd.read_json(json.dumps(tables_data['perannot_data']), orient='table')
         self.perimage_data = pd.read_json(json.dumps(tables_data['perimage_data']), orient='table')
         self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
-
         self.plot_functions = {}
 
         figman = kwplot.FigureManager(
@@ -476,6 +508,8 @@ class Plots:
         )
         # define label mappings for humans
         figman.labels.add_mapping({
+            'pd_datetime': 'Datetime',
+            # 'collection_size': '',
             'num_vertices': 'Num Polygon Vertices',
             'centroid_x': 'Polygon Centroid X',
             'centroid_y': 'Polygon Centroid Y',
@@ -485,14 +519,17 @@ class Plots:
         })
         self.figman = figman
         self.sns = sns
+        self.kwplot = kwplot
         self.perimage_data = self.perimage_data
 
-        import inspect
         # Might want to modify to make this nicer for interactive / reloading
         # use cases
         unbound_methods = inspect.getmembers(BuiltinPlots, predicate=inspect.isfunction)
         for name, func in unbound_methods:
             self.register(func)
+
+    def __getitem__(self, key):
+        return self.plot_functions[key]
 
     def register(self, func):
         key = func.__name__
@@ -562,7 +599,82 @@ class BuiltinPlots:
         ax.invert_yaxis()
         self.figman.finalize('polygon_centroid_relative_distribution.png')
 
+    def polygon_centroid_absolute_distribution_jointplot(self):
+        """
+        Example:
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo(timestamps=True)
+            >>> self['polygon_centroid_absolute_distribution_jointplot'](self)
+        """
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
+            self.figman.fig.clf()
+            marginal_kws = dict()
+            joint_kws = dict()
+            # marginal_kws['log_scale'] = True
+            # joint_kws['log_scale'] = True
+            jointplot_kws = dict(
+                joint_kws=joint_kws,
+                marginal_kws=marginal_kws,
+                kind='hist',
+            )
+            self.sns.jointplot(data=self.perannot_data, x='centroid_x', y='centroid_y', **jointplot_kws)
+            ax = self.figman.fig.gca()
+        ax.set_title('Polygon Absolute Centroid Positions')
+        #ax.set_xlim(0, max_width)
+        #ax.set_ylim(0, max_height)
+        ax.set_xlim(0, ax.get_xlim()[1])
+        ax.set_ylim(0, ax.get_ylim()[1])
+        self.figman.labels.relabel(ax)
+        # ax.set_aspect('equal')
+        ax.invert_yaxis()
+        self.figman.finalize('polygon_centroid_absolute_distribution_jointplot.png')
+
+    def polygon_centroid_relative_distribution_jointplot(self):
+        """
+        Example:
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo(timestamps=True)
+            >>> self['polygon_centroid_relative_distribution_jointplot'](self)
+        """
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+
+        # self.sns.kdeplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax)
+        # self.sns.scatterplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)
+
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
+            self.figman.fig.clf()
+            marginal_kws = dict()
+            joint_kws = dict()
+            # marginal_kws['log_scale'] = True
+            # joint_kws['log_scale'] = True
+            jointplot_kws = dict(
+                joint_kws=joint_kws,
+                marginal_kws=marginal_kws,
+                kind='hist',
+            )
+            self.sns.jointplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', **jointplot_kws)
+            ax = self.figman.fig.gca()
+            # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
+        ax.set_title('Polygon Relative Centroid Positions')
+        ax.set_xlim(0, ax.get_xlim()[1])
+        ax.set_ylim(0, ax.get_ylim()[1])
+        ax.set_xlabel('Polygon X Centroid')
+        ax.set_ylabel('Polygon Y Centroid')
+        self.figman.labels.relabel(ax)
+        # ax.set_aspect('equal')
+        ax.invert_yaxis()
+        self.figman.finalize('polygon_centroid_relative_distribution_jointplot.png')
+
     def image_size_histogram(self):
+        """
+        Example:
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo(timestamps=True, image_size='random', num_frames=100)
+            >>> self['image_size_histogram'](self)
+        """
+        import kwplot
         # self.figman.figure(fnum=1, doclf=True).gca()
         img_dsizes = [f'{w}✕{h}' for w, h in zip(self.perimage_data['width'], self.perimage_data['height'])]
         self.perimage_data['img_dsizes'] = img_dsizes
@@ -570,16 +682,24 @@ class BuiltinPlots:
         data = self.perimage_data
         x = 'img_dsizes'
         snskw = dict(binwidth=1, discrete=True)
-        ax_top, ax_bottom, split_point = _split_histplot(data=data, x=x, snskw=snskw)
+        ax_top, ax_bottom, split_y = kwplot.util_seaborn.histplot_splity(
+            data=data, x=x, **snskw)
         ax_bottom.set_xlabel('Image Width ✕ Height')
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_title('Image Size Histogram')
         self.figman.finalize('image_size_histogram.png', fig=ax_top.figure)
 
     def image_size_scatter(self):
+        """
+        Example:
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo(timestamps=True, image_size='random', num_frames=100)
+            >>> self['image_size_scatter'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         # self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)
-        self.sns.stripplot(data=self.perimage_data, x='width', y='height', ax=ax)
+        # self.sns.stripplot(data=self.perimage_data, x='width', y='height', ax=ax)
+        self.sns.scatterplot(data=self.perimage_data, x='width', y='height', ax=ax)
         # self.sns.swarmplot(data=self.perimage_data, x='width', y='height', ax=ax)
         ax.set_title('Image Size Distribution')
         # ax.set_aspect('equal')
@@ -605,7 +725,7 @@ class BuiltinPlots:
 
     def obox_size_distribution_jointplot(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        with MonkeyPatchPyPlotFigureContext(self.figman.fig):
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
             self.figman.fig.clf()
             marginal_kws = dict()
             joint_kws = dict()
@@ -633,7 +753,7 @@ class BuiltinPlots:
         # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
         # self.sns.scatterplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
 
-        with MonkeyPatchPyPlotFigureContext(self.figman.fig):
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
             # TODO: logscale on boxes
             self.figman.fig.clf()
             marginal_kws = dict()
@@ -676,7 +796,7 @@ class BuiltinPlots:
 
     def polygon_area_vs_num_verts_jointplot(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        with MonkeyPatchPyPlotFigureContext(self.figman.fig):
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
             self.figman.fig.clf()
             marginal_kws = dict()
             joint_kws = dict()
@@ -702,6 +822,47 @@ class BuiltinPlots:
         # ax.set_ylim(0, ax.get_ylim()[1])
         ax.set_title('Polygon Area vs Num Vertices')
         self.figman.finalize('polygon_area_vs_num_verts_jointplot.png')
+
+    def polygon_area_vs_num_verts_jointplot_logscale(self):
+        """
+        Example:
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo(timestamps=True)
+            >>> self['polygon_area_vs_num_verts_jointplot_logscale'](self)
+        """
+        ax = self.figman.figure(fnum=1, doclf=True).gca()
+
+        x = 'sseg_rt_area'
+        y = 'num_vertices'
+        # Hack for logscale to work
+        perannot_data = self.perannot_data.copy()
+        perannot_data[perannot_data[y] == 0] = float('nan')
+        perannot_data[perannot_data[x] == 0] = float('nan')
+        maxx = perannot_data[x].max()
+        maxy = perannot_data[y].max()
+        minx = perannot_data[x].min()
+        miny = perannot_data[y].min()
+
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
+            self.figman.fig.clf()
+            marginal_kws = dict()
+            joint_kws = dict()
+            marginal_kws['log_scale'] = True
+            joint_kws['log_scale'] = True
+            jointplot_kws = dict(
+                joint_kws=joint_kws,
+                marginal_kws=marginal_kws,
+                kind='hist',
+                # kind='scatter',
+            )
+            self.sns.jointplot(data=perannot_data, x=x, y=y, **jointplot_kws)
+            ax = self.figman.fig.gca()
+        self.figman.labels.relabel(ax)
+        ax.set_xlim(minx, maxx)
+        ax.set_ylim(miny, maxy)
+
+        ax.set_title('Polygon Area vs Num Vertices')
+        self.figman.finalize('polygon_area_vs_num_verts_jointplot_logscale.png')
 
     def polygon_area_histogram_logscale(self):
         ax = self.figman.figure(fnum=1, doclf=True).gca()
@@ -738,9 +899,11 @@ class BuiltinPlots:
         # ax.set_yscale('symlog')
         # self.figman.finalize('polygon_area_histogram.png')
 
-        split_point = 'auto'
+        split_y = 'auto'
         snskw = dict(binwidth=50, discrete=False, kde=True)
-        ax_top, ax_bottom, split_point = _split_histplot(self.perannot_data, 'sseg_rt_area', split_point, snskw=snskw)
+        ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(
+            data=self.perannot_data, x='sseg_rt_area', split_y=split_y,
+            **snskw)
         ax = ax_top
         fig = ax.figure
 
@@ -751,8 +914,8 @@ class BuiltinPlots:
         # ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
         ax.set_xlim(0, ax.get_xlim()[1])
 
-        ax_top.set_ylim(bottom=split_point)   # those limits are fake
-        ax_bottom.set_ylim(0, split_point)
+        ax_top.set_ylim(bottom=split_y)   # those limits are fake
+        ax_bottom.set_ylim(0, split_y)
 
         # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
         # self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)
@@ -782,9 +945,12 @@ class BuiltinPlots:
         self.figman.finalize('anns_per_image_histogram.png')
 
     def anns_per_image_histogram_splity(self):
-        split_point = 'auto'
+        split_y = 'auto'
         snskw = dict(binwidth=1, discrete=True)
-        ax_top, ax_bottom, split_point = _split_histplot(self.perimage_data, 'anns_per_image', split_point, snskw=snskw)
+        ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(
+            data=self.perimage_data, x='anns_per_image', split_y=split_y,
+            **snskw
+        )
         ax = ax_top
         fig = ax.figure
 
@@ -795,8 +961,8 @@ class BuiltinPlots:
         ax_top.set_title('Number of Annotations per Image')
         ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
 
-        ax_top.set_ylim(bottom=split_point)   # those limits are fake
-        ax_bottom.set_ylim(0, split_point)
+        ax_top.set_ylim(bottom=split_y)   # those limits are fake
+        ax_bottom.set_ylim(0, split_y)
 
         # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
         self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)
@@ -821,6 +987,12 @@ class BuiltinPlots:
         self.figman.finalize('anns_per_image_histogram_ge1.png')
 
     def images_over_time(self):
+        """
+        Example:
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo(timestamps=True)
+            >>> self['images_over_time'](self)
+        """
         import pandas as pd
         import numpy as np
         img_df = self.perimage_data.sort_values('datetime')
@@ -828,7 +1000,7 @@ class BuiltinPlots:
         img_df['collection_size'] = np.arange(1, len(img_df) + 1)
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.histplot(data=img_df, x='pd_datetime', ax=ax, cumulative=True)
-        self.sns.lineplot(data=img_df, x='pd_datetime', y='collection_size')
+        # self.sns.lineplot(data=img_df, x='pd_datetime', y='collection_size')
         ax.set_title('Images collected over time')
         ax.set_xlabel('Datetime')
         ax.set_ylabel('Number of Images Collected')
@@ -878,13 +1050,26 @@ class BuiltinPlots:
         self.figman.finalize('images_timeofday_distribution.png')
 
     def all_polygons(self):
+        """
+        Example:
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo(timestamps=True)
+            >>> self['all_polygons'](self)
+
+        Ignore:
+            https://drive.google.com/file/d/1mUzJw4QrDfxWqqCsPZ_C7QWcQbfR_IBb/view
+            ~/code/kwimage/kwimage/_im_color_data.py
+        """
+        import kwimage
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        edgecolor = 'black'
-        facecolor = 'baby shit brown'  # its a real color!
-        #edgecolor = 'darkblue'
-        #facecolor = 'lawngreen'
-        #edgecolor = kwimage.Color.coerce('kitware_darkblue').as01()
-        #facecolor = kwimage.Color.coerce('kitware_green').as01()
+        # edgecolor = kwimage.Color.coerce('kitware_darkblue').as01()
+        # facecolor = kwimage.Color.coerce('kitware_green').as01()
+        # edgecolor = kwimage.Color.coerce('white').as01()
+        # facecolor = kwimage.Color.coerce('kitware_darkblue').as01()
+        # edgecolor = kwimage.Color.coerce('almost black').as01()
+        edgecolor = kwimage.Color.coerce('kitware_darkgray').as01()
+        # facecolor = kwimage.Color.coerce('kitware_green').as01()
+        facecolor = kwimage.Color.coerce('#b1dfaa').as01()
         self.polys.draw(alpha=0.5, edgecolor=edgecolor, facecolor=facecolor)
         ax.set_xlabel('Image X Coordinate')
         ax.set_ylabel('Image Y Coordinate')
@@ -898,172 +1083,42 @@ class BuiltinPlots:
         self.figman.finalize('all_polygons.png', tight_layout=0)  # tight layout seems to cause issues here
 
 
-class MonkeyPatchPyPlotFigureContext:
-    """
-    😢 🙈 😭
-
-    Forces all calls of plt.figure to return a specific figure in this context.
-
-    TODO: move to kwplot or hope seaborn updates its API.
-
-    References:
-        ..[Seaborn2830] https://github.com/mwaskom/seaborn/issues/2830
-
-    CommandLine:
-        TEST_MONKEY=1 xdoctest -m kwcoco.cli.coco_plot_stats MonkeyPatchPyPlotFigureContext
-
-    Example:
-        >>> # xdoctest: +REQUIRES(env:TEST_MONKEY)
-        >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
-        >>> import matplotlib.pyplot as plt
-        >>> func1 = plt.figure
-        >>> self = MonkeyPatchPyPlotFigureContext('mockfig')
-        >>> with self:
-        >>>     func2 = plt.figure
-        >>> func3 = plt.figure
-        >>> print(f'func1={func1}')
-        >>> print(f'func2={func2}')
-        >>> print(f'func3={func3}')
-        >>> assert func1 is func3
-        >>> assert func1 is not func2
-    """
-    def __init__(self, fig):
-        from matplotlib import pyplot as plt
-        self.fig = fig
-        self.plt = plt
-        self._monkey_attrname = '__monkey_for_seaborn_issue_2830__'
-        self._orig_figure = None
-
-    def figure(self, *args, **kwargs):
-        """
-        Our hacked version of the figure function
-        """
-        return self.fig
-
-    def _getmonkey(self):
-        """
-        Check if there is a monkey attached to pyplot
-        """
-        return getattr(self.plt, self._monkey_attrname, None)
-
-    def _setmonkey(self):
-        """
-        We are the monkey now
-        """
-        assert self._getmonkey() is None
-        assert self._orig_figure is None
-        # TODO: make thread safe?
-        setattr(self.plt, self._monkey_attrname, 'setting-monkey')
-        self._orig_figure = self.plt.figure
-        self.plt.figure = self.figure
-        setattr(self.plt, self._monkey_attrname, self)
-
-    def _delmonkey(self):
-        """
-        Get outta here monkey
-        """
-        assert self._getmonkey() is self
-        assert self._orig_figure is not None
-        setattr(self.plt, self._monkey_attrname, 'removing-monkey')
-        self.plt.figure = self._orig_figure
-        setattr(self.plt, self._monkey_attrname, None)
-
-    def __enter__(self):
-        current_monkey = self._getmonkey()
-        if current_monkey is None:
-            self._setmonkey()
-        else:
-            raise NotImplementedError('no reentrancy for now')
-
-    def __exit__(self, ex_type, ex_value, ex_traceback):
-        self._delmonkey()
-        if ex_traceback is not None:
-            return False
-
-
-def _split_histplot(data, x, split_point='auto', snskw=None):
-    """
-    TODO: generalize, if there is not a huge delta between histogram
-    values, then fallback to just a single histogram plot.
-    Need to figure out:
-
-    TODO: move to kwplot.
-
-    References:
-        https://stackoverflow.com/questions/32185411/break-in-x-axis-of-matplotlib
-        https://stackoverflow.com/questions/63726234/how-to-draw-a-broken-y-axis-catplot-graphes-with-seaborn
-    """
-    import kwplot
-    sns = kwplot.sns
-    plt = kwplot.plt
-
-    if split_point == 'auto':
-        histogram = data[x].value_counts()
-        small_values = histogram[histogram < histogram.mean()]
-        try:
-            split_point = int(small_values.max() * 1.5)
-            if split_point < 20:
-                split_point = 20
-        except ValueError:
-            split_point = None
-
-    if split_point is None:
-        ax = kwplot.figure(fnum=1, doclf=True).gca()
-        ax_top = ax_bottom = ax
-        sns.histplot(data=data, x=x, ax=ax_top, binwidth=1, discrete=True)
-        return ax_top, ax_bottom, split_point
-
-    # Q: is it possible to pass this an existing figure, so we don't always
-    # create a new one with plt.subplots?
-    # A: No, but we can specify keyword args
-    fig_kw = {'num': 1, 'clear': True}
-    fig, (ax_top, ax_bottom) = plt.subplots(ncols=1, nrows=2, sharex=True,
-                                            gridspec_kw={'hspace': 0.05},
-                                            **fig_kw)
-
-    if snskw is None:
-        snskw = dict(binwidth=1, discrete=True)
-
-    sns.histplot(data=data, x=x, ax=ax_top, **snskw)
-    sns.histplot(data=data, x=x, ax=ax_bottom, **snskw)
-
-    sns.despine(ax=ax_bottom)
-    sns.despine(ax=ax_top, bottom=True)
-    ax = ax_top
-    d = .015  # how big to make the diagonal lines in axes coordinates
-    # arguments to pass to plot, just so we don't keep repeating them
-    kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
-    ax.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
-
-    ax2 = ax_bottom
-    kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
-    ax2.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
-
-    #remove one of the legend
-    if ax_bottom.legend_ is not None:
-        ax_bottom.legend_.remove()
-
-    ax_top.set_ylabel('')
-    ax_top.set_ylim(bottom=split_point)   # those limits are fake
-    ax_bottom.set_ylim(0, split_point)
-    return ax_top, ax_bottom, split_point
-
-
 def polygon_shape_stats(df):
     """
     Compute shape statistics about a geopandas dataframe (assume UTM CRS)
+
+    TODO:
+        - [ ] Use geopandas if available, but fallback to non-geopandas logic
     """
     import numpy as np
     import kwimage
     geometry = df['geometry']
-    df['hull_rt_area'] = np.sqrt(geometry.apply(lambda s: s.convex_hull.area))
-    df['sseg_rt_area'] = np.sqrt(geometry.apply(lambda s: s.area))
+    def hull_area(s):
+        try:
+            return s.convex_hull.area
+        except Exception:
+            return np.nan
+    def sseg_area(s):
+        try:
+            return s.area
+        except Exception:
+            return np.nan
+    df['hull_rt_area'] = np.sqrt(geometry.apply(hull_area))
+    df['sseg_rt_area'] = np.sqrt(geometry.apply(sseg_area))
 
-    obox_whs = [kwimage.MultiPolygon.from_shapely(s).oriented_bounding_box().extent
-                for s in df.geometry]
-
-    df['obox_major'] = [max(e) for e in obox_whs]
-    df['obox_minor'] = [min(e) for e in obox_whs]
+    obox_majors = []
+    obox_minors = []
+    for s in df.geometry:
+        try:
+            obox = kwimage.MultiPolygon.from_shapely(s).oriented_bounding_box()
+            wh = obox.extent
+            obox_majors.append(max(wh))
+            obox_minors.append(min(wh))
+        except Exception:
+            obox_majors.append(np.nan)
+            obox_minors.append(np.nan)
+    df['obox_major'] = np.array(obox_majors)
+    df['obox_minor'] = np.array(obox_minors)
     df['major_obox_ratio'] = df['obox_major'] / df['obox_minor']
 
     # df['ch_aspect_ratio'] =

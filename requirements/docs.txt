@@ -9,8 +9,6 @@ sphinx-reredirects>=0.0.1
 
 
 ## FOR FIGURES
-# ubelt >= 1.2.0
-# xdoctest >= 0.15.6
 kwplot 
 six
 

@@ -18,7 +18,8 @@
                     "supercategory": {
                         "anyOf": [
                             {"type": "string", "pattern": "[^/]+", "description": "A coarser category name"},
-                            {"type": "null"}
+                            {"type": "null"},
+                            {"type": "string", "pattern": "^$"}
                         ]
                     },
                     "parents": {
@@ -44,7 +45,8 @@
                     "supercategory": {
                         "anyOf": [
                             {"type": "string", "pattern": "[^/]+"},
-                            {"type": "null"}
+                            {"type": "null"},
+                            {"type": "string", "pattern": "^$"}
                         ]
                     },
                     "reflection_id": {
