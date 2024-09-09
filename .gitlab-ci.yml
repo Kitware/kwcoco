@@ -501,7 +501,7 @@ deploy/wheels:
     done
   - |-
     # Have the server git-tag the release and push the tags
-    export VERSION=$(python -c "import setup; print(setup.VERSION)")
+    export PROJECT_VERSION=$(python -c "import setup; print(setup.VERSION)")
     # do sed twice to handle the case of https clone with and without a read token
     URL_HOST=$(git remote get-url origin | sed -e 's|https\?://.*@||g' | sed -e 's|https\?://||g' | sed -e 's|git@||g' | sed -e 's|:|/|g')
     source dev/secrets_configuration.sh
@@ -513,7 +513,7 @@ deploy/wheels:
         git config user.email "ci@gitlab.org.com"
         git config user.name "Gitlab-CI"
     fi
-    TAG_NAME="v${VERSION}"
+    TAG_NAME="v${PROJECT_VERSION}"
     echo "TAG_NAME = $TAG_NAME"
     if [ $(git tag -l "$TAG_NAME") ]; then
         echo "Tag already exists"
@@ -521,29 +521,66 @@ deploy/wheels:
         # if we messed up we can delete the tag
         # git push origin :refs/tags/$TAG_NAME
         # and then tag with -f
-        git tag $TAG_NAME -m "tarball tag $VERSION"
+        git tag $TAG_NAME -m "tarball tag $PROJECT_VERSION"
         git push --tags "https://git-push-token:${PUSH_TOKEN}@${URL_HOST}"
     fi
   - |-
     # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
-    echo "CI_PROJECT_URL=$CI_PROJECT_URL"
     echo "CI_PROJECT_ID=$CI_PROJECT_ID"
     echo "CI_PROJECT_NAME=$CI_PROJECT_NAME"
-    echo "CI_PROJECT_NAMESPACE=$CI_PROJECT_NAMESPACE"
     echo "CI_API_V4_URL=$CI_API_V4_URL"
 
     export PROJECT_VERSION=$(python -c "import setup; print(setup.VERSION)")
     echo "PROJECT_VERSION=$PROJECT_VERSION"
 
     # --header "PRIVATE-TOKEN: $PRIVATE_GITLAB_TOKEN" \
+
+    # We will loop over all of the assets in the wheelhouse (i.e.
+    # dist) and upload them to a package registery. We also store
+    # the links to the artifacts so we can attach them to a release
+    # page.
+    PACKAGE_ARTIFACT_ARRAY=()
     for FPATH in "dist"/*; do
         FNAME=$(basename $FPATH)
         echo $FNAME
+        PACKAGE_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_PROJECT_NAME/$PROJECT_VERSION/$FNAME"
         curl \
             --header "JOB-TOKEN: $CI_JOB_TOKEN" \
             --upload-file $FPATH \
-            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_PROJECT_NAME/$PROJECT_VERSION/$FNAME"
+            "$PACKAGE_URL"
+        PACKAGE_ARTIFACT_ARRAY+=("$PACKAGE_URL")
     done
+  - |-
+    export PROJECT_VERSION=$(python -c "import setup; print(setup.VERSION)")
+    echo "PROJECT_VERSION=$PROJECT_VERSION"
+    TAG_NAME="v$PROJECT_VERSION"
+
+    # Construct the JSON for assets to attach to the release
+    RELEASE_ASSET_JSON_LINKS=()
+    for ASSET_URL in "${PACKAGE_ARTIFACT_ARRAY[@]}"; do
+        ASSET_FNAME=$(basename $ASSET_URL)
+        RELEASE_ASSET_JSON_LINKS+=("{\"name\": \"$ASSET_FNAME\", \"url\": \"$ASSET_URL\"},")
+    done
+    _ASSET_LINK_JSON="${RELEASE_ASSET_JSON_LINKS[@]}"
+    # remove the trailing comma
+    ASSET_LINK_JSON=${_ASSET_LINK_JSON::-1}
+    echo "ASSET_LINK_JSON=$ASSET_LINK_JSON"
+
+    # Build json describing the release
+    RELEASE_DATA_JSON="{
+        \"name\": \"Version $PROJECT_VERSION\",
+        \"description\": \"Automated release of $CI_PROJECT_NAME version $PROJECT_VERSION\",
+        \"tag_name\": \"$TAG_NAME\",
+        \"assets\": {\"links\": [$ASSET_LINK_JSON]}
+    }"
+    echo "$RELEASE_DATA_JSON"
+
+    curl \
+        --header 'Content-Type: application/json' \
+        --header "PRIVATE-TOKEN: $PRIVATE_GITLAB_TOKEN" \
+        --data "$RELEASE_DATA_JSON" \
+        --request POST \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
 
 
 # end
