@@ -25,8 +25,9 @@ def main(cmdline=True, **kw):
         'coco_subset',
         'coco_grab',
         'coco_info',
-        'coco_visual_stats',
+        'coco_plot_stats',
         'find_unregistered_images',
+        'finish_install',
     ]
     module_lut = {}
     for name in modnames:

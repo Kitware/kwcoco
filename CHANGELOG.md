@@ -7,6 +7,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.8.4 - Unreleased
 
+### Changed
+
+* Changed `visual_stats` to `plot_stats`.
+* Moved kw18 and kpf to a new `formats` submodule.
+* kwcoco show now respects video frame order if available
+* modified scheme so supercategory is now allowed to be an empty string
+
+### Added
+
+* Added basic helpers for converting from labelme and voc annotations
+* Added finish-install helper script.
+
+
 
 ## Version 0.8.3 - Released 2024-08-30
 

@@ -70,7 +70,7 @@ def parse_requirements(fname="requirements.txt", versions=False):
 
     Args:
         fname (str): path to requirements file
-        versions (bool | str, default=False):
+        versions (bool | str):
             If true include version specs.
             If strict, then pin to the minimum version.
 
@@ -159,7 +159,8 @@ def parse_requirements(fname="requirements.txt", versions=False):
                     if plat_deps is not None:
                         parts.append(";" + plat_deps)
                 item = "".join(parts)
-                yield item
+                if item:
+                    yield item
 
     packages = list(gen_packages_items())
     return packages
@@ -198,7 +199,6 @@ def parse_requirements(fname="requirements.txt", versions=False):
 NAME = "kwcoco"
 INIT_PATH = "kwcoco/__init__.py"
 VERSION = parse_version(INIT_PATH)
-
 if __name__ == "__main__":
     setupkw = {}
 
@@ -213,7 +213,6 @@ if __name__ == "__main__":
             "requirements/postgresql.txt", versions="loose"
         ),
         "docs": parse_requirements("requirements/docs.txt", versions="loose"),
-        "gdal-strict": parse_requirements("requirements/gdal.txt", versions="strict"),
         "gdal": parse_requirements("requirements/gdal.txt", versions="loose"),
         "linting": parse_requirements("requirements/linting.txt", versions="loose"),
         "optional": parse_requirements("requirements/optional.txt", versions="loose"),
@@ -230,9 +229,7 @@ if __name__ == "__main__":
             "requirements/postgresql.txt", versions="strict"
         ),
         "docs-strict": parse_requirements("requirements/docs.txt", versions="strict"),
-        "gdal-strict-strict": parse_requirements(
-            "requirements/gdal-strict.txt", versions="strict"
-        ),
+        "gdal-strict": parse_requirements("requirements/gdal.txt", versions="strict"),
         "linting-strict": parse_requirements(
             "requirements/linting.txt", versions="strict"
         ),
@@ -267,8 +264,10 @@ if __name__ == "__main__":
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
     ]
+    setupkw["include_package_data"] = True
     setupkw["package_data"] = {
         "": ["requirements/*.txt"],
+        "kwcoco.rc.requirements": ["*.txt"],
         "kwcoco": ["py.typed", "*.pyi"],
     }
     setupkw["entry_points"] = {

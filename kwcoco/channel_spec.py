@@ -5,5 +5,9 @@ image. This could be as simple as ``red|green|blue``, or more complex like:
 
 This functionality has been moved to "delayed_image".
 """
-from delayed_image.channel_spec import FusedChannelSpec
-from delayed_image.channel_spec import ChannelSpec
+from delayed_image.channel_spec import FusedChannelSpec  # NOQA
+from delayed_image.channel_spec import ChannelSpec  # NOQA
+import ubelt as ub
+ub.schedule_deprecation(
+    'kwcoco', 'kwcoco.channel_spec', 'module', 'use delayed_image.channel_spec instead',
+    deprecate='0.8.4', error='0.9.0', remove='0.10.0')
