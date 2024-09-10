@@ -57,15 +57,24 @@ class FinishInstallCLI(scfg.DataConfig):
             ]
             ub.cmd([sys.executable, '-m', 'pip', 'install'] + options + requirements, verbose=3)
 
-        if 0:
-            want_system_exes = ['ffmpeg']
-            missing = []
-            for exe in want_system_exes:
-                found = ub.find_path(exe)
-                if found is None:
-                    missing.append(exe)
-            if missing:
-                print('Warning: missing system packages: {missing}')
+        want_system_exes = [
+            # 'ffmpeg',
+            'jq'
+            # Todo: breakdown package managers for requested services
+            # 'postgresql',
+            # 'postgresql-contrib',
+        ]
+        request_system_executables(want_system_exes)
+
+
+def request_system_executables(want_system_exes):
+    missing = []
+    for exe in want_system_exes:
+        found = ub.find_path(exe)
+        if found is None:
+            missing.append(exe)
+    if missing:
+        print('Warning: missing system packages: {missing}')
 
 
 def get_optional_requirements(name, strict=False):
