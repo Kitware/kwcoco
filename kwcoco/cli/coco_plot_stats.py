@@ -518,8 +518,8 @@ class Plots:
             self.annot_max_x = boxes.br_x.max()
             self.annot_max_y = boxes.br_y.max()
 
-        self.perannot_data = pd.read_json(io.StringIO(json.dumps(tables_data['perannot_data']), orient='table'))
-        self.perimage_data = pd.read_json(io.StringIO(json.dumps(tables_data['perimage_data']), orient='table'))
+        self.perannot_data = pd.read_json(io.StringIO(json.dumps(tables_data['perannot_data'])), orient='table')
+        self.perimage_data = pd.read_json(io.StringIO(json.dumps(tables_data['perimage_data'])), orient='table')
         self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
         self.plot_functions = {}
 
