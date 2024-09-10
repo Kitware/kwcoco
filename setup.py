@@ -70,7 +70,7 @@ def parse_requirements(fname="requirements.txt", versions=False):
 
     Args:
         fname (str): path to requirements file
-        versions (bool | str, default=False):
+        versions (bool | str):
             If true include version specs.
             If strict, then pin to the minimum version.
 
@@ -213,7 +213,6 @@ if __name__ == "__main__":
             "requirements/postgresql.txt", versions="loose"
         ),
         "docs": parse_requirements("requirements/docs.txt", versions="loose"),
-        "gdal-strict": parse_requirements("requirements/gdal.txt", versions="strict"),
         "gdal": parse_requirements("requirements/gdal.txt", versions="loose"),
         "linting": parse_requirements("requirements/linting.txt", versions="loose"),
         "optional": parse_requirements("requirements/optional.txt", versions="loose"),
@@ -230,9 +229,7 @@ if __name__ == "__main__":
             "requirements/postgresql.txt", versions="strict"
         ),
         "docs-strict": parse_requirements("requirements/docs.txt", versions="strict"),
-        "gdal-strict-strict": parse_requirements(
-            "requirements/gdal-strict.txt", versions="strict"
-        ),
+        "gdal-strict": parse_requirements("requirements/gdal.txt", versions="strict"),
         "linting-strict": parse_requirements(
             "requirements/linting.txt", versions="strict"
         ),
@@ -269,17 +266,8 @@ if __name__ == "__main__":
     ]
     setupkw["package_data"] = {
         "": ["requirements/*.txt"],
+        "kwcoco.rc.requirements": ["*.txt"],
         "kwcoco": ["py.typed", "*.pyi"],
-        'kwcoco.rc.requirements': [
-            'docs.txt',
-            'gdal.txt',
-            'graphics.txt',
-            'headless.txt',
-            'linting.txt',
-            'optional.txt',
-            'runtime.txt',
-            'tests.txt',
-        ],
     }
     setupkw["entry_points"] = {
         "console_scripts": [

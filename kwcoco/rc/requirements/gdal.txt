@@ -1,6 +1,5 @@
-# Note: this is a template file from ~/code/xcookie/requirements/gdal.txt
+# Generated dynamically via: ~/code/xcookie/xcookie/main.py::TemplateApplier._build_special_requirements
 --find-links https://girder.github.io/large_image_wheels
-GDAL>=3.7.2     ; python_version < '4.0'  and python_version >= '3.12'    # Python 3.12
-GDAL>=3.5.2     ; python_version < '3.12'  and python_version >= '3.11'    # Python 3.11
-GDAL>=3.4.1     ; python_version < '3.11' and python_version >= '3.10'    # Python 3.10
-GDAL>=3.4.1     ; python_version <= '3.9'                                 # Python 3.9-
+GDAL>=3.7.2 ; python_version < 4.0 and python_version >= 3.12
+GDAL>=3.5.2 ; python_version < 3.12 and python_version >= 3.11
+GDAL>=3.4.1 ; python_version < 3.11 and python_version >= 3.8
