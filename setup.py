@@ -159,7 +159,8 @@ def parse_requirements(fname="requirements.txt", versions=False):
                     if plat_deps is not None:
                         parts.append(";" + plat_deps)
                 item = "".join(parts)
-                yield item
+                if item:
+                    yield item
 
     packages = list(gen_packages_items())
     return packages
@@ -198,7 +199,6 @@ def parse_requirements(fname="requirements.txt", versions=False):
 NAME = "kwcoco"
 INIT_PATH = "kwcoco/__init__.py"
 VERSION = parse_version(INIT_PATH)
-
 if __name__ == "__main__":
     setupkw = {}
 
@@ -264,6 +264,7 @@ if __name__ == "__main__":
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
     ]
+    setupkw["include_package_data"] = True
     setupkw["package_data"] = {
         "": ["requirements/*.txt"],
         "kwcoco.rc.requirements": ["*.txt"],
