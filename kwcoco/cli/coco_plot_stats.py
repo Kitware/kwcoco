@@ -83,9 +83,20 @@ def prep_plots(src, plots_dpath=None, dpi=300):
         dset = kwcoco.CocoDataset.coerce(src)
 
     scalar_stats, tables_data, nonsaved_data, dataframes = build_stats_data(dset)
+
+    cache_dpath = ub.Path(dset.fpath).absolute().parent / '_cache'
+    cacher = ub.Cacher('stats', depends=dset._cached_hashid(), dpath=cache_dpath)
+    loaded = cacher.tryload()
+    if loaded is None:
+        info = build_stats_data(dset)
+        scalar_stats, tables_data, nonsaved_data, dataframes = info
+        cacher.save((scalar_stats, tables_data, nonsaved_data))
+    else:
+        scalar_stats, tables_data, nonsaved_data = loaded
+        dataframes = None
     scalar_stats['kwcoco_loadtime_seconds'] = load_timer.elapsed
 
-    if 1:
+    if dataframes is not None:
         perimage_data = dataframes['perimage_data']
         perannot_data = dataframes['perannot_data']
         perannot_summary = json.loads(perannot_data.describe().to_json())
@@ -713,6 +724,7 @@ class BuiltinPlots:
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         # self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)
         # self.sns.stripplot(data=self.perimage_data, x='width', y='height', ax=ax)
+        self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)
         self.sns.scatterplot(data=self.perimage_data, x='width', y='height', ax=ax)
         # self.sns.swarmplot(data=self.perimage_data, x='width', y='height', ax=ax)
         ax.set_title('Image Size Distribution')
