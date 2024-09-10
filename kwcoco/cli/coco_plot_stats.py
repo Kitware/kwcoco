@@ -590,6 +590,13 @@ class BuiltinPlots:
     """
 
     def polygon_centroid_absolute_distribution(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['polygon_centroid_absolute_distribution'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax)
         self.sns.scatterplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)
@@ -605,6 +612,13 @@ class BuiltinPlots:
         self.figman.finalize('polygon_centroid_absolute_distribution.png')
 
     def polygon_centroid_relative_distribution(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['polygon_centroid_relative_distribution'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax)
         self.sns.scatterplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)
@@ -738,6 +752,13 @@ class BuiltinPlots:
         self.figman.finalize('image_size_scatter.png')
 
     def obox_size_distribution(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['obox_size_distribution'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
         self.sns.scatterplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
@@ -751,6 +772,13 @@ class BuiltinPlots:
         self.figman.finalize('obox_size_distribution.png')
 
     def obox_size_distribution_jointplot(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['obox_size_distribution_jointplot'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
             self.figman.fig.clf()
@@ -776,6 +804,13 @@ class BuiltinPlots:
         self.figman.finalize('obox_size_distribution_jointplot.png')
 
     def obox_size_distribution_logscale(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['obox_size_distribution_logscale'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
         # self.sns.scatterplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
@@ -811,6 +846,13 @@ class BuiltinPlots:
         self.figman.finalize('obox_size_distribution_logscale.png')
 
     def polygon_area_vs_num_verts(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['polygon_area_vs_num_verts'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
         self.sns.scatterplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
@@ -822,6 +864,13 @@ class BuiltinPlots:
         self.figman.finalize('polygon_area_vs_num_verts.png')
 
     def polygon_area_vs_num_verts_jointplot(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['polygon_area_vs_num_verts_jointplot'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
             self.figman.fig.clf()
@@ -893,6 +942,13 @@ class BuiltinPlots:
         self.figman.finalize('polygon_area_vs_num_verts_jointplot_logscale.png')
 
     def polygon_area_histogram_logscale(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['polygon_area_histogram_logscale'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, log_scale=True)
         # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
@@ -906,6 +962,13 @@ class BuiltinPlots:
         self.figman.finalize('polygon_area_histogram_logscale.png')
 
     def polygon_area_histogram(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['polygon_area_histogram'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, binwidth=32, log_scale=True)
         self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
@@ -918,6 +981,13 @@ class BuiltinPlots:
         self.figman.finalize('polygon_area_histogram.png')
 
     def polygon_area_histogram_splity(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['polygon_area_histogram_splity'](self)
+        """
         # ax = self.figman.figure(fnum=1, doclf=True).gca()
         # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
         # self.figman.labels.relabel(ax)
@@ -950,6 +1020,13 @@ class BuiltinPlots:
         self.figman.finalize('polygon_area_histogram_splity.png', fig=fig)
 
     def polygon_num_vertices_histogram(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['polygon_num_vertices_histogram'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.histplot(data=self.perannot_data, x='num_vertices', ax=ax)
         ax.set_title('Polygon Number of Vertices Histogram')
@@ -960,6 +1037,13 @@ class BuiltinPlots:
         self.figman.finalize('polygon_num_vertices_histogram.png')
 
     def anns_per_image_histogram(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['anns_per_image_histogram'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.histplot(data=self.perimage_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True)
         ax.set_yscale('linear')
@@ -973,6 +1057,13 @@ class BuiltinPlots:
         self.figman.finalize('anns_per_image_histogram.png')
 
     def anns_per_image_histogram_splity(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['anns_per_image_histogram_splity'](self)
+        """
         split_y = 'auto'
         snskw = dict(binwidth=1, discrete=True)
         ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(
@@ -997,6 +1088,13 @@ class BuiltinPlots:
         self.figman.finalize('anns_per_image_histogram_splity.png', fig=fig)
 
     def anns_per_image_histogram_ge1(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo()
+            >>> self['anns_per_image_histogram_ge1'](self)
+        """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         perimage_data = self.perimage_data
         perimage_ge1_data = perimage_data[perimage_data['anns_per_image'] >= 1]
@@ -1036,6 +1134,13 @@ class BuiltinPlots:
         self.figman.finalize('images_over_time.png')
 
     def images_timeofday_distribution(self):
+        """
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
+            >>> self = Plots.demo(timestamps=True)
+            >>> self['images_timeofday_distribution'](self)
+        """
         import pandas as pd
         import numpy as np
         import kwutil
