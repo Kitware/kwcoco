@@ -499,6 +499,7 @@ class Plots:
         import pandas as pd
         import json
         import inspect
+        import io
 
         # kwplot 0.5.3 doesnt provide util_seaborn access via lazy loading
         # work around this
@@ -517,8 +518,8 @@ class Plots:
             self.annot_max_x = boxes.br_x.max()
             self.annot_max_y = boxes.br_y.max()
 
-        self.perannot_data = pd.read_json(json.dumps(tables_data['perannot_data']), orient='table')
-        self.perimage_data = pd.read_json(json.dumps(tables_data['perimage_data']), orient='table')
+        self.perannot_data = pd.read_json(io.StringIO(json.dumps(tables_data['perannot_data']), orient='table'))
+        self.perimage_data = pd.read_json(io.StringIO(json.dumps(tables_data['perimage_data']), orient='table'))
         self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
         self.plot_functions = {}
 
