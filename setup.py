@@ -270,6 +270,16 @@ if __name__ == "__main__":
     setupkw["package_data"] = {
         "": ["requirements/*.txt"],
         "kwcoco": ["py.typed", "*.pyi"],
+        'kwcoco.rc.requirements': [
+            'docs.txt',
+            'gdal.txt',
+            'graphics.txt',
+            'headless.txt',
+            'linting.txt',
+            'optional.txt',
+            'runtime.txt',
+            'tests.txt',
+        ],
     }
     setupkw["entry_points"] = {
         "console_scripts": [
