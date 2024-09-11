@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.8.5 - Unreleased
 
+### Fixed
+* Fix broken paths in camvid converter
+
 
 ## Version 0.8.4 - Released 2024-09-10
 
