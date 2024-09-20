@@ -2576,7 +2576,7 @@ class MixinCocoStats:
                     if 'segmentation' in ann:
                         try:
                             import kwimage
-                            poly = kwimage.MultiPolygon.from_coco(ann['segmentation'])
+                            poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
                             ann['area'] = float(poly.to_shapely().area)
                         except Exception:
                             import warnings
@@ -2622,7 +2622,7 @@ class MixinCocoStats:
                     # TODO: any original style coco dict is ok, we dont
                     # always need it to be a poly if it is RLE
                     import kwimage
-                    poly = kwimage.MultiPolygon.from_coco(ann['segmentation'])
+                    poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
                     # Hack, looks like kwimage does not wrap the original
                     # coco polygon with a list, but pycocotools needs that
                     ann['segmentation'] = poly.to_coco(style='orig')
