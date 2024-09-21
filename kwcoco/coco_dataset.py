@@ -3442,7 +3442,7 @@ class MixinCocoDraw:
                 elif 'keypoints' in ann:
                     x1, y1 = xys.min(axis=0)
                 else:
-                    raise Exception('no bbox, line, or keypoint position')
+                    raise Exception(f'no bbox, line, or keypoint position: ann={ann}')
 
                 cid = ann.get('category_id', None)
                 if cid is not None:

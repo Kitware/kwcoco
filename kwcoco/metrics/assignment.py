@@ -331,6 +331,15 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
 
         # Find compatible truth indices
         true_idxs = cx_to_matchable_txs[pred_cx]
+
+        # TODO: allow an option where multiple predicted boxes are allowed to
+        # match the same true box. This is important for cases where true
+        # instances are not clearly defined and it is ambiguous if an object
+        # should be annoted as one or multiple instances.
+        # TODO: also in this case, we need to loop over all unused true objects
+        # and check if they intersect a predicted object, so we can allow
+        # multiple truth objects to match a single predicted object.
+
         # Filter out any truth that has already been used
         unused = true_unused[true_idxs]
         unused_true_idxs = true_idxs[unused]
