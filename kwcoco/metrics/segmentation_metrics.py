@@ -90,8 +90,11 @@ class SegmentationEvalConfig(scfg.DataConfig):
     balance_area = scfg.Value(False, isflag=True, help=ub.paragraph(
         '''
         Upweight small instances, downweight large instances.
-        This operates on each image independently. The total area of foreground
-        is balanced against the total area of background.
+
+        Can be:
+           * foreground_independent - this operates on each image
+                 independently. The weight is balanced across all foreground
+                 objects in an image. Background weights are not changed.
         '''), tags=['algo_param'])
 
     thresh_bins = scfg.Value(32 * 32, help='threshold resolution.', tags=['algo_param'])
@@ -147,7 +150,7 @@ class SingleImageSegmentationMetrics:
         config (None | dict): see usage
 
     CommandLine:
-        xdoctest -m geowatch.tasks.fusion.evaluate single_image_segmentation_metrics
+        xdoctest -m kwcoco.metrics.segmentation_metrics SingleImageSegmentationMetrics --show
 
     Example:
         >>> from kwcoco.metrics.segmentation_metrics import *  # NOQA
@@ -161,6 +164,7 @@ class SingleImageSegmentationMetrics:
         >>> pred_coco_img = true_coco.images()[0:1].coco_images[0]
         >>> config = {}
         >>> config['balance_area'] = True
+        >>> config['balance_area'] = 'foreground_independent'
         >>> true_dets = true_coco_img.annots().detections
         >>> video1 = true_coco_img.video
         >>> true_classes = true_coco.object_categories()
@@ -205,6 +209,8 @@ class SingleImageSegmentationMetrics:
 
         self.viz_thresh = config.get('viz_thresh', 'auto')
         self.balance_area = config.get('balance_area', False)
+        if self.balance_area is True:
+            self.balance_area = 'foreground_independent'
 
         # TODO: parameterize these class categories
         # TODO: remove and generalize before porting to kwcoco
@@ -234,14 +240,20 @@ class SingleImageSegmentationMetrics:
         """
         Run like a function
         """
-        self.prepare_variables()
+        self.resolve_config_variables()
+
+        self.prepare_common_truth()
 
         if self.has_saliency:
             self.build_saliency_masks()
-            self.score_saliency_masks()
 
         if self.classes_of_interest:
             self.build_class_masks()
+
+        if self.has_saliency:
+            self.score_saliency_masks()
+
+        if self.classes_of_interest:
             self.score_class_masks()
 
         # TODO: look at the category ranking at each pixel by score.
@@ -257,7 +269,7 @@ class SingleImageSegmentationMetrics:
         #         pred_saliency = pred_sseg.fill(pred_saliency, value=1)
         return self.info
 
-    def prepare_variables(self):
+    def resolve_config_variables(self):
         """
         Messy helper to help transition from function to a class
         """
@@ -275,9 +287,6 @@ class SingleImageSegmentationMetrics:
             else:
                 score_space = 'image'
 
-        true_gid = self.true_coco_img.img['id']
-        pred_gid = self.pred_coco_img.img['id']
-
         if thresh_bins is not None:
             if isinstance(thresh_bins, int):
                 left_bin_edges = np.linspace(0, 1, thresh_bins)
@@ -287,9 +296,8 @@ class SingleImageSegmentationMetrics:
             left_bin_edges = None
         self.left_bin_edges = left_bin_edges
 
-        img1 = self.true_coco_img.img
-
         if score_space == 'image':
+            img1 = self.true_coco_img.img
             dsize = np.array((img1['width'], img1['height']))
         elif score_space == 'video':
             dsize = np.array((video1['width'], video1['height']))
@@ -309,29 +317,24 @@ class SingleImageSegmentationMetrics:
         if scale is not None:
             dsize = np.ceil(np.array(dsize) * np.array(scale)).astype(int)
 
-        self.row = row = {
-            'true_gid': true_gid,
-            'pred_gid': pred_gid,
+        row = {
+            'true_gid': self.true_coco_img.img['id'],
+            'pred_gid': self.pred_coco_img.img['id'],
         }
         if video1 is not None:
             row['video'] = video1['name']
 
-        w, h = dsize
-        # total_area = w * h
         shape = dsize[::-1]
-        self.shape = shape
         info = {
             'row': row,
             'shape': shape,
         }
-        self.info = info
 
         # Determine what true/predicted categories are in common
         predicted_classes = []
         for stream in self.pred_coco_img.channels.streams():
             have = stream.intersection(self.true_classes)
             predicted_classes.extend(have.parsed)
-
         self.classes_of_interest = ub.oset(predicted_classes) - (
             self._behavor_to_classes['negative'] |
             self._behavor_to_classes['background'] |
@@ -339,37 +342,43 @@ class SingleImageSegmentationMetrics:
             self._behavor_to_classes['undistinguished']
         )
 
-        # TODO: allow the use of polygons as saliency predictions.
-
         # Determine if saliency has been predicted
         salient_class = self.config.get('salient_channel', 'salient')
+        # TODO: allow the use of polygons as saliency predictions.
         self.has_saliency = salient_class in self.pred_coco_img.channels
 
-        # Load ground truth annotations
-        true_dets = self.true_dets
-        if score_space == 'video':
-            warp_img_to_vid = kwimage.Affine.coerce(
-                self.true_coco_img.img.get('warp_img_to_vid', {'type': 'affine'}))
-            true_dets = true_dets.warp(warp_img_to_vid)
-        if scale is not None:
-            true_dets = true_dets.scale(scale)
-        info['true_dets'] = true_dets
-
-        self.true_cidxs = true_dets.data['class_idxs']
-        self.true_ssegs = true_dets.data['segmentations']
-        self.true_catnames = list(ub.take(true_dets.classes.idx_to_node, self.true_cidxs))
         self.score_space = score_space
         self.resolution = resolution
+        self.scale = scale
         self.salient_class = salient_class
+        self.shape = shape
+        self.info = info
+        self.row = row
+
+    def prepare_common_truth(self):
+        # Load ground truth annotations
+        scaled_true_dets = self.true_dets
+        if self.score_space == 'video':
+            warp_img_to_vid = kwimage.Affine.coerce(
+                self.true_coco_img.img.get('warp_img_to_vid', {'type': 'affine'}))
+            scaled_true_dets = scaled_true_dets.warp(warp_img_to_vid)
+        if self.scale is not None:
+            scaled_true_dets = scaled_true_dets.scale(self.scale)
+
+        self.scaled_true_dets = scaled_true_dets
+        self.info['true_dets'] = scaled_true_dets
+
+        self.true_cidxs = scaled_true_dets.data['class_idxs']
+        self.true_ssegs = scaled_true_dets.data['segmentations']
+        self.true_catnames = list(ub.take(scaled_true_dets.classes.idx_to_node, self.true_cidxs))
 
     def build_saliency_masks(self):
         """
         Create a truth "panoptic segmentation" style mask and weights
         """
-        shape = self.shape
         # Truth for saliency-task
-        true_saliency = np.zeros(shape, dtype=np.uint8)
-        saliency_weights = np.ones(shape, dtype=np.float32)
+        true_saliency = np.zeros(self.shape, dtype=np.uint8)
+        saliency_weights = np.ones(self.shape, dtype=np.float32)
 
         sseg_groups = {
             'ignore': [],
@@ -388,12 +397,36 @@ class SingleImageSegmentationMetrics:
                 key = 'foreground'
             sseg_groups[key].append(true_sseg)
 
-        if self.balance_area:
+        if self.balance_area == 'foreground_independent':
             if len(sseg_groups['foreground']):
+                # Combine all foreground polygons into a single shape
+                # (removes influence of overlapping polygons)
                 fg_poly = unary_union([p.to_shapely() for p in sseg_groups['foreground']])
+                # The average weight each instance contributes
                 unit_sseg_share = fg_poly.area / len(sseg_groups['foreground'])
             else:
                 unit_sseg_share = 1
+        # I don't like this foreground_background_independent definition it
+        # doesn't really make sense...
+        # elif self.balance_area == 'foreground_background_independent':
+        #     if len(sseg_groups['foreground']):
+        #         # Combine all foreground polygons into a single shape
+        #         # (removes influence of overlapping polygons)
+        #         total_area = np.prod(self.shape)
+        #         fg_poly = unary_union([p.to_shapely() for p in sseg_groups['foreground']])
+        #         fg_area = fg_poly.area
+        #         bg_area = total_area - fg_area
+        #         unit_sseg_share = total_area / (len(sseg_groups['foreground']) + 1)
+        #         # The average weight each instance contributes
+        #         # unit_sseg_share = fg_poly.area / len(sseg_groups['foreground'])
+        #         bg_weight = unit_sseg_share / bg_area
+        #         saliency_weights[:] = bg_weight
+        #     else:
+        #         unit_sseg_share = 1
+        elif not self.balance_area:
+            ...
+        else:
+            raise KeyError(self.balance_area)
 
         # background should be background, do nothing with it
         sseg_groups['background']
@@ -414,7 +447,6 @@ class SingleImageSegmentationMetrics:
         # saliency_weights = saliency_weights / saliency_weights.max()
         self.true_saliency = true_saliency
         self.saliency_weights = saliency_weights
-        self.instance_weight = instance_weight
 
     def build_class_masks(self):
         """
@@ -447,12 +479,14 @@ class SingleImageSegmentationMetrics:
                 true_sseg.meta['true_catname'] = true_catname
             sseg_groups[key].append(true_sseg)
 
-        if self.balance_area:
+        if self.balance_area == 'foreground_independent':
             if len(sseg_groups['foreground']):
                 fg_poly = unary_union([p.to_shapely() for p in sseg_groups['foreground']])
                 unit_sseg_share = fg_poly.area / len(sseg_groups['foreground'])
             else:
                 unit_sseg_share = 1
+        else:
+            raise KeyError(self.balance_area)
 
         true_sseg.area / initial_total_weight
 
@@ -625,6 +659,8 @@ def single_image_segmentation_metrics(pred_coco_img, true_coco_img,
                                       true_classes, true_dets, video1=None,
                                       thresh_bins=None, config=None):
     """
+    DEPRECATED, Use SingleImageSegmentationMetrics instead
+
     Args:
         true_coco_img (kwcoco.CocoImage): detatched true coco image
 
@@ -634,48 +670,6 @@ def single_image_segmentation_metrics(pred_coco_img, true_coco_img,
             to make calculating metrics more efficient
 
         config (None | dict): see usage
-
-    CommandLine:
-        xdoctest -m geowatch.tasks.fusion.evaluate single_image_segmentation_metrics
-
-    Example:
-        >>> from kwcoco.metrics.segmentation_metrics import *  # NOQA
-        >>> from kwcoco.coco_evaluator import CocoEvaluator
-        >>> from kwcoco.demo.perterb import perterb_coco
-        >>> import kwcoco
-        >>> # TODO: kwcoco demodata with easy dummy heatmap channels
-        >>> true_coco = kwcoco.CocoDataset.demo('vidshapes2', image_size=(512, 512))
-        >>> # Score an image against itself
-        >>> true_coco_img = true_coco.images()[0:1].coco_images[0]
-        >>> pred_coco_img = true_coco.images()[0:1].coco_images[0]
-        >>> config = {}
-        >>> config['balance_area'] = True
-        >>> true_dets = true_coco_img.annots().detections
-        >>> video1 = true_coco_img.video
-        >>> true_classes = true_coco.object_categories()
-        >>> config['salient_channel'] = 'r'  # pretend red is the salient channel
-        >>> thresh_bins = np.linspace(0, 255, 1024)
-        >>> info = single_image_segmentation_metrics(
-        >>>    pred_coco_img, true_coco_img, true_classes, true_dets,
-        >>>    thresh_bins=thresh_bins, config=config, video1=video1)
-        >>> # xdoctest: +REQUIRES(--show)
-        >>> # xdoctest: +REQUIRES(module:kwplot)
-        >>> full_classes = true_coco.object_categories()
-        >>> chunk_info = [info]
-        >>> true_gids = [info['row']['true_gid'] for info in chunk_info]
-        >>> true_coco_imgs = true_coco.images(true_gids).coco_images
-        >>> true_coco_imgs = [g.detach() for g in true_coco_imgs]
-        >>> title = 'test'
-        >>> heatmap_dpath = None
-        >>> import kwplot
-        >>> kwplot.autompl()
-        >>> config['draw_weights'] = True
-        >>> canvas, _ = draw_chunked_confusion(
-        >>>     full_classes, true_coco_imgs, chunk_info, title=title,
-        >>>     config=config)
-        >>> kwplot.imshow(canvas)
-        >>> kwplot.show_if_requested()
-        >>> print(np.unique(info['saliency_weights']))
     """
     self = SingleImageSegmentationMetrics(
         pred_coco_img, true_coco_img, true_classes, true_dets,
@@ -915,8 +909,10 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
             if DRAW_WEIGHTS:
                 class_weights = info['class_weights']
                 if class_weights.max() > 1:
-                    weight_image = kwarray.normalize(class_weights, min_val=0)
-                    weight_title = 'weights (normed)'
+                    weight_image = colorize_weights(class_weights)
+                    weight_title = 'weights (yellow means > 1)'
+                    # weight_image = kwarray.normalize(class_weights, min_val=0)
+                    # weight_title = 'weights (normed)'
                 else:
                     weight_image = class_weights
                     weight_title = 'weights'
@@ -958,8 +954,10 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
             if DRAW_WEIGHTS:
                 saliency_weights = info['saliency_weights']
                 if saliency_weights.max() > 1:
-                    weight_image = kwarray.normalize(saliency_weights, min_val=0)
-                    weight_title = 'weights (normed)'
+                    # weight_image = kwarray.normalize(saliency_weights, min_val=0)
+                    # weight_title = 'weights (normed)'
+                    weight_image = colorize_weights(saliency_weights)
+                    weight_title = 'weights (yellow means > 1)'
                 else:
                     weight_image = saliency_weights
                     weight_title = 'weights'
@@ -1957,6 +1955,105 @@ def _ensure_distinct_dict_colors(data_dicts, force=False):
             num_uncolored, existing=existing_colors, legacy=False)
         for d, c in zip(miss_dicts, new_colors):
             d['color'] = c
+
+
+def colorize_weights(weights):
+    """
+    Normally weights will range between 0 and 1, but in some cases they may
+    range higher.  We handle this by coloring the 0-1 range in grayscale and
+    the 1-infinity range in color.
+
+    This could move to kwplot, or even kwimage.Heatmap, but we want to figure
+    out a better name to indicate this is for things that "should be" in the
+    0-1 range, but there are cases where a weight of 1 can be exceeded.
+
+    We should also be able to return a legend for this.
+
+    Example:
+        >>> import kwarray
+        >>> weights = kwimage.gaussian_patch((32, 32))
+        >>> weights = kwarray.normalize(weights)
+        >>> weights[:16, :16] *= 10
+        >>> weights[16:, :16] *= 100
+        >>> weights[16:, 16:] *= 1000
+        >>> weights[:16, 16:] *= 10000
+        >>> canvas = colorize_weights(weights)
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> canvas = kwimage.imresize(canvas, dsize=(512, 512), interpolation='nearest').clip(0, 1)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-10', org=(1, 1), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-100', org=(256, 1), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-1000', org=(256, 256), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-10000', org=(1, 256), border=True)
+        >>> import kwplot
+        >>> import kwplot
+        >>> kwplot.plt.ion()
+        >>> kwplot.imshow(canvas)
+
+    Example:
+        >>> import kwarray
+        >>> weights = kwimage.gaussian_patch((32, 32))
+        >>> n = 512
+        >>> weight_rows = [
+        >>>     np.linspace(0, 1, n),
+        >>>     np.linspace(0, 10, n),
+        >>>     np.linspace(0, 100, n),
+        >>>     np.linspace(0, 1000, n),
+        >>>     np.linspace(0, 2000, n),
+        >>>     np.linspace(0, 5000, n),
+        >>>     np.linspace(0, 8000, n),
+        >>>     np.linspace(0, 10000, n),
+        >>>     np.linspace(0, 100000, n),
+        >>>     np.linspace(0, 1000000, n),
+        >>> ]
+        >>> canvas = np.array([colorize_weights(row[None, :])[0] for row in weight_rows])
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> canvas = kwimage.imresize(canvas, dsize=(512, 512), interpolation='nearest').clip(0, 1)
+        >>> p = int(512 / len(weight_rows))
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-1', org=(1, 1 + p * 0), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-10', org=(1, 1 + p * 1), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-100', org=(1, 1 + p * 2), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-1000', org=(1, 1 + p * 3), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-2000', org=(1, 1 + p * 4), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-5000', org=(1, 1 + p * 5), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-8000', org=(1, 1 + p * 6), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-10000', org=(1, 1 + p * 7), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-100000', org=(1, 1 + p * 8), border=True)
+        >>> canvas = kwimage.draw_text_on_image(canvas, '0-1000000', org=(1, 1 + p * 9), border=True)
+        >>> import kwplot
+        >>> import kwplot
+        >>> kwplot.plt.ion()
+        >>> kwplot.imshow(canvas)
+    """
+    # import xdev
+    # with xdev.embed_on_exception_context:
+    try:
+        canvas = kwimage.atleast_3channels(weights.copy())
+    except ValueError:
+        # probably an integer?
+        canvas = np.full((1, 1, 3), fill_value=weights)
+
+    is_gt_one = weights > 1.0
+    if np.any(is_gt_one):
+        import matplotlib as mpl
+        import matplotlib.cm  # NOQA
+        from scipy import interpolate
+
+        cmap_ = mpl.colormaps['YlOrRd']
+        # cmap_ = mpl.colormaps['gist_rainbow']
+
+        gt_one_values = weights[is_gt_one]
+
+        max_val = gt_one_values.max()
+        # Define a function that maps values from [1,inf) to [0,1]
+        # the last max value part does depend on the inputs, which is fine.
+        mapper = interpolate.interp1d(x=[1.0, 10.0, 100.0, max(max_val, 1000.0)],
+                                      y=[0.0, 0.5, 0.75, 1.0])
+        cmap_values = mapper(gt_one_values)
+        colors01 = cmap_(cmap_values)[..., 0:3]
+
+        rs, cs = np.where(is_gt_one)
+        canvas[rs, cs, :] = colors01
+    return canvas
 
 
 if __name__ == '__main__':
