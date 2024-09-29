@@ -342,6 +342,19 @@ class CocoImage(_CocoObject):
         height = self.img.get('height', None)
         return width, height
 
+    def image_filepath(self):
+        """
+        Note: this only returns a file path if it is directly associated with
+        this image, it does not respect assets. This is intended to duck-type
+        the method of a CocoAsset. Use :func:`primary_image_filepath` for this
+        instead.
+        """
+        if self._bundle_dpath is None:
+            raise Exception('Bundle dpath must be populated to use this method')
+            # return self['file_name']
+        else:
+            return ub.Path(self._bundle_dpath) / self['file_name']
+
     def primary_image_filepath(self, requires=None):
         dpath = ub.Path(self.bundle_dpath)
         fname = self.primary_asset()['file_name']

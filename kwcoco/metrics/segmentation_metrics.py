@@ -28,6 +28,7 @@ from kwcoco.metrics.confusion_measures import Measures
 from typing import Dict
 import scriptconfig as scfg
 from shapely.ops import unary_union
+from kwcoco.util.util_kwutil import _DelayedBlockingJobQueue, _MaxQueuePool
 
 # from geowatch.utils import kwcoco_extensions
 # from geowatch import heuristics
@@ -70,27 +71,41 @@ class SegmentationEvalConfig(scfg.DataConfig):
     """
     Evaluation script for change/segmentation task
     """
-    true_dataset = scfg.Value(None, help='path to the groundtruth dataset')
-    pred_dataset = scfg.Value(None, help='path to the predicted dataset')
-    eval_dpath = scfg.Value(None, help='directory to dump results')
-    eval_fpath = scfg.Value(None, help='path to dump result summary')
+    true_dataset = scfg.Value(None, help='path to the groundtruth dataset', tags=['in_path'])
+    pred_dataset = scfg.Value(None, help='path to the predicted dataset', tags=['in_path'])
+
+    eval_dpath = scfg.Value(None, help='directory to dump results', tags=['out_path'])
+    eval_fpath = scfg.Value(None, help='path to dump result summary', tags=['out_path', 'primary'])
+
+    score_space = scfg.Value('auto', help=ub.paragraph(
+        '''
+        can score in image or video space. If auto, chooses video if there are
+        any, otherwise image
+        '''), tags=['algo_param'])
+    resolution = scfg.Value(None, help=ub.paragraph(
+        '''
+        if specified, override the default resolution to score at
+        '''), tags=['algo_param'])
+
+    balance_area = scfg.Value(False, isflag=True, help=ub.paragraph(
+        '''
+        Upweight small instances, downweight large instances.
+        This operates on each image independently. The total area of foreground
+        is balanced against the total area of background.
+        '''), tags=['algo_param'])
+
+    thresh_bins = scfg.Value(32 * 32, help='threshold resolution.', tags=['algo_param'])
+    salient_channel = scfg.Value('salient', help='channel that is the positive class', tags=['algo_param'])
+
     # options
-    draw_curves = scfg.Value('auto', help='flag to draw curves or not')
-    draw_heatmaps = scfg.Value('auto', help='flag to draw heatmaps or not')
-
-    draw_legend = scfg.Value(True, help='enable/disable the class legend')
-    draw_weights = scfg.Value(False, help='enable/disable pixel weight visualization')
-
-    score_space = scfg.Value('auto', help='can score in image or video space. If auto, chooses video if there are any, otherwise image')
-    resolution = scfg.Value(None, help='if specified, override the default resolution to score at')
-
-    workers = scfg.Value('auto', help='number of parallel scoring workers')
-    draw_workers = scfg.Value('auto', help='number of parallel drawing workers')
+    draw_curves = scfg.Value('auto', help='flag to draw curves or not', tags=['perf_param'])
+    draw_heatmaps = scfg.Value('auto', help='flag to draw heatmaps or not', tags=['perf_param'])
+    draw_legend = scfg.Value(True, help='enable/disable the class legend', tags=['perf_param'])
+    draw_weights = scfg.Value(False, help='enable/disable pixel weight visualization', tags=['perf_param'])
     viz_thresh = scfg.Value('auto', help='visualization threshold')
-    balance_area = scfg.Value(False, isflag=True, help='upweight small instances, downweight large instances')
-    # thresh_bins = scfg.Value(128 * 128, help='threshold resolution, default is high, generally ok to lower')
-    thresh_bins = scfg.Value(32 * 32, help='threshold resolution.')
-    salient_channel = scfg.Value('salient', help='channel that is the positive class')
+
+    workers = scfg.Value('auto', help='number of parallel scoring workers', tags=['perf_param'])
+    draw_workers = scfg.Value('auto', help='number of parallel drawing workers', tags=['perf_param'])
 
 
 def main(cmdline=True, **kwargs):
@@ -993,10 +1008,11 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
     Example:
         >>> # xdoctest: +REQUIRES(env:SLOW_DOCTEST)
         >>> # xdoctest: +REQUIRES(module:kwutil)
+        >>> from kwcoco.metrics.segmentation_metrics import *  # NOQA
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> from kwcoco.demo.perterb import perterb_coco
         >>> import kwcoco
-        >>> true_coco = kwcoco.CocoDataset.demo('vidshapes2', image_size=(64, 64))
+        >>> true_coco = kwcoco.CocoDataset.demo('vidshapes2', image_size=(512, 512))
         >>> kwargs = {
         >>>     'box_noise': 0.5,
         >>>     'n_fp': (0, 10),
@@ -1014,11 +1030,13 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
         >>> print('eval_dpath = {!r}'.format(eval_dpath))
         >>> config = {}
         >>> config['score_space'] = 'video'
+        >>> config['draw_weights'] = True
         >>> config['balance_area'] = True
         >>> draw_curves = 'auto'
         >>> draw_heatmaps = 'auto'
         >>> #draw_heatmaps = False
         >>> config['workers'] = 'min(avail-2,6)'
+        >>> config['workers'] = 1
         >>> #workers = 0
         >>> evaluate_segmentations(true_coco, pred_coco, eval_dpath, config=config)
     """
@@ -1456,176 +1474,6 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
     rich.print(f'Eval Dpath: [link={eval_dpath}]{eval_dpath}[/link]')
     print(f'eval_fpath={eval_fpath}')
     return df
-
-
-class _DelayedFuture:
-    """
-    todo: move to kwutil
-
-    Wraps a future object so we can execute logic when its result has been
-    accessed.
-    """
-    def __init__(self, func, args, kwargs, parent):
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-        self.task = (func, args, kwargs)
-        self.parent = parent
-        self.future = None
-
-    def result(self, timeout=None):
-        if self.future is None:
-            raise Exception('The task has not been submitted yet')
-        result = self.future.result(timeout)
-        self.parent._job_result_accessed_callback(self)
-        return result
-
-
-class _DelayedBlockingJobQueue:
-    """
-    todo: move to kwutil
-
-    References:
-        .. [GISTnoxdafoxMaxQueuePool] https://gist.github.com/noxdafox/4150eff0059ea43f6adbdd66e5d5e87e
-
-    Ignore:
-        >>> self = _DelayedBlockingJobQueue(max_unhandled_jobs=5)
-        >>> futures = [
-        >>>     self.submit(print, i)
-        >>>     for i in range(10)
-        >>> ][::-1]
-        >>> import time
-        >>> time.sleep(0.5)
-        >>> print(self._num_submitted_jobs)
-        >>> print(self._num_handled_results)
-        >>> print('--- First 5 should have printed ---')
-        >>> for _ in range(3):
-        >>>     f = futures.pop()
-        >>>     f.result()
-        >>> time.sleep(0.5)
-        >>> print(self._num_submitted_jobs)
-        >>> print(self._num_handled_results)
-        >>> print('--- 3 Results were haneld, so 3 more can join the queue')
-        >>> for _ in range(3):
-        >>>     f = futures.pop()
-        >>>     f.result()
-        >>> time.sleep(0.5)
-        >>> print(self._num_submitted_jobs)
-        >>> print(self._num_handled_results)
-        >>> print('--- Handling the rest, but everything should have already been submitted')
-        >>> for _ in range(4):
-        >>>     f = futures.pop()
-        >>>     f.result()
-    """
-    def __init__(self, max_unhandled_jobs, mode='thread', max_workers=None):
-        from collections import deque
-        self._unsubmitted = deque()
-        self.pool = ub.Executor(mode=mode, max_workers=max_workers)
-        self.max_unhandled_jobs = max_unhandled_jobs
-        self._num_handled_results = 0
-        self._num_submitted_jobs = 0
-        self._num_unhandled = 0
-
-    def submit(self, func, *args, **kwargs):
-        """
-        Queues a new job, but wont execute until
-        some conditions are met
-        """
-        delayed = _DelayedFuture(func, args, kwargs, parent=self)
-        self._unsubmitted.append(delayed)
-        self._submit_if_room()
-        return delayed
-
-    def _submit_if_room(self):
-        while self._num_unhandled < self.max_unhandled_jobs and self._unsubmitted:
-            delayed = self._unsubmitted.popleft()
-            self._num_submitted_jobs += 1
-            self._num_unhandled += 1
-            delayed.future = self.pool.submit(delayed.func, *delayed.args, **delayed.kwargs)
-
-    def _job_result_accessed_callback(self, _):
-        """Called when the user handles a result """
-        self._num_handled_results += 1
-        self._num_unhandled -= 1
-        self._submit_if_room()
-
-    def shutdown(self):
-        """
-        Calls the shutdown function of the underlying backend.
-        """
-        return self.pool.shutdown()
-
-
-class _MaxQueuePool:
-    """
-
-    todo: move to kwutil
-
-    This Class wraps a concurrent.futures.Executor
-    limiting the size of its task queue.
-    If `max_queue_size` tasks are submitted, the next call to submit will block
-    until a previously submitted one is completed.
-
-    References:
-        .. [GISTnoxdafoxMaxQueuePool] https://gist.github.com/noxdafox/4150eff0059ea43f6adbdd66e5d5e87e
-
-    Ignore:
-        import sys, ubelt
-        sys.path.append(ubelt.expandpath('~/code/geowatch'))
-        from geowatch.tasks.fusion.evaluate import *  # NOQA
-        from geowatch.tasks.fusion.evaluate import _memo_legend, _redraw_measures
-        self = _MaxQueuePool(max_queue_size=0)
-
-        dpath = ub.Path.appdir('kwutil/doctests/maxpoolqueue')
-        dpath.delete().ensuredir()
-        signal_fpath = dpath / 'signal'
-
-        def waiting_worker():
-            counter = 0
-            while not signal_fpath.exists():
-                counter += 1
-            return counter
-
-        future = self.submit(waiting_worker)
-
-        try:
-            future.result(timeout=0.001)
-        except TimeoutError:
-            ...
-        signal_fpath.touch()
-        result = future.result()
-
-    """
-    def __init__(self, max_queue_size=None, mode='thread', max_workers=0):
-        if max_queue_size is None:
-            max_queue_size = max_workers
-        self.pool = ub.Executor(mode=mode, max_workers=max_workers)
-        if 'serial' in self.pool.backend.__class__.__name__.lower():
-            self.pool_queue = None
-        else:
-            from threading import BoundedSemaphore  # NOQA
-            self.pool_queue = BoundedSemaphore(max_queue_size)
-
-    def submit(self, function, *args, **kwargs):
-        """Submits a new task to the pool, blocks if Pool queue is full."""
-        if self.pool_queue is not None:
-            self.pool_queue.acquire()
-
-        future = self.pool.submit(function, *args, **kwargs)
-        future.add_done_callback(self.pool_queue_callback)
-
-        return future
-
-    def pool_queue_callback(self, _):
-        """Called once task is done, releases one queue slot."""
-        if self.pool_queue is not None:
-            self.pool_queue.release()
-
-    def shutdown(self):
-        """
-        Calls the shutdown function of the underlying backend.
-        """
-        return self.pool.shutdown()
 
 
 def _redraw_measures(eval_dpath):
