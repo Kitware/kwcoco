@@ -32,7 +32,10 @@ USE_NEG_INF = True
 def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                               iou_thresh=0.5, bg_cidx=-1, bias=0.0, classes=None,
                               compat='all', prioritize='iou',
-                              ignore_classes='ignore', max_dets=None):
+                              ignore_classes='ignore',
+                              max_dets=None,
+                              multiple_assignment=False,
+                              ):
     """
     Create confusion vectors for detections by assigning to ground true boxes
 
@@ -57,7 +60,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             not specified all images are used.
 
         compat (str, default='all'):
-            can be ('ancestors' | 'mutex' | 'all').  determines which pred
+            can be ('ancestors' | 'mutex' | 'all'). Determines which pred
             boxes are allowed to match which true boxes. If 'mutex', then
             pred boxes can only match true boxes of the same class. If
             'ancestors', then pred boxes can match true boxes that match or
@@ -65,13 +68,13 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             true, regardless of its category label.
 
         prioritize (str, default='iou'):
-            can be ('iou' | 'class' | 'correct') determines which box to
-            assign to if mutiple true boxes overlap a predicted box.  if
+            can be ('iou' | 'class' | 'correct'). Determines which box to
+            assign to if multiple true boxes overlap a predicted box.  if
             prioritize is iou, then the true box with maximum iou (above
             iou_thresh) will be chosen.  If prioritize is class, then it will
             prefer matching a compatible class above a higher iou. If
             prioritize is correct, then ancestors of the true class are
-            preferred over descendents of the true class, over unreleated
+            preferred over descendants of the true class, over unrelated
             classes.
 
         bg_cidx (int, default=-1):
@@ -88,12 +91,16 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
         max_dets (int): maximum number of detections to consider
 
+        multiple_assignment (bool):
+            if True allow multiple predicted detections to match a single true
+            detections and vis versa. Defaults to False.
+
     TODO:
         - [ ] This is a bottleneck function. An implementation in C / C++ /
-        Cython would likely improve the overall system.
+              Cython / Rust would likely improve the overall system.
 
         - [ ] Implement crowd truth. Allow multiple predictions to match any
-              truth objet marked as "iscrowd".
+              truth object marked as "iscrowd".
 
     Returns:
         dict: with relevant confusion vectors. This keys of this dict can be
@@ -103,7 +110,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             and predicted class index, the predicted score, the true weight and
             the iou of the true and predicted boxes. A `txs` value of -1 means
             that the predicted box was not assigned to a true annotation and a
-            `pxs` value of -1 means that the true annotation was not assigne to
+            `pxs` value of -1 means that the true annotation was not assigned to
             any predicted annotation.
 
     Example:
@@ -256,7 +263,8 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         y =  _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                             cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                             pdist_priority, cx_to_ancestors, bg_cidx,
-                            ignore_classes=ignore_classes, max_dets=max_dets)
+                            ignore_classes=ignore_classes, max_dets=max_dets,
+                            multiple_assignment=multiple_assignment)
         iou_thresh_to_y[iou_thresh_] = y
 
     if ub.iterable(iou_thresh):
@@ -268,11 +276,39 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                    cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                    pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes,
-                   max_dets):
+                   max_dets, multiple_assignment):
+    """
+    Args:
+        true_dets (Detections):
+        pred_dets (Detections):
+        iou_lookup (Dict[int, ndarray]):
+        isvalid_lookup (Dict[int, ndarray]):
+        cx_to_matchable_txs (Dict[int64, ndarray]):
+        bg_weight (float):
+        prioritize (str):
+        iou_thresh_ (float):
+        pdist_priority (ndarray):
+        cx_to_ancestors (Dict[int, set[int]]):
+        bg_cidx (int):
+        ignore_classes (str):
+        max_dets (NoneType):
+        multiple_assignment (bool):
+
+    Returns:
+        Dict[str, ndarray]
+
+    Ignore:
+        keys = 'true_dets, pred_dets, iou_lookup, isvalid_lookup, cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_, pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes, max_dets, multiple_assignment'.split(', ')
+        lut = globals()
+        from xdev.introspect import gen_docstr_from_context, generate_typeannot
+        gen_docstr_from_context(keys, lut)
+
+    Note:
+        * Preallocating numpy arrays does not help
+        * It might be useful to code this critical loop up in C / Cython / Py03
+        * Could numba help? (I'm having an issue with cmath)
+    """
     # Note:
-    # * Preallocating numpy arrays does not help
-    # * It might be useful to code this critical loop up in C / Cython
-    # * Could numba help? (I'm having an issue with cmath)
     import kwarray
 
     # Keep track of which true items have been used
@@ -319,7 +355,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     y_pxs = []
     y_txs = []
 
-    # NOTE: I don't think this actualy does anything anymore
+    # NOTE: I don't think this actually does anything anymore
     if prioritize == 'correct' or prioritize == 'class':
         used_truth_policy = 'next_best'
     else:
