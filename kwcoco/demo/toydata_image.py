@@ -419,6 +419,7 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
         globals().update(xinspect.get_kwargs(demodata_toy_img))
 
     """
+    import kwimage.algo  # NOQA
     if anchors is None:
         anchors = [[.20, .20]]
     anchors = np.asarray(anchors)

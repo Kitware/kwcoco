@@ -140,6 +140,10 @@ class CocoEvalConfig(scfg.DataConfig):
             '''
             maximum number of predictions to consider
             '''), tags=['algo_param'])
+    used_truth_policy = scfg.Value(False, help=ub.paragraph(
+            '''
+            Experimental.
+            '''), tags=['algo_param'])
     iou_bias = scfg.Value(1, help=ub.paragraph(
             '''
             pycocotools setting is 1, but 0 may be better
@@ -665,6 +669,7 @@ class CocoEvaluator:
                 workers=coco_eval.config['assign_workers'],
                 bias=coco_eval.config['iou_bias'],
                 max_dets=coco_eval.config['max_dets'],
+                used_truth_policy=coco_eval.config['used_truth_policy'],
             )
 
         # Remove large datasets values in configs that are not file references

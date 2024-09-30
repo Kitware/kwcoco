@@ -475,13 +475,12 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     # Preallocate common datas
     bin_probs = np.empty((len(mc_probs), 2), dtype=mc_probs.dtype)
 
-    import kwimage  # TODO: move to kwarray
     import kwarray
     # Map everything onto 0-1 range
     ranked_cidxs = kwarray.argmaxima(mc_probs, 2, axis=1)
     ranked_scores = np.array([a[x] for a, x in zip(mc_probs, ranked_cidxs)])  # probably better numpy way to do this
 
-    mc_scores = kwimage.normalize(mc_probs, mode='linear')
+    mc_scores = kwarray.normalize(mc_probs, mode='linear')
     total_scores = mc_scores.sum(axis=1, keepdims=0)
     # max_scores = mc_scores.max(axis=1, keepdims=0)
 

@@ -248,7 +248,8 @@ class DetectionMetrics(ub.NiceRepr):
     def confusion_vectors(dmet, iou_thresh=0.5, bias=0, gids=None, compat='mutex',
                           prioritize='iou', ignore_classes='ignore',
                           background_class=ub.NoParam, verbose='auto',
-                          workers=0, track_probs='try', max_dets=None):
+                          workers=0, track_probs='try', max_dets=None,
+                          used_truth_policy=False):
         """
         Assigns predicted boxes to the true boxes so we can transform the
         detection problem into a classification problem for scoring.
@@ -302,6 +303,9 @@ class DetectionMetrics(ub.NiceRepr):
             track_probs (str):
                 can be 'try', 'force', or False.  if truthy, we assume
                 probabilities for multiple classes are available. default='try'
+
+            used_truth_policy (bool):
+                EXPERIMENTAL
 
         Returns:
             ConfusionVectors | Dict[float, ConfusionVectors]
@@ -393,7 +397,9 @@ class DetectionMetrics(ub.NiceRepr):
                 _assign_confusion_vectors, true_dets, pred_dets,
                 bg_weight=1, iou_thresh=iou_thresh_list, bg_cidx=-1, bias=bias,
                 classes=classes, compat=compat, prioritize=prioritize,
-                ignore_classes=ignore_classes, max_dets=max_dets)
+                ignore_classes=ignore_classes, max_dets=max_dets,
+                used_truth_policy=used_truth_policy,
+            )
             job.gid = gid
 
         for job in ub.ProgIter(jobs.jobs, desc='assign detections',

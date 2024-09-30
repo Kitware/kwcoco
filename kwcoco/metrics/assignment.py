@@ -34,7 +34,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                               compat='all', prioritize='iou',
                               ignore_classes='ignore',
                               max_dets=None,
-                              multiple_assignment=False,
+                              used_truth_policy=False,
                               ):
     """
     Create confusion vectors for detections by assigning to ground true boxes
@@ -91,9 +91,8 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
         max_dets (int): maximum number of detections to consider
 
-        multiple_assignment (bool):
-            if True allow multiple predicted detections to match a single true
-            detections and vis versa. Defaults to False.
+        used_truth_policy (str | bool):
+            EXPERIMENTAL
 
     TODO:
         - [ ] This is a bottleneck function. An implementation in C / C++ /
@@ -177,6 +176,25 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
 
+    Example:
+        >>> # xdoctest: +REQUIRES(module:pandas)
+        >>> from kwcoco.metrics.assignment import _assign_confusion_vectors
+        >>> import pandas as pd
+        >>> import ubelt as ub
+        >>> from kwcoco.metrics import DetectionMetrics
+        >>> dmet = DetectionMetrics.demo(nimgs=1, nclasses=8,
+        >>>                              nboxes=(0, 20), n_fp=20,
+        >>>                              box_noise=.2, cls_noise=.3)
+        >>> classes = dmet.classes
+        >>> gid = ub.peek(dmet.gid_to_pred_dets)
+        >>> true_dets = dmet.true_detections(gid)
+        >>> pred_dets = dmet.pred_detections(gid)
+        >>> y = _assign_confusion_vectors(true_dets, pred_dets,
+        >>>                               classes=dmet.classes,
+        >>>                               compat='all', used_truth_policy='next_best')
+        >>> y = pd.DataFrame(y)
+        >>> print(y)  # xdoc: +IGNORE_WANT
+
     Ignore:
         from xinspect.dynamic_kwargs import get_func_kwargs
         globals().update(get_func_kwargs(_assign_confusion_vectors))
@@ -192,7 +210,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         prioritize = 'iou'
 
     # Group true boxes by class
-    # Keep track which true boxes are unused / not assigned
+    # Keep track which true boxes are available / not assigned
     unique_tcxs, tgroupxs = kwarray.group_indices(true_dets.class_idxs)
     cx_to_txs = dict(zip(unique_tcxs, tgroupxs))
 
@@ -264,7 +282,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                             cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                             pdist_priority, cx_to_ancestors, bg_cidx,
                             ignore_classes=ignore_classes, max_dets=max_dets,
-                            multiple_assignment=multiple_assignment)
+                            used_truth_policy=used_truth_policy)
         iou_thresh_to_y[iou_thresh_] = y
 
     if ub.iterable(iou_thresh):
@@ -276,7 +294,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                    cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                    pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes,
-                   max_dets, multiple_assignment):
+                   max_dets, used_truth_policy):
     """
     Args:
         true_dets (Detections):
@@ -292,13 +310,13 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         bg_cidx (int):
         ignore_classes (str):
         max_dets (NoneType):
-        multiple_assignment (bool):
+        used_truth_policy (bool):
 
     Returns:
         Dict[str, ndarray]
 
     Ignore:
-        keys = 'true_dets, pred_dets, iou_lookup, isvalid_lookup, cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_, pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes, max_dets, multiple_assignment'.split(', ')
+        keys = 'true_dets, pred_dets, iou_lookup, isvalid_lookup, cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_, pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes, max_dets, used_truth_policy'.split(', ')
         lut = globals()
         from xdev.introspect import gen_docstr_from_context, generate_typeannot
         gen_docstr_from_context(keys, lut)
@@ -312,7 +330,8 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     import kwarray
 
     # Keep track of which true items have been used
-    true_unused = np.ones(len(true_dets), dtype=bool)
+    true_available = np.ones(len(true_dets), dtype=bool)
+    true_nmatches = np.zeros(len(true_dets), dtype=int)
 
     # sort predictions by descending score
     if 'scores' in pred_dets.data:
@@ -345,7 +364,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         _pred_scores = _pred_scores[_pred_keep_flags]
 
         # Remove ignored truth regions from assignment consideration
-        true_unused[true_ignore_flags] = False
+        true_available[true_ignore_flags] = False
 
     y_pred = []
     y_true = []
@@ -356,84 +375,83 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     y_txs = []
 
     # NOTE: I don't think this actually does anything anymore
-    if prioritize == 'correct' or prioritize == 'class':
-        used_truth_policy = 'next_best'
-    else:
-        used_truth_policy = 'mark_false'
+    # if prioritize == 'correct' or prioritize == 'class':
+    if not used_truth_policy:
+        # Original default
+        used_truth_policy = 'ignore'
+    # used_truth_policy = 'next_best'
 
     # Greedy assignment. For each predicted detection box.
     # Allow it to match the truth of compatible classes.
-    for px, pred_cx, score in zip(_pred_sortx, _pred_cxs, _pred_scores):
-
+    _iter = zip(_pred_sortx, _pred_cxs, _pred_scores)
+    # px, pred_cx, score  = next(_iter)
+    for px, pred_cx, score in _iter:
+        # px, pred_cx, score  = next(_iter)
         # Find compatible truth indices
         true_idxs = cx_to_matchable_txs[pred_cx]
 
         # TODO: allow an option where multiple predicted boxes are allowed to
         # match the same true box. This is important for cases where true
         # instances are not clearly defined and it is ambiguous if an object
-        # should be annoted as one or multiple instances.
-        # TODO: also in this case, we need to loop over all unused true objects
+        # should be annotated as one or multiple instances.
+        # TODO: also in this case, we need to loop over all available true objects
         # and check if they intersect a predicted object, so we can allow
         # multiple truth objects to match a single predicted object.
 
-        # Filter out any truth that has already been used
-        unused = true_unused[true_idxs]
-        unused_true_idxs = true_idxs[unused]
+        # Filter out any truth that has already been marked as unavailable
+        available = true_available[true_idxs]
+        available_true_idxs = true_idxs[available]
 
         ovmax = -np.inf
         ovidx = None
         weight = bg_weight
-        tx = -1  # we will set this to the index of the assignd gt
+        tx = -1  # we will set this to the index of the assigned gt
 
-        if len(unused_true_idxs):
-            # First grab all candidate unused true boxes and lookup precomputed
+        if len(available_true_idxs):
+            # First grab all candidate available true boxes and lookup precomputed
             # ious between this pred and true_idxs
-            cand_true_idxs = unused_true_idxs
+            cand_true_idxs = available_true_idxs
 
             if prioritize == 'iou':
                 # simply match the true box with the highest iou (that is also
                 # considered matchable)
 
-                if used_truth_policy == 'next_best':
+                cand_ious = iou_lookup[px].compress(available)
 
-                    # TODO: VERIFY THIS IS NO DIFFERENT THAN "MARK_FALSE" AND
-                    # REMOVE.
-
-                    # Dont even consider matches to previously used groundtruth
-                    # (note this means it will be marked as a false positive)
-                    cand_ious = iou_lookup[px].compress(unused)
+                if used_truth_policy == 'ignore':
+                    # Ignore matches to unavailable truth
+                    # Use heuristics to pick a single match
                     ovidx = cand_ious.argmax()
-                    ovmax = cand_ious[ovidx]
-                    if ovmax > iou_thresh_:
-                        tx = cand_true_idxs[ovidx]
-                elif used_truth_policy == 'mark_false':
-                    # Consider a match to a previously used truth a false (note
-                    # this means it will be marked as a false positive more
-                    # agressively than the next_best option, because there it
-                    # may match a different truth)
-                    cand_ious = iou_lookup[px]
-                    ovidx = cand_ious.argmax()
-                    ovmax = cand_ious[ovidx]
-                    if ovmax > iou_thresh_:
-                        tx = true_idxs[ovidx]
-                        if not unused[ovidx]:
-                            tx = -1
+                elif used_truth_policy == 'next_best':
+                    # prevent predictions from matching the same truth
+                    # (maybe in a better way than this?)
+                    cand_nmatches = true_nmatches.compress(available)
+                    # allow multiple matches
+                    cand_validmatch = cand_ious > iou_thresh_
+                    ovidx = kwarray.arglexmax([
+                        cand_ious,
+                        cand_nmatches,
+                        cand_validmatch,
+                    ])
                 else:
                     raise KeyError(used_truth_policy)
+                ovmax = cand_ious[ovidx]
+                if ovmax > iou_thresh_:
+                    tx = cand_true_idxs[ovidx]
 
             elif prioritize == 'correct' or prioritize == 'class':
 
-                if used_truth_policy != 'next_best':
+                if used_truth_policy != 'ignore':
                     raise NotImplementedError(used_truth_policy)
 
                 # Choose which (if any) of the overlapping true boxes to match
                 # If there are any correct matches above the overlap threshold
                 # choose to match that.
-                # Flag any unused true box that overlaps
-                overlap_flags = isvalid_lookup[px][unused]
+                # Flag any available true box that overlaps
+                overlap_flags = isvalid_lookup[px][available]
 
                 if overlap_flags.any():
-                    cand_ious = iou_lookup[px][unused]
+                    cand_ious = iou_lookup[px][available]
                     cand_true_cxs = true_dets.class_idxs[cand_true_idxs]
                     cand_true_idxs = cand_true_idxs[overlap_flags]
                     cand_true_cxs = cand_true_cxs[overlap_flags]
@@ -455,8 +473,10 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         if tx > -1:
             # If the prediction matched a true object, mark the assignment
             # as either a true or false positive
-            # tx = unused_true_idxs[ovidx]
-            true_unused[tx] = False  # mark this true box as used
+            # tx = available_true_idxs[ovidx]
+            if used_truth_policy == 'ignore':
+                true_available[tx] = False  # mark this true box as unavailable
+            true_nmatches[tx] += 1  # indicate the number of times a true box is used.
 
             if 'weights' in true_dets.data:
                 weight = true_dets.weights[tx]
@@ -477,9 +497,8 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             y_pxs.append(px)
             y_txs.append(tx)
         else:
-            # Assign this prediction to a the background
+            # Assign this prediction to the background
             # Mark this prediction as a false positive
-
             y_pred.append(pred_cx)
             y_true.append(bg_cidx)
             y_score.append(score)
@@ -489,9 +508,9 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             y_txs.append(tx)
 
     # All pred boxes have been assigned to a truth box or the background.
-    # Mark unused true boxes we failed to predict as false negatives
+    # Mark available true boxes we failed to predict as false negatives
     bg_px = -1
-    unused_txs = np.where(true_unused)[0]
+    unused_txs = np.where(true_nmatches == 0)[0]
     n = len(unused_txs)
 
     unused_y_true = true_dets.class_idxs[unused_txs].tolist()
