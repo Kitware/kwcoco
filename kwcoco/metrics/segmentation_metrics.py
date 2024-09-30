@@ -485,6 +485,8 @@ class SingleImageSegmentationMetrics:
                 unit_sseg_share = fg_poly.area / len(sseg_groups['foreground'])
             else:
                 unit_sseg_share = 1
+        elif not self.balance_area:
+            ...
         else:
             raise KeyError(self.balance_area)
 
