@@ -34,7 +34,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                               compat='all', prioritize='iou',
                               ignore_classes='ignore',
                               max_dets=None,
-                              used_truth_policy=False,
+                              truth_reuse_policy='never',
                               ):
     """
     Create confusion vectors for detections by assigning to ground true boxes
@@ -91,8 +91,13 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
         max_dets (int): maximum number of detections to consider
 
-        used_truth_policy (str | bool):
-            EXPERIMENTAL
+        truth_reuse_policy (str | bool):
+            Defaults to "never".
+            * "never", which means only a single predicted detection
+               is allowed to match a true detection.
+            * "least_used" means that a predicted box will be allowed to
+              match a true object, but it will prioritize unused boxes
+              before reusing one.
 
     TODO:
         - [ ] This is a bottleneck function. An implementation in C / C++ /
@@ -114,6 +119,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
     Example:
         >>> # xdoctest: +REQUIRES(module:pandas)
+        >>> from kwcoco.metrics.assignment import _assign_confusion_vectors
         >>> import pandas as pd
         >>> import kwimage
         >>> # Given a raw numpy representation construct Detection wrappers
@@ -134,9 +140,6 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>> compat = 'all'
         >>> iou_thresh = 0.5
         >>> bias = 0.0
-        >>> import kwcoco
-        >>> classes = kwcoco.CategoryTree.from_mutex(list(range(3)))
-        >>> bg_cidx = -1
         >>> y = _assign_confusion_vectors(true_dets, pred_dets, bias=bias,
         >>>                               bg_weight=bg_weight, iou_thresh=iou_thresh,
         >>>                               compat=compat)
@@ -161,7 +164,6 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>> dmet = DetectionMetrics.demo(nimgs=1, nclasses=8,
         >>>                              nboxes=(0, 20), n_fp=20,
         >>>                              box_noise=.2, cls_noise=.3)
-        >>> classes = dmet.classes
         >>> gid = ub.peek(dmet.gid_to_pred_dets)
         >>> true_dets = dmet.true_detections(gid)
         >>> pred_dets = dmet.pred_detections(gid)
@@ -191,7 +193,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>> pred_dets = dmet.pred_detections(gid)
         >>> y = _assign_confusion_vectors(true_dets, pred_dets,
         >>>                               classes=dmet.classes,
-        >>>                               compat='all', used_truth_policy='next_best')
+        >>>                               compat='all', truth_reuse_policy='least_used')
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
 
@@ -282,7 +284,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                             cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                             pdist_priority, cx_to_ancestors, bg_cidx,
                             ignore_classes=ignore_classes, max_dets=max_dets,
-                            used_truth_policy=used_truth_policy)
+                            truth_reuse_policy=truth_reuse_policy)
         iou_thresh_to_y[iou_thresh_] = y
 
     if ub.iterable(iou_thresh):
@@ -294,7 +296,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                    cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                    pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes,
-                   max_dets, used_truth_policy):
+                   max_dets, truth_reuse_policy):
     """
     Args:
         true_dets (Detections):
@@ -310,13 +312,13 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         bg_cidx (int):
         ignore_classes (str):
         max_dets (NoneType):
-        used_truth_policy (bool):
+        truth_reuse_policy (bool):
 
     Returns:
         Dict[str, ndarray]
 
     Ignore:
-        keys = 'true_dets, pred_dets, iou_lookup, isvalid_lookup, cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_, pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes, max_dets, used_truth_policy'.split(', ')
+        keys = 'true_dets, pred_dets, iou_lookup, isvalid_lookup, cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_, pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes, max_dets, truth_reuse_policy'.split(', ')
         lut = globals()
         from xdev.introspect import gen_docstr_from_context, generate_typeannot
         gen_docstr_from_context(keys, lut)
@@ -374,12 +376,16 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     y_pxs = []
     y_txs = []
 
-    # NOTE: I don't think this actually does anything anymore
-    # if prioritize == 'correct' or prioritize == 'class':
-    if not used_truth_policy:
+    if not truth_reuse_policy:
         # Original default
-        used_truth_policy = 'ignore'
-    # used_truth_policy = 'next_best'
+        truth_reuse_policy = 'never'
+        # TODO: allow an option where multiple predicted boxes are allowed to
+        # match the same true box. This is important for cases where true
+        # instances are not clearly defined and it is ambiguous if an object
+        # should be annotated as one or multiple instances.
+        # TODO: also in this case, we need to loop over all available true objects
+        # and check if they intersect a predicted object, so we can allow
+        # multiple truth objects to match a single predicted object.
 
     # Greedy assignment. For each predicted detection box.
     # Allow it to match the truth of compatible classes.
@@ -389,14 +395,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         # px, pred_cx, score  = next(_iter)
         # Find compatible truth indices
         true_idxs = cx_to_matchable_txs[pred_cx]
-
-        # TODO: allow an option where multiple predicted boxes are allowed to
-        # match the same true box. This is important for cases where true
-        # instances are not clearly defined and it is ambiguous if an object
-        # should be annotated as one or multiple instances.
-        # TODO: also in this case, we need to loop over all available true objects
-        # and check if they intersect a predicted object, so we can allow
-        # multiple truth objects to match a single predicted object.
 
         # Filter out any truth that has already been marked as unavailable
         available = true_available[true_idxs]
@@ -418,31 +416,34 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
 
                 cand_ious = iou_lookup[px].compress(available)
 
-                if used_truth_policy == 'ignore':
-                    # Ignore matches to unavailable truth
-                    # Use heuristics to pick a single match
+                if truth_reuse_policy == 'never':
+                    # In this case we never will match the same truth box
+                    # twice. These are already marked as unavailable so
+                    # we just choose the highest iou.
                     ovidx = cand_ious.argmax()
-                elif used_truth_policy == 'next_best':
-                    # prevent predictions from matching the same truth
-                    # (maybe in a better way than this?)
+                elif truth_reuse_policy == 'least_used':
+                    # In this case we are allowed to reuse boxes, but
+                    # we will always choose the least used true match.
+                    # boxes are never marked as unavailable in this case
+                    # so we use a lex sort to pick the least used but still
+                    # valid match with the highest iou
                     cand_nmatches = true_nmatches.compress(available)
-                    # allow multiple matches
                     cand_validmatch = cand_ious > iou_thresh_
                     ovidx = kwarray.arglexmax([
                         cand_ious,
-                        cand_nmatches,
+                        -cand_nmatches,
                         cand_validmatch,
                     ])
                 else:
-                    raise KeyError(used_truth_policy)
+                    raise KeyError(truth_reuse_policy)
                 ovmax = cand_ious[ovidx]
                 if ovmax > iou_thresh_:
                     tx = cand_true_idxs[ovidx]
 
             elif prioritize == 'correct' or prioritize == 'class':
 
-                if used_truth_policy != 'ignore':
-                    raise NotImplementedError(used_truth_policy)
+                if truth_reuse_policy != 'never':
+                    raise NotImplementedError(truth_reuse_policy)
 
                 # Choose which (if any) of the overlapping true boxes to match
                 # If there are any correct matches above the overlap threshold
@@ -474,7 +475,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             # If the prediction matched a true object, mark the assignment
             # as either a true or false positive
             # tx = available_true_idxs[ovidx]
-            if used_truth_policy == 'ignore':
+            if truth_reuse_policy == 'never':
                 true_available[tx] = False  # mark this true box as unavailable
             true_nmatches[tx] += 1  # indicate the number of times a true box is used.
 

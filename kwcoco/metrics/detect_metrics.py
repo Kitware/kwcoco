@@ -249,7 +249,7 @@ class DetectionMetrics(ub.NiceRepr):
                           prioritize='iou', ignore_classes='ignore',
                           background_class=ub.NoParam, verbose='auto',
                           workers=0, track_probs='try', max_dets=None,
-                          used_truth_policy=False):
+                          truth_reuse_policy=False):
         """
         Assigns predicted boxes to the true boxes so we can transform the
         detection problem into a classification problem for scoring.
@@ -304,7 +304,7 @@ class DetectionMetrics(ub.NiceRepr):
                 can be 'try', 'force', or False.  if truthy, we assume
                 probabilities for multiple classes are available. default='try'
 
-            used_truth_policy (bool):
+            truth_reuse_policy (bool):
                 EXPERIMENTAL
 
         Returns:
@@ -398,7 +398,7 @@ class DetectionMetrics(ub.NiceRepr):
                 bg_weight=1, iou_thresh=iou_thresh_list, bg_cidx=-1, bias=bias,
                 classes=classes, compat=compat, prioritize=prioritize,
                 ignore_classes=ignore_classes, max_dets=max_dets,
-                used_truth_policy=used_truth_policy,
+                truth_reuse_policy=truth_reuse_policy,
             )
             job.gid = gid
 
