@@ -1972,6 +1972,7 @@ def colorize_weights(weights):
     We should also be able to return a legend for this.
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> import kwarray
         >>> weights = kwimage.gaussian_patch((32, 32))
         >>> weights = kwarray.normalize(weights)
@@ -1992,6 +1993,7 @@ def colorize_weights(weights):
         >>> kwplot.imshow(canvas)
 
     Example:
+        >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> import kwarray
         >>> weights = kwimage.gaussian_patch((32, 32))
         >>> n = 512
