@@ -11,6 +11,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Fix broken paths in camvid converter
 * fixed issues when converting segmentations to legacy mscoco format
 
+### Added
+* Users can now specify sensorchan for toydata videos to get a custom sensor/channel arrangement
+
 
 ## Version 0.8.4 - Released 2024-09-10
 

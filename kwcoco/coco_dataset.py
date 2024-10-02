@@ -1061,6 +1061,7 @@ class MixinCocoConstructors:
                 'anchors': None,
                 'image_size': (600, 600),
                 'aux': None,
+                'sensorchan': None,
                 'multispectral': None,
                 'multisensor': False,
                 'max_speed': 0.01,
