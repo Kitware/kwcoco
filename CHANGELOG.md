@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 * Fix broken paths in camvid converter
 * fixed issues when converting segmentations to legacy mscoco format
+* Issue with `image_filepath` in CocoImage / CocoAsset
 
 ### Added
 * Users can now specify sensorchan for toydata videos to get a custom sensor/channel arrangement

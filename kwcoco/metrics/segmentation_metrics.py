@@ -1342,7 +1342,7 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
     # We want to prevent too many evaluate jobs from piling up results to draw,
     # as it takes longer to draw than it does to score. For this reason, block
     # if the draw queue gets too big.
-    metrics_executor = _DelayedBlockingJobQueue(max_unhandled_jobs=workers, mode='process', max_workers=workers)
+    metrics_executor = _DelayedBlockingJobQueue(max_unhandled_jobs=max(1, workers), mode='process', max_workers=workers)
     draw_executor = _MaxQueuePool(mode='process', max_workers=draw_workers, max_queue_size=draw_workers * 4)
 
     prog = ub.ProgIter(total=total_images, desc='submit scoring jobs', adjust=False, freq=1)

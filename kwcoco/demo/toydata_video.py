@@ -488,12 +488,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         senorchan = SensorChanSpec.coerce(sensorchan)
         sensor_to_channels = {}
         sensor_to_subchans = ub.group_items(senorchan.streams(), key=lambda x: x.sensor.spec)
-        print(f'sensor_to_subchans = {ub.urepr(sensor_to_subchans, nl=1)}')
         for sensor, subchans in sensor_to_subchans.items():
             subspec = ','.join([c._chans.spec for c in subchans])
             chans = ChannelSpec.coerce(subspec)
             sensor_to_channels[sensor] = chans
-        print(f'sensor_to_channels={sensor_to_channels}')
 
     sensors = sorted(sensor_to_channels.keys())
 

@@ -349,11 +349,11 @@ class CocoImage(_CocoObject):
         the method of a CocoAsset. Use :func:`primary_image_filepath` for this
         instead.
         """
-        if self._bundle_dpath is None:
+        if self.bundle_dpath is None:
             raise Exception('Bundle dpath must be populated to use this method')
             # return self['file_name']
         else:
-            return ub.Path(self._bundle_dpath) / self['file_name']
+            return ub.Path(self.bundle_dpath) / self['file_name']
 
     def primary_image_filepath(self, requires=None):
         dpath = ub.Path(self.bundle_dpath)
@@ -1507,11 +1507,11 @@ class CocoAsset(_CocoObject):
         return repr(self.__json__())
 
     def image_filepath(self):
-        if self._bundle_dpath is None:
+        if self.bundle_dpath is None:
             raise Exception('Bundle dpath must be populated to use this method')
             # return self['file_name']
         else:
-            return ub.Path(self._bundle_dpath) / self['file_name']
+            return ub.Path(self.bundle_dpath) / self['file_name']
 
 
 class CocoVideo(_CocoObject):

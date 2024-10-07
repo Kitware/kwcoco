@@ -3,6 +3,9 @@ Generates "toydata" for demo and testing purposes.
 
 Loose image version of the toydata generators.
 
+TODO:
+    - [ ] Reimplement these functions to reuse the logic in toydata_video.
+
 Note:
     The implementation of `demodata_toy_img` and `demodata_toy_dset` should be
     redone using the tools built for `random_video_dset`, which have more
