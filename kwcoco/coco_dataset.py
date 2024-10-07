@@ -1640,7 +1640,7 @@ class MixinCocoExtras:
                absolute=False,
                check=True,
                safe=True,
-               verbose=1):
+               verbose=0):
         """
         Modify the prefix of the image/data paths onto a new image/data root.
 

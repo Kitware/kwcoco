@@ -15,6 +15,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Users can now specify sensorchan for toydata videos to get a custom sensor/channel arrangement
 
+### Changed
+* Set verbose default of reroot to 0 to match documentation.
+
 
 ## Version 0.8.4 - Released 2024-09-10
 
