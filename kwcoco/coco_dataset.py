@@ -3829,7 +3829,7 @@ class MixinCocoAddRemove:
 
             keypoints (Any): keypoints in some accepted
                 format, see :func:`kwimage.Points.to_coco`.
-                Extended types: `KeypointsLike`.
+                Extended types: ``PointsLike``.
 
             id (None | int): Force using this annotation id. Typically you
                 should NOT specify this. A new unused id will be chosen and

@@ -112,7 +112,7 @@ An informal spec is as follows:
         'weight' : float,
 
         'caption': str,  # a text caption for this annotation
-        'keypoints' : <Keypoints | List[int] > # an accepted keypoint format
+        'keypoints' : <Points | List[int] > # an accepted keypoint format
         'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
     }
 
@@ -162,7 +162,7 @@ An informal spec is as follows:
             For compatibility with the COCO specs ensure the binary flags
             for these functions are set to true.
 
-    Keypoints:
+    Points:
         Annotation keypoints may also be specified in this non-standard (but
         ultimately more general) way:
 
