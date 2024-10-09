@@ -3828,7 +3828,7 @@ class MixinCocoAddRemove:
                 Extended types: `MaskLike | MultiPolygonLike`.
 
             keypoints (Any): keypoints in some accepted
-                format, see :func:`kwimage.Keypoints.to_coco`.
+                format, see :func:`kwimage.Points.to_coco`.
                 Extended types: `KeypointsLike`.
 
             id (None | int): Force using this annotation id. Typically you
