@@ -941,13 +941,15 @@ class CocoImage(_CocoObject):
             >>> # Test delay when loading in asset space
             >>> from kwcoco.coco_image import *  # NOQA
             >>> import kwcoco
-            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
+            >>> dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor', rng=0)
             >>> coco_img = dset.coco_image(1)
+            >>> # Find a stream where the asset is at a different scale
+            >>> # (currently this is hacked and depends on the rng being nice)
             >>> stream1 = coco_img.channels.streams()[0]
             >>> stream2 = coco_img.channels.streams()[1]
-            >>> asset_delayed = coco_img.imdelay(stream1, space='asset')
-            >>> img_delayed = coco_img.imdelay(stream1, space='image')
-            >>> vid_delayed = coco_img.imdelay(stream1, space='video')
+            >>> asset_delayed = coco_img.imdelay(stream2, space='asset')
+            >>> img_delayed = coco_img.imdelay(stream2, space='image')
+            >>> vid_delayed = coco_img.imdelay(stream2, space='video')
             >>> #
             >>> aux_imdata = asset_delayed.as_xarray().finalize()
             >>> img_imdata = img_delayed.as_xarray().finalize()
