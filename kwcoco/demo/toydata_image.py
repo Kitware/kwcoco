@@ -134,6 +134,10 @@ def demodata_toy_dset(image_size=(600, 600),
             deprecate='0.8.3', error='1.0.0', remove='1.1.0',
         )
         image_size = kwargs.pop('gsize')
+    if 'sensorchan' in kwargs:
+        if kwargs['sensorchan'] is not None:
+            raise NotImplementedError('Use toydata_video instead')
+        kwargs.pop('sensorchan')
     assert len(kwargs) == 0, 'unknown kwargs={}'.format(kwargs)
 
     if bundle_dpath is None:

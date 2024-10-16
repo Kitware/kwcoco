@@ -339,6 +339,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         >>> assert dset.imgs[1]['auxiliary'][1]['channels']
         >>> # test that we can render
         >>> render_toy_dataset(dset, rng=0, dpath=None, renderkw={})
+        >>> # Test we can load a single channel
+        >>> coco_img = dset.coco_image(1)
+        >>> stream = coco_img.channels.streams()[0]
+        >>> coco_img.imdelay(channels=stream).as_xarray().finalize()
 
     Example:
         >>> from kwcoco.demo.toydata_video import *  # NOQA
