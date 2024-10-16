@@ -14,6 +14,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Users can now specify sensorchan for toydata videos to get a custom sensor/channel arrangement
+* Added `flatten` method to `ObjectGroups`.
 
 ### Changed
 * Set verbose default of reroot to 0 to match documentation.

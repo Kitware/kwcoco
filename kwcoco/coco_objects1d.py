@@ -498,6 +498,7 @@ class ObjectGroups(ub.NiceRepr):
             dset (CocoDataset): parent dataset
         """
         self._groups = groups
+        self._dset = dset
 
     def _lookup(self, key):
         return self._lookup(key)  # broken?
@@ -512,6 +513,16 @@ class ObjectGroups(ub.NiceRepr):
 
     def lookup(self, key, default=ub.NoParam):
         return [group.lookup(key, default) for group in self._groups]
+
+    def flatten(self):
+        """
+        Flattens the group into a single object list.
+
+        Returns:
+            ObjectList1D
+        """
+        flat_ids = list(ub.flatten(self))
+        return self._cls1d(flat_ids, self._dset)
 
     def __nice__(self) -> str:
         # import timerit
@@ -1013,6 +1024,7 @@ class AnnotGroups(ObjectGroups):
 
     Example:
         >>> from kwcoco.coco_objects1d import ImageGroups
+        >>> from kwcoco.coco_objects1d import AnnotGroups
         >>> import kwcoco
         >>> dset = kwcoco.CocoDataset.demo('photos')
         >>> images = dset.images()
@@ -1032,6 +1044,8 @@ class AnnotGroups(ObjectGroups):
         >>> print(group.lookup('category_id'))
         [[1, 2, 3, 4, 5, 5, 5, 5, 5], [6, 4], []]
     """
+    _cls1d = Annots
+
     @property
     def cids(self):
         """
@@ -1093,7 +1107,7 @@ class ImageGroups(ObjectGroups):
         >>> print(group.lookup('frame_index'))
         [[0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1]]
     """
-    ...
+    _cls1d = Images
 
 
 if 0:
