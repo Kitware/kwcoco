@@ -285,7 +285,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * demo data now has the ability to render on top of a background image.
 
 ### Fixed
-* Fixed sqlalchemy 2.x compatability
+* Fixed sqlalchemy 2.x compatibility
 * The track index now works properly with SQL variants and returns ordreing
 
 
