@@ -18,6 +18,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 * Set verbose default of reroot to 0 to match documentation.
+* `rich` is now a runtime requirement.
 
 
 ## Version 0.8.4 - Released 2024-09-10
