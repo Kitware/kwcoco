@@ -112,7 +112,7 @@ An informal spec is as follows:
         'weight' : float,
 
         'caption': str,  # a text caption for this annotation
-        'keypoints' : <Points | List[int] > # an accepted keypoint format
+        'keypoints' : <Points | List[number] > # an accepted keypoint format
         'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
     }
 
@@ -197,6 +197,21 @@ An informal spec is as follows:
         keypoint categories.
 
         TODO: Support WTK
+
+        NEW IN VERSION 0.8.5: Column based keypoints:
+        These are still experimental
+
+        'annotations': [
+            {
+                'keypoints': {
+                    'x': List[number],
+                    'y': List[number],
+                    'visible': List[number],
+                    'keypoint_category_id': List[int],
+                    'keypoint_category': List[str],  # this can be specified instead of an id
+                }, ...
+            }, ...
+        ],
 
     Auxiliary Channels / Image Assets:
         For multimodal or multispectral images it is possible to specify

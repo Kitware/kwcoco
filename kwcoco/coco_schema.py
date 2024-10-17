@@ -105,7 +105,7 @@ KWCOCO_POLYGON = OBJECT(
 
 
 ORIG_COCO_KEYPOINTS = ARRAY(
-    INTEGER,
+    NUMBER,
     description='An old-style set of keypoints (x1,y1,v1,...,xk,yk,vk)',
     title='MSCOCO_KEYPOINTS'
 )
