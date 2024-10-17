@@ -1,3 +1,12 @@
+Informal KWCOCO Schema
+----------------------
+
+The original informal MSCOCO spec can be found here: http://cocodataset.org/#format-data
+
+.. .. todo: proper references to these files:
+
+Our formal spec is defined in ``./coco_schema.json``, which is derived from ``./coco_schema.py``
+
 An informal spec is as follows:
 
 .. code::
@@ -185,6 +194,21 @@ An informal spec is as follows:
             'reflection_id': <kp_cid>  # specify only if the keypoint id would be swapped with another keypoint type
         },...
         ]
+
+        Keypoint categories can also be defined on a per-object category level as in the original MSCOCO schema.
+        Each category dictionary is extended with fields:
+
+            categories[{
+                "keypoints": [str],
+                "skeleton": [edge],
+            }]
+
+        The original MSCOCO docs describe this format as: "Finally, for each
+        category, the categories struct has two additional fields: "keypoints,"
+        which is a length k array of keypoint names, and "skeleton", which
+        defines connectivity via a list of keypoint edge pairs and is used for
+        visualization."
+
 
         In this scheme the "keypoints" property of each annotation (which used
         to be a list of floats) is now specified as a list of dictionaries that

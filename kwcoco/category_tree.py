@@ -319,13 +319,14 @@ class CategoryTree(ub.NiceRepr):
         Converts to a coco-style data structure
 
         Yields:
-            Dict: coco category dictionaries
+            Dict[str, Any]: coco category dictionaries
         """
         for cid, node in self.id_to_node.items():
             # Skip if background already added
             cat = {
                 'id': cid,
                 'name': node,
+                **self.graph.nodes[node]
             }
             parents = list(self.graph.predecessors(node))
             if len(parents) == 1:
