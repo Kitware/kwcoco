@@ -36,7 +36,7 @@ class KWCocoSimpleTorchDataset(DatasetBase):
 
     Args:
         coco_dset (kwcoco.CocoDataset | str):
-            something coercable to a kwcoco dataset, this could either be a
+            something coercible to a kwcoco dataset, this could either be a
             :class:`kwcoco.CocoDataset` object, a path to a kwcoco manifest on
             disk, or a special toydata code. See
             :func:`kwcoco.CocoDataset.coerce` for more details.

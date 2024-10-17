@@ -1,7 +1,7 @@
 """
 Generates "toydata" for demo and testing purposes.
 
-This is the video version of the toydata generator and should be prefered to
+This is the video version of the toydata generator and should be preferred to
 the loose image version in toydata_image.
 
 """
@@ -580,7 +580,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
             dset.dataset['keypoint_categories'].append(kpcat)
             kpname_to_id[kpcat['name']] = kpcat['id']
 
-    # Generate paths in a way that they are dependant on each other
+    # Generate paths in a way that they are dependent on each other
     paths = random_multi_object_path(
         num_frames=num_frames,
         num_objects=num_tracks, rng=rng,
@@ -848,7 +848,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
             sophisticated.
 
             Each item in `dset.dataset['images']` will be modified to add
-            the "file_name" field indicating where the rendered data is writen.
+            the "file_name" field indicating where the rendered data is written.
 
         rng (int | None | RandomState): random state
 
@@ -907,7 +907,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     if imwrite_kw:
         # imwrite_kw['backend'] = 'gdal'
         # imwrite_kw['space'] = None
-        # imwrite kw requries gdal
+        # imwrite kw requires gdal
         from osgeo import gdal  # NOQA
 
     main_ext = renderkw.get('main_ext', '.png')
@@ -961,7 +961,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     the image dictionary.
 
     Args:
-        dset (kwcoco.CocoDataset): coco dataset with renderable anotations / images
+        dset (kwcoco.CocoDataset): coco dataset with renderable annotations / images
         gid (int): image to render
         rng (int | None | RandomState): random state
         renderkw (dict | None): rendering config
@@ -1137,7 +1137,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
 def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
                       with_sseg, with_kpts, dims, newstyle, gray, rng):
     """
-    Renders demo annoations on top of a demo background
+    Renders demo annotations on top of a demo background
     """
     boxes = annots.boxes
 
@@ -1438,7 +1438,7 @@ def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
 
             optim.step()
 
-            # Enforce boundry conditions
+            # Enforce boundary conditions
             model.pos.data.clamp_(0, 1)
             positions.append(model.pos.data.numpy().copy())
 

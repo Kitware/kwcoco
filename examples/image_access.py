@@ -12,7 +12,7 @@ all_images.lookup('file_name')
 
 # Lets grab the ID of a single image
 image_id: int = all_images.lookup('id')[0]
-# The vectorized interface is a convinience, if you want raw acccess to the
+# The vectorized interface is a convenience, if you want raw access to the
 # image dictionaries use the index to lookup information by id
 img : dict = coco.index.imgs[image_id]
 import ubelt as ub

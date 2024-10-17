@@ -8,7 +8,7 @@ def getting_started_existing_dataset():
     dset = kwcoco.CocoDataset('<DATASET_NAME>/data.kwcoco.json')
 
     """
-    You can access category, image, and annotation infomation using the index:
+    You can access category, image, and annotation information using the index:
     """
     cat = dset.index.cats[1]
     print('The First Category = {!r}'.format(cat))

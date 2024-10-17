@@ -5,7 +5,7 @@ Experimental support for kwcoco-only.
 Compute semantic segmentation evaluation metrics
 
 TODO::
-- RRMSE (relative root mean squared error) RMSE normalized by root mean sqare value where each residual is scaled against the actual value
+- RRMSE (relative root mean squared error) RMSE normalized by root mean square value where each residual is scaled against the actual value
   sqrt((1 / n) * sum((y - y_hat) ** 2) / sum(y ** 2))
 """
 import json
@@ -136,13 +136,13 @@ def main(cmdline=True, **kwargs):
 
 class SingleImageSegmentationMetrics:
     """
-    Helper class which is a refectored version of an old function to compute
+    Helper class which is a refactored version of an old function to compute
     segmentation metrics between a single predicted and true image.
 
     Args:
-        true_coco_img (kwcoco.CocoImage): detatched true coco image
+        true_coco_img (kwcoco.CocoImage): detached true coco image
 
-        pred_coco_img (kwcoco.CocoImage): detatched predicted coco image
+        pred_coco_img (kwcoco.CocoImage): detached predicted coco image
 
         thresh_bins (int): if specified rounds scores into this many bins
             to make calculating metrics more efficient
@@ -664,9 +664,9 @@ def single_image_segmentation_metrics(pred_coco_img, true_coco_img,
     DEPRECATED, Use SingleImageSegmentationMetrics instead
 
     Args:
-        true_coco_img (kwcoco.CocoImage): detatched true coco image
+        true_coco_img (kwcoco.CocoImage): detached true coco image
 
-        pred_coco_img (kwcoco.CocoImage): detatched predicted coco image
+        pred_coco_img (kwcoco.CocoImage): detached predicted coco image
 
         thresh_bins (int): if specified rounds scores into this many bins
             to make calculating metrics more efficient
@@ -1682,7 +1682,7 @@ def associate_images(dset1, dset2, key_fallback=None):
     they can be scored.
 
     Args:
-        dset1 (kwcoco.CocoDataset): a kwcoco datset.
+        dset1 (kwcoco.CocoDataset): a kwcoco dataset.
 
         dset2 (kwcoco.CocoDataset): another kwcoco dataset
 

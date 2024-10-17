@@ -46,7 +46,7 @@ class CocoSubsetCLI(scfg.DataConfig):
                 .myattr | in({"val1": 1, "val4": 1}) will take images
                 where myattr is either val1 or val4.
 
-                Requries the "jq" python library is installed.
+                Requires the "jq" python library is installed.
                 ''')),
 
         'channels': scfg.Value(
@@ -70,7 +70,7 @@ class CocoSubsetCLI(scfg.DataConfig):
 
                 Only applicable for dataset that contain videos.
 
-                Requries the "jq" python library is installed.
+                Requires the "jq" python library is installed.
                 ''')),
 
         'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
@@ -91,7 +91,7 @@ class CocoSubsetCLI(scfg.DataConfig):
         # image timestamp
         # image file name matches
         # annotations with segmentations / keypoints?
-        # iamges/annotations that contain a special attribute?
+        # images/annotations that contain a special attribute?
         # images with a maximum / minimum number of annotations?
 
         # 'rng': scfg.Value(None, help='random seed'),

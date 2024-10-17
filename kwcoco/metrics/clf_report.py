@@ -17,7 +17,7 @@ def classification_report(y_true, y_pred, target_names=None,
                           ascii_only=False):
     r"""
     Computes a classification report which is a collection of various metrics
-    commonly used to evaulate classification quality. This can handle binary
+    commonly used to evaluate classification quality. This can handle binary
     and multiclass settings [MulticlassMCC]_.
 
     Note that this function does not accept probabilities or scores and must
@@ -557,10 +557,10 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
                 )
 
             if 'brier' in metrics:
-                # Get the probablity of the real class for each example
+                # Get the probability of the real class for each example
                 rprobs = np.clip(true_probs / total_scores, 0, 1)
                 rwants = np.ones(len(rprobs))
-                # Use custom brier implemention until sklearn is fixed.
+                # Use custom brier implementation until sklearn is fixed.
                 mse = (rwants - rprobs) ** 2
                 if sample_weight is None:
                     k_metrics['brier'] = mse.mean()

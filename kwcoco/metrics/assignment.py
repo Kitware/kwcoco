@@ -84,7 +84,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
         classes (List[str] | kwcoco.CategoryTree):
             mapping from class indices to class names. Can also contain class
-            heirarchy information.
+            hierarchy information.
 
         ignore_classes (str | List[str]):
             class name(s) indicating ignore regions
@@ -572,7 +572,7 @@ def _fast_pdist_priority(classes, prioritize, _cache={}):
             pdist_priority = np.array(pdist, dtype=np.float32, copy=True)
             if prioritize == 'correct':
                 # Prioritizes all ancestors first, and then descendants
-                # afterwords, nodes off the direct lineage are ignored.
+                # afterwards, nodes off the direct lineage are ignored.
                 valid_vals = pdist_priority[np.isfinite(pdist_priority)]
                 maxval = (valid_vals.max() - valid_vals.min()) + 1
                 is_ancestor = (pdist_priority >= 0)
@@ -675,7 +675,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
             ignore_sseg = ignore_dets.data.get('segmentations', None)
 
             # Determine which predicted boxes are inside the ignore regions
-            # note: using sum over max is delibrate here.
+            # note: using sum over max is deliberate here.
             with warnings.catch_warnings():
                 warnings.filterwarnings('ignore', message='invalid .* less')
                 warnings.filterwarnings('ignore', message='invalid .* greater_equal')

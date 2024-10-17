@@ -15,7 +15,7 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
 
     This modifies the kwcoco files inplace.
 
-    This operation is not atomic and if it is interupted then your kwcoco
+    This operation is not atomic and if it is interrupted then your kwcoco
     bundle may be put into a bad state.
     """
     src = scfg.Value('source asset file or folder')

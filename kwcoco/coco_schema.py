@@ -85,7 +85,7 @@ KWCOCO_KEYPOINT = OBJECT(
         'keypoint_category': STRING(description='only to be used as a hint')
     },
     title='KWCOCO_KEYPOINT',
-    descripton='A new-style point',
+    description='A new-style point',
 )
 
 KWCOCO_POLYGON = OBJECT(

@@ -34,7 +34,7 @@ class Reloadable(type):
     check that the module and class names agree, which are preserved through
     module reloads, whereas class instances are not.
 
-    This is useful for interactive develoment, but should be removed in
+    This is useful for interactive development, but should be removed in
     production.
 
     Example:

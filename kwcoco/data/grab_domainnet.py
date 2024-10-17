@@ -113,7 +113,7 @@ def grab_domain_net():
         if errors:
             raise Exception('download errors')
 
-        # Extact images from archive files
+        # Extract images from archive files
         for key, info in infos.items():
             if key.endswith('_images'):
                 print('extract {} images'.format(key))

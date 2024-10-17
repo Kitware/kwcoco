@@ -88,7 +88,7 @@ def _special_kwcoco_pretty_dumps_orig(data, indent=None):
     # TODO: optimize efficiency
     # TODO: general "flexible json" package that can read to/from
     # zipfiles, support ujson or pjson backends, has pretty newline
-    # properties. This would abstrat much of the logic away from this
+    # properties. This would abstract much of the logic away from this
     # module and be generally useful when dealing with other larger
     # json files.
     for key in main_keys:

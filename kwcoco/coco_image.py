@@ -39,7 +39,7 @@ from kwcoco.coco_objects1d import Annots
 
 DEFAULT_RESOLUTION_KEYS = {
     'resolution',
-    'target_gsd',  # only exists as a convinience for other projects. Remove in the future.
+    'target_gsd',  # only exists as a convenience for other projects. Remove in the future.
 }
 
 
@@ -154,7 +154,7 @@ class CocoImage(_CocoObject):
     @property
     def assets(self):
         """
-        Convinience wrapper around :func: `CocoImage.iter_assets`.
+        Convenience wrapper around :func: `CocoImage.iter_assets`.
         """
         return list(self.iter_assets())
 
@@ -415,7 +415,7 @@ class CocoImage(_CocoObject):
             >>> })
             >>> assert self.primary_asset()['file_name'] == '2'
             >>> #
-            >>> # Test new objct oriented output
+            >>> # Test new object oriented output
             >>> self = CocoImage({
             >>>     'file_name': 'foo',
             >>>     'assets': [
@@ -454,7 +454,7 @@ class CocoImage(_CocoObject):
                 else:
                     return self
 
-        # Choose "best" auxiliary image based on a hueristic.
+        # Choose "best" auxiliary image based on a heuristic.
         eye = kwimage.Affine.eye().matrix
         asset_objs = img.get('auxiliary', img.get('assets', [])) or []
         for idx, obj in enumerate(asset_objs):
@@ -644,7 +644,7 @@ class CocoImage(_CocoObject):
         """
         Adds an annotation to this image.
 
-        This is a convinience method, and requires that this CocoImage is still
+        This is a convenience method, and requires that this CocoImage is still
         connected to a parent dataset.
 
         Args:
@@ -786,7 +786,7 @@ class CocoImage(_CocoObject):
             if parent_image_id is not None:
                 assert image_id == parent_image_id, (
                     f'The specified image_id ({image_id}) did not match the '
-                    f'parent image id ({parent_image_id}) proprty.'
+                    f'parent image id ({parent_image_id}) property.'
                 )
         else:
             image_id = parent_image_id
@@ -810,7 +810,7 @@ class CocoImage(_CocoObject):
                 #         raise ValueError(ub.paragraph(
                 #             '''
                 #             Got relative file_name, but no dataset is attached
-                #             to this coco image. Attatch a dataset or use an
+                #             to this coco image. Attach a dataset or use an
                 #             absolute path.
                 #             '''))
                 # else:
@@ -1260,7 +1260,7 @@ class CocoImage(_CocoObject):
         Returns:
             Dict:
                 has items mag (with the magnitude of the resolution) and
-                unit, which is a convinience and only loosely enforced.
+                unit, which is a convenience and only loosely enforced.
 
         Example:
             >>> import kwcoco
@@ -1364,7 +1364,7 @@ class CocoImage(_CocoObject):
         Returns:
             Tuple[float, float]:
                 the x and y scale factor that can be used to scale the
-                underlying "space" to acheive the requested resolution.
+                underlying "space" to achieve the requested resolution.
 
         Ignore:
             >>> import kwcoco

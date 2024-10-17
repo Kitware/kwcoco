@@ -6,7 +6,7 @@ import ubelt as ub
 
 def deprecated_function_alias(modname, old_name, new_func, deprecate=None, error=None, remove=None):
     """
-    Exposes an old deprecated alias of a new prefered function
+    Exposes an old deprecated alias of a new preferred function
     """
     new_name = new_func.__name__
     def _deprecated_func_wrapper(*args, **kwargs):

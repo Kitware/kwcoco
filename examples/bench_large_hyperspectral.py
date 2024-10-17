@@ -45,7 +45,7 @@ def benchmark_large_hyperspectral():
         # kwimage.imwrite(fpath, imdata, compress='RAW', backend='gdal')
 
         # Compare to `spectral`
-        # pip isntall spectral
+        # pip install spectral
         import spectral.io.envi
         import spectral  # NOQA
         spy_fpath = base_dpath / 'big_img_{}.hdr'.format(nbands)

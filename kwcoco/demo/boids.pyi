@@ -55,7 +55,7 @@ def clamp_mag(vec, mag, axis: Incomplete | None = ...):
     ...
 
 
-def triu_condense_multi_index(multi_index, dims, symetric: bool = ...):
+def triu_condense_multi_index(multi_index, dims, symmetric: bool = ...):
     ...
 
 

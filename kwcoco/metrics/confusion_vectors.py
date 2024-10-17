@@ -306,7 +306,7 @@ class ConfusionVectors(ub.NiceRepr):
         """
         Creates a binary representation useful for measuring the performance of
         detectors. It is assumed that scores of "positive" classes should be
-        high and "negative" clases should be low.
+        high and "negative" classes should be low.
 
         Args:
             negative_classes (List[str | int] | None):
@@ -378,7 +378,7 @@ class ConfusionVectors(ub.NiceRepr):
         category.
 
         Args:
-            mode (int, default=1): 0 for heirarchy aware or 1 for voc like.
+            mode (int, default=1): 0 for hierarchy aware or 1 for voc like.
                 MODE 0 IS PROBABLY BROKEN
 
             keyby (int | str) : can be cx or name
@@ -455,7 +455,7 @@ class ConfusionVectors(ub.NiceRepr):
             if mode == 0:
                 import warnings
                 warnings.warn(
-                    'THIS CALCLUATION MIGHT BE WRONG. MANY OTHERS '
+                    'THIS CALCULATION MIGHT BE WRONG. MANY OTHERS '
                     'IN THIS FILE WERE, AND I HAVENT CHECKED THIS ONE YET')
 
                 # Lookup original probability predictions for the class of interest
@@ -493,7 +493,7 @@ class ConfusionVectors(ub.NiceRepr):
                 bin_cfsn = BinaryConfusionVectors(bin_data, cx, classes)
 
             elif mode == 1:
-                # More VOC-like, not heirarchy friendly
+                # More VOC-like, not hierarchy friendly
                 if cfsn_vecs.probs is not None:
 
                     # TODO: perhaps we shouldn't use these or at least
@@ -799,7 +799,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
         Args:
             stabalize_thresh (int, default=7):
-                if fewer than this many data points inserts dummy stabalization
+                if fewer than this many data points inserts dummy stabilization
                 data so curves can still be drawn.
 
             fp_cutoff (int | None):
@@ -868,7 +868,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
         Args:
             stabalize_thresh (int): if fewer than this many data points insert
-                stabalization data.
+                stabilization data.
 
             fp_cutoff (int | None): maximum number of false positives
 
@@ -913,7 +913,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             nsupport = 0
         else:
             if len(self) < stabalize_thresh:
-                # add dummy data to stabalize the computation
+                # add dummy data to stabilize the computation
                 if sample_weight is None:
                     sample_weight = np.ones(len(self))
                 npad = stabalize_thresh - len(self)

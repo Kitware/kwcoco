@@ -3,7 +3,7 @@ Evaluates a predicted coco dataset against a truth coco dataset.
 
 This currently computes detection-level metrics.
 
-The components in this module work programatically or as a command line script.
+The components in this module work programmatically or as a command line script.
 
 TODO:
     - [ ] does evaluate return one result or multiple results
@@ -114,7 +114,7 @@ class CocoEvalConfig(scfg.DataConfig):
     ap_method = scfg.Value('pycocotools', help=ub.paragraph(
             '''
             Method for computing AP. Defaults to a setting comparable to
-            pycocotools. Can also be set to sklearn to use an alterative
+            pycocotools. Can also be set to sklearn to use an alternative
             method.
             '''), tags=['algo_param'])
     use_area_attr = scfg.Value('try', help=ub.paragraph(
@@ -271,7 +271,7 @@ class CocoEvaluator:
             # pred dset, we should not do that, just store a gid mapping.
 
             # TODO: we will port the watch associate-images functionality soon,
-            # which should supercede this.
+            # which should supersede this.
             pred_to_true_gid = {}
             true_coco = true_extra['coco_dset']
             pred_coco = pred_extra['coco_dset']
@@ -318,7 +318,7 @@ class CocoEvaluator:
         true_to_unified_cid = unified_cid_maps['true']
         pred_to_unified_cid = unified_cid_maps['pred']
 
-        # Helper infor for mapping predicted probabilities
+        # Helper info for mapping predicted probabilities
         pred_new_idxs = []
         pred_old_idxs = []
         for old_idx, old_node in enumerate(pred_classes.idx_to_node):
@@ -1191,7 +1191,7 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
         gid = single_img_coco.dataset['images'][0]['id']
         dets.meta['gid'] = gid
     else:
-        warnings.warn('Loading dets with muliple images, must track gids carefully')
+        warnings.warn('Loading dets with multiple images, must track gids carefully')
 
     if with_coco:
         return dets, single_img_coco

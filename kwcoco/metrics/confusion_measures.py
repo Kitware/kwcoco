@@ -596,7 +596,7 @@ def _combine_threshold(tocombine_thresh, thresh_bins, growth, precision):
 
 def reversable_diff(arr, assume_sorted=1, reverse=False):
     """
-    Does a reversable array difference operation.
+    Does a reversible array difference operation.
 
     This will be used to find positions where accumulation happened in
     confusion count array.
@@ -1049,7 +1049,7 @@ def populate_info(info):
             p_denom[p_denom == 0] = 1
             fnr = fn / p_denom  # miss-rate
             fdr  = 1 - ppv  # false discovery rate
-            fmr  = 1 - npv  # false ommision rate (for)
+            fmr  = 1 - npv  # false omission rate (for)
 
             info['tnr'] = tnr
             info['npv'] = npv
@@ -1116,12 +1116,12 @@ def populate_info(info):
             Apparently, consistent scoring is really hard to get right.
 
             For detection problems scoring via
-            confusion_vectors+sklearn produces noticably different
+            confusion_vectors+sklearn produces noticeably different
             results than the VOC method. There are a few reasons for
             this.  The VOC method stops counting true positives after
             all assigned predicted boxes have been counted. It simply
             remembers the amount of original true positives to
-            normalize the true positive reate. On the other hand,
+            normalize the true positive rate. On the other hand,
             confusion vectors maintains a list of these unassigned true
             boxes and gives them a predicted index of -1 and a score of
             zero. This means that this function sees them as having a
@@ -1160,7 +1160,7 @@ def populate_info(info):
             diff_items = np.diff(rec)
             prec_items = prec[1:]
 
-            # basline way
+            # baseline way
             info['sklish_ap'] = float(np.sum(diff_items * prec_items))
 
         PYCOCOTOOLS_AP = True

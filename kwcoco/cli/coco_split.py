@@ -27,7 +27,7 @@ class CocoSplitCLI(scfg.DataConfig):
             The number of splits to write. Can be between 1 and ``factor``.
             In the case that ``num_write > ``, then dst1 and dst2 datasets
             must contain a {} format string specifier so each of the output
-            filesnames can be indexed.
+            filenames can be indexed.
             ''')),
         'splitter': scfg.Value(
             'auto', help=ub.paragraph(

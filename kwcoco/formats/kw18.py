@@ -197,7 +197,7 @@ class KW18(kwarray.DataFrameArray):
             >>> canvas = coco_dset.draw_image(1)
             >>> # xdoctest: +REQUIRES(--draw)
             >>> kwimage.imwrite('foo.jpg', canvas)
-            >>> # Draw all iamges
+            >>> # Draw all images
             >>> for gid in coco_dset.imgs.keys():
             >>>     canvas = coco_dset.draw_image(gid)
             >>>     fpath = dpath / 'gid_{}.jpg'.format(gid)

@@ -58,7 +58,7 @@ class CocoGrabCLI(scfg.DataConfig):
         names = config['names']
         print('names = {!r}'.format(names))
 
-        # TODO: standardize this interface, allow specificaiton of dpath
+        # TODO: standardize this interface, allow specification of dpath
         # everywhere
 
         for name in names:

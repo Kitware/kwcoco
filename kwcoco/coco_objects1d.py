@@ -5,7 +5,7 @@ This powers the ``.images()``, ``.videos()``, and ``.annotation()`` methods of
 :class:`kwcoco.CocoDataset`.
 
 TODO:
-    - [ ] The use of methods vs properties is inconsistent. This needs to be fixed, but backwards compatability is a consideration.
+    - [ ] The use of methods vs properties is inconsistent. This needs to be fixed, but backwards compatibility is a consideration.
 
 See:
     :func:`kwcoco.coco_dataset.MixinCocoObjects.categories`
@@ -253,7 +253,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> self.lookup(key=['id', 'image_id'], keepid=True)
         """
         # Note: while the old _lookup code was slightly faster than this, the
-        # difference is extremely negligable (179us vs 178us).
+        # difference is extremely negligible (179us vs 178us).
         if ub.iterable(key):
             return {k: self.lookup(k, default, keepid) for k in key}
         else:
@@ -334,7 +334,7 @@ class ObjectList1D(ub.NiceRepr):
         if has_sql_backend:
             # Special case for SQL speed. This only works on schema columns.
             try:
-                # TODO: check if the column is in the stuctured schema
+                # TODO: check if the column is in the structured schema
                 return self._dset._column_lookup(
                     tablename=self._key, key=key, rowids=self._ids,
                     default=default)
@@ -1019,7 +1019,7 @@ class AnnotGroups(ObjectGroups):
     """
     Annotation groups are vectorized lists of lists.
 
-    Each item represents a set of annotations that corresopnds with something
+    Each item represents a set of annotations that corresponds with something
     (i.e.  belongs to a particular image).
 
     Example:
@@ -1083,7 +1083,7 @@ class ImageGroups(ObjectGroups):
     """
     Image groups are vectorized lists of other Image objects.
 
-    Each item represents a set of images that corresopnds with something (i.e.
+    Each item represents a set of images that corresponds with something (i.e.
     belongs to a particular video).
 
     Example:

@@ -278,12 +278,12 @@ class DetectionMetrics(ub.NiceRepr):
 
             prioritize (str):
                 can be ('iou' | 'class' | 'correct') determines which box to
-                assign to if mutiple true boxes overlap a predicted box.  if
+                assign to if multiple true boxes overlap a predicted box.  if
                 prioritize is iou, then the true box with maximum iou (above
                 iou_thresh) will be chosen.  If prioritize is class, then it will
                 prefer matching a compatible class above a higher iou. If
                 prioritize is correct, then ancestors of the true class are
-                preferred over descendents of the true class, over unreleated
+                preferred over descendents of the true class, over unrelated
                 classes. Default to 'iou'
 
             ignore_classes (set | str):
@@ -752,7 +752,7 @@ class DetectionMetrics(ub.NiceRepr):
 
         pred, true, gt_aid_to_tx, dt_aid_to_px = dmet._to_coco()
 
-        # The original pycoco-api prints to much, supress it
+        # The original pycoco-api prints to much, suppress it
         quiet = verbose == 0
         with SupressPrint(coco, cocoeval, enabled=quiet):
             cocoGt = true._aspycoco()
@@ -1018,7 +1018,7 @@ class DetectionMetrics(ub.NiceRepr):
             false_score_RV = distributions.TruncNormal(
                 mean=false_mean, std=.5, low=0, high=false_high, rng=rng)
 
-            # Create the category hierarcy
+            # Create the category hierarchy
             if isinstance(classes, int):
                 graph = nx.DiGraph()
                 graph.add_node('background', id=0)

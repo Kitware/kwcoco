@@ -542,7 +542,7 @@ def _define_camvid_class_hierarcy(dset):
         import graphid
         graphid.util.show_nx(graph)
 
-    # Add in some hierarcy information
+    # Add in some hierarchy information
     if 0:
         for x in dset.name_to_cat:
             print("dset.name_to_cat[{!r}]['supercategory'] = 'object'".format(x))

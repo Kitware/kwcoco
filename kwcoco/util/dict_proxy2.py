@@ -168,12 +168,12 @@ class DictProxy2(DictInterface):
     """
     Allows an object to proxy the behavior of a _proxy dict attribute.
 
-    Inheriting classes must define a ``self._proxy`` attriute as a dictionary.
+    Inheriting classes must define a ``self._proxy`` attribute as a dictionary.
     Given that, this class will give the inheriting class methods such that the
     user can treat it like a dictionary and all dictionary operations are
     simply forwarded to proxy. In other words, you can make a class that wraps
     a dictionary, still makes it behave like a dictionary, but you can do fancy
-    things with other methods and attributes, while still maintaing the core
+    things with other methods and attributes, while still maintaining the core
     underlying dictionary.
 
     Example:
@@ -321,7 +321,7 @@ class AliasedDictProxy(DictProxy2, metaclass=_AliasMetaclass):
         >>> assert obj._proxy == {
         >>>     'foo_primary': 789,
         >>>     'bar_primary': 456}
-        >>> # Test that if aliases keys are existant we dont add primary keys
+        >>> # Test that if aliases keys are existent we dont add primary keys
         >>> obj = MyAliasedObject({
         >>>     'foo_alias1': 123,
         >>> })

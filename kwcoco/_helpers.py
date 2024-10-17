@@ -179,7 +179,7 @@ class SortedSet(sortedcontainers.SortedSet):
 
 
 # Do not use.
-# Just exist for backwards compatability with older pickeled data.
+# Just exist for backwards compatibility with older pickeled data.
 SortedSetQuiet = SortedSet
 
 

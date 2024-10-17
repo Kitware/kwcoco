@@ -51,7 +51,7 @@ class CategoryTree(ub.NiceRepr):
                 often denoted as (id, cid).
 
             index:
-                Contigous zero-based indices that indexes the list of
+                Contiguous zero-based indices that indexes the list of
                 categories.  These should be used for the fastest access in
                 backend computation tasks. Typically corresponds to the
                 ordering of the channels in the final linear layer in an
@@ -461,7 +461,7 @@ class CategoryTree(ub.NiceRepr):
                 state.pop(key)
         state['graph'] = to_directed_nested_tuples(self.graph)
         if True:
-            # Remove reundant items
+            # Remove redundant items
             state.pop('node_to_idx')
             state.pop('node_to_id')
             state.pop('idx_groups')
@@ -898,7 +898,7 @@ class _calldict(dict):
 
     def __call__(self):
         import warnings
-        warnings.warn('Calling id_to_idx as a method has been depricated. '
+        warnings.warn('Calling id_to_idx as a method has been deprecated. '
                       'Use this dict as a property')
         return self
 

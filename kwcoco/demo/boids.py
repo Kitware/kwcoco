@@ -559,7 +559,7 @@ def closest_point_on_line_segment(pts, e1, e2):
     """
     # shift e1 to origin
     de = (e2 - e1)[None, :]
-    # make point vector wrt orgin
+    # make point vector wrt origin
     pv = pts - e1
     # Project pv onto de
     mag = np.linalg.norm(de, axis=1)

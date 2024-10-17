@@ -38,7 +38,7 @@ TODO:
           annotation on an intermediate frame.
 
     - [ ] Efficiency: Allow each section of the kwcoco file to be written as a
-          separate json file. Perhaps allow genric pointer support? Might get
+          separate json file. Perhaps allow generic pointer support? Might get
           messy.
 
     - [ ] Reroot needs to be redesigned very carefully.
@@ -127,7 +127,7 @@ SPEC_KEYS = [
 
 class MixinCocoDepricate:
     """
-    These functions are marked for deprication and will be removed
+    These functions are marked for deprecation and will be removed
     """
 
     def keypoint_annotation_frequency(self):
@@ -140,7 +140,7 @@ class MixinCocoDepricate:
             >>> self = kwcoco.CocoDataset.demo('shapes', rng=0)
             >>> hist = self.keypoint_annotation_frequency()
             >>> hist = ub.odict(sorted(hist.items()))
-            >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
+            >>> # FIXME: for whatever reason demodata generation is not deterministic when seeded
             >>> print(ub.urepr(hist))  # xdoc: +IGNORE_WANT
             {
                 'bot_tip': 6,
@@ -915,12 +915,12 @@ class MixinCocoConstructors:
     @classmethod
     def demo(cls, key='photos', **kwargs):
         """
-        Create a toy coco dataset for testing and demo puposes
+        Create a toy coco dataset for testing and demo purposes
 
         Args:
             key (str):
                 Either 'photos' (default), 'shapes', or 'vidshapes'. There are
-                also special sufixes that can control behavior.
+                also special suffixes that can control behavior.
 
                 Basic options that define which flavor of demodata to generate
                 are: `photos`, `shapes`, and `vidshapes`. A numeric suffix e.g.
@@ -971,7 +971,7 @@ class MixinCocoConstructors:
             >>> print(CocoDataset.demo('photos', verbose=1))
             >>> print(CocoDataset.demo('shapes', verbose=1))
             >>> print(CocoDataset.demo('vidshapes', verbose=1))
-            >>> # Varaints of demodata keys
+            >>> # Variants of demodata keys
             >>> print(CocoDataset.demo('shapes8', verbose=0))
             >>> print(CocoDataset.demo('shapes8-msi', verbose=0))
             >>> print(CocoDataset.demo('shapes8-frames1-speed0.2-msi', verbose=0))
@@ -2518,7 +2518,7 @@ class MixinCocoStats:
 
     def conform(self, **config):
         """
-        Make the COCO file conform a stricter spec, infers attibutes where
+        Make the COCO file conform a stricter spec, infers attributes where
         possible.
 
         Corresponds to the ``kwcoco conform`` CLI tool.
@@ -4697,7 +4697,7 @@ class MixinCocoAddRemove:
             >>> kp_identifiers = ['left_eye', 'mid_tip']
             >>> remove_info = self.remove_keypoint_categories(kp_identifiers)
             >>> print('remove_info = {!r}'.format(remove_info))
-            >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
+            >>> # FIXME: for whatever reason demodata generation is not deterministic when seeded
             >>> # assert remove_info == {'keypoint_categories': 2, 'annotation_keypoints': 16, 'reflection_ids': 1}
             >>> assert self._resolve_to_kpcat('right_eye')['reflection_id'] is None
         """
@@ -4790,7 +4790,7 @@ class CocoIndex:
 
         cid_to_gids (Dict[int, List[int]]):
             mapping between an category-id and image-ids that contain
-            at least one annotation with this cateogry id.
+            at least one annotation with this category id.
 
         trackid_to_aids (Dict[int, List[int]]):
             mapping between a track-id and annotation-ids that belong to it
@@ -5405,7 +5405,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             relative to. This can also be manually overwritten by the user.
 
         hashid (str | None) :
-            If computed, this will be a hash uniquely identifing the dataset.
+            If computed, this will be a hash uniquely identifying the dataset.
             To ensure this is computed see
             :func:`kwcoco.coco_dataset.MixinCocoExtras._build_hashid`.
 
@@ -5436,7 +5436,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             'url': 'https://i.imgur.com/KXhKM72.png',
         }
         >>> #
-        >>> # Use the (gid_to_aids) index to lookup annotations in the iamge
+        >>> # Use the (gid_to_aids) index to lookup annotations in the image
         >>> annotation_id = sorted(self.index.gid_to_aids[image_id])[0]
         >>> ann = self.index.anns[annotation_id]
         >>> print(ub.urepr((ub.udict(ann) - {'segmentation'}).sorted_keys(), nl=1))
@@ -5492,7 +5492,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             data (str | PathLike | dict | None):
                 Either a filepath to a coco json file, or a dictionary
                 containing the actual coco json structure. For a more generally
-                coercable constructor see func:`CocoDataset.coerce`.
+                coercible constructor see func:`CocoDataset.coerce`.
 
                 Note: in the future, we may only accept construction from a
                 data dictionary, and use a `.load` classmethod to handle
@@ -5502,7 +5502,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             tag (str | None) :
                 Name of the dataset for display purposes, and does not
                 influence behavior of the underlying data structure, although
-                it may be used via convinience methods. We attempt to
+                it may be used via convenience methods. We attempt to
                 autopopulate this via information in ``data`` if available.
                 If unspecfied and ``data`` is a filepath this becomes the
                 basename.
@@ -5832,7 +5832,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """
         Constructor from a list of images paths.
 
-        This is a convinience method.
+        This is a convenience method.
 
         Args:
             gpaths (List[str]): list of image paths
@@ -5982,7 +5982,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         SeeAlso:
             * coerce_multiple - like this function but accepts general
-                coercable inputs.
+                coercible inputs.
         """
         import kwcoco
         _loader = kwcoco.CocoDataset
@@ -6054,7 +6054,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             union (str | bool): If True, unions the result
                 datasets after loading. If False, just returns the result list.
-                If 'try', then try to preform the union, but return the result
+                If 'try', then try to perform the union, but return the result
                 list if it fails. Default='try'
 
         Note:
@@ -6721,7 +6721,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
                             old_reflect_id = new_kpcat.get('reflection_id', None)
                             if old_reflect_id is not None:
-                                # Temporarilly overwrite reflectid with name
+                                # Temporarily overwrite reflectid with name
                                 reflect_name = old_id_to_name.get(old_reflect_id, None)
                                 new_kpcat['reflection_id'] = reflect_name
                                 postproc_kpcats.append(new_kpcat)
@@ -6956,7 +6956,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             video_ids (List[int] | None):
                 list of video ids to copy into the new dataset.
-                This is a convinience argument that simply selects all image
+                This is a convenience argument that simply selects all image
                 ids associated with the given videos.
 
             copy (bool):
@@ -7146,7 +7146,7 @@ def demo_coco_data():
         # It probably does make sense to allow this to be specified in the
         # dictionary itself if we are constructing a CocoDataset class from it,
         # but we likely don't want to save it (or if we do it must be
-        # constantly updated to be corret)
+        # constantly updated to be correct)
         'img_root': img_root,
 
         'categories': [

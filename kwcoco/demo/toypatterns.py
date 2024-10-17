@@ -84,7 +84,7 @@ class CategoryPatterns(object):
                 cname_to_cat = {c['name']: c for c in CategoryPatterns._default_categories}
                 arg = list(ub.take(cname_to_cat, catnames))
             elif ub.iterable(data) and len(data) > 0:
-                # choose specific catgories
+                # choose specific categories
                 if isinstance(data[0], str):
                     catnames = data
                     cname_to_cat = {c['name']: c for c in CategoryPatterns._default_categories}

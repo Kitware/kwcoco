@@ -55,7 +55,7 @@ def _truncated_roc(y_df, bg_idx=-1, fp_cutoff=None):
 
     # y_true[y_true == -1] = 0
 
-    # < TRUCNATED PART >
+    # < TRUNCATED PART >
     # GET ROC CURVES AT A PARTICULAR FALSE POSITIVE COUNT CUTOFF
     # This will let different runs be more comparable
     realpos_total = sample_weight[(y_df['txs'] >= 0)].sum()
@@ -99,7 +99,7 @@ def _truncated_roc(y_df, bg_idx=-1, fp_cutoff=None):
     trunc_tpr = trunc_tp_count / realpos_total
     trunc_fpr = trunc_fp_count / falsepos_total
     trunc_auc = sklearn.metrics.auc(trunc_fpr, trunc_tpr)
-    # < /TRUCNATED PART >
+    # < /TRUNCATED PART >
     roc_info = {
         'fp_cutoff': fp_cutoff,
         'realpos_total': realpos_total,

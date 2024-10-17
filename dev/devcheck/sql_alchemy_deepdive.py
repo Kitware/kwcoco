@@ -1,5 +1,5 @@
 r"""
-Notes about a deep dive into sqlalchemy picking appart some internals
+Notes about a deep dive into sqlalchemy picking apart some internals
 
 
 Initialize the Global PostgreSQL database and server:

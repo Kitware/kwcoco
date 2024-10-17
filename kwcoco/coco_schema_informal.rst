@@ -50,7 +50,7 @@ An informal spec is as follows:
                 'channels': <ChannelSpec>,   # a string encoding
                 'width':     <int>    # pixel width of image asset
                 'height':    <int>    # pixel height of image asset
-                'warp_aux_to_img': <TransformSpec>,  # tranform from "base" image space to auxiliary/asset space. (identity if unspecified)
+                'warp_aux_to_img': <TransformSpec>,  # transform from "base" image space to auxiliary/asset space. (identity if unspecified)
                 'quantization': <QuantizationSpec>,  # indicates that the underlying data was quantized
             }, ...
         ]
@@ -62,7 +62,7 @@ An informal spec is as follows:
     }
 
     TransformSpec:
-        The spec can be anything coercable to a kwimage.Affine object.
+        The spec can be anything coercible to a kwimage.Affine object.
         This can be an explicit affine transform matrix like:
             {'type': 'affine': 'matrix': <a-3x3 matrix>},
 
@@ -123,7 +123,7 @@ An informal spec is as follows:
         'name': int,
     }
 
-    # A dataset bundles a manifest of all aformentioned data into one structure.
+    # A dataset bundles a manifest of all aforementioned data into one structure.
     dataset = {
         'categories': [category, ...],
         'videos': [video, ...]
@@ -151,7 +151,7 @@ An informal spec is as follows:
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
         encoding. We reuse the original C functions are in [PyCocoToolsMask]_
-        in ``kwimage.structs.Mask`` to provide a convinient way to abstract
+        in ``kwimage.structs.Mask`` to provide a convenient way to abstract
         this rather esoteric bytes encoding.
 
         For pure python implementations see kwimage:
@@ -230,7 +230,7 @@ An informal spec is as follows:
             ]
         }
 
-        Note that specifing a filename / channels for the base image is not
+        Note that specifying a filename / channels for the base image is not
         necessary, and mainly useful for augmenting an existing single-image
         dataset with multimodal information. Typically if an image consists of
         more than one file, all file information should be stored in the

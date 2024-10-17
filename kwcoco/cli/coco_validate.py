@@ -3,7 +3,7 @@ import ubelt as ub
 import scriptconfig as scfg
 
 
-# Code to help generate the CLI from keyword arugments to CocoDataset.validate
+# Code to help generate the CLI from keyword arguments to CocoDataset.validate
 __autogen_cli_args__ = r"""
 import kwcoco
 from xdoctest.docstr import docscrape_google
@@ -97,7 +97,7 @@ class CocoValidateCLI(scfg.DataConfig):
             Code indicating strategy to attempt to fix the dataset. If
             None, do nothing. If remove, removes missing / corrupted
             images. Other strategies may be added in the future. This is
-            a hueristic and does not always work. dst must be specified.
+            a heuristic and does not always work. dst must be specified.
             And only one src dataset can be given.
 
             DEPRECATED. Use kwcoco fixup instead.

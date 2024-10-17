@@ -84,7 +84,7 @@ Note:
 
               C'.corners = C.corners.warp(W.inv()) ?
 
-    Idealized Rules: (none of these are impemented)
+    Idealized Rules: (none of these are implemented)
 
         * If the child of a crop is a warp, compute the equivalent warp with a
           crop child.
@@ -100,7 +100,7 @@ Note:
 
         * The way this is mitigated is instead of optimizing the operation tree
           at finalize time, we have a explicit method to optimize the tree.
-          Then calling finalize on this optimized tree guarentees the minimal
+          Then calling finalize on this optimized tree guarantees the minimal
           computation.
 
 TODO:
