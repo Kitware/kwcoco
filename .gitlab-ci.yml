@@ -18,7 +18,8 @@ stages:
   variables:
     # Change pip's cache directory to be inside the project directory
     # since we can only cache local items.
-    PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
   except:
     # Don't run the pipeline for new tags
   - tags
@@ -74,13 +75,22 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
-    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
-    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
-    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
-  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
-    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
-    \    print(cls(fpath).version)\n\")"
+  - |-
+    export WHEEL_FPATH=$(python -c "if 1:
+        import pathlib
+        dist_dpath = pathlib.Path('dist')
+        candidates = list(dist_dpath.glob('kwcoco*.whl'))
+        candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))
+        fpath = sorted(candidates)[-1]
+        print(str(fpath).replace(chr(92), chr(47)))
+    ")
+  - |-
+    export MOD_VERSION=$(python -c "if 1:
+        from pkginfo import Wheel, SDist
+        fpath = '$WHEEL_FPATH'
+        cls = Wheel if fpath.endswith('.whl') else SDist
+        print(cls(fpath).version)
+    ")
   - pip install -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
@@ -130,13 +140,22 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
-    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
-    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
-    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
-  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
-    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
-    \    print(cls(fpath).version)\n\")"
+  - |-
+    export WHEEL_FPATH=$(python -c "if 1:
+        import pathlib
+        dist_dpath = pathlib.Path('dist')
+        candidates = list(dist_dpath.glob('kwcoco*.whl'))
+        candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))
+        fpath = sorted(candidates)[-1]
+        print(str(fpath).replace(chr(92), chr(47)))
+    ")
+  - |-
+    export MOD_VERSION=$(python -c "if 1:
+        from pkginfo import Wheel, SDist
+        fpath = '$WHEEL_FPATH'
+        cls = Wheel if fpath.endswith('.whl') else SDist
+        print(cls(fpath).version)
+    ")
   - pip install -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
@@ -186,13 +205,22 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
-    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
-    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
-    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
-  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
-    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
-    \    print(cls(fpath).version)\n\")"
+  - |-
+    export WHEEL_FPATH=$(python -c "if 1:
+        import pathlib
+        dist_dpath = pathlib.Path('dist')
+        candidates = list(dist_dpath.glob('kwcoco*.whl'))
+        candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))
+        fpath = sorted(candidates)[-1]
+        print(str(fpath).replace(chr(92), chr(47)))
+    ")
+  - |-
+    export MOD_VERSION=$(python -c "if 1:
+        from pkginfo import Wheel, SDist
+        fpath = '$WHEEL_FPATH'
+        cls = Wheel if fpath.endswith('.whl') else SDist
+        print(cls(fpath).version)
+    ")
   - pip install -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
@@ -242,13 +270,22 @@ stages:
   - echo "Installing helpers"
   - pip install setuptools>=0.8 setuptools_scm wheel build -U
   - pip install tomli pkginfo
-  - "export WHEEL_FPATH=$(python -c \"if 1:\n    import pathlib\n    dist_dpath =
-    pathlib.Path('dist')\n    candidates = list(dist_dpath.glob('kwcoco*.whl'))\n\
-    \    candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))\n    fpath = sorted(candidates)[-1]\n\
-    \    print(str(fpath).replace(chr(92), chr(47)))\n\")"
-  - "export MOD_VERSION=$(python -c \"if 1:\n    from pkginfo import Wheel, SDist\n\
-    \    fpath = '$WHEEL_FPATH'\n    cls = Wheel if fpath.endswith('.whl') else SDist\n\
-    \    print(cls(fpath).version)\n\")"
+  - |-
+    export WHEEL_FPATH=$(python -c "if 1:
+        import pathlib
+        dist_dpath = pathlib.Path('dist')
+        candidates = list(dist_dpath.glob('kwcoco*.whl'))
+        candidates += list(dist_dpath.glob('kwcoco*.tar.gz'))
+        fpath = sorted(candidates)[-1]
+        print(str(fpath).replace(chr(92), chr(47)))
+    ")
+  - |-
+    export MOD_VERSION=$(python -c "if 1:
+        from pkginfo import Wheel, SDist
+        fpath = '$WHEEL_FPATH'
+        cls = Wheel if fpath.endswith('.whl') else SDist
+        print(cls(fpath).version)
+    ")
   - pip install -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
@@ -441,14 +478,10 @@ gpgsign/wheels:
   - openssl version
   - $GPG_EXECUTABLE --list-keys
     # note CI_KITWARE_SECRET is a protected variables only available on main and release branch
-  - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a
-    -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import
-  - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a
-    -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
-  - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a
-    -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import
-  - GPG_SIGN_CMD="$GPG_EXECUTABLE --batch --yes --detach-sign --armor --local-user
-    $GPG_KEYID"
+  - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import
+  - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
+  - CIS=$CI_SECRET openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CIS -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import
+  - GPG_SIGN_CMD="$GPG_EXECUTABLE --batch --yes --detach-sign --armor --local-user $GPG_KEYID"
   - |-
     WHEEL_PATHS=(dist/*.whl dist/*.tar.gz)
     WHEEL_PATHS_STR=$(printf '"%s" ' "${WHEEL_PATHS[@]}")
@@ -542,7 +575,7 @@ deploy/wheels:
     fi
 
     # Loop over all of the assets in the wheelhouse (i.e.  dist)
-    # and upload them to a package registery. We also store the
+    # and upload them to a package registry. We also store the
     # links to the artifacts so we can attach them to a release
     # page.
     PACKAGE_ARTIFACT_ARRAY=()
