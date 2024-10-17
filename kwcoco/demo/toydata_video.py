@@ -367,6 +367,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
     Example:
         >>> # Test custom channel specification
+        >>> # xdoctest: +REQUIRES(module:lark)
         >>> from kwcoco.demo.toydata_video import *  # NOQA
         >>> dset = random_single_video_dset(num_frames=4, num_tracks=1, sensorchan='s1:(r|g|b,x|y|z),s2:flowx|flowy,s3:(ir,B:4)', image_size='random', rng=2338)
         >>> print(dset.images().coco_images[0])
