@@ -748,6 +748,9 @@ class MixinCocoAccessors:
                 kpcats = self.index.kpcats.values()
             else:
                 kpcats = iter(self.dataset['keypoint_categories'])
+            kpcats = list(kpcats)
+            if len(kpcats) == 0:
+                raise KeyError  # hack for old behavior
         except KeyError:
             catnames = self._keypoint_category_names()
             classes = CategoryTree.coerce(catnames)
@@ -4256,7 +4259,7 @@ class MixinCocoAddRemove:
             >>> keypoint_cats = [{'id': 1, 'name': 'ear'}, {'id': 2, 'name': 'nose'}]
             >>> self.add_keypoint_categories(keypoint_cats)
             >>> kp_identifiers = keypoint_cats
-            >>> self.remove_keypoint_categories(kp_identifiers)
+            >>> self.remove_keypoint_categories(kp_identifiers, clean_anns=False)
         """
         if 'keypoint_categories' not in self.dataset:
             self.dataset['keypoint_categories'] = []
@@ -4739,16 +4742,17 @@ class MixinCocoAddRemove:
         remove_info = {'annotation_keypoints': num_kps_removed}
         return remove_info
 
-    def remove_keypoint_categories(self, kp_identifiers, clean_anns=False):
+    def remove_keypoint_categories(self, kp_identifiers, clean_anns=True):
         """
         Removes all keypoints of a particular category as well as all
         annotation keypoints with those ids.
 
         Args:
             kp_identifiers (List): list of keypoint category dicts, names, or ids
+
             clean_anns (bool):
                 if True, will try to remove the now invalid keypoints from
-                annotations that contain it.
+                annotations that contain it. May cause breakage.
 
         Returns:
             Dict: num_removed: information on the number of items removed
@@ -6620,8 +6624,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> # Test union works with different keypoint categories
             >>> dset1 = kwcoco.CocoDataset.demo('shapes1')
             >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
-            >>> dset1.remove_keypoint_categories(['bot_tip', 'mid_tip', 'right_eye'])
-            >>> dset2.remove_keypoint_categories(['top_tip', 'left_eye'])
+            >>> dset1.remove_keypoint_categories(['bot_tip', 'mid_tip', 'right_eye'], clean_anns=True)
+            >>> dset2.remove_keypoint_categories(['top_tip', 'left_eye'], clean_anns=True)
             >>> dset_12a = kwcoco.CocoDataset.union(dset1, dset2)
             >>> dset_12b = dset1.union(dset2)
             >>> dset_21 = dset2.union(dset1)
