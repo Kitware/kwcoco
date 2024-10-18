@@ -1,7 +1,7 @@
 delayed_image>=0.4.2
 jsonschema>=3.2.0
 kwarray>=0.6.19
-kwimage>=0.11.0
+kwimage>=0.11.1
 packaging>=21.3
 parse>=1.19.0
 safer>=4.4.1
