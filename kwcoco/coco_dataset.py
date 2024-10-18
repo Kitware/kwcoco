@@ -4234,6 +4234,36 @@ class MixinCocoAddRemove:
         self.index._add_categories(cats)
         self._invalidate_hashid(['categories'])
 
+    def add_keypoint_categories(self, keypoint_cats):
+        """
+        Faster less-safe multi-item alternative to add_category.
+
+        We assume the items are well formatted in kwcoco compliant
+        dictionaries, including the "id" field. No validation checks are made
+        when calling this function, but the index is updated, and the hashid is
+        invalidated.
+
+        Args:
+            cats (List[Dict]): list of category dictionaries
+
+        SeeAlso:
+            :func:`add_category`
+            :func:`add_categories`
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> keypoint_cats = [{'id': 1, 'name': 'ear'}, {'id': 2, 'name': 'nose'}]
+            >>> self.add_keypoint_categories(keypoint_cats)
+            >>> kp_identifiers = keypoint_cats
+            >>> self.remove_keypoint_categories(kp_identifiers)
+        """
+        if 'keypoint_categories' not in self.dataset:
+            self.dataset['keypoint_categories'] = []
+        self.dataset['keypoint_categories'].extend(keypoint_cats)
+        self.index._add_keypoint_categories(keypoint_cats)
+        self._invalidate_hashid(['keypoint_categories'])
+
     def add_annotations(self, anns):
         """
         Faster less-safe multi-item alternative to add_annotation.
@@ -4709,13 +4739,16 @@ class MixinCocoAddRemove:
         remove_info = {'annotation_keypoints': num_kps_removed}
         return remove_info
 
-    def remove_keypoint_categories(self, kp_identifiers):
+    def remove_keypoint_categories(self, kp_identifiers, clean_anns=False):
         """
         Removes all keypoints of a particular category as well as all
         annotation keypoints with those ids.
 
         Args:
             kp_identifiers (List): list of keypoint category dicts, names, or ids
+            clean_anns (bool):
+                if True, will try to remove the now invalid keypoints from
+                annotations that contain it.
 
         Returns:
             Dict: num_removed: information on the number of items removed
@@ -4736,8 +4769,10 @@ class MixinCocoAddRemove:
         }
         remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))
 
-        _ann_remove_info = self.remove_annotation_keypoints(remove_kpcats)
-        remove_info.update(_ann_remove_info)
+        # This is expensive, should make it optional.
+        if clean_anns:
+            _ann_remove_info = self.remove_annotation_keypoints(remove_kpcats)
+            remove_info.update(_ann_remove_info)
 
         remove_kpcids = {k['id'] for k in remove_kpcats}
 
@@ -4753,6 +4788,7 @@ class MixinCocoAddRemove:
 
         remove_info['reflection_ids'] = remove_reflect_ids
         remove_info['keypoint_categories'] = len(remove_kpcats)
+        self.index._remove_keypoint_categories(remove_kpcids)
         return remove_info
 
     def set_annotation_category(self, aid_or_ann, cid_or_cat):
@@ -5031,6 +5067,13 @@ class CocoIndex:
                     index.trackid_to_aids[tid] = index._annots_set_sorted_by_frame_index()
                 index.trackid_to_aids[tid].add(aid)
 
+    def _add_keypoint_categories(index, keypoint_cats):
+        if index.kpcats is None:
+            index.kpcats = {}
+        ids = [obj['id'] for obj in keypoint_cats]
+        new_objs = dict(zip(ids, keypoint_cats))
+        index.kpcats.update(new_objs)
+
     def _add_categories(index, cats):
         if index.cats is not None:
             ids = [obj['id'] for obj in cats]
@@ -5098,6 +5141,14 @@ class CocoIndex:
                 _.clear()
             for _ in index.vidid_to_gids.values():
                 _.clear()
+
+    def _remove_keypoint_categories(index, remove_kpcid, verbose=0):
+        if index.kpcats is not None:
+            for kpcid in remove_kpcid:
+                del index.kpcats[kpcid]
+                # kpcat = index.kpcats.pop(kpcid)
+            if verbose > 2:
+                print('Updated category index')
 
     def _remove_annotations(index, remove_aids, verbose=0):
         if index.anns is not None:
@@ -5181,7 +5232,7 @@ class CocoIndex:
         index.name_to_video = None
         index.trackid_to_aids = None
         index.name_to_track = None
-        # index.kpcid_to_aids = None  # TODO
+        # index.kpcid_to_aids = None  # TODO?
 
     def build(index, parent):
         """

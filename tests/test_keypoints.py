@@ -1,18 +1,32 @@
 
-def test_column_based_keypoints():
-    import pytest
-    pytest.skip('keypoint support needs an overhaul here and in kwimage')
-
+def test_column_based_keypoints_without_categories():
     import kwcoco
     keypoints = {
         'x': [0, 1, 2, 3],
         'y': [0, 1, 2, 3],
-        'keypoint_category_id': [0, 0, 0, 0],
     }
     dset = kwcoco.CocoDataset()
     image_id = dset.add_image(file_name='dummy.png')
     dset.add_annotation(image_id=image_id, bbox=[0, 0, 100, 100], keypoints=keypoints)
-    dset.annots().detections.data
+    dets = dset.annots().detections
+    dets.data
+
+
+def test_column_based_keypoints_with_categories():
+    import kwcoco
+    keypoints = {
+        'x': [0, 1, 2, 3],
+        'y': [0, 1, 2, 3],
+        'keypoint_category_id': [2, 1, 3, 0],
+    }
+    dset = kwcoco.CocoDataset()
+    keypoint_classes = kwcoco.CategoryTree.coerce(['head', 'tail', 'ears', 'nose'])
+    dset.add_keypoint_categories(list(keypoint_classes.to_coco()))
+    image_id = dset.add_image(file_name='dummy.png')
+    dset.add_annotation(image_id=image_id, bbox=[0, 0, 100, 100], keypoints=keypoints)
+    dets = dset.annots().detections
+    recon = dets.data['keypoints'][0].to_coco('new-v2')
+    assert keypoints['keypoint_category_id'] == recon['keypoint_category_id']
 
 
 def test_keypoint_formats():
@@ -66,7 +80,7 @@ def test_keypoint_formats():
         'keypoints_variant': keypoints_variants,
     }
     grid_items = list(ub.named_product(basis))
-    DEBUG = 1
+    DEBUG = 0
     errors = []
     results = []
     for variants in grid_items:
