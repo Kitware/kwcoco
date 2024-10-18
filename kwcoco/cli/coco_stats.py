@@ -84,7 +84,7 @@ class CocoStatsCLI(scfg.DataConfig):
             import networkx as nx
             for dset in datasets:
                 print('dset = {!r}'.format(dset))
-                print('Category Heirarchy: ')
+                print('Category Hierarchy: ')
                 print(nx.write_network_text(dset.object_categories().graph))
         except Exception:
             pass

@@ -17,7 +17,7 @@ IndexableWalker = ub.IndexableWalker
 
 def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
     """
-    Attempt to convert common types (e.g. numpy) into something json complient
+    Attempt to convert common types (e.g. numpy) into something json compliant
 
     Convert numpy and tuples into lists
 

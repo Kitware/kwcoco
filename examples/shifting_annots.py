@@ -1,5 +1,5 @@
 """
-How to explictly breakup a kwcoco file into smaller tiles.
+How to explicitly breakup a kwcoco file into smaller tiles.
 """
 import kwcoco
 import kwarray

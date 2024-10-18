@@ -182,7 +182,7 @@ class Boids(ub.NiceRepr):
         #     rxs = np.full_like(cxs, fill_value=rx)
         #     multi_index = (rxs, cxs)
         #     utriu_idxs = triu_condense_multi_index(
-        #         multi_index, dims=(n, n), symetric=True)
+        #         multi_index, dims=(n, n), symmetric=True)
         #     rx_to_neighb_utriu_idxs[rx] = utriu_idxs
 
         # self.utriu_dists = utriu_dists
@@ -380,7 +380,7 @@ def clamp_mag(vec, mag, axis=None):
     return vec
 
 
-def triu_condense_multi_index(multi_index, dims, symetric=False):
+def triu_condense_multi_index(multi_index, dims, symmetric=False):
     r"""
     Like np.ravel_multi_index but returns positions in an upper triangular
     condensed square matrix
@@ -393,7 +393,7 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
             shape of each dimension in the square matrix (should all be the
             same)
 
-        symetric (bool):
+        symmetric (bool):
             if True, converts lower triangular indices to their upper
             triangular location. This may cause a copy to occur.
 
@@ -403,15 +403,15 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
 
     Examples:
         >>> dims = (3, 3)
-        >>> symetric = True
+        >>> symmetric = True
         >>> multi_index = (np.array([0, 0, 1]), np.array([1, 2, 2]))
-        >>> condensed_idxs = triu_condense_multi_index(multi_index, dims, symetric=symetric)
+        >>> condensed_idxs = triu_condense_multi_index(multi_index, dims, symmetric=symmetric)
         >>> assert condensed_idxs.tolist() == [0, 1, 2]
 
         >>> n = 7
-        >>> symetric = True
+        >>> symmetric = True
         >>> multi_index = np.triu_indices(n=n, k=1)
-        >>> condensed_idxs = triu_condense_multi_index(multi_index, [n] * 2, symetric=symetric)
+        >>> condensed_idxs = triu_condense_multi_index(multi_index, [n] * 2, symmetric=symmetric)
         >>> assert condensed_idxs.tolist() == list(range(n * (n - 1) // 2))
         >>> from scipy.spatial.distance import pdist, squareform
         >>> square_mat = np.zeros((n, n))
@@ -421,9 +421,9 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
         >>> print('square_mat =\n{}'.format(ub.urepr(square_mat, nl=1)))
 
         >>> n = 7
-        >>> symetric = True
+        >>> symmetric = True
         >>> multi_index = np.tril_indices(n=n, k=-1)
-        >>> condensed_idxs = triu_condense_multi_index(multi_index, [n] * 2, symetric=symetric)
+        >>> condensed_idxs = triu_condense_multi_index(multi_index, [n] * 2, symmetric=symmetric)
         >>> assert sorted(condensed_idxs.tolist()) == list(range(n * (n - 1) // 2))
         >>> from scipy.spatial.distance import pdist, squareform
         >>> square_mat = np.zeros((n, n))
@@ -435,7 +435,7 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
     Ignore:
         >>> import xdev
         >>> n = 30
-        >>> symetric = True
+        >>> symmetric = True
         >>> multi_index = np.triu_indices(n=n, k=1)
         >>> condensed_idxs = xdev.profile_now(triu_condense_multi_index)(multi_index, [n] * 2)
 
@@ -463,10 +463,10 @@ def triu_condense_multi_index(multi_index, dims, symetric=False):
 
         tril_flags = ~triu_flags
 
-        if not symetric:
+        if not symmetric:
             raise ValueError(
                 'multi_index cannot contain inputs from '
-                'lower triangle unless symetric=True')
+                'lower triangle unless symmetric=True')
         else:
             rxs = rxs.copy()
             cxs = cxs.copy()
@@ -559,7 +559,7 @@ def closest_point_on_line_segment(pts, e1, e2):
     """
     # shift e1 to origin
     de = (e2 - e1)[None, :]
-    # make point vector wrt orgin
+    # make point vector wrt origin
     pv = pts - e1
     # Project pv onto de
     mag = np.linalg.norm(de, axis=1)

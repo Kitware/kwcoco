@@ -96,7 +96,7 @@ def perterb_coco(coco_dset, **kwargs):
     false_score_RV = distributions.TruncNormal(
         mean=false_mean, std=.5, low=false_low, high=false_high, rng=rng)
 
-    # Create the category hierarcy
+    # Create the category hierarchy
     classes = coco_dset.object_categories()
 
     cids = coco_dset.cats.keys()

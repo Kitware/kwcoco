@@ -1,7 +1,7 @@
 """
 Finally got a baseline implementation of an SQLite backend for COCO
 datasets. This mostly plugs into my existing tools (as long as only read
-operations are used; haven't impelmented writing yet) by duck-typing the
+operations are used; haven't implemented writing yet) by duck-typing the
 dict API.
 
 This solves the issue of forking and then accessing nested dictionaries in
@@ -141,7 +141,7 @@ try:
         JSONVariant = JSON().with_variant(JSONB(), "postgresql")
 except ImportError:
     # Hack: xdoctest should have been able to figure out that
-    # all of these tests were diabled due to the absense of sqlalchemy
+    # all of these tests were disabled due to the absence of sqlalchemy
     # but apparently it has a bug. We can remove this hack once that is fixed
     sqlalchemy_version_str = None
     sqlalchemy_version = None
@@ -381,7 +381,7 @@ class SqlListProxy(ub.NiceRepr):
                 colinfo = inspector.get_columns(proxy.cls.__tablename__)
                 # Huge hack to fixup json columns.
                 # the session.execute seems to do this for
-                # some columns, but not all, hense the isinstance
+                # some columns, but not all, hence the isinstance
                 def _json_caster(x):
                     if isinstance(x, str):
                         return json.loads(x)
@@ -526,7 +526,7 @@ class SqlDictProxy(DictLike):
         proxy._casters = None
         proxy.ignore_null = ignore_null
 
-        # It seems like writing the raw sql ourselves is fater than
+        # It seems like writing the raw sql ourselves is faster than
         # using the ORM in most cases.
         proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
 
@@ -659,7 +659,7 @@ class SqlDictProxy(DictLike):
             query = proxy.session.query(proxy.cls)
             if proxy.ignore_null:
                 # I think this is only needed in the autoreload session
-                # otherwise it might be possible to jsut use proxy.keyattr
+                # otherwise it might be possible to just use proxy.keyattr
                 cls_keyattr = getattr(proxy.cls, proxy.keyattr.key)
                 query = query.filter(cls_keyattr != None)  # NOQA
             query = query.order_by(proxy.cls.id)
@@ -673,7 +673,7 @@ class SqlDictProxy(DictLike):
                 inspector = inspect(proxy.session.get_bind())
                 colinfo = inspector.get_columns(proxy.cls.__tablename__)
                 # HACK: to fixup json columns, session.execute seems to fix
-                # the type for some columns, but not all, hense the isinstance
+                # the type for some columns, but not all, hence the isinstance
                 def _json_caster(x):
                     if isinstance(x, str):
                         return json.loads(x)
@@ -1048,7 +1048,7 @@ class SqlIdGroupDictProxy(DictLike):
                     yield tup
 
     def values(proxy):
-        # Not sure if there if iterating over just the valuse can be more
+        # Not sure if there if iterating over just the values can be more
         # efficient than iterating over the items and discarding the values.
         for key, val in proxy.items():
             yield val
@@ -1258,7 +1258,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
     Note:
         By default constructing an instance of the CocoSqlDatabase does not
-        create a connection to the databse. Use the :func:`connect` method to
+        create a connection to the database. Use the :func:`connect` method to
         open a connection.
 
     References:
@@ -1388,7 +1388,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
     def __setstate__(self, state):
         """
-        Reopen new readonly connnections when unpickling the object.
+        Reopen new readonly connections when unpickling the object.
         """
         self.__dict__.update(state)
         self.session = None
@@ -1755,7 +1755,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
     def _column_lookup(self, tablename, key, rowids, default=ub.NoParam,
                        keepid=False, _join_optimize=1):
         """
-        Convinience method to lookup only a single column of information
+        Convenience method to lookup only a single column of information
 
         Note:
             Using default has a quirk here and can produce wrong results
@@ -2013,7 +2013,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         if default is ub.NoParam or default is None:
             ...
         else:
-            # TODO: surpress the warning if we can determine that the column is
+            # TODO: suppress the warning if we can determine that the column is
             # safe. Or rather, its really annoying so maybe figure out when to
             # enable it instead? Or can we fix it in general?
             # import warnings
@@ -2032,7 +2032,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
     def _all_rows_column_lookup(self, tablename, keys):
         """
-        Convinience method to look up all rows from a table and only a few
+        Convenience method to look up all rows from a table and only a few
         columns.
 
         Example:
@@ -2057,7 +2057,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
     def tabular_targets(self):
         """
-        Convinience method to create an in-memory summary of basic annotation
+        Convenience method to create an in-memory summary of basic annotation
         properties with minimal SQL overhead.
 
         Example:

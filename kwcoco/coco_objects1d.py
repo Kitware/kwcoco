@@ -5,7 +5,7 @@ This powers the ``.images()``, ``.videos()``, and ``.annotation()`` methods of
 :class:`kwcoco.CocoDataset`.
 
 TODO:
-    - [ ] The use of methods vs properties is inconsistent. This needs to be fixed, but backwards compatability is a consideration.
+    - [ ] The use of methods vs properties is inconsistent. This needs to be fixed, but backwards compatibility is a consideration.
 
 See:
     :func:`kwcoco.coco_dataset.MixinCocoObjects.categories`
@@ -253,7 +253,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> self.lookup(key=['id', 'image_id'], keepid=True)
         """
         # Note: while the old _lookup code was slightly faster than this, the
-        # difference is extremely negligable (179us vs 178us).
+        # difference is extremely negligible (179us vs 178us).
         if ub.iterable(key):
             return {k: self.lookup(k, default, keepid) for k in key}
         else:
@@ -334,7 +334,7 @@ class ObjectList1D(ub.NiceRepr):
         if has_sql_backend:
             # Special case for SQL speed. This only works on schema columns.
             try:
-                # TODO: check if the column is in the stuctured schema
+                # TODO: check if the column is in the structured schema
                 return self._dset._column_lookup(
                     tablename=self._key, key=key, rowids=self._ids,
                     default=default)
@@ -498,6 +498,7 @@ class ObjectGroups(ub.NiceRepr):
             dset (CocoDataset): parent dataset
         """
         self._groups = groups
+        self._dset = dset
 
     def _lookup(self, key):
         return self._lookup(key)  # broken?
@@ -512,6 +513,16 @@ class ObjectGroups(ub.NiceRepr):
 
     def lookup(self, key, default=ub.NoParam):
         return [group.lookup(key, default) for group in self._groups]
+
+    def flatten(self):
+        """
+        Flattens the group into a single object list.
+
+        Returns:
+            ObjectList1D
+        """
+        flat_ids = list(ub.flatten(self))
+        return self._cls1d(flat_ids, self._dset)
 
     def __nice__(self) -> str:
         # import timerit
@@ -1008,11 +1019,12 @@ class AnnotGroups(ObjectGroups):
     """
     Annotation groups are vectorized lists of lists.
 
-    Each item represents a set of annotations that corresopnds with something
+    Each item represents a set of annotations that corresponds with something
     (i.e.  belongs to a particular image).
 
     Example:
         >>> from kwcoco.coco_objects1d import ImageGroups
+        >>> from kwcoco.coco_objects1d import AnnotGroups
         >>> import kwcoco
         >>> dset = kwcoco.CocoDataset.demo('photos')
         >>> images = dset.images()
@@ -1032,6 +1044,8 @@ class AnnotGroups(ObjectGroups):
         >>> print(group.lookup('category_id'))
         [[1, 2, 3, 4, 5, 5, 5, 5, 5], [6, 4], []]
     """
+    _cls1d = Annots
+
     @property
     def cids(self):
         """
@@ -1069,7 +1083,7 @@ class ImageGroups(ObjectGroups):
     """
     Image groups are vectorized lists of other Image objects.
 
-    Each item represents a set of images that corresopnds with something (i.e.
+    Each item represents a set of images that corresponds with something (i.e.
     belongs to a particular video).
 
     Example:
@@ -1093,7 +1107,7 @@ class ImageGroups(ObjectGroups):
         >>> print(group.lookup('frame_index'))
         [[0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1]]
     """
-    ...
+    _cls1d = Images
 
 
 if 0:

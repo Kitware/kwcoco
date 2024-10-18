@@ -59,7 +59,7 @@ once, but they all go through the dictionary interface under the hood.
     [(600, 600), (600, 600), (600, 600), (600, 600)]
 
 
-The "Annots"  object has a "detections" convinience method
+The "Annots"  object has a "detections" convenience method
 
 
 .. code:: python

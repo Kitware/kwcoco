@@ -32,7 +32,10 @@ USE_NEG_INF = True
 def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                               iou_thresh=0.5, bg_cidx=-1, bias=0.0, classes=None,
                               compat='all', prioritize='iou',
-                              ignore_classes='ignore', max_dets=None):
+                              ignore_classes='ignore',
+                              max_dets=None,
+                              truth_reuse_policy='never',
+                              ):
     """
     Create confusion vectors for detections by assigning to ground true boxes
 
@@ -57,7 +60,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             not specified all images are used.
 
         compat (str, default='all'):
-            can be ('ancestors' | 'mutex' | 'all').  determines which pred
+            can be ('ancestors' | 'mutex' | 'all'). Determines which pred
             boxes are allowed to match which true boxes. If 'mutex', then
             pred boxes can only match true boxes of the same class. If
             'ancestors', then pred boxes can match true boxes that match or
@@ -65,13 +68,13 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             true, regardless of its category label.
 
         prioritize (str, default='iou'):
-            can be ('iou' | 'class' | 'correct') determines which box to
-            assign to if mutiple true boxes overlap a predicted box.  if
+            can be ('iou' | 'class' | 'correct'). Determines which box to
+            assign to if multiple true boxes overlap a predicted box.  if
             prioritize is iou, then the true box with maximum iou (above
             iou_thresh) will be chosen.  If prioritize is class, then it will
             prefer matching a compatible class above a higher iou. If
             prioritize is correct, then ancestors of the true class are
-            preferred over descendents of the true class, over unreleated
+            preferred over descendants of the true class, over unrelated
             classes.
 
         bg_cidx (int, default=-1):
@@ -81,19 +84,27 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
         classes (List[str] | kwcoco.CategoryTree):
             mapping from class indices to class names. Can also contain class
-            heirarchy information.
+            hierarchy information.
 
         ignore_classes (str | List[str]):
             class name(s) indicating ignore regions
 
         max_dets (int): maximum number of detections to consider
 
+        truth_reuse_policy (str | bool):
+            Defaults to "never".
+            * "never", which means only a single predicted detection
+               is allowed to match a true detection.
+            * "least_used" means that a predicted box will be allowed to
+              match a true object, but it will prioritize unused boxes
+              before reusing one.
+
     TODO:
         - [ ] This is a bottleneck function. An implementation in C / C++ /
-        Cython would likely improve the overall system.
+              Cython / Rust would likely improve the overall system.
 
         - [ ] Implement crowd truth. Allow multiple predictions to match any
-              truth objet marked as "iscrowd".
+              truth object marked as "iscrowd".
 
     Returns:
         dict: with relevant confusion vectors. This keys of this dict can be
@@ -103,11 +114,12 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
             and predicted class index, the predicted score, the true weight and
             the iou of the true and predicted boxes. A `txs` value of -1 means
             that the predicted box was not assigned to a true annotation and a
-            `pxs` value of -1 means that the true annotation was not assigne to
+            `pxs` value of -1 means that the true annotation was not assigned to
             any predicted annotation.
 
     Example:
         >>> # xdoctest: +REQUIRES(module:pandas)
+        >>> from kwcoco.metrics.assignment import _assign_confusion_vectors
         >>> import pandas as pd
         >>> import kwimage
         >>> # Given a raw numpy representation construct Detection wrappers
@@ -128,9 +140,6 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>> compat = 'all'
         >>> iou_thresh = 0.5
         >>> bias = 0.0
-        >>> import kwcoco
-        >>> classes = kwcoco.CategoryTree.from_mutex(list(range(3)))
-        >>> bg_cidx = -1
         >>> y = _assign_confusion_vectors(true_dets, pred_dets, bias=bias,
         >>>                               bg_weight=bg_weight, iou_thresh=iou_thresh,
         >>>                               compat=compat)
@@ -155,7 +164,6 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>> dmet = DetectionMetrics.demo(nimgs=1, nclasses=8,
         >>>                              nboxes=(0, 20), n_fp=20,
         >>>                              box_noise=.2, cls_noise=.3)
-        >>> classes = dmet.classes
         >>> gid = ub.peek(dmet.gid_to_pred_dets)
         >>> true_dets = dmet.true_detections(gid)
         >>> pred_dets = dmet.pred_detections(gid)
@@ -167,6 +175,25 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         >>> y = _assign_confusion_vectors(true_dets, pred_dets,
         >>>                               classes=dmet.classes,
         >>>                               compat='ancestors', iou_thresh=.5)
+        >>> y = pd.DataFrame(y)
+        >>> print(y)  # xdoc: +IGNORE_WANT
+
+    Example:
+        >>> # xdoctest: +REQUIRES(module:pandas)
+        >>> from kwcoco.metrics.assignment import _assign_confusion_vectors
+        >>> import pandas as pd
+        >>> import ubelt as ub
+        >>> from kwcoco.metrics import DetectionMetrics
+        >>> dmet = DetectionMetrics.demo(nimgs=1, nclasses=8,
+        >>>                              nboxes=(0, 20), n_fp=20,
+        >>>                              box_noise=.2, cls_noise=.3)
+        >>> classes = dmet.classes
+        >>> gid = ub.peek(dmet.gid_to_pred_dets)
+        >>> true_dets = dmet.true_detections(gid)
+        >>> pred_dets = dmet.pred_detections(gid)
+        >>> y = _assign_confusion_vectors(true_dets, pred_dets,
+        >>>                               classes=dmet.classes,
+        >>>                               compat='all', truth_reuse_policy='least_used')
         >>> y = pd.DataFrame(y)
         >>> print(y)  # xdoc: +IGNORE_WANT
 
@@ -185,7 +212,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         prioritize = 'iou'
 
     # Group true boxes by class
-    # Keep track which true boxes are unused / not assigned
+    # Keep track which true boxes are available / not assigned
     unique_tcxs, tgroupxs = kwarray.group_indices(true_dets.class_idxs)
     cx_to_txs = dict(zip(unique_tcxs, tgroupxs))
 
@@ -256,7 +283,8 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         y =  _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                             cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                             pdist_priority, cx_to_ancestors, bg_cidx,
-                            ignore_classes=ignore_classes, max_dets=max_dets)
+                            ignore_classes=ignore_classes, max_dets=max_dets,
+                            truth_reuse_policy=truth_reuse_policy)
         iou_thresh_to_y[iou_thresh_] = y
 
     if ub.iterable(iou_thresh):
@@ -268,15 +296,44 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                    cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
                    pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes,
-                   max_dets):
+                   max_dets, truth_reuse_policy):
+    """
+    Args:
+        true_dets (Detections):
+        pred_dets (Detections):
+        iou_lookup (Dict[int, ndarray]):
+        isvalid_lookup (Dict[int, ndarray]):
+        cx_to_matchable_txs (Dict[int64, ndarray]):
+        bg_weight (float):
+        prioritize (str):
+        iou_thresh_ (float):
+        pdist_priority (ndarray):
+        cx_to_ancestors (Dict[int, set[int]]):
+        bg_cidx (int):
+        ignore_classes (str):
+        max_dets (NoneType):
+        truth_reuse_policy (bool):
+
+    Returns:
+        Dict[str, ndarray]
+
+    Ignore:
+        keys = 'true_dets, pred_dets, iou_lookup, isvalid_lookup, cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_, pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes, max_dets, truth_reuse_policy'.split(', ')
+        lut = globals()
+        from xdev.introspect import gen_docstr_from_context, generate_typeannot
+        gen_docstr_from_context(keys, lut)
+
+    Note:
+        * Preallocating numpy arrays does not help
+        * It might be useful to code this critical loop up in C / Cython / Py03
+        * Could numba help? (I'm having an issue with cmath)
+    """
     # Note:
-    # * Preallocating numpy arrays does not help
-    # * It might be useful to code this critical loop up in C / Cython
-    # * Could numba help? (I'm having an issue with cmath)
     import kwarray
 
     # Keep track of which true items have been used
-    true_unused = np.ones(len(true_dets), dtype=bool)
+    true_available = np.ones(len(true_dets), dtype=bool)
+    true_nmatches = np.zeros(len(true_dets), dtype=int)
 
     # sort predictions by descending score
     if 'scores' in pred_dets.data:
@@ -309,7 +366,7 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         _pred_scores = _pred_scores[_pred_keep_flags]
 
         # Remove ignored truth regions from assignment consideration
-        true_unused[true_ignore_flags] = False
+        true_available[true_ignore_flags] = False
 
     y_pred = []
     y_true = []
@@ -319,76 +376,83 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
     y_pxs = []
     y_txs = []
 
-    # NOTE: I don't think this actualy does anything anymore
-    if prioritize == 'correct' or prioritize == 'class':
-        used_truth_policy = 'next_best'
-    else:
-        used_truth_policy = 'mark_false'
+    if not truth_reuse_policy:
+        # Original default
+        truth_reuse_policy = 'never'
+        # TODO: allow an option where multiple predicted boxes are allowed to
+        # match the same true box. This is important for cases where true
+        # instances are not clearly defined and it is ambiguous if an object
+        # should be annotated as one or multiple instances.
+        # TODO: also in this case, we need to loop over all available true objects
+        # and check if they intersect a predicted object, so we can allow
+        # multiple truth objects to match a single predicted object.
 
     # Greedy assignment. For each predicted detection box.
     # Allow it to match the truth of compatible classes.
-    for px, pred_cx, score in zip(_pred_sortx, _pred_cxs, _pred_scores):
-
+    _iter = zip(_pred_sortx, _pred_cxs, _pred_scores)
+    # px, pred_cx, score  = next(_iter)
+    for px, pred_cx, score in _iter:
+        # px, pred_cx, score  = next(_iter)
         # Find compatible truth indices
         true_idxs = cx_to_matchable_txs[pred_cx]
-        # Filter out any truth that has already been used
-        unused = true_unused[true_idxs]
-        unused_true_idxs = true_idxs[unused]
+
+        # Filter out any truth that has already been marked as unavailable
+        available = true_available[true_idxs]
+        available_true_idxs = true_idxs[available]
 
         ovmax = -np.inf
         ovidx = None
         weight = bg_weight
-        tx = -1  # we will set this to the index of the assignd gt
+        tx = -1  # we will set this to the index of the assigned gt
 
-        if len(unused_true_idxs):
-            # First grab all candidate unused true boxes and lookup precomputed
+        if len(available_true_idxs):
+            # First grab all candidate available true boxes and lookup precomputed
             # ious between this pred and true_idxs
-            cand_true_idxs = unused_true_idxs
+            cand_true_idxs = available_true_idxs
 
             if prioritize == 'iou':
                 # simply match the true box with the highest iou (that is also
                 # considered matchable)
 
-                if used_truth_policy == 'next_best':
+                cand_ious = iou_lookup[px].compress(available)
 
-                    # TODO: VERIFY THIS IS NO DIFFERENT THAN "MARK_FALSE" AND
-                    # REMOVE.
-
-                    # Dont even consider matches to previously used groundtruth
-                    # (note this means it will be marked as a false positive)
-                    cand_ious = iou_lookup[px].compress(unused)
+                if truth_reuse_policy == 'never':
+                    # In this case we never will match the same truth box
+                    # twice. These are already marked as unavailable so
+                    # we just choose the highest iou.
                     ovidx = cand_ious.argmax()
-                    ovmax = cand_ious[ovidx]
-                    if ovmax > iou_thresh_:
-                        tx = cand_true_idxs[ovidx]
-                elif used_truth_policy == 'mark_false':
-                    # Consider a match to a previously used truth a false (note
-                    # this means it will be marked as a false positive more
-                    # agressively than the next_best option, because there it
-                    # may match a different truth)
-                    cand_ious = iou_lookup[px]
-                    ovidx = cand_ious.argmax()
-                    ovmax = cand_ious[ovidx]
-                    if ovmax > iou_thresh_:
-                        tx = true_idxs[ovidx]
-                        if not unused[ovidx]:
-                            tx = -1
+                elif truth_reuse_policy == 'least_used':
+                    # In this case we are allowed to reuse boxes, but
+                    # we will always choose the least used true match.
+                    # boxes are never marked as unavailable in this case
+                    # so we use a lex sort to pick the least used but still
+                    # valid match with the highest iou
+                    cand_nmatches = true_nmatches.compress(available)
+                    cand_validmatch = cand_ious > iou_thresh_
+                    ovidx = kwarray.arglexmax([
+                        cand_ious,
+                        -cand_nmatches,
+                        cand_validmatch,
+                    ])
                 else:
-                    raise KeyError(used_truth_policy)
+                    raise KeyError(truth_reuse_policy)
+                ovmax = cand_ious[ovidx]
+                if ovmax > iou_thresh_:
+                    tx = cand_true_idxs[ovidx]
 
             elif prioritize == 'correct' or prioritize == 'class':
 
-                if used_truth_policy != 'next_best':
-                    raise NotImplementedError(used_truth_policy)
+                if truth_reuse_policy != 'never':
+                    raise NotImplementedError(truth_reuse_policy)
 
                 # Choose which (if any) of the overlapping true boxes to match
                 # If there are any correct matches above the overlap threshold
                 # choose to match that.
-                # Flag any unused true box that overlaps
-                overlap_flags = isvalid_lookup[px][unused]
+                # Flag any available true box that overlaps
+                overlap_flags = isvalid_lookup[px][available]
 
                 if overlap_flags.any():
-                    cand_ious = iou_lookup[px][unused]
+                    cand_ious = iou_lookup[px][available]
                     cand_true_cxs = true_dets.class_idxs[cand_true_idxs]
                     cand_true_idxs = cand_true_idxs[overlap_flags]
                     cand_true_cxs = cand_true_cxs[overlap_flags]
@@ -410,8 +474,10 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         if tx > -1:
             # If the prediction matched a true object, mark the assignment
             # as either a true or false positive
-            # tx = unused_true_idxs[ovidx]
-            true_unused[tx] = False  # mark this true box as used
+            # tx = available_true_idxs[ovidx]
+            if truth_reuse_policy == 'never':
+                true_available[tx] = False  # mark this true box as unavailable
+            true_nmatches[tx] += 1  # indicate the number of times a true box is used.
 
             if 'weights' in true_dets.data:
                 weight = true_dets.weights[tx]
@@ -432,9 +498,8 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             y_pxs.append(px)
             y_txs.append(tx)
         else:
-            # Assign this prediction to a the background
+            # Assign this prediction to the background
             # Mark this prediction as a false positive
-
             y_pred.append(pred_cx)
             y_true.append(bg_cidx)
             y_score.append(score)
@@ -444,9 +509,9 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
             y_txs.append(tx)
 
     # All pred boxes have been assigned to a truth box or the background.
-    # Mark unused true boxes we failed to predict as false negatives
+    # Mark available true boxes we failed to predict as false negatives
     bg_px = -1
-    unused_txs = np.where(true_unused)[0]
+    unused_txs = np.where(true_nmatches == 0)[0]
     n = len(unused_txs)
 
     unused_y_true = true_dets.class_idxs[unused_txs].tolist()
@@ -507,7 +572,7 @@ def _fast_pdist_priority(classes, prioritize, _cache={}):
             pdist_priority = np.array(pdist, dtype=np.float32, copy=True)
             if prioritize == 'correct':
                 # Prioritizes all ancestors first, and then descendants
-                # afterwords, nodes off the direct lineage are ignored.
+                # afterwards, nodes off the direct lineage are ignored.
                 valid_vals = pdist_priority[np.isfinite(pdist_priority)]
                 maxval = (valid_vals.max() - valid_vals.min()) + 1
                 is_ancestor = (pdist_priority >= 0)
@@ -610,7 +675,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
             ignore_sseg = ignore_dets.data.get('segmentations', None)
 
             # Determine which predicted boxes are inside the ignore regions
-            # note: using sum over max is delibrate here.
+            # note: using sum over max is deliberate here.
             with warnings.catch_warnings():
                 warnings.filterwarnings('ignore', message='invalid .* less')
                 warnings.filterwarnings('ignore', message='invalid .* greater_equal')

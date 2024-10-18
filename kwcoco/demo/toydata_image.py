@@ -3,6 +3,9 @@ Generates "toydata" for demo and testing purposes.
 
 Loose image version of the toydata generators.
 
+TODO:
+    - [ ] Reimplement these functions to reuse the logic in toydata_video.
+
 Note:
     The implementation of `demodata_toy_img` and `demodata_toy_dset` should be
     redone using the tools built for `random_video_dset`, which have more
@@ -122,14 +125,19 @@ def demodata_toy_dset(image_size=(600, 600),
 
     """
     import kwcoco
+    from os.path import abspath
 
     if 'gsize' in kwargs:  # nocover
-        if 0:
-            # TODO: enable this warning
-            import warnings
-            warnings.warn('gsize is deprecated. Use image_size param instead',
-                          DeprecationWarning)
+        ub.schedule_deprecation(
+            modname='kwcoco', name='gsize', type='toydata argument',
+            migration='use image_size instead',
+            deprecate='0.8.3', error='1.0.0', remove='1.1.0',
+        )
         image_size = kwargs.pop('gsize')
+    if 'sensorchan' in kwargs:
+        if kwargs['sensorchan'] is not None:
+            raise NotImplementedError('Use toydata_video instead')
+        kwargs.pop('sensorchan')
     assert len(kwargs) == 0, 'unknown kwargs={}'.format(kwargs)
 
     if bundle_dpath is None:
@@ -152,6 +160,7 @@ def demodata_toy_dset(image_size=(600, 600),
         # 'diamond'
     ])
 
+    # TODO: expose to the user, but come up with a good specification.
     anchors = np.array([
         [1, 1], [2, 2], [1.5, 1], [2, 1], [3, 1], [3, 2], [2.5, 2.5],
     ])
@@ -176,10 +185,9 @@ def demodata_toy_dset(image_size=(600, 600),
     depends = ub.hash_data(cfg, base='abc')[0:14]
 
     if bundle_dpath is None:
-        bundle_dname = 'shapes_{}_{}'.format(cfg['n_imgs'], depends)
+        bundle_dname = f'shapes_{n_imgs}_{depends}'
         bundle_dpath = ub.ensuredir((dpath, bundle_dname))
 
-    from os.path import abspath
     bundle_dpath = abspath(bundle_dpath)
 
     if fpath is None:
@@ -287,7 +295,6 @@ def demodata_toy_dset(image_size=(600, 600),
                 dataset['annotations'].append(ann)
 
             kwimage.imwrite(fpath, imdata)
-            # print('write fpath = {!r}'.format(fpath))
 
         fname = basename(dset_fpath)
         dset = kwcoco.CocoDataset(dataset, bundle_dpath=bundle_dpath,
@@ -304,10 +311,6 @@ def demodata_toy_dset(image_size=(600, 600),
 
     dset.tag = basename(bundle_dpath)
     dset.fpath = dset_fpath
-
-    # print('dset.bundle_dpath = {!r}'.format(dset.bundle_dpath))
-    # dset.reroot(dset.bundle_dpath)
-
     return dset
 
 
@@ -419,16 +422,17 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
         globals().update(xinspect.get_kwargs(demodata_toy_img))
 
     """
+    import kwimage.algo  # NOQA
     if anchors is None:
         anchors = [[.20, .20]]
     anchors = np.asarray(anchors)
 
     if 'gsize' in kwargs:  # nocover
-        if 0:
-            # TODO: enable this warning
-            import warnings
-            warnings.warn('gsize is deprecated. Use image_size param instead',
-                          DeprecationWarning)
+        ub.schedule_deprecation(
+            modname='kwcoco', name='gsize', type='toydata argument',
+            migration='use image_size instead',
+            deprecate='0.8.3', error='1.0.0', remove='1.1.0',
+        )
         image_size = kwargs.pop('gsize')
     assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
 

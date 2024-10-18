@@ -248,7 +248,8 @@ class DetectionMetrics(ub.NiceRepr):
     def confusion_vectors(dmet, iou_thresh=0.5, bias=0, gids=None, compat='mutex',
                           prioritize='iou', ignore_classes='ignore',
                           background_class=ub.NoParam, verbose='auto',
-                          workers=0, track_probs='try', max_dets=None):
+                          workers=0, track_probs='try', max_dets=None,
+                          truth_reuse_policy=False):
         """
         Assigns predicted boxes to the true boxes so we can transform the
         detection problem into a classification problem for scoring.
@@ -277,12 +278,12 @@ class DetectionMetrics(ub.NiceRepr):
 
             prioritize (str):
                 can be ('iou' | 'class' | 'correct') determines which box to
-                assign to if mutiple true boxes overlap a predicted box.  if
+                assign to if multiple true boxes overlap a predicted box.  if
                 prioritize is iou, then the true box with maximum iou (above
                 iou_thresh) will be chosen.  If prioritize is class, then it will
                 prefer matching a compatible class above a higher iou. If
                 prioritize is correct, then ancestors of the true class are
-                preferred over descendents of the true class, over unreleated
+                preferred over descendents of the true class, over unrelated
                 classes. Default to 'iou'
 
             ignore_classes (set | str):
@@ -302,6 +303,9 @@ class DetectionMetrics(ub.NiceRepr):
             track_probs (str):
                 can be 'try', 'force', or False.  if truthy, we assume
                 probabilities for multiple classes are available. default='try'
+
+            truth_reuse_policy (bool):
+                EXPERIMENTAL
 
         Returns:
             ConfusionVectors | Dict[float, ConfusionVectors]
@@ -393,7 +397,9 @@ class DetectionMetrics(ub.NiceRepr):
                 _assign_confusion_vectors, true_dets, pred_dets,
                 bg_weight=1, iou_thresh=iou_thresh_list, bg_cidx=-1, bias=bias,
                 classes=classes, compat=compat, prioritize=prioritize,
-                ignore_classes=ignore_classes, max_dets=max_dets)
+                ignore_classes=ignore_classes, max_dets=max_dets,
+                truth_reuse_policy=truth_reuse_policy,
+            )
             job.gid = gid
 
         for job in ub.ProgIter(jobs.jobs, desc='assign detections',
@@ -746,7 +752,7 @@ class DetectionMetrics(ub.NiceRepr):
 
         pred, true, gt_aid_to_tx, dt_aid_to_px = dmet._to_coco()
 
-        # The original pycoco-api prints to much, supress it
+        # The original pycoco-api prints to much, suppress it
         quiet = verbose == 0
         with SupressPrint(coco, cocoeval, enabled=quiet):
             cocoGt = true._aspycoco()
@@ -1012,7 +1018,7 @@ class DetectionMetrics(ub.NiceRepr):
             false_score_RV = distributions.TruncNormal(
                 mean=false_mean, std=.5, low=0, high=false_high, rng=rng)
 
-            # Create the category hierarcy
+            # Create the category hierarchy
             if isinstance(classes, int):
                 graph = nx.DiGraph()
                 graph.add_node('background', id=0)

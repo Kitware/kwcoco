@@ -197,37 +197,29 @@ def grab_coco_camvid():
     coco_fpath = join(cache_dpath, 'camvid.mscoco.json')
 
     # Need to manually bump this if you make a change to loading
-    SCRIPT_VERSION = 'v4'
+    SCRIPT_VERSION = 'v6'
 
     # Ubelt's stamp-based caches are super cheap and let you take control of
     # the data format.
     stamp = ub.CacheStamp('camvid_coco', depends=[SCRIPT_VERSION],
-                          dpath=cache_dpath, product=coco_fpath, hasher='sha1',
-                          verbose=3)
+                          dpath=cache_dpath, product=coco_fpath,
+                          hasher='sha1', verbose=3)
     if stamp.expired():
         camvid_raw_info = grab_raw_camvid()
         dset = convert_camvid_raw_to_coco(camvid_raw_info)
-        with ub.Timer('dumping MS-COCO dset to: {}'.format(coco_fpath)):
-            dset.dump(coco_fpath)
+        # Fixup issues with paths
+        dset.reroot(absolute=True)
+        dset.fpath = coco_fpath
+        dset.reroot(absolute=False)
+        with ub.Timer('dumping MS-COCO dset to: {}'.format(dset)):
+            dset.dump()
         # Mark this process as completed by saving a small file containing the
         # hash of the "product" you are stamping.
         stamp.renew()
 
-    # We can also cache the index build step independently. This uses
-    # ubelt.Cacher, which is pickle based, and writes the actual object to
-    # disk. Each type of caching has its own uses and tradeoffs.
-    cacher = ub.Cacher('prebuilt-coco', depends=[SCRIPT_VERSION],
-                       dpath=cache_dpath, verbose=3)
-    dset = cacher.tryload()
-    if dset is None:
-        print('Reading coco_fpath = {!r}'.format(coco_fpath))
-        dset = kwcoco.CocoDataset(coco_fpath, tag='camvid')
-        # Directly save the file to disk.
-        dset._build_index()
-        dset._build_hashid()
-        cacher.save(dset)
-
-    camvid_dset = dset
+    # Load the dataset
+    camvid_dset = kwcoco.CocoDataset(coco_fpath, tag='camvid')
+    camvid_dset.validate()
     print('Loaded camvid_dset = {!r}'.format(camvid_dset))
     return camvid_dset
 
@@ -550,7 +542,7 @@ def _define_camvid_class_hierarcy(dset):
         import graphid
         graphid.util.show_nx(graph)
 
-    # Add in some hierarcy information
+    # Add in some hierarchy information
     if 0:
         for x in dset.name_to_cat:
             print("dset.name_to_cat[{!r}]['supercategory'] = 'object'".format(x))
@@ -619,15 +611,16 @@ def main():
 
     # Dump the full dataset
     fpath = join(dpath, 'camvid-full.mscoco.json')
-    print(fpath)
-    coco_dset.dump(open(fpath, 'w'))
+    coco_dset.fpath = coco_dset
+    coco_dset.reroot(absolute=False)
+    coco_dset.dump()
 
     # Dump the train/vali/test splits
     for tag, gids in gid_subsets.items():
         subset = coco_dset.subset(gids)
         fpath = join(dpath, 'camvid-{}.mscoco.json'.format(tag))
-        print(fpath)
-        subset.dump(open(fpath, 'w'))
+        subset.fpath = fpath
+        subset.dump()
 
 if __name__ == '__main__':
     """

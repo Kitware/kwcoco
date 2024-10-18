@@ -9,7 +9,7 @@ repo_name = "kwcoco"
 rel_mod_parent_dpath = "."
 min_python = '3.8'
 url = "https://gitlab.kitware.com/computer-vision/kwcoco"
-ci_cpython_versions = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+ci_cpython_versions = ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
 extra_full_strict_lines = [
     "pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
 ]
@@ -64,3 +64,9 @@ omit = [ "kwcoco/__main__.py", "*/setup.py",]
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.codespell]
+skip = ['./docs/build', './*.egg-info', './build', './htmlcov']
+count = true
+quiet-level = 3
+ignore-words-list = ["fpr", 'ANS', 'ans', 'numer', 'wont', 'cant', 'ANS', 'doesnt', 'arent', 'ans', 'thats', 'datas', 'isnt', 'nd', 'bu', 'hasnt', 'didnt']

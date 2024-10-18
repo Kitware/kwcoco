@@ -97,7 +97,7 @@ several features.
 
 * Toydata generation for easy CI testing and demos.
 
-* Backwards compatability with the original `cocoapi <https://github.com/cocodataset/cocoapi>`_.
+* Backwards compatibility with the original `cocoapi <https://github.com/cocodataset/cocoapi>`_.
 
 
 The KWCOCO CLI
@@ -302,7 +302,7 @@ A high level overview of the structure - entities and their relationships - is s
 .. image:: https://i.imgur.com/YBIMOWM.png
 
 
-The CocoDatset API Grouped by Functinoality
+The CocoDatset API Grouped by Functionality
 -------------------------------------------
 
 The following are grouped attribute/method names of a ``kwcoco.CocoDataset``.
@@ -472,7 +472,7 @@ a coco file using process similar to the following code:
         # One quirk of the coco format is you need to be aware that
         # boxes are in <top-left-x, top-left-y, width-w, height-h> format.
         box = annot['box']
-        # Use kwimage.Box to preform quick, reliable, and readable
+        # Use kwimage.Box to perform quick, reliable, and readable
         # conversions between common bounding box formats.
         ltrb = [box['tl_x'], box['tl_y'], box['br_x'], box['br_y']]
         xywh = kwimage.Box.coerce(ltrb, format='ltrb').to_coco()
@@ -495,7 +495,7 @@ asset/auxiliary space.
 
 Videos can contain multiple images, images can contain multiple asset/auxiliary
 items, and kwcoco needs to know about any transformation that relates between
-different levels in this heirarchy.
+different levels in this hierarchy.
 
 1. Video space - In a sequence of images, each individual image might be at a
    different resolution, or misaligned with other images in the sequence.

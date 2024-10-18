@@ -40,7 +40,7 @@ The file structure looks like this:
     |
     +---- data.kwcoco.json   # Manifest of all information 
     |
-    +---- < this directory can contain any mirror of the main mainfest file 
+    +---- < this directory can contain any mirror of the main manifest file 
     |       for example, an SQLite read-only view >
     |    
     +---- .assets  # This directory is where raw data should be stored.

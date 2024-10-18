@@ -15,7 +15,7 @@ def __torrent_voc():
         https://academictorrents.com/details/f6ddac36ac7ae2ef79dc72a26a065b803c9c7230
 
     TODO:
-        - [ ] Is there a pythonic way to download a torrent programatically?
+        - [ ] Is there a pythonic way to download a torrent programmatically?
     """
     # info = ub.cmd('deluge-console --help', verbose=3)
     pass

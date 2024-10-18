@@ -2,7 +2,7 @@
 
 def coerce_num_workers(num_workers='auto', minimum=0):
     """
-    Return some number of CPUs based on a chosen hueristic
+    Return some number of CPUs based on a chosen heuristic
 
     Args:
         num_workers (int | str):
@@ -66,7 +66,7 @@ def coerce_num_workers(num_workers='auto', minimum=0):
             num_workers = None
         else:
             expr = num_workers.replace('all', 'all_')
-            # limit chars even futher if eval is used
+            # limit chars even further if eval is used
             if 1:
                 # Mitigate attack surface by restricting builtin usage
                 max_chars = 32
@@ -74,7 +74,7 @@ def coerce_num_workers(num_workers='auto', minimum=0):
                 num_workers = restricted_eval(expr, max_chars, local_dict,
                                               builtins_passlist)
             else:
-                # note: eval is not safe, mabye use numexpr instead
+                # note: eval is not safe, maybe use numexpr instead
                 import numexpr
                 num_workers = numexpr.evaluate(expr, local_dict=local_dict,
                                                global_dict=local_dict)

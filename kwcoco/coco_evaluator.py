@@ -3,7 +3,7 @@ Evaluates a predicted coco dataset against a truth coco dataset.
 
 This currently computes detection-level metrics.
 
-The components in this module work programatically or as a command line script.
+The components in this module work programmatically or as a command line script.
 
 TODO:
     - [ ] does evaluate return one result or multiple results
@@ -84,19 +84,19 @@ class CocoEvalConfig(scfg.DataConfig):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
-    true_dataset = scfg.Value(None, type=str, position=1, help='coercable true detections')
-    pred_dataset = scfg.Value(None, type=str, position=2, help='coercable predicted detections')
+    true_dataset = scfg.Value(None, type=str, position=1, help='coercable true detections', tags=['in_path'])
+    pred_dataset = scfg.Value(None, type=str, position=2, help='coercable predicted detections', tags=['in_path'])
     ignore_classes = scfg.Value(None, type=list, help=ub.paragraph(
             '''
             classes to ignore (give them zero weight)
-            '''))
-    implicit_negative_classes = scfg.Value(['background'], help=None)
-    implicit_ignore_classes = scfg.Value(['ignore'], help=None)
-    fp_cutoff = scfg.Value(float('inf'), help='False positive cutoff for ROC')
+            '''), tags=['algo_param'])
+    implicit_negative_classes = scfg.Value(['background'], help=None, tags=['algo_param'])
+    implicit_ignore_classes = scfg.Value(['ignore'], help=None, tags=['algo_param'])
+    fp_cutoff = scfg.Value(float('inf'), help='False positive cutoff for ROC', tags=['algo_param'])
     iou_thresh = scfg.Value(0.5, alias=['ovthresh'], help=ub.paragraph(
             '''
             One or more IoU overlap threshold for detection assignment
-            '''))
+            '''), tags=['algo_param'])
     compat = scfg.Value('mutex', help=ub.paragraph(
             '''
             Matching strategy for which true annots are allowed to match
@@ -104,26 +104,26 @@ class CocoEvalConfig(scfg.DataConfig):
             match predictions where the true class has highest
             probability (pycocotools setting). `all` means any class can
             match any other class. Dont use `ancestors`, it is broken.
-            '''), choices=['all', 'mutex', 'ancestors'])
+            '''), choices=['all', 'mutex', 'ancestors'], tags=['algo_param'])
     monotonic_ppv = scfg.Value(True, help=ub.paragraph(
             '''
             if True forces precision to be monotonic. Defaults to True
             for compatibility with pycocotools, but that might not be
             the best option.
-            '''))
+            '''), tags=['algo_param'])
     ap_method = scfg.Value('pycocotools', help=ub.paragraph(
             '''
             Method for computing AP. Defaults to a setting comparable to
-            pycocotools. Can also be set to sklearn to use an alterative
+            pycocotools. Can also be set to sklearn to use an alternative
             method.
-            '''))
+            '''), tags=['algo_param'])
     use_area_attr = scfg.Value('try', help=ub.paragraph(
             '''
             if True (pycocotools setting) uses the area coco attribute
             to filter area range instead of bbox area. Otherwise just
             filters based on bbox area. If 'try' then it tries to use it
             but will fallback if it does not exist.
-            '''))
+            '''), tags=['algo_param'])
     area_range = scfg.Value(['all'], help=ub.paragraph(
             '''
             Minimum and maximum object areas to consider. May specified
@@ -135,36 +135,40 @@ class CocoEvalConfig(scfg.DataConfig):
             e.g. 16x16 boxes are considered small, but 17x16 boxes are
             medium. These can be mixed an matched, e.g.:
             `--area_range=0-4e3,small,1024-inf`.
-            '''))
+            '''), tags=['algo_param'])
     max_dets = scfg.Value(float('inf'), help=ub.paragraph(
             '''
             maximum number of predictions to consider
-            '''))
+            '''), tags=['algo_param'])
+    truth_reuse_policy = scfg.Value(False, help=ub.paragraph(
+            '''
+            Experimental.
+            '''), tags=['algo_param'])
     iou_bias = scfg.Value(1, help=ub.paragraph(
             '''
             pycocotools setting is 1, but 0 may be better
-            '''))
+            '''), tags=['algo_param'])
     force_pycocoutils = scfg.Value(False, help=ub.paragraph(
             '''
             ignore all other options and just use pycocoutils to score
-            '''))
+            '''), tags=['algo_param'])
     assign_workers = scfg.Value(8, help=ub.paragraph(
             '''
             number of background workers for assignment
-            '''))
+            '''), tags=['perf_param'])
     load_workers = scfg.Value(0, help=ub.paragraph(
             '''
             number of workers to load cached detections
-            '''))
+            '''), tags=['perf_param'])
     classes_of_interest = scfg.Value(None, type=list, help=ub.paragraph(
             '''
             if specified only these classes are given weight
-            '''))
+            '''), tags=['algo_param'])
     use_image_names = scfg.Value(False, help=ub.paragraph(
             '''
             if True use image file_name to associate images instead of
             ids
-            '''))
+            '''), tags=['algo_param'])
 
     def __post_init__(self):
         # if self['ovthresh'] is not None:
@@ -267,7 +271,7 @@ class CocoEvaluator:
             # pred dset, we should not do that, just store a gid mapping.
 
             # TODO: we will port the watch associate-images functionality soon,
-            # which should supercede this.
+            # which should supersede this.
             pred_to_true_gid = {}
             true_coco = true_extra['coco_dset']
             pred_coco = pred_extra['coco_dset']
@@ -314,7 +318,7 @@ class CocoEvaluator:
         true_to_unified_cid = unified_cid_maps['true']
         pred_to_unified_cid = unified_cid_maps['pred']
 
-        # Helper infor for mapping predicted probabilities
+        # Helper info for mapping predicted probabilities
         pred_new_idxs = []
         pred_old_idxs = []
         for old_idx, old_node in enumerate(pred_classes.idx_to_node):
@@ -665,6 +669,7 @@ class CocoEvaluator:
                 workers=coco_eval.config['assign_workers'],
                 bias=coco_eval.config['iou_bias'],
                 max_dets=coco_eval.config['max_dets'],
+                truth_reuse_policy=coco_eval.config['truth_reuse_policy'],
             )
 
         # Remove large datasets values in configs that are not file references
@@ -1186,7 +1191,7 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
         gid = single_img_coco.dataset['images'][0]['id']
         dets.meta['gid'] = gid
     else:
-        warnings.warn('Loading dets with muliple images, must track gids carefully')
+        warnings.warn('Loading dets with multiple images, must track gids carefully')
 
     if with_coco:
         return dets, single_img_coco

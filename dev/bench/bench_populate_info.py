@@ -27,7 +27,7 @@ def bench_pop_info():
     p_denom[p_denom == 0] = 1
     fnr = fn / p_denom  # miss-rate
     fdr  = 1 - ppv  # false discovery rate
-    fmr  = 1 - npv  # false ommision rate (for)
+    fmr  = 1 - npv  # false omission rate (for)
 
     import timerit
     ti = timerit.Timerit(10000, bestof=10, verbose=2)

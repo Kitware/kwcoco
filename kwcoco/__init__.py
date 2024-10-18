@@ -129,7 +129,7 @@ CocoDataset classmethods (via MixinCocoExtras)
 **********************************************
 
  * :func:`kwcoco.CocoDataset.coerce<kwcoco.coco_dataset.MixinCocoExtras.coerce>` - Attempt to transform the input into the intended CocoDataset.
- * :func:`kwcoco.CocoDataset.demo<kwcoco.coco_dataset.MixinCocoExtras.demo>` - Create a toy coco dataset for testing and demo puposes
+ * :func:`kwcoco.CocoDataset.demo<kwcoco.coco_dataset.MixinCocoExtras.demo>` - Create a toy coco dataset for testing and demo purposes
  * :func:`kwcoco.CocoDataset.random<kwcoco.coco_dataset.MixinCocoExtras.random>` - Creates a random CocoDataset according to distribution parameters
 
 CocoDataset classmethods (via CocoDataset)
@@ -143,7 +143,7 @@ CocoDataset slots
 *****************
 
  * :attr:`kwcoco.CocoDataset.index<kwcoco.coco_dataset.CocoDataset.index>` - an efficient lookup index into the coco data structure. The index defines its own attributes like ``anns``, ``cats``, ``imgs``, ``gid_to_aids``, ``file_name_to_img``, etc. See :class:`CocoIndex` for more details on which attributes are available.
- * :attr:`kwcoco.CocoDataset.hashid<kwcoco.coco_dataset.CocoDataset.hashid>` - If computed, this will be a hash uniquely identifing the dataset.  To ensure this is computed see  :func:`kwcoco.coco_dataset.MixinCocoExtras._build_hashid`.
+ * :attr:`kwcoco.CocoDataset.hashid<kwcoco.coco_dataset.CocoDataset.hashid>` - If computed, this will be a hash uniquely identifying the dataset.  To ensure this is computed see  :func:`kwcoco.coco_dataset.MixinCocoExtras._build_hashid`.
  * :attr:`kwcoco.CocoDataset.hashid_parts<kwcoco.coco_dataset.CocoDataset.hashid_parts>` -
  * :attr:`kwcoco.CocoDataset.tag<kwcoco.coco_dataset.CocoDataset.tag>` - A tag indicating the name of the dataset.
  * :attr:`kwcoco.CocoDataset.dataset<kwcoco.coco_dataset.CocoDataset.dataset>` - raw json data structure. This is the base dictionary that contains {'annotations': List, 'images': List, 'categories': List}
@@ -206,7 +206,7 @@ CocoDataset methods (via MixinCocoStats)
  * :func:`kwcoco.CocoDataset.boxsize_stats<kwcoco.coco_dataset.MixinCocoStats.boxsize_stats>` - Compute statistics about bounding box sizes.
  * :func:`kwcoco.CocoDataset.category_annotation_frequency<kwcoco.coco_dataset.MixinCocoStats.category_annotation_frequency>` - Reports the number of annotations of each category
  * :func:`kwcoco.CocoDataset.category_annotation_type_frequency<kwcoco.coco_dataset.MixinCocoStats.category_annotation_type_frequency>` - Reports the number of annotations of each type for each category
- * :func:`kwcoco.CocoDataset.conform<kwcoco.coco_dataset.MixinCocoStats.conform>` - Make the COCO file conform a stricter spec, infers attibutes where possible.
+ * :func:`kwcoco.CocoDataset.conform<kwcoco.coco_dataset.MixinCocoStats.conform>` - Make the COCO file conform a stricter spec, infers attributes where possible.
  * :func:`kwcoco.CocoDataset.extended_stats<kwcoco.coco_dataset.MixinCocoStats.extended_stats>` - Reports number of images, annotations, and categories.
  * :func:`kwcoco.CocoDataset.find_representative_images<kwcoco.coco_dataset.MixinCocoStats.find_representative_images>` - Find images that have a wide array of categories. Attempt to find the fewest images that cover all categories using images that contain both a large and small number of annotations.
  * :func:`kwcoco.CocoDataset.keypoint_annotation_frequency<kwcoco.coco_dataset.MixinCocoStats.keypoint_annotation_frequency>` -
@@ -269,7 +269,7 @@ Testing:
 
 """
 
-__version__ = '0.8.4'
+__version__ = '0.8.5'
 
 
 __submodules__ = {

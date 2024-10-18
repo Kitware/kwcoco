@@ -48,6 +48,8 @@ class CocoToyDataCLI(scfg.DataConfig):
             '''))
     verbose = scfg.Value(False, help='Verbosity')
 
+    sensorchan = scfg.Value(None, help='Control the sensor / channels with a sensorchanspec')
+
     __epilog__ = r"""
     Example Usage:
         kwcoco toydata --key=shapes8 --dst=toydata.kwcoco.json
@@ -57,6 +59,11 @@ class CocoToyDataCLI(scfg.DataConfig):
 
         kwcoco toydata \
             --key=vidshapes1-frames32 \
+            --dst=./mytoybundle/dataset.kwcoco.json
+
+        kwcoco toydata \
+            --key=vidshapes1-frames32 \
+            --sensorchan s1:ir \
             --dst=./mytoybundle/dataset.kwcoco.json
 
     TODO:
@@ -82,6 +89,7 @@ class CocoToyDataCLI(scfg.DataConfig):
         demo_kwargs = {
             'use_cache': config['use_cache'],
             'verbose': config['verbose'],
+            'sensorchan': config['sensorchan'],
         }
 
         if config['bundle_dpath'] is not None:

@@ -19,14 +19,14 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     __alias__ = ['eval_detections']
 
     # These should go into the CLI args, not the class config args
-    expt_title = scfg.Value('', type=str, help='title for plots')
-    draw = scfg.Value(True, isflag=1, help='draw metric plots')
-    out_dpath = scfg.Value('./coco_metrics', type=str, help='where to dump results')
+    expt_title = scfg.Value('', type=str, help='title for plots', tags=['perf_param'])
+    draw = scfg.Value(True, isflag=1, help='draw metric plots', tags=['perf_param'])
+    out_dpath = scfg.Value('./coco_metrics', type=str, help='where to dump results', tags=['out_path'])
     out_fpath = scfg.Value('auto', type=str, help=ub.paragraph(
         '''
         Where to dump the json file containing result. If "auto",
         defaults to out_dpath / "metrics.json"
-        '''))
+        '''), tags=['out_path', 'primary'])
 
     @classmethod
     def main(cls, cmdline=True, **kw):

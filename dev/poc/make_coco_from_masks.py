@@ -36,7 +36,7 @@ def _make_intmask_demodata(rng=None):
         num_objects = rng.randint(0, 5)
         data = np.zeros(shape, dtype=np.uint8)
         for obj_idx in range(0, num_objects + 1):
-            # Make a binay mask and add it as a new objct
+            # Make a binary mask and add it as a new object
             binmask = kwimage.Mask.random(shape=shape, rng=rng).data
             data[binmask > 0] = obj_idx
         return data
@@ -126,7 +126,7 @@ class MakeCocoFromMasksCLI(scfg.Config):
             # I recall there is a better opencv of splitting these sort of
             # masks up into binary masks, maybe it was a connected-component
             # function? I guess it depends if you want disconnected objects
-            # represented as separte annotations or not.  I'm just going to do
+            # represented as separate annotations or not.  I'm just going to do
             # the naive thing for now.
             obj_idxs = np.setdiff1d(np.unique(multi_mask), [0])
             for obj_idx in obj_idxs:
@@ -167,7 +167,7 @@ class MakeCocoFromMasksCLI(scfg.Config):
 
                 METHOD1 = False
                 if METHOD1:
-                    # We could just add it diretly like this
+                    # We could just add it directly like this
                     # FIXME: it should be ok to add an annotation without a
                     # category, but it seems like a recent change in kwcoco has
                     # broken that. That will be fixed in the future.

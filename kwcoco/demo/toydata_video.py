@@ -1,7 +1,7 @@
 """
 Generates "toydata" for demo and testing purposes.
 
-This is the video version of the toydata generator and should be prefered to
+This is the video version of the toydata generator and should be preferred to
 the loose image version in toydata_image.
 
 """
@@ -29,7 +29,7 @@ def random_video_dset(
         image_size=(600, 600), verbose=3, render=False, aux=None,
         multispectral=False, multisensor=False, rng=None, dpath=None,
         max_speed=0.01, channels=None, background='noise',
-        timestamps=False, **kwargs):
+        timestamps=False, sensorchan=None, **kwargs):
     """
     Create a toy Coco Video Dataset
 
@@ -115,11 +115,11 @@ def random_video_dset(
         num_videos = 2
     """
     if 'gsize' in kwargs:  # nocover
-        if 0:
-            # TODO: enable this warning
-            import warnings
-            warnings.warn('gsize is deprecated. Use image_size param instead',
-                          DeprecationWarning)
+        ub.schedule_deprecation(
+            modname='kwcoco', name='gsize', type='toydata argument',
+            migration='use image_size instead',
+            deprecate='0.8.3', error='1.0.0', remove='1.1.0',
+        )
         image_size = kwargs.pop('gsize')
     if len(kwargs) != 0:
         raise ValueError('unknown kwargs={}'.format(kwargs))
@@ -144,6 +144,7 @@ def random_video_dset(
             gid_start=gid_start, video_id=vidid, render=False, autobuild=False,
             aux=aux, multispectral=multispectral, multisensor=multisensor,
             timestamps=timestamps, max_speed=max_speed, channels=channels,
+            sensorchan=sensorchan,
             rng=rng, verbose=verbose)
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
@@ -200,7 +201,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
                              video_id=1, anchors=None, rng=None, render=False,
                              dpath=None, autobuild=True, verbose=3, aux=None,
                              multispectral=False, max_speed=0.01,
-                             channels=None, multisensor=False, timestamps=False,
+                             channels=None,
+                             multisensor=False,
+                             timestamps=False,
+                             sensorchan=None,
                              **kwargs):
     """
     Create the video scene layout of object positions.
@@ -241,12 +245,16 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         max_speed (float):
             max speed of movers
 
-        channels (str | None | kwcoco.ChannelSpec):
+        channels (str | None | delayed_image.ChannelSpec):
             if specified generates multispectral images with dummy channels
+            (maybe) DEPRECATE. Use sensorchan instead?
 
         multisensor (bool):
             if True, generates demodata from "multiple sensors", in
                 other words, observations may have different "bands".
+
+        sensorchan (str):
+            Experimental sensorchan code.
 
         **kwargs : used for old backwards compatible argument names
             gsize - alias for image_size
@@ -331,6 +339,10 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         >>> assert dset.imgs[1]['auxiliary'][1]['channels']
         >>> # test that we can render
         >>> render_toy_dataset(dset, rng=0, dpath=None, renderkw={})
+        >>> # Test we can load a single channel
+        >>> coco_img = dset.coco_image(1)
+        >>> stream = coco_img.channels.streams()[0]
+        >>> coco_img.imdelay(channels=stream).as_xarray().finalize()
 
     Example:
         >>> from kwcoco.demo.toydata_video import *  # NOQA
@@ -353,6 +365,31 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         >>> print('dset.fpath = {!r}'.format(dset.fpath))
         >>> kwplot.imshow(final)
 
+    Example:
+        >>> # Test custom channel specification
+        >>> # xdoctest: +REQUIRES(module:lark)
+        >>> from kwcoco.demo.toydata_video import *  # NOQA
+        >>> dset = random_single_video_dset(num_frames=4, num_tracks=1, sensorchan='s1:(r|g|b,x|y|z),s2:flowx|flowy,s3:(ir,B:4)', image_size='random', rng=2338)
+        >>> print(dset.images().coco_images[0])
+        >>> dset._check_json_serializable()
+        >>> assert dset.imgs[1]['auxiliary'][1]['channels']
+        >>> # Print before and after render
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset['images'], nl=-2)))
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset, nl=-2)))
+        >>> print(ub.hash_data(dset.dataset))
+        >>> # test that we can render
+        >>> render_toy_dataset(dset, rng=0, dpath=None, renderkw={})
+        >>> #print('multisensor-images = {}'.format(ub.urepr(dset.dataset['images'], nl=-2)))
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> from kwcoco.demo.toydata_video import _draw_video_sequence  # NOQA
+        >>> gids = [1, 2, 3, 4]
+        >>> final = _draw_video_sequence(dset, gids)
+        >>> print('dset.fpath = {!r}'.format(dset.fpath))
+        >>> kwplot.imshow(final)
+
+
     Ignore:
         import xdev
         globals().update(xdev.get_func_kwargs(random_single_video_dset))
@@ -364,14 +401,15 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     import pandas as pd
     import kwcoco
     from kwarray import distributions
+    from delayed_image import ChannelSpec, SensorChanSpec
     rng = kwarray.ensure_rng(rng)
 
     if 'gsize' in kwargs:  # nocover
-        if 0:
-            # TODO: enable this warning
-            import warnings
-            warnings.warn('gsize is deprecated. Use image_size param instead',
-                          DeprecationWarning)
+        ub.schedule_deprecation(
+            modname='kwcoco', name='gsize', type='toydata argument',
+            migration='use image_size instead',
+            deprecate='0.8.3', error='1.0.0', remove='1.1.0',
+        )
         image_size = kwargs.pop('gsize')
     assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
 
@@ -436,16 +474,29 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
     sensor_to_channels = {}
     if channels is not None:
-        channels = kwcoco.ChannelSpec.coerce(channels)
+        channels = ChannelSpec.coerce(channels)
         sensor_to_channels['sensor1'] = channels
 
     if multisensor:
         assert channels is not None
         # todo: give users a way to specify (1) how many sensors, and (2)
         # what the channels for each sensor should be.
-        sensor_to_channels['sensor2'] = kwcoco.ChannelSpec.coerce('r|g|b,disparity,gauss,B8|B11')
-        sensor_to_channels['sensor3'] = kwcoco.ChannelSpec.coerce('r|g|b,flowx|flowy,distri,B10|B11')
-        sensor_to_channels['sensor4'] = kwcoco.ChannelSpec.coerce('B11,X.2,Y:2:6')
+        sensor_to_channels['sensor2'] = ChannelSpec.coerce('r|g|b,disparity,gauss,B8|B11')
+        sensor_to_channels['sensor3'] = ChannelSpec.coerce('r|g|b,flowx|flowy,distri,B10|B11')
+        sensor_to_channels['sensor4'] = ChannelSpec.coerce('B11,X.2,Y:2:6')
+
+    if sensorchan is not None:
+        no_main_image = True
+        # NEW EXPERIMENTAL SENSORCHAN OPTIONS
+        # The idea is that this can remove the need for aux, channels,
+        # multisensor, and multispectral. Just specify what you want.
+        senorchan = SensorChanSpec.coerce(sensorchan)
+        sensor_to_channels = {}
+        sensor_to_subchans = ub.group_items(senorchan.streams(), key=lambda x: x.sensor.spec)
+        for sensor, subchans in sensor_to_subchans.items():
+            subspec = ','.join([c._chans.spec for c in subchans])
+            chans = ChannelSpec.coerce(subspec)
+            sensor_to_channels[sensor] = chans
 
     sensors = sorted(sensor_to_channels.keys())
 
@@ -530,7 +581,7 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
             dset.dataset['keypoint_categories'].append(kpcat)
             kpname_to_id[kpcat['name']] = kpcat['id']
 
-    # Generate paths in a way that they are dependant on each other
+    # Generate paths in a way that they are dependent on each other
     paths = random_multi_object_path(
         num_frames=num_frames,
         num_objects=num_tracks, rng=rng,
@@ -798,7 +849,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
             sophisticated.
 
             Each item in `dset.dataset['images']` will be modified to add
-            the "file_name" field indicating where the rendered data is writen.
+            the "file_name" field indicating where the rendered data is written.
 
         rng (int | None | RandomState): random state
 
@@ -857,7 +908,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     if imwrite_kw:
         # imwrite_kw['backend'] = 'gdal'
         # imwrite_kw['space'] = None
-        # imwrite kw requries gdal
+        # imwrite kw requires gdal
         from osgeo import gdal  # NOQA
 
     main_ext = renderkw.get('main_ext', '.png')
@@ -911,7 +962,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     the image dictionary.
 
     Args:
-        dset (kwcoco.CocoDataset): coco dataset with renderable anotations / images
+        dset (kwcoco.CocoDataset): coco dataset with renderable annotations / images
         gid (int): image to render
         rng (int | None | RandomState): random state
         renderkw (dict | None): rendering config
@@ -1087,7 +1138,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
 def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
                       with_sseg, with_kpts, dims, newstyle, gray, rng):
     """
-    Renders demo annoations on top of a demo background
+    Renders demo annotations on top of a demo background
     """
     boxes = annots.boxes
 
@@ -1388,7 +1439,7 @@ def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
 
             optim.step()
 
-            # Enforce boundry conditions
+            # Enforce boundary conditions
             model.pos.data.clamp_(0, 1)
             positions.append(model.pos.data.numpy().copy())
 

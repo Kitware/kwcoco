@@ -5,8 +5,8 @@ import ubelt as ub
 TODO:
     - [ ] Port logic from validate.
     - [ ] Handle annotations with duplicate ids.
-        * Case 1: if all other information in the annotation is eactly the same, then delete all but one of the annotations.
-        * Case 2: if all other information in the annotation is diffrent, keep both and give the duplicates new ids.
+        * Case 1: if all other information in the annotation is exactly the same, then delete all but one of the annotations.
+        * Case 2: if all other information in the annotation is different, keep both and give the duplicates new ids.
 """
 
 

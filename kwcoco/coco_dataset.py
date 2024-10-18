@@ -38,7 +38,7 @@ TODO:
           annotation on an intermediate frame.
 
     - [ ] Efficiency: Allow each section of the kwcoco file to be written as a
-          separate json file. Perhaps allow genric pointer support? Might get
+          separate json file. Perhaps allow generic pointer support? Might get
           messy.
 
     - [ ] Reroot needs to be redesigned very carefully.
@@ -127,7 +127,7 @@ SPEC_KEYS = [
 
 class MixinCocoDepricate:
     """
-    These functions are marked for deprication and will be removed
+    These functions are marked for deprecation and will be removed
     """
 
     def keypoint_annotation_frequency(self):
@@ -140,7 +140,7 @@ class MixinCocoDepricate:
             >>> self = kwcoco.CocoDataset.demo('shapes', rng=0)
             >>> hist = self.keypoint_annotation_frequency()
             >>> hist = ub.odict(sorted(hist.items()))
-            >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
+            >>> # FIXME: for whatever reason demodata generation is not deterministic when seeded
             >>> print(ub.urepr(hist))  # xdoc: +IGNORE_WANT
             {
                 'bot_tip': 6,
@@ -748,6 +748,9 @@ class MixinCocoAccessors:
                 kpcats = self.index.kpcats.values()
             else:
                 kpcats = iter(self.dataset['keypoint_categories'])
+            kpcats = list(kpcats)
+            if len(kpcats) == 0:
+                raise KeyError  # hack for old behavior
         except KeyError:
             catnames = self._keypoint_category_names()
             classes = CategoryTree.coerce(catnames)
@@ -915,12 +918,12 @@ class MixinCocoConstructors:
     @classmethod
     def demo(cls, key='photos', **kwargs):
         """
-        Create a toy coco dataset for testing and demo puposes
+        Create a toy coco dataset for testing and demo purposes
 
         Args:
             key (str):
                 Either 'photos' (default), 'shapes', or 'vidshapes'. There are
-                also special sufixes that can control behavior.
+                also special suffixes that can control behavior.
 
                 Basic options that define which flavor of demodata to generate
                 are: `photos`, `shapes`, and `vidshapes`. A numeric suffix e.g.
@@ -971,7 +974,7 @@ class MixinCocoConstructors:
             >>> print(CocoDataset.demo('photos', verbose=1))
             >>> print(CocoDataset.demo('shapes', verbose=1))
             >>> print(CocoDataset.demo('vidshapes', verbose=1))
-            >>> # Varaints of demodata keys
+            >>> # Variants of demodata keys
             >>> print(CocoDataset.demo('shapes8', verbose=0))
             >>> print(CocoDataset.demo('shapes8-msi', verbose=0))
             >>> print(CocoDataset.demo('shapes8-frames1-speed0.2-msi', verbose=0))
@@ -1061,6 +1064,7 @@ class MixinCocoConstructors:
                 'anchors': None,
                 'image_size': (600, 600),
                 'aux': None,
+                'sensorchan': None,
                 'multispectral': None,
                 'multisensor': False,
                 'max_speed': 0.01,
@@ -1610,7 +1614,7 @@ class MixinCocoExtras:
                 rebuild = True
 
         if rebuild:
-            self._build_index()
+            self.rebuild_index()
         else:
             self.index.clear()
         self._invalidate_hashid()
@@ -1639,7 +1643,7 @@ class MixinCocoExtras:
                absolute=False,
                check=True,
                safe=True,
-               verbose=1):
+               verbose=0):
         """
         Modify the prefix of the image/data paths onto a new image/data root.
 
@@ -2517,7 +2521,7 @@ class MixinCocoStats:
 
     def conform(self, **config):
         """
-        Make the COCO file conform a stricter spec, infers attibutes where
+        Make the COCO file conform a stricter spec, infers attributes where
         possible.
 
         Corresponds to the ``kwcoco conform`` CLI tool.
@@ -2576,7 +2580,7 @@ class MixinCocoStats:
                     if 'segmentation' in ann:
                         try:
                             import kwimage
-                            poly = kwimage.MultiPolygon.from_coco(ann['segmentation'])
+                            poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
                             ann['area'] = float(poly.to_shapely().area)
                         except Exception:
                             import warnings
@@ -2622,7 +2626,7 @@ class MixinCocoStats:
                     # TODO: any original style coco dict is ok, we dont
                     # always need it to be a poly if it is RLE
                     import kwimage
-                    poly = kwimage.MultiPolygon.from_coco(ann['segmentation'])
+                    poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
                     # Hack, looks like kwimage does not wrap the original
                     # coco polygon with a list, but pycocotools needs that
                     ann['segmentation'] = poly.to_coco(style='orig')
@@ -3442,7 +3446,7 @@ class MixinCocoDraw:
                 elif 'keypoints' in ann:
                     x1, y1 = xys.min(axis=0)
                 else:
-                    raise Exception('no bbox, line, or keypoint position')
+                    raise Exception(f'no bbox, line, or keypoint position: ann={ann}')
 
                 cid = ann.get('category_id', None)
                 if cid is not None:
@@ -3827,8 +3831,8 @@ class MixinCocoAddRemove:
                 Extended types: `MaskLike | MultiPolygonLike`.
 
             keypoints (Any): keypoints in some accepted
-                format, see :func:`kwimage.Keypoints.to_coco`.
-                Extended types: `KeypointsLike`.
+                format, see :func:`kwimage.Points.to_coco`.
+                Extended types: ``PointsLike``.
 
             id (None | int): Force using this annotation id. Typically you
                 should NOT specify this. A new unused id will be chosen and
@@ -4203,6 +4207,65 @@ class MixinCocoAddRemove:
             cat = self.index.name_to_cat[name]
             id = cat['id']
         return id
+
+    def add_categories(self, cats):
+        """
+        Faster less-safe multi-item alternative to add_category.
+
+        We assume the items are well formatted in kwcoco compliant
+        dictionaries, including the "id" field. No validation checks are made
+        when calling this function, but the index is updated, and the hashid is
+        invalidated.
+
+        Args:
+            cats (List[Dict]): list of category dictionaries
+
+        SeeAlso:
+            :func:`add_category`
+            :func:`add_categories`
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> cats = [self.cats[cid] for cid in [2, 3, 5, 7]]
+            >>> self.remove_categories(cats)
+            >>> assert self.n_cats == 4 and self._check_integrity()
+            >>> self.add_categories(cats)
+            >>> assert self.n_cats == 8 and self._check_integrity()
+        """
+        self.dataset['categories'].extend(cats)
+        self.index._add_categories(cats)
+        self._invalidate_hashid(['categories'])
+
+    def add_keypoint_categories(self, keypoint_cats):
+        """
+        Faster less-safe multi-item alternative to add_category.
+
+        We assume the items are well formatted in kwcoco compliant
+        dictionaries, including the "id" field. No validation checks are made
+        when calling this function, but the index is updated, and the hashid is
+        invalidated.
+
+        Args:
+            cats (List[Dict]): list of category dictionaries
+
+        SeeAlso:
+            :func:`add_category`
+            :func:`add_categories`
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> keypoint_cats = [{'id': 1, 'name': 'ear'}, {'id': 2, 'name': 'nose'}]
+            >>> self.add_keypoint_categories(keypoint_cats)
+            >>> kp_identifiers = keypoint_cats
+            >>> self.remove_keypoint_categories(kp_identifiers, clean_anns=False)
+        """
+        if 'keypoint_categories' not in self.dataset:
+            self.dataset['keypoint_categories'] = []
+        self.dataset['keypoint_categories'].extend(keypoint_cats)
+        self.index._add_keypoint_categories(keypoint_cats)
+        self._invalidate_hashid(['keypoint_categories'])
 
     def add_annotations(self, anns):
         """
@@ -4679,13 +4742,17 @@ class MixinCocoAddRemove:
         remove_info = {'annotation_keypoints': num_kps_removed}
         return remove_info
 
-    def remove_keypoint_categories(self, kp_identifiers):
+    def remove_keypoint_categories(self, kp_identifiers, clean_anns=True):
         """
         Removes all keypoints of a particular category as well as all
         annotation keypoints with those ids.
 
         Args:
             kp_identifiers (List): list of keypoint category dicts, names, or ids
+
+            clean_anns (bool):
+                if True, will try to remove the now invalid keypoints from
+                annotations that contain it. May cause breakage.
 
         Returns:
             Dict: num_removed: information on the number of items removed
@@ -4696,7 +4763,7 @@ class MixinCocoAddRemove:
             >>> kp_identifiers = ['left_eye', 'mid_tip']
             >>> remove_info = self.remove_keypoint_categories(kp_identifiers)
             >>> print('remove_info = {!r}'.format(remove_info))
-            >>> # FIXME: for whatever reason demodata generation is not determenistic when seeded
+            >>> # FIXME: for whatever reason demodata generation is not deterministic when seeded
             >>> # assert remove_info == {'keypoint_categories': 2, 'annotation_keypoints': 16, 'reflection_ids': 1}
             >>> assert self._resolve_to_kpcat('right_eye')['reflection_id'] is None
         """
@@ -4706,8 +4773,10 @@ class MixinCocoAddRemove:
         }
         remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))
 
-        _ann_remove_info = self.remove_annotation_keypoints(remove_kpcats)
-        remove_info.update(_ann_remove_info)
+        # This is expensive, should make it optional.
+        if clean_anns:
+            _ann_remove_info = self.remove_annotation_keypoints(remove_kpcats)
+            remove_info.update(_ann_remove_info)
 
         remove_kpcids = {k['id'] for k in remove_kpcats}
 
@@ -4723,6 +4792,7 @@ class MixinCocoAddRemove:
 
         remove_info['reflection_ids'] = remove_reflect_ids
         remove_info['keypoint_categories'] = len(remove_kpcats)
+        self.index._remove_keypoint_categories(remove_kpcids)
         return remove_info
 
     def set_annotation_category(self, aid_or_ann, cid_or_cat):
@@ -4789,7 +4859,7 @@ class CocoIndex:
 
         cid_to_gids (Dict[int, List[int]]):
             mapping between an category-id and image-ids that contain
-            at least one annotation with this cateogry id.
+            at least one annotation with this category id.
 
         trackid_to_aids (Dict[int, List[int]]):
             mapping between a track-id and annotation-ids that belong to it
@@ -5001,6 +5071,23 @@ class CocoIndex:
                     index.trackid_to_aids[tid] = index._annots_set_sorted_by_frame_index()
                 index.trackid_to_aids[tid].add(aid)
 
+    def _add_keypoint_categories(index, keypoint_cats):
+        if index.kpcats is None:
+            index.kpcats = {}
+        ids = [obj['id'] for obj in keypoint_cats]
+        new_objs = dict(zip(ids, keypoint_cats))
+        index.kpcats.update(new_objs)
+
+    def _add_categories(index, cats):
+        if index.cats is not None:
+            ids = [obj['id'] for obj in cats]
+            names = [obj['name'] for obj in cats]
+            new_objs = dict(zip(ids, cats))
+            index.cats.update(new_objs)
+            for cid, cat, name in zip(ids, cats, names):
+                index.cid_to_aids[cid] = index._set()
+                index.name_to_cat[name] = cat
+
     def _add_annotations(index, anns):
         if index.anns is not None:
             aids = [ann['id'] for ann in anns]
@@ -5058,6 +5145,14 @@ class CocoIndex:
                 _.clear()
             for _ in index.vidid_to_gids.values():
                 _.clear()
+
+    def _remove_keypoint_categories(index, remove_kpcid, verbose=0):
+        if index.kpcats is not None:
+            for kpcid in remove_kpcid:
+                del index.kpcats[kpcid]
+                # kpcat = index.kpcats.pop(kpcid)
+            if verbose > 2:
+                print('Updated category index')
 
     def _remove_annotations(index, remove_aids, verbose=0):
         if index.anns is not None:
@@ -5141,7 +5236,7 @@ class CocoIndex:
         index.name_to_video = None
         index.trackid_to_aids = None
         index.name_to_track = None
-        # index.kpcid_to_aids = None  # TODO
+        # index.kpcid_to_aids = None  # TODO?
 
     def build(index, parent):
         """
@@ -5167,6 +5262,7 @@ class CocoIndex:
         anns, cats, imgs = {}, {}, {}
         videos = {}
         tracks = {}
+        kpcats = {}
 
         # Build one-to-one index-lookup maps
         for cat in parent.dataset.get('categories', []):
@@ -5176,6 +5272,14 @@ class CocoIndex:
                     'Categories have the same id in {}:\n{} and\n{}'.format(
                         parent, cats[cid], cat))
             cats[cid] = cat
+
+        for obj in parent.dataset.get('keypoint_categories', []):
+            cid = obj['id']
+            if cid in obj:
+                warnings.warn(
+                    'Keypoint objegories have the same id in {}:\n{} and\n{}'.format(
+                        parent, kpcats[cid], obj))
+            kpcats[cid] = obj
 
         for video in parent.dataset.get('videos', []):
             vidid = video['id']
@@ -5290,11 +5394,12 @@ class CocoIndex:
             'annotations': anns,
             'videos': videos,
             'tracks': tracks,
+            'keypoint_categories': kpcats,
         }
         index.anns = anns
         index.imgs = imgs
         index.cats = cats
-        index.kpcats = None  # TODO
+        index.kpcats = kpcats
         index.videos = videos
         index.tracks = tracks
 
@@ -5404,7 +5509,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             relative to. This can also be manually overwritten by the user.
 
         hashid (str | None) :
-            If computed, this will be a hash uniquely identifing the dataset.
+            If computed, this will be a hash uniquely identifying the dataset.
             To ensure this is computed see
             :func:`kwcoco.coco_dataset.MixinCocoExtras._build_hashid`.
 
@@ -5435,7 +5540,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             'url': 'https://i.imgur.com/KXhKM72.png',
         }
         >>> #
-        >>> # Use the (gid_to_aids) index to lookup annotations in the iamge
+        >>> # Use the (gid_to_aids) index to lookup annotations in the image
         >>> annotation_id = sorted(self.index.gid_to_aids[image_id])[0]
         >>> ann = self.index.anns[annotation_id]
         >>> print(ub.urepr((ub.udict(ann) - {'segmentation'}).sorted_keys(), nl=1))
@@ -5491,7 +5596,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             data (str | PathLike | dict | None):
                 Either a filepath to a coco json file, or a dictionary
                 containing the actual coco json structure. For a more generally
-                coercable constructor see func:`CocoDataset.coerce`.
+                coercible constructor see func:`CocoDataset.coerce`.
 
                 Note: in the future, we may only accept construction from a
                 data dictionary, and use a `.load` classmethod to handle
@@ -5501,7 +5606,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             tag (str | None) :
                 Name of the dataset for display purposes, and does not
                 influence behavior of the underlying data structure, although
-                it may be used via convinience methods. We attempt to
+                it may be used via convenience methods. We attempt to
                 autopopulate this via information in ``data`` if available.
                 If unspecfied and ``data`` is a filepath this becomes the
                 basename.
@@ -5711,7 +5816,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         self._infer_dirs()
 
         if autobuild:
-            self._build_index()
+            self.rebuild_index()
 
     @property
     def fpath(self):
@@ -5831,7 +5936,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """
         Constructor from a list of images paths.
 
-        This is a convinience method.
+        This is a convenience method.
 
         Args:
             gpaths (List[str]): list of image paths
@@ -5981,7 +6086,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         SeeAlso:
             * coerce_multiple - like this function but accepts general
-                coercable inputs.
+                coercible inputs.
         """
         import kwcoco
         _loader = kwcoco.CocoDataset
@@ -6053,7 +6158,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             union (str | bool): If True, unions the result
                 datasets after loading. If False, just returns the result list.
-                If 'try', then try to preform the union, but return the result
+                If 'try', then try to perform the union, but return the result
                 list if it fails. Default='try'
 
         Note:
@@ -6103,7 +6208,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new.hashid_parts = copy.deepcopy(self.hashid_parts)
         new.dataset = copy.deepcopy(self.dataset)
         new._next_ids = _NextId(new)
-        new._build_index()
+        new.rebuild_index()
         return new
 
     def __nice__(self):
@@ -6369,7 +6474,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # checking if the newly constructed index is the same as this index.
         new_dataset = copy.deepcopy(self.dataset)
         new = self.__class__(new_dataset, autobuild=False)
-        new._build_index()
+        new.rebuild_index()
         checks = {}
         checks['anns'] = self.index.anns == new.index.anns
         checks['imgs'] = self.index.imgs == new.index.imgs
@@ -6475,6 +6580,14 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         return True
 
     def _build_index(self):
+        # use rebuild_index instead
+        # ub.schedule_deprecation
+        self.index.build(self)
+
+    def rebuild_index(self):
+        """
+        Build or rebuild the fast lookup index.
+        """
         self.index.build(self)
 
     def union(*others, disjoint_tracks=True, remember_parent=False, **kwargs):
@@ -6511,8 +6624,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> # Test union works with different keypoint categories
             >>> dset1 = kwcoco.CocoDataset.demo('shapes1')
             >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
-            >>> dset1.remove_keypoint_categories(['bot_tip', 'mid_tip', 'right_eye'])
-            >>> dset2.remove_keypoint_categories(['top_tip', 'left_eye'])
+            >>> dset1.remove_keypoint_categories(['bot_tip', 'mid_tip', 'right_eye'], clean_anns=True)
+            >>> dset2.remove_keypoint_categories(['top_tip', 'left_eye'], clean_anns=True)
             >>> dset_12a = kwcoco.CocoDataset.union(dset1, dset2)
             >>> dset_12b = dset1.union(dset2)
             >>> dset_21 = dset2.union(dset1)
@@ -6533,7 +6646,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>>         dset1.anns[aid]['image_id'] = new_gid
             >>>     img['id'] = new_gid
             >>> dset1.index.clear()
-            >>> dset1._build_index()
+            >>> dset1.rebuild_index()
             >>> # ------
             >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
             >>> for new_gid, img in enumerate(dset2.dataset['images'], start=100):
@@ -6541,7 +6654,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>>         dset2.anns[aid]['image_id'] = new_gid
             >>>     img['id'] = new_gid
             >>> dset1.index.clear()
-            >>> dset2._build_index()
+            >>> dset2.rebuild_index()
             >>> others = [dset1, dset2]
             >>> merged = kwcoco.CocoDataset.union(*others)
             >>> print('merged = {!r}'.format(merged))
@@ -6720,7 +6833,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
                             old_reflect_id = new_kpcat.get('reflection_id', None)
                             if old_reflect_id is not None:
-                                # Temporarilly overwrite reflectid with name
+                                # Temporarily overwrite reflectid with name
                                 reflect_name = old_id_to_name.get(old_reflect_id, None)
                                 new_kpcat['reflection_id'] = reflect_name
                                 postproc_kpcats.append(new_kpcat)
@@ -6955,7 +7068,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             video_ids (List[int] | None):
                 list of video ids to copy into the new dataset.
-                This is a convinience argument that simply selects all image
+                This is a convenience argument that simply selects all image
                 ids associated with the given videos.
 
             copy (bool):
@@ -7145,7 +7258,7 @@ def demo_coco_data():
         # It probably does make sense to allow this to be specified in the
         # dictionary itself if we are constructing a CocoDataset class from it,
         # but we likely don't want to save it (or if we do it must be
-        # constantly updated to be corret)
+        # constantly updated to be correct)
         'img_root': img_root,
 
         'categories': [

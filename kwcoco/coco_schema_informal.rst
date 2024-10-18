@@ -1,3 +1,12 @@
+Informal KWCOCO Schema
+----------------------
+
+The original informal MSCOCO spec can be found here: http://cocodataset.org/#format-data
+
+.. .. todo: proper references to these files:
+
+Our formal spec is defined in ``./coco_schema.json``, which is derived from ``./coco_schema.py``
+
 An informal spec is as follows:
 
 .. code::
@@ -50,7 +59,7 @@ An informal spec is as follows:
                 'channels': <ChannelSpec>,   # a string encoding
                 'width':     <int>    # pixel width of image asset
                 'height':    <int>    # pixel height of image asset
-                'warp_aux_to_img': <TransformSpec>,  # tranform from "base" image space to auxiliary/asset space. (identity if unspecified)
+                'warp_aux_to_img': <TransformSpec>,  # transform from "base" image space to auxiliary/asset space. (identity if unspecified)
                 'quantization': <QuantizationSpec>,  # indicates that the underlying data was quantized
             }, ...
         ]
@@ -62,7 +71,7 @@ An informal spec is as follows:
     }
 
     TransformSpec:
-        The spec can be anything coercable to a kwimage.Affine object.
+        The spec can be anything coercible to a kwimage.Affine object.
         This can be an explicit affine transform matrix like:
             {'type': 'affine': 'matrix': <a-3x3 matrix>},
 
@@ -112,7 +121,7 @@ An informal spec is as follows:
         'weight' : float,
 
         'caption': str,  # a text caption for this annotation
-        'keypoints' : <Keypoints | List[int] > # an accepted keypoint format
+        'keypoints' : <Points | List[number] > # an accepted keypoint format
         'segmentation': <RunLengthEncoding | Polygon | MaskPath | WKT >,  # an accepted segmentation format
     }
 
@@ -123,7 +132,7 @@ An informal spec is as follows:
         'name': int,
     }
 
-    # A dataset bundles a manifest of all aformentioned data into one structure.
+    # A dataset bundles a manifest of all aforementioned data into one structure.
     dataset = {
         'categories': [category, ...],
         'videos': [video, ...]
@@ -151,7 +160,7 @@ An informal spec is as follows:
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
         encoding. We reuse the original C functions are in [PyCocoToolsMask]_
-        in ``kwimage.structs.Mask`` to provide a convinient way to abstract
+        in ``kwimage.structs.Mask`` to provide a convenient way to abstract
         this rather esoteric bytes encoding.
 
         For pure python implementations see kwimage:
@@ -162,7 +171,7 @@ An informal spec is as follows:
             For compatibility with the COCO specs ensure the binary flags
             for these functions are set to true.
 
-    Keypoints:
+    Points:
         Annotation keypoints may also be specified in this non-standard (but
         ultimately more general) way:
 
@@ -186,6 +195,21 @@ An informal spec is as follows:
         },...
         ]
 
+        Keypoint categories can also be defined on a per-object category level as in the original MSCOCO schema.
+        Each category dictionary is extended with fields:
+
+            categories[{
+                "keypoints": [str],
+                "skeleton": [edge],
+            }]
+
+        The original MSCOCO docs describe this format as: "Finally, for each
+        category, the categories struct has two additional fields: "keypoints,"
+        which is a length k array of keypoint names, and "skeleton", which
+        defines connectivity via a list of keypoint edge pairs and is used for
+        visualization."
+
+
         In this scheme the "keypoints" property of each annotation (which used
         to be a list of floats) is now specified as a list of dictionaries that
         specify each keypoints location, id, and visibility explicitly. This
@@ -197,6 +221,21 @@ An informal spec is as follows:
         keypoint categories.
 
         TODO: Support WTK
+
+        NEW IN VERSION 0.8.5: Column based keypoints:
+        These are still experimental
+
+        'annotations': [
+            {
+                'keypoints': {
+                    'x': List[number],
+                    'y': List[number],
+                    'visible': List[number],
+                    'keypoint_category_id': List[int],
+                    'keypoint_category': List[str],  # this can be specified instead of an id
+                }, ...
+            }, ...
+        ],
 
     Auxiliary Channels / Image Assets:
         For multimodal or multispectral images it is possible to specify
@@ -215,7 +254,7 @@ An informal spec is as follows:
             ]
         }
 
-        Note that specifing a filename / channels for the base image is not
+        Note that specifying a filename / channels for the base image is not
         necessary, and mainly useful for augmenting an existing single-image
         dataset with multimodal information. Typically if an image consists of
         more than one file, all file information should be stored in the

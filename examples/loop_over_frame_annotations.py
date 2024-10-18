@@ -27,4 +27,4 @@ for video_id in videos:
 
         # todo: Construct the buffered ignore polygons
         # subtract away the do_not_ignore_poly from them
-        # add them as new anotations with an "ignore" label.
+        # add them as new annotations with an "ignore" label.

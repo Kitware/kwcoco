@@ -2,7 +2,7 @@
 A wrapper around the basic kwcoco dataset with a pycocotools API.
 
 We do not recommend using this API because it has some idiosyncrasies, where
-names can be missleading and APIs are not always clear / efficient: e.g.
+names can be misleading and APIs are not always clear / efficient: e.g.
 
 (1) catToImgs returns integer image ids but imgToAnns returns annotation
     dictionaries.

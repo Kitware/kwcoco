@@ -3,7 +3,7 @@ KWCOCO Views / Spaces
 
 NOTE:
 
-We are working on improving termonology and data structures when discussing
+We are working on improving terminology and data structures when discussing
 this topic. Not all documentation may be up to date. There are several things
 to be aware of.
 
@@ -100,9 +100,9 @@ The following visualizes these key spaces:
 .. image:: https://i.imgur.com/QuiSJwR.png
 
 
-NOTE: we use the terms "auxiliary" and "asset" interchangably. The code was
+NOTE: we use the terms "auxiliary" and "asset" interchangeably. The code was
 originally written using "auxiliary", but we later switched to "asset".
-Termonology will vary based on when something was written, eventually we will
+Terminology will vary based on when something was written, eventually we will
 deprecate all instances of "auxiliary" and only refer to "assets".
 
 Each "asset" / "auxiliary" dictionary, if they exist, contains a
@@ -118,7 +118,7 @@ transform (i.e. no change), so they are only needed if your on-disk data is not
 already aligned (which can be desirable to save disk-space and reduce
 resampling artifacts).
 
-The transform dictionaries can be in any format coercable by
+The transform dictionaries can be in any format coercible by
 :class:`kwimage.Affine<kwimage.transforms.Affine>`.
 
 The :class:`kwcoco.CocoDataset<kwcoco.coco_dataset.CocoDataset>` also exposes
@@ -142,12 +142,12 @@ method, which can be used to access image information in image or video space.
     # specified. These are all fused together to reduce resampling
     # artifacts.
     img_delayed = self.delayed_load(gid, space='image')
-    # Execture all transforms
+    # Execute all transforms
     img_final = img_delayed.finalize()
 
     #
     vid_delayed = self.delayed_load(gid, space='image')
-    # Execture all transforms
+    # Execute all transforms
     vid_final = vid_delayed.finalize()
 
 Currently the ``warp_img_to_vid`` transform in the demo

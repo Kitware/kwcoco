@@ -85,7 +85,7 @@ KWCOCO_KEYPOINT = OBJECT(
         'keypoint_category': STRING(description='only to be used as a hint')
     },
     title='KWCOCO_KEYPOINT',
-    descripton='A new-style point',
+    description='A new-style point',
 )
 
 KWCOCO_POLYGON = OBJECT(
@@ -105,7 +105,7 @@ KWCOCO_POLYGON = OBJECT(
 
 
 ORIG_COCO_KEYPOINTS = ARRAY(
-    INTEGER,
+    NUMBER,
     description='An old-style set of keypoints (x1,y1,v1,...,xk,yk,vk)',
     title='MSCOCO_KEYPOINTS'
 )

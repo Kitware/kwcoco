@@ -127,7 +127,7 @@ def remap_category_ids_demo():
     It's also worth noting that the id's in each object are meant to be internal
     and not used by an external program expecting persistence. So in code like
     kwcoco eval, when I have to handle categories in two coco files, I use the
-    category names to build a mapping from category ids betwen the files.
+    category names to build a mapping from category ids between the files.
 
 
     A bit of custom code like this should help fix the issue.  As long as you

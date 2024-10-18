@@ -91,7 +91,7 @@ def concice_si_display(val, eps=1e-8, precision=2, si_thresh=4):
 
     Args:
         eps (float):
-            threshold to be formated as an integer if other integer conditions
+            threshold to be formatted as an integer if other integer conditions
             hold.
 
         precision (int):

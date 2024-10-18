@@ -4,7 +4,7 @@ Helpers for labelme files
 import ubelt as ub
 
 
-def labelme_to_coco_structure(labelme_data):
+def labelme_to_coco_structure(labelme_data, special_options=True):
     """
     Helper to convert labelme data into dictionaries suitable for adding to a
     CocoDataset.
@@ -34,6 +34,14 @@ def labelme_to_coco_structure(labelme_data):
         >>>             'points': [[1346.0, 2285.5], [1318.0, 2282.5], [1370.5, 2241.0], [1360.5, 2258.0], [1357.5, 2272.0], [1354.5, 2278.0]],
         >>>             'shape_type': 'polygon',
         >>>         },
+        >>>         {
+        >>>             'description': 'image level description',
+        >>>             'flags': {},
+        >>>             'group_id': None,
+        >>>             'label': '__metadata__',
+        >>>             'points': [[1346.0, 2285.5]],
+        >>>             'shape_type': 'point',
+        >>>         },
         >>>     ],
         >>>     'version': '5.3.1',
         >>> }
@@ -56,30 +64,40 @@ def labelme_to_coco_structure(labelme_data):
             print(f'unhandled shape = {ub.urepr(shape, nl=1)}')
             raise NotImplementedError(f'groupid: {shape}')
 
-        if shape['description']:
-            desc = shape['description']
-            if desc is not None and desc.strip():
-                desc = desc.strip()
-                img['tags'] = desc.split(';')
-                # print(f'unhandled esc = {ub.urepr(desc, nl=1)}')
-                # raise NotImplementedError(f'desc: {shape}')
+        desc = shape.get('description', None)
+        if desc is not None and not desc.strip():
+            desc = None
+        # else:
+        #     tags = desc.split(';')
+        #     # raise NotImplementedError(f'desc: {shape}')
+
         shape_type = shape['shape_type']
-
-        if shape_type != 'polygon':
-            raise NotImplementedError(shape_type)
-
         flags = shape['flags']
         if flags:
             raise NotImplementedError('flags')
 
         category_name = shape['label']
-        poly = kwimage.Polygon.coerce(np.array(points))
-
-        ann = {
-            'category_name': category_name,
-            'bbox': poly.box().quantize().to_coco(),
-            'segmentation': poly.to_coco(style='new'),
-        }
-        anns.append(ann)
+        if shape_type == 'polygon':
+            poly = kwimage.Polygon.coerce(np.array(points))
+            ann = {
+                'category_name': category_name,
+                'bbox': poly.box().quantize().to_coco(),
+                'segmentation': poly.to_coco(style='new'),
+            }
+            anns.append(ann)
+        elif shape_type == 'point':
+            if special_options:
+                # Handle points in a special case.
+                if category_name == '__metadata__':
+                    if desc is not None:
+                        if img.get('description'):
+                            raise AssertionError('Multiple metadata points in an image')
+                        img['description'] = desc
+                else:
+                    raise NotImplementedError(shape_type)
+            else:
+                raise NotImplementedError(shape_type)
+        else:
+            raise NotImplementedError(shape_type)
 
     return img, anns

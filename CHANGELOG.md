@@ -5,7 +5,25 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.4 - Unreleased
+## Version 0.8.5 - Unreleased
+
+### Fixed
+* Fix broken paths in camvid converter
+* fixed issues when converting segmentations to legacy mscoco format
+* Issue with `image_filepath` in CocoImage / CocoAsset
+
+### Added
+* Added `CocoDataset.add_categories`
+* Users can now specify sensorchan for toydata videos to get a custom sensor/channel arrangement
+* Added `flatten` method to `ObjectGroups`.
+* Add public `rebuild_index` function which should be used instead of `_build_index`.
+
+### Changed
+* Set verbose default of reroot to 0 to match documentation.
+* `rich` is now a runtime requirement.
+
+
+## Version 0.8.4 - Released 2024-09-10
 
 ### Changed
 
@@ -270,7 +288,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * demo data now has the ability to render on top of a background image.
 
 ### Fixed
-* Fixed sqlalchemy 2.x compatability
+* Fixed sqlalchemy 2.x compatibility
 * The track index now works properly with SQL variants and returns ordreing
 
 

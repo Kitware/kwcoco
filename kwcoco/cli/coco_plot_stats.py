@@ -381,7 +381,7 @@ def build_stats_data(dset):
                 geom = poly.to_shapely()
             except Exception:
                 # Masks with linestrings can get misinterpreted, but we can fix
-                # them by considering pixels as areas isntead of points
+                # them by considering pixels as areas instead of points
                 sseg = ann.get('segmentation', None)
                 if sseg is not None:
                     mask = kwimage.Mask.coerce(sseg)
@@ -586,7 +586,7 @@ class Plots:
 class BuiltinPlots:
     """
     A class that ONLY contains methods that will produce a plot.
-    This is used to regeister them with :class:`Plots`.
+    This is used to register them with :class:`Plots`.
     """
 
     def polygon_centroid_absolute_distribution(self):
