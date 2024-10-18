@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Issue with `image_filepath` in CocoImage / CocoAsset
 
 ### Added
+* Added `CocoDataset.add_categories`
 * Users can now specify sensorchan for toydata videos to get a custom sensor/channel arrangement
 * Added `flatten` method to `ObjectGroups`.
 

@@ -4205,6 +4205,35 @@ class MixinCocoAddRemove:
             id = cat['id']
         return id
 
+    def add_categories(self, cats):
+        """
+        Faster less-safe multi-item alternative to add_category.
+
+        We assume the items are well formatted in kwcoco compliant
+        dictionaries, including the "id" field. No validation checks are made
+        when calling this function, but the index is updated, and the hashid is
+        invalidated.
+
+        Args:
+            cats (List[Dict]): list of category dictionaries
+
+        SeeAlso:
+            :func:`add_category`
+            :func:`add_categories`
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo()
+            >>> cats = [self.cats[cid] for cid in [2, 3, 5, 7]]
+            >>> self.remove_categories(cats)
+            >>> assert self.n_cats == 4 and self._check_integrity()
+            >>> self.add_categories(cats)
+            >>> assert self.n_cats == 8 and self._check_integrity()
+        """
+        self.dataset['categories'].extend(cats)
+        self.index._add_categories(cats)
+        self._invalidate_hashid(['categories'])
+
     def add_annotations(self, anns):
         """
         Faster less-safe multi-item alternative to add_annotation.
@@ -5001,6 +5030,16 @@ class CocoIndex:
                 else:
                     index.trackid_to_aids[tid] = index._annots_set_sorted_by_frame_index()
                 index.trackid_to_aids[tid].add(aid)
+
+    def _add_categories(index, cats):
+        if index.cats is not None:
+            ids = [obj['id'] for obj in cats]
+            names = [obj['name'] for obj in cats]
+            new_objs = dict(zip(ids, cats))
+            index.cats.update(new_objs)
+            for cid, cat, name in zip(ids, cats, names):
+                index.cid_to_aids[cid] = index._set()
+                index.name_to_cat[name] = cat
 
     def _add_annotations(index, anns):
         if index.anns is not None:
