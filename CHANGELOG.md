@@ -16,6 +16,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Added `CocoDataset.add_categories`
 * Users can now specify sensorchan for toydata videos to get a custom sensor/channel arrangement
 * Added `flatten` method to `ObjectGroups`.
+* Add public `rebuild_index` function which should be used instead of `_build_index`.
 
 ### Changed
 * Set verbose default of reroot to 0 to match documentation.

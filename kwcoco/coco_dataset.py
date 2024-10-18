@@ -1611,7 +1611,7 @@ class MixinCocoExtras:
                 rebuild = True
 
         if rebuild:
-            self._build_index()
+            self.rebuild_index()
         else:
             self.index.clear()
         self._invalidate_hashid()
@@ -5258,6 +5258,7 @@ class CocoIndex:
         anns, cats, imgs = {}, {}, {}
         videos = {}
         tracks = {}
+        kpcats = {}
 
         # Build one-to-one index-lookup maps
         for cat in parent.dataset.get('categories', []):
@@ -5267,6 +5268,14 @@ class CocoIndex:
                     'Categories have the same id in {}:\n{} and\n{}'.format(
                         parent, cats[cid], cat))
             cats[cid] = cat
+
+        for obj in parent.dataset.get('keypoint_categories', []):
+            cid = obj['id']
+            if cid in obj:
+                warnings.warn(
+                    'Keypoint objegories have the same id in {}:\n{} and\n{}'.format(
+                        parent, kpcats[cid], obj))
+            kpcats[cid] = obj
 
         for video in parent.dataset.get('videos', []):
             vidid = video['id']
@@ -5381,11 +5390,12 @@ class CocoIndex:
             'annotations': anns,
             'videos': videos,
             'tracks': tracks,
+            'keypoint_categories': kpcats,
         }
         index.anns = anns
         index.imgs = imgs
         index.cats = cats
-        index.kpcats = None  # TODO
+        index.kpcats = kpcats
         index.videos = videos
         index.tracks = tracks
 
@@ -5802,7 +5812,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         self._infer_dirs()
 
         if autobuild:
-            self._build_index()
+            self.rebuild_index()
 
     @property
     def fpath(self):
@@ -6194,7 +6204,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new.hashid_parts = copy.deepcopy(self.hashid_parts)
         new.dataset = copy.deepcopy(self.dataset)
         new._next_ids = _NextId(new)
-        new._build_index()
+        new.rebuild_index()
         return new
 
     def __nice__(self):
@@ -6460,7 +6470,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # checking if the newly constructed index is the same as this index.
         new_dataset = copy.deepcopy(self.dataset)
         new = self.__class__(new_dataset, autobuild=False)
-        new._build_index()
+        new.rebuild_index()
         checks = {}
         checks['anns'] = self.index.anns == new.index.anns
         checks['imgs'] = self.index.imgs == new.index.imgs
@@ -6566,6 +6576,14 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         return True
 
     def _build_index(self):
+        # use rebuild_index instead
+        # ub.schedule_deprecation
+        self.index.build(self)
+
+    def rebuild_index(self):
+        """
+        Build or rebuild the fast lookup index.
+        """
         self.index.build(self)
 
     def union(*others, disjoint_tracks=True, remember_parent=False, **kwargs):
@@ -6624,7 +6642,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>>         dset1.anns[aid]['image_id'] = new_gid
             >>>     img['id'] = new_gid
             >>> dset1.index.clear()
-            >>> dset1._build_index()
+            >>> dset1.rebuild_index()
             >>> # ------
             >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
             >>> for new_gid, img in enumerate(dset2.dataset['images'], start=100):
@@ -6632,7 +6650,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>>         dset2.anns[aid]['image_id'] = new_gid
             >>>     img['id'] = new_gid
             >>> dset1.index.clear()
-            >>> dset2._build_index()
+            >>> dset2.rebuild_index()
             >>> others = [dset1, dset2]
             >>> merged = kwcoco.CocoDataset.union(*others)
             >>> print('merged = {!r}'.format(merged))
