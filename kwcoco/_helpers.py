@@ -233,3 +233,133 @@ def _image_corruption_check(fpath, only_shape=False, imread_kwargs=None):
             info['failed'] = True
             info['error'] = err
     return info
+
+
+def _query_image_ids(coco_dset, select_images=None, select_videos=None):
+    """
+    Filters to a specific set of images given query parameters based on
+    json-query (jq).
+
+    Args:
+        select_images(str | None):
+            A json query (via the jq spec) that specifies which images
+            belong in the subset. Note, this is a passed as the body of
+            the following jq query format string to filter valid ids
+            '.images[] | select({select_images}) | .id'.
+
+            Examples for this argument are as follows:
+            '.id < 3' will select all image ids less than 3.
+            '.file_name | test(".*png")' will select only images with
+            file names that end with png.
+            '.file_name | test(".*png") | not' will select only images
+            with file names that do not end with png.
+            '.myattr == "foo"' will select only image dictionaries
+            where the value of myattr is "foo".
+            '.id < 3 and (.file_name | test(".*png"))' will select only
+            images with id less than 3 that are also pngs.
+            '.myattr | in({"val1": 1, "val4": 1})' will take images
+            where myattr is either val1 or val4.
+            An alternative syntax is:
+            '[.myattr] | inside(["val1", "val4"])'
+
+            Requires the "jq" python library is installed.
+
+        select_videos(str | None):
+            A json query (via the jq spec) that specifies which videos
+            belong in the subset. Note, this is a passed as the body of
+            the following jq query format string to filter valid ids
+            '.videos[] | select({select_images}) | .id'.
+
+            Examples for this argument are as follows:
+            '.file_name | startswith("foo")' will select only videos
+            where the name starts with foo. or
+            '.file_name | contains("foo")' will select videos where
+            any part of the filename contains foo.
+
+            Only applicable for dataset that contain videos.
+
+            Requires the "jq" python library is installed.
+
+    SeeAlso:
+        Based on ~/code/geowatch/geowatch/utils/kwcoco_extensions.py::filter_image_ids
+
+    Example:
+        >>> # xdoctest: +REQUIRES(module:jq)
+        >>> from kwcoco._helpers import _query_image_ids
+        >>> import kwcoco
+        >>> coco_dset = kwcoco.CocoDataset.demo('vidshapes8')
+        >>> _query_image_ids(coco_dset, select_images='.id < 3')
+        >>> _query_image_ids(coco_dset, select_images='.file_name | test(".*.png")')
+        >>> _query_image_ids(coco_dset, select_images='.file_name | test(".*.png") | not')
+        >>> _query_image_ids(coco_dset, select_images='.id < 3 and (.file_name | test(".*.png"))')
+        >>> _query_image_ids(coco_dset, select_images='.id < 3 or (.file_name | test(".*.png"))')
+
+    Ignore:
+        # JQ Dev examples
+        import jq
+        dataset = [
+            {'id': 1, 'name': 'foo'},
+            {'id': 2, 'name': 'bar'},
+            {'id': 3, 'name': 'baz'},
+            {'id': 4, 'name': 'biz'},
+        ]
+        # The IN keyword doesnt seem to do what I want very well
+        # jq.compile('.[] | select(.id | IN([1, 3]))').input(dataset).all()
+
+        # This sorta works
+        jq.compile('.[] | select(.id as $id | [1, 3] | index($id) != null)').input(dataset).all()
+
+        # THERE WE GO, this is more reasonable
+        jq.compile('.[] | select([.id] | inside([1, 3]))').input(dataset).all()
+        jq.compile('.[] | select([.id] | inside([2, 4]))').input(dataset).all()
+        jq.compile('.[] | select([.name] | inside(["foo", "baz"]))').input(dataset).all()
+
+        jq.compile('.[] | select(.id < 3)').input(dataset).all()
+        jq.compile('.[] | select(.name | test("b.*"))').input(dataset).all()
+
+    """
+    import ubelt as ub
+    # Start with all images
+    valid_gids = set(coco_dset.images())
+
+    if select_images is not None:
+        try:
+            import jq
+        except Exception:
+            print('The jq library is required to run a generic image query')
+            raise
+
+        try:
+            query_text = ".images[] | select({}) | .id".format(select_images)
+            query = jq.compile(query_text)
+            image_selected_gids = set(query.input(coco_dset.dataset).all())
+            valid_gids &= image_selected_gids
+        except Exception as ex:
+            print('JQ Query Failed: {}, ex={}'.format(query_text, ex))
+            raise
+
+    if select_videos is not None:
+
+        if isinstance(select_videos, list):
+            # Interpret as video_ids
+            ...
+        else:
+            try:
+                import jq
+            except Exception:
+                print('The jq library is required to run a generic image query')
+                raise
+
+            try:
+                query_text = ".videos[] | select({}) | .id".format(select_videos)
+                query = jq.compile(query_text)
+                selected_vidids = query.input(coco_dset.dataset).all()
+                vid_selected_gids = set(ub.flatten(coco_dset.index.vidid_to_gids[vidid]
+                                                   for vidid in selected_vidids))
+                valid_gids &= vid_selected_gids
+            except Exception:
+                print('JQ Query Failed: {}'.format(query_text))
+                raise
+
+    valid_gids = sorted(valid_gids)
+    return valid_gids

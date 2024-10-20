@@ -105,10 +105,55 @@ class SegmentationEvalConfig(scfg.DataConfig):
     draw_heatmaps = scfg.Value('auto', help='flag to draw heatmaps or not', tags=['perf_param'])
     draw_legend = scfg.Value(True, help='enable/disable the class legend', tags=['perf_param'])
     draw_weights = scfg.Value(False, help='enable/disable pixel weight visualization', tags=['perf_param'])
+
+    draw_components = scfg.Value(False, help='if True, draw individual components of the heatmap plots', tags=['perf_param'])
+    draw_burnin = scfg.Value(False, help='if True, burn in text on images for label purposes', tags=['perf_param'])
+
     viz_thresh = scfg.Value('auto', help='visualization threshold')
 
     workers = scfg.Value('auto', help='number of parallel scoring workers', tags=['perf_param'])
     draw_workers = scfg.Value('auto', help='number of parallel drawing workers', tags=['perf_param'])
+
+    select_images = scfg.Value(
+        None, type=str, help=ub.paragraph(
+            '''
+            A json query (via the jq spec) that specifies which images
+            belong in the subset. Note, this is a passed as the body of
+            the following jq query format string to filter valid ids
+            '.images[] | select({select_images}) | .id'.
+
+            Examples for this argument are as follows:
+            '.id < 3' will select all image ids less than 3.
+            '.file_name | test(".*png")' will select only images with
+            file names that end with png.
+            '.file_name | test(".*png") | not' will select only images
+            with file names that do not end with png.
+            '.myattr == "foo"' will select only image dictionaries
+            where the value of myattr is "foo".
+            '.id < 3 and (.file_name | test(".*png"))' will select only
+            images with id less than 3 that are also pngs.
+            .myattr | in({"val1": 1, "val4": 1}) will take images
+            where myattr is either val1 or val4.
+
+            Requries the "jq" python library is installed.
+            '''))
+
+    select_videos = scfg.Value(
+        None, help=ub.paragraph(
+            '''
+            A json query (via the jq spec) that specifies which videos
+            belong in the subset. Note, this is a passed as the body of
+            the following jq query format string to filter valid ids
+            '.videos[] | select({select_images}) | .id'.
+
+            Examples for this argument are as follows:
+            '.name | startswith("foo")' will select only videos
+            where the name starts with foo.
+
+            Only applicable for dataset that contain videos.
+
+            Requries the "jq" python library is installed.
+            '''))
 
 
 def main(cmdline=True, **kwargs):
@@ -797,6 +842,8 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
 
     resolution = config.get('resolution', None)
     draw_legend = config.get('draw_legend', True)
+    DRAW_VIZ_COMPONENTS = config.get('draw_components', False)
+    draw_burnin = config.get('draw_burnin', False)
 
     # Make a legend
     color01_lut = color_lut / 255.0
@@ -825,6 +872,7 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
         legend_img = None
 
     # Draw predictions on each frame
+    frame_parts = {}
     parts = []
     frame_nums = []
     true_gids = []
@@ -875,9 +923,9 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
             # image=None,
             text=image_header_text, color='red', stack=False)
 
-        vert_parts = [
-            header,
-        ]
+        vert_parts = {}
+        vert_parts['header'] = header
+
         DRAW_WEIGHTS = config.get('draw_weights', False)
 
         if 'catname_to_prob' in info:
@@ -903,10 +951,11 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
             # true_overlay = true_heatmap.colorize('class_probs')[..., 0:3]
             true_overlay = draw_truth_borders(true_dets, true_overlay, alpha=1.0)
             true_overlay = kwimage.ensure_uint255(true_overlay)
-            true_overlay = kwimage.draw_text_on_image(
-                true_overlay, 'true class', org=(1, 1), valign='top',
-                color=TRUE_GREEN, border=1)
-            vert_parts.append(true_overlay)
+            if draw_burnin:
+                true_overlay = kwimage.draw_text_on_image(
+                    true_overlay, 'true class', org=(1, 1), valign='top',
+                    color=TRUE_GREEN, border=1)
+            vert_parts['class_truth'] = true_overlay
 
             if DRAW_WEIGHTS:
                 class_weights = info['class_weights']
@@ -919,12 +968,13 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
                     weight_image = class_weights
                     weight_title = 'weights'
                 weight_image = kwimage.ensure_uint255(weight_image)
-                weight_image = kwimage.draw_text_on_image(
-                    weight_image,
-                    weight_title,
-                    org=(1, 1), valign='top',
-                    color='pink', border=1)
-                vert_parts.append(weight_image)
+                if draw_burnin:
+                    weight_image = kwimage.draw_text_on_image(
+                        weight_image,
+                        weight_title,
+                        org=(1, 1), valign='top',
+                        color='pink', border=1)
+                vert_parts['class_weights'] = weight_image
 
             pred_overlay = colorize_class_probs(pred_cat_ohe, pred_classes)[..., 0:3]
             # pred_heatmap = kwimage.Heatmap(class_probs=pred_cat_ohe, classes=pred_classes)
@@ -932,10 +982,11 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
             pred_overlay = draw_truth_borders(true_dets, pred_overlay, alpha=0.05, color='white')
             # pred_overlay = draw_truth_borders(true_dets, pred_overlay, alpha=0.05)
             pred_overlay = kwimage.ensure_uint255(pred_overlay)
-            pred_overlay = kwimage.draw_text_on_image(
-                pred_overlay, 'pred class', org=(1, 1), valign='top',
-                color=PRED_BLUE, border=1)
-            vert_parts.append(pred_overlay)
+            if draw_burnin:
+                pred_overlay = kwimage.draw_text_on_image(
+                    pred_overlay, 'pred class', org=(1, 1), valign='top',
+                    color=PRED_BLUE, border=1)
+            vert_parts['class_heatmap'] = pred_overlay
 
         if 'pred_saliency' in info:
             pred_saliency = info['pred_saliency'].astype(np.uint8)
@@ -944,14 +995,14 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
             confusion_idxs = draw_confusion_image(pred_saliency, true_saliency)
             confusion_image = color_lut[confusion_idxs]
             confusion_image = kwimage.ensure_uint255(confusion_image)
-            confusion_image = kwimage.draw_text_on_image(
-                confusion_image,
-                f'confusion saliency: thresh={saliency_thresh:0.3f}',
-                org=(1, 1), valign='top',
-                color='white', border=1)
-            vert_parts.append(
-                confusion_image
-            )
+            if draw_burnin:
+                confusion_image = kwimage.draw_text_on_image(
+                    confusion_image,
+                    f'confusion saliency: thresh={saliency_thresh:0.3f}',
+                    org=(1, 1), valign='top',
+                    color='white', border=1)
+
+            vert_parts['saliency_confusion'] = confusion_image
 
             if DRAW_WEIGHTS:
                 saliency_weights = info['saliency_weights']
@@ -964,12 +1015,13 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
                     weight_image = saliency_weights
                     weight_title = 'weights'
                 weight_image = kwimage.ensure_uint255(weight_image)
-                weight_image = kwimage.draw_text_on_image(
-                    weight_image,
-                    weight_title,
-                    org=(1, 1), valign='top',
-                    color='pink', border=1)
-                vert_parts.append(weight_image)
+                if draw_burnin:
+                    weight_image = kwimage.draw_text_on_image(
+                        weight_image,
+                        weight_title,
+                        org=(1, 1), valign='top',
+                        color='pink', border=1)
+                vert_parts['saliency_weights'] = weight_image
 
         elif 'true_saliency' in info:
             true_saliency = info['true_saliency']
@@ -978,10 +1030,12 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
                 true_saliency, with_alpha=0.5, cmap='plasma')
             # heatmap[invalid_mask] = 0
             heatmap_int = kwimage.ensure_uint255(heatmap[..., 0:3])
-            heatmap_int = kwimage.draw_text_on_image(
-                heatmap_int, 'true saliency', org=(1, 1), valign='top',
-                color=TRUE_GREEN, border=1)
-            vert_parts.append(heatmap_int)
+            if draw_burnin:
+                heatmap_int = kwimage.draw_text_on_image(
+                    heatmap_int, 'true saliency', org=(1, 1), valign='top',
+                    color=TRUE_GREEN, border=1)
+
+            vert_parts['saliency_heatmap'] = heatmap_int
         # confusion_image = kwimage.draw_text_on_image(
         #     confusion_image, image_text, org=(1, 1), valign='top',
         #     color='white', border={'color': 'black'})
@@ -1029,20 +1083,23 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
                 heatmap = kwimage.fill_nans_with_checkers(heatmap)
                 # heatmap[invalid_mask] = 0
                 heatmap_int = kwimage.ensure_uint255(heatmap[..., 0:3])
-                heatmap_int = kwimage.draw_text_on_image(
-                    heatmap_int, 'pred saliency', org=(1, 1), valign='top',
-                    color=PRED_BLUE, border=1)
-                vert_parts.append(heatmap_int)
+                if draw_burnin:
+                    heatmap_int = kwimage.draw_text_on_image(
+                        heatmap_int, 'pred saliency', org=(1, 1), valign='top',
+                        color=PRED_BLUE, border=1)
+                vert_parts['salient_pred'] = heatmap_int
                 # if real_image_norm is not None:
                 #     overlaid = kwimage.overlay_alpha_layers([heatmap, real_image_norm.mean(axis=2)])
                 #     overlaid = kwimage.ensure_uint255(overlaid[..., 0:3])
                 #     vert_parts.append(overlaid)
 
         if real_image_int is not None:
-            vert_parts.append(real_image_int)
+            vert_parts['input_image'] = real_image_int
 
-        vert_parts = [kwimage.ensure_uint255(c) for c in vert_parts]
-        vert_stack = kwimage.stack_images(vert_parts, axis=0)
+        vert_parts = {k: kwimage.ensure_uint255(c) for k, c in vert_parts.items()}
+        vert_stack = kwimage.stack_images(list(vert_parts.values()), axis=0)
+        if DRAW_VIZ_COMPONENTS:
+            frame_parts[true_gid] = vert_parts
         parts.append(vert_stack)
 
     max_frame = None if len(frame_nums) == 0 else max(frame_nums)
@@ -1089,9 +1146,12 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
     header = kwimage.draw_header_text(
         {'width': plot_canvas.shape[1]}, canvas_title)
     plot_canvas = kwimage.stack_images([header, plot_canvas], axis=0)
+
     plot_info = {}
     plot_info['vidname_part'] = vidname_part
     plot_info['plot_fstem'] = plot_fstem
+    if DRAW_VIZ_COMPONENTS:
+        plot_info['frame_parts'] = frame_parts
     return plot_canvas, plot_info
 
 
@@ -1101,13 +1161,26 @@ def dump_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
     """
     Draw and write a sequence of true/pred image predictions
     """
+    config = config or {}
+    DRAW_VIZ_COMPONENTS = config.get('draw_components', False)
     plot_canvas, plot_info = draw_chunked_confusion(
         full_classes, true_coco_imgs, chunk_info, title=title, config=config)
 
     vidname_part = plot_info['vidname_part']
     plot_fstem = plot_info['plot_fstem']
-
     heatmap_dpath = ub.Path(str(heatmap_dpath))
+
+    if DRAW_VIZ_COMPONENTS:
+        frame_parts = plot_info['frame_parts']
+        components_dpath = heatmap_dpath / '_components'
+        components_dpath.ensuredir()
+        for gid, vert_parts in frame_parts.items():
+            gid_dpath = components_dpath / f'_img_{gid:05d}'
+            gid_dpath.ensuredir()
+            for key, part in vert_parts.items():
+                part_fpath = gid_dpath / (key + '.jpg')
+                kwimage.imwrite(part_fpath, part)
+
     vid_plot_dpath = (heatmap_dpath / vidname_part).ensuredir()
     plot_fpath = vid_plot_dpath / (plot_fstem + '.jpg')
     kwimage.imwrite(str(plot_fpath), plot_canvas)
@@ -1273,8 +1346,16 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
         # otherwise assume that we should restirct to marked images
         required_marked = any(pred_coco.images().lookup('has_predictions', False))
 
+    # Handle user-specified filter
+    from kwcoco._helpers import _query_image_ids
+    valid_image_ids = _query_image_ids(
+        true_coco,
+        config.get('select_images', None),
+        config.get('select_videos', None)
+    )
     matches  = associate_images(
-        true_coco, pred_coco, key_fallback='id')
+        true_coco, pred_coco, key_fallback='id',
+        valid_image_ids=valid_image_ids)
 
     video_matches = matches['video']
     image_matches = matches['image']
@@ -1673,7 +1754,7 @@ def _max_digits(max_num):
 
 
 @profile
-def associate_images(dset1, dset2, key_fallback=None):
+def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
     """
     Builds an association between image-ids in two datasets.
 
@@ -1689,6 +1770,9 @@ def associate_images(dset1, dset2, key_fallback=None):
         key_fallback (str):
             The fallback key to use if the image "name" is not specified.
             This can either be "file_name" or "id" or None.
+
+        valid_image_ids (set | None): if given, filter out matches where
+            the truth image ids are not in this set.
 
     TODO:
         - [ ] port to kwcoco proper
@@ -1795,6 +1879,20 @@ def associate_images(dset1, dset2, key_fallback=None):
         'image': image_matches,
         'video': video_matches,
     }
+
+    if valid_image_ids is not None:
+        # Filter invalid images
+        for item in video_matches + [image_matches]:
+            gids1 = item['match_gids1']
+            gids2 = item['match_gids1']
+            new_gids1 = []
+            new_gids2 = []
+            for gid1, gid2 in zip(gids1, gids2):
+                if gid1 in valid_image_ids:
+                    new_gids1.append(gid1)
+                    new_gids2.append(gid2)
+            item['match_gids1'] = new_gids1
+            item['match_gids2'] = new_gids2
     return matches
 
 
