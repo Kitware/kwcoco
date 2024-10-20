@@ -101,6 +101,9 @@ def concice_si_display(val, eps=1e-8, precision=2, si_thresh=4):
             If the number is less than 10^{si_thresh}, then it will be printed
             as an integer if it is within eps of an integer.
 
+    TODO:
+        port to kwplot.humanize
+
     References:
         https://docs.python.org/2/library/stdtypes.html#string-formatting-operations
 

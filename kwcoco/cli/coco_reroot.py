@@ -34,10 +34,10 @@ class CocoRerootCLI(scfg.DataConfig):
     old_prefix = scfg.Value(None, help=(
         'Old prefix to remove from the start of every image file name.'))
 
-    absolute = scfg.Value(True, help=(
+    absolute = scfg.Value(True, isflag=True, help=(
         'If False, the output file uses relative paths'))
 
-    check = scfg.Value(True, help=(
+    check = scfg.Value(True, isflag=True, help=(
         'If True, checks that all data exists'))
 
     autofix = scfg.Value(False, isflag=True, help=(
