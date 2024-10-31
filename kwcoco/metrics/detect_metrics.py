@@ -229,7 +229,7 @@ class DetectionMetrics(ub.NiceRepr):
     def classes(dmet):
         if dmet._classes is not None:
             return dmet._classes
-        # If the detection metrics object doest have a top-level class
+        # If the detection metrics object does not have a top-level class
         # list, then try to extract one from the ground truth.
         # Try to grab classes from the truth if they exist
         for dets in dmet.gid_to_true_dets.values():

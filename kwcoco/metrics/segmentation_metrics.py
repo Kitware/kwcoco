@@ -135,7 +135,7 @@ class SegmentationEvalConfig(scfg.DataConfig):
             .myattr | in({"val1": 1, "val4": 1}) will take images
             where myattr is either val1 or val4.
 
-            Requries the "jq" python library is installed.
+            Requires the "jq" python library is installed.
             '''))
 
     select_videos = scfg.Value(
@@ -152,7 +152,7 @@ class SegmentationEvalConfig(scfg.DataConfig):
 
             Only applicable for dataset that contain videos.
 
-            Requries the "jq" python library is installed.
+            Requires the "jq" python library is installed.
             '''))
 
 
