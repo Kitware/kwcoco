@@ -11,6 +11,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * `segmentation_metrics` now has the ability to dump components of its visualization for more flexible figure aggregation.
 * `segmentation_metrics` now has the ability to specify a subset of images to evaluate on.
 
+### Changed
+* The return type of `_ensure_imgsize` changed from a `List[Dict]` to a `Dict` with summary information. The old return value is accessable via the `"bad_images"` key in the new summary dictionary.
+
 
 ## Version 0.8.5 - Released 2024-10-18
 

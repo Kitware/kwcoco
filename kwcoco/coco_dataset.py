@@ -1290,16 +1290,23 @@ class MixinCocoExtras:
                anything size fails to load.
 
         Returns:
-            List[dict]: a list of "bad" image dictionaries where the size could
-                not be determined. Typically these are corrupted images and
-                should be removed.
+            Dict: summary: contains an overview of what was done / what failed.
+                Key/Value pairs are:
+                    message (str): overview of what happened
+                    bad_images (List[dict]):
+                        a list of "bad" image dictionaries where the size could
+                        not be determined. Typically these are corrupted images
+                        and should be removed.
+                    num_attempts (int): number of size read jobs attempted
+                    num_modified (int): number of images changed
+                    num_failed (int): number of images changed
 
         Example:
             >>> # Normal case
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
-            >>> bad_imgs = self._ensure_imgsize()
-            >>> assert len(bad_imgs) == 0
+            >>> summary = self._ensure_imgsize()
+            >>> assert len(summary['bad_images']) == 0
             >>> assert self.imgs[1]['width'] == 512
             >>> assert self.imgs[2]['width'] == 328
             >>> assert self.imgs[3]['width'] == 256
@@ -1307,12 +1314,13 @@ class MixinCocoExtras:
             >>> # Fail cases
             >>> self = kwcoco.CocoDataset()
             >>> self.add_image('does-not-exist.jpg')
-            >>> bad_imgs = self._ensure_imgsize()
-            >>> assert len(bad_imgs) == 1
+            >>> summary = self._ensure_imgsize()
+            >>> assert len(summary['bad_images']) == 1
             >>> import pytest
             >>> with pytest.raises(Exception):
             >>>     self._ensure_imgsize(fail=True)
         """
+        summary = {}
         bad_images = []
         if any('width' not in img or 'height' not in img
                for img in self.dataset['images']):
@@ -1335,6 +1343,9 @@ class MixinCocoExtras:
                             job = pool.submit(kwimage.load_image_shape, gpath)
                             job.obj = obj
 
+            summary['num_attempts'] = len(pool)
+            num_modified = 0
+
             for job in pool.as_completed(desc=desc, progkw={'verbose': verbose}):
                 try:
                     h, w = job.result()[0:2]
@@ -1345,7 +1356,15 @@ class MixinCocoExtras:
                 else:
                     job.obj['width'] = w
                     job.obj['height'] = h
-        return bad_images
+                    num_modified += 1
+            summary['num_modified'] = num_modified
+            summary['num_failed'] = len(bad_images)
+            summary['message'] = 'attempted to populated width/height'
+        else:
+            summary['message'] = 'all images had width/height keys, no work to be done'
+
+        summary['bad_images'] = bad_images
+        return summary
 
     def _ensure_image_data(self, gids=None, verbose=1):
         """
