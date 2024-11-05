@@ -15,6 +15,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * The return type of `_ensure_imgsize` changed from a `List[Dict]` to a `Dict` with summary information. The old return value is accessible via the `"bad_images"` key in the new summary dictionary.
 
 
+### Fixed
+* the `loadImgs`, `loadAnns`, and `loadCats` functions in the compat dataset now do the same thing as pycocotools
+
 ## Version 0.8.5 - Released 2024-10-18
 
 ### Fixed
