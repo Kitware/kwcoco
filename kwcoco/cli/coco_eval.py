@@ -162,6 +162,13 @@ def main(cmdline=True, **kw):
             fig_fpath = viz_dpath / 'eval-gid={}.jpg'.format(gid)
             kwimage.imwrite(fig_fpath, canvas)
 
+    try:
+        from rich import print as rich_print
+    except ImportError:
+        rich_print = print
+    else:
+        rich_print(f'Eval Dpath: [link={out_dpath}]{out_dpath}[/link]')
+
 
 if __name__ == '__main__':
     r"""
