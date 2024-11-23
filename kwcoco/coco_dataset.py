@@ -5850,9 +5850,23 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         self._infer_dirs()
 
     def _update_fpath(self, new_fpath):
-        # New method for more robustly updating the file path and bundle
-        # directory, still a WIP. Only works when the current dataset is
-        # already valid.
+        """
+        Update the write location for this dataset and reroot if necessary.
+
+        New method for more robustly updating the file path and bundle
+        directory, still a WIP. Only works when the current dataset is
+        already valid.
+
+        This is used when you are reading a source dataset, and modifying, and
+        then plan to write it to a new location. If the new location is in a
+        different bundle dpath than the original file, we need to reroot to
+        otherwise any relative paths will break.
+
+        We need to come up with a good name for this function.  I don't think
+        this should happen when just modifying the ``fpath`` property. But I
+        also don't know what a good name that indicates this sets fpath and
+        does a conditional reroot would be.
+        """
         if new_fpath is None:
             # Bundle directory is clobbered, so we should make everything
             # absolute

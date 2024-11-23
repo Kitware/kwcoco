@@ -8,7 +8,7 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
     Move assets and update corresponding kwcoco files as well
 
     NOTE:
-        The options: src and dst refer to folderes of asset, NOT kwcoco files.
+        The options: src and dst refer to folders of asset, NOT kwcoco files.
         Think about this the same way you think about moving files.  All kwcoco
         files that reference the moved assets need to be specified so they can
         have their paths updated. Unspecified kwcoco files may break.
