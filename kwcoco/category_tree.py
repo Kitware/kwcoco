@@ -183,6 +183,7 @@ class CategoryTree(ub.NiceRepr):
             List[Dict]: list of coco-style categories
 
         Example:
+            >>> import kwcoco
             >>> classes1 = kwcoco.CategoryTree.coerce([{'name': 'cat1'}, {'name': 'cat2', 'id': 1}])
             >>> assert classes1.id_to_node == {2: 'cat1', 1: 'cat2'}
             >>> classes2 = kwcoco.CategoryTree.coerce([{'name': 'cat4'}, {'name': 'cat5'}])
