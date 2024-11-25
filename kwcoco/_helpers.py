@@ -153,6 +153,57 @@ class UniqueNameRemapper(object):
         return name
 
 
+class _CategoryID_Remapper:
+    """
+    Helper for a category union that re-uses ids whenever possible.
+
+    Given an old category dictionary, calling :func:`remap` will return a new
+    category dictionary with updated properties if necessary.
+
+    Example:
+        >>> from kwcoco._helpers import _CategoryID_Remapper
+        >>> self = _CategoryID_Remapper()
+        >>> self.remap({'name': 'cat5', 'id': 5})
+        >>> self.remap({'name': 'cat6', 'id': 9})
+        >>> self.remap({'name': 'cat9', 'id': 5})
+        >>> self.remap({'name': 'cat5', 'id': 9, 'special_property': 5})
+        >>> assert self._id_to_cat == {
+        >>>     5: {'name': 'cat5', 'id': 5, 'special_property': 5},
+        >>>     9: {'name': 'cat6', 'id': 9},
+        >>>     10: {'name': 'cat9', 'id': 10}}
+    """
+    def __init__(self):
+        self._name_to_cat = {}
+        self._id_to_cat = {}
+        self._categories = []
+        self._nextid = 1
+
+    def remap(self, old_cat):
+        import ubelt as ub
+        catname = old_cat['name']
+        new_cat = self._name_to_cat.get(catname, None)
+        if new_cat is None:
+            old_id = old_cat['id']
+            if old_id in self._id_to_cat:
+                # Need to update the ID
+                new_id = self._nextid
+                self._nextid += 1
+            else:
+                new_id = old_id
+                if new_id >= self._nextid:
+                    self._nextid = new_id + 1
+            new_cat = {**old_cat}
+            new_cat['id'] = new_id
+            self._id_to_cat[new_id] = new_cat
+            self._name_to_cat[catname] = new_cat
+            self._categories.append(new_cat)
+        else:
+            # add in any special properties that dont disagree with
+            # what already has been seen
+            new_cat.update(ub.udict(old_cat) - new_cat.keys())
+        return new_cat
+
+
 # Defined as a global for pickle
 def _lut_image_frame_index(imgs, gid):
     return imgs[gid]['frame_index']

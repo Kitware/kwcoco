@@ -228,3 +228,28 @@ def test_duplicate_union_with_tracks_no_tracktable():
     print(f'annot_trackids2 = {ub.urepr(annot_trackids2, nl=0)}')
     assert track_names2 == []
     assert annot_trackids2 == [1, 1, 2, 2, 1, 1, 2, 2]
+
+
+def test_union_keeps_category_ids_consistent():
+    """
+    If two kwcoco files have the same exact categories the union should
+    preserve their structure.
+    """
+    import kwcoco
+    categories = [
+        {'id': 0, 'name': 'cat0'},
+        {'id': 1, 'name': 'cat1'},
+        {'id': 2, 'name': 'cat2'},
+        {'id': 3, 'name': 'cat3'},
+        {'id': 4, 'name': 'cat4'},
+        {'id': 5, 'name': 'cat5'}
+    ]
+    dset1 = kwcoco.CocoDataset()
+    dset2 = kwcoco.CocoDataset()
+    [dset1.ensure_category(**cat) for cat in categories]
+    [dset2.ensure_category(**cat) for cat in categories]
+
+    combo_dset = dset1.union(dset2)
+    assert combo_dset.dataset['categories'] == categories, (
+        "Categories were exactly the same, so they should be presereved"
+    )

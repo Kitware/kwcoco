@@ -80,6 +80,7 @@ from kwcoco._helpers import (
     _load_and_postprocess, _image_corruption_check
 )
 from kwcoco._helpers import _ID_Remapper
+from kwcoco._helpers import _CategoryID_Remapper
 
 import json as pjson
 from types import ModuleType
@@ -6728,7 +6729,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         TODO:
             - [ ] are supercategories broken?
             - [ ] reuse image ids where possible
-            - [ ] reuse annotation / category ids where possible
+            - [ ] reuse annotation ids where possible
+            - [x] reuse category ids where possible
             - [X] handle case where no inputs are given
             - [x] disambiguate track-ids
             - [x] disambiguate video-ids
@@ -6808,6 +6810,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             # doesn't have an associated track.
             hacked_track_id_map = _ID_Remapper(reuse=False)
 
+            # New category id remap strategy
+            global_catid_remaper = _CategoryID_Remapper()
+            merged['categories'] = global_catid_remaper._categories
+
             # If disjoint_tracks is True keep track of track-ids we've seen in
             # so far in previous datasets and ensure we dont reuse them.
             # TODO: do this Remapper class with other ids?
@@ -6829,23 +6835,14 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
                 # Add the categories into the merged dataset
                 for old_cat in old_dset['categories']:
-                    new_id = merged_cat_name_to_id.get(old_cat['name'], None)
                     # The same category might exist in different datasets.
-                    if new_id is None:
-                        # Only add if it does not yet exist
-                        new_id = len(merged_cat_name_to_id) + 1
-                        merged_cat_name_to_id[old_cat['name']] = new_id
-                        new_cat = _dict([
-                            ('id', new_id),
-                            ('name', old_cat['name']),
-                            # ('supercategory', old_cat['supercategory']),
-                        ])
-                        update_ifnotin(new_cat, old_cat)
-                        merged['categories'].append(new_cat)
+                    new_cat = global_catid_remaper.remap(old_cat)
+                    new_id = new_cat['id']
                     cat_id_map[old_cat['id']] = new_id
 
                 # Add the keypoint categories into the merged dataset
                 if 'keypoint_categories' in old_dset:
+                    # TODO: use _CategoryID_Remapper
                     if 'keypoint_categories' not in merged:
                         merged['keypoint_categories'] = []
                     old_id_to_name = {k['id']: k['name']
