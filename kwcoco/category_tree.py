@@ -181,6 +181,12 @@ class CategoryTree(ub.NiceRepr):
 
         Args:
             List[Dict]: list of coco-style categories
+
+        Example:
+            >>> classes1 = kwcoco.CategoryTree.coerce([{'name': 'cat1'}, {'name': 'cat2', 'id': 1}])
+            >>> assert classes1.id_to_node == {2: 'cat1', 1: 'cat2'}
+            >>> classes2 = kwcoco.CategoryTree.coerce([{'name': 'cat4'}, {'name': 'cat5'}])
+            >>> assert classes2.id_to_node == {1: 'cat4', 2: 'cat5'}
         """
         graph = OrderedDiGraph()
         for cat in categories:
@@ -220,6 +226,7 @@ class CategoryTree(ub.NiceRepr):
             >>> classes3 = kwcoco.CategoryTree.coerce(['class_1', 'class_2', 'class_3'])  # mutex list
             >>> classes4 = kwcoco.CategoryTree.coerce(classes1.graph)  # nx Graph
             >>> classes5 = kwcoco.CategoryTree.coerce(classes1)  # cls
+            >>> classes_09 = kwcoco.CategoryTree.coerce([{'name': 'cat1'}])
             >>> # xdoctest: +REQUIRES(module:ndsampler)
             >>> import ndsampler
             >>> classes6 = ndsampler.CategoryTree.coerce(3)
@@ -234,8 +241,12 @@ class CategoryTree(ub.NiceRepr):
             # A dictionary is assumed to be in a special json format
             self = cls.from_json(data, **kw)
         elif isinstance(data, list):
-            # A list is assumed to be a list of class names
-            self = cls.from_mutex(data, **kw)
+            if len(data) and isinstance(data[0], dict) and 'name' in data[0]:
+                # The list is likely a coco categoyr list
+                self = cls.from_coco(data, **kw)
+            else:
+                # A list is assumed to be a list of class names
+                self = cls.from_mutex(data, **kw)
         elif isinstance(data, nx.DiGraph):
             # A nx.DiGraph should represent the category tree
             self = cls(data, **kw)

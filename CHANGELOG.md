@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * `kwcoco modify_categories` now uses kwutil and YAML arguments to specify keep / remove.
 * The return type of `_ensure_imgsize` changed from a `List[Dict]` to a `Dict` with summary information. The old return value is accessible via the `"bad_images"` key in the new summary dictionary.
+* The `kwcoco.CategoryTree.coerce` now will recognize coco category lists.
 
 
 ### Fixed
