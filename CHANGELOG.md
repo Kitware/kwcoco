@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * `segmentation_metrics` now has the ability to dump components of its visualization for more flexible figure aggregation.
 * `segmentation_metrics` now has the ability to specify a subset of images to evaluate on.
+* conforming to the legacy coco format will now remove holes and warn.
 
 
 ### Changed

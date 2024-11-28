@@ -2649,7 +2649,25 @@ class MixinCocoStats:
                     poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
                     # Hack, looks like kwimage does not wrap the original
                     # coco polygon with a list, but pycocotools needs that
-                    ann['segmentation'] = poly.to_coco(style='orig')
+
+                    if poly is None:
+                        ann.pop('segmentation')
+                    else:
+                        # import xdev
+                        # with xdev.embed_on_exception_context:
+                        try:
+                            ann['segmentation'] = poly.to_coco(style='orig')
+                        except ValueError:
+                            REMOVE_HOLES = 1
+                            if REMOVE_HOLES:
+                                print('Warning: converting to legacy polygon is removing holes')
+                                mpoly = poly.to_shapely()
+                                from shapely.geometry import Polygon, MultiPolygon
+                                fixed_mpoly = MultiPolygon([Polygon(p.exterior) for p in mpoly.geoms])
+                                ann['segmentation'] = kwimage.MultiPolygon.from_shapely(fixed_mpoly).to_coco(style='orig')
+                            else:
+                                raise
+
                 if 'keypoints' in ann:
                     import kwimage
                     # TODO: these have to be in some defined order for
