@@ -6800,10 +6800,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 ('annotations', []),
             ])
 
-            # TODO: need to handle keypoint_categories
-            merged_cat_name_to_id = {}
-            merged_kp_name_to_id = {}
-
             # Check if the image-ids are unique and can be preserved
             _all_imgs = (img for _, _, d in relative_dsets for img in d['images'])
             _all_gids = (img['id'] for img in _all_imgs)
@@ -6830,6 +6826,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             # New category id remap strategy
             global_catid_remaper = _CategoryID_Remapper()
+            global_keypoint_catid_remaper = _CategoryID_Remapper()
             merged['categories'] = global_catid_remaper._categories
 
             # If disjoint_tracks is True keep track of track-ids we've seen in
@@ -6855,45 +6852,30 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 for old_cat in old_dset['categories']:
                     # The same category might exist in different datasets.
                     new_cat = global_catid_remaper.remap(old_cat)
-                    new_id = new_cat['id']
-                    cat_id_map[old_cat['id']] = new_id
+                    cat_id_map[old_cat['id']] = new_cat['id']
 
                 # Add the keypoint categories into the merged dataset
                 if 'keypoint_categories' in old_dset:
-                    # TODO: use _CategoryID_Remapper
                     if 'keypoint_categories' not in merged:
-                        merged['keypoint_categories'] = []
+                        merged['keypoint_categories'] = global_keypoint_catid_remaper._categories
                     old_id_to_name = {k['id']: k['name']
                                       for k in old_dset['keypoint_categories']}
                     postproc_kpcats = []
                     for old_kpcat in old_dset['keypoint_categories']:
-                        new_id = merged_kp_name_to_id.get(old_kpcat['name'], None)
-                        # The same kpcategory might exist in different datasets.
-                        if new_id is None:
-                            # Only add if it does not yet exist
-                            new_id = len(merged_kp_name_to_id) + 1
-                            merged_kp_name_to_id[old_kpcat['name']] = new_id
-                            new_kpcat = _dict([
-                                ('id', new_id),
-                                ('name', old_kpcat['name']),
-                            ])
-                            update_ifnotin(new_kpcat, old_kpcat)
-
-                            old_reflect_id = new_kpcat.get('reflection_id', None)
-                            if old_reflect_id is not None:
-                                # Temporarily overwrite reflectid with name
-                                reflect_name = old_id_to_name.get(old_reflect_id, None)
-                                new_kpcat['reflection_id'] = reflect_name
-                                postproc_kpcats.append(new_kpcat)
-
-                            merged['keypoint_categories'].append(new_kpcat)
-                        kpcat_id_map[old_kpcat['id']] = new_id
+                        new_kpcat = global_keypoint_catid_remaper.remap(old_kpcat)
+                        kpcat_id_map[old_kpcat['id']] = new_kpcat['id']
+                        old_reflect_id = old_kpcat.get('reflection_id', None)
+                        if old_reflect_id is not None:
+                            # Temporarily overwrite reflectid with name
+                            reflect_name = old_id_to_name.get(old_reflect_id, None)
+                            new_kpcat['reflection_id'] = reflect_name
+                            postproc_kpcats.append(new_kpcat)
 
                     # Fix reflection ids
                     for kpcat in postproc_kpcats:
                         reflect_name = kpcat['reflection_id']
-                        new_reflect_id = merged_kp_name_to_id.get(reflect_name, None)
-                        kpcat['reflection_id'] = new_reflect_id
+                        new_relect_cat = global_keypoint_catid_remaper._name_to_cat.get(reflect_name)
+                        kpcat['reflection_id'] = new_relect_cat['id']
 
                 # Add the tracks into the merged dataset
                 for old_track in old_dset.get('tracks', []):
