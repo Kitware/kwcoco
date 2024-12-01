@@ -8,6 +8,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Version 0.8.7 - Unreleased
 
 
+### Changed
+* `CocoDataset.conform` now returns a reference to `self`
+
+### Added
+* Support segmentations in legacy `COCO.loadRes`
+
+
 ## Version 0.8.6 - Released 2024-11-30
 
 ### Added

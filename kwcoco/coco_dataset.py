@@ -2562,6 +2562,9 @@ class MixinCocoStats:
 
                 workers (int): number of parallel jobs for IO tasks
 
+        Returns:
+            Self: the inplace modified kwcoco dataset
+
         Example:
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
@@ -2667,6 +2670,9 @@ class MixinCocoStats:
                                 ann['segmentation'] = kwimage.MultiPolygon.from_shapely(fixed_mpoly).to_coco(style='orig')
                             else:
                                 raise
+                            # from numbers import Number
+                            # if len(segm) and isinstance(segm[0], Number):
+                            #     segm = [segm]
 
                 if 'keypoints' in ann:
                     import kwimage
@@ -2674,6 +2680,7 @@ class MixinCocoStats:
                     # each category, currently it is arbitrary
                     pts = kwimage.Points.from_coco(ann['keypoints'], classes=kpcats)
                     ann['keypoints'] = pts.to_coco(style='orig')
+        return self
 
     def validate(self, **config):
         """
