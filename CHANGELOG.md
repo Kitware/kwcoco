@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.6 - Unreleased
+## Version 0.8.7 - Unreleased
+
+
+## Version 0.8.6 - Released 2024-11-30
 
 ### Added
 * `segmentation_metrics` now has the ability to dump components of its visualization for more flexible figure aggregation.
