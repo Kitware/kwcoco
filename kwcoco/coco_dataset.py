@@ -80,6 +80,7 @@ from kwcoco._helpers import (
     _load_and_postprocess, _image_corruption_check
 )
 from kwcoco._helpers import _ID_Remapper
+from kwcoco._helpers import _CategoryID_Remapper
 
 import json as pjson
 from types import ModuleType
@@ -1290,16 +1291,23 @@ class MixinCocoExtras:
                anything size fails to load.
 
         Returns:
-            List[dict]: a list of "bad" image dictionaries where the size could
-                not be determined. Typically these are corrupted images and
-                should be removed.
+            Dict: summary: contains an overview of what was done / what failed.
+                Key/Value pairs are:
+                    message (str): overview of what happened
+                    bad_images (List[dict]):
+                        a list of "bad" image dictionaries where the size could
+                        not be determined. Typically these are corrupted images
+                        and should be removed.
+                    num_attempts (int): number of size read jobs attempted
+                    num_modified (int): number of images changed
+                    num_failed (int): number of images changed
 
         Example:
             >>> # Normal case
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
-            >>> bad_imgs = self._ensure_imgsize()
-            >>> assert len(bad_imgs) == 0
+            >>> summary = self._ensure_imgsize()
+            >>> assert len(summary['bad_images']) == 0
             >>> assert self.imgs[1]['width'] == 512
             >>> assert self.imgs[2]['width'] == 328
             >>> assert self.imgs[3]['width'] == 256
@@ -1307,12 +1315,13 @@ class MixinCocoExtras:
             >>> # Fail cases
             >>> self = kwcoco.CocoDataset()
             >>> self.add_image('does-not-exist.jpg')
-            >>> bad_imgs = self._ensure_imgsize()
-            >>> assert len(bad_imgs) == 1
+            >>> summary = self._ensure_imgsize()
+            >>> assert len(summary['bad_images']) == 1
             >>> import pytest
             >>> with pytest.raises(Exception):
             >>>     self._ensure_imgsize(fail=True)
         """
+        summary = {}
         bad_images = []
         if any('width' not in img or 'height' not in img
                for img in self.dataset['images']):
@@ -1335,6 +1344,9 @@ class MixinCocoExtras:
                             job = pool.submit(kwimage.load_image_shape, gpath)
                             job.obj = obj
 
+            summary['num_attempts'] = len(pool)
+            num_modified = 0
+
             for job in pool.as_completed(desc=desc, progkw={'verbose': verbose}):
                 try:
                     h, w = job.result()[0:2]
@@ -1345,7 +1357,15 @@ class MixinCocoExtras:
                 else:
                     job.obj['width'] = w
                     job.obj['height'] = h
-        return bad_images
+                    num_modified += 1
+            summary['num_modified'] = num_modified
+            summary['num_failed'] = len(bad_images)
+            summary['message'] = 'attempted to populated width/height'
+        else:
+            summary['message'] = 'all images had width/height keys, no work to be done'
+
+        summary['bad_images'] = bad_images
+        return summary
 
     def _ensure_image_data(self, gids=None, verbose=1):
         """
@@ -2629,7 +2649,25 @@ class MixinCocoStats:
                     poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
                     # Hack, looks like kwimage does not wrap the original
                     # coco polygon with a list, but pycocotools needs that
-                    ann['segmentation'] = poly.to_coco(style='orig')
+
+                    if poly is None:
+                        ann.pop('segmentation')
+                    else:
+                        # import xdev
+                        # with xdev.embed_on_exception_context:
+                        try:
+                            ann['segmentation'] = poly.to_coco(style='orig')
+                        except ValueError:
+                            REMOVE_HOLES = 1
+                            if REMOVE_HOLES:
+                                print('Warning: converting to legacy polygon is removing holes')
+                                mpoly = poly.to_shapely()
+                                from shapely.geometry import Polygon, MultiPolygon
+                                fixed_mpoly = MultiPolygon([Polygon(p.exterior) for p in mpoly.geoms])
+                                ann['segmentation'] = kwimage.MultiPolygon.from_shapely(fixed_mpoly).to_coco(style='orig')
+                            else:
+                                raise
+
                 if 'keypoints' in ann:
                     import kwimage
                     # TODO: these have to be in some defined order for
@@ -5831,9 +5869,23 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         self._infer_dirs()
 
     def _update_fpath(self, new_fpath):
-        # New method for more robustly updating the file path and bundle
-        # directory, still a WIP. Only works when the current dataset is
-        # already valid.
+        """
+        Update the write location for this dataset and reroot if necessary.
+
+        New method for more robustly updating the file path and bundle
+        directory, still a WIP. Only works when the current dataset is
+        already valid.
+
+        This is used when you are reading a source dataset, and modifying, and
+        then plan to write it to a new location. If the new location is in a
+        different bundle dpath than the original file, we need to reroot to
+        otherwise any relative paths will break.
+
+        We need to come up with a good name for this function.  I don't think
+        this should happen when just modifying the ``fpath`` property. But I
+        also don't know what a good name that indicates this sets fpath and
+        does a conditional reroot would be.
+        """
         if new_fpath is None:
             # Bundle directory is clobbered, so we should make everything
             # absolute
@@ -6695,7 +6747,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         TODO:
             - [ ] are supercategories broken?
             - [ ] reuse image ids where possible
-            - [ ] reuse annotation / category ids where possible
+            - [ ] reuse annotation ids where possible
+            - [x] reuse category ids where possible
             - [X] handle case where no inputs are given
             - [x] disambiguate track-ids
             - [x] disambiguate video-ids
@@ -6747,10 +6800,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 ('annotations', []),
             ])
 
-            # TODO: need to handle keypoint_categories
-            merged_cat_name_to_id = {}
-            merged_kp_name_to_id = {}
-
             # Check if the image-ids are unique and can be preserved
             _all_imgs = (img for _, _, d in relative_dsets for img in d['images'])
             _all_gids = (img['id'] for img in _all_imgs)
@@ -6775,6 +6824,11 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             # doesn't have an associated track.
             hacked_track_id_map = _ID_Remapper(reuse=False)
 
+            # New category id remap strategy
+            global_catid_remaper = _CategoryID_Remapper()
+            global_keypoint_catid_remaper = _CategoryID_Remapper()
+            merged['categories'] = global_catid_remaper._categories
+
             # If disjoint_tracks is True keep track of track-ids we've seen in
             # so far in previous datasets and ensure we dont reuse them.
             # TODO: do this Remapper class with other ids?
@@ -6796,56 +6850,32 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
                 # Add the categories into the merged dataset
                 for old_cat in old_dset['categories']:
-                    new_id = merged_cat_name_to_id.get(old_cat['name'], None)
                     # The same category might exist in different datasets.
-                    if new_id is None:
-                        # Only add if it does not yet exist
-                        new_id = len(merged_cat_name_to_id) + 1
-                        merged_cat_name_to_id[old_cat['name']] = new_id
-                        new_cat = _dict([
-                            ('id', new_id),
-                            ('name', old_cat['name']),
-                            # ('supercategory', old_cat['supercategory']),
-                        ])
-                        update_ifnotin(new_cat, old_cat)
-                        merged['categories'].append(new_cat)
-                    cat_id_map[old_cat['id']] = new_id
+                    new_cat = global_catid_remaper.remap(old_cat)
+                    cat_id_map[old_cat['id']] = new_cat['id']
 
                 # Add the keypoint categories into the merged dataset
                 if 'keypoint_categories' in old_dset:
                     if 'keypoint_categories' not in merged:
-                        merged['keypoint_categories'] = []
+                        merged['keypoint_categories'] = global_keypoint_catid_remaper._categories
                     old_id_to_name = {k['id']: k['name']
                                       for k in old_dset['keypoint_categories']}
                     postproc_kpcats = []
                     for old_kpcat in old_dset['keypoint_categories']:
-                        new_id = merged_kp_name_to_id.get(old_kpcat['name'], None)
-                        # The same kpcategory might exist in different datasets.
-                        if new_id is None:
-                            # Only add if it does not yet exist
-                            new_id = len(merged_kp_name_to_id) + 1
-                            merged_kp_name_to_id[old_kpcat['name']] = new_id
-                            new_kpcat = _dict([
-                                ('id', new_id),
-                                ('name', old_kpcat['name']),
-                            ])
-                            update_ifnotin(new_kpcat, old_kpcat)
-
-                            old_reflect_id = new_kpcat.get('reflection_id', None)
-                            if old_reflect_id is not None:
-                                # Temporarily overwrite reflectid with name
-                                reflect_name = old_id_to_name.get(old_reflect_id, None)
-                                new_kpcat['reflection_id'] = reflect_name
-                                postproc_kpcats.append(new_kpcat)
-
-                            merged['keypoint_categories'].append(new_kpcat)
-                        kpcat_id_map[old_kpcat['id']] = new_id
+                        new_kpcat = global_keypoint_catid_remaper.remap(old_kpcat)
+                        kpcat_id_map[old_kpcat['id']] = new_kpcat['id']
+                        old_reflect_id = old_kpcat.get('reflection_id', None)
+                        if old_reflect_id is not None:
+                            # Temporarily overwrite reflectid with name
+                            reflect_name = old_id_to_name.get(old_reflect_id, None)
+                            new_kpcat['reflection_id'] = reflect_name
+                            postproc_kpcats.append(new_kpcat)
 
                     # Fix reflection ids
                     for kpcat in postproc_kpcats:
                         reflect_name = kpcat['reflection_id']
-                        new_reflect_id = merged_kp_name_to_id.get(reflect_name, None)
-                        kpcat['reflection_id'] = new_reflect_id
+                        new_relect_cat = global_keypoint_catid_remaper._name_to_cat.get(reflect_name)
+                        kpcat['reflection_id'] = new_relect_cat['id']
 
                 # Add the tracks into the merged dataset
                 for old_track in old_dset.get('tracks', []):

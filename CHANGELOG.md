@@ -5,7 +5,25 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.5 - Unreleased
+## Version 0.8.6 - Unreleased
+
+### Added
+* `segmentation_metrics` now has the ability to dump components of its visualization for more flexible figure aggregation.
+* `segmentation_metrics` now has the ability to specify a subset of images to evaluate on.
+* conforming to the legacy coco format will now remove holes and warn.
+
+
+### Changed
+* `kwcoco modify_categories` now uses kwutil and YAML arguments to specify keep / remove.
+* The return type of `_ensure_imgsize` changed from a `List[Dict]` to a `Dict` with summary information. The old return value is accessible via the `"bad_images"` key in the new summary dictionary.
+* The `kwcoco.CategoryTree.coerce` now will recognize coco category lists.
+* `CocoDataset.union` will now preserve category ids if possible.
+
+
+### Fixed
+* the `loadImgs`, `loadAnns`, and `loadCats` functions in the compat dataset now do the same thing as pycocotools
+
+## Version 0.8.5 - Released 2024-10-18
 
 ### Fixed
 * Fix broken paths in camvid converter
@@ -34,7 +52,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
-* Added basic helpers for converting from labelme and voc annotations
+* Added basic helpers for converting from labelme and VOC annotations
 * Added finish-install helper script.
 
 

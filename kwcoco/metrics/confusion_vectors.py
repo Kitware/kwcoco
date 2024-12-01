@@ -456,7 +456,7 @@ class ConfusionVectors(ub.NiceRepr):
                 import warnings
                 warnings.warn(
                     'THIS CALCULATION MIGHT BE WRONG. MANY OTHERS '
-                    'IN THIS FILE WERE, AND I HAVENT CHECKED THIS ONE YET')
+                    'IN THIS FILE WERE, AND I HAVE NOT CHECKED THIS ONE YET')
 
                 # Lookup original probability predictions for the class of interest
                 new_scores = cfsn_vecs.probs[:, cx]

@@ -207,8 +207,8 @@ class COCO(CocoDataset):
             List[dict]: loaded ann objects
         """
         if isinstance(ids, int):
-            return self.anns[ids]
-        return list(ub.take(self.anns, ids))
+            return [self.anns[ids]]
+        return [self.anns[id] for id in ids]
 
     def loadCats(self, ids=[]):
         """
@@ -221,22 +221,22 @@ class COCO(CocoDataset):
             List[dict]: loaded cat objects
         """
         if isinstance(ids, int):
-            return self.cats[ids]
-        return list(ub.take(self.cats, ids))
+            return [self.cats[ids]]
+        return [self.cats[id] for id in ids]
 
     def loadImgs(self, ids=[]):
         """
         Load anns with the specified ids.
 
         Args:
-            ids (List[int]) : integer ids specifying img
+            ids (List[int] | int) : integer ids specifying img
 
         Returns:
             List[dict]: loaded img objects
         """
         if isinstance(ids, int):
-            return self.imgs[ids]
-        return list(map(self.load_image, ids))
+            return [self.imgs[ids]]
+        return [self.imgs[id] for id in ids]
 
     def showAnns(self, anns, draw_bbox=False):
         """

@@ -29,7 +29,7 @@ def get_all_channels_in_dataset():
     """
     Q.  After I load a kwcoco.json into a kwcoco_dset, is there a nice way to
     query what channels are available for the input imagery? It looks like I
-    can iterate over .imgs and build my own set, but maybe theres a built in
+    can iterate over .imgs and build my own set, but maybe there's a built in
     way
 
     A. The better way is to use the CocoImage API.

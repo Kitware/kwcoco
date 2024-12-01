@@ -100,13 +100,13 @@ for group, def_to_items in groups.items():
             except Exception:
                 docline = ''
             if group in {'slots', 'properties'}:
-                reffer = ':attr:'
+                refer = ':attr:'
             else:
-                reffer = ':func:'
+                refer = ':func:'
 
             # https://sublime-and-sphinx-guide.readthedocs.io/en/latest/references.html
             # https://www.sphinx-doc.org/en/master/usage/restructuredtext/domains.html#cross-referencing-python-objects
-            line = f' * {reffer}`.CocoDataset.{item}<kwcoco.coco_dataset.{definer}.{item}>` - {docline}'
+            line = f' * {refer}`.CocoDataset.{item}<kwcoco.coco_dataset.{definer}.{item}>` - {docline}'
             aprint(line)
 
 print('\n'.join(autogen))

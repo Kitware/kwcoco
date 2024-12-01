@@ -307,7 +307,7 @@ class CocoInfoCLI(scfg.DataConfig):
             _cocofile._close()
 
 
-# This was a start for a fix for the different order problem, but I wasnt able
+# This was a start for a fix for the different order problem, but I wasn't able
 # to finish it. I need to learn how the ijson coroutines work better.
 # def main2(config):
 #     num_infos = float('inf') if config.show_info is True else int(config.show_info)

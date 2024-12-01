@@ -19,6 +19,11 @@ class CocoSplitCLI(scfg.DataConfig):
         'src': scfg.Value(None, help='input dataset to split', position=1),
         'dst1': scfg.Value('split1.kwcoco.json', help='output path of the larger split'),
         'dst2': scfg.Value('split2.kwcoco.json', help='output path of the smaller split'),
+
+        'train_fpath': scfg.Value(None, help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2'),
+        'vali_fpath': scfg.Value(None, help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2'),
+        'test_fpath': scfg.Value(None, help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2'),
+
         'factor': scfg.Value(3, help='number of items in dset1 for each item in dset2. Also defines the maximum number of splits that could be written.'),
         'rng': scfg.Value(None, help='A random seed for reproducible splits'),
         'balance_categories': scfg.Value(True, help='if True tries to balance annotation categories across splits'),
@@ -126,6 +131,17 @@ class CocoSplitCLI(scfg.DataConfig):
                                                  random_state=rng,
                                                  shuffle=shuffle)
 
+        dst1_fpath = config['dst1']
+        dst2_fpath = config['dst2']
+
+        train_fpath = config['train_fpath']
+        vali_fpath = config['vali_fpath']
+        test_fpath = config['test_fpath']
+        if train_fpath is not None:
+            # todo: expand checks
+            assert dst1_fpath is None
+            assert dst2_fpath is None
+
         if config['balance_categories']:
             split_idxs = list(self.split(X=final_group_gids, y=final_group_cids, groups=final_group_ids))
         else:
@@ -146,12 +162,16 @@ class CocoSplitCLI(scfg.DataConfig):
             print('stats(dset1): ' + ub.urepr(dset1.basic_stats(), nl=0))
             print('stats(dset2): ' + ub.urepr(dset2.basic_stats(), nl=0))
 
-            dset1.fpath = str(config['dst1']).format(split_num)
-            dset2.fpath = str(config['dst2']).format(split_num)
-            print(f'Writing dset1({split_num} / {factor}) = {dset1.fpath!r}')
-            dset1.dump(**dumpkw)
-            print(f'Writing dset2({split_num} / {factor}) = {dset2.fpath!r}')
-            dset2.dump(**dumpkw)
+            if dst1_fpath is not None:
+                dset1.fpath = str(dst1_fpath).format(split_num)
+                dset2.fpath = str(dst2_fpath).format(split_num)
+                print(f'Writing dset1({split_num} / {factor}) = {dset1.fpath!r}')
+                dset1.dump(**dumpkw)
+                print(f'Writing dset2({split_num} / {factor}) = {dset2.fpath!r}')
+                dset2.dump(**dumpkw)
+            else:
+                assert train_fpath is not None
+                # TODO: implement the rest of the train/vali/test split
 
             if split_num + 1 >= config['num_write']:
                 break

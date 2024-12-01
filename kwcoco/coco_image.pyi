@@ -10,7 +10,7 @@ from _typeshed import Incomplete
 from collections.abc import Generator
 from kwcoco.util.dict_proxy2 import AliasedDictProxy
 
-from kwcoco.channel_spec import FusedChannelSpec
+from delayed_image.channel_spec import FusedChannelSpec
 from kwcoco.coco_objects1d import Annots
 
 __docstubs__: str

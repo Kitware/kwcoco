@@ -29,6 +29,10 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             'if False, removes annotations when categories are removed, '
             'otherwise the annotations category is simply unset')),
 
+        'remove_empty_images': scfg.Value(False, isflag=True, help=(
+            'if True, removes images when categories are removed, '
+            'otherwise the images are simply kept as is')),
+
         'remove': scfg.Value(None, help='Category names to remove. Mutex with keep.'),
 
         'keep': scfg.Value(None, help='If specified, remove all other categories. Mutex with remove.'),
@@ -41,7 +45,6 @@ class CocoModifyCatsCLI(scfg.DataConfig):
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
-
         Example:
             >>> from kwcoco.cli.coco_modify_categories import *  # NOQA
             >>> import kwcoco
@@ -75,6 +78,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         print('dset = {!r}'.format(dset))
 
         import networkx as nx
+        import warnings
         print('Input Categories:')
         try:
             print(nx.forest_str(dset.object_categories().graph))
@@ -87,29 +91,42 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             print('mapper = {}'.format(ub.urepr(mapper, nl=1)))
             dset.rename_categories(mapper)
 
-        if config['keep'] is not None:
+        keep = config['keep']
+        if keep is not None:
             classes = set(dset.name_to_cat.keys())
-            if isinstance(config['keep'], str):
-                import warnings
+            try:
+                import kwutil
+                keep = kwutil.Yaml.coerce(keep)
+            except ImportError:
+                warnings.warn('kwutil is not available')
+            if isinstance(keep, str):
                 warnings.warn(
                     'Keep is specified as a string. '
                     'Did you mean to input a list?')
-            remove = list(classes - set(config['keep']))
+            remove = list(classes - set(keep))
         else:
             remove = config['remove']
 
         if remove is not None:
+            try:
+                import kwutil
+                remove = kwutil.Yaml.coerce(remove)
+            except ImportError:
+                warnings.warn('kwutil is not available')
             remove_cids = []
             for catname in remove:
                 try:
                     cid = dset._resolve_to_cid(catname)
                 except KeyError:
-                    import warnings
                     warnings.warn('unable to lookup catname={!r}'.format(catname))
                 else:
                     remove_cids.append(cid)
             dset.remove_categories(
                 remove_cids, keep_annots=config['keep_annots'], verbose=1)
+
+        if config['remove_empty_images']:
+            noannot_images = [gid for gid, aids in dset.index.gid_to_aids.items() if len(aids) == 0]
+            dset.remove_images(noannot_images, verbose=3)
 
         print('Output Categories: ')
         try:
