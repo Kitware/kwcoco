@@ -134,7 +134,9 @@ def perterb_coco(coco_dset, **kwargs):
             old_cxywh = kwimage.Boxes([old_bbox], 'xywh').to_cxywh()
             new_cxywh = kwimage.Boxes([new_bbox], 'xywh').to_cxywh()
 
-            old_sseg = kwimage.Segmentation.coerce(ann['segmentation'])
+            old_sseg = ann.get('segmentation', None)
+            if old_sseg is not None:
+                old_sseg = kwimage.Segmentation.coerce(old_sseg)
 
             # Compute the transform of the box so we can modify the
             # other attributes (TODO: we could use a random affine transform
@@ -142,10 +144,15 @@ def perterb_coco(coco_dset, **kwargs):
             offset = new_cxywh.data[0, 0:2] - old_cxywh.data[0, 0:2]
             scale = new_cxywh.data[0, 2:4] / old_cxywh.data[0, 2:4]
             old_to_new = kwimage.Affine.coerce(offset=offset, scale=scale)
-            new_sseg = old_sseg.warp(old_to_new)
+
+            if old_sseg is not None:
+                new_sseg = old_sseg.warp(old_to_new)
+            else:
+                new_sseg = None
 
             # Overwrite the data
-            ann['segmentation'] = new_sseg.to_coco(style='new')
+            if new_sseg is not None:
+                ann['segmentation'] = new_sseg.to_coco(style='new')
             ann['bbox'] = [new_x, new_y, new_w, new_h]
             ann['score'] = float(true_score_RV(1)[0])
 

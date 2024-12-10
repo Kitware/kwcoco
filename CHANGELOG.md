@@ -14,6 +14,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Support segmentations in legacy `COCO.loadRes`
 
+### Fixed
+* Perterb no longer fails if segmentations are not present
+
 
 ## Version 0.8.6 - Released 2024-11-30
 
