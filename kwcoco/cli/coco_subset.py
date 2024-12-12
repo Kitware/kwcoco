@@ -62,10 +62,10 @@ class CocoSubsetCLI(scfg.DataConfig):
                 A json query (via the jq spec) that specifies which videos
                 belong in the subset. Note, this is a passed as the body of
                 the following jq query format string to filter valid ids
-                '.videos[] | select({select_images}) | .id'.
+                '.videos[] | select({select_videos}) | .id'.
 
                 Examples for this argument are as follows:
-                '.file_name | startswith("foo")' will select only videos
+                '.name | startswith("foo")' will select only videos
                 where the name starts with foo.
 
                 Only applicable for dataset that contain videos.
