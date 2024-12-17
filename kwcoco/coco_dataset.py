@@ -7131,6 +7131,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> sub_dset = self.subset(gids, copy=True)
             >>> assert len(sub_dset.index.videos) == 1
             >>> assert len(self.index.videos) == 2
+            >>> assert len(sub_dset.index.tracks) == 2
+            >>> assert len(self.index.tracks) == 4
 
         Example:
             >>> import kwcoco
@@ -7181,9 +7183,14 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         sub_aids = sorted([aid for gid in chosen_gids
                            for aid in self.index.gid_to_aids.get(gid, [])])
         new_dataset['annotations'] = list(ub.take(self.index.anns, sub_aids))
-        new_dataset['img_root'] = self.dataset.get('img_root', None)
 
-        # TODO: handle tracks table.
+        if 'tracks' in self.dataset:
+            sub_track_ids = sorted(set(
+                ann.get('track_id', None)
+                for ann in new_dataset['annotations']))
+            new_dataset['tracks'] = list(self.tracks(sub_track_ids).objs_iter())
+
+        new_dataset['img_root'] = self.dataset.get('img_root', None)
 
         if copy:
             from copy import deepcopy

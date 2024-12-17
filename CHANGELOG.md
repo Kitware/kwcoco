@@ -16,6 +16,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * Perterb no longer fails if segmentations are not present
+* Subset now correctly handles tracks
 
 
 ## Version 0.8.6 - Released 2024-11-30
