@@ -7187,7 +7187,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if 'tracks' in self.dataset:
             sub_track_ids = sorted(set(
                 ann.get('track_id', None)
-                for ann in new_dataset['annotations']))
+                for ann in new_dataset['annotations']) - {None})
             new_dataset['tracks'] = list(self.tracks(sub_track_ids).objs_iter())
 
         new_dataset['img_root'] = self.dataset.get('img_root', None)
