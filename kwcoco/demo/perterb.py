@@ -12,8 +12,12 @@ def perterb_coco(coco_dset, **kwargs):
         cls_noise (int, default=0):
         null_pred (bool, default=False):
         with_probs (bool, default=False):
+        with_heatmaps (bool): default false
+        verbose (int):
         score_noise (float, default=0.2):
         hacked (int, default=1):
+        n_fp(int): num false positives
+        n_fn(int): num false negatives
 
     Example:
         >>> from kwcoco.demo.perterb import *  # NOQA
@@ -39,6 +43,7 @@ def perterb_coco(coco_dset, **kwargs):
 
     Ignore:
         import xdev
+        # broken due to argspec
         from kwcoco.demo.perterb import perterb_coco  # NOQA
         defaultkw = xdev.get_func_kwargs(perterb_coco)
         for k, v in defaultkw.items():
