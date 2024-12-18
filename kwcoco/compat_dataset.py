@@ -247,21 +247,45 @@ class COCO(CocoDataset):
         """
         aids = [ann['id'] for ann in anns]
         self.show_image(aids=aids, show_boxes=draw_bbox)
-        # raise NotImplementedError
 
     def loadRes(self, resFile):
         """
         Load result file and return a result api object.
 
         Args:
-            resFile (str): file name of result file
+            resFile (str | ndarray | List[Dict]):
+                file name of result file or something else that resolves to a
+                json list of annotation dictionaries corresponding to
+                predictions.
 
         Returns:
-            object: res result api object
+            COCO: res result api object
+
+        Example:
+            >>> from kwcoco.compat_dataset import *  # NOQA
+            >>> import kwcoco
+            >>> from kwcoco.demo.perterb import perterb_coco
+            >>> truth = kwcoco.CocoDataset.demo('shapes8').conform(legacy=True)
+            >>> self = COCO(truth.dataset)
+            >>> dpath = ub.Path.appdir('kwcoco/tests/compat').ensuredir()
+            >>> pred = perterb_coco(truth)
+            >>> # Get a type of input loadRes accepts
+            >>> anns = pred.dataset['annotations']
+            >>> # This function handles 4 different types of result annotations
+            >>> capn_anns = [(ub.udict(ann) | {'caption': 'stuff'}) & {'caption', 'image_id'} for ann in anns]
+            >>> bbox_anns = [ub.udict(ann) & {'bbox', 'image_id', 'category_id',} for ann in anns]
+            >>> sseg_anns = [ub.udict(ann) & {'segmentation', 'image_id', 'category_id'} for ann in anns]
+            >>> kpts_anns = [ub.udict(ann) & {'keypoints', 'image_id', 'category_id'} for ann in anns]
+            >>> # Ensure we can get a result object for each
+            >>> res = self.loadRes(capn_anns)
+            >>> res = self.loadRes(bbox_anns)
+            >>> res = self.loadRes(sseg_anns)
+            >>> res = self.loadRes(kpts_anns)
         """
         import json
         import time
         import copy
+        import kwimage
         res = COCO()
         res.dataset['images'] = [img for img in self.dataset['images']]
 
@@ -300,25 +324,31 @@ class COCO(CocoDataset):
                 res.dataset['categories'] = copy.deepcopy(
                     self.dataset['categories'])
                 for id, ann in enumerate(anns):
-                    # now only support compressed RLE format as segmentation
-                    # results
-                    raise NotImplementedError('havent ported mask results yet')
+                    # Unlike the original, using kwimage will support multiple
+                    # segmentation formats, even in legacy mode.
+                    sseg = kwimage.Segmentation.coerce(ann['segmentation'])
                     # ann['area'] = maskUtils.area(ann['segmentation'])
-                    # if 'bbox' not in ann:
-                    #     ann['bbox'] = maskUtils.toBbox(ann['segmentation'])
+                    if 'bbox' not in ann:
+                        ann['bbox'] = sseg.to_multi_polygon().box().to_coco()
+                        # ann['bbox'] = maskUtils.toBbox(ann['segmentation'])
                     ann['id'] = id + 1
                     ann['iscrowd'] = 0
             elif 'keypoints' in anns[0]:
                 res.dataset['categories'] = copy.deepcopy(
                     self.dataset['categories'])
                 for id, ann in enumerate(anns):
-                    s = ann['keypoints']
-                    x = s[0::3]
-                    y = s[1::3]
-                    x0, x1, y0, y1 = np.min(x), np.max(x), np.min(y), np.max(y)
-                    ann['area'] = (x1 - x0) * (y1 - y0)
+                    s = kwimage.Points.coerce(ann['keypoints']).to_coco()
+                    if len(s):
+                        x = s[0::3]
+                        y = s[1::3]
+                        x0, x1, y0, y1 = np.min(x), np.max(x), np.min(y), np.max(y)
+                        ann['area'] = (x1 - x0) * (y1 - y0)
+                        ann['bbox'] = [x0, y0, x1 - x0, y1 - y0]
+                    else:
+                        ann['area'] = 0
+                        ann['bbox'] = [0, 0, 0, 0]
+                        print('Warning: annotation missing keypoints')
                     ann['id'] = id + 1
-                    ann['bbox'] = [x0, y0, x1 - x0, y1 - y0]
         print('DONE (t={:0.2f}s)'.format(time.time() - tic))
 
         res.dataset['annotations'] = anns
@@ -368,7 +398,7 @@ class COCO(CocoDataset):
         Convert annotation which can be polygons, uncompressed RLE to RLE.
 
         Returns:
-            kwimage.Mask
+            Dict: containing the size and counts to define the RLE.
 
         Note:
             * This requires the C-extensions for kwimage to be installed (i.e.
@@ -390,16 +420,17 @@ class COCO(CocoDataset):
             >>> self.conform(legacy=True)
             >>> orig = self._aspycoco().annToRLE(self.anns[1])
         """
-        from kwimage.structs.segmentation import _coerce_coco_segmentation
+        import kwimage
         aid = ann['id']
         ann = self.anns[aid]
         t = self.imgs[ann['image_id']]
         h, w = t['height'], t['width']
         data = ann['segmentation']
         dims = (h, w)
-        sseg = _coerce_coco_segmentation(data, dims)
+        sseg = kwimage.Segmentation.coerce(data, dims=dims)
         try:
-            rle = sseg.to_mask(dims=dims).to_bytes_rle().data
+            mask = sseg.to_mask(dims=dims)
+            rle = mask.to_bytes_rle().data
         except NotImplementedError:
             raise NotImplementedError((
                 'kwimage does not seem to have required '
@@ -433,12 +464,12 @@ class COCO(CocoDataset):
             >>> kwplot.imshow(diff)
             >>> kwplot.show_if_requested()
         """
-        from kwimage.structs.segmentation import _coerce_coco_segmentation
+        import kwimage
         aid = ann['id']
         ann = self.anns[aid]
         data = ann['segmentation']
         dims = None
-        sseg = _coerce_coco_segmentation(data, dims)
+        sseg = kwimage.Segmentation.coerce(data, dims=dims)
         try:
             mask = sseg.to_mask()
         except Exception:

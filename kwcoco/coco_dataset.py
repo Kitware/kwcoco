@@ -2562,6 +2562,9 @@ class MixinCocoStats:
 
                 workers (int): number of parallel jobs for IO tasks
 
+        Returns:
+            Self: the inplace modified kwcoco dataset
+
         Example:
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
@@ -2667,6 +2670,9 @@ class MixinCocoStats:
                                 ann['segmentation'] = kwimage.MultiPolygon.from_shapely(fixed_mpoly).to_coco(style='orig')
                             else:
                                 raise
+                            # from numbers import Number
+                            # if len(segm) and isinstance(segm[0], Number):
+                            #     segm = [segm]
 
                 if 'keypoints' in ann:
                     import kwimage
@@ -2674,6 +2680,7 @@ class MixinCocoStats:
                     # each category, currently it is arbitrary
                     pts = kwimage.Points.from_coco(ann['keypoints'], classes=kpcats)
                     ann['keypoints'] = pts.to_coco(style='orig')
+        return self
 
     def validate(self, **config):
         """
@@ -7124,6 +7131,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> sub_dset = self.subset(gids, copy=True)
             >>> assert len(sub_dset.index.videos) == 1
             >>> assert len(self.index.videos) == 2
+            >>> assert len(sub_dset.index.tracks) == 2
+            >>> assert len(self.index.tracks) == 4
 
         Example:
             >>> import kwcoco
@@ -7174,9 +7183,14 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         sub_aids = sorted([aid for gid in chosen_gids
                            for aid in self.index.gid_to_aids.get(gid, [])])
         new_dataset['annotations'] = list(ub.take(self.index.anns, sub_aids))
-        new_dataset['img_root'] = self.dataset.get('img_root', None)
 
-        # TODO: handle tracks table.
+        if 'tracks' in self.dataset:
+            sub_track_ids = sorted(set(
+                ann.get('track_id', None)
+                for ann in new_dataset['annotations']) - {None})
+            new_dataset['tracks'] = list(self.tracks(sub_track_ids).objs_iter())
+
+        new_dataset['img_root'] = self.dataset.get('img_root', None)
 
         if copy:
             from copy import deepcopy
