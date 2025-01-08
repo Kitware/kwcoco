@@ -7,6 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.8.8 - Unreleased
 
+### Added
+* can now convert a kwcoco file to labelme files.
+* classmethod `CocoDataset.empty` for explicit creation of new unpopulated dataset containers
+* More support for labelme files.
+
 
 ## Version 0.8.7 - Released 2024-12-18
 

@@ -5938,6 +5938,14 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             self.cache_dpath = cache_dpath
 
     @classmethod
+    def empty(CocoDataset):
+        """
+        Create an empty dataset
+        """
+        self = CocoDataset()
+        return self
+
+    @classmethod
     def load(CocoDataset, file, bundle_dpath=None, autobuild=True):
         """
         Constructor from a open file or file path.
