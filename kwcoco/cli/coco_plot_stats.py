@@ -51,7 +51,32 @@ class PlotStatsCLI(scfg.DataConfig):
     __alias__ = ['visual_stats']
 
     src = scfg.Value(None, help='path to kwcoco file', position=1)
-    plots = scfg.Value(None, help='names of specific plots to create', nargs='+', position=2)
+
+    #
+    # from kwcoco.cli.coco_plot_stats import Plots  # NOQA
+    # print(', '.join(Plots.available_plot_funcs().keys()))
+    # TODO: keep this in sync
+    plots = scfg.Value(None, help=ub.paragraph(
+        '''
+        Names of specific plots to create. If unspecified, all plots are
+        generated.
+
+        Available plot names are:
+            all_polygons, anns_per_image_histogram,
+            anns_per_image_histogram_ge1, anns_per_image_histogram_splity,
+            image_size_histogram, image_size_scatter, images_over_time,
+            images_timeofday_distribution, obox_size_distribution,
+            obox_size_distribution_jointplot, obox_size_distribution_logscale,
+            polygon_area_histogram, polygon_area_histogram_logscale,
+            polygon_area_histogram_splity, polygon_area_vs_num_verts,
+            polygon_area_vs_num_verts_jointplot,
+            polygon_area_vs_num_verts_jointplot_logscale,
+            polygon_centroid_absolute_distribution,
+            polygon_centroid_absolute_distribution_jointplot,
+            polygon_centroid_relative_distribution,
+            polygon_centroid_relative_distribution_jointplot,
+            polygon_num_vertices_histogram
+        '''), nargs='+', position=2)
 
     dst_fpath = scfg.Value('auto', help='manifest of results. If unspecfied defaults to dst_dpath / "stats.json"')
     dst_dpath = scfg.Value('./coco_annot_stats', help='directory to dump results')
@@ -498,7 +523,6 @@ class Plots:
         import kwplot
         import pandas as pd
         import json
-        import inspect
         import io
 
         # kwplot 0.5.3 doesnt provide util_seaborn access via lazy loading
@@ -546,9 +570,15 @@ class Plots:
 
         # Might want to modify to make this nicer for interactive / reloading
         # use cases
-        unbound_methods = inspect.getmembers(BuiltinPlots, predicate=inspect.isfunction)
-        for name, func in unbound_methods:
+        for name, func in self.__class__.available_plot_funcs().items():
             self.register(func)
+
+    @classmethod
+    def available_plot_funcs(cls):
+        import inspect
+        unbound_methods_items = inspect.getmembers(BuiltinPlots, predicate=inspect.isfunction)
+        unbound_methods = dict(unbound_methods_items)
+        return unbound_methods
 
     def __getitem__(self, key):
         return self.plot_functions[key]
