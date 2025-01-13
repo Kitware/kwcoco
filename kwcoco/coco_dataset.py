@@ -6783,9 +6783,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # are not already disjoint. Alternatively, it could be the case
         # that a union between images with the same name really does
         # mean that they are the same image.
-        unique_img_names = UniqueNameRemapper()
-        unique_video_names = UniqueNameRemapper()
-        unique_track_names = UniqueNameRemapper()
+        unique_img_names = UniqueNameRemapper(policy='warn', name_type='image')
+        unique_video_names = UniqueNameRemapper(policy='warn', name_type='video')
+        unique_track_names = UniqueNameRemapper(policy='warn', name_type='track')
 
         def update_ifnotin(d1, d2):
             """ copies keys from d2 that doent exist in d1 into d1 """
