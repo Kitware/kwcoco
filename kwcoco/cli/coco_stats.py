@@ -182,6 +182,15 @@ class CocoStatsCLI(scfg.DataConfig):
                 except Exception:
                     print('error getting max size')
 
+                if 0:
+                    # POC code for getting total disk size
+                    total_bytes = 0
+                    for coco_img in images.coco_images_iter():
+                        for fpath in coco_img.iter_image_filepaths():
+                            total_bytes += fpath.stat().st_size
+                    total_gb = total_bytes / 2 ** 30
+                    print(f'total_gb={total_gb}')
+
                 # print('dset.tag = {!r}'.format(dset.tag))
                 # print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
 
