@@ -6654,6 +6654,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
     def rebuild_index(self):
         """
         Build or rebuild the fast lookup index.
+
+        This can be used to ensure a clean fast lookup index if the user
+        directly modifies values in `self.dataset`.
         """
         self.index.build(self)
 
