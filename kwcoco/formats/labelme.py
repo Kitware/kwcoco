@@ -81,13 +81,13 @@ def labelme_to_coco_structure(labelme_data, special_options=True):
             raise NotImplementedError('flags')
 
         category_name = shape['label']
+        ann = {
+            'category_name': category_name,
+        }
         if shape_type == 'polygon':
             poly = kwimage.Polygon.coerce(np.array(points))
-            ann = {
-                'category_name': category_name,
-                'bbox': poly.box().quantize().to_coco(),
-                'segmentation': poly.to_coco(style='new'),
-            }
+            ann['bbox'] = poly.box().quantize().to_coco()
+            ann['segmentation'] = poly.to_coco(style='new')
             if desc:
                 ann['description'] = desc
             anns.append(ann)
@@ -310,6 +310,11 @@ class LabelMeFile(ub.NiceRepr):
             >>> self = LabelMeFile.from_coco(coco_dset, image_id)
             >>> coco_recon = self.to_coco()
             >>> recon = LabelMeFile.from_coco(coco_recon)
+            >>> # Need to ignore the "extra" data
+            >>> for shape in recon.data['shapes']:
+            ...     shape.pop('extra')
+            >>> for shape in self.data['shapes']:
+            ...     shape.pop('extra')
             >>> assert self.data == recon.data
         """
         if image_id is None:
@@ -339,6 +344,9 @@ class LabelMeFile(ub.NiceRepr):
             catname = cat.get('name', 'unknown')
             segmentation = ann.get('segmentation', None)
             bbox = ann.get('bbox', [])
+            # HACK: store more information than necessary in the labelme file
+            # TODO: think about if we want to support round tripping and
+            # how to improve this encoding for that case.
             extra = ub.udict(ann) - {'category_id', 'segmentation', 'bbox', 'image_id'}
 
             if segmentation:

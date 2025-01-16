@@ -15,6 +15,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * kwcoco union will now warn the user if it performs a name remapping.
 
+### Fixed
+* index failure if tracks were used on images without `frame_index`
+
 
 ## Version 0.8.7 - Released 2024-12-18
 
