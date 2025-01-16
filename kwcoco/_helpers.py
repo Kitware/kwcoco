@@ -266,7 +266,7 @@ _lut_frame_index = _lut_image_frame_index
 
 
 def _lut_annot_frame_index(imgs, anns, aid):
-    return imgs[anns[aid]['image_id']]['frame_index']
+    return imgs[anns[aid]['image_id']].get('frame_index', -1)
 
 
 class SortedSet(sortedcontainers.SortedSet):
