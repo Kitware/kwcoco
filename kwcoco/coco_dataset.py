@@ -2450,7 +2450,7 @@ class MixinCocoObjects:
             video_ids = [self.index.name_to_video[name]['id'] for name in names]
         return Videos(video_ids, self)
 
-    def tracks(self, track_ids=None, names=None):
+    def tracks(self, track_ids=None, names=None, video_id=None):
         """
         Return vectorized track objects
 
@@ -2461,6 +2461,10 @@ class MixinCocoObjects:
             names (List[str] | None):
                 lookup tracks by their name.
                 Mutually exclusive with other args.
+
+            video_id (int | None):
+                if specified, return tracks in this video id.
+                Note: this query is currently inefficient
 
         Returns:
             kwcoco.coco_objects1d.Tracks: vectorized video object
@@ -2479,6 +2483,15 @@ class MixinCocoObjects:
 
         if names is not None:
             track_ids = [self.index.name_to_track[name]['id'] for name in names]
+
+        if video_id is not None:
+            # Note: this is an inefficient lookup
+            annot_ids = sorted(ub.flatten([
+                self.index.gid_to_aids[gid]
+                for gid in self.index.vidid_to_gids[video_id]]))
+            annot_track_ids = self.annots(annot_ids).lookup('track_id')
+            track_ids = list(ub.unique(annot_track_ids))
+
         return Tracks(track_ids, self)
 
 

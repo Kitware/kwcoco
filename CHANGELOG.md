@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * can now convert a kwcoco file to labelme files.
 * classmethod `CocoDataset.empty` for explicit creation of new unpopulated dataset containers
 * More support for labelme files.
+* Can now lookup tracks by video id
 
 ### Changed
 * kwcoco union will now warn the user if it performs a name remapping.
