@@ -1,9 +1,13 @@
+"""
+TODO:
+    - [ ] Does this rely on the image ids being the same? In either case document it.
+"""
 import numpy as np
 import ubelt as ub
 import networkx as nx
-# from .assignment import _assign_confusion_vectors
 from kwcoco.metrics.confusion_vectors import ConfusionVectors
 from kwcoco.metrics.assignment import _assign_confusion_vectors
+# from .assignment import _assign_confusion_vectors
 
 
 # Helper for xdev docstubs
