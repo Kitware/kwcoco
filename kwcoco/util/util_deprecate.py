@@ -48,7 +48,7 @@ def migrate_argnames(aliases, explicit_args, kwargs, warn_non_cannon=False):
             argument (from the aliases) is used in `kwargs`.
 
     Returns:
-        Dict[str, Any]: a map from the new names to the official values
+        Dict[str, Any]: a map from the new cannonical names to the values
 
     Example:
         >>> from kwcoco.util.util_deprecate import *  # NOQA
@@ -84,7 +84,7 @@ def migrate_argnames(aliases, explicit_args, kwargs, warn_non_cannon=False):
     aliases = {k: [vs] if isinstance(vs, str) else vs
                for k, vs in aliases.items()}
 
-    result = {}
+    cannonical = {}
 
     # Loop over each canonical argument (cannon_key) and its alternative names (alts)
     for cannon_key, alts in aliases.items():
@@ -112,10 +112,12 @@ def migrate_argnames(aliases, explicit_args, kwargs, warn_non_cannon=False):
                     warnings.warn(f"Old argument '{given_key}' used, use new canonical name '{cannon_key}' instead.")
         else:
             given_value = candidates[cannon_key]
-        result[cannon_key] = given_value
+        cannonical[cannon_key] = given_value
 
     # Catch any unexpected keyword arguments in kwargs
     if len(kwargs):
+        # TODO: option to grab or specify the name of the caller?
+        # should we use the schedule deprecation here as well?
         bad_key = list(kwargs)[0]
         raise TypeError(f'<calling function> got an unexpected keyword argument {bad_key!r}')
-    return result
+    return cannonical

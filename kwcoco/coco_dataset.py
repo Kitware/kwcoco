@@ -7118,7 +7118,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dset = cls(merged, **kwargs)
         return new_dset
 
-    def subset(self, gids=None, video_ids=None, copy=False, autobuild=True):
+    def subset(self, gids=None, video_ids=None, copy=False, autobuild=True, **kwargs):
         """
         Return a subset of the larger coco dataset by specifying which images
         to port. All annotations in those images will be taken.
@@ -7139,6 +7139,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             autobuild (bool):
                 if True will automatically build the fast lookup index.
                 Defaults to True.
+
+            **kwargs:
+                Only used for new cannonical names:
+                    image_id := gids
 
         Example:
             >>> import kwcoco
@@ -7182,6 +7186,17 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dataset['categories'] = self.dataset['categories']
         new_dataset['info'] = self.dataset.get('info', [])
         new_dataset['licenses'] = self.dataset.get('licenses', [])
+
+        from kwcoco.util.util_deprecate import migrate_argnames
+        cannonical = migrate_argnames(
+            aliases={
+                'image_ids': ['gids'],
+            },
+            explicit_args=dict(gids=gids),
+            kwargs=kwargs,
+            warn_non_cannon=True,
+        )
+        gids = cannonical['image_ids']
 
         if gids is None:
             gids = []

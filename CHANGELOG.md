@@ -15,6 +15,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * eval-detections can now write a confusion kwcoco file
 * migrate_argnames helper
 
+
+### Changed
+* Start migration of subset argument from `gids` to `image_ids`.
+
 ### Changed
 * kwcoco union will now warn the user if it performs a name remapping.
 
