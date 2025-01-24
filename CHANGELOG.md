@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * More support for labelme files.
 * Can now lookup tracks by video id
 * eval-detections can now write a confusion kwcoco file
+* migrate_argnames helper
 
 ### Changed
 * kwcoco union will now warn the user if it performs a name remapping.
