@@ -52,6 +52,45 @@ def migrate_argnames(aliases, explicit_args, kwargs, warn_non_cannon=False):
 
     Example:
         >>> from kwcoco.util.util_deprecate import *  # NOQA
+        >>> # Simple case
+        >>> # We have a function that currently takes an argument `a`
+        >>> # but we want to change the signature name to more readable `array`
+        >>> # To do this we need to modify the function signature so
+        >>> # the old explicit argument defaults to None and then add **kwargs
+        >>> # Then in the body we call `migrate_argnames`, which will
+        >>> # map the inputs to the new cannonical name, and ensure that
+        >>> # no extra kwargs are given.
+        >>> def myfunc(a=None, **kwargs):
+        >>>     explicit_args = dict(a=a)
+        >>>     aliases = {
+        >>>         'array': 'a',
+        >>>     }
+        >>>     result = migrate_argnames(
+        >>>         aliases,
+        >>>         explicit_args,
+        >>>         kwargs,
+        >>>     )
+        >>>     return result
+        >>> # Now we can call the function using positional args
+        >>> print(myfunc([1, 2]))
+        >>> # Use the old name as a keyword arg
+        >>> print(myfunc(a=[1, 2]))
+        >>> # Or use the new name as a keyword arg
+        >>> print(myfunc(array=[1, 2]))
+        >>> import pytest
+        >>> # We cannot specify both old and new values
+        >>> with pytest.raises(ValueError):
+        >>>     myfunc(a=[1, 2], array=[1, 2])
+        >>> # We cannot give undefined arguments
+        >>> with pytest.raises(TypeError):
+        >>>     print(myfunc(does_not_exist=[2]))
+
+    Example:
+        >>> from kwcoco.util.util_deprecate import *  # NOQA
+        >>> # Demonstrate a function where we have an existing signature with
+        >>> # gids and vidids, but we plan to switch to image_ids and video_ids.
+        >>> # We also want to still support an old argument _flag1, even though
+        >>> # we have already "switched" to a new name: flag1.
         >>> def myfunc(gid=None, flag1=False, vidids=None, flag2=True, **kwargs):
         >>>     explicit_args = dict(gid=gid, vidids=vidids)
         >>>     aliases = {
@@ -78,6 +117,14 @@ def migrate_argnames(aliases, explicit_args, kwargs, warn_non_cannon=False):
         >>> # Should not specify more than one name for a cannon key
         >>> with pytest.raises(ValueError):
         >>>     print(myfunc(gid=1, image_id=2))
+
+    Notes:
+        Possible improvements:
+            - [ ] add a fast path when the cannonical key is given
+            - [ ] add the ability to mark arguments are required
+            - [ ] get caller information for better warning information
+            - [ ] use ub.NoParam to allow None as a valid value.
+            - [ ] allow cannon args to specify a default if it is not specified
     """
     import warnings
     # Ensure all values are List[str]

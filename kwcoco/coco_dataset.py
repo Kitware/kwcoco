@@ -7188,13 +7188,15 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dataset['licenses'] = self.dataset.get('licenses', [])
 
         from kwcoco.util.util_deprecate import migrate_argnames
+        # TODO: schedule a time to switch the explicit args to the cannonical
+        # values.
         cannonical = migrate_argnames(
             aliases={
                 'image_ids': ['gids'],
             },
             explicit_args=dict(gids=gids),
             kwargs=kwargs,
-            warn_non_cannon=True,
+            warn_non_cannon=False,
         )
         gids = cannonical['image_ids']
 
