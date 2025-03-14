@@ -154,7 +154,7 @@ class ObjectList1D(ub.NiceRepr):
             'kwcoco', name='.objs_iter()', type='method',
             deprecate='0.8.8', error='1.0.0', remove='1.1.0',
             migration=(
-                'use `.objs()` instead.'
+                'use `.objs` instead.'
             )
         )
         return ub.take(self._id_to_obj, self._ids)
@@ -171,7 +171,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
             >>> self = dset.images()
-            >>> objs = list(self.objs())
+            >>> objs = list(self.objs)
             >>> assert len(objs) == len(self)
         """
         return ObjView(self._id_to_obj, self._ids)
@@ -661,7 +661,7 @@ class Images(ObjectList1D):
             'kwcoco', name='Images.coco_images_iter()', type='method',
             deprecate='0.8.8', error='1.0.0', remove='1.1.0',
             migration=(
-                'use `.coco_images()` instead.'
+                'use `.coco_images` instead.'
             )
         )
         yield from (self._dset.coco_image(gid) for gid in self)
@@ -677,7 +677,7 @@ class Images(ObjectList1D):
         Example:
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('photos')
-            >>> coco_images = list(dset.images().coco_images())
+            >>> coco_images = list(dset.images().coco_images)
             >>> coco_image = coco_images[0]
         """
         return CocoImageView(self._dset.coco_image, self._ids)
@@ -1131,17 +1131,17 @@ class ImageGroups(ObjectGroups):
     _cls1d = Images
 
 
-class CallableView(collections.abc.Sequence):
+class _BaseView(collections.abc.Sequence):
     """
     This class works around a previous design decision where `.objs` was a
-    property that returned a list instead of a method that returned an
-    iterator.
+    property that returned a list instead of an iterator.
     """
-    def __call__(self):
-        """
-        Allows properties that return this object to behave like a method
-        """
-        return self
+    # Do we want this?
+    # def __call__(self):
+    #     """
+    #     Allows properties that return this object to behave like a method
+    #     """
+    #     return self
 
     def __repr__(self):
         return repr(list(self))
@@ -1150,7 +1150,7 @@ class CallableView(collections.abc.Sequence):
         return repr(list(self))
 
 
-class ObjView(CallableView):
+class ObjView(_BaseView):
     """
     A proxy for an iterator over object dictionaries
     """
@@ -1172,7 +1172,7 @@ class ObjView(CallableView):
             yield self._id_to_obj[_id]
 
 
-class CocoImageView(CallableView):
+class CocoImageView(_BaseView):
     """
     A proxy for an iterator over CocoImage objects
     """
