@@ -18,9 +18,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 * Start migration of subset argument from `gids` to `image_ids`.
-
-### Changed
 * kwcoco union will now warn the user if it performs a name remapping.
+* The `ObjectList1D.objs` property now returns an ObjView instead of a list, 
+  which enables more efficient iteration. As a result `.objs_iter` is deprecated.
+* The `Images.coco_images` property now returns an CocoImageView instead of a list, 
+  which enables more efficient iteration. As a result `.coco_images_iter` is deprecated.
 
 ### Fixed
 * index failure if tracks were used on images without `frame_index`

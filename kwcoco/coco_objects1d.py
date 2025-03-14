@@ -15,6 +15,7 @@ See:
     :func:`kwcoco.coco_dataset.MixinCocoObjects.tracks`
 
 """
+import collections.abc
 from os.path import join
 import numpy as np
 import ubelt as ub
@@ -146,9 +147,16 @@ class ObjectList1D(ub.NiceRepr):
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
             >>> self = dset.images()
             >>> objs_iter = self.objs_iter()
-            >>> assert self.objs == list(objs_iter)
+            >>> assert list(self.objs) == list(objs_iter)
             >>> assert len(list(objs_iter)) == 0, 'should be exhausted'
         """
+        ub.schedule_deprecation(
+            'kwcoco', name='.objs_iter()', type='method',
+            deprecate='0.8.8', error='1.0.0', remove='1.1.0',
+            migration=(
+                'use `.objs()` instead.'
+            )
+        )
         return ub.take(self._id_to_obj, self._ids)
 
     @property
@@ -157,16 +165,16 @@ class ObjectList1D(ub.NiceRepr):
         Get the underlying object dictionary for each object.
 
         Returns:
-            List[ObjT]: all object dictionaries
+            Sequence[ObjT]: all object dictionaries
 
         Example:
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
             >>> self = dset.images()
-            >>> objs = self.objs
+            >>> objs = list(self.objs())
             >>> assert len(objs) == len(self)
         """
-        return list(ub.take(self._id_to_obj, self._ids))
+        return ObjView(self._id_to_obj, self._ids)
 
     def take(self, idxs):
         """
@@ -649,6 +657,13 @@ class Images(ObjectList1D):
         Yields:
             CocoImage
         """
+        ub.schedule_deprecation(
+            'kwcoco', name='Images.coco_images_iter()', type='method',
+            deprecate='0.8.8', error='1.0.0', remove='1.1.0',
+            migration=(
+                'use `.coco_images()` instead.'
+            )
+        )
         yield from (self._dset.coco_image(gid) for gid in self)
 
     @property
@@ -657,9 +672,15 @@ class Images(ObjectList1D):
         Access the enriched coco image objects.
 
         Returns:
-            List[CocoImage]:
+            Sequence[CocoImage]:
+
+        Example:
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('photos')
+            >>> coco_images = list(dset.images().coco_images())
+            >>> coco_image = coco_images[0]
         """
-        return [self._dset.coco_image(gid) for gid in self]
+        return CocoImageView(self._dset.coco_image, self._ids)
 
     @property
     def gids(self):
@@ -1110,14 +1131,65 @@ class ImageGroups(ObjectGroups):
     _cls1d = Images
 
 
-if 0:
-    # Do we want this?
-    # If so changelog note will be:
-    # * Vectorized objects can that were previously only accessible as properties,
-    #   can now be accessed as methods.
-    class CallableList(list):
+class CallableView(collections.abc.Sequence):
+    """
+    This class works around a previous design decision where `.objs` was a
+    property that returned a list instead of a method that returned an
+    iterator.
+    """
+    def __call__(self):
         """
-        Allows properties that return a list to behave like methods.
+        Allows properties that return this object to behave like a method
         """
-        def __call__(self):
-            return self
+        return self
+
+    def __repr__(self):
+        return repr(list(self))
+
+    def __str__(self):
+        return repr(list(self))
+
+
+class ObjView(CallableView):
+    """
+    A proxy for an iterator over object dictionaries
+    """
+    def __init__(self, id_to_obj, ids):
+        self._id_to_obj = id_to_obj
+        self._ids = ids
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return [self._id_to_obj[_id] for _id in self._ids[index]]
+        else:
+            return self._id_to_obj[self._ids[index]]
+
+    def __len__(self):
+        return len(self._ids)
+
+    def __iter__(self):
+        for _id in self._ids:
+            yield self._id_to_obj[_id]
+
+
+class CocoImageView(CallableView):
+    """
+    A proxy for an iterator over CocoImage objects
+    """
+    def __init__(self, getter, ids):
+        self._getter = getter
+        self._ids = ids
+
+    def __getitem__(self, index):
+        return self._getter(self._ids[index])
+        if isinstance(index, slice):
+            return [self._getter(_id) for _id in self._ids[index]]
+        else:
+            return self._getter(self._ids[index])
+
+    def __len__(self):
+        return len(self._ids)
+
+    def __iter__(self):
+        for _id in self._ids:
+            yield self._getter(_id)
