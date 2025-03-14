@@ -264,7 +264,7 @@ def indexable_allclose(dct1, dct2, return_info=False):
         remove='1.1.0',
         warncls=Warning,
     )
-    return ub.IndexableWalker(dct1).allclose(dct2, return_info=return_info)
+    return ub.IndexableWalker(dct1).allclose(dct2, return_info=return_info, rel_tol=1e-5, abs_tol=1e-8)
 
 
 class Difference(NamedTuple):
