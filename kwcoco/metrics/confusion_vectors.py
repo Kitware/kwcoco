@@ -798,9 +798,9 @@ class BinaryConfusionVectors(ub.NiceRepr):
         Get statistics (F1, G1, MCC) versus thresholds
 
         Args:
-            stabalize_thresh (int, default=7):
+            stabalize_thresh (int):
                 if fewer than this many data points inserts dummy stabilization
-                data so curves can still be drawn.
+                data so curves can still be drawn. Defaults to 7.
 
             fp_cutoff (int | None):
                 maximum number of false positives in the truncated roc curves.
