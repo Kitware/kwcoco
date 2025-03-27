@@ -573,8 +573,33 @@ class DetectionMetrics(ub.NiceRepr):
         return info
 
     def score_kwcoco(dmet, iou_thresh=0.5, bias=0, gids=None,
-                      compat='all', prioritize='iou'):
-        """ our scoring method """
+                      compat='all', prioritize='iou', stabalize_thresh=7):
+        """
+        our scoring method
+
+        Args:
+            iou_thresh (float | List[float]):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            bias (float):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            gids (List[int] | None):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            compat (str):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            prioritize (str):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            stabalize_thresh (int):
+                if fewer than this many data points inserts dummy stabilization
+                data so curves can still be drawn. Defaults to 7.
+
+        Returns:
+            dict
+        """
         cfsn_vecs = dmet.confusion_vectors(iou_thresh=iou_thresh, bias=bias,
                                            gids=gids,
                                            compat=compat,
@@ -582,7 +607,7 @@ class DetectionMetrics(ub.NiceRepr):
         info = {}
         try:
             cfsn_perclass = cfsn_vecs.binarize_ovr(mode=1)
-            perclass = cfsn_perclass.measures()
+            perclass = cfsn_perclass.measures(stabalize_thresh=stabalize_thresh)
         except Exception as ex:
             print('warning: ex = {!r}'.format(ex))
         else:
