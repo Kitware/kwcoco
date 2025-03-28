@@ -7,15 +7,15 @@ def perterb_coco(coco_dset, **kwargs):
     Perterbs a coco dataset
 
     Args:
-        rng (int, default=0):
-        box_noise (int, default=0):
-        cls_noise (int, default=0):
-        null_pred (bool, default=False):
-        with_probs (bool, default=False):
-        with_heatmaps (bool): default false
-        verbose (int):
-        score_noise (float, default=0.2):
-        hacked (int, default=1):
+        rng (int):  defaults to 0
+        box_noise (int):  defaults to 0
+        cls_noise (int):  defaults to 0
+        null_pred (bool):  defaults to False
+        with_probs (bool):  defaults to False
+        with_heatmaps (bool):  defaults to False
+        verbose (int):  defaults to 0
+        score_noise (float):  defaults to 0.2
+        hacked (int):  defaults to 1
         n_fp(int): num false positives
         n_fn(int): num false negatives
 
@@ -48,7 +48,7 @@ def perterb_coco(coco_dset, **kwargs):
         defaultkw = xdev.get_func_kwargs(perterb_coco)
         for k, v in defaultkw.items():
             desc = ''
-            print('{} ({}, default={}): {}'.format(k, type(v).__name__, v, desc))
+            print('{} ({}): {} defaults to {}'.format(k, type(v).__name__, desc, v))
 
     """
     import kwimage

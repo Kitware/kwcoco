@@ -904,6 +904,7 @@ class DetectionMetrics(ub.NiceRepr):
             xdoctest -m kwcoco.metrics.detect_metrics DetectionMetrics.demo:2 --show
 
         Example:
+            >>> from kwcoco.metrics.detect_metrics import *  # NOQA
             >>> kwargs = {}
             >>> # Seed the RNG
             >>> kwargs['rng'] = 0
