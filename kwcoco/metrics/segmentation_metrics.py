@@ -535,8 +535,6 @@ class SingleImageSegmentationMetrics:
         else:
             raise KeyError(self.balance_area)
 
-        true_sseg.area / initial_total_weight
-
         # background should be background, do nothing with it
         sseg_groups['background']
         # Ignore context classes in saliency
