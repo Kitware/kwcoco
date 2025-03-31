@@ -215,7 +215,7 @@ def demodata_toy_dset(image_size=(600, 600),
     bg_scale = 0.8
 
     if stamp.expired():
-        ub.delete(img_dpath, verbose=1)
+        ub.delete(img_dpath, verbose=verbose > 0)
         ub.ensuredir(img_dpath)
 
         dataset = {
@@ -300,13 +300,15 @@ def demodata_toy_dset(image_size=(600, 600),
         dset = kwcoco.CocoDataset(dataset, bundle_dpath=bundle_dpath,
                                   fname=fname)
         dset.dset_fpath = dset_fpath
-        print('dump dset.dset_fpath = {!r}'.format(dset.dset_fpath))
+        if verbose:
+            print('dump dset.dset_fpath = {!r}'.format(dset.dset_fpath))
         dset.dump(dset.dset_fpath, newlines=True)
         stamp.renew()
     else:
         # otherwise load the data
         # bundle_dpath = dirname(dset_fpath)
-        print('read dset_fpath = {!r}'.format(dset_fpath))
+        if verbose:
+            print('read dset_fpath = {!r}'.format(dset_fpath))
         dset = kwcoco.CocoDataset(dset_fpath, bundle_dpath=bundle_dpath)
 
     dset.tag = basename(bundle_dpath)

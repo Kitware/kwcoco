@@ -6121,7 +6121,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """
         import kwcoco
         from kwcoco.util.util_parallel import coerce_num_workers
-        _loader = kwcoco.CocoDataset.coerce
+        from functools import partial
+        _loader = partial(kwcoco.CocoDataset.coerce, verbose=verbose)
         workers = coerce_num_workers(workers)
         workers = min(workers, len(datas))
         # Reuse coerce_multiple logic but overload the loader function.

@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * eval-detections can now write a confusion kwcoco file
 * migrate_argnames helper
 * Add `stabalize_thresh` to DetectionMetrics.score_kwcoco
+* Add "format" argument to `kwcoco stats` for machine readable output
 
 
 ### Changed
@@ -27,6 +28,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 * index failure if tracks were used on images without `frame_index`
+* minor verbosity fixes
 
 
 ## Version 0.8.7 - Released 2024-12-18

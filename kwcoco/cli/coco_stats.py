@@ -31,7 +31,8 @@ class CocoStatsCLI(scfg.DataConfig):
             '''
             number of workers when reading multiple kwcoco files
             '''))
-    embed = scfg.Value(False, isflag=True, help='embed into interactive shell')
+    embed = scfg.Value(False, isflag=True, help='embed into interactive shell for debugging')
+    format = scfg.Value('human', help='output format. Can be "human", "json", or "yaml"')
 
     __epilog__ = """
     Example Usage:
@@ -43,10 +44,29 @@ class CocoStatsCLI(scfg.DataConfig):
     def main(cls, cmdline=True, **kw):
         """
         CommandLine:
-            xdoctest -m kwcoco.cli.coco_stats CocoStatsCLI.main
+            xdoctest -m kwcoco.cli.coco_stats CocoStatsCLI.main:0
+            xdoctest -m kwcoco.cli.coco_stats CocoStatsCLI.main:1
 
         Example:
             >>> kw = {'src': 'special:shapes8'}
+            >>> cmdline = False
+            >>> cls = CocoStatsCLI
+            >>> cls.main(cmdline, **kw)
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> kw = {
+            >>>     'src': ['special:shapes8', 'special:vidshapes8', 'special:vidshapes2'],
+            >>>     'format': 'urepr',
+            >>>     'basic': True,
+            >>>     'extended': True,
+            >>>     'catfreq': True,
+            >>>     'image_size': True,
+            >>>     'annot_attrs': True,
+            >>>     'image_attrs': True,
+            >>>     'video_attrs': True,
+            >>>     'boxes': True,
+            >>> }
             >>> cmdline = False
             >>> cls = CocoStatsCLI
             >>> cls.main(cmdline, **kw)
@@ -58,7 +78,11 @@ class CocoStatsCLI(scfg.DataConfig):
             from rich import print as rich_print
         except ImportError:
             rich_print = print
-        rich_print('config = {}'.format(ub.urepr(config, nl=1)))
+
+        human_readable = config.format == 'human'
+
+        if human_readable:
+            rich_print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
@@ -68,8 +92,9 @@ class CocoStatsCLI(scfg.DataConfig):
         else:
             fpaths = config['src']
 
-        datasets = list(kwcoco.CocoDataset.coerce_multiple(fpaths, workers=config.io_workers))
-        print('Finished reading datasets')
+        datasets = list(kwcoco.CocoDataset.coerce_multiple(fpaths, workers=config.io_workers, verbose=human_readable))
+        if human_readable:
+            print('Finished reading datasets')
 
         # hack dataset tags
         dset_tags = [dset.tag for dset in datasets]
@@ -80,77 +105,104 @@ class CocoStatsCLI(scfg.DataConfig):
             for dset in datasets:
                 dset.tag = dset.fpath.replace(toremove, '')
 
-        try:
-            import networkx as nx
-            for dset in datasets:
-                print('dset = {!r}'.format(dset))
-                print('Category Hierarchy: ')
-                print(nx.write_network_text(dset.object_categories().graph))
-        except Exception:
-            pass
+        if human_readable:
+            try:
+                import networkx as nx
+                for dset in datasets:
+                    print('dset = {!r}'.format(dset))
+                    print('Category Hierarchy: ')
+                    print(nx.write_network_text(dset.object_categories().graph))
+            except Exception:
+                pass
 
         import pandas as pd
         pd.set_option('max_colwidth', 256)
 
+        stat_types = {}
+
         if config['basic']:
-            tag_to_stats = {}
+            stat_types['basic'] = tag_to_stats = {}
             for dset in datasets:
                 tag_to_stats[dset.tag] = dset.basic_stats()
-            df = pd.DataFrame.from_dict(tag_to_stats)
-            rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
+            if human_readable:
+                df = pd.DataFrame.from_dict(tag_to_stats)
+                if human_readable:
+                    rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['extended']:
-            tag_to_ext_stats = {}
+            stat_types['extended'] = tag_to_ext_stats = {}
             for dset in datasets:
                 tag_to_ext_stats[dset.tag] = dset.extended_stats()
 
-            # allkeys = ['annots_per_img', 'annots_per_cat']
             allkeys = sorted(set(ub.flatten(s.keys() for s in tag_to_ext_stats.values())))
-            # print('allkeys = {!r}'.format(allkeys))
-
             for key in allkeys:
-                print('\n--{!r}'.format(key))
+                if human_readable:
+                    print('\n--{!r}'.format(key))
                 df = pd.DataFrame.from_dict(
                     {k: v[key] for k, v in tag_to_ext_stats.items()})
-                rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
+                if human_readable:
+                    rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['catfreq']:
-            tag_to_freq = {}
+            stat_types['catfreq'] = tag_to_freq = {}
             for dset in datasets:
                 tag_to_freq[dset.tag] = dset.category_annotation_frequency()
             df = pd.DataFrame.from_dict(tag_to_freq)
-            rich_print(df.to_string(float_format=lambda x: '%0.3f' % x))
+            if human_readable:
+                rich_print(df.to_string(float_format=lambda x: '%0.3f' % x))
 
         if config['video_attrs']:
-            print('Video Attribute Histogram')
+            if human_readable:
+                print('Video Attribute Histogram')
+            stat_types['video_attrs'] = {}
             for dset in datasets:
                 attrs = dset.videos().attribute_frequency()
-                print('hist(video_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
+                stat_types['video_attrs'][dset.tag] = attrs
+                if human_readable:
+                    print('hist(video_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['image_attrs']:
-            print('Image Attribute Histogram')
+            if human_readable:
+                print('Image Attribute Histogram')
+            stat_types['image_attrs'] = {}
             for dset in datasets:
-                print('dset.tag = {!r}'.format(dset.tag))
+                if human_readable:
+                    print('dset.tag = {!r}'.format(dset.tag))
                 attrs = dset.images().attribute_frequency()
-                print('hist(image_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
+                stat_types['image_attrs'][dset.tag] = attrs
+                if human_readable:
+                    print('hist(image_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['annot_attrs']:
-            print('Annot Attribute Histogram')
+            if human_readable:
+                print('Annot Attribute Histogram')
+            stat_types['annot_attrs'] = {}
             for dset in datasets:
-                print('dset.tag = {!r}'.format(dset.tag))
+                if human_readable:
+                    print('dset.tag = {!r}'.format(dset.tag))
                 attrs = dset.annots().attribute_frequency()
-                print('hist(annot_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
+                stat_types['annot_attrs'][dset.tag] = attrs
+                if human_readable:
+                    print('hist(annot_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
         if config['boxes']:
-            print('Box stats')
+            if human_readable:
+                print('Box stats')
+            stat_types['boxes'] = {}
             for dset in datasets:
-                print('dset.tag = {!r}'.format(dset.tag))
-                print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
+                box_stats = dset.boxsize_stats()
+                if human_readable:
+                    print('dset.tag = {!r}'.format(dset.tag))
+                    print(ub.urepr(box_stats, nl=-1, precision=2))
+                stat_types['boxes'][dset.tag] = box_stats
 
         if config['image_size']:
-            print('Image size stats')
+            if human_readable:
+                print('Image size stats')
+            stat_types['image_size'] = {}
             for dset in datasets:
-                print('dset.tag = {!r}'.format(dset.tag))
+                if human_readable:
+                    print('dset.tag = {!r}'.format(dset.tag))
                 images = dset.images()
                 heights = np.array(images.lookup('height', np.nan))
                 widths = np.array(images.lookup('width', np.nan))
@@ -160,15 +212,20 @@ class CocoStatsCLI(scfg.DataConfig):
                     'widths': widths,
                     'rt_areas': rt_areas,
                 })
+                stat_types['image_size'][dset.tag] = image_size_info = {}
                 size_stats = imgsize_df.describe()
-                print(size_stats)
+                image_size_info['size_stats'] = size_stats.to_dict()
+                if human_readable:
+                    print(size_stats)
                 idx = np.argmax(rt_areas)
 
                 try:
                     biggest_image = images.take([idx]).coco_images[0]
                     max_area_h = biggest_image.img['height']
                     max_area_w = biggest_image.img['width']
-                    print('Max image: {} x {}'.format(max_area_w, max_area_h))
+                    if human_readable:
+                        print('Max image: {} x {}'.format(max_area_w, max_area_h))
+                    image_size_info['max_image_wh'] = (max_area_w, max_area_h)
                     pixels = max_area_w * max_area_h
                     total_disk_bytes = 0
                     for fpath in list(biggest_image.iter_image_filepaths()):
@@ -177,10 +234,15 @@ class CocoStatsCLI(scfg.DataConfig):
                         total_disk_bytes += num_bytes
                     total_disk_gb = total_disk_bytes / 2 ** 30
                     pixel_gb_per_bit = (pixels / 8) / 2 ** 30
-                    print('total_disk_gb = {!r}'.format(total_disk_gb))
-                    print('pixel_gb_per_bit = {!r}'.format(pixel_gb_per_bit))
+                    if human_readable:
+                        print('total_disk_gb = {!r}'.format(total_disk_gb))
+                        print('pixel_gb_per_bit = {!r}'.format(pixel_gb_per_bit))
+                    image_size_info['total_disk_gb'] = (total_disk_gb)
+                    image_size_info['pixel_gb_per_bit'] = (pixel_gb_per_bit)
                 except Exception:
-                    print('error getting max size')
+                    if human_readable:
+                        print('error getting max size')
+                    image_size_info['errors'] = 'error getting max size'
 
                 if 0:
                     # POC code for getting total disk size
@@ -189,10 +251,25 @@ class CocoStatsCLI(scfg.DataConfig):
                         for fpath in coco_img.iter_image_filepaths():
                             total_bytes += fpath.stat().st_size
                     total_gb = total_bytes / 2 ** 30
-                    print(f'total_gb={total_gb}')
+                    if human_readable:
+                        print(f'total_gb={total_gb}')
 
                 # print('dset.tag = {!r}'.format(dset.tag))
                 # print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
+
+        if not human_readable:
+            import kwutil
+            stat_types = kwutil.util_json.ensure_json_serializable(stat_types)
+            if config.format == 'json':
+                import json
+                print(json.dumps(stat_types, indent=' '))
+            elif config.format == 'yaml':
+                import kwutil
+                print(kwutil.Yaml.dumps(stat_types))
+            elif config.format == 'urepr':
+                print(ub.urepr(stat_types, nl=-1))
+            else:
+                raise KeyError(config.format)
 
         if config['embed']:
             # Hidden hack
