@@ -260,14 +260,29 @@ class CocoStatsCLI(scfg.DataConfig):
         if not human_readable:
             import kwutil
             stat_types = kwutil.util_json.ensure_json_serializable(stat_types)
+            # Rotate dictionaries so the dataset is the top-level key
+            rotated_stat_type = {
+                dset.tag: {
+                    'fpath': dset.fpath,
+                    'tag': dset.tag
+                }
+                for dset in datasets
+            }
+            for type_key1, value1 in stat_types.items():
+                for tag_key2, value2 in value1.items():
+                    rotated_stat_type[tag_key2][type_key1] = value2
+
+            # output stats as a List[dict]
+            stat_lists = list(rotated_stat_type.values())
+
             if config.format == 'json':
                 import json
-                print(json.dumps(stat_types, indent=' '))
+                print(json.dumps(stat_lists, indent=' '))
             elif config.format == 'yaml':
                 import kwutil
-                print(kwutil.Yaml.dumps(stat_types))
+                print(kwutil.Yaml.dumps(stat_lists))
             elif config.format == 'urepr':
-                print(ub.urepr(stat_types, nl=-1))
+                print(ub.urepr(stat_lists, nl=-1))
             else:
                 raise KeyError(config.format)
 

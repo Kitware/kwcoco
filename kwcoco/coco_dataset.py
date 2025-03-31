@@ -899,7 +899,7 @@ class MixinCocoConstructors:
                 else:
                     self = kwcoco.CocoDataset(dset_fpath, **kw)
             elif result.scheme == 'special':
-                self = cls.demo(key=key, **kw)
+                self = cls.demo(key=key, verbose=verbose, **kw)
             else:
                 # This case can be env-dependant in the unlikely case where you
                 # have a file with the same name as a demo key. But hey, you
