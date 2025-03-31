@@ -837,7 +837,7 @@ class MixinCocoConstructors:
     """
 
     @classmethod
-    def coerce(cls, key, sqlview=False, **kw):
+    def coerce(cls, key, sqlview=False, verbose=1, **kw):
         """
         Attempt to transform the input into the intended CocoDataset.
 
@@ -851,6 +851,9 @@ class MixinCocoConstructors:
                 can be quicker to load and use in some instances. Can be given
                 as a string, which sets the backend that is used: either sqlite
                 or postgresql.  Defaults to False.
+
+            verbose (int):
+                passed to coerce or demo if special constructors are used.
 
             **kw: passed to whatever constructor is chosen (if any)
 
@@ -905,7 +908,7 @@ class MixinCocoConstructors:
                 if exists(dset_fpath):
                     self = kwcoco.CocoDataset(dset_fpath, **kw)
                 else:
-                    self = cls.demo(key=key, **kw)
+                    self = cls.demo(key=key, verbose=verbose, **kw)
         elif type(key).__name__ == 'CocoSqlDatabase':
             self = key
         elif type(key).__name__ == 'CocoDataset':
