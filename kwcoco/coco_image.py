@@ -673,7 +673,9 @@ class CocoImage(_CocoObject):
             >>>     ],
             >>> })
             >>> # Searching for an asset that does not exist returns None
-            >>> self.find_asset_obj('depth')
+            >>> import pytest
+            >>> with pytest.raises(TypeError):
+            >>>     self.find_asset_obj('depth')
         """
         # from delayed_image.channel_spec import FusedChannelSpec
         channels = FusedChannelSpec.coerce(channels)
