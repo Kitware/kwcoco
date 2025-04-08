@@ -228,6 +228,6 @@ def main():
 if __name__ == '__main__':
     """
     CommandLine:
-        python ~/code/kwcoco/dev/benchmark_scalability.py
+        python ~/code/kwcoco/dev/bench/benchmark_scalability.py
     """
     main()
