@@ -202,8 +202,12 @@ class DetectionMetrics(ub.NiceRepr):
         Register/Add predicted detections for an image
 
         Args:
-            pred_dets (kwimage.Detections): predicted detections
+            pred_dets (kwimage.Detections):
+                Predicted detections. These should contain boxes, class_idxs.
+                They can optionally include scores.
+
             imgname (str | None): a unique string to identify the image
+
             gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
@@ -214,8 +218,12 @@ class DetectionMetrics(ub.NiceRepr):
         Register/Add groundtruth detections for an image
 
         Args:
-            true_dets (kwimage.Detections): groundtruth
+            true_dets (kwimage.Detections): groundtruth detections.
+            These should contain boxes, class_idxs. They can optionally include
+            weights.
+
             imgname (str | None): a unique string to identify the image
+
             gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
