@@ -787,6 +787,10 @@ class MeasureCombiner:
         return len(self.queue)
 
     def submit(self, other):
+        """
+        Args:
+            other (BinaryConfusionVectors): confusion vectors for an item
+        """
         self.queue.append(other)
 
     def combine(self):
@@ -798,7 +802,7 @@ class MeasureCombiner:
 
         if len(to_combine) == 0:
             pass
-        if len(to_combine) == 1:
+        elif len(to_combine) == 1:
             self.measures = to_combine[0]
         else:
             self.measures = Measures.combine(

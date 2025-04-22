@@ -504,7 +504,7 @@ class SingleImageSegmentationMetrics:
             for catname in self.classes_of_interest
         }
         class_weights = np.ones(shape, dtype=np.float32)
-        initial_total_weight = class_weights.size
+        # initial_total_weight = class_weights.size
 
         sseg_groups = {
             'background': [],
@@ -2154,6 +2154,80 @@ def colorize_weights(weights):
         rs, cs = np.where(is_gt_one)
         canvas[rs, cs, :] = colors01
     return canvas
+
+
+def _poc_online_binary_saliency_measures_demo():
+    """
+    proof of concpet for online segmentation measures
+    """
+    import kwarray
+    # import numpy as np
+    # import kwarray
+
+    class BinarySegmentationMetrics:
+        """
+        TODO: expose and make similar to DetectionMetrics
+        TODO: add multi-class variant
+        """
+        def __init__(self, thresh_bins=128, max_queue_size=5):
+            from kwcoco.metrics.confusion_measures import MeasureCombiner
+            self.thresh_bins = thresh_bins
+            self.max_queue_size = max_queue_size
+            self.left_bin_edges = np.linspace(0, 1, self.thresh_bins)
+            self.combiner = MeasureCombiner(thresh_bins=thresh_bins)
+
+        def add_item(self, true_mask, pred_probs, weights=None):
+            """
+            true_mask: np.ndarray of shape (H, W), bool or int (0 or 1)
+            pred_probs: np.ndarray of shape (H, W), float in [0, 1]
+            """
+            from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
+            assert pred_probs.shape == true_mask.shape
+            probs = pred_probs.copy()
+            truth = true_mask.astype(bool)
+
+            if weights is None:
+                weights = np.ones_like(probs, dtype=np.float32)
+
+            invalid_mask = np.isnan(probs)
+            probs[invalid_mask] = 0
+            weights[invalid_mask] = 0
+
+            pred_score = probs.ravel()
+            if self.left_bin_edges is not None:
+                # pre-clip the scores to bins (makes combination more
+                # efficient)
+                rounded_idx = np.searchsorted(self.left_bin_edges, pred_score)
+                pred_score = self.left_bin_edges[np.clip(rounded_idx, 0, len(self.left_bin_edges) - 1)]
+
+            bin_cfns = BinaryConfusionVectors(kwarray.DataFrameArray({
+                'is_true': truth.ravel(),
+                'pred_score': pred_score,
+                'weight': weights.ravel().astype(np.float32),
+            }))
+
+            self.combiner.submit(bin_cfns.measures())
+            if self.combiner.queue_size > self.max_queue_size:
+                self.combiner.combine()
+
+        def measures(self):
+            return self.combiner.finalize()
+
+    bin_sseg_metrics = BinarySegmentationMetrics(
+        thresh_bins=128,
+        max_queue_size=5,
+    )
+    rng = kwarray.ensure_rng()
+
+    num_items = 10
+    for _ in range(num_items):
+        # Pretend we have some truth labels and prediction probabilities
+        truth = (rng.rand(32, 32) > 0.5)
+        probs = rng.rand(32, 32)
+        bin_sseg_metrics.add_item(truth, probs)
+
+    final_measures = bin_sseg_metrics.measures()
+    print(f'final_measures = {ub.urepr(final_measures, nl=1)}')
 
 
 if __name__ == '__main__':
