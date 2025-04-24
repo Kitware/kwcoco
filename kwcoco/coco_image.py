@@ -25,11 +25,6 @@ from delayed_image import DelayedNans
 from delayed_image import DelayedChannelConcat
 from delayed_image import DelayedLoad, DelayedIdentity
 
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
-
 
 __docstubs__ = """
 from delayed_image.channel_spec import FusedChannelSpec
@@ -885,7 +880,6 @@ class CocoImage(_CocoObject):
         if self.dset is not None:
             self.dset._invalidate_hashid()
 
-    @profile
     def imdelay(self, channels=None, space='image', resolution=None,
                 bundle_dpath=None, interpolation='linear', antialias=True,
                 nodata_method=None, RESOLUTION_KEY=None):
@@ -1648,7 +1642,6 @@ class CocoTrack(_CocoObject):
         return self.dset.annots(track_id=self['id'])
 
 
-@profile
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     # from os.path import join
     # from delayed_image.channel_spec import FusedChannelSpec
