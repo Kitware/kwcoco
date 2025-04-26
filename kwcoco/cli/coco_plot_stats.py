@@ -83,6 +83,11 @@ class PlotStatsCLI(scfg.DataConfig):
 
     with_process_context = scfg.Value(True, help='set to false to disable process contxt')
 
+    options = scfg.Value(None, help=ub.paragraph(
+        '''
+        YAML options specification
+        '''))
+
     dpi = scfg.Value(300, help='dpi for figures')
 
     @classmethod
@@ -99,7 +104,7 @@ class PlotStatsCLI(scfg.DataConfig):
 __cli__ = PlotStatsCLI
 
 
-def prep_plots(src, plots_dpath=None, dpi=300):
+def prep_plots(src, plots_dpath=None, options=None, dpi=300):
     import kwcoco
     import json
     from kwcoco.util.util_rich import rich_print
@@ -132,7 +137,7 @@ def prep_plots(src, plots_dpath=None, dpi=300):
         rich_print(ub.urepr(perimage_summary, nl=-1, align=':', precision=2))
 
     print('Preparing plots')
-    plots = Plots(plots_dpath, tables_data, nonsaved_data, dpi=dpi)
+    plots = Plots(plots_dpath, tables_data, nonsaved_data, options, dpi=dpi)
     plots.scalar_stats = scalar_stats
     return plots
 
@@ -168,8 +173,9 @@ def run(config):
         proc_context = None
 
     src = config['src']
+    options = config['options']
     dpi = config.dpi
-    plots = prep_plots(src, plots_dpath, dpi=dpi)
+    plots = prep_plots(src, plots_dpath, options, dpi=dpi)
     tables_data = plots.tables_data
     rich_print(f'Will write plots to: [link={plots_dpath}]{plots_dpath}[/link]')
     scalar_stats = plots.scalar_stats
@@ -251,7 +257,8 @@ def rerun_plots(tables_fpath):
     plots_dpath = None
     nonsaved_data = None
     dpi = None
-    plots = Plots(plots_dpath, tables_data, nonsaved_data, dpi=dpi)
+    options = None
+    plots = Plots(plots_dpath, tables_data, nonsaved_data, options, dpi=dpi)
     self = plots  # NOQA
     BuiltinPlots.polygon_area_vs_num_verts(self)
     # plots.plot_functions['polygon_area_vs_num_verts'](self)
@@ -269,7 +276,7 @@ def geospatial_stats(dset, images, perimage_data):
         def coco_estimate_sunlight(dset, image_ids=None):
             try:
                 from kwgis.utils.util_sunlight import estimate_sunlight
-                import suntime  # NOQA
+                # import suntime  # NOQA
                 import timezonefinder  # NOQA
                 import pytz  # NOQA
             except ImportError as ex:
@@ -279,7 +286,7 @@ def geospatial_stats(dset, images, perimage_data):
                     pip install suntime timezonefinder pytz kwgis
                     {ex}
                     '''
-                if 0:
+                if 1:
                     raise add_exception_note(ex, ub.codeblock(msg))
                 else:
                     warnings.warn(msg)
@@ -309,14 +316,15 @@ def geospatial_stats(dset, images, perimage_data):
 
         try:
             sunlight_values = coco_estimate_sunlight(dset, image_ids=images)
-            # print(f'sunlight_values={sunlight_values}')
+            print(f'sunlight_values={sunlight_values}')
             if not np.isnan(sunlight_values).all():
                 perimage_data['sunlight'] = sunlight_values
-        except ImportError:
-            print('Unable to estimate sunlight')
+        except ImportError as ex:
+            print(f'Unable to estimate sunlight: {ex}')
             raise
-        except Exception:
-            print('Unable to estimate sunlight')
+        except Exception as ex:
+            print(f'Unable to estimate sunlight: {ex}')
+            raise
 
 
 @profile
@@ -376,11 +384,12 @@ def build_stats_data(dset):
         try:
             geospatial_stats(dset, images, perimage_data)
         except Exception as ex:
-            raise
             print(f'Failed to build domain (geospatial) stats: ex={ex}')
+            raise
         else:
-            print('Built domain (goespatial) stats')
             # TODO: medical stats / other domain stats
+            print('Built domain (geospatial) stats')
+        print(perimage_data)
 
         # try:
         #     # We dont want to require geopandas
@@ -502,7 +511,7 @@ class Plots:
     _plot_function_registery = {}
 
     @classmethod
-    def demo(cls, **kwargs):
+    def demo(cls, options=None, **kwargs):
         """
         Helper for tweaking visualizations
 
@@ -515,15 +524,16 @@ class Plots:
         import kwcoco
         dpath = ub.Path.appdir('kwcoco/demo/vis_stats').ensuredir()
         src = kwcoco.CocoDataset.demo('vidshapes8', **kwargs)
-        plots = prep_plots(src, plots_dpath=dpath)
+        plots = prep_plots(src, plots_dpath=dpath, options=options)
         return plots
 
     @profile
-    def __init__(self, plots_dpath, tables_data, nonsaved_data, dpi=300):
+    def __init__(self, plots_dpath, tables_data, nonsaved_data, options=None, dpi=300):
         import kwplot
         import pandas as pd
         import json
         import io
+        import kwutil
 
         # kwplot 0.5.3 doesnt provide util_seaborn access via lazy loading
         # work around this
@@ -533,6 +543,7 @@ class Plots:
         self.tables_data = tables_data
         self.nonsaved_data = nonsaved_data
         self.dpi = dpi
+        self.options = kwutil.Yaml.coerce(options)
 
         sns = kwplot.autosns(verbose=3)
 
@@ -544,6 +555,7 @@ class Plots:
 
         self.perannot_data = pd.read_json(io.StringIO(json.dumps(tables_data['perannot_data'])), orient='table')
         self.perimage_data = pd.read_json(io.StringIO(json.dumps(tables_data['perimage_data'])), orient='table')
+        print(self.perimage_data)
         self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
         self.plot_functions = {}
 
@@ -572,6 +584,18 @@ class Plots:
         # use cases
         for name, func in self.__class__.available_plot_funcs().items():
             self.register(func)
+
+    def resolve_options(self, defaults, plot_name):
+        defaults = ub.udict(defaults)
+        resolved = defaults.copy()
+        if self.options is not None:
+            import copy
+            options = ub.udict(copy.deepcopy(self.options))
+            if plot_name in options:
+                options.update(options[plot_name])
+            resolved = resolved | (options & resolved)
+        print(f'resolved={resolved}')
+        return resolved
 
     @classmethod
     def available_plot_funcs(cls):
@@ -617,6 +641,10 @@ class BuiltinPlots:
     """
     A class that ONLY contains methods that will produce a plot.
     This is used to register them with :class:`Plots`.
+
+    Note:
+        The "self" argument is an instance of Plots, not this class.
+        It would be nice to find a better way to organize this.
     """
 
     def polygon_centroid_absolute_distribution(self):
@@ -1218,7 +1246,12 @@ class BuiltinPlots:
         Example:
             >>> # xdoctest: +REQUIRES(module:kwutil)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
-            >>> self = Plots.demo(timestamps=True)
+            >>> options = '''
+                all_polygons:
+                    facecolor: red
+                    edgecolor: green
+                '''
+            >>> self = Plots.demo(timestamps=True, options=options)
             >>> self['all_polygons'](self)
 
         Ignore:
@@ -1226,15 +1259,22 @@ class BuiltinPlots:
             ~/code/kwimage/kwimage/_im_color_data.py
         """
         import kwimage
+        default_options = ub.udict({
+            'edgecolor': 'kitware_darkgray',
+            'facecolor': '#b1dfaa',
+        })
+        options = self.resolve_options(default_options, 'all_polygons')
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         # edgecolor = kwimage.Color.coerce('kitware_darkblue').as01()
         # facecolor = kwimage.Color.coerce('kitware_green').as01()
         # edgecolor = kwimage.Color.coerce('white').as01()
         # facecolor = kwimage.Color.coerce('kitware_darkblue').as01()
         # edgecolor = kwimage.Color.coerce('almost black').as01()
-        edgecolor = kwimage.Color.coerce('kitware_darkgray').as01()
+
+        edgecolor = kwimage.Color.coerce(options['edgecolor']).as01()
         # facecolor = kwimage.Color.coerce('kitware_green').as01()
-        facecolor = kwimage.Color.coerce('#b1dfaa').as01()
+        #ad900d
+        facecolor = kwimage.Color.coerce(options['facecolor']).as01()
         self.polys.draw(alpha=0.5, edgecolor=edgecolor, facecolor=facecolor)
         ax.set_xlabel('Image X Coordinate')
         ax.set_ylabel('Image Y Coordinate')
