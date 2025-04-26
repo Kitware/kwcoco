@@ -696,6 +696,18 @@ class Images(ObjectList1D):
         return [join(root, gname) for gname in self.gname]
 
     @property
+    def image_id(self):
+        return self._ids
+
+    @property
+    def image_name(self):
+        return self.gname
+
+    @property
+    def image_path(self):
+        return self.gpath
+
+    @property
     def width(self):
         return self.lookup('width')
 
@@ -1144,10 +1156,11 @@ class _BaseView(collections.abc.Sequence):
     #     return self
 
     def __repr__(self):
-        return repr(list(self))
+        clsname = self.__class__.__name__
+        return f'{clsname}({list(self)!r})'
 
     def __str__(self):
-        return repr(list(self))
+        return f'{list(self)!r}'
 
 
 class ObjView(_BaseView):
