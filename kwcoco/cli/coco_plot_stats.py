@@ -316,7 +316,6 @@ def geospatial_stats(dset, images, perimage_data):
 
         try:
             sunlight_values = coco_estimate_sunlight(dset, image_ids=images)
-            print(f'sunlight_values={sunlight_values}')
             if not np.isnan(sunlight_values).all():
                 perimage_data['sunlight'] = sunlight_values
         except ImportError as ex:
@@ -389,7 +388,6 @@ def build_stats_data(dset):
         else:
             # TODO: medical stats / other domain stats
             print('Built domain (geospatial) stats')
-        print(perimage_data)
 
         # try:
         #     # We dont want to require geopandas
@@ -555,7 +553,6 @@ class Plots:
 
         self.perannot_data = pd.read_json(io.StringIO(json.dumps(tables_data['perannot_data'])), orient='table')
         self.perimage_data = pd.read_json(io.StringIO(json.dumps(tables_data['perimage_data'])), orient='table')
-        print(self.perimage_data)
         self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
         self.plot_functions = {}
 
@@ -594,7 +591,6 @@ class Plots:
             if plot_name in options:
                 options.update(options[plot_name])
             resolved = resolved | (options & resolved)
-        print(f'resolved={resolved}')
         return resolved
 
     @classmethod
