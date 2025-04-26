@@ -102,7 +102,8 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             if isinstance(keep, str):
                 warnings.warn(
                     'Keep is specified as a string. '
-                    'Did you mean to input a list?')
+                    'Did you mean to input a list? Auto fixing.')
+                keep = [keep]
             remove = list(classes - set(keep))
         else:
             remove = config['remove']
