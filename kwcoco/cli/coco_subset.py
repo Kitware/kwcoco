@@ -73,6 +73,9 @@ class CocoSubsetCLI(scfg.DataConfig):
                 Requires the "jq" python library is installed.
                 ''')),
 
+        # FIXME: this can cause issues if the src kwcoco points to files
+        # outside of its bundle directory. Is there an inuitive way to handle
+        # this? Maybe this followed by a move-assets operation?
         'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
 
         'compress': scfg.Value('auto', help='if True writes results with compression'),
@@ -168,6 +171,7 @@ class CocoSubsetCLI(scfg.DataConfig):
         if config['copy_assets']:
             # Create a copy of the data, (currently only works for relative
             # kwcoco files)
+            # TODO use kwutil copy manager
             from os.path import join, dirname
             import shutil
             print('Copying assets')
