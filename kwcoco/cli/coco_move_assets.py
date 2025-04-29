@@ -21,12 +21,68 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
     src = scfg.Value('source asset file or folder')
     dst = scfg.Value('destination asset file or folder')
     io_workers = scfg.Value(0, help='io workers')
+    dry = scfg.Value(False, isflag=True, short_alias=['-n'], help='if True do a dry run, only report what would be done')
     coco_fpaths = scfg.Value([], nargs='+', help='coco files modified by the move operation')
+
+    @classmethod
+    def main(cls, cmdline=1, **kwargs):
+        """
+        CommandLine:
+            xdoctest -m kwcoco.cli.coco_move_assets CocoMoveAssetsCLI.main
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_move_assets import *  # NOQA
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset.demo('shapes8')
+            >>> cls = CocoMoveAssetsCLI
+            >>> cmdline = False
+            >>> kwargs = {
+            >>>     'coco_fpaths': [dset.fpath],
+            >>>     'src': ub.Path(dset.bundle_dpath) / '_assets',
+            >>>     'dst': ub.Path(dset.bundle_dpath) / 'new_asset_dir',
+            >>>     'dry': True,
+            >>> }
+            >>> cls.main(cmdline=cmdline, **kwargs)
+
+        Example:
+            >>> # xdoctest: +SKIP
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # development use-case. TODO: turn into a real doctest
+            >>> cmdline = 0
+            >>> kwargs = dict(
+            >>>     coco_fpaths=['*_E.kwcoco.zip', '*_mae.kwcoco.zip'],
+            >>>     src='./_assets/teamfeats',
+            >>>     dst='./teamfeats/mae',
+            >>>     io_workers='avail',
+            >>> )
+
+            >>> cmdline = 0
+            >>> kwargs = dict(
+            >>>     coco_fpaths=['*_M.kwcoco.zip', '*_rutgers_material_seg_v4.kwcoco.zip'],
+            >>>     src='./_teamfeats',
+            >>>     dst='./teamfeats/materials',
+            >>>     io_workers='avail',
+            >>> )
+            >>> main(cmdline=cmdline, **kwargs)
+        """
+        import rich
+        config = CocoMoveAssetsCLI.cli(cmdline=cmdline, data=kwargs, strict=True)
+        rich.print('config = ' + ub.urepr(config, nl=1))
+        from kwutil import util_path
+        import kwcoco
+        coco_fpaths = util_path.coerce_patterned_paths(config.coco_fpaths)
+        dsets = list(kwcoco.CocoDataset.coerce_multiple(coco_fpaths, workers=config.io_workers))
+
+        mv_man = CocoMoveAssetManager(dsets, dry=config.dry)
+        mv_man.submit(config.src, config.dst)
+        mv_man.run()
 
 
 class CocoMoveAssetManager:
-    def __init__(self, coco_dsets):
+    def __init__(self, coco_dsets, dry=False):
         self.jobs = []
+        self.dry = dry
         self.coco_dsets = coco_dsets
         self.impacted_assets = None
         self.impacted_dsets = None
@@ -41,13 +97,15 @@ class CocoMoveAssetManager:
 
         Otherwise we assume src needs to be moved to dst.
         """
+        src = ub.Path(src)
+        dst = ub.Path(dst)
         if dst.exists():
             # Tell the manager that the src was already move to the dst, but
             # the kwcoco files may need to be updated.
-            assert not src.exists()
+            assert not src.exists(), f'{src}'
             self._previous_moves.append({'src': src, 'dst': dst})
         else:
-            assert src.exists()
+            assert src.exists(), f'{src}'
             self.jobs.append({'src': src, 'dst': dst})
 
     def find_impacted(self):
@@ -86,6 +144,9 @@ class CocoMoveAssetManager:
 
     def modify_datasets(self):
         # Modify the kwcoco files in memory
+        if self.dry:
+            print('Dry run, skip modify datasets')
+            return
         import os
         for asset, s, d in self.impacted_assets:
             old_asset_fname = asset['file_name']
@@ -101,12 +162,20 @@ class CocoMoveAssetManager:
             asset['file_name'] = os.fspath(new_asset_fname)
 
     def move_files(self):
+        if self.dry:
+            print(f'Dry run, would move: {ub.urepr(self.jobs, nl=True)}')
+            return
+
         for job in ub.ProgIter(self.jobs, desc='moving files'):
             s = job['src'].absolute()
             d = job['dst'].absolute()
             s.move(d)
 
     def dump_datasets(self):
+        if self.dry:
+            print('Dry run, skip dump datasets')
+            return
+
         # Check that the kwcoco files are working
         for dset in self.impacted_dsets.values():
             assert not dset.missing_images()
@@ -127,40 +196,7 @@ class CocoMoveAssetManager:
 #     fs = fsspec.filesystem('file', asynchronous=True)
 
 
-def main(cmdline=1, **kwargs):
-    """
-    Example:
-        >>> # xdoctest: +SKIP
-        >>> # xdoctest: +REQUIRES(module:kwutil)
-        >>> cmdline = 0
-        >>> kwargs = dict(
-        >>>     coco_fpaths=['*_E.kwcoco.zip', '*_mae.kwcoco.zip'],
-        >>>     src='./_assets/teamfeats',
-        >>>     dst='./teamfeats/mae',
-        >>>     io_workers='avail',
-        >>> )
-
-        >>> cmdline = 0
-        >>> kwargs = dict(
-        >>>     coco_fpaths=['*_M.kwcoco.zip', '*_rutgers_material_seg_v4.kwcoco.zip'],
-        >>>     src='./_teamfeats',
-        >>>     dst='./teamfeats/materials',
-        >>>     io_workers='avail',
-        >>> )
-        >>> main(cmdline=cmdline, **kwargs)
-    """
-    import rich
-    config = CocoMoveAssetsCLI.cli(cmdline=cmdline, data=kwargs, strict=True)
-    rich.print('config = ' + ub.urepr(config, nl=1))
-    from kwutil import util_path
-    import kwcoco
-    coco_fpaths = util_path.coerce_patterned_paths(config.coco_fpaths)
-    dsets = list(kwcoco.CocoDataset.coerce_multiple(coco_fpaths, workers=config.io_workers))
-
-    mv_man = CocoMoveAssetManager(dsets)
-    mv_man.submit(config.src, config.dst)
-    mv_man.run()
-
+__cli__ = CocoMoveAssetsCLI
 
 if __name__ == '__main__':
     """
@@ -168,4 +204,4 @@ if __name__ == '__main__':
         python ~/code/kwcoco/kwcoco/cli/coco_move_assets.py
         python -m kwcoco.cli.coco_move_assets
     """
-    main()
+    __cli__.main()
