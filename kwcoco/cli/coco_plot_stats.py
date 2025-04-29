@@ -1118,7 +1118,12 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['anns_per_image_histogram_splity'](self)
         """
-        split_y = 'auto'
+        # split_y = 'auto'
+        default_options = ub.udict({
+            'split_y': 'auto',
+        })
+        options = self.resolve_options(default_options, 'anns_per_image_histogram_splity')
+        split_y = options['split_y']
         snskw = dict(binwidth=1, discrete=True)
         ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(
             data=self.perimage_data, x='anns_per_image', split_y=split_y,
