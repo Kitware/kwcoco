@@ -286,7 +286,7 @@ def geospatial_stats(dset, images, perimage_data):
                     pip install suntime timezonefinder pytz kwgis
                     {ex}
                     '''
-                if 1:
+                if 0:
                     raise add_exception_note(ex, ub.codeblock(msg))
                 else:
                     warnings.warn(msg)
