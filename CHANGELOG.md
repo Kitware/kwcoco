@@ -27,6 +27,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * The `Images.coco_images` property now returns an CocoImageView instead of a list, 
   which enables more efficient iteration. As a result `.coco_images_iter` is deprecated.
 * Modify categories keep argument will coerce to a list if given as a string.
+* Confusion measures will now included more metrics at maximized operating points.
 
 ### Fixed
 * index failure if tracks were used on images without `frame_index`

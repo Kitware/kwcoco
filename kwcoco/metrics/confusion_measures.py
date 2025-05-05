@@ -149,7 +149,30 @@ class Measures(ub.NiceRepr, DictProxy):
                 }
         return maximized_info
 
+    def scalars(self):
+        """
+        Return the computed metrics without the full curve content
+
+        Example:
+            >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors  # NOQA
+            >>> binvecs = BinaryConfusionVectors.demo(n=100, p_error=0.5)
+            >>> self = binvecs.measures()
+            >>> scalars = self.scalars()
+            >>> print(f'scalars = {ub.urepr(scalars, nl=1)}')
+        """
+        scalar_data = ub.dict_diff(self, [
+            'fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds',
+            'trunc_fpr', 'monotonic_ppv', 'trunc_fp_count', 'trunc_tp_count',
+            'trunc_tpr', 'trunc_thresholds', 'tpr', 'ppv', 'tpr', 'fpr', 'bm',
+            'mk', 'acc', 'tnr', 'npv', 'mcc', 'f1', 'g1',
+        ])
+        return scalar_data
+
     def counts(self):
+        """
+        Just return the curves, from which most other data is computed
+        (subject to metadata, see __json__ for actual minimal metadata)
+        """
         counts_df = ub.dict_isect(self, [
             'fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds'])
         counts_df = kwarray.DataFrameArray(counts_df)
@@ -1067,13 +1090,14 @@ def populate_info(info):
         info['f1'] =  f1_numer / f1_denom
 
         # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
+        # https://arxiv.org/abs/2305.00594
         # info['g1'] = np.sqrt(ppv * tpr)
         info['g1'] = np.sqrt(ppv_mul_tpr)
 
         # Report the threshold that maximizes wholistic quality metrics as well
         # as the contextural metrics at that threshold.
         keys = ['mcc', 'g1', 'f1', 'acc']
-        sub_keys = ['ppv', 'tpr', 'fpr', 'tnr', 'bm', 'mk']
+        sub_keys = ['ppv', 'tpr', 'fpr', 'tnr', 'bm', 'mk', 'mcc', 'g1', 'f1', 'acc']
         finite_thresh = thresh[finite_flags]
         for key in keys:
             if key in info:
