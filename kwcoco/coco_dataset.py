@@ -2480,6 +2480,15 @@ class MixinCocoObjects:
             >>> tracks.lookup('name')
             >>> tracks.lookup('id')
             >>> print('tracks.objs = {}'.format(ub.urepr(tracks.objs[0:2], nl=1)))
+
+        Example:
+            >>> # Test case for video id lookup when not all annotations are in tracks
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> for image_id in self.images():
+            >>>     self.add_annotation(image_id=image_id, bbox=[1, 2, 3, 4])
+            >>> tracks = self.tracks(video_id=1)
+            >>> assert len(tracks) == 2
         """
         if track_ids is None:
             track_ids = sorted(self.index.tracks.keys())
@@ -2492,9 +2501,8 @@ class MixinCocoObjects:
             annot_ids = sorted(ub.flatten([
                 self.index.gid_to_aids[gid]
                 for gid in self.index.vidid_to_gids[video_id]]))
-            annot_track_ids = self.annots(annot_ids).lookup('track_id')
-            track_ids = list(ub.unique(annot_track_ids))
-
+            annot_track_ids = self.annots(annot_ids).lookup('track_id', None)
+            track_ids = [tid for tid in ub.unique(annot_track_ids) if tid is not None]
         return Tracks(track_ids, self)
 
 

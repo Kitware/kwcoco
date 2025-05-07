@@ -32,6 +32,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 * index failure if tracks were used on images without `frame_index`
 * minor verbosity fixes
+* Issue with track lookup by video-id
 
 
 ## Version 0.8.7 - Released 2024-12-18
