@@ -2418,8 +2418,8 @@ class MixinCocoObjects:
         Args:
             video_ids (List[int] | None):
                 video ids to reference, if unspecified all videos are returned.
-                The `vidids` argument is an alias.  Mutually exclusive with
-                other args.
+                The `vidids` argument is a deprecated alias.  Mutually
+                exclusive with other args.
 
             names (List[str] | None):
                 lookup videos by their name.
@@ -2445,6 +2445,15 @@ class MixinCocoObjects:
             >>> print('videos.objs = {}'.format(ub.urepr(videos.objs[0:2], nl=1)))
         """
         if video_ids is None:
+            if vidids is not None:
+                ub.schedule_deprecation(
+                    'kwcoco', name='vidids', type='parameter',
+                    deprecate='0.6.3', error='1.0.0', remove='1.1.0',
+                    migration=ub.paragraph(
+                        '''
+                        Use video_ids instead.
+                        ''')
+                )
             video_ids = vidids
         if video_ids is None:
             video_ids = sorted(self.index.videos.keys())
