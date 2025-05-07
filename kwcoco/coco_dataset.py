@@ -2448,7 +2448,7 @@ class MixinCocoObjects:
             if vidids is not None:
                 ub.schedule_deprecation(
                     'kwcoco', name='vidids', type='parameter',
-                    deprecate='0.6.3', error='1.0.0', remove='1.1.0',
+                    deprecate='0.8.8', error='1.0.0', remove='1.1.0',
                     migration=ub.paragraph(
                         '''
                         Use video_ids instead.
