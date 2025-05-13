@@ -415,6 +415,14 @@ class SingleImageSegmentationMetrics:
 
         self.true_cidxs = scaled_true_dets.data['class_idxs']
         self.true_ssegs = scaled_true_dets.data['segmentations']
+
+        if 'weights' in scaled_true_dets.data:
+            self.true_weights = np.array(scaled_true_dets.data['weights'])
+            # Unspecified weights should be 1.0 (kwimage will default to nan)
+            self.true_weights[np.isnan(self.true_weights)] = 1.0
+        else:
+            self.true_weights = [1.0] * len(self.true_ssegs)
+
         self.true_catnames = list(ub.take(scaled_true_dets.classes.idx_to_node, self.true_cidxs))
 
     def build_saliency_masks(self):
@@ -431,7 +439,7 @@ class SingleImageSegmentationMetrics:
             'foreground': [],
             'background': [],
         }
-        for true_sseg, true_catname in zip(self.true_ssegs, self.true_catnames):
+        for true_sseg, true_catname, true_weight in zip(self.true_ssegs, self.true_catnames, self.true_weights):
             if true_catname in self._behavor_to_classes['background']:
                 key = 'background'
             elif true_catname in self._behavor_to_classes['ignore']:
@@ -440,7 +448,7 @@ class SingleImageSegmentationMetrics:
                 key = 'context'
             else:
                 key = 'foreground'
-            sseg_groups[key].append(true_sseg)
+            sseg_groups[key].append((true_sseg, true_weight))
 
         if self.balance_area == 'foreground_independent':
             if len(sseg_groups['foreground']):
@@ -477,18 +485,20 @@ class SingleImageSegmentationMetrics:
         sseg_groups['background']
         # Ignore context classes in saliency
         # Ignore no-activity and post-construction, ignore, and Unknown
-        for true_sseg in sseg_groups['ignore']:
+        for true_sseg, true_weight in sseg_groups['ignore']:
             saliency_weights = true_sseg.fill(saliency_weights, value=0)
-        for true_sseg in sseg_groups['context']:
+        for true_sseg, true_weight in sseg_groups['context']:
             # saliency_weights = true_sseg.fill(saliency_weights, value=0)
             ...
         # Score positive, site prep, and active construction.
-        for true_sseg in sseg_groups['foreground']:
+        for true_sseg, true_weight in sseg_groups['foreground']:
             true_saliency = true_sseg.fill(true_saliency, value=1)
             if self.balance_area:
                 # Fill in the weights to upweight smaller areas.
-                instance_weight = unit_sseg_share / true_sseg.area
+                instance_weight = true_weight * unit_sseg_share / true_sseg.area
                 saliency_weights = true_sseg.fill(saliency_weights, value=instance_weight)
+            elif true_weight != 1:
+                saliency_weights = true_sseg.fill(saliency_weights, value=true_weight)
         # saliency_weights = saliency_weights / saliency_weights.max()
         self.true_saliency = true_saliency
         self.saliency_weights = saliency_weights
@@ -512,7 +522,7 @@ class SingleImageSegmentationMetrics:
             'undistinguished': [],
             'foreground': [],
         }
-        for true_sseg, true_catname in zip(self.true_ssegs, self.true_catnames):
+        for true_sseg, true_catname, true_weight in zip(self.true_ssegs, self.true_catnames, self.true_weights):
             if true_catname in self._behavor_to_classes['background']:
                 key = 'background'
             elif true_catname in self._behavor_to_classes['ignore']:
@@ -522,7 +532,7 @@ class SingleImageSegmentationMetrics:
             else:
                 key = 'foreground'
                 true_sseg.meta['true_catname'] = true_catname
-            sseg_groups[key].append(true_sseg)
+            sseg_groups[key].append((true_sseg, true_weight))
 
         if self.balance_area == 'foreground_independent':
             if len(sseg_groups['foreground']):
@@ -539,17 +549,19 @@ class SingleImageSegmentationMetrics:
         sseg_groups['background']
         # Ignore context classes in saliency
         # Ignore no-activity and post-construction, ignore, and Unknown
-        for true_sseg in sseg_groups['ignore']:
+        for true_sseg, true_weight in sseg_groups['ignore']:
             class_weights = true_sseg.fill(class_weights, value=0)
-        for true_sseg in sseg_groups['undistinguished']:
+        for true_sseg, true_weight in sseg_groups['undistinguished']:
             class_weights = true_sseg.fill(class_weights, value=0)
         # Score positive, site prep, and active construction.
-        for true_sseg in sseg_groups['foreground']:
+        for true_sseg, true_weight in sseg_groups['foreground']:
             true_catname = true_sseg.meta['true_catname']
             if self.balance_area:
                 # Fill in the weights to upweight smaller areas.
-                instance_weight = unit_sseg_share / true_sseg.area
+                instance_weight = true_weight * unit_sseg_share / true_sseg.area
                 class_weights = true_sseg.fill(class_weights, value=instance_weight)
+            elif true_weight != 1.0:
+                class_weights = true_sseg.fill(class_weights, value=true_weight)
             catname_to_true[true_catname] = true_sseg.fill(catname_to_true[true_catname], value=1)
 
         # Hack:
@@ -571,7 +583,14 @@ class SingleImageSegmentationMetrics:
             self.salient_class, space=self.score_space,
             resolution=self.resolution,
             nodata_method='float')
-        salient_prob = salient_delay.finalize(nodata_method='float')[..., 0]
+        _got_salient_prob = salient_delay.finalize(nodata_method='float')
+        # FIXME: Delayed image bug? Not sure why it returns 2 channels
+        # sometimes instead of 3. That should not happen. Probably something to
+        # do with saving / reading the asset as a png?
+        if len(_got_salient_prob.shape) == 2:
+            salient_prob = _got_salient_prob
+        else:
+            salient_prob = _got_salient_prob[..., 0]
         salient_prob_orig = salient_prob.copy()
         invalid_mask = np.isnan(salient_prob)
 
@@ -588,11 +607,12 @@ class SingleImageSegmentationMetrics:
             rounded_idx = np.searchsorted(self.left_bin_edges, pred_score)
             pred_score = self.left_bin_edges[rounded_idx]
 
-        bin_cfns = BinaryConfusionVectors(kwarray.DataFrameArray({
+        data = kwarray.DataFrameArray({
             'is_true': self.true_saliency.ravel(),
             'pred_score': pred_score,
             'weight': self.saliency_weights.ravel().astype(np.float32),
-        }))
+        })
+        bin_cfns = BinaryConfusionVectors(data)
         salient_measures = bin_cfns.measures()
         salient_summary = salient_measures.summary()
 
