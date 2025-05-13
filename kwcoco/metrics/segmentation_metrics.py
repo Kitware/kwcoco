@@ -417,7 +417,8 @@ class SingleImageSegmentationMetrics:
         self.true_ssegs = scaled_true_dets.data['segmentations']
 
         if 'weights' in scaled_true_dets.data:
-            self.true_weights = np.array(scaled_true_dets.data['weights'])
+            self.true_weights = np.array(
+                scaled_true_dets.data['weights'], dtype=np.float32)
             # Unspecified weights should be 1.0 (kwimage will default to nan)
             self.true_weights[np.isnan(self.true_weights)] = 1.0
         else:
