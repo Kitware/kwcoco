@@ -499,7 +499,7 @@ class SingleImageSegmentationMetrics:
                 instance_weight = true_weight * unit_sseg_share / true_sseg.area
                 saliency_weights = true_sseg.fill(saliency_weights, value=instance_weight)
             elif true_weight != 1:
-                saliency_weights = true_sseg.fill(saliency_weights, value=true_weight)
+                saliency_weights = true_sseg.fill(saliency_weights, value=float(true_weight))
         # saliency_weights = saliency_weights / saliency_weights.max()
         self.true_saliency = true_saliency
         self.saliency_weights = saliency_weights
@@ -562,7 +562,7 @@ class SingleImageSegmentationMetrics:
                 instance_weight = true_weight * unit_sseg_share / true_sseg.area
                 class_weights = true_sseg.fill(class_weights, value=instance_weight)
             elif true_weight != 1.0:
-                class_weights = true_sseg.fill(class_weights, value=true_weight)
+                class_weights = true_sseg.fill(class_weights, value=float(true_weight))
             catname_to_true[true_catname] = true_sseg.fill(catname_to_true[true_catname], value=1)
 
         # Hack:
