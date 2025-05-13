@@ -277,13 +277,14 @@ def geospatial_stats(dset, images, perimage_data):
             try:
                 from kwgis.utils.util_sunlight import estimate_sunlight
                 # import suntime  # NOQA
+                import astral  # NOQA
                 import timezonefinder  # NOQA
                 import pytz  # NOQA
             except ImportError as ex:
                 from kwutil.util_exception import add_exception_note
                 msg = f'''
                     Missing requirements, please:
-                    pip install suntime timezonefinder pytz kwgis
+                    pip install astral suntime timezonefinder pytz kwgis
                     {ex}
                     '''
                 if 0:
