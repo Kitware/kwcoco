@@ -280,6 +280,7 @@ def geospatial_stats(dset, images, perimage_data):
                 import astral  # NOQA
                 import timezonefinder  # NOQA
                 import pytz  # NOQA
+                raise ImportError
             except ImportError as ex:
                 from kwutil.util_exception import add_exception_note
                 msg = f'''
@@ -317,7 +318,7 @@ def geospatial_stats(dset, images, perimage_data):
 
         try:
             sunlight_values = coco_estimate_sunlight(dset, image_ids=images)
-            if not np.isnan(sunlight_values).all():
+            if sunlight_values is not None and not np.isnan(sunlight_values).all():
                 perimage_data['sunlight'] = sunlight_values
         except ImportError as ex:
             print(f'Unable to estimate sunlight: {ex}')
