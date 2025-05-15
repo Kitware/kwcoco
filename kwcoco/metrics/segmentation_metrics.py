@@ -455,7 +455,8 @@ class SingleImageSegmentationMetrics:
             if len(sseg_groups['foreground']):
                 # Combine all foreground polygons into a single shape
                 # (removes influence of overlapping polygons)
-                fg_poly = unary_union([p.to_shapely() for p in sseg_groups['foreground']])
+                # TODO: should we account for weights here
+                fg_poly = unary_union([p.to_shapely() for p, w in sseg_groups['foreground']])
                 # The average weight each instance contributes
                 unit_sseg_share = fg_poly.area / len(sseg_groups['foreground'])
             else:
@@ -537,7 +538,7 @@ class SingleImageSegmentationMetrics:
 
         if self.balance_area == 'foreground_independent':
             if len(sseg_groups['foreground']):
-                fg_poly = unary_union([p.to_shapely() for p in sseg_groups['foreground']])
+                fg_poly = unary_union([p.to_shapely() for p, w in sseg_groups['foreground']])
                 unit_sseg_share = fg_poly.area / len(sseg_groups['foreground'])
             else:
                 unit_sseg_share = 1
