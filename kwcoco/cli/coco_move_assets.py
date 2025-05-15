@@ -128,7 +128,11 @@ class CocoMoveAssetManager:
                 for asset in coco_img.assets:
                     asset_fpath = asset.image_filepath().absolute()
                     for _s, _d in src_dst_pairs:
-                        if asset_fpath.is_relative_to(_s):
+                        try:
+                            flag = asset_fpath.is_relative_to(_s)
+                        except AttributeError:
+                            flag = _is_relative_to_backport(asset_fpath, _s)
+                        if flag:
                             asset.dset = dset
                             asset.image_id = coco_img['id']
                             impacted_assets.append((asset, _s, _d))
@@ -189,6 +193,18 @@ class CocoMoveAssetManager:
         self.modify_datasets()
         self.move_files()
         self.dump_datasets()
+
+
+def _is_relative_to_backport(self, other):
+    r"""
+    A backport of is_relative_to for Python <=3.8
+    """
+    try:
+        self.relative_to(other)
+    except ValueError:
+        return False
+    else:
+        return True
 
 
 # def _devcheck():
