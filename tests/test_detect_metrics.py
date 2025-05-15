@@ -133,3 +133,51 @@ def test_with_multiple_images_and_some_have_no_truth():
 
     scores = dmet.score_kwcoco()
     print(scores)
+
+
+def test_with_annotation_weights():
+    """
+    Test that weights are respected when scoring.
+    """
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+    import kwimage
+    import numpy as np
+    import kwarray
+
+    rng = kwarray.ensure_rng(122374405)
+    classes = ['class_1']
+    # Start of with several true objects
+    true_dets = kwimage.Detections.random(10, classes=classes, rng=rng)
+    true_dets.data['weights'] = np.array([1] * len(true_dets))
+
+    # Make perfect predictions
+    pred_dets = true_dets.copy()
+    dmet = DetectionMetrics()
+    dmet.add_truth(true_dets, imgname='image1')
+    dmet.add_predictions(pred_dets, imgname='image1')
+    # Scores should be perfect
+    scores1 = dmet.score_kwcoco()
+    assert np.isclose(scores1['mAP'], 1)
+
+    # Delete one of the predictions
+    del_idxs = np.array([2])
+
+    flags = np.ones(len(pred_dets))
+    flags[del_idxs] = False
+    pred_dets2 = pred_dets.compress(flags)
+    dmet = DetectionMetrics()
+    dmet.add_truth(true_dets, imgname='image1')
+    dmet.add_predictions(pred_dets2, imgname='image1')
+    # Scores should fall
+    scores2 = dmet.score_kwcoco()
+    assert scores2['mAP'] < 0.95
+
+    # Modify truth to ignore the missing prediction
+    true_dets2 = true_dets.copy()
+    true_dets2.data['weights'][del_idxs] = 0
+    dmet = DetectionMetrics()
+    dmet.add_truth(true_dets2, imgname='image1')
+    dmet.add_predictions(pred_dets2, imgname='image1')
+    # Scores should recover to 1.0
+    scores3 = dmet.score_kwcoco()
+    assert np.isclose(scores3['mAP'], 1)
