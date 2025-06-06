@@ -181,3 +181,36 @@ def test_with_annotation_weights():
     # Scores should recover to 1.0
     scores3 = dmet.score_kwcoco()
     assert np.isclose(scores3['mAP'], 1)
+
+
+def test_confusion_vectors_compat():
+    """
+    Test that compat=all will ignore class labels and compat=mutex will respect
+    them.
+    """
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+    import kwimage
+
+    classes = ['background', 'A', 'B']
+
+    # Define the box
+    true_dets = kwimage.Detections.random(num=1, classes=classes, rng=0)
+    true_dets.data['class_idxs'][:] = 1
+
+    # Same box, but wrong class
+    pred_dets = true_dets.copy()
+    pred_dets.data['class_idxs'][:] = 2
+
+    dmet = DetectionMetrics(classes=classes)
+    dmet.add_truth(true_dets, imgname='A')
+    dmet.add_predictions(pred_dets, imgname='A')
+
+    cfsn_vecs = dmet.confusion_vectors(compat='all')
+    print(cfsn_vecs.data.pandas())
+    measures = cfsn_vecs.binarize_classless().measures()
+    assert measures['ap'] == 1
+
+    cfsn_vecs = dmet.confusion_vectors(compat='mutex')
+    print(cfsn_vecs.data.pandas())
+    measures = cfsn_vecs.binarize_classless().measures()
+    assert measures['ap'] < 0.2
