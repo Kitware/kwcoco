@@ -4,7 +4,6 @@ Downloads and converts CIFAR 10 and CIFAR 100 to kwcoco format
 import ubelt as ub
 import os
 import pickle
-import torchvision
 import kwimage
 
 
@@ -68,6 +67,7 @@ def _convert_cifar_to_kwcoco(dpath, cifar_dset, cifar_name, classes):
 
 
 def convert_cifar10(dpath=None):
+    import torchvision
     if dpath is None:
         dpath = ub.Path.appdir('kwcoco/data').ensuredir()
     else:
@@ -100,6 +100,7 @@ def convert_cifar10(dpath=None):
 
 
 def convert_cifar100(dpath=None):
+    import torchvision
     if dpath is None:
         dpath = ub.Path.appdir('kwcoco/data').ensuredir()
     expected_classes = [

@@ -6,7 +6,7 @@ kwcoco vectorized interface. Reorganizing this as proper docs is left as a
 TODO.
 
 The vectorized methods are the "fancy" vectorized way of looking up information
-in kwcoco, as opposed to accessing the dictionaries 
+in kwcoco, as opposed to accessing the dictionaries
 
 
 The Mixin Coco Objects:
@@ -24,6 +24,7 @@ CocoDataset methods (via MixinCocoObjects)
 * :func:`kwcoco.CocoDataset.categories<kwcoco.coco_dataset.MixinCocoObjects.categories>` - Return vectorized category objects
 * :func:`kwcoco.CocoDataset.images<kwcoco.coco_dataset.MixinCocoObjects.images>` - Return vectorized image objects
 * :func:`kwcoco.CocoDataset.videos<kwcoco.coco_dataset.MixinCocoObjects.videos>` - Return vectorized video objects
+* :func:`kwcoco.CocoDataset.tracks<kwcoco.coco_dataset.MixinCocoObjects.tracks>` - Return vectorized track objects
 
 
 The logic for all of these is defined in the coco_objects1d.py file and they
@@ -83,8 +84,8 @@ The "Annots"  object has a "detections" convenience method
     # The useful thing about kwimage structures is they all have a warp method
     new_dets = dets.warp(transform)
 
-    # The new annot from detections will not transfer all of the properties, but the relevant geometries 
-    # will all be warped. 
+    # The new annot from detections will not transfer all of the properties, but the relevant geometries
+    # will all be warped.
     new_anns = list(new_dets.to_coco(style='new'))
 
     for old_ann, new_ann in zip(annots_objs.objs, new_anns):
