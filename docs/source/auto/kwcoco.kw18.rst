@@ -3,6 +3,6 @@ kwcoco.kw18 module
 
 .. automodule:: kwcoco.kw18
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:

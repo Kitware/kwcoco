@@ -10,8 +10,9 @@ Subpackages
    kwcoco.cli
    kwcoco.data
    kwcoco.demo
-   kwcoco.gui
+   kwcoco.formats
    kwcoco.metrics
+   kwcoco.rc
    kwcoco.util
 
 Submodules
@@ -42,6 +43,6 @@ Module contents
 
 .. automodule:: kwcoco
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:

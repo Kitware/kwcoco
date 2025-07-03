@@ -3,6 +3,6 @@ kwcoco.util.util\_monkey module
 
 .. automodule:: kwcoco.util.util_monkey
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:

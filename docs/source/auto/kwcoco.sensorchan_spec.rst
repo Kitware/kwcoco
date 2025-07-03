@@ -3,6 +3,6 @@ kwcoco.sensorchan\_spec module
 
 .. automodule:: kwcoco.sensorchan_spec
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:

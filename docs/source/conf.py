@@ -16,14 +16,15 @@ Notes:
 
     # need to edit the conf.py
 
+    # Remove any old auto docs folder and regenerate it.
+    rm -rf ~/code/kwcoco/docs/source/auto
     cd ~/code/kwcoco/docs
     sphinx-apidoc --private --separate --force --output-dir ~/code/kwcoco/docs/source/auto ~/code/kwcoco/kwcoco
+    git add source/auto/*.rst
 
     # Note: the module should importable before running this
     # (e.g. install it in developer mode or munge the PYTHONPATH)
     make html
-
-    git add source/auto/*.rst
 
     Also:
         To turn on PR checks

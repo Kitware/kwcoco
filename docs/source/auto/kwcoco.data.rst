@@ -19,6 +19,6 @@ Module contents
 
 .. automodule:: kwcoco.data
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:
