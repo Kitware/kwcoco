@@ -53,6 +53,7 @@ for key in dir(dset):
         heuristic = None
     groups[heuristic][method_definer].append(key)
 
+
 print('For Reference, the following are grouped attributes/methods of a kwcoco.CocoDataset')
 print('{}'.format(ub.urepr(groups, sort=0, nl=3)))
 
@@ -106,7 +107,7 @@ for group, def_to_items in groups.items():
 
             # https://sublime-and-sphinx-guide.readthedocs.io/en/latest/references.html
             # https://www.sphinx-doc.org/en/master/usage/restructuredtext/domains.html#cross-referencing-python-objects
-            line = f' * {refer}`.CocoDataset.{item}<kwcoco.coco_dataset.{definer}.{item}>` - {docline}'
+            line = f' * {refer}`kwcoco.CocoDataset.{item}<kwcoco.coco_dataset.{definer}.{item}>` - {docline}'
             aprint(line)
 
 print('\n'.join(autogen))
