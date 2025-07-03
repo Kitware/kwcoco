@@ -125,31 +125,28 @@ CocoDataset API
 
 The following is a logical grouping of the public kwcoco.CocoDataset API attributes and methods. See the in-code documentation for further details.
 
-CocoDataset classmethods (via MixinCocoExtras)
-**********************************************
+CocoDataset classmethods (via MixinCocoConstructors)
+****************************************************
 
- * :func:`kwcoco.CocoDataset.coerce<kwcoco.coco_dataset.MixinCocoExtras.coerce>` - Attempt to transform the input into the intended CocoDataset.
- * :func:`kwcoco.CocoDataset.demo<kwcoco.coco_dataset.MixinCocoExtras.demo>` - Create a toy coco dataset for testing and demo purposes
- * :func:`kwcoco.CocoDataset.random<kwcoco.coco_dataset.MixinCocoExtras.random>` - Creates a random CocoDataset according to distribution parameters
+ * :func:`kwcoco.CocoDataset.coerce<kwcoco.coco_dataset.MixinCocoConstructors.coerce>` - Attempt to transform the input into the intended CocoDataset.
+ * :func:`kwcoco.CocoDataset.coerce_multiple<kwcoco.coco_dataset.MixinCocoConstructors.coerce_multiple>` - Coerce multiple CocoDataset objects in parallel.
+ * :func:`kwcoco.CocoDataset.demo<kwcoco.coco_dataset.MixinCocoConstructors.demo>` - Create a toy coco dataset for testing and demo purposes
+ * :func:`kwcoco.CocoDataset.empty<kwcoco.coco_dataset.MixinCocoConstructors.empty>` - Create an empty dataset
+ * :func:`kwcoco.CocoDataset.from_class_image_paths<kwcoco.coco_dataset.MixinCocoConstructors.from_class_image_paths>` - Ingest classification data in the common format where images of different categories are stored in folders with the category label.
+ * :func:`kwcoco.CocoDataset.from_coco_paths<kwcoco.coco_dataset.MixinCocoConstructors.from_coco_paths>` - Constructor from multiple coco file paths.
+ * :func:`kwcoco.CocoDataset.from_data<kwcoco.coco_dataset.MixinCocoConstructors.from_data>` - Constructor from a json dictionary
+ * :func:`kwcoco.CocoDataset.from_image_paths<kwcoco.coco_dataset.MixinCocoConstructors.from_image_paths>` - Constructor from a list of images paths.
+ * :func:`kwcoco.CocoDataset.load<kwcoco.coco_dataset.MixinCocoConstructors.load>` - Constructor from a open file or file path.
+ * :func:`kwcoco.CocoDataset.load_multiple<kwcoco.coco_dataset.MixinCocoConstructors.load_multiple>` - Load multiple CocoDataset objects in parallel.
+ * :func:`kwcoco.CocoDataset.random<kwcoco.coco_dataset.MixinCocoConstructors.random>` - Creates a random CocoDataset according to distribution parameters
 
-CocoDataset classmethods (via CocoDataset)
-******************************************
-
- * :func:`kwcoco.CocoDataset.coerce_multiple<kwcoco.coco_dataset.CocoDataset.coerce_multiple>` - Coerce multiple CocoDataset objects in parallel.
- * :func:`kwcoco.CocoDataset.empty<kwcoco.coco_dataset.CocoDataset.empty>` - Create an empty dataset
- * :func:`kwcoco.CocoDataset.from_class_image_paths<kwcoco.coco_dataset.CocoDataset.from_class_image_paths>` - Ingest classification data in the common format where images of different categories are stored in folders with the category label.
- * :func:`kwcoco.CocoDataset.from_coco_paths<kwcoco.coco_dataset.CocoDataset.from_coco_paths>` - Constructor from multiple coco file paths.
- * :func:`kwcoco.CocoDataset.from_data<kwcoco.coco_dataset.CocoDataset.from_data>` - Constructor from a json dictionary
- * :func:`kwcoco.CocoDataset.from_image_paths<kwcoco.coco_dataset.CocoDataset.from_image_paths>` - Constructor from a list of images paths.
- * :func:`kwcoco.CocoDataset.load<kwcoco.coco_dataset.CocoDataset.load>` - Constructor from a open file or file path.
- * :func:`kwcoco.CocoDataset.load_multiple<kwcoco.coco_dataset.CocoDataset.load_multiple>` - Load multiple CocoDataset objects in parallel.
 
 
 CocoDataset slots
 *****************
 
  * :attr:`kwcoco.CocoDataset.index<kwcoco.coco_dataset.CocoDataset.index>` - an efficient lookup index into the coco data structure. The index defines its own attributes like ``anns``, ``cats``, ``imgs``, ``gid_to_aids``, ``file_name_to_img``, etc. See :class:`CocoIndex` for more details on which attributes are available.
- * :attr:`kwcoco.CocoDataset.hashid<kwcoco.coco_dataset.CocoDataset.hashid>` - If computed, this will be a hash uniquely identifying the dataset.  To ensure this is computed see  :func:`kwcoco.coco_dataset.MixinCocoExtras._build_hashid`.
+ * :attr:`kwcoco.CocoDataset.hashid<kwcoco.coco_dataset.CocoDataset.hashid>` - If computed, this will be a hash uniquely identifying the dataset.  To ensure this is computed see  :func:`kwcoco.coco_dataset.MixinCocoHashing._build_hashid`.
  * :attr:`kwcoco.CocoDataset.hashid_parts<kwcoco.coco_dataset.CocoDataset.hashid_parts>` -
  * :attr:`kwcoco.CocoDataset.tag<kwcoco.coco_dataset.CocoDataset.tag>` - A tag indicating the name of the dataset.
  * :attr:`kwcoco.CocoDataset.dataset<kwcoco.coco_dataset.CocoDataset.dataset>` - raw json data structure. This is the base dictionary that contains {'annotations': List, 'images': List, 'categories': List}
