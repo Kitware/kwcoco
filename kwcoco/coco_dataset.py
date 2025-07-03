@@ -63,7 +63,7 @@ import ubelt as ub
 import warnings
 
 from packaging.version import parse as Version
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from os.path import (dirname, basename, join, exists, isdir, relpath)
 from functools import partial
 
@@ -101,12 +101,6 @@ if ujson is not None and Version(ujson.__version__) >= Version('5.2.0') and KWCO
 else:
     json_r: ModuleType = pjson
     json_w: ModuleType = pjson
-
-
-if sys.version_info <= (3, 6):
-    _dict = OrderedDict
-else:
-    _dict = dict
 
 __docstubs__ = """
 from kwcoco.coco_image import CocoImage
@@ -2029,7 +2023,7 @@ class MixinCocoHashing:
         # info corresponding to each type of data that we track.
         hashid_parts = self.hashid_parts
         if hashid_parts is None:
-            hashid_parts = OrderedDict()
+            hashid_parts = dict()
 
         # TODO: hashid for videos? Maybe?
 
@@ -2038,7 +2032,7 @@ class MixinCocoHashing:
         parts = ['annotations', 'images', 'categories']
         for part in parts:
             if not hashid_parts.get(part, None):
-                hashid_parts[part] = OrderedDict()
+                hashid_parts[part] = dict()
 
         rebuild_parts = []
         reuse_parts = []
@@ -2064,8 +2058,7 @@ class MixinCocoHashing:
             # Dumping annots to json takes the longest amount of time
             # However, its faster than hashing the data directly
             def _ditems(d):
-                # return sorted(d.items())
-                return list(d.items()) if isinstance(d, OrderedDict) else sorted(d.items())
+                return sorted(d.items())
 
             if not hashid_parts['annotations'].get('json', None):
                 aids = sorted(self.anns.keys())
@@ -3846,7 +3839,7 @@ class MixinCocoAddRemove:
         elif self.imgs and id in self.imgs:
             raise exceptions.DuplicateAddError('Image id={} already exists'.format(id))
 
-        img = _dict()
+        img = dict()
         img['id'] = int(id)
         try:
             img['file_name'] = os.fspath(file_name)
@@ -4015,7 +4008,7 @@ class MixinCocoAddRemove:
         elif self.anns and id in self.anns:
             raise IndexError('Annot id={} already exists'.format(id))
 
-        ann = _dict()
+        ann = dict()
         ann['id'] = int(id)
         ann['image_id'] = int(image_id)
         ann['category_id'] = None if category_id is None else int(category_id)
@@ -4092,7 +4085,7 @@ class MixinCocoAddRemove:
         elif index.cats and id in index.cats:
             raise exceptions.DuplicateAddError('Category id={} already exists'.format(id))
 
-        cat = _dict()
+        cat = dict()
         cat['id'] = int(id)
         cat['name'] = str(name)
         if supercategory:
@@ -4152,7 +4145,7 @@ class MixinCocoAddRemove:
         elif index.tracks and id in index.tracks:
             raise exceptions.DuplicateAddError('Track id={} already exists'.format(id))
 
-        track = _dict()
+        track = dict()
         track['id'] = int(id)
         track['name'] = str(name)
         track.update(**kw)
@@ -6843,7 +6836,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         def _coco_union(relative_dsets, common_root):
             """ union of dictionary based data structure """
             # TODO: rely on subset of SPEC keys
-            merged = _dict([
+            merged = dict([
                 ('licenses', []),
                 ('info', []),
                 ('categories', []),
@@ -6941,7 +6934,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         # Tracks with the same name are considered distinct
                         # and given new non-conflicting names
                         new_trackname = unique_track_names.remap(old_track['name'])
-                        new_track = _dict([
+                        new_track = dict([
                             ('id', new_id),
                             ('name', new_trackname),
                         ])
@@ -6956,7 +6949,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         # across datasets.
                         if old_track['name'] not in unique_track_names:
                             new_trackname = unique_track_names.remap(old_track['name'])
-                            new_track = _dict([
+                            new_track = dict([
                                 ('id', new_id),
                                 ('name', new_trackname),
                             ])
@@ -6978,7 +6971,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     else:
                         new_id = len(merged['videos']) + 1
                     new_vidname = unique_video_names.remap(old_video['name'])
-                    new_video = _dict([
+                    new_video = dict([
                         ('id', new_id),
                         ('name', new_vidname),
                     ])
@@ -6999,7 +6992,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     new_gname = None if old_gname is None else (
                         join(subdir, old_gname)
                     )
-                    new_img = _dict([
+                    new_img = dict([
                         ('id', new_id),
                         ('file_name', new_gname),
                     ])
@@ -7044,7 +7037,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         warnings.warn(f'annot {old_annot} in {subdir} has bad category-id {old_cat_id}')
                     if new_img_id is None:
                         warnings.warn(f'annot {old_annot} in {subdir} has bad image-id {old_img_id}')
-                    new_annot = _dict([
+                    new_annot = dict([
                         ('id', len(merged['annotations']) + 1),
                         ('image_id', new_img_id),
                         ('category_id', new_cat_id),
@@ -7204,7 +7197,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert len(sub3.anns) == 0
             >>> assert rejoined.basic_stats() == self.basic_stats()
         """
-        new_dataset = _dict([(k, []) for k in self.dataset])
+        new_dataset = dict([(k, []) for k in self.dataset])
         new_dataset['categories'] = self.dataset['categories']
         new_dataset['info'] = self.dataset.get('info', [])
         new_dataset['licenses'] = self.dataset.get('licenses', [])

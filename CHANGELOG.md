@@ -36,6 +36,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Issue with track lookup by video-id
 
 
+### Removed
+* Starting to remove old code meant to support older Python versions <3.8.
+
+
 ## Version 0.8.7 - Released 2024-12-18
 
 
