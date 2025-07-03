@@ -1644,6 +1644,7 @@ class MixinCocoExtras:
 
     def _ensure_json_serializable(self):
         # inplace convert any ndarrays to lists
+        # TODO: use the kwutil version
         from kwcoco.util.util_json import ensure_json_serializable
         _ = ensure_json_serializable(self.dataset, verbose=1)
 
