@@ -2343,9 +2343,10 @@ class MixinCocoHashing:
         """
         # Construct nested container that we will populate with hashable
         # info corresponding to each type of data that we track.
+        from collections import OrderedDict
         hashid_parts = self.hashid_parts
         if hashid_parts is None:
-            hashid_parts = dict()
+            hashid_parts = OrderedDict()
 
         # TODO: hashid for videos? Maybe?
 
@@ -2354,7 +2355,7 @@ class MixinCocoHashing:
         parts = ['annotations', 'images', 'categories']
         for part in parts:
             if not hashid_parts.get(part, None):
-                hashid_parts[part] = dict()
+                hashid_parts[part] = OrderedDict()
 
         rebuild_parts = []
         reuse_parts = []
@@ -2380,7 +2381,8 @@ class MixinCocoHashing:
             # Dumping annots to json takes the longest amount of time
             # However, its faster than hashing the data directly
             def _ditems(d):
-                return sorted(d.items())
+                return list(d.items()) if isinstance(d, OrderedDict) else sorted(d.items())
+                # return sorted(d.items())
 
             if not hashid_parts['annotations'].get('json', None):
                 aids = sorted(self.anns.keys())
