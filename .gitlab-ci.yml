@@ -231,7 +231,7 @@ stages:
         cls = Wheel if fpath.endswith('.whl') else SDist
         print(cls(fpath).version)
     ")
-  - sed 's/>=/==/' "requirements/gdal.txt" > "requirements-strict/gdal-strict.txt"
+  - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
   - python -m uv pip install -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
@@ -298,7 +298,7 @@ stages:
         cls = Wheel if fpath.endswith('.whl') else SDist
         print(cls(fpath).version)
     ")
-  - sed 's/>=/==/' "requirements/gdal.txt" > "requirements-strict/gdal-strict.txt"
+  - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
   - python -m uv pip install -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
