@@ -84,6 +84,7 @@ Notes:
                 push events,
                 tag push events,
                 merge request events
+                release events
 
             Click the "Add webhook" button.
 

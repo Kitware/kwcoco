@@ -19,14 +19,16 @@ networkx>=2.8    ; python_version < '4.0'   and python_version >= '3.11' # Pytho
 networkx>=2.8    ; python_version < '3.11'  and python_version >= '3.8'  # Python 3.8-3.11
 
 # xdev availpkg scipy
-scipy>=1.11.2    ; python_version < '4.0'  and python_version >= '3.12'  # Python 3.12+
+scipy>=1.14.1    ; python_version < '4.0'  and python_version >= '3.13'    # Python 3.13+
+scipy>=1.11.2    ; python_version < '3.13' and python_version >= '3.12'    # Python 3.12
 scipy>=1.9.2     ; python_version < '3.12' and python_version >= '3.11'  # Python 3.11
 scipy>=1.8.0     ; python_version < '3.11' and python_version >= '3.10'  # Python 3.10
 scipy>=1.8.0     ; python_version < '3.10' and python_version >= '3.9'   # Python 3.9
 scipy>=1.8.0     ; python_version < '3.9' and python_version >= '3.8'    # Python 3.8
 
 # 1.19.2 is the tensorflow minimum
-numpy>=1.26.0  ; python_version < '4.0'  and python_version >= '3.12'    # Python 3.12+
+numpy>=2.1.0   ; python_version < '4.0'  and python_version >= '3.13'    # Python 3.13+
+numpy>=1.26.0  ; python_version < '3.13' and python_version >= '3.12'    # Python 3.12
 numpy>=1.23.2  ; python_version < '3.12' and python_version >= '3.11'    # Python 3.11
 numpy>=1.21.6  ; python_version < '3.11' and python_version >= '3.10'    # Python 3.10
 numpy>=1.19.3  ; python_version < '3.10' and python_version >= '3.9'     # Python 3.9
