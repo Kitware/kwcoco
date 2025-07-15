@@ -21,7 +21,8 @@ matplotlib>=3.6.2  ; python_version <  '3.10'    # Python 3.8-3.9
 ujson>=5.2.0 ; python_version >= '3.7'
 
 # xdev availpkg sqlalchemy
-sqlalchemy>=2.0.21    ; python_version < '4.0'  and python_version >= '3.12'    # Python 3.12+
+sqlalchemy>=2.0.36    ; python_version < '4.0'  and python_version >= '3.13'    # Python 3.13+
+sqlalchemy>=2.0.21    ; python_version < '3.13' and python_version >= '3.12'    # Python 3.12
 sqlalchemy>=1.4.41    ; python_version < '3.12' and python_version >= '3.11'    # Python 3.11
 sqlalchemy>=1.4.26    ; python_version < '3.11' and python_version >= '3.10'    # Python 3.10
 sqlalchemy>=1.4.0     ; python_version < '3.10' and python_version >= '3.9'    # Python 3.9
