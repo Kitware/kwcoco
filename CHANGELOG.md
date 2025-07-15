@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.8 - Unreleased
+## Version 0.8.9 - Unreleased
+
+
+## Version 0.8.8 - Released 2025-07-15
 
 ### Added
 * can now convert a kwcoco file to labelme files.
