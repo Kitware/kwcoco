@@ -1,9 +1,13 @@
+"""
+TODO:
+    - [ ] Does this rely on the image ids being the same? In either case document it.
+"""
 import numpy as np
 import ubelt as ub
 import networkx as nx
-# from .assignment import _assign_confusion_vectors
 from kwcoco.metrics.confusion_vectors import ConfusionVectors
 from kwcoco.metrics.assignment import _assign_confusion_vectors
+# from .assignment import _assign_confusion_vectors
 
 
 # Helper for xdev docstubs
@@ -198,8 +202,12 @@ class DetectionMetrics(ub.NiceRepr):
         Register/Add predicted detections for an image
 
         Args:
-            pred_dets (kwimage.Detections): predicted detections
+            pred_dets (kwimage.Detections):
+                Predicted detections. These should contain boxes, class_idxs.
+                They can optionally include scores.
+
             imgname (str | None): a unique string to identify the image
+
             gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
@@ -210,8 +218,12 @@ class DetectionMetrics(ub.NiceRepr):
         Register/Add groundtruth detections for an image
 
         Args:
-            true_dets (kwimage.Detections): groundtruth
+            true_dets (kwimage.Detections): groundtruth detections.
+            These should contain boxes, class_idxs. They can optionally include
+            weights.
+
             imgname (str | None): a unique string to identify the image
+
             gid (int | None): the integer image id if known
         """
         gid = dmet._register_imagename(imgname, gid)
@@ -569,8 +581,33 @@ class DetectionMetrics(ub.NiceRepr):
         return info
 
     def score_kwcoco(dmet, iou_thresh=0.5, bias=0, gids=None,
-                      compat='all', prioritize='iou'):
-        """ our scoring method """
+                      compat='all', prioritize='iou', stabalize_thresh=7):
+        """
+        our scoring method
+
+        Args:
+            iou_thresh (float | List[float]):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            bias (float):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            gids (List[int] | None):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            compat (str):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            prioritize (str):
+                See :func:`DetectionMetrics.confusion_vectors`.
+
+            stabalize_thresh (int):
+                if fewer than this many data points inserts dummy stabilization
+                data so curves can still be drawn. Defaults to 7.
+
+        Returns:
+            dict
+        """
         cfsn_vecs = dmet.confusion_vectors(iou_thresh=iou_thresh, bias=bias,
                                            gids=gids,
                                            compat=compat,
@@ -578,7 +615,7 @@ class DetectionMetrics(ub.NiceRepr):
         info = {}
         try:
             cfsn_perclass = cfsn_vecs.binarize_ovr(mode=1)
-            perclass = cfsn_perclass.measures()
+            perclass = cfsn_perclass.measures(stabalize_thresh=stabalize_thresh)
         except Exception as ex:
             print('warning: ex = {!r}'.format(ex))
         else:
@@ -875,6 +912,7 @@ class DetectionMetrics(ub.NiceRepr):
             xdoctest -m kwcoco.metrics.detect_metrics DetectionMetrics.demo:2 --show
 
         Example:
+            >>> from kwcoco.metrics.detect_metrics import *  # NOQA
             >>> kwargs = {}
             >>> # Seed the RNG
             >>> kwargs['rng'] = 0

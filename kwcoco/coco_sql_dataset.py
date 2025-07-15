@@ -2388,7 +2388,6 @@ def demo(num=10, backend=None):
 
 
 def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
-    from kwcoco.util.util_json import indexable_allclose
     # Test that the duck types are working
     compare = {}
     compare['gid_to_aids'] = {
@@ -2444,7 +2443,7 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
             common2 = ub.dict_isect(item1, item2)
             diff1 = ub.dict_diff(item1, common2)
             diff2 = ub.dict_diff(item2, common1)
-            if not indexable_allclose(common2, common1):
+            if not ub.IndexableWalker(common2).allclose(common1):
                 print('item1 = {}'.format(ub.urepr(item1, nl=1)))
                 print('item2 = {}'.format(ub.urepr(item2, nl=1)))
                 print('common1 = {}'.format(ub.urepr(common1, nl=1)))

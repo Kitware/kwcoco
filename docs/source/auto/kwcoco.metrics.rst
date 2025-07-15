@@ -14,6 +14,7 @@ Submodules
    kwcoco.metrics.detect_metrics
    kwcoco.metrics.drawing
    kwcoco.metrics.functional
+   kwcoco.metrics.segmentation_metrics
    kwcoco.metrics.sklearn_alts
    kwcoco.metrics.voc_metrics
 
@@ -22,6 +23,6 @@ Module contents
 
 .. automodule:: kwcoco.metrics
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:

@@ -28,6 +28,12 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
         defaults to out_dpath / "metrics.json"
         '''), tags=['out_path', 'primary'])
 
+    confusion_fpath = scfg.Value(None, help=ub.paragraph(
+        '''
+        if specified, write a kwcoco file with confusion labels for further
+        inspection and visualization.
+        '''))
+
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
@@ -36,27 +42,36 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
             >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_eval import *  # NOQA
             >>> import ubelt as ub
-            >>> from kwcoco.cli.coco_eval import *  # NOQA
-            >>> from os.path import join
             >>> import kwcoco
+            >>> from kwcoco.demo.perterb import perterb_coco
             >>> dpath = ub.Path.appdir('kwcoco/tests/eval').ensuredir()
             >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
-            >>> from kwcoco.demo.perterb import perterb_coco
             >>> kwargs = {
             >>>     'box_noise': 0.5,
             >>>     'n_fp': (0, 10),
             >>>     'n_fn': (0, 10),
             >>> }
             >>> pred_dset = perterb_coco(true_dset, **kwargs)
-            >>> true_dset.fpath = join(dpath, 'true.mscoco.json')
-            >>> pred_dset.fpath = join(dpath, 'pred.mscoco.json')
+            >>> true_dset.fpath = dpath / 'true.mscoco.json'
+            >>> pred_dset.fpath = dpath / 'pred.mscoco.json'
+            >>> confusion_fpath = dpath / 'confusion.kwcoco.json'
             >>> true_dset.dump(true_dset.fpath)
             >>> pred_dset.dump(pred_dset.fpath)
             >>> draw = False  # set to false for faster tests
-            >>> CocoEvalCLI.main(cmdline=False,
+            >>> kw = dict(
             >>>     true_dataset=true_dset.fpath,
             >>>     pred_dataset=pred_dset.fpath,
-            >>>     draw=draw, out_dpath=dpath)
+            >>>     confusion_fpath=confusion_fpath,
+            >>>     draw=draw,
+            >>>     out_dpath=dpath
+            >>> )
+            >>> cmdline = False
+            >>> CocoEvalCLI.main(cmdline=cmdline, **kw)
+
+        Ignore:
+            geowatch visualize ~/.cache/kwcoco/tests/eval/confusion.kwcoco.json --smart --animate=False --role_order="true,pred"
+            geowatch visualize ~/.cache/kwcoco/tests/eval/confusion.kwcoco.json --smart --animate=False --channels="r|g|b,r|g|b" --role_order="true,pred"
+
         """
         main(cmdline=cmdline, **kw)
 
@@ -111,6 +126,15 @@ def main(cmdline=True, **kw):
             out_dpath,
             expt_title=cli_config['expt_title']
         )
+
+    DO_CONFUSION_DUMP = cli_config.confusion_fpath is not None
+    if DO_CONFUSION_DUMP:
+        print('Dumping confusion kwcoco files')
+        key_to_cfsn_dset = build_confusion_datasets(coco_eval, results)
+        for key, cfsn_dset in key_to_cfsn_dset.items():
+            # TODO: augment path base don key
+            cfsn_dset.fpath = cli_config.confusion_fpath
+            cfsn_dset.dump()
 
     if 'coco_dset' in coco_eval.true_extra:
         truth_dset = coco_eval.true_extra['coco_dset']
@@ -168,6 +192,90 @@ def main(cmdline=True, **kw):
         rich_print = print
     else:
         rich_print(f'Eval Dpath: [link={out_dpath}]{out_dpath}[/link]')
+
+
+def build_confusion_datasets(coco_eval, results):
+    """
+    For each result build the confusion dataset
+    """
+    import kwimage  # NOQA
+    # CONFUSION_COLORS = {
+    #     'pred_false_positive': kwimage.Color.coerce('kitware_red').ashex(),
+    #     'pred_true_positive': kwimage.Color.coerce('kitware_blue').ashex(),
+    #     'true_false_negative': kwimage.Color.coerce('purple').ashex(),
+    #     'true_true_positive': kwimage.Color.coerce('kitware_green').ashex(),
+    # }
+    CONFUSION_COLORS = {
+        'pred_false_positive': '#f42836',
+        'pred_true_positive': '#0068c7',
+        'true_false_negative': '#800080',
+        'true_true_positive': '#3eae2b',
+        None: '#242a37',
+    }
+
+    pred_dset = coco_eval.pred_extra['coco_dset']
+    true_dset = coco_eval.true_extra['coco_dset']
+    dmet = coco_eval._dmet
+
+    key_to_cfsn_dset = {}
+
+    assert len(results) == 1, 'not impl'
+    for key, result in results.items():
+
+        # TODO: add an info section about the confusion
+
+        cfsn_dset = pred_dset.copy()
+        cfsn_dset.reroot(absolute=True)
+        # Mark the predicted annotations in the confusion dataset
+        for ann in cfsn_dset.annots().objs_iter():
+            ann.update({
+                'role': 'pred',
+                'confusion': None,
+                'color': CONFUSION_COLORS[None],
+            })
+
+        cfsn_vecs = result.cfsn_vecs
+        bin_vecs = cfsn_vecs.binarize_classless()
+        for gid, tx, px in zip(bin_vecs.data['gid'], bin_vecs.data['txs'], bin_vecs.data['pxs']):
+
+            pred_gid = gid  # is this the pred gid?
+
+            true_dets = dmet.gid_to_true_dets[gid]
+            pred_dets = dmet.gid_to_pred_dets[gid]
+            true_aid = true_dets.data['aids'][tx] if tx >= 0 else None
+            pred_aid = pred_dets.data['aids'][px] if px >= 0 else None
+
+            pred_ann = None
+            true_ann = None
+            if pred_aid is not None:
+                pred_ann = cfsn_dset.index.anns[pred_aid]
+                pred_ann['role'] = 'pred'
+                if true_aid is None:
+                    pred_ann['confusion'] = 'false_positive'
+                    pred_ann['color'] = CONFUSION_COLORS['pred_false_positive']
+                else:
+                    pred_ann['confusion'] = 'true_positive'
+                    pred_ann['color'] = CONFUSION_COLORS['pred_true_positive']
+
+            if true_aid is not None:
+                true_ann = true_dset.index.anns[true_aid].copy()
+                true_ann.pop('id')
+                true_ann['role'] = 'true'
+                true_ann['image_id'] = pred_gid
+
+                if pred_aid is None:
+                    true_ann['confusion'] = 'false_negative'
+                    true_ann['color'] = CONFUSION_COLORS['true_false_negative']
+                else:
+                    true_ann['confusion'] = 'true_positive'
+                    true_ann['score'] = pred_ann['score']
+                    true_ann['matching_pred_annot_id'] = pred_ann['id']
+                    true_ann['color'] = CONFUSION_COLORS['true_true_positive']
+
+                cfsn_dset.add_annotation(**true_ann)
+
+        key_to_cfsn_dset[key] = cfsn_dset
+    return key_to_cfsn_dset
 
 
 if __name__ == '__main__':

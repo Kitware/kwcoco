@@ -116,28 +116,68 @@ class _ID_Remapper(object):
         return next_id
 
 
-class UniqueNameRemapper(object):
+# maybe use an enum? the StrEnum requires 3.11
+# import enum
+# class RenamePolicy(enum.StrEnum):
+#     IGNORE = enum.auto()
+#     WARN = enum.auto()
+#     ERROR = enum.auto()
+
+class UniqueNameRemapper:
     """
-    helper to ensure names will be unique by appending suffixes
+    Helper to ensure names will be unique by appending suffixes.
+
+    By default will notify users about this action based on `policy`.
 
     Example:
-        >>> from kwcoco.coco_dataset import *  # NOQA
-        >>> self = UniqueNameRemapper()
+        >>> from kwcoco._helpers import UniqueNameRemapper
+        >>> self = UniqueNameRemapper(policy='ignore')
         >>> assert self.remap('foo') == 'foo'
         >>> assert self.remap('foo') == 'foo_v001'
         >>> assert self.remap('foo') == 'foo_v002'
         >>> assert self.remap('foo_v001') == 'foo_v003'
         >>> assert 'foo' in self
+
+    Example:
+        >>> from kwcoco._helpers import UniqueNameRemapper
+        >>> import pytest
+        >>> # Test error policy
+        >>> self = UniqueNameRemapper(policy='error')
+        >>> assert self.remap('foo') == 'foo'
+        >>> with pytest.raises(Exception) as ex:
+        >>>     self.remap('foo')
+        >>> print(f'ex={ex}')
     """
-    def __init__(self):
+    def __init__(self, policy='warn', name_type='unspecified'):
+        """
+        Args:
+            policy (str):
+                if "ignore", will not notify the user of a rename.
+                if "warn", will emit a warning when a rename occurs.
+                if "error", will raise an exception if a rename occurs.
+            name_type (str):
+                A hint to the user about what type of name this was when
+                an error or warning message is emitted.
+        """
         import re
         self._seen = set()
         self.suffix_pat = re.compile(r'(.*)_v(\d+)')
+        if policy not in {'ignore', 'warn', 'error'}:
+            raise ValueError('policy must be ignore, warn, or ignore')
+        self.policy = policy
+        self.name_type = name_type
 
     def __contains__(self, name):
         return name in self._seen
 
     def remap(self, name):
+        """
+        Args:
+            name (str): name to check / rename
+
+        Returns:
+            str: a name guarenteed to be unique
+        """
         suffix_pat = self.suffix_pat
         match = suffix_pat.match(name)
         if match:
@@ -146,9 +186,21 @@ class UniqueNameRemapper(object):
         else:
             prefix = name
             num = 0
+        input_name = name
+        did_rename = False
         while name in self._seen:
             num += 1
             name = '{}_v{:03d}'.format(prefix, num)
+            did_rename = True
+        if did_rename:
+            if self.policy == 'ignore':
+                ...
+            elif self.policy == 'warn':
+                import warnings
+                warnings.warn(f'A {self.name_type!r} name was renamed from {input_name!r} to {name!r}')
+            elif self.policy == 'error':
+                raise Exception(f'A {self.name_type!r} name was renamed from {input_name!r} to {name!r}')
+
         self._seen.add(name)
         return name
 
@@ -214,7 +266,7 @@ _lut_frame_index = _lut_image_frame_index
 
 
 def _lut_annot_frame_index(imgs, anns, aid):
-    return imgs[anns[aid]['image_id']]['frame_index']
+    return imgs[anns[aid]['image_id']].get('frame_index', -1)
 
 
 class SortedSet(sortedcontainers.SortedSet):

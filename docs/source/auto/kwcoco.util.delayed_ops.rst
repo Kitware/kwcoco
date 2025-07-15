@@ -6,6 +6,6 @@ Module contents
 
 .. automodule:: kwcoco.util.delayed_ops
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:

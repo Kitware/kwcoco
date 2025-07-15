@@ -63,7 +63,7 @@ import ubelt as ub
 import warnings
 
 from packaging.version import parse as Version
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from os.path import (dirname, basename, join, exists, isdir, relpath)
 from functools import partial
 
@@ -101,12 +101,6 @@ if ujson is not None and Version(ujson.__version__) >= Version('5.2.0') and KWCO
 else:
     json_r: ModuleType = pjson
     json_w: ModuleType = pjson
-
-
-if sys.version_info <= (3, 6):
-    _dict = OrderedDict
-else:
-    _dict = dict
 
 __docstubs__ = """
 from kwcoco.coco_image import CocoImage
@@ -837,7 +831,7 @@ class MixinCocoConstructors:
     """
 
     @classmethod
-    def coerce(cls, key, sqlview=False, **kw):
+    def coerce(cls, key, sqlview=False, verbose=1, **kw):
         """
         Attempt to transform the input into the intended CocoDataset.
 
@@ -851,6 +845,9 @@ class MixinCocoConstructors:
                 can be quicker to load and use in some instances. Can be given
                 as a string, which sets the backend that is used: either sqlite
                 or postgresql.  Defaults to False.
+
+            verbose (int):
+                passed to coerce or demo if special constructors are used.
 
             **kw: passed to whatever constructor is chosen (if any)
 
@@ -896,7 +893,7 @@ class MixinCocoConstructors:
                 else:
                     self = kwcoco.CocoDataset(dset_fpath, **kw)
             elif result.scheme == 'special':
-                self = cls.demo(key=key, **kw)
+                self = cls.demo(key=key, verbose=verbose, **kw)
             else:
                 # This case can be env-dependant in the unlikely case where you
                 # have a file with the same name as a demo key. But hey, you
@@ -905,7 +902,7 @@ class MixinCocoConstructors:
                 if exists(dset_fpath):
                     self = kwcoco.CocoDataset(dset_fpath, **kw)
                 else:
-                    self = cls.demo(key=key, **kw)
+                    self = cls.demo(key=key, verbose=verbose, **kw)
         elif type(key).__name__ == 'CocoSqlDatabase':
             self = key
         elif type(key).__name__ == 'CocoDataset':
@@ -1219,6 +1216,328 @@ class MixinCocoConstructors:
         dset = random_single_video_dset(num_frames=5, num_tracks=3,
                                         tid_start=1, rng=rng)
         return dset
+
+    @classmethod
+    def empty(CocoDataset):
+        """
+        Create an empty dataset
+        """
+        self = CocoDataset()
+        return self
+
+    @classmethod
+    def load(CocoDataset, file, bundle_dpath=None, autobuild=True):
+        """
+        Constructor from a open file or file path.
+
+        Args:
+            file (PathLike | IO):
+                Where to read the data. Can either be a path to a file or an
+                open file pointer / stream.
+
+        Returns:
+            CocoDataset: the loaded dataset
+
+        Example:
+            >>> import kwcoco
+            >>> # Create demo data to load
+            >>> demo_dset = kwcoco.CocoDataset.demo('shapes1')
+            >>> fpath = demo_dset.fpath
+            >>> bundle_dpath = demo_dset.bundle_dpath
+            >>> # Create a CocoDataset from the filepath
+            >>> dset1 = kwcoco.CocoDataset.load(fpath)
+            >>> # Create a CocoDataset from an open file
+            >>> with open(fpath, 'r') as file:
+            >>>     dset2 = kwcoco.CocoDataset.load(file, bundle_dpath=bundle_dpath)
+        """
+        try:
+            fpath = os.fspath(file)
+        except TypeError:
+            input_was_pathlike = False
+        else:
+            input_was_pathlike = True
+        if input_was_pathlike:
+            coco_dset = CocoDataset(fpath, bundle_dpath=bundle_dpath,
+                                    autobuild=autobuild)
+        else:
+            data = json_r.load(file)
+            coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
+                                    autobuild=autobuild)
+        return coco_dset
+
+    @classmethod
+    def from_data(CocoDataset, data, bundle_dpath=None, img_root=None):
+        """
+        Constructor from a json dictionary
+
+        Returns:
+            CocoDataset:
+        """
+        coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
+                                img_root=img_root)
+        return coco_dset
+
+    @classmethod
+    def from_image_paths(CocoDataset, gpaths, bundle_dpath=None,
+                         img_root=None):
+        """
+        Constructor from a list of images paths.
+
+        This is a convenience method.
+
+        Args:
+            gpaths (List[str]): list of image paths
+
+        Returns:
+            CocoDataset:
+
+        Example:
+            >>> import kwcoco
+            >>> coco_dset = kwcoco.CocoDataset.from_image_paths(['a.png', 'b.png'])
+            >>> assert coco_dset.n_images == 2
+        """
+        coco_dset = CocoDataset(bundle_dpath=bundle_dpath, img_root=img_root)
+        for gpath in gpaths:
+            coco_dset.add_image(gpath)
+        return coco_dset
+
+    @classmethod
+    def from_class_image_paths(CocoDataset, root):
+        """
+        Ingest classification data in the common format where images of
+        different categories are stored in folders with the category label.
+
+        Args:
+            root (str | PathLike):
+                the path to a directory containing class-subdirectories
+
+        Returns:
+            CocoDataset:
+        """
+        import kwimage
+        root = ub.Path(root)
+        subdirs = [child for child in root.glob('*') if child.is_dir()]
+        coco_dset = CocoDataset(bundle_dpath=root)
+        for subdir in subdirs:
+            catname = subdir.name
+            cat_id = coco_dset.ensure_category(catname)
+            for gpath in subdir.glob('*'):
+                h, w = kwimage.load_image_shape(gpath)[0:2]
+                image_id = coco_dset.add_image(gpath)
+                coco_dset.add_annotation(
+                    bbox=[0, 0, w, h], category_id=cat_id, image_id=image_id)
+        return coco_dset
+
+    @classmethod
+    def coerce_multiple(cls, datas, workers=0, mode='process', verbose=1,
+                        postprocess=None, ordered=True, **kwargs):
+        """
+        Coerce multiple CocoDataset objects in parallel.
+
+        Args:
+            datas (List): list of kwcoco coercables to load
+
+            workers (int | str): number of worker threads / processes.
+                Can also accept coerceable workers.
+
+            mode (str):
+                Parallelism type, can be: 'thread', 'process', or 'serial'.
+                Defaults to 'process'.
+
+            verbose (int): verbosity level
+
+            postprocess (Callable | None):
+                A function taking one arg (the loaded dataset) to run on the
+                loaded kwcoco dataset in background workers. This can be more
+                efficient when postprocessing is independent per kwcoco file.
+
+            ordered (bool):
+                if True yields datasets in the same order as given. Otherwise
+                results are yielded as they become available. Defaults to True.
+
+            **kwargs:
+                arguments passed to the constructor
+
+        Yields:
+            CocoDataset
+
+        SeeAlso:
+            * load_multiple - like this function but is a strict file-path-only loader
+
+        CommandLine:
+            xdoctest -m kwcoco.coco_dataset CocoDataset.coerce_multiple
+
+        Example:
+            >>> import kwcoco
+            >>> dset1 = kwcoco.CocoDataset.demo('shapes1')
+            >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
+            >>> dset3 = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> dsets = [dset1, dset2, dset3]
+            >>> input_fpaths = [d.fpath for d in dsets]
+            >>> results = list(kwcoco.CocoDataset.coerce_multiple(input_fpaths, ordered=True))
+            >>> result_fpaths = [r.fpath for r in results]
+            >>> assert result_fpaths == input_fpaths
+            >>> # Test unordered
+            >>> results1 = list(kwcoco.CocoDataset.coerce_multiple(input_fpaths, ordered=False))
+            >>> result_fpaths = [r.fpath for r in results]
+            >>> assert set(result_fpaths) == set(input_fpaths)
+            >>> #
+            >>> # Coerce from existing datasets
+            >>> results2 = list(kwcoco.CocoDataset.coerce_multiple(dsets, ordered=True, workers=0))
+            >>> assert results2[0] is dsets[0]
+        """
+        import kwcoco
+        from kwcoco.util.util_parallel import coerce_num_workers
+        from functools import partial
+        _loader = partial(kwcoco.CocoDataset.coerce, verbose=verbose)
+        workers = coerce_num_workers(workers)
+        workers = min(workers, len(datas))
+        # Reuse coerce_multiple logic but overload the loader function.
+        yield from cls._load_multiple(_loader, datas, workers=workers,
+                                      mode=mode, verbose=verbose,
+                                      postprocess=postprocess, ordered=ordered,
+                                      **kwargs)
+
+    @classmethod
+    def load_multiple(cls, fpaths, workers=0, mode='process', verbose=1,
+                      postprocess=None, ordered=True, **kwargs):
+        """
+        Load multiple CocoDataset objects in parallel.
+
+        Args:
+            fpaths (List[str | PathLike]):
+                list of paths to multiple coco files to be loaded
+
+            workers (int): number of worker threads / processes
+
+            mode (str):
+                Parallelism type, can be: 'thread', 'process', or 'serial'.
+                Defaults to 'process'.
+
+            verbose (int): verbosity level
+
+            postprocess (Callable | None):
+                A function taking one arg (the loaded dataset) to run on the
+                loaded kwcoco dataset in background workers and returns the
+                modified dataset. This can be more efficient when
+                postprocessing is independent per kwcoco file.
+
+            ordered (bool):
+                if True yields datasets in the same order as given. Otherwise
+                results are yielded as they become available. Defaults to True.
+
+            **kwargs:
+                arguments passed to the constructor
+
+        Yields:
+            CocoDataset
+
+        SeeAlso:
+            * coerce_multiple - like this function but accepts general
+                coercible inputs.
+        """
+        import kwcoco
+        _loader = kwcoco.CocoDataset
+        # Reuse coerce_multiple logic but overload the loader function.
+        yield from cls._load_multiple(_loader, fpaths, workers=workers,
+                                      mode=mode, verbose=verbose,
+                                      postprocess=postprocess, ordered=ordered,
+                                      **kwargs)
+
+    @classmethod
+    def _load_multiple(cls, _loader, inputs, workers=0, mode='process',
+                       verbose=1, postprocess=None, ordered=True, **kwargs):
+        """
+        Shared logic for multiprocessing loaders.
+
+        SeeAlso:
+            * coerce_multiple
+            * load_multiple
+        """
+        _submit_prog = ub.ProgIter(inputs, desc='submit load kwcoco jobs',
+                                   enabled=workers > 0, verbose=verbose)
+        executor = ub.Executor(mode=mode, max_workers=workers)
+        with executor:
+            jobs = []
+            for job_idx, data in enumerate(_submit_prog):
+                job = executor.submit(
+                    _load_and_postprocess,
+                    data=data,
+                    loader=_loader,
+                    postprocess=postprocess, **kwargs)
+                job.job_idx = job_idx
+                jobs.append(job)
+
+            if ordered:
+                _jobiter = jobs
+            else:
+                from concurrent.futures import as_completed
+                _jobiter = as_completed(jobs)
+
+            _collect_prog = ub.ProgIter(_jobiter, total=len(jobs),
+                                        desc='loading kwcoco files',
+                                        verbose=verbose)
+            for job in _collect_prog:
+                # Clear the reference to this job
+                jobs[job.job_idx] = None
+                yield job.result()
+
+    @classmethod
+    def from_coco_paths(CocoDataset, fpaths, max_workers=0, verbose=1,
+                        mode='thread', union='try'):
+        """
+        Constructor from multiple coco file paths.
+
+        Loads multiple coco datasets and unions the result
+
+        Note:
+            if the union operation fails, the list of individually loaded files
+            is returned instead.
+
+        Args:
+            fpaths (List[str]): list of paths to multiple coco files to be
+                loaded and unioned.
+
+            max_workers (int): number of worker threads / processes
+
+            verbose (int): verbosity level
+
+            mode (str): thread, process, or serial
+
+            union (str | bool): If True, unions the result
+                datasets after loading. If False, just returns the result list.
+                If 'try', then try to perform the union, but return the result
+                list if it fails. Default='try'
+
+        Note:
+            This may be deprecated. Use load_multiple or coerce_multiple and
+            then manually perform the union.
+        """
+        results = CocoDataset.load_multiple(
+            fpaths, workers=max_workers, verbose=verbose, mode=mode,
+            ordered=False, autobuild=False)
+
+        results = list(results)
+
+        if union:
+            try:
+                if verbose:
+                    # TODO: it would be nice if we had a way to combine results
+                    # on the fly, so we can work while the remaining io jobs
+                    # are loading
+                    print('combining results')
+                coco_dset = CocoDataset.union(*results)
+            except Exception as ex:
+                if union == 'try':
+                    warnings.warn(
+                        'Failed to union coco results: {!r}'.format(ex))
+                    return results
+                else:
+                    raise
+            else:
+                return coco_dset
+        else:
+            return results
 
 
 class MixinCocoExtras:
@@ -1641,6 +1960,7 @@ class MixinCocoExtras:
 
     def _ensure_json_serializable(self):
         # inplace convert any ndarrays to lists
+        # TODO: use the kwutil version
         from kwcoco.util.util_json import ensure_json_serializable
         _ = ensure_json_serializable(self.dataset, verbose=1)
 
@@ -2023,6 +2343,7 @@ class MixinCocoHashing:
         """
         # Construct nested container that we will populate with hashable
         # info corresponding to each type of data that we track.
+        from collections import OrderedDict
         hashid_parts = self.hashid_parts
         if hashid_parts is None:
             hashid_parts = OrderedDict()
@@ -2060,8 +2381,8 @@ class MixinCocoHashing:
             # Dumping annots to json takes the longest amount of time
             # However, its faster than hashing the data directly
             def _ditems(d):
-                # return sorted(d.items())
                 return list(d.items()) if isinstance(d, OrderedDict) else sorted(d.items())
+                # return sorted(d.items())
 
             if not hashid_parts['annotations'].get('json', None):
                 aids = sorted(self.anns.keys())
@@ -2415,8 +2736,8 @@ class MixinCocoObjects:
         Args:
             video_ids (List[int] | None):
                 video ids to reference, if unspecified all videos are returned.
-                The `vidids` argument is an alias.  Mutually exclusive with
-                other args.
+                The `vidids` argument is a deprecated alias.  Mutually
+                exclusive with other args.
 
             names (List[str] | None):
                 lookup videos by their name.
@@ -2442,6 +2763,15 @@ class MixinCocoObjects:
             >>> print('videos.objs = {}'.format(ub.urepr(videos.objs[0:2], nl=1)))
         """
         if video_ids is None:
+            if vidids is not None:
+                ub.schedule_deprecation(
+                    'kwcoco', name='vidids', type='parameter',
+                    deprecate='0.8.8', error='1.0.0', remove='1.1.0',
+                    migration=ub.paragraph(
+                        '''
+                        Use video_ids instead.
+                        ''')
+                )
             video_ids = vidids
         if video_ids is None:
             video_ids = sorted(self.index.videos.keys())
@@ -2450,7 +2780,7 @@ class MixinCocoObjects:
             video_ids = [self.index.name_to_video[name]['id'] for name in names]
         return Videos(video_ids, self)
 
-    def tracks(self, track_ids=None, names=None):
+    def tracks(self, track_ids=None, names=None, video_id=None):
         """
         Return vectorized track objects
 
@@ -2461,6 +2791,10 @@ class MixinCocoObjects:
             names (List[str] | None):
                 lookup tracks by their name.
                 Mutually exclusive with other args.
+
+            video_id (int | None):
+                if specified, return tracks in this video id.
+                Note: this query is currently inefficient
 
         Returns:
             kwcoco.coco_objects1d.Tracks: vectorized video object
@@ -2473,12 +2807,29 @@ class MixinCocoObjects:
             >>> tracks.lookup('name')
             >>> tracks.lookup('id')
             >>> print('tracks.objs = {}'.format(ub.urepr(tracks.objs[0:2], nl=1)))
+
+        Example:
+            >>> # Test case for video id lookup when not all annotations are in tracks
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('vidshapes2')
+            >>> for image_id in self.images():
+            >>>     self.add_annotation(image_id=image_id, bbox=[1, 2, 3, 4])
+            >>> tracks = self.tracks(video_id=1)
+            >>> assert len(tracks) == 2
         """
         if track_ids is None:
             track_ids = sorted(self.index.tracks.keys())
 
         if names is not None:
             track_ids = [self.index.name_to_track[name]['id'] for name in names]
+
+        if video_id is not None:
+            # Note: this is an inefficient lookup
+            annot_ids = sorted(ub.flatten([
+                self.index.gid_to_aids[gid]
+                for gid in self.index.vidid_to_gids[video_id]]))
+            annot_track_ids = self.annots(annot_ids).lookup('track_id', None)
+            track_ids = [tid for tid in ub.unique(annot_track_ids) if tid is not None]
         return Tracks(track_ids, self)
 
 
@@ -3812,7 +4163,7 @@ class MixinCocoAddRemove:
         elif self.imgs and id in self.imgs:
             raise exceptions.DuplicateAddError('Image id={} already exists'.format(id))
 
-        img = _dict()
+        img = dict()
         img['id'] = int(id)
         try:
             img['file_name'] = os.fspath(file_name)
@@ -3981,7 +4332,7 @@ class MixinCocoAddRemove:
         elif self.anns and id in self.anns:
             raise IndexError('Annot id={} already exists'.format(id))
 
-        ann = _dict()
+        ann = dict()
         ann['id'] = int(id)
         ann['image_id'] = int(image_id)
         ann['category_id'] = None if category_id is None else int(category_id)
@@ -4058,7 +4409,7 @@ class MixinCocoAddRemove:
         elif index.cats and id in index.cats:
             raise exceptions.DuplicateAddError('Category id={} already exists'.format(id))
 
-        cat = _dict()
+        cat = dict()
         cat['id'] = int(id)
         cat['name'] = str(name)
         if supercategory:
@@ -4118,7 +4469,7 @@ class MixinCocoAddRemove:
         elif index.tracks and id in index.tracks:
             raise exceptions.DuplicateAddError('Track id={} already exists'.format(id))
 
-        track = _dict()
+        track = dict()
         track['id'] = int(id)
         track['name'] = str(name)
         track.update(**kw)
@@ -5937,318 +6288,13 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             self.assets_dpath = assets_dpath
             self.cache_dpath = cache_dpath
 
-    @classmethod
-    def load(CocoDataset, file, bundle_dpath=None, autobuild=True):
-        """
-        Constructor from a open file or file path.
-
-        Args:
-            file (PathLike | IO):
-                Where to read the data. Can either be a path to a file or an
-                open file pointer / stream.
-
-        Returns:
-            CocoDataset: the loaded dataset
-
-        Example:
-            >>> import kwcoco
-            >>> # Create demo data to load
-            >>> demo_dset = kwcoco.CocoDataset.demo('shapes1')
-            >>> fpath = demo_dset.fpath
-            >>> bundle_dpath = demo_dset.bundle_dpath
-            >>> # Create a CocoDataset from the filepath
-            >>> dset1 = kwcoco.CocoDataset.load(fpath)
-            >>> # Create a CocoDataset from an open file
-            >>> with open(fpath, 'r') as file:
-            >>>     dset2 = kwcoco.CocoDataset.load(file, bundle_dpath=bundle_dpath)
-        """
-        try:
-            fpath = os.fspath(file)
-        except TypeError:
-            input_was_pathlike = False
-        else:
-            input_was_pathlike = True
-        if input_was_pathlike:
-            coco_dset = CocoDataset(fpath, bundle_dpath=bundle_dpath,
-                                    autobuild=autobuild)
-        else:
-            data = json_r.load(file)
-            coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
-                                    autobuild=autobuild)
-        return coco_dset
-
-    @classmethod
-    def from_data(CocoDataset, data, bundle_dpath=None, img_root=None):
-        """
-        Constructor from a json dictionary
-
-        Returns:
-            CocoDataset:
-        """
-        coco_dset = CocoDataset(data, bundle_dpath=bundle_dpath,
-                                img_root=img_root)
-        return coco_dset
-
-    @classmethod
-    def from_image_paths(CocoDataset, gpaths, bundle_dpath=None,
-                         img_root=None):
-        """
-        Constructor from a list of images paths.
-
-        This is a convenience method.
-
-        Args:
-            gpaths (List[str]): list of image paths
-
-        Returns:
-            CocoDataset:
-
-        Example:
-            >>> import kwcoco
-            >>> coco_dset = kwcoco.CocoDataset.from_image_paths(['a.png', 'b.png'])
-            >>> assert coco_dset.n_images == 2
-        """
-        coco_dset = CocoDataset(bundle_dpath=bundle_dpath, img_root=img_root)
-        for gpath in gpaths:
-            coco_dset.add_image(gpath)
-        return coco_dset
-
-    @classmethod
-    def from_class_image_paths(CocoDataset, root):
-        """
-        Ingest classification data in the common format where images of
-        different categories are stored in folders with the category label.
-
-        Args:
-            root (str | PathLike):
-                the path to a directory containing class-subdirectories
-
-        Returns:
-            CocoDataset:
-        """
-        import kwimage
-        root = ub.Path(root)
-        subdirs = [child for child in root.glob('*') if child.is_dir()]
-        coco_dset = CocoDataset(bundle_dpath=root)
-        for subdir in subdirs:
-            catname = subdir.name
-            cat_id = coco_dset.ensure_category(catname)
-            for gpath in subdir.glob('*'):
-                h, w = kwimage.load_image_shape(gpath)[0:2]
-                image_id = coco_dset.add_image(gpath)
-                coco_dset.add_annotation(
-                    bbox=[0, 0, w, h], category_id=cat_id, image_id=image_id)
-        return coco_dset
-
-    @classmethod
-    def coerce_multiple(cls, datas, workers=0, mode='process', verbose=1,
-                        postprocess=None, ordered=True, **kwargs):
-        """
-        Coerce multiple CocoDataset objects in parallel.
-
-        Args:
-            datas (List): list of kwcoco coercables to load
-
-            workers (int | str): number of worker threads / processes.
-                Can also accept coerceable workers.
-
-            mode (str):
-                Parallelism type, can be: 'thread', 'process', or 'serial'.
-                Defaults to 'process'.
-
-            verbose (int): verbosity level
-
-            postprocess (Callable | None):
-                A function taking one arg (the loaded dataset) to run on the
-                loaded kwcoco dataset in background workers. This can be more
-                efficient when postprocessing is independent per kwcoco file.
-
-            ordered (bool):
-                if True yields datasets in the same order as given. Otherwise
-                results are yielded as they become available. Defaults to True.
-
-            **kwargs:
-                arguments passed to the constructor
-
-        Yields:
-            CocoDataset
-
-        SeeAlso:
-            * load_multiple - like this function but is a strict file-path-only loader
-
-        CommandLine:
-            xdoctest -m kwcoco.coco_dataset CocoDataset.coerce_multiple
-
-        Example:
-            >>> import kwcoco
-            >>> dset1 = kwcoco.CocoDataset.demo('shapes1')
-            >>> dset2 = kwcoco.CocoDataset.demo('shapes2')
-            >>> dset3 = kwcoco.CocoDataset.demo('vidshapes8')
-            >>> dsets = [dset1, dset2, dset3]
-            >>> input_fpaths = [d.fpath for d in dsets]
-            >>> results = list(kwcoco.CocoDataset.coerce_multiple(input_fpaths, ordered=True))
-            >>> result_fpaths = [r.fpath for r in results]
-            >>> assert result_fpaths == input_fpaths
-            >>> # Test unordered
-            >>> results1 = list(kwcoco.CocoDataset.coerce_multiple(input_fpaths, ordered=False))
-            >>> result_fpaths = [r.fpath for r in results]
-            >>> assert set(result_fpaths) == set(input_fpaths)
-            >>> #
-            >>> # Coerce from existing datasets
-            >>> results2 = list(kwcoco.CocoDataset.coerce_multiple(dsets, ordered=True, workers=0))
-            >>> assert results2[0] is dsets[0]
-        """
-        import kwcoco
-        from kwcoco.util.util_parallel import coerce_num_workers
-        _loader = kwcoco.CocoDataset.coerce
-        workers = coerce_num_workers(workers)
-        workers = min(workers, len(datas))
-        # Reuse coerce_multiple logic but overload the loader function.
-        yield from cls._load_multiple(_loader, datas, workers=workers,
-                                      mode=mode, verbose=verbose,
-                                      postprocess=postprocess, ordered=ordered,
-                                      **kwargs)
-
-    @classmethod
-    def load_multiple(cls, fpaths, workers=0, mode='process', verbose=1,
-                      postprocess=None, ordered=True, **kwargs):
-        """
-        Load multiple CocoDataset objects in parallel.
-
-        Args:
-            fpaths (List[str | PathLike]):
-                list of paths to multiple coco files to be loaded
-
-            workers (int): number of worker threads / processes
-
-            mode (str):
-                Parallelism type, can be: 'thread', 'process', or 'serial'.
-                Defaults to 'process'.
-
-            verbose (int): verbosity level
-
-            postprocess (Callable | None):
-                A function taking one arg (the loaded dataset) to run on the
-                loaded kwcoco dataset in background workers and returns the
-                modified dataset. This can be more efficient when
-                postprocessing is independent per kwcoco file.
-
-            ordered (bool):
-                if True yields datasets in the same order as given. Otherwise
-                results are yielded as they become available. Defaults to True.
-
-            **kwargs:
-                arguments passed to the constructor
-
-        Yields:
-            CocoDataset
-
-        SeeAlso:
-            * coerce_multiple - like this function but accepts general
-                coercible inputs.
-        """
-        import kwcoco
-        _loader = kwcoco.CocoDataset
-        # Reuse coerce_multiple logic but overload the loader function.
-        yield from cls._load_multiple(_loader, fpaths, workers=workers,
-                                      mode=mode, verbose=verbose,
-                                      postprocess=postprocess, ordered=ordered,
-                                      **kwargs)
-
-    @classmethod
-    def _load_multiple(cls, _loader, inputs, workers=0, mode='process',
-                       verbose=1, postprocess=None, ordered=True, **kwargs):
-        """
-        Shared logic for multiprocessing loaders.
-
-        SeeAlso:
-            * coerce_multiple
-            * load_multiple
-        """
-        _submit_prog = ub.ProgIter(inputs, desc='submit load kwcoco jobs',
-                                   enabled=workers > 0, verbose=verbose)
-        executor = ub.Executor(mode=mode, max_workers=workers)
-        with executor:
-            jobs = []
-            for job_idx, data in enumerate(_submit_prog):
-                job = executor.submit(
-                    _load_and_postprocess,
-                    data=data,
-                    loader=_loader,
-                    postprocess=postprocess, **kwargs)
-                job.job_idx = job_idx
-                jobs.append(job)
-
-            if ordered:
-                _jobiter = jobs
-            else:
-                from concurrent.futures import as_completed
-                _jobiter = as_completed(jobs)
-
-            _collect_prog = ub.ProgIter(_jobiter, total=len(jobs),
-                                        desc='loading kwcoco files',
-                                        verbose=verbose)
-            for job in _collect_prog:
-                # Clear the reference to this job
-                jobs[job.job_idx] = None
-                yield job.result()
-
-    @classmethod
-    def from_coco_paths(CocoDataset, fpaths, max_workers=0, verbose=1,
-                        mode='thread', union='try'):
-        """
-        Constructor from multiple coco file paths.
-
-        Loads multiple coco datasets and unions the result
-
-        Note:
-            if the union operation fails, the list of individually loaded files
-            is returned instead.
-
-        Args:
-            fpaths (List[str]): list of paths to multiple coco files to be
-                loaded and unioned.
-
-            max_workers (int): number of worker threads / processes
-
-            verbose (int): verbosity level
-
-            mode (str): thread, process, or serial
-
-            union (str | bool): If True, unions the result
-                datasets after loading. If False, just returns the result list.
-                If 'try', then try to perform the union, but return the result
-                list if it fails. Default='try'
-
-        Note:
-            This may be deprecated. Use load_multiple or coerce_multiple and
-            then manually perform the union.
-        """
-        results = CocoDataset.load_multiple(
-            fpaths, workers=max_workers, verbose=verbose, mode=mode,
-            ordered=False, autobuild=False)
-
-        results = list(results)
-
-        if union:
-            try:
-                if verbose:
-                    # TODO: it would be nice if we had a way to combine results
-                    # on the fly, so we can work while the remaining io jobs
-                    # are loading
-                    print('combining results')
-                coco_dset = CocoDataset.union(*results)
-            except Exception as ex:
-                if union == 'try':
-                    warnings.warn(
-                        'Failed to union coco results: {!r}'.format(ex))
-                    return results
-                else:
-                    raise
-            else:
-                return coco_dset
-        else:
-            return results
+    def __nice__(self):
+        parts = []
+        parts.append('tag={}'.format(self.tag))
+        if self.dataset is not None:
+            info = ub.urepr(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)
+            parts.append(info)
+        return ', '.join(parts)
 
     def copy(self):
         """
@@ -6269,14 +6315,6 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new._next_ids = _NextId(new)
         new.rebuild_index()
         return new
-
-    def __nice__(self):
-        parts = []
-        parts.append('tag={}'.format(self.tag))
-        if self.dataset is not None:
-            info = ub.urepr(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)
-            parts.append(info)
-        return ', '.join(parts)
 
     def dumps(self, indent=None, newlines=False):
         """
@@ -6646,6 +6684,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
     def rebuild_index(self):
         """
         Build or rebuild the fast lookup index.
+
+        This can be used to ensure a clean fast lookup index if the user
+        directly modifies values in `self.dataset`.
         """
         self.index.build(self)
 
@@ -6775,9 +6816,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # are not already disjoint. Alternatively, it could be the case
         # that a union between images with the same name really does
         # mean that they are the same image.
-        unique_img_names = UniqueNameRemapper()
-        unique_video_names = UniqueNameRemapper()
-        unique_track_names = UniqueNameRemapper()
+        unique_img_names = UniqueNameRemapper(policy='warn', name_type='image')
+        unique_video_names = UniqueNameRemapper(policy='warn', name_type='video')
+        unique_track_names = UniqueNameRemapper(policy='warn', name_type='track')
 
         def update_ifnotin(d1, d2):
             """ copies keys from d2 that doent exist in d1 into d1 """
@@ -6797,7 +6838,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         def _coco_union(relative_dsets, common_root):
             """ union of dictionary based data structure """
             # TODO: rely on subset of SPEC keys
-            merged = _dict([
+            merged = dict([
                 ('licenses', []),
                 ('info', []),
                 ('categories', []),
@@ -6895,7 +6936,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         # Tracks with the same name are considered distinct
                         # and given new non-conflicting names
                         new_trackname = unique_track_names.remap(old_track['name'])
-                        new_track = _dict([
+                        new_track = dict([
                             ('id', new_id),
                             ('name', new_trackname),
                         ])
@@ -6910,7 +6951,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         # across datasets.
                         if old_track['name'] not in unique_track_names:
                             new_trackname = unique_track_names.remap(old_track['name'])
-                            new_track = _dict([
+                            new_track = dict([
                                 ('id', new_id),
                                 ('name', new_trackname),
                             ])
@@ -6932,7 +6973,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     else:
                         new_id = len(merged['videos']) + 1
                     new_vidname = unique_video_names.remap(old_video['name'])
-                    new_video = _dict([
+                    new_video = dict([
                         ('id', new_id),
                         ('name', new_vidname),
                     ])
@@ -6953,7 +6994,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     new_gname = None if old_gname is None else (
                         join(subdir, old_gname)
                     )
-                    new_img = _dict([
+                    new_img = dict([
                         ('id', new_id),
                         ('file_name', new_gname),
                     ])
@@ -6998,7 +7039,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                         warnings.warn(f'annot {old_annot} in {subdir} has bad category-id {old_cat_id}')
                     if new_img_id is None:
                         warnings.warn(f'annot {old_annot} in {subdir} has bad image-id {old_img_id}')
-                    new_annot = _dict([
+                    new_annot = dict([
                         ('id', len(merged['annotations']) + 1),
                         ('image_id', new_img_id),
                         ('category_id', new_cat_id),
@@ -7094,7 +7135,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dset = cls(merged, **kwargs)
         return new_dset
 
-    def subset(self, gids=None, video_ids=None, copy=False, autobuild=True):
+    def subset(self, gids=None, video_ids=None, copy=False, autobuild=True, **kwargs):
         """
         Return a subset of the larger coco dataset by specifying which images
         to port. All annotations in those images will be taken.
@@ -7115,6 +7156,10 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             autobuild (bool):
                 if True will automatically build the fast lookup index.
                 Defaults to True.
+
+            **kwargs:
+                Only used for new cannonical names:
+                    image_id := gids
 
         Example:
             >>> import kwcoco
@@ -7154,10 +7199,23 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> assert len(sub3.anns) == 0
             >>> assert rejoined.basic_stats() == self.basic_stats()
         """
-        new_dataset = _dict([(k, []) for k in self.dataset])
+        new_dataset = dict([(k, []) for k in self.dataset])
         new_dataset['categories'] = self.dataset['categories']
         new_dataset['info'] = self.dataset.get('info', [])
         new_dataset['licenses'] = self.dataset.get('licenses', [])
+
+        from kwcoco.util.util_deprecate import migrate_argnames
+        # TODO: schedule a time to switch the explicit args to the cannonical
+        # values.
+        cannonical = migrate_argnames(
+            aliases={
+                'image_ids': ['gids'],
+            },
+            explicit_args=dict(gids=gids),
+            kwargs=kwargs,
+            warn_non_cannon=False,
+        )
+        gids = cannonical['image_ids']
 
         if gids is None:
             gids = []

@@ -5,7 +5,42 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.7 - Unreleased
+## Version 0.8.8 - Unreleased
+
+### Added
+* can now convert a kwcoco file to labelme files.
+* classmethod `CocoDataset.empty` for explicit creation of new unpopulated dataset containers
+* More support for labelme files.
+* Can now lookup tracks by video id
+* eval-detections can now write a confusion kwcoco file
+* `migrate_argnames` helper
+* Add `stabalize_thresh` to DetectionMetrics.score_kwcoco
+* Add "format" argument to `kwcoco stats` for machine readable output
+* Add "options" argument to `plot_stats`
+
+
+### Changed
+* Start migration of subset argument from `gids` to `image_ids`.
+* kwcoco union will now warn the user if it performs a name remapping.
+* The `ObjectList1D.objs` property now returns an ObjView instead of a list, 
+  which enables more efficient iteration. As a result `.objs_iter` is deprecated.
+* The `Images.coco_images` property now returns an CocoImageView instead of a list, 
+  which enables more efficient iteration. As a result `.coco_images_iter` is deprecated.
+* Modify categories keep argument will coerce to a list if given as a string.
+* Confusion measures will now included more metrics at maximized operating points.
+* Segmentation metrics now respect truth annotation weights.
+
+### Fixed
+* index failure if tracks were used on images without `frame_index`
+* minor verbosity fixes
+* Issue with track lookup by video-id
+
+
+### Removed
+* Starting to remove old code meant to support older Python versions <3.8.
+
+
+## Version 0.8.7 - Released 2024-12-18
 
 
 ### Changed

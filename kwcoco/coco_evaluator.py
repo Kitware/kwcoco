@@ -236,6 +236,7 @@ class CocoEvaluator:
         coco_eval._is_init = False
         coco_eval._logs = []
         coco_eval._verbose = 1
+        coco_eval._dmet = None
 
     def log(coco_eval, msg, level='INFO'):
         if coco_eval._verbose:
@@ -627,6 +628,11 @@ class CocoEvaluator:
         # print('coco_eval.config = {}'.format(ub.urepr(dict(coco_eval.config), nl=3)))
 
         dmet = coco_eval._build_dmet()
+
+        # Store a reference to the raw detection metrics for external use.
+        # For now, make it an internal variable in case we want to revert this
+        # decision later.
+        coco_eval._dmet = dmet
 
         # Ignore any categories with too few tests instances
         classes = coco_eval.classes

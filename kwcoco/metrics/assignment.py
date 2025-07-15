@@ -44,10 +44,10 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
     Args:
         true_dets (Detections):
-            groundtruth with boxes, classes, and weights
+            groundtruth with boxes, class_idxs, and weights
 
         pred_dets (Detections):
-            predictions with boxes, classes, and scores
+            predictions with boxes, class_idxs, and scores
 
         iou_thresh (float, default=0.5):
             bounding box overlap iou threshold required for assignment

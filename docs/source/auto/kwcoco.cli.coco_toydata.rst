@@ -3,6 +3,6 @@ kwcoco.cli.coco\_toydata module
 
 .. automodule:: kwcoco.cli.coco_toydata
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:

@@ -25,11 +25,6 @@ from delayed_image import DelayedNans
 from delayed_image import DelayedChannelConcat
 from delayed_image import DelayedLoad, DelayedIdentity
 
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
-
 
 __docstubs__ = """
 from delayed_image.channel_spec import FusedChannelSpec
@@ -566,6 +561,7 @@ class CocoImage(_CocoObject):
             CocoImage | CocoAsset
 
         Example:
+            >>> # A pathological example (test-case)
             >>> import kwcoco
             >>> self = kwcoco.CocoImage({
             >>>     'file_name': 'raw',
@@ -583,6 +579,44 @@ class CocoImage(_CocoObject):
             >>> assert self.find_asset('red|green|blue') is self
             >>> self.find_asset('foo')['file_name'] == '3'
             >>> self.find_asset('baz')['file_name'] == '4'
+
+        Example:
+            >>> # A more standard test case
+            >>> # In this case there is is a top-level base image, as well as
+            >>> # additional assets.
+            >>> import kwcoco
+            >>> self = kwcoco.CocoImage({
+            >>>     'file_name': 'path/to/rgbdata.jpg',
+            >>>     'channels': 'red|green|blue',
+            >>>     'assets': [
+            >>>         {'file_name': 'path/to/depth/data.png', 'channels': 'depth'},
+            >>>         {'file_name': 'path/to/opticalflow/data.tif', 'channels': 'flowx|flowy'},
+            >>>     ],
+            >>> })
+            >>> # Searching for an asset that does not exist returns None
+            >>> assert self.find_asset('does-not-exist') is None
+            >>> # Searching for an asset finds the dictionary containing the channel
+            >>> assert self.find_asset('flowy')['channels'] == 'flowx|flowy'
+            >>> # The top level dict is considered an asset if it has channels
+            >>> assert self.find_asset('red') is self
+            >>> #
+            >>> #
+            >>> # Another common case is when the top-level dictionary has no
+            >>> # file_name, and all image information is pointed to by the assets.
+            >>> self = kwcoco.CocoImage({
+            >>>     'assets': [
+            >>>         {'file_name': 'path/to/rgbdata.jpg', 'channels': 'red|green|blue'},
+            >>>         {'file_name': 'path/to/depth/data.png', 'channels': 'depth'},
+            >>>         {'file_name': 'path/to/opticalflow/data.tif', 'channels': 'flowx|flowy'},
+            >>>     ],
+            >>> })
+            >>> # Searching for an asset that does not exist returns None
+            >>> assert self.find_asset('does-not-exist') is None
+            >>> # Searching for an asset finds the dictionary containing the channel
+            >>> assert self.find_asset('flowy|flowx')['channels'] == 'flowx|flowy'
+            >>> assert self.find_asset('flowy|flowx')['channels'] == 'flowx|flowy'
+            >>> # The top level dict is considered an asset if it has channels
+            >>> assert self.find_asset('red') is not self
         """
         obj = self.find_asset_obj(channels)
         if obj is not None:
@@ -620,6 +654,23 @@ class CocoImage(_CocoObject):
             >>> assert coco_img.find_asset_obj('foo.3') is not None
             >>> assert coco_img.find_asset_obj('foo.3:5') is not None
             >>> assert coco_img.find_asset_obj('foo.3000') is None
+
+        Example:
+            >>> # Test a mallformed case. If using this function each
+            >>> # dictionary with file_name must have channels
+            >>> import kwcoco
+            >>> self = kwcoco.CocoImage({
+            >>>     'file_name': 'path/to/rgbdata.jpg',
+            >>>     'channels': None,
+            >>>     'assets': [
+            >>>         {'file_name': 'path/to/depth/data.png', 'channels': 'depth'},
+            >>>         {'file_name': 'path/to/opticalflow/data.tif', 'channels': 'flowx|flowy'},
+            >>>     ],
+            >>> })
+            >>> # Searching for an asset that does not exist returns None
+            >>> import pytest
+            >>> with pytest.raises(TypeError):
+            >>>     self.find_asset_obj('depth')
         """
         # from delayed_image.channel_spec import FusedChannelSpec
         channels = FusedChannelSpec.coerce(channels)
@@ -829,7 +880,6 @@ class CocoImage(_CocoObject):
         if self.dset is not None:
             self.dset._invalidate_hashid()
 
-    @profile
     def imdelay(self, channels=None, space='image', resolution=None,
                 bundle_dpath=None, interpolation='linear', antialias=True,
                 nodata_method=None, RESOLUTION_KEY=None):
@@ -1592,7 +1642,6 @@ class CocoTrack(_CocoObject):
         return self.dset.annots(track_id=self['id'])
 
 
-@profile
 def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     # from os.path import join
     # from delayed_image.channel_spec import FusedChannelSpec

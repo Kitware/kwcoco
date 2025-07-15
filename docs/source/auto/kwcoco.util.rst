@@ -25,10 +25,12 @@ Submodules
    kwcoco.util.util_eval
    kwcoco.util.util_futures
    kwcoco.util.util_json
+   kwcoco.util.util_kwutil
    kwcoco.util.util_monkey
    kwcoco.util.util_networkx
    kwcoco.util.util_parallel
    kwcoco.util.util_reroot
+   kwcoco.util.util_rich
    kwcoco.util.util_sklearn
    kwcoco.util.util_special_json
    kwcoco.util.util_truncate
@@ -39,6 +41,6 @@ Module contents
 
 .. automodule:: kwcoco.util
    :members:
-   :undoc-members:
-   :show-inheritance:
    :private-members:
+   :show-inheritance:
+   :undoc-members:

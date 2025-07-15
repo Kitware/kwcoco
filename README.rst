@@ -770,6 +770,12 @@ The home of the channel specification has moved to
 `delayed_image <https://gitlab.kitware.com/computer-vision/delayed_image>`_.
 See the `delayed image channel spec docs <https://delayed-image.readthedocs.io/en/latest/delayed_image.channel_spec.html#>`_ for more details.
 
+See Also
+--------
+
+* `kwcoco_dataloader <https://gitlab.kitware.com/computer-vision/kwcoco_dataloader>`__ - a torch dataloader for sampling within kwcoco files.
+* `nrtk-explorer <https://github.com/Kitware/nrtk-explorer>`__ - a dataset visualizer with support for kwcoco.
+
 
 Related Work
 ------------

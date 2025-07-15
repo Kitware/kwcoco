@@ -163,9 +163,10 @@ This the above example, this will result in:
 
 ::
 
-   OrderedDict([('id', 1), ('name', 'cat')])
-   OrderedDict([('id', 1), ('file_name', '/path/to/limecat.jpg')])
-   OrderedDict([('id', 1), ('image_id', 1), ('category_id', 1), ('bbox', [0, 0, 100, 100])])
+    {'id': 1, 'name': 'cat'}
+    {'id': 1, 'file_name': '/path/to/limecat.jpg'}
+    {'id': 1, 'image_id': 1, 'category_id': 1, 'bbox': [0, 0, 100, 100]}
+
 
 In the above example, you can display the underlying ``dataset``
 structure as such
@@ -226,7 +227,7 @@ Examples of kwcoco + ndsampler being to write torch datasets to train
 deep networks can be found in
 `netharn's <https://gitlab.kitware.com/computer-vision/netharn>`__
 examples for:
-`detection <https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/examples/object_detection.py>`__, 
+`detection <https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/examples/object_detection.py>`__,
 `classification <https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/examples/classification.py>`__, and
 `segmentation <https://gitlab.kitware.com/computer-vision/netharn/-/blob/master/netharn/examples/segmentation.py>`__
 
@@ -235,27 +236,24 @@ examples for:
 Technical Debt
 --------------
 
-Based on design decisions made in the original MS-COCO and KW-COCO,
-there are a few weird things
+Due to design decisions inherited from the original MS-COCO specification and early iterations of KW-COCO, a few legacy quirks and inconsistencies remain:
 
--  The “bbox” field gives no indication it should be xywh format.
+- Ambiguous bbox format: The bbox field does not explicitly indicate that it uses the [x, y, width, height] (xywh) format, which can lead to confusion without referencing the documentation.
 
--  We can’t use “vid” as a variable name for “video-id” because “vid” is
-   also an abbreviation for “video”. Hence, while category, image, and
-   annotation all have a nice 1-letter prefix to their id in the
-   standard variable names I use (i.e. cid, gid, aid). I have to use
-   vidid to refer to “video-ids”.
+- Naming conflict with vid: The abbreviation vid is ambiguous - it can mean either video or video-id. To avoid confusion in code, we use vidid to refer to video IDs. This breaks the otherwise clean 1-letter prefix pattern used for other identifiers (e.g., aid, gid, cid for annotations, images, categories). We are thus moving away from this in favor of more verbose but explicit identifiers, but the old ones still exist.
 
--  I’m not in love with the way “keypoint_categories” are handled.
+- Keypoint category representation: The current design for keypoint_categories is awkward and may benefit from a clearer structure or better integration with existing category metadata.
 
--  Are “images” always “images”? Are “videos” always “videos”?
+- Terminology ambiguity: The terms images and videos are overloaded. For example, a video is simply a temporally ordered group of images, but this abstraction may not be immediately obvious.
 
--  Would we benefit from using JSON-LD?
+- Potential use of JSON-LD: It's unclear whether adopting JSON-LD would improve interoperability or clarity. This remains an open question worth exploring.
 
--  The “prob” field needs to be better defined
+- Poorly defined prob field: The meaning and semantics of the prob (probability) field are underspecified. Clarifying its purpose and standardizing its use would improve consistency across datasets.
 
--  The name “video” might be confusing. Its just a temporally ordered
-   group of images.
+- Confusing use of video: As mentioned, the term video may imply an actual video file, when in practice, it refers to an ordered sequence of image frames. A clearer term might reduce confusion.
+
+
+
 
 Code Examples
 -------------
