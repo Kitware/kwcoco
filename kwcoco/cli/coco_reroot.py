@@ -10,6 +10,12 @@ class CocoRerootCLI(scfg.DataConfig):
     Modify the root of a coco dataset such to either make paths relative to a
     new root or make paths absolute.
 
+    NOTE:
+        * This script still has issues, and may change behavior in the future.
+          As a workaround reroot to the same bundle directory first with
+          absolute=True to ensure that paths resolve, and then reroot to the
+          target location.
+
     TODO:
         - [ ] Evaluate that all tests cases work
     """
@@ -84,28 +90,6 @@ class CocoRerootCLI(scfg.DataConfig):
             >>> cmdline = False
             >>> cls = CocoRerootCLI
             >>> cls.main(cmdline, **kw)
-
-        Ignore:
-            python ~/code/kwcoco/kwcoco/cli/coco_reroot.py  \
-                --src=$HOME/code/bioharn/fast_test/deep_training/training_truth.json \
-                --dst=$HOME/code/bioharn/fast_test/deep_training/training_truth2.json \
-                --new_prefix=/home/joncrall/code/bioharn/fast_test/training_data \
-                --old_prefix=/run/media/matt/Storage/TEST/training_data
-
-            python ~/code/kwcoco/kwcoco/cli/coco_reroot.py  \
-                --src=$HOME/code/bioharn/fast_test/deep_training/validation_truth.json \
-                --dst=$HOME/code/bioharn/fast_test/deep_training/validation_truth2.json \
-                --new_prefix=/home/joncrall/code/bioharn/fast_test/training_data \
-                --old_prefix=/run/media/matt/Storage/TEST/training_data
-
-            cmdline = '''
-                --src=$HOME/code/bioharn/fast_test/deep_training/training_truth.json
-                --dst=$HOME/code/bioharn/fast_test/deep_training/training_truth2.json
-                --new_prefix=/home/joncrall/code/bioharn/fast_test/training_data
-                --old_prefix=/run/media/matt/Storage/TEST/training_data
-            '''
-                /run/media/matt/Storage/TEST/training_data
-                --check=True --dst rerooted.json
         """
         import kwcoco
         from os.path import dirname, abspath
@@ -135,11 +119,11 @@ class CocoRerootCLI(scfg.DataConfig):
             new_root = abspath(new_root)
 
         if config['autofix']:
-            autfixer = find_reroot_autofix(dset)
-            if autfixer is not None:
-                print('Found autfixer = {}'.format(ub.urepr(autfixer, nl=1)))
-                config['new_prefix'] = autfixer['new_prefix']
-                config['old_prefix'] = autfixer['old_prefix']
+            autofixer = find_reroot_autofix(dset)
+            if autofixer is not None:
+                print('Found autofixer = {}'.format(ub.urepr(autofixer, nl=1)))
+                config['new_prefix'] = autofixer['new_prefix']
+                config['old_prefix'] = autofixer['old_prefix']
 
         dset.reroot(
             new_root=new_root,
