@@ -68,6 +68,11 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         dst with a .zip suffix to compress
         '''))
 
+    verbose = scfg.Value(True, isflag=True, help=ub.paragraph(
+        '''
+        verbosity level
+        '''))
+
     @classmethod
     def main(cls, cmdline=True, **kw):
         """
@@ -117,26 +122,32 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
-        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        if 0:
+            config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+            print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        else:
+            # newstyle
+            config = cls.cli(data=kw, argv=cmdline, strict=True,
+                             verbose='auto')
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
-        print('dset = {!r}'.format(dset))
+        if config.verbose:
+            print('dset = {!r}'.format(dset))
 
         import networkx as nx
         import warnings
-        print('Input Categories:')
-        try:
-            print(nx.forest_str(dset.object_categories().graph))
-        except AttributeError:
-            print(nx.write_network_text(dset.object_categories().graph))
+        if config.verbose:
+            print('Input Categories:')
+            try:
+                print(nx.forest_str(dset.object_categories().graph))
+            except AttributeError:
+                print(nx.write_network_text(dset.object_categories().graph))
 
         if config['rename'] is not None:
             # parse rename string
-            print(f'config.rename={config.rename}')
             try:
                 import kwutil
                 mapper = kwutil.Yaml.coerce(config.rename)
@@ -196,17 +207,19 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             order = kwutil.Yaml.coerce(config['order'])
             dset.normalize_category_ids(start_id=start_id, order=order)
 
-        print('Output Categories: ')
-        try:
-            print(nx.forest_str(dset.object_categories().graph))
-        except AttributeError:
-            print(nx.write_network_text(dset.object_categories().graph))
+        if config.verbose:
+            print('Output Categories: ')
+            try:
+                print(nx.forest_str(dset.object_categories().graph))
+            except AttributeError:
+                print(nx.write_network_text(dset.object_categories().graph))
 
         if config['dst'] is None:
             print('dry run')
         else:
             dset.fpath = config['dst']
-            print('dset.fpath = {!r}'.format(dset.fpath))
+            if config.verbose:
+                print('dset.fpath = {!r}'.format(dset.fpath))
             dumpkw = {
                 'newlines': True,
                 'compress': config['compress'],
