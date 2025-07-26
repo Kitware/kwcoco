@@ -5,7 +5,7 @@ import scriptconfig as scfg
 
 class CocoModifyCatsCLI(scfg.DataConfig):
     """
-    Remove, rename, or coarsen categories.
+    Remove, rename, reorder, re-id, or coarsen categories.
     """
     __command__ = 'modify_categories'
     __epilog__ = """
@@ -17,57 +17,56 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep eff,
 
         kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep=[] --keep_annots=True
+        kwcoco modify_categories --src=special:shapes8 --dst modcats.json --start_id=0 --order "[star,background]"
     """
-    __default__ = {
-        'src': scfg.Value(None, help=(
-            'Path to the coco dataset'), position=1),
+    src = scfg.Value(None, help=(
+        'Path to the coco dataset'), position=1)
 
-        'dst': scfg.Value(None, help=(
-            'Save the modified dataset to a new file')),
+    dst = scfg.Value(None, help=(
+        'Save the modified dataset to a new file'))
 
-        'keep_annots': scfg.Value(False, help=(
-            'if False, removes annotations when categories are removed, '
-            'otherwise the annotations category is simply unset')),
+    keep_annots = scfg.Value(False, help=(
+        'if False, removes annotations when categories are removed, '
+        'otherwise the annotations category is simply unset'))
 
-        'remove_empty_images': scfg.Value(False, isflag=True, help=(
-            'if True, removes images when categories are removed, '
-            'otherwise the images are simply kept as is')),
+    remove_empty_images = scfg.Value(False, isflag=True, help=(
+        'if True, removes images when categories are removed, '
+        'otherwise the images are simply kept as is'))
 
-        'remove': scfg.Value(None, help=ub.paragraph(
-            '''
-            Category names to remove. Mutex with keep.
-            ''')),
+    remove = scfg.Value(None, help=ub.paragraph(
+        '''
+        Category names to remove. Mutex with keep.
+        '''))
 
-        'keep': scfg.Value(None, help=ub.paragraph(
-            '''
-            If specified, remove all other categories. Mutex with remove.
-            ''')),
+    keep = scfg.Value(None, help=ub.paragraph(
+        '''
+        If specified, remove all other categories. Mutex with remove.
+        '''))
 
-        'rename': scfg.Value(None, type=str, help=ub.paragraph(
-            '''
-            category mapping as a YAML dictionary. The old format format:
-            "old1:new1,old2:new2" is still accepted.
-            ''')),
+    rename = scfg.Value(None, type=str, help=ub.paragraph(
+        '''
+        category mapping as a YAML dictionary. The old format format:
+        "old1:new1,old2:new2" is still accepted.
+        '''))
 
-        'start_id': scfg.Value(None, type=int, help=ub.paragraph(
-            '''
-            if specified, then normalize category IDs to be consecutive and
-            start from this order.
-            ''')),
+    start_id = scfg.Value(None, type=int, help=ub.paragraph(
+        '''
+        if specified, then normalize category IDs to be consecutive and
+        start from this order.
+        '''))
 
-        'order': scfg.Value(None, type=str, help=ub.paragraph(
-            '''
-            if specified this is a YAML list, reorder to the first categories
-            are in this order. Can also be "sort" to sort alphabetically.
-            If using "rename", then use the new names here.
-            ''')),
+    order = scfg.Value(None, type=str, help=ub.paragraph(
+        '''
+        if specified this is a YAML list, reorder to the first categories
+        are in this order. Can also be "sort" to sort alphabetically.
+        If using "rename", then use the new names here.
+        '''))
 
-        'compress': scfg.Value('auto', help=ub.paragraph(
-            '''
-            if True writes results with compression. DEPRECATED: just specify
-            dst with a .zip suffix to compress
-            ''')),
-    }
+    compress = scfg.Value('auto', help=ub.paragraph(
+        '''
+        if True writes results with compression. DEPRECATED: just specify
+        dst with a .zip suffix to compress
+        '''))
 
     @classmethod
     def main(cls, cmdline=True, **kw):
