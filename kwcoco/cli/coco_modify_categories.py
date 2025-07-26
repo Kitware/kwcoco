@@ -37,9 +37,18 @@ class CocoModifyCatsCLI(scfg.DataConfig):
 
         'keep': scfg.Value(None, help='If specified, remove all other categories. Mutex with remove.'),
 
-        'rename': scfg.Value(None, type=str, help='category mapping in the format. "old1:new1,old2:new2"'),
+        'rename': scfg.Value(None, type=str, help='category mapping as a YAML dictionary. The old format format: "old1:new1,old2:new2" is still accepted'),
 
-        'compress': scfg.Value('auto', help='if True writes results with compression'),
+        'start_id': scfg.Value(None, type=int, help='if specified, then normalize category IDs to be consecutive and start from this order.'),
+
+        'order': scfg.Value(None, type=str, help=ub.paragraph(
+            '''
+            if specified this is a YAML list, reorder to the first categories
+            are in this order. Can also be "sort" to sort alphabetically.
+            If using "rename", then use the new names here.
+            ''')),
+
+        'compress': scfg.Value('auto', help='if True writes results with compression. DEPRECATED: just specify dst with a .zip suffix to compress'),
     }
 
     @classmethod
@@ -87,7 +96,19 @@ class CocoModifyCatsCLI(scfg.DataConfig):
 
         if config['rename'] is not None:
             # parse rename string
-            mapper = dict([p.split(':') for p in config['rename'].split(',')])
+            print(f'config.rename={config.rename}')
+            try:
+                import kwutil
+                mapper = kwutil.Yaml.coerce(config.rename)
+            except ImportError as ex:
+                print(f'Warning: ex={ex}. The kwutil package is required for YAML rename formatting')
+            except Exception as ex:
+                print(f'Warning: ex={ex}. Prefer YAML for mapper')
+                mapper = None
+
+            if mapper is None:
+                mapper = dict([p.split(':') for p in config['rename'].split(',')])
+
             print('mapper = {}'.format(ub.urepr(mapper, nl=1)))
             dset.rename_categories(mapper)
 
@@ -128,6 +149,13 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         if config['remove_empty_images']:
             noannot_images = [gid for gid, aids in dset.index.gid_to_aids.items() if len(aids) == 0]
             dset.remove_images(noannot_images, verbose=3)
+
+        if config['start_id']:
+            raise NotImplementedError
+            # dset.normalize_category_ids(start_id=
+
+        if config['order']:
+            raise NotImplementedError
 
         print('Output Categories: ')
         try:

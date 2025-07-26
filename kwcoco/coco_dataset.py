@@ -1802,6 +1802,97 @@ class MixinCocoExtras:
 
         return bad_paths
 
+    def normalize_category_ids(self, start_id=None, order=None):
+        """
+        Reassign category IDs to be consecutive integers starting at `start_id`.
+
+        Optionally reorders category definitions to make the order canonical,
+        sorted, or front-loaded based on a custom list of category names.
+
+        Args:
+            start_id (int | None):
+                If specified, reassign each category consecutive ids starting
+                with this id.
+
+            order (List[str] | str | None): Optional control over category
+                ordering. If:
+                    - None: preserves original order.
+                    - List[str]: category names to prioritize in that order.
+                    - "sort": sorts categories alphabetically by name.
+
+        Example:
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8', verbose=0)
+            >>> print('Original categories:')
+            >>> print(ub.urepr(self.dataset['categories'], nl=0))
+            Original categories:
+            [{'id': 1, 'name': 'star'}, {'id': 2, 'name': 'superstar'}, {'id': 3, 'name': 'eff'}]
+            >>> # 1. Reindex starting at 0
+            >>> self.normalize_category_ids(start_id=0)
+            >>> print('After start_id=0:')
+            >>> print(ub.urepr(self.dataset['categories'], nl=0))
+            After start_id=0:
+            [{'id': 0, 'name': 'star'}, {'id': 1, 'name': 'superstar'}, {'id': 2, 'name': 'eff'}]
+            >>> # 2. Sort categories alphabetically
+            >>> self.normalize_category_ids(order='sort', start_id=1)
+            >>> print('After order="sort", start_id=1:')
+            >>> print(ub.urepr(self.dataset['categories'], nl=0))
+            After order="sort", start_id=1:
+            [{'id': 1, 'name': 'eff'}, {'id': 2, 'name': 'star'}, {'id': 3, 'name': 'superstar'}]
+            >>> # 3. Front-load a custom class order
+            >>> self.normalize_category_ids(order=['superstar'], start_id=100)
+            >>> print('After order=["superstar"], start_id=100:')
+            >>> print(ub.urepr(self.dataset['categories'], nl=0))
+            After order=["superstar"], start_id=100:
+            [{'id': 100, 'name': 'superstar'}, {'id': 101, 'name': 'eff'}, {'id': 102, 'name': 'star'}]
+        """
+        # Get existing categories as a list of dicts
+        orig_categories = self.dataset['categories']
+
+        # Determine category ordering
+        if order is None:
+            new_catname_order = None
+        elif isinstance(order, str):
+            if order == 'sort':
+                new_catname_order = sorted(c['name'] for c in orig_categories)
+            else:
+                raise KeyError(f'Unknown ordering method: {order}')
+        else:
+            # Assume order: List[str]
+            orig_order = ub.oset([cat['name'] for cat in orig_categories])
+            suffix_order = list(orig_order - order)
+            new_catname_order = order + suffix_order
+
+        if new_catname_order is not None:
+            # If we are reordering the categoryes, build the new list
+            new_categories = [
+                self.index.name_to_cat[name] for name in new_catname_order]
+        else:
+            new_categories = orig_categories
+
+        if start_id is not None:
+            # If requested, replace category ids and build new ID map
+            cat_id_map = {}
+            for new_id, cat in enumerate(new_categories, start=start_id):
+                old_id = cat['id']
+                cat_id_map[old_id] = new_id
+                cat['id'] = new_id
+
+            # Update annotations
+            for ann in self.dataset['annotations']:
+                old_cid = ann.get('category_id', None)
+                if old_cid is not None:
+                    ann['category_id'] = cat_id_map[old_cid]
+
+        if new_catname_order is not None:
+            # If we reordered the categories, replace the dataset category list
+            self.dataset['categories'][:] = new_categories
+
+        # Invalidate and rebuild index
+        self._invalidate_hashid()
+        self.rebuild_index()
+
     def rename_categories(self, mapper, rebuild=True, merge_policy='ignore'):
         """
         Rename categories with a potentially coarser categorization.
@@ -1817,7 +1908,7 @@ class MixinCocoExtras:
 
         Example:
             >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo()
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8')
             >>> self.rename_categories({'astronomer': 'person',
             >>>                         'astronaut': 'person',
             >>>                         'mouth': 'person',
@@ -2726,6 +2817,8 @@ class MixinCocoObjects:
                     deprecate='0.7.3', error='1.0.0', remove='1.1.0',
                 )
         if category_ids is None:
+            # Question: why are we sorting here? Maybe this was handling some
+            # Python 3.6 case? Do we still need to?  Would it break UX?
             category_ids = sorted(self.index.cats.keys())
         return Categories(category_ids, self)
 

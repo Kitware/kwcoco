@@ -172,3 +172,37 @@ def test_ensure_video_does_not_duplicate():
     dset.ensure_video(name='foo')
     print(dset.dataset['videos'])
     assert len(dset.dataset['videos']) == 1
+
+
+def test_normalize_category_ids():
+    import kwcoco
+    import copy
+    self = kwcoco.CocoDataset.demo()
+    old_catlist = copy.deepcopy(self.dataset['categories'])
+    old_catdict = copy.deepcopy(self.index.cats)
+    self.normalize_category_ids(start_id=None)  # Should do nothing
+    assert old_catlist == self.dataset['categories']
+    self.normalize_category_ids(start_id=None, order=['human'])  # reorder, but dont change ids
+    assert old_catlist != self.dataset['categories'], 'order should change'
+    assert old_catdict == self.index.cats, 'ids should not'
+    self.normalize_category_ids(start_id=3, order=['human'])  # reorder, but dont change ids
+    assert old_catlist != self.dataset['categories'], 'order should change'
+    assert old_catdict != self.index.cats, 'ids should change'
+
+    import kwcoco
+    self = kwcoco.CocoDataset.demo()
+    self.normalize_category_ids(start_id=2)
+    classes = self.object_categories()
+    assert min(classes.id_to_idx) == 2
+    self.normalize_category_ids(start_id=0)
+    classes = self.object_categories()
+    assert min(classes.id_to_idx) == 0
+    # Sorting alphabetically
+    self.normalize_category_ids(order='sort', start_id=1)
+    catnames = self.categories().lookup('name')
+    assert sorted(catnames) == catnames, f'Got: {catnames}'
+    # Custom front-loaded order
+    order = ['astronomer', 'rocket']
+    start_id = -1
+    self.normalize_category_ids(start_id=start_id, order=order)
+    self.categories().lookup('name')[0:2] == order

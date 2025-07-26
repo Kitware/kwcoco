@@ -7,6 +7,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Version 0.8.9 - Unreleased
 
+### Added
+* New function `CocoDataset.normalize_category_ids` that lets the user modify the starting index of category ids, or provide 
+
+### Changed
+* Allow category map to be passed as YAML in cli modify-categories
+
 
 ## Version 0.8.8 - Released 2025-07-15
 
