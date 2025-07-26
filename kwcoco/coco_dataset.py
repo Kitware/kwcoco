@@ -1908,7 +1908,7 @@ class MixinCocoExtras:
 
         Example:
             >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo('vidshapes8')
+            >>> self = kwcoco.CocoDataset.demo()
             >>> self.rename_categories({'astronomer': 'person',
             >>>                         'astronaut': 'person',
             >>>                         'mouth': 'person',
