@@ -33,13 +33,27 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             'if True, removes images when categories are removed, '
             'otherwise the images are simply kept as is')),
 
-        'remove': scfg.Value(None, help='Category names to remove. Mutex with keep.'),
+        'remove': scfg.Value(None, help=ub.paragraph(
+            '''
+            Category names to remove. Mutex with keep.
+            ''')),
 
-        'keep': scfg.Value(None, help='If specified, remove all other categories. Mutex with remove.'),
+        'keep': scfg.Value(None, help=ub.paragraph(
+            '''
+            If specified, remove all other categories. Mutex with remove.
+            ''')),
 
-        'rename': scfg.Value(None, type=str, help='category mapping as a YAML dictionary. The old format format: "old1:new1,old2:new2" is still accepted'),
+        'rename': scfg.Value(None, type=str, help=ub.paragraph(
+            '''
+            category mapping as a YAML dictionary. The old format format:
+            "old1:new1,old2:new2" is still accepted.
+            ''')),
 
-        'start_id': scfg.Value(None, type=int, help='if specified, then normalize category IDs to be consecutive and start from this order.'),
+        'start_id': scfg.Value(None, type=int, help=ub.paragraph(
+            '''
+            if specified, then normalize category IDs to be consecutive and
+            start from this order.
+            ''')),
 
         'order': scfg.Value(None, type=str, help=ub.paragraph(
             '''
@@ -48,7 +62,11 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             If using "rename", then use the new names here.
             ''')),
 
-        'compress': scfg.Value('auto', help='if True writes results with compression. DEPRECATED: just specify dst with a .zip suffix to compress'),
+        'compress': scfg.Value('auto', help=ub.paragraph(
+            '''
+            if True writes results with compression. DEPRECATED: just specify
+            dst with a .zip suffix to compress
+            ''')),
     }
 
     @classmethod
@@ -68,6 +86,29 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             >>> assert dst_fpath.exists()
             >>> new_dset = kwcoco.CocoDataset(dst_fpath)
             >>> assert len(new_dset.cats) == 0
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_modify_categories import *  # NOQA
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/coco_modify_categories').ensuredir()
+            >>> old_dset = kwcoco.CocoDataset.demo('special:shapes8')
+            >>> dst_fpath = dpath / 'modified_category.kwcoco.zip'
+            >>> kw = {
+            >>>     'src': old_dset.fpath,
+            >>>     'dst': dst_fpath,
+            >>>     'start_id': 3,
+            >>>     'order': 'sort',
+            >>> }
+            >>> cmdline = False
+            >>> cls = CocoModifyCatsCLI
+            >>> cls.main(cmdline=cmdline, **kw)
+            >>> assert dst_fpath.exists()
+            >>> new_dset = kwcoco.CocoDataset(dst_fpath)
+            >>> assert min(new_dset.categories().lookup('id')) == 3
+            >>> names = new_dset.categories().lookup('name')
+            >>> assert sorted(names) == names
 
         Example:
             >>> # xdoctest: +SKIP
@@ -150,12 +191,11 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             noannot_images = [gid for gid, aids in dset.index.gid_to_aids.items() if len(aids) == 0]
             dset.remove_images(noannot_images, verbose=3)
 
-        if config['start_id']:
-            raise NotImplementedError
-            # dset.normalize_category_ids(start_id=
-
-        if config['order']:
-            raise NotImplementedError
+        if config['start_id'] is not None or config['order'] is not None:
+            import kwutil
+            start_id = config['start_id']
+            order = kwutil.Yaml.coerce(config['order'])
+            dset.normalize_category_ids(start_id=start_id, order=order)
 
         print('Output Categories: ')
         try:
