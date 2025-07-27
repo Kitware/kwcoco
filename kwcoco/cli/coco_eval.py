@@ -16,7 +16,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
         python -m kwcoco.metrics.segmentation_metrics --help
     """
     __command__ = 'eval'
-    __alias__ = ['eval_detections']
+    __alias__ = ['eval_detections', 'evaluate_detections']
 
     # These should go into the CLI args, not the class config args
     expt_title = scfg.Value('', type=str, help='title for plots', tags=['perf_param'])
@@ -31,7 +31,10 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     confusion_fpath = scfg.Value(None, help=ub.paragraph(
         '''
         if specified, write a kwcoco file with confusion labels for further
-        inspection and visualization.
+        inspection and visualization. A script to perform visualization will
+        also be written as a sidecar. Note, that multiple confusion files may
+        be written if multiple thresholds are were requested, and this path
+        will symlink to that final path.
         '''))
 
     @classmethod
@@ -131,10 +134,59 @@ def main(cmdline=True, **kw):
     if DO_CONFUSION_DUMP:
         print('Dumping confusion kwcoco files')
         key_to_cfsn_dset = build_confusion_datasets(coco_eval, results)
+
+        # This is a little strange because the CLI lets the user request a
+        # single confusion path, but we might need to output multiple for
+        # multi-threshold results. To handle this we will augment the requested
+        # path, but to ensure output existence checks are met we will symlink
+        # the final one to the original path.
+        requested_confusion_fpath = ub.Path(cli_config.confusion_fpath)
+        confusion_fpath = None
+
         for key, cfsn_dset in key_to_cfsn_dset.items():
-            # TODO: augment path base don key
-            cfsn_dset.fpath = cli_config.confusion_fpath
+            # augment confusion path based on key
+            confusion_fpath = ub.Path(requested_confusion_fpath)
+            confusion_fpath = confusion_fpath.augment(stemsuffix='-' + key, multidot=True)
+
+            try:
+                import kwutil
+                new_name = kwutil.util_path.sanitize_path_name(confusion_fpath.name, safe=True)
+                confusion_fpath = confusion_fpath.parent / new_name
+            except ImportError:
+                ...
+
+            cfsn_dset.fpath = confusion_fpath
             cfsn_dset.dump()
+
+            # Also write a script to visualize the confusion kwcoco file to disk.
+            WRITE_VIZ_SCRIPT = True
+            if WRITE_VIZ_SCRIPT:
+                # Also write the confusion viz script, requires geowatch is
+                # installed (in the future geowatch visualize should be moved
+                # to kwcoco proper)
+                viz_script_fpath = confusion_fpath.augment(prefix='visualize_', ext='.sh')
+                channels = cfsn_dset.coco_image(ub.peek(cfsn_dset.imgs)).channels
+                channel_spec = channels.spec
+                viz_script_text = ub.codeblock(
+                    rf'''
+                    #!/bin/bash
+                    geowatch visualize {cfsn_dset.fpath} --smart --animate=False \
+                        --channels "{channel_spec},{channel_spec}" \
+                        --role_order="true,pred" \
+                        --draw_imgs=False --draw_anns=True \
+                        --max_dim=640 --draw_chancode=False \
+                        --draw_header=False
+                    ''')
+                viz_script_fpath.write_text(viz_script_text)
+                try:
+                    viz_script_fpath.chmod('+x')
+                except Exception:
+                    ...
+
+        assert confusion_fpath is not None
+        ub.symlink(real_path=confusion_fpath,
+                   link_path=requested_confusion_fpath, overwrite=True,
+                   verbose=1)
 
     if 'coco_dset' in coco_eval.true_extra:
         truth_dset = coco_eval.true_extra['coco_dset']
@@ -268,7 +320,7 @@ def build_confusion_datasets(coco_eval, results):
                     true_ann['color'] = CONFUSION_COLORS['true_false_negative']
                 else:
                     true_ann['confusion'] = 'true_positive'
-                    true_ann['score'] = pred_ann['score']
+                    true_ann['score'] = pred_ann.get('score', None)
                     true_ann['matching_pred_annot_id'] = pred_ann['id']
                     true_ann['color'] = CONFUSION_COLORS['true_true_positive']
 
