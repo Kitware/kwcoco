@@ -445,11 +445,15 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
     if select_images is not None:
         coerced = None
         if kwutil is not None:
-            coerced = kwutil.Yaml.coerce(select_images)
-            if isinstance(coerced, list):
-                # Allow the user to specify a YAML list of image ids
-                image_selected_gids = set(coerced)
-                valid_gids &= image_selected_gids
+            try:
+                coerced = kwutil.Yaml.coerce(select_images)
+                if isinstance(coerced, list):
+                    # Allow the user to specify a YAML list of image ids
+                    image_selected_gids = set(coerced)
+                    valid_gids &= image_selected_gids
+            except Exception:
+                # yaml coerce failed, try jq
+                ...
         if coerced is None:
             try:
                 import jq
@@ -469,10 +473,14 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
     if select_videos is not None:
         coerced = None
         if kwutil is not None:
-            coerced = kwutil.Yaml.coerce(select_videos)
-            if isinstance(coerced, list):
-                # Allow the user to specify a YAML list of video ids
-                selected_vidids = set(coerced)
+            try:
+                coerced = kwutil.Yaml.coerce(select_videos)
+                if isinstance(coerced, list):
+                    # Allow the user to specify a YAML list of video ids
+                    selected_vidids = set(coerced)
+            except Exception:
+                # yaml coerce failed, try jq
+                ...
         if coerced is None:
             try:
                 import jq
