@@ -344,7 +344,9 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
     json-query (jq).
 
     Args:
-        select_images(str | None):
+        select_images (str  | List[int] | None):
+            Can be a coercable YAML list of image ids, or...
+
             A json query (via the jq spec) that specifies which images
             belong in the subset. Note, this is a passed as the body of
             the following jq query format string to filter valid ids
@@ -367,7 +369,9 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
 
             Requires the "jq" python library is installed.
 
-        select_videos(str | None):
+        select_videos (str  | List[int] | None):
+            Can be a coercable YAML list of video ids, or...
+
             A json query (via the jq spec) that specifies which videos
             belong in the subset. Note, this is a passed as the body of
             the following jq query format string to filter valid ids
@@ -397,6 +401,14 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
         >>> _query_image_ids(coco_dset, select_images='.id < 3 and (.file_name | test(".*.png"))')
         >>> _query_image_ids(coco_dset, select_images='.id < 3 or (.file_name | test(".*.png"))')
 
+    Example:
+        >>> # xdoctest: +REQUIRES(module:kwutil)
+        >>> from kwcoco._helpers import _query_image_ids
+        >>> import kwcoco
+        >>> coco_dset = kwcoco.CocoDataset.demo('vidshapes8')
+        >>> assert _query_image_ids(coco_dset, select_images='[2, 3, 4]') == [2, 3, 4]
+        >>> assert _query_image_ids(coco_dset, select_videos='[3]') == [5, 6]
+
     Ignore:
         # JQ Dev examples
         import jq
@@ -422,31 +434,46 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
 
     """
     import ubelt as ub
+    try:
+        import kwutil
+    except Exception:
+        kwutil is None
+
     # Start with all images
     valid_gids = set(coco_dset.images())
 
     if select_images is not None:
-        try:
-            import jq
-        except Exception:
-            print('The jq library is required to run a generic image query')
-            raise
+        coerced = None
+        if kwutil is not None:
+            coerced = kwutil.Yaml.coerce(select_images)
+            if isinstance(coerced, list):
+                # Allow the user to specify a YAML list of image ids
+                image_selected_gids = set(coerced)
+                valid_gids &= image_selected_gids
+        if coerced is None:
+            try:
+                import jq
+            except Exception:
+                print('The jq library is required to run a generic image query')
+                raise
 
-        try:
-            query_text = ".images[] | select({}) | .id".format(select_images)
-            query = jq.compile(query_text)
-            image_selected_gids = set(query.input(coco_dset.dataset).all())
-            valid_gids &= image_selected_gids
-        except Exception as ex:
-            print('JQ Query Failed: {}, ex={}'.format(query_text, ex))
-            raise
+            try:
+                query_text = ".images[] | select({}) | .id".format(select_images)
+                query = jq.compile(query_text)
+                image_selected_gids = set(query.input(coco_dset.dataset).all())
+                valid_gids &= image_selected_gids
+            except Exception as ex:
+                print('JQ Query Failed: {}, ex={}'.format(query_text, ex))
+                raise
 
     if select_videos is not None:
-
-        if isinstance(select_videos, list):
-            # Interpret as video_ids
-            ...
-        else:
+        coerced = None
+        if kwutil is not None:
+            coerced = kwutil.Yaml.coerce(select_videos)
+            if isinstance(coerced, list):
+                # Allow the user to specify a YAML list of video ids
+                selected_vidids = set(coerced)
+        if coerced is None:
             try:
                 import jq
             except Exception:
@@ -457,12 +484,13 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
                 query_text = ".videos[] | select({}) | .id".format(select_videos)
                 query = jq.compile(query_text)
                 selected_vidids = query.input(coco_dset.dataset).all()
-                vid_selected_gids = set(ub.flatten(coco_dset.index.vidid_to_gids[vidid]
-                                                   for vidid in selected_vidids))
-                valid_gids &= vid_selected_gids
             except Exception:
                 print('JQ Query Failed: {}'.format(query_text))
                 raise
+
+        vid_selected_gids = set(ub.flatten(coco_dset.index.vidid_to_gids[vidid]
+                                           for vidid in selected_vidids))
+        valid_gids &= vid_selected_gids
 
     valid_gids = sorted(valid_gids)
     return valid_gids
