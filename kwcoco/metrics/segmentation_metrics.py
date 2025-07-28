@@ -48,13 +48,28 @@ except Exception:
 TRUE_GREEN = 'kitware_green'
 PRED_BLUE = 'kitware_blue'
 
+# Old scheme
+# CONFUSION_COLOR_SCHEME = {
+#     'TN': 'black',
+#     # 'TP': 'white',
+#     # 'TP': 'snow',  # off white
+#     'TP': 'whitesmoke',  # off white
+#     'FN': 'teal',
+#     'FP': 'red',
+# }
+
+# Agree with colors in cli/coco_eval
+#'pred_false_positive': kwimage.Color.coerce('kitware_red').ashex(),
+#'pred_true_positive': kwimage.Color.coerce('kitware_blue').ashex(),
+#'true_false_negative': kwimage.Color.coerce('purple').ashex(),
+#'true_true_positive': kwimage.Color.coerce('kitware_green').ashex(),
 CONFUSION_COLOR_SCHEME = {
+    'FP': '#f42836',
+    # 'pred_true_positive': '#0068c7',
+    'FN': '#800080',
+    'TP': '#3eae2b',
     'TN': 'black',
-    # 'TP': 'white',
-    # 'TP': 'snow',  # off white
-    'TP': 'whitesmoke',  # off white
-    'FN': 'teal',
-    'FP': 'red',
+    # None: '#242a37',
 }
 
 
@@ -615,7 +630,7 @@ class SingleImageSegmentationMetrics:
             'weight': self.saliency_weights.ravel().astype(np.float32),
         })
         bin_cfns = BinaryConfusionVectors(data)
-        salient_measures = bin_cfns.measures()
+        salient_measures: Measures = bin_cfns.measures()
         salient_summary = salient_measures.summary()
 
         salient_metrics = {

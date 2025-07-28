@@ -811,6 +811,11 @@ class BinaryConfusionVectors(ub.NiceRepr):
                 decreases. This is done in pycocotools scoring, but I'm not
                 sure its a good idea.
 
+        Returns:
+            kwcoco.metrics.confusion_measures.Measures:
+                dictionary proxy with detailed scores across a range of
+                operating points.
+
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> self = BinaryConfusionVectors.demo(n=0)

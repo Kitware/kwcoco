@@ -30,7 +30,14 @@ except Exception:
 
 class Measures(ub.NiceRepr, DictProxy):
     """
-    Holds accumulated confusion counts, and derived measures
+    Holds accumulated confusion counts, and derived measures.
+
+    At minimum this class needs to be given an array of thresholds and
+    corresponding arrays of FP, FP, TN, FN counts at each threshold.
+    These are generally computed by
+    :class:`kwcoco.metrics.confusion_vectors.BinaryConfusionVectors`.
+    From there, other higher level metrics such as AP, AUC, max-F1, max-MCC etc
+    can be computed.
 
     Example:
         >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors  # NOQA
@@ -134,6 +141,15 @@ class Measures(ub.NiceRepr, DictProxy):
     def maximized_thresholds(self):
         """
         Returns thresholds that maximize metrics.
+
+        Returns:
+            Dict[str, Dict[str, Any]]
+
+        Example:
+            >>> from kwcoco.metrics.confusion_measures import *  # NOQA
+            >>> self = Measures.demo()
+            >>> info = self.maximized_thresholds()
+            >>> print(f'info = {ub.urepr(info, nl=1, precision=2)}')
         """
         # TODO: clean up the underlying storage of this info
         maximized_info = {}
@@ -1084,10 +1100,19 @@ def populate_info(info):
             info['mcc'] = np.sqrt(ppv_mul_tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
 
         # f1_numer = (2 * ppv * tpr)
+
+        # NOTE: F1 might be impacted by the monotonic flag
+        # might need to refine that metric, probably in a backwards compatible
+        # way
         f1_numer = (2 * ppv_mul_tpr)
         f1_denom = (ppv + tpr)
         f1_denom[f1_denom == 0] = 1
         info['f1'] =  f1_numer / f1_denom
+
+        if 0:
+            # The IoU (or Jaccard) is directly related to F1 if we want it.
+            f1 = info['f1']
+            info['jaccard'] = f1 / (2 - f1)
 
         # https://erotemic.wordpress.com/2019/10/23/closed-form-of-the-mcc-when-tn-inf/
         # https://arxiv.org/abs/2305.00594
