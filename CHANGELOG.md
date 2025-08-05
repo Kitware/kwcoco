@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Better support for confusion kwcoco and visualize script in evaluate detections
 * Interfaces using the `_query_image_ids` helper, can now accept YAML lists of video or image ids if kwutil is available. 
 * Updated segmentation confusion color scheme to match detection color scheme.
+* Standardize image id query in subset cli.
 
 
 ## Version 0.8.8 - Released 2025-07-15

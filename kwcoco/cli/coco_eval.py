@@ -185,7 +185,8 @@ def main(cmdline=True, **kw):
 
         assert confusion_fpath is not None
         ub.symlink(real_path=confusion_fpath,
-                   link_path=requested_confusion_fpath, overwrite=True,
+                   link_path=requested_confusion_fpath,
+                   overwrite=True,
                    verbose=1)
 
     if 'coco_dset' in coco_eval.true_extra:

@@ -338,7 +338,8 @@ def _image_corruption_check(fpath, only_shape=False, imread_kwargs=None):
     return info
 
 
-def _query_image_ids(coco_dset, select_images=None, select_videos=None):
+def _query_image_ids(coco_dset, select_images=None, select_videos=None,
+                     valid_image_ids=None):
     """
     Filters to a specific set of images given query parameters based on
     json-query (jq).
@@ -387,6 +388,13 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
 
             Requires the "jq" python library is installed.
 
+        valid_image_ids (Set[int] | None):
+            if specified use this initial set of image ids, otherwise select
+            from all available.
+
+    Returns:
+        List[int]: sorted list of filtered image ids
+
     SeeAlso:
         Based on ~/code/geowatch/geowatch/utils/kwcoco_extensions.py::filter_image_ids
 
@@ -394,7 +402,7 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
         >>> # xdoctest: +REQUIRES(module:jq)
         >>> from kwcoco._helpers import _query_image_ids
         >>> import kwcoco
-        >>> coco_dset = kwcoco.CocoDataset.demo('vidshapes8')
+        >>> coco_dset = kwcoco.CocoDataset.demo('vidshapes8', verbose=0)
         >>> _query_image_ids(coco_dset, select_images='.id < 3')
         >>> _query_image_ids(coco_dset, select_images='.file_name | test(".*.png")')
         >>> _query_image_ids(coco_dset, select_images='.file_name | test(".*.png") | not')
@@ -405,7 +413,7 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
         >>> # xdoctest: +REQUIRES(module:kwutil)
         >>> from kwcoco._helpers import _query_image_ids
         >>> import kwcoco
-        >>> coco_dset = kwcoco.CocoDataset.demo('vidshapes8')
+        >>> coco_dset = kwcoco.CocoDataset.demo('vidshapes8', verbose=0)
         >>> assert _query_image_ids(coco_dset, select_images='[2, 3, 4]') == [2, 3, 4]
         >>> assert _query_image_ids(coco_dset, select_videos='[3]') == [5, 6]
 
@@ -439,8 +447,9 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
     except Exception:
         kwutil is None
 
-    # Start with all images
-    valid_gids = set(coco_dset.images())
+    if valid_image_ids is None:
+        # Start with all images
+        valid_image_ids = set(coco_dset.images())
 
     if select_images is not None:
         coerced = None
@@ -450,7 +459,9 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
                 if isinstance(coerced, list):
                     # Allow the user to specify a YAML list of image ids
                     image_selected_gids = set(coerced)
-                    valid_gids &= image_selected_gids
+                    valid_image_ids &= image_selected_gids
+                else:
+                    coerced = None  # probably a query string
             except Exception:
                 # yaml coerce failed, try jq
                 ...
@@ -465,7 +476,7 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
                 query_text = ".images[] | select({}) | .id".format(select_images)
                 query = jq.compile(query_text)
                 image_selected_gids = set(query.input(coco_dset.dataset).all())
-                valid_gids &= image_selected_gids
+                valid_image_ids &= image_selected_gids
             except Exception as ex:
                 print('JQ Query Failed: {}, ex={}'.format(query_text, ex))
                 raise
@@ -478,6 +489,8 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
                 if isinstance(coerced, list):
                     # Allow the user to specify a YAML list of video ids
                     selected_vidids = set(coerced)
+                else:
+                    coerced = None  # Probably given as a query string
             except Exception:
                 # yaml coerce failed, try jq
                 ...
@@ -498,7 +511,7 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None):
 
         vid_selected_gids = set(ub.flatten(coco_dset.index.vidid_to_gids[vidid]
                                            for vidid in selected_vidids))
-        valid_gids &= vid_selected_gids
+        valid_image_ids &= vid_selected_gids
 
-    valid_gids = sorted(valid_gids)
-    return valid_gids
+    valid_image_ids = sorted(valid_image_ids)
+    return valid_image_ids

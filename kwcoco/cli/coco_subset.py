@@ -8,97 +8,93 @@ class CocoSubsetCLI(scfg.DataConfig):
     Take a subset of this dataset and write it to a new file
     """
     __command__ = 'subset'
-    __default__ = {
-        'src': scfg.Value(None, help='input dataset path', position=1),
-        'dst': scfg.Value(None, help='output dataset path', position=2),
-        'include_categories': scfg.Value(
-            None, type=str, help=ub.paragraph(
-                '''
-                a comma separated list of categories, if specified only
-                images containing these categories will be included.
-                ''')),  # TODO: pattern matching?
 
-        'gids': scfg.Value(
-            None, help=ub.paragraph(
-                '''
-                A comma separated list of image ids.
-                If specified, only consider these image ids
-                '''), alias=['image_ids']),
+    src = scfg.Value(None, position=1, help='input dataset path')
 
-        'select_images': scfg.Value(
-            None, type=str, help=ub.paragraph(
-                '''
-                A json query (via the jq spec) that specifies which images
-                belong in the subset. Note, this is a passed as the body of
-                the following jq query format string to filter valid ids
-                '.images[] | select({select_images}) | .id'.
+    dst = scfg.Value(None, position=2, help='output dataset path')
 
-                Examples for this argument are as follows:
-                '.id < 3' will select all image ids less than 3.
-                '.file_name | test(".*png")' will select only images with
-                file names that end with png.
-                '.file_name | test(".*png") | not' will select only images
-                with file names that do not end with png.
-                '.myattr == "foo"' will select only image dictionaries
-                where the value of myattr is "foo".
-                '.id < 3 and (.file_name | test(".*png"))' will select only
-                images with id less than 3 that are also pngs.
-                .myattr | in({"val1": 1, "val4": 1}) will take images
-                where myattr is either val1 or val4.
-
-                Requires the "jq" python library is installed.
-                ''')),
-
-        'channels': scfg.Value(
-            None, help=ub.paragraph(
-                '''
-                if specified select only images that contain these channels
-                (specified as a delayed-image channel spec)
-                ''')),
-
-        'select_videos': scfg.Value(
-            None, help=ub.paragraph(
-                '''
-                A json query (via the jq spec) that specifies which videos
-                belong in the subset. Note, this is a passed as the body of
-                the following jq query format string to filter valid ids
-                '.videos[] | select({select_videos}) | .id'.
-
-                Examples for this argument are as follows:
-                '.name | startswith("foo")' will select only videos
-                where the name starts with foo.
-
-                Only applicable for dataset that contain videos.
-
-                Requires the "jq" python library is installed.
-                ''')),
-
-        # FIXME: this can cause issues if the src kwcoco points to files
-        # outside of its bundle directory. Is there an inuitive way to handle
-        # this? Maybe this followed by a move-assets operation?
-        'copy_assets': scfg.Value(False, help='if True copy the assests to the new bundle directory'),
-
-        'compress': scfg.Value('auto', help='if True writes results with compression'),
-
-        'absolute': scfg.Value('auto', help=ub.paragraph(
+    include_categories = scfg.Value(None, type=str, help=ub.paragraph(
             '''
-            if True will reroot all paths to be absolute before writing. If
-            "auto", becomes True if the dest dataset is written outside of
-            the source bundle directory and copy_assets is False.
+            a comma separated list of categories, if specified only
+            images containing these categories will be included.
+            '''))  # TODO: pattern matching?
+
+    gids = scfg.Value(None, alias=['image_ids'], help=ub.paragraph(
             '''
-        ))
+            A comma separated list of image ids. If specified, only
+            consider these image ids. DEPRECATED. Can pass a YAML list of
+            integer image ids directly to select_images.
+            '''))
 
-        # TODO: Add more filter criteria
-        #
-        # image size
-        # image timestamp
-        # image file name matches
-        # annotations with segmentations / keypoints?
-        # images/annotations that contain a special attribute?
-        # images with a maximum / minimum number of annotations?
+    select_images = scfg.Value(None, type=str, help=ub.paragraph(
+            '''
+            Can be a coercable YAML list of image ids, or...
 
-        # 'rng': scfg.Value(None, help='random seed'),
-    }
+            A json query (via the jq spec) that specifies which images
+            belong in the subset. Note, this is a passed as the body of
+            the following jq query format string to filter valid ids
+            '.images[] | select({select_images}) | .id'. Examples for
+            this argument are as follows: '.id < 3' will select all
+            image ids less than 3. '.file_name | test(".*png")' will
+            select only images with file names that end with png.
+            '.file_name | test(".*png") | not' will select only images
+            with file names that do not end with png. '.myattr == "foo"'
+            will select only image dictionaries where the value of
+            myattr is "foo". '.id < 3 and (.file_name | test(".*png"))'
+            will select only images with id less than 3 that are also
+            pngs. .myattr | in({"val1": 1, "val4": 1}) will take images
+            where myattr is either val1 or val4. Requires the "jq"
+            python library is installed.
+            '''))
+
+    select_videos = scfg.Value(None, help=ub.paragraph(
+            '''
+            Can be a coercable YAML list of video ids, or...
+
+            A json query (via the jq spec) that specifies which videos
+            belong in the subset. Note, this is a passed as the body of
+            the following jq query format string to filter valid ids
+            '.videos[] | select({select_videos}) | .id'. Examples for
+            this argument are as follows: '.name | startswith("foo")'
+            will select only videos where the name starts with foo. Only
+            applicable for dataset that contain videos. Requires the
+            "jq" python library is installed.
+            '''))
+
+    channels = scfg.Value(None, help=ub.paragraph(
+            '''
+            if specified select only images that contain these channels
+            (specified as a delayed-image channel spec)
+            '''))
+
+    # FIXME: this can cause issues if the src kwcoco points to files
+    # outside of its bundle directory. Is there an inuitive way to handle
+    # this? Maybe this followed by a move-assets operation?
+    copy_assets = scfg.Value(False, help=ub.paragraph(
+            '''
+            if True copy the assests to the new bundle directory
+            '''))
+
+    compress = scfg.Value('auto', help='if True writes results with compression')
+
+    absolute = scfg.Value('auto', help=ub.paragraph(
+            '''
+            if True will reroot all paths to be absolute before writing.
+            If "auto", becomes True if the dest dataset is written
+            outside of the source bundle directory and copy_assets is
+            False.
+            '''))
+
+    # TODO: Add more filter criteria
+    #
+    # image size
+    # image timestamp
+    # image file name matches
+    # annotations with segmentations / keypoints?
+    # images/annotations that contain a special attribute?
+    # images with a maximum / minimum number of annotations?
+
+    # 'rng': scfg.Value(None, help='random seed'),
     __epilog__ = """
     Example Usage:
         kwcoco subset --src special:shapes8 --dst=foo.kwcoco.json
@@ -223,7 +219,7 @@ def query_subset(dset, config):
         >>> # xdoctest: +REQUIRES(module:jq)
         >>> from kwcoco.cli.coco_subset import *  # NOQA
         >>> import kwcoco
-        >>> dset = kwcoco.CocoDataset.demo()
+        >>> dset = kwcoco.CocoDataset.demo(verbose=0)
         >>> assert dset.n_images == 3
         >>> #
         >>> config = CocoSubsetCLI(**{'select_images': '.id < 3'})
@@ -252,7 +248,7 @@ def query_subset(dset, config):
         >>> # xdoctest: +REQUIRES(module:jq)
         >>> from kwcoco.cli.coco_subset import *  # NOQA
         >>> import kwcoco
-        >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes8', verbose=0)
         >>> assert dset.n_videos == 8
         >>> assert dset.n_images == 16
         >>> config = CocoSubsetCLI(**{'select_videos': '.name == "toy_video_3"'})
@@ -282,48 +278,17 @@ def query_subset(dset, config):
 
         valid_gids &= category_gids
 
-    if config['select_images'] is not None:
-        try:
-            import jq
-        except Exception:
-            print('The jq library is required to run a generic image query')
-            raise
-
-        try:
-            query_text = ".images[] | select({select_images}) | .id".format(**config)
-            query = jq.compile(query_text)
-            found_gids = query.input(dset.dataset).all()
-            found_gids = set(found_gids)
-            valid_gids &= found_gids
-        except Exception:
-            print('JQ Query Failed: {}'.format(query_text))
-            raise
-
-    if config['select_videos'] is not None:
-        if not dset.dataset.get('videos', []):
-            raise ValueError('Dataset does not contain videos')
-
-        try:
-            import jq
-        except Exception:
-            print('The jq library is required to run a generic image query')
-            raise
-
-        try:
-            query_text = ".videos[] | select({select_videos}) | .id".format(**config)
-            query = jq.compile(query_text)
-            found_vidids = query.input(dset.dataset).all()
-            found_vidids = set(found_vidids)
-            found_gids = set(ub.flatten(dset.index.vidid_to_gids[vidid]
-                                        for vidid in found_vidids))
-            valid_gids &= found_gids
-        except Exception:
-            print('JQ Query Failed: {}'.format(query_text))
-            raise
+    from kwcoco._helpers import _query_image_ids
+    # TODO: more the rest of the filters into this helper and normalize them.
+    valid_gids = _query_image_ids(
+        coco_dset=dset,
+        select_images=config['select_images'],
+        select_videos=config['select_videos'],
+        valid_image_ids=valid_gids)
 
     if config['channels'] is not None:
-        import kwcoco
-        requested_chans = kwcoco.ChannelSpec(config['channels'])
+        from delayed_image.channel_spec import ChannelSpec
+        requested_chans = ChannelSpec(config['channels'])
         valid_gids = [
             gid for gid in valid_gids
             if (requested_chans & dset.coco_image(gid).channels).numel() == requested_chans.numel()
