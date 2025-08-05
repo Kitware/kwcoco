@@ -6785,7 +6785,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     def union(*others, disjoint_tracks=True, remember_parent=False, **kwargs):
         """
-        Merges multiple :class:`CocoDataset` items into one. Names and
+        Combines multiple :class:`CocoDataset` items into one. Names and
         associations are retained, but ids may be different.
 
         Args:
@@ -6806,8 +6806,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             **kwargs : constructor options for the new merged CocoDataset
 
+        Note:
+            While categories in datasets are merged, all other information is
+            not. I.e. this assumes images, videos, and annotations in the
+            datsets are all disjoint. If you need to combine datasets you
+            currently must copy one dataset, and then add information from
+            other datasets while removing ambiguities in a way that makes sense
+            in context.
+
         Returns:
-            kwcoco.CocoDataset: a new merged coco dataset
+            kwcoco.CocoDataset: a new coco dataset containing original datasets.
 
         CommandLine:
             xdoctest -m kwcoco.coco_dataset CocoDataset.union
