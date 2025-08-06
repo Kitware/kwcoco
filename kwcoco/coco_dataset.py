@@ -6568,7 +6568,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         self._state['was_saved'] = True
 
     def dump(self, file=None, indent=None, newlines=False, temp_file='auto',
-             compress='auto'):
+             compress='auto', verbose=0):
         """
         Writes the dataset out to the json format
 
@@ -6595,6 +6595,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 write mode. If auto, then it will default to False unless
                 it can introspect the file name and the name ends with .zip
 
+            verbose (int):
+                verbosity level
+
         Example:
             >>> import kwcoco
             >>> import ubelt as ub
@@ -6619,9 +6622,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> dpath = ub.Path.appdir('kwcoco/demo/dump').ensuredir()
             >>> dset = kwcoco.CocoDataset.demo()
             >>> fpath1 = dset.fpath = dpath / 'my_coco_file.zip'
-            >>> dset.dump()
+            >>> dset.dump(verbose=1)
             >>> fpath2 = dset.fpath = dpath / 'my_coco_file.json'
-            >>> dset.dump()
+            >>> dset.dump(verbose=1)
             >>> assert fpath1.read_bytes()[0:8] != fpath2.read_bytes()[0:8]
         """
         from kwcoco.util.util_json import coerce_indent
@@ -6647,6 +6650,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         mode = 'wb' if compress else 'w'
 
+        if verbose:
+            if input_was_pathlike:
+                print(f'Writing to: {fpath}... ', end='')
+            else:
+                print('Writing to file... ', end='')
+
         if input_was_pathlike:
             import safer
             if temp_file == 'auto':
@@ -6659,6 +6668,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             # We are likely dumping to a real file.
             self._dump(
                 file, indent=indent, newlines=newlines, compress=compress)
+
+        if verbose:
+            print('done.')
 
     def _check_json_serializable(self, verbose=1):
         """

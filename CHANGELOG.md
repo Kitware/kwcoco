@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * New function `CocoDataset.normalize_category_ids` that lets the user modify the starting index of category ids, or provide 
 * Added track/video/image name lookup to relevant vectorized lookups
 * Add `pandas` method to `ConfusionVectors`
+* Add verbose argument to dump.
 
 ### Changed
 * Allow category map to be passed as YAML in cli modify-categories
