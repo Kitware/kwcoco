@@ -16,6 +16,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Interfaces using the `_query_image_ids` helper, can now accept YAML lists of video or image ids if kwutil is available. 
 * Updated segmentation confusion color scheme to match detection color scheme.
 * Standardize image id query in subset cli.
+* Changed default of verbose from 1 to 0 in `CocoDataset`: `coerce`, `demo` and `coerce_multiple`.
 
 
 ## Version 0.8.8 - Released 2025-07-15

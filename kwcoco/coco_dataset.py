@@ -831,7 +831,7 @@ class MixinCocoConstructors:
     """
 
     @classmethod
-    def coerce(cls, key, sqlview=False, verbose=1, **kw):
+    def coerce(cls, key, sqlview=False, verbose=0, **kw):
         """
         Attempt to transform the input into the intended CocoDataset.
 
@@ -883,9 +883,13 @@ class MixinCocoConstructors:
             # https://tools.ietf.org/html/rfc8089
             result = uritools.urisplit(dset_fpath)
             if result.scheme == 'sqlite' or result.path.endswith('.sqlite'):
+                if verbose:
+                    print(f'Reading {dset_fpath}')
                 from kwcoco.coco_sql_dataset import CocoSqlDatabase
                 self = CocoSqlDatabase(dset_fpath).connect()
             elif result.path.endswith('.json') or '.json' in result.path or '.kwcoco' in result.path:
+                if verbose:
+                    print(f'Reading {dset_fpath}')
                 if sqlview:
                     from kwcoco.coco_sql_dataset import CocoSqlDatabase
                     kw['backend'] = sqlview
@@ -900,6 +904,8 @@ class MixinCocoConstructors:
                 # are using the coerce function, be more explicit if you want
                 # predictable behavior.
                 if exists(dset_fpath):
+                    if verbose:
+                        print(f'Reading {dset_fpath}')
                     self = kwcoco.CocoDataset(dset_fpath, **kw)
                 else:
                     self = cls.demo(key=key, verbose=verbose, **kw)
@@ -1026,11 +1032,12 @@ class MixinCocoConstructors:
                 kwargs['n_imgs'] = int(res.named['num_imgs'])
             if 'rng' not in kwargs and 'n_imgs' in kwargs:
                 kwargs['rng'] = kwargs['n_imgs']
+            kwargs['verbose'] = kwargs.get('verbose', 0)
             self = toydata_image.demodata_toy_dset(**kwargs)
             self.tag = key
         elif key.startswith('vidshapes'):
             from kwcoco.demo import toydata_video
-            verbose = kwargs.get('verbose', 1)
+            verbose = kwargs.get('verbose', 0)
             res = parse.parse('vidshapes{num_videos:d}', key)
             if res is None:
                 res = parse.parse('vidshapes{num_videos:d}-{suffix}', key)
@@ -1329,7 +1336,7 @@ class MixinCocoConstructors:
         return coco_dset
 
     @classmethod
-    def coerce_multiple(cls, datas, workers=0, mode='process', verbose=1,
+    def coerce_multiple(cls, datas, workers=0, mode='process', verbose=0,
                         postprocess=None, ordered=True, **kwargs):
         """
         Coerce multiple CocoDataset objects in parallel.
@@ -1365,7 +1372,7 @@ class MixinCocoConstructors:
             * load_multiple - like this function but is a strict file-path-only loader
 
         CommandLine:
-            xdoctest -m kwcoco.coco_dataset CocoDataset.coerce_multiple
+            xdoctest -m kwcoco.coco_dataset MixinCocoConstructors.coerce_multiple
 
         Example:
             >>> import kwcoco
