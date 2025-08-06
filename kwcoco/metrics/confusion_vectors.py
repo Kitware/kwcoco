@@ -108,6 +108,25 @@ class ConfusionVectors(ub.NiceRepr):
         }
         return state
 
+    def pandas(self):
+        """
+        Return a pandas representation.
+
+        Returns:
+            pd.DataFrame: the classes and probs are stored as attributes
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:pandas)
+            >>> from kwcoco.metrics import ConfusionVectors
+            >>> self = ConfusionVectors.demo(n_imgs=1, classes=2, n_fp=0, nboxes=1)
+            >>> df = self.pandas()
+            >>> print(df)
+        """
+        df = self.data.pandas()
+        df.attrs['classes'] = self.classes
+        df.attrs['probs'] = self.probs
+        return df
+
     @classmethod
     def from_json(cls, state):
         import kwarray
