@@ -108,9 +108,13 @@ class ConfusionVectors(ub.NiceRepr):
         }
         return state
 
-    def pandas(self):
+    def pandas(self, concat_prob_columns=False):
         """
         Return a pandas representation.
+
+        Args:
+            concat_prob_columns (bool): default False, if True add probs
+                as new columns instead of as attributes.
 
         Returns:
             pd.DataFrame: the classes and probs are stored as attributes
@@ -119,12 +123,20 @@ class ConfusionVectors(ub.NiceRepr):
             >>> # xdoctest: +REQUIRES(module:pandas)
             >>> from kwcoco.metrics import ConfusionVectors
             >>> self = ConfusionVectors.demo(n_imgs=1, classes=2, n_fp=0, nboxes=1)
-            >>> df = self.pandas()
+            >>> df = self.pandas(concat_prob_columns=True)
+            >>> print(df)
+            >>> df = self.pandas(concat_prob_columns=False)
             >>> print(df)
         """
         df = self.data.pandas()
         df.attrs['classes'] = self.classes
-        df.attrs['probs'] = self.probs
+        if concat_prob_columns and self.probs is not None:
+            # Maybe add probabilities as columns?
+            import pandas as pd
+            probs_df = pd.DataFrame(self.probs, columns=self.classes)
+            df = pd.concat([df, probs_df], axis=1)
+        else:
+            df.attrs['probs'] = self.probs
         return df
 
     @classmethod
