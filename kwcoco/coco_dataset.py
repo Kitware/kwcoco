@@ -2672,7 +2672,10 @@ class MixinCocoObjects:
     This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
-    def annots(self, annot_ids=None, image_id=None, track_id=None, video_id=None, trackid=None, aids=None, gid=None):
+    def annots(self, annot_ids=None, image_id=None, track_id=None, video_id=None,
+               image_name=None, track_name=None, video_name=None,
+               *,
+               trackid=None, aids=None, gid=None):
         """
         Return vectorized annotation objects
 
@@ -2694,6 +2697,12 @@ class MixinCocoObjects:
             video_id (int | None):
                 return all annotations that belong to this video.
                 mutually exclusive with other arguments.
+
+            track_name (str | None): name alternative to id
+
+            image_name (str | None): name alternative to id
+
+            video_name (str | None): name alternative to id
 
         Returns:
             kwcoco.coco_objects1d.Annots: vectorized annotation object
@@ -2727,6 +2736,19 @@ class MixinCocoObjects:
             )
             track_id = trackid
 
+        # name to id resolution
+
+        if track_name is not None:
+            track_id = self.index.name_to_track[track_name]['id']
+
+        if video_name is not None:
+            video_id = self.index.name_to_video[video_name]['id']
+
+        if image_name is not None:
+            image_id = self.index.name_to_img[image_name]['id']
+
+        # id lookups
+
         if image_id is not None:
             annot_ids = sorted(self.index.gid_to_aids[image_id])
 
@@ -2743,7 +2765,8 @@ class MixinCocoObjects:
 
         return Annots(annot_ids, self)
 
-    def images(self, image_ids=None, video_id=None, names=None, gids=None, vidid=None):
+    def images(self, image_ids=None, video_id=None, names=None,
+               video_name=None, *, gids=None, vidid=None):
         """
         Return vectorized image objects
 
@@ -2753,6 +2776,9 @@ class MixinCocoObjects:
 
             video_id (int | None): returns all images that belong to this video id.
                 mutually exclusive with `image_ids` arg.
+
+            video_name (str | None):
+                alternative lookup to video-id
 
             names (List[str] | None):
                 lookup images by their names.
@@ -2785,6 +2811,9 @@ class MixinCocoObjects:
             )
             video_id = vidid
 
+        if video_name is not None:
+            video_id = self.index.name_to_video[video_name]['id']
+
         if video_id is not None:
             image_ids = self.index.vidid_to_gids[video_id]
 
@@ -2796,7 +2825,7 @@ class MixinCocoObjects:
 
         return Images(image_ids, self)
 
-    def categories(self, category_ids=None, cids=None):
+    def categories(self, category_ids=None, *, cids=None):
         """
         Return vectorized category objects
 
@@ -2829,7 +2858,7 @@ class MixinCocoObjects:
             category_ids = sorted(self.index.cats.keys())
         return Categories(category_ids, self)
 
-    def videos(self, video_ids=None, names=None, vidids=None):
+    def videos(self, video_ids=None, names=None, *, vidids=None):
         """
         Return vectorized video objects
 
@@ -2880,7 +2909,7 @@ class MixinCocoObjects:
             video_ids = [self.index.name_to_video[name]['id'] for name in names]
         return Videos(video_ids, self)
 
-    def tracks(self, track_ids=None, names=None, video_id=None):
+    def tracks(self, track_ids=None, names=None, video_id=None, video_name=None):
         """
         Return vectorized track objects
 
@@ -2895,6 +2924,9 @@ class MixinCocoObjects:
             video_id (int | None):
                 if specified, return tracks in this video id.
                 Note: this query is currently inefficient
+
+            video_name (str | None):
+                alternative lookup to video_id
 
         Returns:
             kwcoco.coco_objects1d.Tracks: vectorized video object
@@ -2922,6 +2954,11 @@ class MixinCocoObjects:
 
         if names is not None:
             track_ids = [self.index.name_to_track[name]['id'] for name in names]
+
+        if video_name is not None:
+            # TODO handle more mutex checks
+            assert video_id is None, 'video_name is mutex with video_id'
+            video_id = self.index.name_to_video[video_name]['id']
 
         if video_id is not None:
             # Note: this is an inefficient lookup
