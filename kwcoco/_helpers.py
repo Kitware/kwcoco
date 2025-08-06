@@ -447,6 +447,8 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None,
     except Exception:
         kwutil = None
 
+    # TODO: sane messages depending on if kwutil / jq are installed or not
+
     if valid_image_ids is None:
         # Start with all images
         valid_image_ids = set(coco_dset.images())
