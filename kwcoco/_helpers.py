@@ -445,7 +445,7 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None,
     try:
         import kwutil
     except Exception:
-        kwutil is None
+        kwutil = None
 
     if valid_image_ids is None:
         # Start with all images
