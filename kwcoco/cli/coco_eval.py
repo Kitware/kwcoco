@@ -279,6 +279,12 @@ def build_confusion_datasets(coco_eval, results):
 
         cfsn_dset = pred_dset.copy()
         cfsn_dset.reroot(absolute=True)
+
+        # Ensure true and pred categories exist in the cfsn dataset
+        for cat in true_dset.categories().objs:
+            new_cat = ub.udict(cat) - {'id'}
+            cfsn_dset.ensure_category(**new_cat)
+
         # Mark the predicted annotations in the confusion dataset
         for ann in cfsn_dset.annots().objs_iter():
             ann.update({
@@ -324,6 +330,13 @@ def build_confusion_datasets(coco_eval, results):
                     true_ann['score'] = pred_ann.get('score', None)
                     true_ann['matching_pred_annot_id'] = pred_ann['id']
                     true_ann['color'] = CONFUSION_COLORS['true_true_positive']
+
+                # Update the category id (requires categories were ported)
+                old_true_cat_id = true_ann.pop('category_id')
+                old_cat = true_dset.index.cats[old_true_cat_id]
+                catname = old_cat['name']
+                new_cat = cfsn_dset.index.name_to_cat[catname]
+                true_ann['category_id'] = new_cat['id']
 
                 cfsn_dset.add_annotation(**true_ann)
 
