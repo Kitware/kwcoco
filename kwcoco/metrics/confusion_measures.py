@@ -22,12 +22,6 @@ import warnings
 from kwcoco.util.dict_like import DictProxy
 
 
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
-
-
 class Measures(ub.NiceRepr, DictProxy):
     """
     Holds accumulated confusion counts, and derived measures.
@@ -259,7 +253,6 @@ class Measures(ub.NiceRepr, DictProxy):
         return measures
 
     @classmethod
-    @profile
     def combine(cls, tocombine, precision=None, growth=None, thresh_bins=None):
         """
         Combine binary confusion metrics
@@ -926,7 +919,6 @@ class OneVersusRestMeasureCombiner:
         return compatible_format
 
 
-@profile
 def populate_info(info):
     """
     Given raw accumulated confusion counts, populated secondary measures like

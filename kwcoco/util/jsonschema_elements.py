@@ -145,7 +145,7 @@ class Element(dict):
         return ANYOF(*unpacked)
 
 
-class ScalarElements(object):
+class ScalarElements:
     """
     Single-valued elements
     """
@@ -197,7 +197,7 @@ class ScalarElements(object):
         })
 
 
-class QuantifierElements(object):
+class QuantifierElements:
     """
     Quantifier types
 

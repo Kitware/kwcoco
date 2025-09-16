@@ -11,11 +11,6 @@ from kwcoco.category_tree import CategoryTree
 from kwcoco.metrics.confusion_measures import (
     Measures, PerClass_Measures, populate_info)
 
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
-
 
 class ConfusionVectors(ub.NiceRepr):
     """
@@ -893,7 +888,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
         populate_info(info)
         return measures
 
-    @profile
     def _binary_clf_curves(self, stabalize_thresh=7, fp_cutoff=None):
         """
         Compute TP, FP, TN, and FN counts for this binary confusion vector.
@@ -918,20 +912,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
             >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.5, p_error=0.5)
             >>> self._binary_clf_curves()
-
-        Ignore:
-            import xdev
-            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors._binary_clf_curves))
-            >>> self = BinaryConfusionVectors.demo(n=10, p_true=0.7, p_error=0.3, p_miss=0.2)
-            >>> print('measures = {}'.format(ub.urepr(self._binary_clf_curves())))
-            >>> info = self.measures()
-            >>> info = ub.dict_isect(info, ['tpr', 'fpr', 'ppv', 'fp_count'])
-            >>> print('measures = {}'.format(ub.urepr(ub.odict(i))))
         """
-        # try:
-        #     from sklearn.metrics._ranking import _binary_clf_curve
-        # except ImportError:
-        #     from sklearn.metrics.ranking import _binary_clf_curve
         data = self.data
         y_true = data['is_true'].astype(np.uint8)
         y_score = data['pred_score']

@@ -37,11 +37,6 @@ import scriptconfig as scfg
 import ubelt as ub
 import os
 
-try:
-    from line_profiler import profile
-except ImportError:
-    profile = ub.identity
-
 
 class PlotStatsCLI(scfg.DataConfig):
     """
@@ -142,7 +137,6 @@ def prep_plots(src, plots_dpath=None, options=None, dpi=300):
     return plots
 
 
-@profile
 def run(config):
     import json
     import safer
@@ -328,7 +322,6 @@ def geospatial_stats(dset, images, perimage_data):
             raise
 
 
-@profile
 def build_stats_data(dset):
     """
     Build a table of perimage and perannotation as well as a summary table of
@@ -527,7 +520,6 @@ class Plots:
         plots = prep_plots(src, plots_dpath=dpath, options=options)
         return plots
 
-    @profile
     def __init__(self, plots_dpath, tables_data, nonsaved_data, options=None, dpi=300):
         import kwplot
         import pandas as pd

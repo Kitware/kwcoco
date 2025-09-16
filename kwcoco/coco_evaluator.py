@@ -74,12 +74,6 @@ from os.path import isfile
 from kwcoco.util.dict_like import DictProxy
 
 
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
-
-
 class CocoEvalConfig(scfg.DataConfig):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
@@ -851,7 +845,7 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
 class CocoResults(ub.NiceRepr, DictProxy):
     """
     CommandLine:
-        xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_evaluator.py CocoResults --profile
+        xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_evaluator.py CocoResults
 
     Example:
         >>> from kwcoco.coco_evaluator import *  # NOQA
@@ -1023,7 +1017,6 @@ class CocoSingleResult(ub.NiceRepr):
             with safer.open(fpath, 'w', temp_file=not ub.WIN32) as fp:
                 return result.dump(fp, indent=indent)
 
-    @profile
     def dump_figures(result, out_dpath, expt_title=None, figsize='auto',
                      tight=True, verbose=1):
         if expt_title is None:
@@ -1129,7 +1122,6 @@ class CocoSingleResult(ub.NiceRepr):
             pass
 
 
-@profile
 def _writefig(fig, metrics_dpath, fname, figsize, verbose, tight):
     fig_fpath = ub.Path(metrics_dpath) / fname
     if verbose:

@@ -7,7 +7,7 @@ recycle ids, do renaming, extend sortedcontainers etc...
 import sortedcontainers
 
 
-class _NextId(object):
+class _NextId:
     """
     Helper class to tracks unused ids for new items
     """
@@ -45,7 +45,7 @@ class _NextId(object):
         return new_id
 
 
-class _ID_Remapper(object):
+class _ID_Remapper:
     """
     Helper to recycle ids for unions.
 
