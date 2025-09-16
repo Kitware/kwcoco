@@ -6703,6 +6703,26 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # assert len(self.missing_images()) == 0
         return True
 
+    def _check_warnables(self):
+        warning_checks = {}
+        referenced_track_ids = set()
+        for annot in self.dataset['annotations']:
+            track_id = annot.get('track_id', None)
+            referenced_track_ids.add(track_id)
+
+        table_track_ids = {track['id'] for track in self.dataset.get('tracks', [])}
+        # referenced_track_ids - table_track_ids
+        # table_track_ids - referenced_track_ids
+        # True if there is a track in the table without an annotation.
+        warning_checks['unreferenced_track_ids'] = table_track_ids.issubset(referenced_track_ids)
+        # True if there are annotations with a track id not in the track table.
+        warning_checks['unregistered_track_ids'] = table_track_ids.issuperset(referenced_track_ids)
+
+        failed_warnings = {k: v for k, v in warning_checks.items() if not v}
+        if any(failed_warnings):
+            msg = 'Potential issues: {}'.format(list(failed_warnings))
+            warnings.warn(msg)
+
     def _check_index(self):
         """
         Example:
