@@ -166,12 +166,16 @@ def main(cmdline=True, **kw):
                 # to kwcoco proper)
                 viz_script_fpath = confusion_fpath.augment(prefix='visualize_', ext='.sh')
                 channels = cfsn_dset.coco_image(ub.peek(cfsn_dset.imgs)).channels
-                channel_spec = channels.spec
+                if channels is not None:
+                    channel_spec = channels.spec
+                    channel_arg = f'--channels "{channel_spec},{channel_spec}"'
+                else:
+                    channel_arg = ''
                 viz_script_text = ub.codeblock(
                     rf'''
                     #!/bin/bash
                     geowatch visualize {cfsn_dset.fpath} --smart --animate=False \
-                        --channels "{channel_spec},{channel_spec}" \
+                        {channel_arg} \
                         --role_order="true,pred" \
                         --draw_imgs=False --draw_anns=True \
                         --max_dim=640 --draw_chancode=False \
