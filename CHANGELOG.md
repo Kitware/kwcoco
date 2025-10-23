@@ -20,6 +20,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Updated segmentation confusion color scheme to match detection color scheme.
 * Standardize image id query in subset cli.
 * Changed default of verbose from 1 to 0 in `CocoDataset`: `coerce`, `demo` and `coerce_multiple`.
+* Demo images can now be generated with kwimage.imwrite keyword arguments to control overviews and other attributes.
 
 
 ## Version 0.8.8 - Released 2025-07-15

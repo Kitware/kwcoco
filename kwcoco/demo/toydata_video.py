@@ -891,7 +891,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     img_dpath = ub.ensuredir((bundle_dpath, rel_img_dpath))
 
     imwrite_kw = {}
-    imwrite_ops = {'compress', 'blocksize', 'interleave', 'options'}
+    imwrite_ops = {'compress', 'blocksize', 'interleave', 'options', 'overviews'}
     if renderkw is None:
         renderkw = {}
 
@@ -900,7 +900,12 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
         # imwrite_kw['backend'] = 'gdal'
         # imwrite_kw['space'] = None
         # imwrite kw requires gdal
-        from osgeo import gdal  # NOQA
+        try:
+            from osgeo import gdal  # NOQA
+        except ImportError:
+            print('ERROR: using imwrite keywords requires gdal')
+            raise
+        imwrite_kw['backend'] = 'gdal'
 
     main_ext = renderkw.get('main_ext', '.png')
     main_chans = renderkw.get('main_channels', 'r|g|b')
@@ -918,7 +923,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
                 'file_name': os.fspath(img_fpath.relative_to(bundle_dpath)),
                 'channels': main_chans,
             })
-            kwimage.imwrite(img_fpath, imdata)
+            kwimage.imwrite(img_fpath, imdata, **imwrite_kw)
 
         auxiliaries = img.pop('auxiliary', None)
         if auxiliaries is not None:
