@@ -79,9 +79,11 @@ stages:
   - export INSTALL_EXTRAS="tests,headless"
   - echo "Finding the path to the wheel"
   - ls dist || echo "dist does not exist"
-  - echo "Installing helpers"
+  - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
+  - 'echo "Installing helpers: setuptools"'
   - python -m uv pip install setuptools>=0.8 setuptools_scm wheel build -U
+  - 'echo "Installing helpers: tomli and pkginfo"'
   - python -m uv pip install tomli pkginfo
   - |-
     export WHEEL_FPATH=$(python -c "if 1:
@@ -95,15 +97,18 @@ stages:
   - |-
     export MOD_VERSION=$(python -c "if 1:
         from pkginfo import Wheel, SDist
+        import pathlib
         fpath = '$WHEEL_FPATH'
         cls = Wheel if fpath.endswith('.whl') else SDist
-        print(cls(fpath).version)
+        item = cls(fpath)
+        print(item.version)
     ")
   - python -m uv pip install -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m uv pip install --prerelease=allow "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -145,9 +150,11 @@ stages:
   - export INSTALL_EXTRAS="tests,optional,headless"
   - echo "Finding the path to the wheel"
   - ls dist || echo "dist does not exist"
-  - echo "Installing helpers"
+  - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
+  - 'echo "Installing helpers: setuptools"'
   - python -m uv pip install setuptools>=0.8 setuptools_scm wheel build -U
+  - 'echo "Installing helpers: tomli and pkginfo"'
   - python -m uv pip install tomli pkginfo
   - |-
     export WHEEL_FPATH=$(python -c "if 1:
@@ -161,15 +168,18 @@ stages:
   - |-
     export MOD_VERSION=$(python -c "if 1:
         from pkginfo import Wheel, SDist
+        import pathlib
         fpath = '$WHEEL_FPATH'
         cls = Wheel if fpath.endswith('.whl') else SDist
-        print(cls(fpath).version)
+        item = cls(fpath)
+        print(item.version)
     ")
   - python -m uv pip install -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m uv pip install --prerelease=allow "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -211,9 +221,11 @@ stages:
   - export INSTALL_EXTRAS="tests-strict,runtime-strict,headless-strict"
   - echo "Finding the path to the wheel"
   - ls dist || echo "dist does not exist"
-  - echo "Installing helpers"
+  - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
+  - 'echo "Installing helpers: setuptools"'
   - python -m uv pip install setuptools>=0.8 setuptools_scm wheel build -U
+  - 'echo "Installing helpers: tomli and pkginfo"'
   - python -m uv pip install tomli pkginfo
   - |-
     export WHEEL_FPATH=$(python -c "if 1:
@@ -227,16 +239,19 @@ stages:
   - |-
     export MOD_VERSION=$(python -c "if 1:
         from pkginfo import Wheel, SDist
+        import pathlib
         fpath = '$WHEEL_FPATH'
         cls = Wheel if fpath.endswith('.whl') else SDist
-        print(cls(fpath).version)
+        item = cls(fpath)
+        print(item.version)
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
   - python -m uv pip install -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m uv pip install --prerelease=allow "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -278,9 +293,11 @@ stages:
   - export INSTALL_EXTRAS="tests-strict,runtime-strict,optional-strict,headless-strict"
   - echo "Finding the path to the wheel"
   - ls dist || echo "dist does not exist"
-  - echo "Installing helpers"
+  - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
+  - 'echo "Installing helpers: setuptools"'
   - python -m uv pip install setuptools>=0.8 setuptools_scm wheel build -U
+  - 'echo "Installing helpers: tomli and pkginfo"'
   - python -m uv pip install tomli pkginfo
   - |-
     export WHEEL_FPATH=$(python -c "if 1:
@@ -294,16 +311,19 @@ stages:
   - |-
     export MOD_VERSION=$(python -c "if 1:
         from pkginfo import Wheel, SDist
+        import pathlib
         fpath = '$WHEEL_FPATH'
         cls = Wheel if fpath.endswith('.whl') else SDist
-        print(cls(fpath).version)
+        item = cls(fpath)
+        print(item.version)
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
   - python -m uv pip install -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
+  - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m uv pip install --prerelease=allow "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -329,10 +349,10 @@ stages:
   - echo "pytest command finished, moving the coverage file to the repo root"
 build/sdist:
   <<: *build_sdist_template
-  image: python:3.13
-test/sdist/minimal-loose/cp313-linux-x86_64:
+  image: python:3.14
+test/sdist/minimal-loose/cp314-linux-x86_64:
   <<: *test_minimal-loose_template
-  image: python:3.13
+  image: python:3.14
   needs:
   - build/sdist
 build/cp38-linux-x86_64:
@@ -475,7 +495,7 @@ test/full-strict/cp313-linux-x86_64:
   - build/cp313-linux-x86_64
 lint:
   <<: *common_template
-  image: python:3.13
+  image: python:3.14
   stage: lint
   before_script:
   - df -h
@@ -486,7 +506,7 @@ lint:
   allow_failure: true
 gpgsign/wheels:
   <<: *common_template
-  image: python:3.13
+  image: python:3.14
   stage: gpgsign
   artifacts:
     paths:
@@ -534,7 +554,7 @@ gpgsign/wheels:
   - ls dist
   - python -m pip install pip uv -U
   - python -m uv pip install opentimestamps-client
-  - ots stamp dist/*.tar.gz dist/*.whl dist/*.asc
+  - ots stamp dist/*.whl dist/*.asc dist/*.tar.gz
   needs:
   - job: build/sdist
     artifacts: true
@@ -552,7 +572,7 @@ gpgsign/wheels:
     artifacts: true
 deploy/wheels:
   <<: *common_template
-  image: python:3.13
+  image: python:3.14
   stage: deploy
   only:
     refs:
