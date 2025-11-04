@@ -24,6 +24,8 @@ from kwcoco.util.dict_like import DictProxy
 
 class Measures(ub.NiceRepr, DictProxy):
     """
+    Dict-like container for accumulated confusion counts and derived metrics.
+
     Holds accumulated confusion counts, and derived measures.
 
     At minimum this class needs to be given an array of thresholds and
@@ -53,6 +55,9 @@ class Measures(ub.NiceRepr, DictProxy):
 
     @property
     def catname(self):
+        """
+        Category name associated with these measures, if any (``node`` key).
+        """
         return self.get('node', None)
 
     def __nice__(self):
@@ -60,16 +65,31 @@ class Measures(ub.NiceRepr, DictProxy):
         return ub.urepr(info, nl=0, precision=3, strvals=True, align=':')
 
     def reconstruct(self):
+        """
+        Recomputes derivable measures (e.g. AP, F1) from raw confusion counts.
+
+        Returns:
+            Self
+        """
         populate_info(info=self)
         return self
 
     @classmethod
     def from_json(cls, state):
+        """
+        Construct from a minimally serialized state.
+        """
         populate_info(state)
         return cls(state)
 
     def __json__(self):
         """
+        Return a minimal, JSON-serializable snapshot of the measures.
+
+        The snapshot includes the raw counts, thresholds, totals, and selected
+        derived scalars (e.g., ``auc``, ``ap``) when present. Omitted fields
+        can be recomputed with :func:`Measures.reconstruct`.
+
         Example:
             >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors  # NOQA
             >>> from kwcoco.metrics.confusion_measures import *  # NOQA
@@ -120,6 +140,12 @@ class Measures(ub.NiceRepr, DictProxy):
         return state
 
     def summary(self):
+        """
+        A concise dictionary with summary level information about the measures
+
+        Returns:
+            dict
+        """
         return {
             'ap': self.get('ap', None),
             'auc': self.get('auc', None),
@@ -137,7 +163,9 @@ class Measures(ub.NiceRepr, DictProxy):
         Returns thresholds that maximize metrics.
 
         Returns:
-            Dict[str, Dict[str, Any]]
+            Dict[str, Dict[str, Any]]:
+                For each metric (e.g., ``"f1"``, ``"mcc"``), a dict with:
+                ``{"thresh": float, "metric_value": float, "metric_name": str}``.
 
         Example:
             >>> from kwcoco.metrics.confusion_measures import *  # NOQA
@@ -163,6 +191,10 @@ class Measures(ub.NiceRepr, DictProxy):
         """
         Return the computed metrics without the full curve content
 
+        Returns:
+            Dict:
+                The underlying map with large arrays removed.
+
         Example:
             >>> from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors  # NOQA
             >>> binvecs = BinaryConfusionVectors.demo(n=100, p_error=0.5)
@@ -182,6 +214,9 @@ class Measures(ub.NiceRepr, DictProxy):
         """
         Just return the curves, from which most other data is computed
         (subject to metadata, see __json__ for actual minimal metadata)
+
+        Returns:
+            kwarray.DataFrameArray
         """
         counts_df = ub.dict_isect(self, [
             'fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds'])
@@ -190,6 +225,24 @@ class Measures(ub.NiceRepr, DictProxy):
 
     def draw(self, key=None, prefix='', **kw):
         """
+        Draw a specified metric curve using matplotlib.
+
+        Args:
+
+            key (str | None):
+                - ``None`` or ``"thresh"``: threshold vs metric curves
+                - ``"pr"``: precision–recall curve
+                - ``"roc"``: ROC curve
+
+            prefix (str):
+                Label prefix for legends/titles.
+
+            **kw
+                Forwarded to the underlying drawing helpers.
+
+        TODO:
+            - [ ] Modernize these plots with seaborn
+
         Example:
             >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> # xdoctest: +REQUIRES(module:pandas)
@@ -211,6 +264,8 @@ class Measures(ub.NiceRepr, DictProxy):
 
     def summary_plot(self, fnum=1, title='', subplots='auto'):
         """
+        Draws a figure with multiple metric curves using :func:`Measures.draw`.
+
         Example:
             >>> from kwcoco.metrics.confusion_measures import *  # NOQA
             >>> from kwcoco.metrics.confusion_vectors import ConfusionVectors  # NOQA
@@ -267,7 +322,7 @@ class Measures(ub.NiceRepr, DictProxy):
                 measures. However, this is a lossy operation and will impact
                 the underlying scores. NOTE: use ``growth`` instead.
 
-            growth (int | None):
+            growth (str | None):
                 if specified this limits how much the resulting measures
                 are allowed to grow by. If None, growth is unlimited.
                 Otherwise, if growth is 'max', the growth is limited to the
@@ -633,6 +688,26 @@ def reversable_diff(arr, assume_sorted=1, reverse=False):
     This will be used to find positions where accumulation happened in
     confusion count array.
 
+    Args:
+        arr (ndarray):
+            Input sequence (finite interior; may have +/-inf at ends).
+
+        assume_sorted (int):
+            Reserved; asserts the monotone assumption. Default is True.
+
+        reverse (bool):
+            If True, treat ``arr`` as reversed; outputs are adjusted
+            accordingly.  Defaults to False.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray]
+            ``(diff_arr, prefix, suffix)``.
+            To invert:
+            - if ``reverse=False``:
+              ``recon = np.cumsum(diff_arr); recon[:len(prefix)] += prefix; recon[-len(suffix):] += suffix``
+            - if ``reverse=True``:
+              apply the same idea with reversed arrays.
+
     Ignore:
         >>> from kwcoco.metrics.confusion_measures import *  # NOQA
         >>> funcs = {
@@ -709,6 +784,7 @@ def reversable_diff(arr, assume_sorted=1, reverse=False):
 
 class PerClass_Measures(ub.NiceRepr, DictProxy):
     """
+    A container class mapping categories to :class:`Measures`.
     """
     def __init__(self, cx_to_info):
         self.proxy = cx_to_info
@@ -808,6 +884,21 @@ class MeasureCombiner:
 
     """
     def __init__(self, precision=None, growth=None, thresh_bins=None):
+        """
+        Args:
+            precision (None | int):
+                deprecated use growth or thresh_bins instead.
+
+            growth (str | None):
+                if specified this limits how much the resulting measures are
+                allowed to grow by. If None, growth is unlimited.  Otherwise,
+                if growth is 'max', the growth is limited to the maximum length
+                of an input. We might make this more numerical in the future.
+
+            thresh_bins (int | List[float] | None):
+                If an integer force this many threshold bins, or if a list
+                then use these threshold bins.
+        """
         self.measures = None
         self.growth = growth
         self.thresh_bins = thresh_bins
@@ -820,12 +911,17 @@ class MeasureCombiner:
 
     def submit(self, other):
         """
+        Queue another set of measures for combination.
+
         Args:
             other (BinaryConfusionVectors): confusion vectors for an item
         """
         self.queue.append(other)
 
     def combine(self):
+        """
+        Reduce the current queue into a consolidated ``self.measures``.
+        """
         # Reduce measures over the chunk
         if self.measures is None:
             to_combine = self.queue
@@ -843,6 +939,12 @@ class MeasureCombiner:
         self.queue = []
 
     def finalize(self):
+        """
+        Combine any remaining items, reconstruct metrics, and return the result.
+
+        Returns:
+            Measures: the combined measures
+        """
         if self.queue:
             self.combine()
         if self.measures is None:
