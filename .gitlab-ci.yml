@@ -108,7 +108,7 @@ stages:
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install --prerelease=allow "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -179,7 +179,7 @@ stages:
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install --prerelease=allow "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -251,7 +251,7 @@ stages:
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install --prerelease=allow "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -323,7 +323,7 @@ stages:
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install --prerelease=allow "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
