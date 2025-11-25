@@ -15,8 +15,8 @@ xarray>=0.17.0     ; python_version < '3.12' and python_version >= '3.8'    # Py
 
 # xdev availpkg networkx --request_min=2.2.0
 # xdev availpkg imageio
-networkx>=2.8    ; python_version < '4.0'   and python_version >= '3.11' # Python 3.11+
-networkx>=2.8    ; python_version < '3.11'  and python_version >= '3.8'  # Python 3.8-3.11
+networkx>=3.0.0  ; python_version < '4.0'  and python_version >= '3.13' # Python 3.13+
+networkx>=2.8.0  ; python_version < '3.13' and python_version >= '3.8'  # Python 3.12-
 
 # xdev availpkg scipy
 scipy>=1.14.1    ; python_version < '4.0'  and python_version >= '3.13'    # Python 3.13+
