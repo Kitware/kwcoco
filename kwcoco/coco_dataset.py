@@ -4237,12 +4237,12 @@ class MixinCocoAddRemove:
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
         """
         index = self.index
-        if id is None:
-            id = self._next_ids.get('videos')
-        elif index.videos is not None and id in index.videos:
-            raise exceptions.DuplicateAddError(f'Video id={id} already exists')
         if index.videos is not None and name in index.name_to_video:
             raise exceptions.DuplicateAddError(f'Video name={name} already exists')
+        if id is not None and index.videos is not None and id in index.videos:
+            raise exceptions.DuplicateAddError(f'Video id={id} already exists')
+        if id is None:
+            id = self._next_ids.get('videos')
         video = ub.odict()
         video['id'] = id
         video['name'] = name
@@ -4295,17 +4295,26 @@ class MixinCocoAddRemove:
             >>> gid = self.add_image(gname)
             >>> assert self.imgs[gid]['file_name'] == gname
         """
+        index = self.index
+
+        try:
+            norm_file_name = os.fspath(file_name)
+        except TypeError:
+            norm_file_name = file_name
+
+        if index.imgs is not None and norm_file_name in index.file_name_to_img:
+            raise exceptions.DuplicateAddError(
+                'Image with file_name={} already exists'.format(norm_file_name)
+            )
+
+        if id is not None and self.imgs and id in self.imgs:
+            raise exceptions.DuplicateAddError('Image id={} already exists'.format(id))
         if id is None:
             id = self._next_ids.get('images')
-        elif self.imgs and id in self.imgs:
-            raise exceptions.DuplicateAddError('Image id={} already exists'.format(id))
 
         img = dict()
         img['id'] = int(id)
-        try:
-            img['file_name'] = os.fspath(file_name)
-        except TypeError:
-            img['file_name'] = file_name
+        img['file_name'] = norm_file_name
         img.update(**kw)
         self.index._add_image(id, img)
         self.dataset['images'].append(img)
