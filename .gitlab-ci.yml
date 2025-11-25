@@ -9,7 +9,7 @@ workflow:
   - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
   # Allow branch pipelines for release branch
-  - if: '$CI_COMMIT_BRANCH == release'
+  - if: '$CI_COMMIT_BRANCH == "release"'
 stages:
 # TEMPLATES
 - lint
