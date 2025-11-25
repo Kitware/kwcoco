@@ -20,18 +20,12 @@ import kwarray
 import kwimage
 from kwcoco.demo.toypatterns import CategoryPatterns
 
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
-
 
 # Updated when toydata is modified.
 # Internal cachers use this to invalidate old caches
 TOYDATA_IMAGE_VERSION = 20
 
 
-@profile
 def demodata_toy_dset(image_size=(600, 600),
                       n_imgs=5,
                       verbose=3,
@@ -365,7 +359,7 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
             gsize - alias for image_size
 
     CommandLine:
-        xdoctest -m kwcoco.demo.toydata_image demodata_toy_img:0 --profile
+        xdoctest -m kwcoco.demo.toydata_image demodata_toy_img:0
         xdoctest -m kwcoco.demo.toydata_image demodata_toy_img:1 --show
 
     Example:

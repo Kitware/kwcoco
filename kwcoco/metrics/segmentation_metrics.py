@@ -23,20 +23,11 @@ from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
 from kwcoco.metrics.confusion_measures import OneVersusRestMeasureCombiner
 from kwcoco.metrics.confusion_vectors import OneVsRestConfusionVectors
 from kwcoco.metrics.confusion_measures import MeasureCombiner
-# from kwcoco.metrics.confusion_measures import PerClass_Measures
 from kwcoco.metrics.confusion_measures import Measures
 from typing import Dict
 import scriptconfig as scfg
 from shapely.ops import unary_union
 from kwcoco.util.util_kwutil import _DelayedBlockingJobQueue, _MaxQueuePool
-
-# from geowatch.utils import kwcoco_extensions
-# from geowatch import heuristics
-
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
 
 
 # The colors I traditionally use for truth and predictions
@@ -48,13 +39,28 @@ except Exception:
 TRUE_GREEN = 'kitware_green'
 PRED_BLUE = 'kitware_blue'
 
+# Old scheme
+# CONFUSION_COLOR_SCHEME = {
+#     'TN': 'black',
+#     # 'TP': 'white',
+#     # 'TP': 'snow',  # off white
+#     'TP': 'whitesmoke',  # off white
+#     'FN': 'teal',
+#     'FP': 'red',
+# }
+
+# Agree with colors in cli/coco_eval
+#'pred_false_positive': kwimage.Color.coerce('kitware_red').ashex(),
+#'pred_true_positive': kwimage.Color.coerce('kitware_blue').ashex(),
+#'true_false_negative': kwimage.Color.coerce('purple').ashex(),
+#'true_true_positive': kwimage.Color.coerce('kitware_green').ashex(),
 CONFUSION_COLOR_SCHEME = {
+    'FP': '#f42836',
+    # 'pred_true_positive': '#0068c7',
+    'FN': '#800080',
+    'TP': '#3eae2b',
     'TN': 'black',
-    # 'TP': 'white',
-    # 'TP': 'snow',  # off white
-    'TP': 'whitesmoke',  # off white
-    'FN': 'teal',
-    'FP': 'red',
+    # None: '#242a37',
 }
 
 
@@ -615,7 +621,7 @@ class SingleImageSegmentationMetrics:
             'weight': self.saliency_weights.ravel().astype(np.float32),
         })
         bin_cfns = BinaryConfusionVectors(data)
-        salient_measures = bin_cfns.measures()
+        salient_measures: Measures = bin_cfns.measures()
         salient_summary = salient_measures.summary()
 
         salient_metrics = {
@@ -721,7 +727,6 @@ class SingleImageSegmentationMetrics:
         })
 
 
-@profile
 def single_image_segmentation_metrics(pred_coco_img, true_coco_img,
                                       true_classes, true_dets, video1=None,
                                       thresh_bins=None, config=None):
@@ -761,7 +766,6 @@ def draw_confusion_image(pred, target):
     return canvas
 
 
-@profile
 def colorize_class_probs(probs, classes):
     """
     probs = pred_cat_ohe
@@ -815,7 +819,6 @@ def colorize_class_probs(probs, classes):
     return colormask
 
 
-@profile
 def draw_truth_borders(true_dets, canvas, alpha=1.0, color=None):
     true_sseg = true_dets.data['segmentations']
     true_cidxs = true_dets.data['class_idxs']
@@ -841,7 +844,6 @@ def draw_truth_borders(true_dets, canvas, alpha=1.0, color=None):
     return canvas
 
 
-@profile
 def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
                            title=None, config=None):
     """
@@ -1175,7 +1177,6 @@ def draw_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
     return plot_canvas, plot_info
 
 
-@profile
 def dump_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
                            heatmap_dpath, title=None, config=None):
     """
@@ -1206,7 +1207,6 @@ def dump_chunked_confusion(full_classes, true_coco_imgs, chunk_info,
     kwimage.imwrite(str(plot_fpath), plot_canvas)
 
 
-@profile
 def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
                            eval_fpath=None, config=None):
     """
@@ -1773,7 +1773,6 @@ def _max_digits(max_num):
     return num_digits
 
 
-@profile
 def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
     """
     Builds an association between image-ids in two datasets.
@@ -2253,6 +2252,4 @@ def _poc_online_binary_saliency_measures_demo():
 
 
 if __name__ == '__main__':
-    # import xdev
-    # xdev.make_warnings_print_tracebacks()
     main()

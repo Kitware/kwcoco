@@ -1,5 +1,5 @@
 
-class SupressPrint(object):
+class SupressPrint:
     """
     Temporarily replace the print function in a module with a noop
 

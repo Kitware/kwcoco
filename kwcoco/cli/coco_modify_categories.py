@@ -5,7 +5,7 @@ import scriptconfig as scfg
 
 class CocoModifyCatsCLI(scfg.DataConfig):
     """
-    Remove, rename, or coarsen categories.
+    Remove, rename, reorder, re-id, or coarsen categories.
     """
     __command__ = 'modify_categories'
     __epilog__ = """
@@ -17,30 +17,61 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep eff,
 
         kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep=[] --keep_annots=True
+        kwcoco modify_categories --src=special:shapes8 --dst modcats.json --start_id=0 --order "[star,background]"
     """
-    __default__ = {
-        'src': scfg.Value(None, help=(
-            'Path to the coco dataset'), position=1),
+    src = scfg.Value(None, help=(
+        'Path to the coco dataset'), position=1)
 
-        'dst': scfg.Value(None, help=(
-            'Save the modified dataset to a new file')),
+    dst = scfg.Value(None, help=(
+        'Save the modified dataset to a new file'))
 
-        'keep_annots': scfg.Value(False, help=(
-            'if False, removes annotations when categories are removed, '
-            'otherwise the annotations category is simply unset')),
+    keep_annots = scfg.Value(False, help=(
+        'if False, removes annotations when categories are removed, '
+        'otherwise the annotations category is simply unset'))
 
-        'remove_empty_images': scfg.Value(False, isflag=True, help=(
-            'if True, removes images when categories are removed, '
-            'otherwise the images are simply kept as is')),
+    remove_empty_images = scfg.Value(False, isflag=True, help=(
+        'if True, removes images when categories are removed, '
+        'otherwise the images are simply kept as is'))
 
-        'remove': scfg.Value(None, help='Category names to remove. Mutex with keep.'),
+    remove = scfg.Value(None, help=ub.paragraph(
+        '''
+        Category names to remove. Mutex with keep.
+        '''))
 
-        'keep': scfg.Value(None, help='If specified, remove all other categories. Mutex with remove.'),
+    keep = scfg.Value(None, help=ub.paragraph(
+        '''
+        If specified, remove all other categories. Mutex with remove.
+        '''))
 
-        'rename': scfg.Value(None, type=str, help='category mapping in the format. "old1:new1,old2:new2"'),
+    rename = scfg.Value(None, type=str, help=ub.paragraph(
+        '''
+        category mapping as a YAML dictionary. The old format format:
+        "old1:new1,old2:new2" is still accepted.
+        '''))
 
-        'compress': scfg.Value('auto', help='if True writes results with compression'),
-    }
+    start_id = scfg.Value(None, type=int, help=ub.paragraph(
+        '''
+        if specified, then normalize category IDs to be consecutive and
+        start from this order.
+        '''))
+
+    order = scfg.Value(None, type=str, help=ub.paragraph(
+        '''
+        if specified this is a YAML list, reorder to the first categories
+        are in this order. Can also be "sort" to sort alphabetically.
+        If using "rename", then use the new names here.
+        '''))
+
+    compress = scfg.Value('auto', help=ub.paragraph(
+        '''
+        if True writes results with compression. DEPRECATED: just specify
+        dst with a .zip suffix to compress
+        '''))
+
+    verbose = scfg.Value(True, isflag=True, help=ub.paragraph(
+        '''
+        verbosity level
+        '''))
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -61,6 +92,29 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             >>> assert len(new_dset.cats) == 0
 
         Example:
+            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> from kwcoco.cli.coco_modify_categories import *  # NOQA
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> dpath = ub.Path.appdir('kwcoco/tests/coco_modify_categories').ensuredir()
+            >>> old_dset = kwcoco.CocoDataset.demo('special:shapes8')
+            >>> dst_fpath = dpath / 'modified_category.kwcoco.zip'
+            >>> kw = {
+            >>>     'src': old_dset.fpath,
+            >>>     'dst': dst_fpath,
+            >>>     'start_id': 3,
+            >>>     'order': 'sort',
+            >>> }
+            >>> cmdline = False
+            >>> cls = CocoModifyCatsCLI
+            >>> cls.main(cmdline=cmdline, **kw)
+            >>> assert dst_fpath.exists()
+            >>> new_dset = kwcoco.CocoDataset(dst_fpath)
+            >>> assert min(new_dset.categories().lookup('id')) == 3
+            >>> names = new_dset.categories().lookup('name')
+            >>> assert sorted(names) == names
+
+        Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}
             >>> cmdline = False
@@ -68,26 +122,44 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
-        print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        if 0:
+            config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+            print('config = {}'.format(ub.urepr(dict(config), nl=1)))
+        else:
+            # newstyle
+            config = cls.cli(data=kw, argv=cmdline, strict=True,
+                             verbose='auto')
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
-        print('dset = {!r}'.format(dset))
+        if config.verbose:
+            print('dset = {!r}'.format(dset))
 
         import networkx as nx
         import warnings
-        print('Input Categories:')
-        try:
-            print(nx.forest_str(dset.object_categories().graph))
-        except AttributeError:
-            print(nx.write_network_text(dset.object_categories().graph))
+        if config.verbose:
+            print('Input Categories:')
+            try:
+                print(nx.forest_str(dset.object_categories().graph))
+            except AttributeError:
+                print(nx.write_network_text(dset.object_categories().graph))
 
         if config['rename'] is not None:
             # parse rename string
-            mapper = dict([p.split(':') for p in config['rename'].split(',')])
+            try:
+                import kwutil
+                mapper = kwutil.Yaml.coerce(config.rename)
+            except ImportError as ex:
+                print(f'Warning: ex={ex}. The kwutil package is required for YAML rename formatting')
+            except Exception as ex:
+                print(f'Warning: ex={ex}. Prefer YAML for mapper')
+                mapper = None
+
+            if mapper is None:
+                mapper = dict([p.split(':') for p in config['rename'].split(',')])
+
             print('mapper = {}'.format(ub.urepr(mapper, nl=1)))
             dset.rename_categories(mapper)
 
@@ -129,17 +201,25 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             noannot_images = [gid for gid, aids in dset.index.gid_to_aids.items() if len(aids) == 0]
             dset.remove_images(noannot_images, verbose=3)
 
-        print('Output Categories: ')
-        try:
-            print(nx.forest_str(dset.object_categories().graph))
-        except AttributeError:
-            print(nx.write_network_text(dset.object_categories().graph))
+        if config['start_id'] is not None or config['order'] is not None:
+            import kwutil
+            start_id = config['start_id']
+            order = kwutil.Yaml.coerce(config['order'])
+            dset.normalize_category_ids(start_id=start_id, order=order)
+
+        if config.verbose:
+            print('Output Categories: ')
+            try:
+                print(nx.forest_str(dset.object_categories().graph))
+            except AttributeError:
+                print(nx.write_network_text(dset.object_categories().graph))
 
         if config['dst'] is None:
             print('dry run')
         else:
             dset.fpath = config['dst']
-            print('dset.fpath = {!r}'.format(dset.fpath))
+            if config.verbose:
+                print('dset.fpath = {!r}'.format(dset.fpath))
             dumpkw = {
                 'newlines': True,
                 'compress': config['compress'],

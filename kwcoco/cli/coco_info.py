@@ -15,9 +15,18 @@ class CocoFileHelper:
         self.mode = mode
 
     def _open(self):
+        import kwcoco
         import zipfile
         fpath = self.fpath
-        if zipfile.is_zipfile(fpath):
+        if isinstance(fpath, kwcoco.CocoDataset):
+            # Allow using a raw CocoDatset path for testing.
+            import io
+            file = io.StringIO()
+            dset: kwcoco.CocoDatset = fpath
+            dset.dump(file)
+            file.seek(0)
+            self.file = file
+        elif zipfile.is_zipfile(fpath):
             self.zfile = zfile = zipfile.ZipFile(fpath, 'r')
             members = zfile.namelist()
             if len(members) != 1:
@@ -89,14 +98,14 @@ class CocoInfoCLI(scfg.DataConfig):
     image_name = scfg.Value(None, help='If specified, lookup and show the image with this name')
 
     @classmethod
-    def main(cls, cmdline=1, **kwargs):
+    def main(cls, argv=True, **kwargs):
         """
         Example:
             >>> # xdoctest: +REQUIRES(module:ijson)
             >>> from kwcoco.cli.coco_info import *  # NOQA
             >>> import kwcoco
             >>> cls = CocoInfoCLI
-            >>> cmdline = 0
+            >>> argv = 0
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
             >>> # Add some info to the data section
             >>> dset.dataset['info'] = [{'type': 'demo', 'data': 'hi mom'}]
@@ -104,13 +113,13 @@ class CocoInfoCLI(scfg.DataConfig):
             >>> dset.dump()
             >>> # test normal json
             >>> kwargs = dict(src=dset.fpath, show_images=True, show_videos=True, show_annotations=True)
-            >>> cls.main(cmdline=cmdline, **kwargs)
+            >>> cls.main(argv=argv, **kwargs)
             >>> # test zipped json
             >>> dset_zip = dset.copy()
             >>> dset_zip.fpath = dset_zip.fpath + '.zip'
             >>> dset_zip.dump()
             >>> kwargs = dict(src=dset_zip.fpath, show_images=True, show_videos=True, show_annotations=True)
-            >>> cls.main(cmdline=cmdline, **kwargs)
+            >>> cls.main(argv=argv, **kwargs)
             >>> # test bad-order json
             >>> dset_bad_order = dset.copy()
             >>> dset_bad_order.dataset['images'] = dset_bad_order.dataset.pop('images')
@@ -118,9 +127,21 @@ class CocoInfoCLI(scfg.DataConfig):
             >>> dset_bad_order.fpath = ub.Path(dset_bad_order.fpath).augment(prefix='bad_order')
             >>> dset_bad_order.dump()
             >>> kwargs = dict(src=dset_bad_order.fpath, show_images=True, show_videos=True, show_annotations=True)
-            >>> cls.main(cmdline=cmdline, **kwargs)
+            >>> cls.main(argv=argv, **kwargs)
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:ijson)
+            >>> # Test for non-compliant json
+            >>> from kwcoco.cli.coco_info import *  # NOQA
+            >>> import kwcoco
+            >>> cls = CocoInfoCLI
+            >>> argv = 0
+            >>> dset = kwcoco.CocoDataset()
+            >>> dset.dataset['info'].append({'type': 'demo', 'data': None})
+            >>> kwargs = dict(src=dset, show_info=True)
+            >>> cls.main(argv=argv, **kwargs)
         """
-        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
+        config = cls.cli(argv=argv, data=kwargs, strict=True)
         try:
             if not config.rich:
                 raise ImportError
@@ -166,11 +187,14 @@ class CocoInfoCLI(scfg.DataConfig):
 
         # import kwcoco
         from kwcoco.util import ijson_ext
+        import json
         if config.src is None:
             raise ValueError('A source kwcoco file is required')
 
-        fpath = ub.Path(config.src)
+        # urepr might not output true json, disable it for now.
+        USE_UREPR = False
 
+        fpath = config.src
         sentinel = object()
         _cocofile = CocoFileHelper(fpath)
         try:
@@ -240,7 +264,11 @@ class CocoInfoCLI(scfg.DataConfig):
                 except StopIteration:
                     print('{}')
                 else:
-                    rich_print('{}'.format(ub.urepr(info_section, nl=4, trailsep=False).replace('\'', '"')))
+                    if USE_UREPR:
+                        _text = ub.urepr(info_section, nl=4, trailsep=False).replace('\'', '"')
+                    else:
+                        _text = json.dumps(info_section, indent=4)
+                    rich_print(_text)
 
             parent_order = [
                 'categories',
@@ -290,7 +318,12 @@ class CocoInfoCLI(scfg.DataConfig):
                         if show_this_one:
                             if prev_obj is not sentinel:
                                 print(',')
-                            rich_print('{}'.format(ub.urepr(obj, nl=4, trailsep=False).replace('\'', '"')))
+                            # rich_print('{}'.format(ub.urepr(obj, nl=4, trailsep=False).replace('\'', '"')))
+                            if USE_UREPR:
+                                _text = ub.urepr(obj, nl=4, trailsep=False).replace('\'', '"')
+                            else:
+                                _text = json.dumps(obj, indent=4)
+                            rich_print(_text)
                             num_shown += 1
                             prev_obj = obj
 

@@ -6,13 +6,7 @@ import skimage
 import ubelt as ub
 
 
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
-
-
-class CategoryPatterns(object):
+class CategoryPatterns:
     """
     Example:
         >>> from kwcoco.demo.toypatterns import *  # NOQA
@@ -187,7 +181,6 @@ class CategoryPatterns(object):
                 size=size)
         return info
 
-    @profile
     def render_category(self, cname, chip, xy_offset=None, dims=None,
                         newstyle=True, size=None):
         """
@@ -217,7 +210,6 @@ class CategoryPatterns(object):
                                   newstyle=newstyle)
         return info
 
-    @profile
     def _todo_refactor_geometric_info(self, cname, xy_offset, dims):
         """
 
@@ -293,7 +285,6 @@ class CategoryPatterns(object):
         }
         return info
 
-    @profile
     def _package_info(self, cname, data, mask, kpts, xy_offset, dims,
                       newstyle):
         """ packages data from _from_elem into coco-like annotation """
@@ -332,7 +323,6 @@ class CategoryPatterns(object):
         }
         return info
 
-    @profile
     def _from_elem(self, cname, chip, size=None):
         """
         Example:

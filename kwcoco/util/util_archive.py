@@ -9,7 +9,7 @@ import zipfile
 from os.path import relpath
 
 
-class Archive(object):
+class Archive:
     """
     Abstraction over zipfile and tarfile
 

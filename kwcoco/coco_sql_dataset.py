@@ -1082,7 +1082,7 @@ class SqlIdGroupDictProxy(DictLike):
         #         yield group
 
 
-class CocoSqlIndex(object):
+class CocoSqlIndex:
     """
     Simulates the dictionary provided by :class:`kwcoco.coco_dataset.CocoIndex`
     """

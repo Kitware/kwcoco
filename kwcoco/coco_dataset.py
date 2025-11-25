@@ -831,7 +831,7 @@ class MixinCocoConstructors:
     """
 
     @classmethod
-    def coerce(cls, key, sqlview=False, verbose=1, **kw):
+    def coerce(cls, key, sqlview=False, verbose=0, **kw):
         """
         Attempt to transform the input into the intended CocoDataset.
 
@@ -883,9 +883,13 @@ class MixinCocoConstructors:
             # https://tools.ietf.org/html/rfc8089
             result = uritools.urisplit(dset_fpath)
             if result.scheme == 'sqlite' or result.path.endswith('.sqlite'):
+                if verbose:
+                    print(f'Reading {dset_fpath}')
                 from kwcoco.coco_sql_dataset import CocoSqlDatabase
                 self = CocoSqlDatabase(dset_fpath).connect()
             elif result.path.endswith('.json') or '.json' in result.path or '.kwcoco' in result.path:
+                if verbose:
+                    print(f'Reading {dset_fpath}')
                 if sqlview:
                     from kwcoco.coco_sql_dataset import CocoSqlDatabase
                     kw['backend'] = sqlview
@@ -900,6 +904,8 @@ class MixinCocoConstructors:
                 # are using the coerce function, be more explicit if you want
                 # predictable behavior.
                 if exists(dset_fpath):
+                    if verbose:
+                        print(f'Reading {dset_fpath}')
                     self = kwcoco.CocoDataset(dset_fpath, **kw)
                 else:
                     self = cls.demo(key=key, verbose=verbose, **kw)
@@ -1026,11 +1032,12 @@ class MixinCocoConstructors:
                 kwargs['n_imgs'] = int(res.named['num_imgs'])
             if 'rng' not in kwargs and 'n_imgs' in kwargs:
                 kwargs['rng'] = kwargs['n_imgs']
+            kwargs['verbose'] = kwargs.get('verbose', 0)
             self = toydata_image.demodata_toy_dset(**kwargs)
             self.tag = key
         elif key.startswith('vidshapes'):
             from kwcoco.demo import toydata_video
-            verbose = kwargs.get('verbose', 1)
+            verbose = kwargs.get('verbose', 0)
             res = parse.parse('vidshapes{num_videos:d}', key)
             if res is None:
                 res = parse.parse('vidshapes{num_videos:d}-{suffix}', key)
@@ -1329,7 +1336,7 @@ class MixinCocoConstructors:
         return coco_dset
 
     @classmethod
-    def coerce_multiple(cls, datas, workers=0, mode='process', verbose=1,
+    def coerce_multiple(cls, datas, workers=0, mode='process', verbose=0,
                         postprocess=None, ordered=True, **kwargs):
         """
         Coerce multiple CocoDataset objects in parallel.
@@ -1365,7 +1372,7 @@ class MixinCocoConstructors:
             * load_multiple - like this function but is a strict file-path-only loader
 
         CommandLine:
-            xdoctest -m kwcoco.coco_dataset CocoDataset.coerce_multiple
+            xdoctest -m kwcoco.coco_dataset MixinCocoConstructors.coerce_multiple
 
         Example:
             >>> import kwcoco
@@ -1801,6 +1808,97 @@ class MixinCocoExtras:
                 bad_paths.append(job.input_info)
 
         return bad_paths
+
+    def normalize_category_ids(self, start_id=None, order=None):
+        """
+        Reassign category IDs to be consecutive integers starting at `start_id`.
+
+        Optionally reorders category definitions to make the order canonical,
+        sorted, or front-loaded based on a custom list of category names.
+
+        Args:
+            start_id (int | None):
+                If specified, reassign each category consecutive ids starting
+                with this id.
+
+            order (List[str] | str | None): Optional control over category
+                ordering. If:
+                    - None: preserves original order.
+                    - List[str]: category names to prioritize in that order.
+                    - "sort": sorts categories alphabetically by name.
+
+        Example:
+            >>> import kwcoco
+            >>> import ubelt as ub
+            >>> self = kwcoco.CocoDataset.demo('vidshapes8', verbose=0)
+            >>> print('Original categories:')
+            >>> print(ub.urepr(self.dataset['categories'], nl=0))
+            Original categories:
+            [{'id': 1, 'name': 'star'}, {'id': 2, 'name': 'superstar'}, {'id': 3, 'name': 'eff'}]
+            >>> # 1. Reindex starting at 0
+            >>> self.normalize_category_ids(start_id=0)
+            >>> print('After start_id=0:')
+            >>> print(ub.urepr(self.dataset['categories'], nl=0))
+            After start_id=0:
+            [{'id': 0, 'name': 'star'}, {'id': 1, 'name': 'superstar'}, {'id': 2, 'name': 'eff'}]
+            >>> # 2. Sort categories alphabetically
+            >>> self.normalize_category_ids(order='sort', start_id=1)
+            >>> print('After order="sort", start_id=1:')
+            >>> print(ub.urepr(self.dataset['categories'], nl=0))
+            After order="sort", start_id=1:
+            [{'id': 1, 'name': 'eff'}, {'id': 2, 'name': 'star'}, {'id': 3, 'name': 'superstar'}]
+            >>> # 3. Front-load a custom class order
+            >>> self.normalize_category_ids(order=['superstar'], start_id=100)
+            >>> print('After order=["superstar"], start_id=100:')
+            >>> print(ub.urepr(self.dataset['categories'], nl=0))
+            After order=["superstar"], start_id=100:
+            [{'id': 100, 'name': 'superstar'}, {'id': 101, 'name': 'eff'}, {'id': 102, 'name': 'star'}]
+        """
+        # Get existing categories as a list of dicts
+        orig_categories = self.dataset['categories']
+
+        # Determine category ordering
+        if order is None:
+            new_catname_order = None
+        elif isinstance(order, str):
+            if order == 'sort':
+                new_catname_order = sorted(c['name'] for c in orig_categories)
+            else:
+                raise KeyError(f'Unknown ordering method: {order}')
+        else:
+            # Assume order: List[str]
+            orig_order = ub.oset([cat['name'] for cat in orig_categories])
+            suffix_order = list(orig_order - order)
+            new_catname_order = order + suffix_order
+
+        if new_catname_order is not None:
+            # If we are reordering the categoryes, build the new list
+            new_categories = [
+                self.index.name_to_cat[name] for name in new_catname_order]
+        else:
+            new_categories = orig_categories
+
+        if start_id is not None:
+            # If requested, replace category ids and build new ID map
+            cat_id_map = {}
+            for new_id, cat in enumerate(new_categories, start=start_id):
+                old_id = cat['id']
+                cat_id_map[old_id] = new_id
+                cat['id'] = new_id
+
+            # Update annotations
+            for ann in self.dataset['annotations']:
+                old_cid = ann.get('category_id', None)
+                if old_cid is not None:
+                    ann['category_id'] = cat_id_map[old_cid]
+
+        if new_catname_order is not None:
+            # If we reordered the categories, replace the dataset category list
+            self.dataset['categories'][:] = new_categories
+
+        # Invalidate and rebuild index
+        self._invalidate_hashid()
+        self.rebuild_index()
 
     def rename_categories(self, mapper, rebuild=True, merge_policy='ignore'):
         """
@@ -2574,7 +2672,10 @@ class MixinCocoObjects:
     This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
-    def annots(self, annot_ids=None, image_id=None, track_id=None, video_id=None, trackid=None, aids=None, gid=None):
+    def annots(self, annot_ids=None, image_id=None, track_id=None, video_id=None,
+               image_name=None, track_name=None, video_name=None,
+               *,
+               trackid=None, aids=None, gid=None):
         """
         Return vectorized annotation objects
 
@@ -2596,6 +2697,12 @@ class MixinCocoObjects:
             video_id (int | None):
                 return all annotations that belong to this video.
                 mutually exclusive with other arguments.
+
+            track_name (str | None): name alternative to id
+
+            image_name (str | None): name alternative to id
+
+            video_name (str | None): name alternative to id
 
         Returns:
             kwcoco.coco_objects1d.Annots: vectorized annotation object
@@ -2629,6 +2736,19 @@ class MixinCocoObjects:
             )
             track_id = trackid
 
+        # name to id resolution
+
+        if track_name is not None:
+            track_id = self.index.name_to_track[track_name]['id']
+
+        if video_name is not None:
+            video_id = self.index.name_to_video[video_name]['id']
+
+        if image_name is not None:
+            image_id = self.index.name_to_img[image_name]['id']
+
+        # id lookups
+
         if image_id is not None:
             annot_ids = sorted(self.index.gid_to_aids[image_id])
 
@@ -2645,7 +2765,8 @@ class MixinCocoObjects:
 
         return Annots(annot_ids, self)
 
-    def images(self, image_ids=None, video_id=None, names=None, gids=None, vidid=None):
+    def images(self, image_ids=None, video_id=None, names=None,
+               video_name=None, *, gids=None, vidid=None):
         """
         Return vectorized image objects
 
@@ -2655,6 +2776,9 @@ class MixinCocoObjects:
 
             video_id (int | None): returns all images that belong to this video id.
                 mutually exclusive with `image_ids` arg.
+
+            video_name (str | None):
+                alternative lookup to video-id
 
             names (List[str] | None):
                 lookup images by their names.
@@ -2687,6 +2811,9 @@ class MixinCocoObjects:
             )
             video_id = vidid
 
+        if video_name is not None:
+            video_id = self.index.name_to_video[video_name]['id']
+
         if video_id is not None:
             image_ids = self.index.vidid_to_gids[video_id]
 
@@ -2698,7 +2825,7 @@ class MixinCocoObjects:
 
         return Images(image_ids, self)
 
-    def categories(self, category_ids=None, cids=None):
+    def categories(self, category_ids=None, *, cids=None):
         """
         Return vectorized category objects
 
@@ -2726,10 +2853,12 @@ class MixinCocoObjects:
                     deprecate='0.7.3', error='1.0.0', remove='1.1.0',
                 )
         if category_ids is None:
+            # Question: why are we sorting here? Maybe this was handling some
+            # Python 3.6 case? Do we still need to?  Would it break UX?
             category_ids = sorted(self.index.cats.keys())
         return Categories(category_ids, self)
 
-    def videos(self, video_ids=None, names=None, vidids=None):
+    def videos(self, video_ids=None, names=None, *, vidids=None):
         """
         Return vectorized video objects
 
@@ -2780,7 +2909,7 @@ class MixinCocoObjects:
             video_ids = [self.index.name_to_video[name]['id'] for name in names]
         return Videos(video_ids, self)
 
-    def tracks(self, track_ids=None, names=None, video_id=None):
+    def tracks(self, track_ids=None, names=None, video_id=None, video_name=None):
         """
         Return vectorized track objects
 
@@ -2795,6 +2924,9 @@ class MixinCocoObjects:
             video_id (int | None):
                 if specified, return tracks in this video id.
                 Note: this query is currently inefficient
+
+            video_name (str | None):
+                alternative lookup to video_id
 
         Returns:
             kwcoco.coco_objects1d.Tracks: vectorized video object
@@ -2822,6 +2954,11 @@ class MixinCocoObjects:
 
         if names is not None:
             track_ids = [self.index.name_to_track[name]['id'] for name in names]
+
+        if video_name is not None:
+            # TODO handle more mutex checks
+            assert video_id is None, 'video_name is mutex with video_id'
+            video_id = self.index.name_to_video[video_name]['id']
 
         if video_id is not None:
             # Note: this is an inefficient lookup
@@ -6431,7 +6568,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         self._state['was_saved'] = True
 
     def dump(self, file=None, indent=None, newlines=False, temp_file='auto',
-             compress='auto'):
+             compress='auto', verbose=0):
         """
         Writes the dataset out to the json format
 
@@ -6458,6 +6595,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 write mode. If auto, then it will default to False unless
                 it can introspect the file name and the name ends with .zip
 
+            verbose (int):
+                verbosity level
+
         Example:
             >>> import kwcoco
             >>> import ubelt as ub
@@ -6482,9 +6622,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             >>> dpath = ub.Path.appdir('kwcoco/demo/dump').ensuredir()
             >>> dset = kwcoco.CocoDataset.demo()
             >>> fpath1 = dset.fpath = dpath / 'my_coco_file.zip'
-            >>> dset.dump()
+            >>> dset.dump(verbose=1)
             >>> fpath2 = dset.fpath = dpath / 'my_coco_file.json'
-            >>> dset.dump()
+            >>> dset.dump(verbose=1)
             >>> assert fpath1.read_bytes()[0:8] != fpath2.read_bytes()[0:8]
         """
         from kwcoco.util.util_json import coerce_indent
@@ -6510,6 +6650,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         mode = 'wb' if compress else 'w'
 
+        if verbose:
+            if input_was_pathlike:
+                print(f'Writing to: {fpath}... ', end='')
+            else:
+                print('Writing to file... ', end='')
+
         if input_was_pathlike:
             import safer
             if temp_file == 'auto':
@@ -6522,6 +6668,9 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             # We are likely dumping to a real file.
             self._dump(
                 file, indent=indent, newlines=newlines, compress=compress)
+
+        if verbose:
+            print('done.')
 
     def _check_json_serializable(self, verbose=1):
         """
@@ -6553,6 +6702,26 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         self.validate(img_attrs=False, annot_attrs=False, unique=False)
         # assert len(self.missing_images()) == 0
         return True
+
+    def _check_warnables(self):
+        warning_checks = {}
+        referenced_track_ids = set()
+        for annot in self.dataset['annotations']:
+            track_id = annot.get('track_id', None)
+            referenced_track_ids.add(track_id)
+
+        table_track_ids = {track['id'] for track in self.dataset.get('tracks', [])}
+        # referenced_track_ids - table_track_ids
+        # table_track_ids - referenced_track_ids
+        # True if there is a track in the table without an annotation.
+        warning_checks['unreferenced_track_ids'] = table_track_ids.issubset(referenced_track_ids)
+        # True if there are annotations with a track id not in the track table.
+        warning_checks['unregistered_track_ids'] = table_track_ids.issuperset(referenced_track_ids)
+
+        failed_warnings = {k: v for k, v in warning_checks.items() if not v}
+        if any(failed_warnings):
+            msg = 'Potential issues: {}'.format(list(failed_warnings))
+            warnings.warn(msg)
 
     def _check_index(self):
         """
@@ -6692,7 +6861,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
     def union(*others, disjoint_tracks=True, remember_parent=False, **kwargs):
         """
-        Merges multiple :class:`CocoDataset` items into one. Names and
+        Combines multiple :class:`CocoDataset` items into one. Names and
         associations are retained, but ids may be different.
 
         Args:
@@ -6713,8 +6882,16 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
             **kwargs : constructor options for the new merged CocoDataset
 
+        Note:
+            While categories in datasets are merged, all other information is
+            not. I.e. this assumes images, videos, and annotations in the
+            datsets are all disjoint. If you need to combine datasets you
+            currently must copy one dataset, and then add information from
+            other datasets while removing ambiguities in a way that makes sense
+            in context.
+
         Returns:
-            kwcoco.CocoDataset: a new merged coco dataset
+            kwcoco.CocoDataset: a new coco dataset containing original datasets.
 
         CommandLine:
             xdoctest -m kwcoco.coco_dataset CocoDataset.union

@@ -11,11 +11,6 @@ from kwcoco.category_tree import CategoryTree
 from kwcoco.metrics.confusion_measures import (
     Measures, PerClass_Measures, populate_info)
 
-try:
-    from line_profiler import profile
-except Exception:
-    profile = ub.identity
-
 
 class ConfusionVectors(ub.NiceRepr):
     """
@@ -107,6 +102,37 @@ class ConfusionVectors(ub.NiceRepr):
             'data': self.data.pandas().to_dict(orient='list'),
         }
         return state
+
+    def pandas(self, concat_prob_columns=False):
+        """
+        Return a pandas representation.
+
+        Args:
+            concat_prob_columns (bool): default False, if True add probs
+                as new columns instead of as attributes.
+
+        Returns:
+            pd.DataFrame: the classes and probs are stored as attributes
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:pandas)
+            >>> from kwcoco.metrics import ConfusionVectors
+            >>> self = ConfusionVectors.demo(n_imgs=1, classes=2, n_fp=0, nboxes=1)
+            >>> df = self.pandas(concat_prob_columns=True)
+            >>> print(df)
+            >>> df = self.pandas(concat_prob_columns=False)
+            >>> print(df)
+        """
+        df = self.data.pandas()
+        df.attrs['classes'] = self.classes
+        if concat_prob_columns and self.probs is not None:
+            # Maybe add probabilities as columns?
+            import pandas as pd
+            probs_df = pd.DataFrame(self.probs, columns=self.classes)
+            df = pd.concat([df, probs_df], axis=1)
+        else:
+            df.attrs['probs'] = self.probs
+        return df
 
     @classmethod
     def from_json(cls, state):
@@ -811,6 +837,11 @@ class BinaryConfusionVectors(ub.NiceRepr):
                 decreases. This is done in pycocotools scoring, but I'm not
                 sure its a good idea.
 
+        Returns:
+            kwcoco.metrics.confusion_measures.Measures:
+                dictionary proxy with detailed scores across a range of
+                operating points.
+
         Example:
             >>> from kwcoco.metrics.confusion_vectors import *  # NOQA
             >>> self = BinaryConfusionVectors.demo(n=0)
@@ -857,7 +888,6 @@ class BinaryConfusionVectors(ub.NiceRepr):
         populate_info(info)
         return measures
 
-    @profile
     def _binary_clf_curves(self, stabalize_thresh=7, fp_cutoff=None):
         """
         Compute TP, FP, TN, and FN counts for this binary confusion vector.
@@ -882,20 +912,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
             >>> self = BinaryConfusionVectors.demo(n=100, p_true=0.5, p_error=0.5)
             >>> self._binary_clf_curves()
-
-        Ignore:
-            import xdev
-            globals().update(xdev.get_func_kwargs(BinaryConfusionVectors._binary_clf_curves))
-            >>> self = BinaryConfusionVectors.demo(n=10, p_true=0.7, p_error=0.3, p_miss=0.2)
-            >>> print('measures = {}'.format(ub.urepr(self._binary_clf_curves())))
-            >>> info = self.measures()
-            >>> info = ub.dict_isect(info, ['tpr', 'fpr', 'ppv', 'fp_count'])
-            >>> print('measures = {}'.format(ub.urepr(ub.odict(i))))
         """
-        # try:
-        #     from sklearn.metrics._ranking import _binary_clf_curve
-        # except ImportError:
-        #     from sklearn.metrics.ranking import _binary_clf_curve
         data = self.data
         y_true = data['is_true'].astype(np.uint8)
         y_score = data['pred_score']

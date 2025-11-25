@@ -5,7 +5,28 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.8 - Unreleased
+## Version 0.8.9 - Unreleased
+
+### Added
+* New function `CocoDataset.normalize_category_ids` that lets the user modify the starting index of category ids, or provide 
+* Added track/video/image name lookup to relevant vectorized lookups
+* Add `pandas` method to `ConfusionVectors`
+* Add verbose argument to dump.
+
+### Changed
+* Allow category map to be passed as YAML in CLI modify-categories
+* Better support for confusion kwcoco and visualize script in evaluate detections
+* Interfaces using the `_query_image_ids` helper, can now accept YAML lists of video or image ids if kwutil is available. 
+* Updated segmentation confusion color scheme to match detection color scheme.
+* Standardize image id query in subset CLI.
+* Changed default of verbose from 1 to 0 in `CocoDataset`: `coerce`, `demo` and `coerce_multiple`.
+* Demo images can now be generated with kwimage.imwrite keyword arguments to control overviews and other attributes.
+
+### Fixed
+* Issue in `kwcoco tables` where the output might not be valid json.
+
+
+## Version 0.8.8 - Released 2025-07-15
 
 ### Added
 * can now convert a kwcoco file to labelme files.
@@ -568,7 +589,7 @@ Bug in `CocoImage.add_asset` where json serialization was broken
 
 ### Added
 * Initial non-experimental version of SensorChanSpec with limited functionality
-* Updated `kwcoco validate` cli tool with full options (and added checks for img attrs)
+* Updated `kwcoco validate` CLI tool with full options (and added checks for img attrs)
 * New Delayed operations with a more scalable design 
 
 ### Fixed
@@ -1023,7 +1044,7 @@ Bug in `CocoImage.add_asset` where json serialization was broken
 * Add `kwcoco.Subset` create a subset of a coco file based on filter criteria
 * Add `kwcoco.Subset` create a subset of a coco file based on filter criteria
 * Experimental interactive mode to kwcoco show
-* Start to merge cli and class functionality.
+* Start to merge CLI and class functionality.
 
 ### Fixed
 * Fixed the default bundle root to be the cwd instead of
