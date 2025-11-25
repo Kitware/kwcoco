@@ -5,7 +5,10 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.9 - Unreleased
+## Version 0.8.10 - Unreleased
+
+
+## Version 0.8.9 - Released 2025-11-25
 
 ### Added
 * New function `CocoDataset.normalize_category_ids` that lets the user modify the starting index of category ids, or provide 
