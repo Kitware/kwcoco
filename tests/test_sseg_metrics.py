@@ -1,4 +1,8 @@
 def test_single_image_sseg_with_weights():
+    """
+    CommandLine:
+        xdoctest -m ./tests/test_sseg_metrics.py test_single_image_sseg_with_weights
+    """
     from kwcoco.metrics.segmentation_metrics import SingleImageSegmentationMetrics
     import kwcoco
     import numpy as np

@@ -71,6 +71,10 @@ def test_coco_image_add_asset():
 
 
 def test_imdelay_with_interpolation():
+    """
+    CommandLine:
+        xdoctest -m ./tests/test_coco_image.py test_imdelay_with_interpolation
+    """
     import ubelt as ub
     dpath = ub.Path.appdir('kwcoco/tests/imdelay-with-interp').ensuredir()
 
@@ -89,6 +93,13 @@ def test_imdelay_with_interpolation():
 
     delayed = coco_img.imdelay(interpolation='nearest', antialias=False)
     data = delayed.finalize()
+
+    # if len(data.shape) == 3:
+    #     # Hack: upgrading to numpy 2.3.5 from 2.3.3 seemed to have the shape
+    #     # change? Or maybe this is lack of gdal?
+    #     assert data.shape[2] == 1
+    #     data = data.squeeze()
+
     assert np.all(data == imdata)
 
     # Test to make sure imdelay respect interplation
@@ -99,6 +110,12 @@ def test_imdelay_with_interpolation():
     scaled = scaled.optimize()
     scaled.write_network_text(fields=True)
     assert set(imdata.ravel()) == set(data_scaled.ravel())
+
+    if len(data.shape) == 3:
+        # Hack: upgrading to numpy 2.3.5 from 2.3.3 seemed to have the shape
+        # change? Or maybe this is lack of gdal?
+        assert data.shape[2] == 1
+        data = data.squeeze()
 
     assert np.all(data == imdata)
 

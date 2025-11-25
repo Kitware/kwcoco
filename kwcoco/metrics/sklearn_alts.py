@@ -161,7 +161,8 @@ def _binary_clf_curve2(y_true, y_score, pos_label=None, sample_weight=None):
 
     # Transform nans into negative infinity
     nan_flags = np.isnan(y_score)
-    y_score[nan_flags] = -np.inf
+    if np.any(nan_flags):
+        y_score[nan_flags] = -np.inf
 
     # sort scores and corresponding truth values
     desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
