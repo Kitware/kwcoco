@@ -21,6 +21,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Standardize image id query in subset CLI.
 * Changed default of verbose from 1 to 0 in `CocoDataset`: `coerce`, `demo` and `coerce_multiple`.
 * Demo images can now be generated with kwimage.imwrite keyword arguments to control overviews and other attributes.
+* Add images will now fail if there are duplicate top-level file names.
 
 ### Fixed
 * Issue in `kwcoco tables` where the output might not be valid json.
