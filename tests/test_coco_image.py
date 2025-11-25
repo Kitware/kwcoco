@@ -94,11 +94,11 @@ def test_imdelay_with_interpolation():
     delayed = coco_img.imdelay(interpolation='nearest', antialias=False)
     data = delayed.finalize()
 
-    # if len(data.shape) == 3:
-    #     # Hack: upgrading to numpy 2.3.5 from 2.3.3 seemed to have the shape
-    #     # change? Or maybe this is lack of gdal?
-    #     assert data.shape[2] == 1
-    #     data = data.squeeze()
+    if len(data.shape) == 3:
+        # Hack: upgrading to numpy 2.3.5 from 2.3.3 seemed to have the shape
+        # change? Or maybe this is lack of gdal?
+        assert data.shape[2] == 1
+        data = data.squeeze()
 
     assert np.all(data == imdata)
 
