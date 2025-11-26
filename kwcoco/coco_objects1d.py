@@ -860,6 +860,8 @@ class Annots(ObjectList1D):
     @property
     def cnames(self):
         """
+        DEPRECATED
+
         Get the column of category names
 
         Returns:
@@ -871,6 +873,8 @@ class Annots(ObjectList1D):
     @cnames.setter
     def cnames(self, cnames):
         """
+        DEPRECATED
+
         Args:
             cnames (List[str]):
         """
@@ -890,7 +894,7 @@ class Annots(ObjectList1D):
     @category_names.setter
     def category_names(self, names):
         """
-        Get the column of category names
+        Set the category name of each annotation.
 
         Returns:
             List[str]
@@ -1098,6 +1102,22 @@ class AnnotGroups(ObjectGroups):
 
     @property
     def cnames(self):
+        """
+        Get the grouped category names for annotations in this group
+
+        Returns:
+            List[List[str]]:
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('photos').images().annots
+            >>> print('self.cnames = {}'.format(ub.urepr(self.cnames, nl=0)))
+            self.cnames = [['astronaut', 'rocket', 'helmet', 'mouth', 'star', 'star', 'star', 'star', 'star'], ['astronomer', 'mouth'], []]
+        """
+        return [getattr(group, 'cnames') for group in self._groups]
+
+    @property
+    def category_names(self):
         """
         Get the grouped category names for annotations in this group
 
