@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Changed
 * The `classes_of_interest` parameter to evaluate_detections now uses coercable YAML as input. Previous input formats were not reliable. This could result in minor breaking changes.
 * Reworked image association in detection metrics to reuse segmentation metrics code. The "name" is now used as the primary key, but fallbacks to older image id and filename methods are still supported.
+* Rework how special-cased labelme __metadata__ data is stored, use the COCO caption convention.
 
 ## Version 0.8.9 - Released 2025-11-25
 

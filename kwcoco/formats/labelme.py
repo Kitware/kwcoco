@@ -93,14 +93,23 @@ def labelme_to_coco_structure(labelme_data, special_options=True):
             anns.append(ann)
         elif shape_type == 'point':
             if special_options:
-                # Handle points in a special case.
-                if category_name == '__metadata__':
-                    if desc is not None:
-                        if img.get('description'):
-                            raise AssertionError('Multiple metadata points in an image')
-                        img['description'] = desc
+
+                OLD_META_METHOD = 0
+                if OLD_META_METHOD:
+                    # Handle points in a special case.
+                    if category_name == '__metadata__':
+                        if desc is not None:
+                            if img.get('description'):
+                                print(f'img = {ub.urepr(img, nl=1)}')
+                                raise AssertionError('Multiple metadata points in an image')
+                            img['description'] = desc
+                    else:
+                        raise NotImplementedError(shape_type)
                 else:
-                    raise NotImplementedError(shape_type)
+                    ann = {
+                        'caption': desc,
+                    }
+                    anns.append(ann)
             else:
                 raise NotImplementedError(shape_type)
         else:
@@ -339,9 +348,14 @@ class LabelMeFile(ub.NiceRepr):
 
         # Collect annotations for this image
         for ann in coco_dset.annots(image_id=image_id).objs:
-            category_id = ann['category_id']
-            cat = coco_dset.index.cats[category_id]
-            catname = cat.get('name', 'unknown')
+            category_id = ann.get('category_id', None)
+            if category_id is not None:
+                cat = coco_dset.index.cats[category_id]
+                catname = cat.get('name', 'unknown')
+            else:
+                catname = '__metadata__'
+
+            caption = ann.get('caption', None)
             segmentation = ann.get('segmentation', None)
             bbox = ann.get('bbox', [])
             # HACK: store more information than necessary in the labelme file
@@ -364,11 +378,15 @@ class LabelMeFile(ub.NiceRepr):
                     # add fallback options.
                     points = poly.exterior.data.tolist()
                     self.add_polygon(catname, points, group_id=group_id, extra=extra)
-
             elif bbox:
                 # Add bounding box as a rectangle
                 self.add_rectangle(catname, bbox, extra=extra)
-
+            elif caption:
+                # labelme does not have a mechanism for captions.
+                # Use points to encode fake caption metadata
+                assert catname == '__metadata__', 'cant handle real points'
+                fake_points = [[1., 1.]]
+                self.add_point(catname, fake_points, description=caption)
             else:
                 raise NotImplementedError(f'Unable to convert {ann} to a labelme object')
 
@@ -388,10 +406,11 @@ class LabelMeFile(ub.NiceRepr):
         image_id = coco_dset.add_image(**img)
 
         for ann in anns:
-            catname = ann.pop('category_name')
-            cid = coco_dset.ensure_category(catname)
+            catname = ann.pop('category_name', None)
+            if catname is not None:
+                cid = coco_dset.ensure_category(catname)
+                ann['category_id'] = cid
             ann['image_id'] = image_id
-            ann['category_id'] = cid
             coco_dset.add_annotation(**ann)
 
     def to_coco(self):
@@ -422,12 +441,31 @@ class LabelMeFile(ub.NiceRepr):
         self.add_to_coco(coco_dset)
         return coco_dset
 
+    def add_point(self, label, points, flags=None, **kwargs):
+        """
+        Add a polygon shape.
+
+        Args:
+            label (str): Category name / label for the shape.
+            points (list of list of float): List of (x, y) points defining the polygon.
+            group_id (int, optional): Group ID for the shape.
+            flags (dict, optional): Additional flags for the shape.
+        """
+        shape = {
+            "label": label,
+            "points": points,
+            "shape_type": "point",
+            "flags": flags or {},
+            **kwargs
+        }
+        self.data["shapes"].append(shape)
+
     def add_polygon(self, label, points, group_id=None, flags=None, **kwargs):
         """
         Add a polygon shape.
 
         Args:
-            label (str): Category namae / label for the shape.
+            label (str): Category name / label for the shape.
             points (list of list of float): List of (x, y) points defining the polygon.
             group_id (int, optional): Group ID for the shape.
             flags (dict, optional): Additional flags for the shape.
