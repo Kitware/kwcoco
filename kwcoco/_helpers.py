@@ -410,7 +410,7 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None,
         >>> _query_image_ids(coco_dset, select_images='.id < 3 or (.file_name | test(".*.png"))')
 
     Example:
-        >>> # xdoctest: +REQUIRES(module:kwutil)
+        >>> # xdoctest: +REQUIRES(module:yaml)
         >>> from kwcoco._helpers import _query_image_ids
         >>> import kwcoco
         >>> coco_dset = kwcoco.CocoDataset.demo('vidshapes8', verbose=0)
