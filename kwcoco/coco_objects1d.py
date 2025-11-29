@@ -860,34 +860,26 @@ class Annots(ObjectList1D):
     @property
     def cnames(self):
         """
+        DEPRECATED
+
         Get the column of category names
 
         Returns:
             List[str]
         """
         # TODO: deprecate cnames and use category_names instead
-        return [cat['name'] for cat in ub.take(self._dset.cats, self.cids)]
+        return self.category_names
 
     @cnames.setter
     def cnames(self, cnames):
         """
+        DEPRECATED
+
         Args:
             cnames (List[str]):
-
-        Example:
-            >>> import kwcoco
-            >>> self = kwcoco.CocoDataset.demo().annots([1, 2, 11])
-            >>> print('self.cnames = {!r}'.format(self.cnames))
-            >>> print('self.cids = {!r}'.format(self.cids))
-            >>> cnames = ['boo', 'bar', 'rocket']
-            >>> list(map(self._dset.ensure_category, set(cnames)))
-            >>> self.cnames = cnames
-            >>> print('self.cnames = {!r}'.format(self.cnames))
-            >>> print('self.cids = {!r}'.format(self.cids))
         """
-        cats = map(self._dset._alias_to_cat, cnames)
-        cids = (cat['id'] for cat in cats)
-        self.set('category_id', cids)
+        # TODO: deprecate cnames and use category_names instead
+        self.category_names = cnames
 
     @property
     def category_names(self):
@@ -897,17 +889,30 @@ class Annots(ObjectList1D):
         Returns:
             List[str]
         """
-        return self.cnames
+        return [cat['name'] for cat in ub.take(self._dset.cats, self.cids)]
 
     @category_names.setter
     def category_names(self, names):
         """
-        Get the column of category names
+        Set the category name of each annotation.
 
         Returns:
             List[str]
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo().annots([1, 2, 11])
+            >>> print('self.category_names = {!r}'.format(self.category_names))
+            >>> print('self.cids = {!r}'.format(self.cids))
+            >>> category_names = ['boo', 'bar', 'rocket']
+            >>> list(map(self._dset.ensure_category, set(category_names)))
+            >>> self.category_names = category_names
+            >>> print('self.category_names = {!r}'.format(self.category_names))
+            >>> print('self.cids = {!r}'.format(self.cids))
         """
-        self.cnames = names
+        cats = map(self._dset._alias_to_cat, names)
+        cids = (cat['id'] for cat in cats)
+        self.set('category_id', cids)
 
     @property
     def detections(self):
@@ -1097,6 +1102,22 @@ class AnnotGroups(ObjectGroups):
 
     @property
     def cnames(self):
+        """
+        Get the grouped category names for annotations in this group
+
+        Returns:
+            List[List[str]]:
+
+        Example:
+            >>> import kwcoco
+            >>> self = kwcoco.CocoDataset.demo('photos').images().annots
+            >>> print('self.cnames = {}'.format(ub.urepr(self.cnames, nl=0)))
+            self.cnames = [['astronaut', 'rocket', 'helmet', 'mouth', 'star', 'star', 'star', 'star', 'star'], ['astronomer', 'mouth'], []]
+        """
+        return [getattr(group, 'cnames') for group in self._groups]
+
+    @property
+    def category_names(self):
         """
         Get the grouped category names for annotations in this group
 

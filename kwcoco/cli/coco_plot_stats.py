@@ -5,7 +5,7 @@ CommandLine:
     xdoctest -m kwcoco.cli.coco_plot_stats __doc__:1
 
 Example:
-    >>> # xdoctest: +REQUIRES(module:kwutil)
+    >>> # xdoctest: +REQUIRES(module:kwplot)
     >>> # Stats on a simple dataset
     >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
     >>> import kwcoco
@@ -17,7 +17,7 @@ Example:
     >>> cls.main(cmdline=cmdline, **kwargs)
 
 Example:
-    >>> # xdoctest: +REQUIRES(module:kwutil)
+    >>> # xdoctest: +REQUIRES(module:kwplot)
     >>> # Stats on a more complex dataset
     >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
     >>> import kwcoco
@@ -509,7 +509,7 @@ class Plots:
         Helper for tweaking visualizations
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> self = Plots.demo(timestamps=True)
             >>> self.perimage_data
             >>> self.perannot_data
@@ -640,7 +640,7 @@ class BuiltinPlots:
     def polygon_centroid_absolute_distribution(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['polygon_centroid_absolute_distribution'](self)
@@ -662,7 +662,7 @@ class BuiltinPlots:
     def polygon_centroid_relative_distribution(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['polygon_centroid_relative_distribution'](self)
@@ -686,7 +686,7 @@ class BuiltinPlots:
     def polygon_centroid_absolute_distribution_jointplot(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_centroid_absolute_distribution_jointplot'](self)
@@ -718,7 +718,7 @@ class BuiltinPlots:
     def polygon_centroid_relative_distribution_jointplot(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_centroid_relative_distribution_jointplot'](self)
@@ -756,7 +756,7 @@ class BuiltinPlots:
     def image_size_histogram(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True, image_size='random', num_frames=100)
             >>> self['image_size_histogram'](self)
@@ -779,7 +779,7 @@ class BuiltinPlots:
     def image_size_scatter(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True, image_size='random', num_frames=100)
             >>> self['image_size_scatter'](self)
@@ -802,7 +802,7 @@ class BuiltinPlots:
     def obox_size_distribution(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['obox_size_distribution'](self)
@@ -822,7 +822,7 @@ class BuiltinPlots:
     def obox_size_distribution_jointplot(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['obox_size_distribution_jointplot'](self)
@@ -854,7 +854,7 @@ class BuiltinPlots:
     def obox_size_distribution_logscale(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['obox_size_distribution_logscale'](self)
@@ -896,7 +896,7 @@ class BuiltinPlots:
     def polygon_area_vs_num_verts(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['polygon_area_vs_num_verts'](self)
@@ -914,7 +914,7 @@ class BuiltinPlots:
     def polygon_area_vs_num_verts_jointplot(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['polygon_area_vs_num_verts_jointplot'](self)
@@ -950,7 +950,7 @@ class BuiltinPlots:
     def polygon_area_vs_num_verts_jointplot_logscale(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_area_vs_num_verts_jointplot_logscale'](self)
@@ -992,7 +992,7 @@ class BuiltinPlots:
     def polygon_area_histogram_logscale(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['polygon_area_histogram_logscale'](self)
@@ -1012,7 +1012,7 @@ class BuiltinPlots:
     def polygon_area_histogram(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['polygon_area_histogram'](self)
@@ -1031,7 +1031,7 @@ class BuiltinPlots:
     def polygon_area_histogram_splity(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['polygon_area_histogram_splity'](self)
@@ -1070,7 +1070,7 @@ class BuiltinPlots:
     def polygon_num_vertices_histogram(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['polygon_num_vertices_histogram'](self)
@@ -1087,7 +1087,7 @@ class BuiltinPlots:
     def anns_per_image_histogram(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['anns_per_image_histogram'](self)
@@ -1107,7 +1107,7 @@ class BuiltinPlots:
     def anns_per_image_histogram_splity(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['anns_per_image_histogram_splity'](self)
@@ -1143,7 +1143,7 @@ class BuiltinPlots:
     def anns_per_image_histogram_ge1(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo()
             >>> self['anns_per_image_histogram_ge1'](self)
@@ -1168,7 +1168,7 @@ class BuiltinPlots:
     def images_over_time(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['images_over_time'](self)
@@ -1189,7 +1189,7 @@ class BuiltinPlots:
     def images_timeofday_distribution(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> self = Plots.demo(timestamps=True)
             >>> self['images_timeofday_distribution'](self)
@@ -1239,7 +1239,7 @@ class BuiltinPlots:
     def all_polygons(self):
         """
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> from kwcoco.cli.coco_plot_stats import *  # NOQA
             >>> options = '''
                 all_polygons:

@@ -3094,7 +3094,6 @@ class MixinCocoStats:
                             poly = kwimage.MultiPolygon.coerce(ann['segmentation'])
                             ann['area'] = float(poly.to_shapely().area)
                         except Exception:
-                            import warnings
                             warnings.warn(ub.paragraph(
                                 '''
                                 Unable to coerce segmentation to a polygon.

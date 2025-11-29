@@ -57,3 +57,5 @@ psutil>=5.7.3     ; python_version < '3.10' and python_version >= '3.9'     # Py
 psutil>=5.6.3     ; python_version < '3.9'  and python_version >= '3.8'     # Python 3.8
 
 rich>=12.3.0
+
+kwutil>=0.3.5

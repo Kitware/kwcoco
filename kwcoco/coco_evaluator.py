@@ -154,9 +154,10 @@ class CocoEvalConfig(scfg.DataConfig):
             '''
             number of workers to load cached detections
             '''), tags=['perf_param'])
-    classes_of_interest = scfg.Value(None, type=list, help=ub.paragraph(
+    classes_of_interest = scfg.Value(None, type=str, help=ub.paragraph(
             '''
-            if specified only these classes are given weight
+            if specified only these classes are given weight. Input should be a
+            YAML coercable list[str].
             '''), tags=['algo_param'])
     use_image_names = scfg.Value(False, help=ub.paragraph(
             '''
@@ -251,7 +252,7 @@ class CocoEvaluator:
         # * ensure there is more than one category.
         coco_eval.log('init truth dset')
 
-        # FIXME: What is the image names line up correctly, but the image ids
+        # FIXME: What if the image names line up correctly, but the image ids
         # do not? This will be common if an external detector is used.
         load_workers = coco_eval.config['load_workers']
         gid_to_true, true_extra = CocoEvaluator._coerce_dets(
@@ -261,28 +262,31 @@ class CocoEvaluator:
         gid_to_pred, pred_extra = CocoEvaluator._coerce_dets(
             coco_eval.config['pred_dataset'], workers=load_workers)
 
+        true_coco = true_extra['coco_dset']
+        pred_coco = pred_extra['coco_dset']
         if coco_eval.config['use_image_names']:
+            key_fallback = 'file_name'
+        else:
+            key_fallback = 'id'
+        from kwcoco.metrics.helpers import associate_images
+        matches  = associate_images(
+            true_coco, pred_coco, key_fallback=key_fallback,
+            valid_image_ids=None)
+
+        # TODO: This is the pairwise mapping of true / predicted image-ids that
+        # should be used in the scoring code.
+        true_image_ids = matches['image']['match_gids1']
+        pred_image_ids = matches['image']['match_gids2']
+
+        if true_image_ids != pred_image_ids:
             # TODO: currently this is a hacky implementation that modifies the
-            # pred dset, we should not do that, just store a gid mapping.
-
-            # TODO: we will port the watch associate-images functionality soon,
-            # which should supersede this.
-            pred_to_true_gid = {}
-            true_coco = true_extra['coco_dset']
-            pred_coco = pred_extra['coco_dset']
-            for gid, true_img in true_coco.imgs.items():
-                fname = true_img['file_name']
-                if fname not in pred_coco.index.file_name_to_img:
-                    continue
-                pred_img = pred_coco.index.file_name_to_img[fname]
-                pred_to_true_gid[pred_img['id']] = true_img['id']
-
-            if not pred_to_true_gid:
-                raise Exception('FAILED TO MAP IMAGE NAMES')
-
+            # pred dset, we should not do that, just store an image-id mapping.
+            pred_to_true_gid = dict(zip(pred_image_ids, true_image_ids))
             unused_pred_gids = set(pred_coco.imgs.keys()) - set(pred_to_true_gid.keys())
             pred_coco.remove_images(unused_pred_gids)
 
+            # Remap the predicted image-ids to agree with the truth
+            # (Again, we want to refactor so we dont need to do this)
             new_gid_to_pred = {}
             for pred_img in pred_coco.imgs.values():
                 old_gid = pred_img['id']
@@ -295,21 +299,17 @@ class CocoEvaluator:
 
             gid_to_pred = new_gid_to_pred
             pred_coco._build_index()
+            # These should now be the same.
+            pred_image_ids = true_image_ids
 
-        pred_gids = sorted(gid_to_pred.keys())
-        true_gids = sorted(gid_to_true.keys())
-        gids = list(set(pred_gids) & set(true_gids))
+        gids = true_image_ids
 
+        # Check for class definitions in true and predicted files.
         true_classes = ub.peek(gid_to_true.values()).classes
         pred_classes = ub.peek(gid_to_pred.values()).classes
 
-        if 0:
-            import xdev
-            xdev.set_overlaps(set(true_gids), set(pred_gids), 'true', 'pred')
-
         classes, unified_cid_maps = CocoEvaluator._rectify_classes(
             true_classes, pred_classes)
-
         true_to_unified_cid = unified_cid_maps['true']
         pred_to_unified_cid = unified_cid_maps['pred']
 
@@ -329,8 +329,8 @@ class CocoEvaluator:
         ) or True
 
         # Move truth to the unified class indices
-        for gid in ub.ProgIter(gids, desc='Rectify truth class idxs'):
-            det = gid_to_true[gid]
+        for true_gid in ub.ProgIter(true_image_ids, desc='Rectify truth class idxs'):
+            det = gid_to_true[true_gid]
             new_classes = classes
             old_classes = det.meta['classes']
             old_cidxs = det.data['class_idxs']
@@ -341,8 +341,8 @@ class CocoEvaluator:
             det.data['class_idxs'] = new_cidxs
 
         # Move predictions to the unified class indices
-        for gid in ub.ProgIter(gids, desc='Rectify pred class idxs'):
-            det = gid_to_pred[gid]
+        for pred_gid in ub.ProgIter(pred_image_ids, desc='Rectify pred class idxs'):
+            det = gid_to_pred[pred_gid]
             new_classes = classes
             old_classes = det.meta['classes']
             old_cidxs = det.data['class_idxs']
@@ -360,7 +360,10 @@ class CocoEvaluator:
                     new_probs[:, pred_new_idxs] = old_probs[:, pred_old_idxs]
                 det.data['probs'] = new_probs
 
-        coco_eval.gids = gids
+        coco_eval.gids = gids  # This will be removed in the future.
+        coco_eval.true_image_ids = true_image_ids
+        coco_eval.pred_image_ids = pred_image_ids
+
         coco_eval.classes = classes
         coco_eval.gid_to_true = gid_to_true
         coco_eval.gid_to_pred = gid_to_pred
@@ -486,6 +489,14 @@ class CocoEvaluator:
             for gid in ub.ProgIter(gids, desc='convert coco to dets'):
                 aids = list(coco_dset.index.gid_to_aids[gid])
                 anns = [coco_dset.anns[aid] for aid in aids]
+
+                # Filter to annotations that have bounding boxes.
+                # (i.e. ignore caption annotations)
+                flags = [ann.get('bbox', None) is not None for ann in anns]
+
+                aids = [_ for _, flag in zip(aids, flags) if flag]
+                anns = [_ for _, flag in zip(anns, flags) if flag]
+
                 cids = [a['category_id'] for a in anns]
                 # remap truth cids to be consistent with "classes"
                 # cids = [cid_true_to_pred.get(cid, cid) for cid in cids]
@@ -591,12 +602,17 @@ class CocoEvaluator:
                 pred_names += cnames
             ub.dict_hist(pred_names)
 
+        # TODO: we need to update DetectionMetrics so the alignment of images
+        # is more explicit.
         dmet = DetectionMetrics(classes=classes)
-        for gid in ub.ProgIter(coco_eval.gids):
-            pred_dets = gid_to_pred[gid]
-            true_dets = gid_to_true[gid]
-            dmet.add_predictions(pred_dets, gid=gid)
-            dmet.add_truth(true_dets, gid=gid)
+        for true_gid, pred_gid in ub.ProgIter(zip(coco_eval.true_image_ids,
+                                                  coco_eval.pred_image_ids),
+                                              total=len(coco_eval.true_image_ids)):
+            pred_dets = gid_to_pred[pred_gid]
+            true_dets = gid_to_true[true_gid]
+            # Note: these require common identifiers.
+            dmet.add_predictions(pred_dets, gid=pred_gid)
+            dmet.add_truth(true_dets, gid=true_gid)
 
         if 0:
             voc_info = dmet.score_voc(ignore_classes='ignore')
@@ -631,7 +647,12 @@ class CocoEvaluator:
         # Ignore any categories with too few tests instances
         classes = coco_eval.classes
         negative_classes = coco_eval.config['implicit_negative_classes']
-        classes_of_interest = coco_eval.config['classes_of_interest']
+
+        import kwutil
+        classes_of_interest = kwutil.Yaml.coerce(coco_eval.config['classes_of_interest'])
+        print(f'classes_of_interest={classes_of_interest}')
+
+        # classes_of_interest = coco_eval.config['classes_of_interest']
         ignore_classes = set(coco_eval.config['implicit_ignore_classes'])
         if coco_eval.config['ignore_classes']:
             ignore_classes.update(coco_eval.config['ignore_classes'])
