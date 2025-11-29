@@ -92,7 +92,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             >>> assert len(new_dset.cats) == 0
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:yaml)
+            >>> # xdoctest: +REQUIRES(module:pint)
             >>> from kwcoco.cli.coco_modify_categories import *  # NOQA
             >>> import kwcoco
             >>> import ubelt as ub

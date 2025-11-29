@@ -31,7 +31,7 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
             xdoctest -m kwcoco.cli.coco_move_assets CocoMoveAssetsCLI.main
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:yaml)
+            >>> # xdoctest: +REQUIRES(module:pint)
             >>> from kwcoco.cli.coco_move_assets import *  # NOQA
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
@@ -47,7 +47,7 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
 
         Example:
             >>> # xdoctest: +SKIP
-            >>> # xdoctest: +REQUIRES(module:yaml)
+            >>> # xdoctest: +REQUIRES(module:pint)
             >>> # development use-case. TODO: turn into a real doctest
             >>> cmdline = 0
             >>> kwargs = dict(
