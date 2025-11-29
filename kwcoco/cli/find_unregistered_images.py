@@ -4,8 +4,12 @@
 TODO:
     - [ ] Should this be renamed to find_unregsitered_assets?
 
+CommandLine:
+    xdoctest -m kwcoco.cli.find_unregistered_images
+
 Example:
-    >>> # xdoctest: +REQUIRES(module:kwutil)
+    >>> # xdoctest: +REQUIRES(module:kwplot)
+    >>> # Hack the requires directives does not work on ruamel.yaml
     >>> import ubelt as ub
     >>> import kwcoco
     >>> dpath = ub.Path.appdir('kwcoco/tests/cli/find_unregistered_images')

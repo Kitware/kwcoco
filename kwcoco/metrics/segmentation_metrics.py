@@ -1218,6 +1218,7 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
 
     Example:
         >>> # xdoctest: +REQUIRES(module:kwutil)
+        >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> from kwcoco.demo.perterb import perterb_coco
         >>> import kwcoco
@@ -1253,6 +1254,7 @@ def evaluate_segmentations(true_coco, pred_coco, eval_dpath=None,
     Example:
         >>> # xdoctest: +REQUIRES(env:SLOW_DOCTEST)
         >>> # xdoctest: +REQUIRES(module:kwutil)
+        >>> # xdoctest: +REQUIRES(module:kwplot)
         >>> from kwcoco.metrics.segmentation_metrics import *  # NOQA
         >>> from kwcoco.coco_evaluator import CocoEvaluator
         >>> from kwcoco.demo.perterb import perterb_coco
