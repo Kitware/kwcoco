@@ -46,7 +46,8 @@ class CocoModifyCatsCLI(scfg.DataConfig):
     rename = scfg.Value(None, type=str, help=ub.paragraph(
         '''
         category mapping as a YAML dictionary. The old format format:
-        "old1:new1,old2:new2" is still accepted.
+        "old1:new1,old2:new2" is still accepted, but may be removed in the
+        future.
         '''))
 
     start_id = scfg.Value(None, type=int, help=ub.paragraph(
