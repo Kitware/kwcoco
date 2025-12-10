@@ -57,7 +57,7 @@ class CocoStatsCLI(scfg.DataConfig):
             >>> cls.main(cmdline, **kw)
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:pyyaml)
             >>> from kwcoco.cli.coco_stats import *  # NOQA
             >>> kw = {
             >>>     'src': ['special:shapes8', 'special:vidshapes8', 'special:vidshapes2'],
@@ -294,7 +294,7 @@ class CocoStatsCLI(scfg.DataConfig):
                 print(json.dumps(stat_lists, indent=' '))
             elif config.format == 'yaml':
                 import kwutil
-                print(kwutil.Yaml.dumps(stat_lists))
+                print(kwutil.Yaml.dumps(stat_lists, backend='pyyaml'))
             elif config.format == 'urepr':
                 print(ub.urepr(stat_lists, nl=-1))
             else:
