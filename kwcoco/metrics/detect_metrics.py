@@ -6,7 +6,7 @@ import numpy as np
 import ubelt as ub
 import networkx as nx
 from kwcoco.metrics.confusion_vectors import ConfusionVectors
-from kwcoco.metrics.assignment import _assign_confusion_vectors
+from kwcoco.metrics.assignment import _assign_confusion_vectors, ASSIGN_COLUMNS
 # from .assignment import _assign_confusion_vectors
 
 
@@ -473,6 +473,12 @@ class DetectionMetrics(ub.NiceRepr):
                     _data[k] = np.asarray(v)
 
             # Avoid pandas when possible
+            if len(_data) == 0:
+                # Handle empty input case - note: dtypes here are not correct
+                # but it works well enough.
+                _data = {
+                    k: np.empty((0,)) for k in ['gid'] + ASSIGN_COLUMNS
+                }
             cfsn_data = kwarray.DataFrameArray(_data)
 
             if 0:
