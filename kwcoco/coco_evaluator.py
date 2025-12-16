@@ -269,9 +269,9 @@ class CocoEvaluator:
         else:
             key_fallback = 'id'
         from kwcoco.metrics.helpers import associate_images
-        matches  = associate_images(
+        matches = associate_images(
             true_coco, pred_coco, key_fallback=key_fallback,
-            valid_image_ids=None)
+            valid_image_ids=None, group_videos=False)
 
         # TODO: This is the pairwise mapping of true / predicted image-ids that
         # should be used in the scoring code.
@@ -719,6 +719,7 @@ class CocoEvaluator:
                 ap_method=coco_eval.config['ap_method'],
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
+
             weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
             for minmax_key, minmax, new_weights in weight_gen:
                 cfsn_vecs.data['weight'] = new_weights

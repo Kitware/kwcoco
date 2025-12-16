@@ -1,7 +1,8 @@
 import ubelt as ub
 
 
-def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
+def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
+                     group_videos=False):
     """
     Builds an association between image-ids in two datasets.
 
@@ -22,9 +23,47 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
             the truth image ids are not in this set. We may remove this option
             in the future.
 
-    TODO:
-        - [x] port to kwcoco proper
-        - [x] use in kwcoco evaluate_detections as a robust image/video association method
+        group_videos (bool):
+            If ``True``, return matches grouped by video under the ``"video"``
+            key. If ``False``, all matched images (including those from videos)
+            are flattened into the ``"image"`` entry and the ``"video"`` key is
+            omitted.
+
+    Returns:
+        dict[str, dict]:
+            A dictionary describing associations between the two datasets.
+
+            If ``group_videos=True``, the dictionary has the following keys:
+
+            * ``"image"`` (dict):
+                Matches for images not belonging to any matched video, with:
+
+                * ``match_gids1`` (List[int]):
+                    Image ids from ``dset1``.
+
+                * ``match_gids2`` (List[int]):
+                    Corresponding image ids from ``dset2``.
+
+            * ``"video"`` (List[dict]):
+                Per-video match dictionaries, one for each video name common to
+                both datasets. Each dictionary contains:
+
+                * ``vidname`` (str):
+                    The shared video name.
+
+                * ``match_gids1`` (List[int]):
+                    Image ids from ``dset1`` belonging to this video.
+
+                * ``match_gids2`` (List[int]):
+                    Corresponding image ids from ``dset2``.
+
+            If ``group_videos=False``, the return value only contains the
+            ``"image"`` key, and all matched image ids (including those from
+            videos) are flattened into its ``match_gids1`` / ``match_gids2``
+            lists.
+
+            In all cases, ``match_gids1`` and ``match_gids2`` are aligned such
+            that indices correspond to the same logical image.
 
     Example:
         >>> import kwcoco
@@ -132,7 +171,7 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
         # Filter invalid images
         for item in video_matches + [image_matches]:
             gids1 = item['match_gids1']
-            gids2 = item['match_gids1']
+            gids2 = item['match_gids2']
             new_gids1 = []
             new_gids2 = []
             for gid1, gid2 in zip(gids1, gids2):
@@ -141,4 +180,13 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
                     new_gids2.append(gid2)
             item['match_gids1'] = new_gids1
             item['match_gids2'] = new_gids2
+
+    if not group_videos:
+        # The consumer does not care about videos, so we move all matches into
+        # the images item
+        del matches['video']
+        for item in video_matches:
+            remain_gids1.extend(item['match_gids1'])
+            remain_gids2.extend(item['match_gids2'])
+
     return matches

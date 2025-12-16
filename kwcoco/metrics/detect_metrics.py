@@ -484,7 +484,10 @@ class DetectionMetrics(ub.NiceRepr):
 
             if _tracking_probs:
                 prob_accum = iou_to_probaccum[t]
-                y_prob = np.vstack(prob_accum)
+                try:
+                    y_prob = np.vstack(prob_accum)
+                except ValueError:
+                    y_prob = None
             else:
                 y_prob = None
             cfsn_vecs = ConfusionVectors(cfsn_data, classes=classes,
