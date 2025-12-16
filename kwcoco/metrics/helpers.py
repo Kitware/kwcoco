@@ -65,6 +65,14 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
             In all cases, ``match_gids1`` and ``match_gids2`` are aligned such
             that indices correspond to the same logical image.
 
+    TODO:
+        - [ ] It may be best to turn this into a class ImageAssignment that
+              can be configured to handle the assignment based on the use-case.
+              Perhaps we should always use file names, or names, or ids, or
+              maybe sometimes we should only associate if the video name and
+              image name is the same. This function is trying to be one size
+              fits all and that might not be possible.
+
     Example:
         >>> import kwcoco
         >>> from kwcoco.demo.perterb import perterb_coco
