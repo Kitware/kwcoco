@@ -2,7 +2,7 @@ import ubelt as ub
 
 
 def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
-                     group_videos=False):
+                     flatten_video_structure=False):
     """
     Builds an association between image-ids in two datasets.
 
@@ -20,20 +20,20 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
             This can either be "file_name" or "id" or None.
 
         valid_image_ids (set | None): if given, filter out matches where
-            the truth image ids are not in this set. We may remove this option
-            in the future.
+            the truth image ids (dset1) are not in this set. We may remove this
+            option in the future.
 
-        group_videos (bool):
-            If ``True``, return matches grouped by video under the ``"video"``
-            key. If ``False``, all matched images (including those from videos)
+        flatten_video_structure (bool):
+            If ``False``, return matches grouped by video under the ``"video"``
+            key. If ``True``, all matched images (including those from videos)
             are flattened into the ``"image"`` entry and the ``"video"`` key is
-            omitted.
+            omitted. Default is False.
 
     Returns:
         dict[str, dict]:
             A dictionary describing associations between the two datasets.
 
-            If ``group_videos=True``, the dictionary has the following keys:
+            If ``flatten_video_structure=False``, the dictionary has the following keys:
 
             * ``"image"`` (dict):
                 Matches for images not belonging to any matched video, with:
@@ -57,7 +57,7 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
                 * ``match_gids2`` (List[int]):
                     Corresponding image ids from ``dset2``.
 
-            If ``group_videos=False``, the return value only contains the
+            If ``flatten_video_structure=True``, the return value only contains the
             ``"image"`` key, and all matched image ids (including those from
             videos) are flattened into its ``match_gids1`` / ``match_gids2``
             lists.
@@ -181,10 +181,12 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
             item['match_gids1'] = new_gids1
             item['match_gids2'] = new_gids2
 
-    if not group_videos:
+    if flatten_video_structure:
         # The consumer does not care about videos, so we move all matches into
         # the images item
         del matches['video']
+        remain_gids1 = image_matches['match_gids1']
+        remain_gids2 = image_matches['match_gids2']
         for item in video_matches:
             remain_gids1.extend(item['match_gids1'])
             remain_gids2.extend(item['match_gids2'])

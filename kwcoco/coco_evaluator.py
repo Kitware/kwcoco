@@ -271,7 +271,7 @@ class CocoEvaluator:
         from kwcoco.metrics.helpers import associate_images
         matches = associate_images(
             true_coco, pred_coco, key_fallback=key_fallback,
-            valid_image_ids=None, group_videos=False)
+            valid_image_ids=None, flatten_video_structure=True)
 
         # TODO: This is the pairwise mapping of true / predicted image-ids that
         # should be used in the scoring code.
