@@ -98,6 +98,7 @@ def test_with_multiple_images_and_some_have_no_truth():
     from kwcoco.metrics.detect_metrics import DetectionMetrics
     import kwimage
     import kwarray
+    import kwarray.distributions
 
     rng = kwarray.ensure_rng(4329012312)
 
@@ -214,3 +215,32 @@ def test_confusion_vectors_compat():
     print(cfsn_vecs.data.pandas())
     measures = cfsn_vecs.binarize_classless().measures()
     assert measures['ap'] < 0.2
+
+
+def test_auc_all_tp_no_fp_regression():
+    """
+    Repro: if fp_count is identically zero, then trunc_fpr is identically zero.
+    sklearn.metrics.auc integrates over x=trunc_fpr, so the area becomes 0.0
+    even if trunc_tpr rises to 1. But we have a fallback metric to Youden's J
+    """
+    import numpy as np
+    import pytest  # NOQA
+
+    from kwcoco.metrics.confusion_measures import Measures
+
+    # 3 positives, explicitly 0 negatives
+    info = {
+        "thresholds": np.array([0.9, 0.7, 0.5, -np.inf]),
+        "tp_count":   np.array([0,   1,   2,   3]),
+        "fp_count":   np.array([0,   0,   0,   0]),
+        "fn_count":   np.array([3,   2,   1,   0]),
+        "tn_count":   np.array([0,   0,   0,   0]),
+        "realpos_total": 3,
+        "realneg_total": 0,
+    }
+
+    m = Measures(info).reconstruct()
+    print(f'm={m}')
+
+    assert m["trunc_auc"] == 1.0
+    assert m["auc"] == 1.0
