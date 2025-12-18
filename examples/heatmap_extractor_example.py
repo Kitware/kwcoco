@@ -1,52 +1,154 @@
-"""Example: attach simple threshold heatmaps as kwcoco assets.
+r"""
+Example: attach simple heatmaps as kwcoco assets.
 
-This script demonstrates how to:
+This is an *illustrative* script that shows how to:
     1. Load a kwcoco dataset (defaults to the ``vidshapes8`` demo).
-    2. Build a trivial threshold-based heatmap for each image.
-    3. Save the heatmaps to disk using :func:`kwimage.imwrite`.
-    4. Register the saved files as new auxiliary assets with optional
-       quantization metadata.
+    2. Compute a toy heatmap per image via :func:`_predict_image_heatmap`.
+    3. Write heatmaps to disk (float32 -> tif, uint8 -> png).
+    4. Register the written files as kwcoco assets, optionally with quantization
+       metadata so downstream pipelines can re-expand to float.
 
-Run with ``python -m examples.heatmap_extractor_example --help`` for CLI
-options. The CLI is implemented with :mod:`scriptconfig` to match the
-project's other tools.
+Assuing you are in the repo root, running the example:
+
+.. code:: bash
+
+    python ./examples/heatmap_extractor_example.py \
+        --coco_fpath=special:vidshapes8 \
+        --dst_coco_fpath=$HOME/.cache/kwcoco/heatmap_example/out.kwcoco.json \
+        --asset_dpath=$HOME/.cache/kwcoco/heatmap_example/assets/heatmaps \
+        --heatmap_channel=salient \
+        --sigma=7 \
+        --thresh=0.3 \
+        --quantize=1
+
+And visualize the results:
+
+.. code:: bash
+
+    kwcoco show $HOME/.cache/kwcoco/heatmap_example/out.kwcoco.json --channels=salient
+
 """
-
 from __future__ import annotations
-
 import numpy as np
 import scriptconfig as scfg
 import ubelt as ub
+import kwarray
 import kwcoco
 import kwimage
 
 
-def simple_threshold_heatmap(image: np.ndarray, *, threshold: float = 0.5) -> np.ndarray:
-    """Return a float heatmap indicating values above ``threshold``.
-
-    Parameters:
-        image:
-            Array in the range ``[0, 255]`` or ``[0, 1]``. If multi-channel,
-            a grayscale conversion is performed first.
-        threshold:
-            Value in the ``[0, 1]`` range used to select high-valued pixels.
+class HeatmapExtractorConfig(scfg.DataConfig):
     """
-    image = kwimage.ensure_float01(image)
-    if image.ndim == 2:
-        gray = image
-    elif image.ndim == 3 and image.shape[2] != 1:
-        # Use a simple luminance-weighted grayscale conversion to avoid
-        # optional dependencies.
-        weights = np.array([0.299, 0.587, 0.114], dtype=np.float32)
-        gray = (image[..., 0:3] * weights).sum(axis=2)
-    else:
-        gray = image[..., 0]
-    heatmap = (gray > threshold).astype(np.float32)
-    return heatmap
+    CLI options for the illustrative heatmap extractor.
+
+    Example:
+        >>> import sys, ubelt
+        >>> sys.path.append(ubelt.expandpath('~/code/kwcoco/examples'))
+        >>> from heatmap_extractor_example import *  # NOQA
+        >>> import kwcoco
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+        >>> dpath = ub.Path.appdir('kwcoco/examples/heatmap_extractor').ensuredir()
+        >>> kwargs = {
+        ...     'coco_fpath': dset.fpath,
+        ...     'dst_coco_fpath': dpath / 'out.kwcoco.json',
+        ...     'asset_dpath': dpath / 'assets/heatmaps',
+        ...     'heatmap_channel': 'salient',
+        ...     'sigma': 7.0,
+        ...     'thresh': 0.3,
+        ...     'quantize': True,
+        ... }
+        >>> HeatmapExtractorConfig.main(argv=False, **kwargs)
+        >>> assert (dpath / 'out.kwcoco.json').exists()
+    """
+    coco_fpath = scfg.Value('special:vidshapes8', position=1,
+                            help='Input kwcoco dataset path or special name')
+    dst_coco_fpath = scfg.Value("heatmap.kwcoco.json", help="Output kwcoco file")
+    asset_dpath = scfg.Value("assets/heatmaps",
+                             help="Where to store written heatmaps (ideally next to dst_coco_fpath)")
+    heatmap_channel = scfg.Value("salient", help="Name of the output heatmap channel")
+    sigma = scfg.Value(7.0, help="Gaussian blur applied to whiteness response")
+    thresh = scfg.Value(0.3, help="Threshold floor for minimum heatmap value")
+    quantize = scfg.Value(True, isflag=True, help="Quantize (uint8/png) instead of float32/tif")
+
+    @classmethod
+    def main(cls, argv=True, **kwargs):
+        config = cls.cli(argv=argv, data=kwargs, strict=True, verbose="auto")
+
+        # --- inlined "run_heatmap_extractor" logic ---
+        src_coco = kwcoco.CocoDataset.coerce(config.coco_fpath)
+
+        pred_coco = src_coco.copy()
+        pred_coco.reroot(absolute=True)
+        pred_coco.fpath = str(config.dst_coco_fpath)
+
+        dst_parent = ub.Path(config.dst_coco_fpath).parent
+        pred_coco.bundle_dpath = str(dst_parent)
+
+        asset_dpath = ub.Path(config.asset_dpath).ensuredir()
+
+        for image_id in ub.ProgIter(list(pred_coco.imgs.keys()), desc="write heatmaps"):
+            coco_img = pred_coco.coco_image(image_id)
+
+            heatmap = _predict_image_heatmap(
+                coco_img,
+                sigma=float(config.sigma),
+                thresh=float(config.thresh),
+            )
+
+            img_name = coco_img.img.get("name", f"image-{image_id}")
+            stem = ub.Path(img_name).stem
+
+            if bool(config.quantize):
+                # uint8 -> png (+ quantization metadata)
+                write_data, quantization = quantize_heatmap(
+                    heatmap, old_min=0.0, old_max=1.0, dtype=np.uint8)
+                heatmap_fname = f"{stem}_{config.heatmap_channel}.png"
+                write_kwargs = {}
+            else:
+                # float32 -> tif (no quantization metadata)
+                write_data, quantization = heatmap.astype(np.float32, copy=False), None
+                heatmap_fname = f"{stem}_{config.heatmap_channel}.tif"
+                write_kwargs = {}
+
+            heatmap_fpath = asset_dpath / heatmap_fname
+            kwimage.imwrite(heatmap_fpath, write_data, **write_kwargs)
+
+            # Prefer relative paths if asset is inside the dst bundle
+            try:
+                rel_path = ub.Path(heatmap_fpath).relative_to(dst_parent)
+            except Exception:
+                rel_path = ub.Path(heatmap_fpath)
+
+            coco_img.add_asset(
+                file_name=str(rel_path),
+                channels=config.heatmap_channel,
+                width=heatmap.shape[1],
+                height=heatmap.shape[0],
+                quantization=quantization,
+                warp_aux_to_img=kwimage.Affine.eye(),
+            )
+
+        pred_coco.dump(config.dst_coco_fpath, newlines=True)
+        print(f"Wrote {config.dst_coco_fpath}")
+        return pred_coco
 
 
 def quantize_heatmap(data: np.ndarray, *, old_min=0.0, old_max=1.0, dtype=np.uint8):
-    """Quantize a float heatmap into an integer array with metadata."""
+    """
+    Quantize a float heatmap into an integer array with kwcoco-friendly metadata.
+
+    Example:
+        >>> import sys, ubelt
+        >>> sys.path.append(ubelt.expandpath('~/code/kwcoco/examples'))
+        >>> from heatmap_extractor_example import *  # NOQA
+        >>> data = np.linspace(0, 1, 11, dtype=np.float32)[None, :]
+        >>> q, meta = quantize_heatmap(data, old_min=0.0, old_max=1.0)
+        >>> assert q.dtype == np.uint8
+        >>> assert meta['orig_min'] == 0.0
+        >>> assert meta['orig_max'] == 1.0
+        >>> assert meta['quant_min'] == 0
+        >>> assert meta['quant_max'] == 255
+    """
     quant_min = np.iinfo(dtype).min
     quant_max = np.iinfo(dtype).max
     scaled = (data - old_min) / (old_max - old_min)
@@ -62,127 +164,46 @@ def quantize_heatmap(data: np.ndarray, *, old_min=0.0, old_max=1.0, dtype=np.uin
     return quantized, quantization
 
 
-def ensure_bundle_dpath(coco: kwcoco.CocoDataset) -> ub.Path:
-    """Ensure the dataset has a bundle directory to write into."""
-    if coco.bundle_dpath is not None:
-        bundle_dpath = ub.Path(coco.bundle_dpath)
-    elif coco.fpath is not None:
-        bundle_dpath = ub.Path(coco.fpath).resolve().parent
-    else:
-        bundle_dpath = ub.Path.appdir('kwcoco/heatmap_example').ensuredir()
-        coco.bundle_dpath = str(bundle_dpath)
-    return bundle_dpath
-
-
-def extract_heatmaps(coco: kwcoco.CocoDataset, *, channels: str = 'red|green|blue',
-                     threshold: float = 0.5, heatmap_channel_name: str = 'heatmap',
-                     quantize: bool = True, output_subdir: str = 'heatmaps'):
-    """Compute and attach heatmaps to each image in ``coco``.
-
-    The new assets are written inside ``<bundle_dpath>/<output_subdir>``.
+def _predict_image_heatmap(coco_img, *, sigma: float, thresh: float) -> np.ndarray:
     """
-    bundle_dpath = ensure_bundle_dpath(coco)
-    output_dir = (bundle_dpath / output_subdir).ensuredir()
+    Compute a toy "white-blob" saliency heatmap for a single image.
 
-    for gid in coco.imgs.keys():
-        coco_img = coco.coco_image(gid)
-        delayed = coco_img.imdelay(channels)
-        image = delayed.finalize()
+    Example:
+        >>> import sys, ubelt
+        >>> sys.path.append(ubelt.expandpath('~/code/kwcoco/examples'))
+        >>> from heatmap_extractor_example import *  # NOQA
+        >>> from heatmap_extractor_example import _predict_image_heatmap
+        >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
+        >>> coco_img = dset.coco_image(1)
+        >>> smooth = _predict_image_heatmap(coco_img, sigma=7, thresh=0.0)
+        >>> assert smooth.ndim == 2
+        >>> assert smooth.shape[0] == coco_img.img['height']
+        >>> assert smooth.shape[1] == coco_img.img['width']
+        >>> # xdoctest: +REQUIRES(--show)
+        >>> import kwplot
+        >>> kwplot.autompl()
+        >>> rgb = coco_img.imdelay().finalize()
+        >>> kwplot.imshow(rgb, pnum=(1, 2, 1), title='RGB')
+        >>> kwplot.imshow(smooth, pnum=(1, 2, 2), title='White-blob heatmap')
+        >>> kwplot.show_if_requested()
+    """
+    img = coco_img.imdelay().finalize()
+    img = kwarray.atleast_nd(img, 3)
+    rgb01 = kwimage.ensure_float01(img)
 
-        heatmap = simple_threshold_heatmap(image, threshold=threshold)
+    hsv = kwimage.convert_colorspace(rgb01, src_space="rgb", dst_space="hsv")
+    sat = hsv[..., 1]
+    val = hsv[..., 2]
 
-        if quantize:
-            write_data, quantization = quantize_heatmap(heatmap, old_min=0.0, old_max=1.0)
-        else:
-            write_data, quantization = heatmap, None
+    whiteness = val * (1.0 - sat)
+    smooth = kwimage.gaussian_blur(whiteness, sigma=float(sigma))
 
-        name = coco_img.img.get('name', str(gid)).replace('/', '_')
-        heatmap_fpath = output_dir / f'{name}_{heatmap_channel_name}.png'
+    if thresh is not None:
+        smooth = smooth.astype(np.float32)
+        smooth[smooth < float(thresh)] = 0.0
 
-        write_kwargs = {}
-        if quantization is not None:
-            write_kwargs['metadata'] = {'quantization': quantization}
-
-        kwimage.imwrite(heatmap_fpath, write_data, space=None, **write_kwargs)
-
-        try:
-            relative_path = heatmap_fpath.relative_to(bundle_dpath)
-        except ValueError:
-            relative_path = heatmap_fpath
-
-        coco_img.add_asset(
-            file_name=str(relative_path),
-            width=heatmap.shape[1],
-            height=heatmap.shape[0],
-            channels=heatmap_channel_name,
-            warp_aux_to_img=kwimage.Affine.eye(),
-            quantization=quantization,
-        )
-
-    return coco
-
-
-class HeatmapExtractorConfig(scfg.DataConfig):
-    """ScriptConfig interface for the heatmap extractor example."""
-
-    __command__ = 'heatmap-extractor-example'
-
-    coco = scfg.Value('special:vidshapes8', position=1,
-                      help='Input kwcoco dataset path or special name (e.g. vidshapes8)')
-    channels = scfg.Value('red|green|blue', help='Channel string used for extraction')
-    threshold = scfg.Value(0.4, help='Threshold in [0, 1] for the toy heatmap')
-    heatmap_channel = scfg.Value('heatmap', help='Channel code to assign to the new asset')
-    quantize = scfg.Value(True, isflag=True, help='Quantize heatmap before writing')
-    output_subdir = scfg.Value('heatmaps', help='Where to place generated heatmaps relative to the bundle')
-
-    @classmethod
-    def main(cls, argv=True, **kwargs):
-        config = cls.cli(argv=argv, data=kwargs)
-        try:
-            coco = kwcoco.CocoDataset.coerce(config.coco)
-        except ModuleNotFoundError as ex:
-            # Some demo datasets rely on optional dependencies like ``cv2``.
-            # Fall back to a tiny synthetic dataset so the example remains
-            # runnable in minimal environments.
-            if ex.name != 'cv2':
-                raise
-            bundle_dpath = ub.Path.appdir('kwcoco/heatmap_example').ensuredir()
-            print('Falling back to a synthetic dataset because cv2 is unavailable')
-            image_dir = (bundle_dpath / 'images').ensuredir()
-            coco = kwcoco.CocoDataset()
-            coco.bundle_dpath = str(bundle_dpath)
-            for idx in range(3):
-                data = np.random.randint(0, 255, (128, 128, 3), dtype=np.uint8)
-                fpath = image_dir / f'synthetic_{idx}.png'
-                kwimage.imwrite(fpath, data)
-                coco.add_image(
-                    file_name=str(fpath.relative_to(bundle_dpath)),
-                    width=data.shape[1],
-                    height=data.shape[0],
-                    id=idx + 1,
-                    name=f'synthetic_{idx}',
-                    channels='red|green|blue',
-                )
-        extract_heatmaps(
-            coco,
-            channels=config.channels,
-            threshold=config.threshold,
-            heatmap_channel_name=config.heatmap_channel,
-            quantize=config.quantize,
-            output_subdir=config.output_subdir,
-        )
-
-        first_gid = next(iter(coco.imgs.keys()))
-        first_coco_img = coco.coco_image(first_gid)
-        assets_key = first_coco_img._assets_key()
-        print('Assets on first image:')
-        print(ub.urepr(first_coco_img.img.get(assets_key, []), nl=1, sort=True))
-
-
-def main(argv=True):
-    """Run the heatmap extraction demo via :class:`HeatmapExtractorConfig`."""
-    return HeatmapExtractorConfig.main(argv=argv)
+    return smooth.astype(np.float32, copy=False)
 
 
 if __name__ == '__main__':
-    main()
+    HeatmapExtractorConfig.main(argv=True)
