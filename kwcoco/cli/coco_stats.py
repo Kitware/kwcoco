@@ -350,7 +350,10 @@ def _coco_channel_stats(coco_dset):
     This is a streamlined version of the richer geowatch stats, focused on
     generic kwcoco datasets.
 
+    The exact return values of this function may change in the future.
+
     Example:
+        >>> # xdoctest: +REQUIRES(module:lark)
         >>> import kwcoco
         >>> from kwcoco.cli.coco_stats import _coco_channel_stats
         >>> dset = kwcoco.CocoDataset()
@@ -365,16 +368,16 @@ def _coco_channel_stats(coco_dset):
         >>> assert info['sensor_hist'] == {'S1': 1, 'S2': 1}
         >>> assert info['chan_hist']['blue,red,green,unknown-chan'] == 1
         >>> assert info['chan_hist']['nir,red,green,unknown-chan'] == 1
-        >>> assert info['common_channels'] == '<FusedChannelSpec(red|green|unknown-chan)>'
-        >>> assert info['all_channels'] == '<FusedChannelSpec(blue|red|green|unknown-chan|nir)>'
     """
-    import kwcoco
     from kwcoco.coco_image import CocoImage
+    from delayed_image.channel_spec import ChannelSpec
+    # Some ideas are commented out, because we may reintroduce them in the future
+    # from delayed_image.channel_spec import FusedChannelSpec
+    # from delayed_image.sensorchan_spec import SensorChanSpec
 
     sensor_hist = ub.ddict(int)
     chan_hist = ub.ddict(int)
     single_chan_hist = ub.ddict(int)
-    sensorchan_hist = ub.ddict(lambda: ub.ddict(int))
     sensorchan_hist2 = ub.ddict(int)
     for _gid, img in coco_dset.index.imgs.items():
         coco_img: CocoImage = coco_dset.coco_image(_gid)
@@ -386,37 +389,35 @@ def _coco_channel_stats(coco_dset):
         sensor = img.get('sensor_coarse', '*')
         chan_hist[chan] += 1
         sensor_hist[sensor] += 1
-        sensorchan_hist[sensor][chan] += 1
         sensorchan = f'{sensor}:({chan})'
         sensorchan_hist2[sensorchan] += 1
 
-        for single_chan in kwcoco.ChannelSpec(chan).unique():
+        for single_chan in ChannelSpec(chan).unique():
             single_chan_hist[single_chan] += 1
 
-    CS = kwcoco.ChannelSpec
-    FS = kwcoco.FusedChannelSpec
-    osets = [CS.coerce(c).fuse().to_oset() for c in chan_hist]
-    if len(osets) == 0:
-        common_channels = FS.coerce([])
-        all_channels = FS.coerce([])
-        all_sensorchan = kwcoco.SensorChanSpec.coerce('')
-    else:
-        common_channels = FS.coerce(list(ub.oset.intersection(*osets))).concise()
-        all_channels = FS.coerce(list(ub.oset.union(*osets))).concise()
-        all_sensorchan = kwcoco.SensorChanSpec.late_fuse(*[
-            kwcoco.SensorChanSpec.coerce(s)
-            for s in sensorchan_hist2.keys()]).concise()
+    # CS = ChannelSpec
+    # FS = FusedChannelSpec
+    # osets = [CS.coerce(c).fuse().to_oset() for c in chan_hist]
+    # if len(osets) == 0:
+    #     common_channels = FS.coerce([])
+    #     all_channels = FS.coerce([])
+    #     all_sensorchan = SensorChanSpec.coerce('')
+    # else:
+    #     common_channels = FS.coerce(list(ub.oset.intersection(*osets))).concise()
+    #     all_channels = FS.coerce(list(ub.oset.union(*osets))).concise()
+    #     all_sensorchan = SensorChanSpec.late_fuse(*[
+    #         SensorChanSpec.coerce(s)
+    #         for s in sensorchan_hist2.keys()]).concise()
 
     info = {
         'single_chan_hist': {k: int(v) for k, v in single_chan_hist.items()},
         'chan_hist': {k: int(v) for k, v in chan_hist.items()},
         'sensor_hist': {k: int(v) for k, v in sensor_hist.items()},
-        'sensorchan_hist': {k: {k2: int(v2) for k2, v2 in v.items()}
-                            for k, v in sensorchan_hist.items()},
-        'sensorchan_hist2': {k: int(v) for k, v in sensorchan_hist2.items()},
-        'common_channels': str(common_channels),
-        'all_channels': str(all_channels),
-        'all_sensorchan': str(all_sensorchan),
+        'sensorchan_hist': {k: int(v) for k, v in sensorchan_hist2.items()},
+        # Note sure if we want these or not
+        # 'common_channels': str(common_channels),
+        # 'all_channels': str(all_channels),
+        # 'all_sensorchan': str(all_sensorchan),
     }
     return info
 

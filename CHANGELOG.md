@@ -15,6 +15,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 * Add `disk_usage` argument to kwcoco stats.
+* Add channels option to coco stats.
 
 ### Fixed
 * Fix detection evaluation crash when inputs are empty

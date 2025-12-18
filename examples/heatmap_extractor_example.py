@@ -21,9 +21,11 @@ Assuing you are in the repo root, running the example:
         --thresh=0.3 \
         --quantize=1
 
-And visualize the results:
+And check stats / visualize the results:
 
 .. code:: bash
+
+    kwcoco stats $HOME/.cache/kwcoco/heatmap_example/out.kwcoco.json --channels=True
 
     kwcoco show $HOME/.cache/kwcoco/heatmap_example/out.kwcoco.json --channels=salient
 
