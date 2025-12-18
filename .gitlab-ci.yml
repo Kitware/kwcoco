@@ -113,7 +113,7 @@ stages:
         item = cls(fpath)
         print(item.version)
     ")
-  - python -m uv pip install -r requirements/gdal.txt
+  - python -m pip install --prefer-binary -r requirements/gdal.txt  # manual test
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
@@ -184,7 +184,7 @@ stages:
         item = cls(fpath)
         print(item.version)
     ")
-  - python -m uv pip install -r requirements/gdal.txt
+  - python -m pip install --prefer-binary -r requirements/gdal.txt  # manual test without uv
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
@@ -256,7 +256,7 @@ stages:
         print(item.version)
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m uv pip install -r requirements/gdal-strict.txt
+  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt # manual test without uv
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
@@ -328,7 +328,7 @@ stages:
         print(item.version)
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m uv pip install -r requirements/gdal-strict.txt
+  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt  # manual test
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
