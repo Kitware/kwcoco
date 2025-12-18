@@ -31,6 +31,9 @@ class CocoStatsCLI(scfg.DataConfig):
             '''
             number of workers when reading multiple kwcoco files
             '''))
+
+    disk_usage = scfg.Value(False, isflag=True, help='measure disk usage of assets')
+
     embed = scfg.Value(False, isflag=True, help='embed into interactive shell for debugging')
     format = scfg.Value('human', help='output format. Can be "human", "json", or "yaml"')
 
@@ -54,10 +57,10 @@ class CocoStatsCLI(scfg.DataConfig):
             >>> cls.main(cmdline, **kw)
 
         Example:
-            >>> # xdoctest: +REQUIRES(module:kwutil)
+            >>> # xdoctest: +REQUIRES(module:pyyaml)
+            >>> from kwcoco.cli.coco_stats import *  # NOQA
             >>> kw = {
             >>>     'src': ['special:shapes8', 'special:vidshapes8', 'special:vidshapes2'],
-            >>>     'format': 'urepr',
             >>>     'basic': True,
             >>>     'extended': True,
             >>>     'catfreq': True,
@@ -65,10 +68,16 @@ class CocoStatsCLI(scfg.DataConfig):
             >>>     'annot_attrs': True,
             >>>     'image_attrs': True,
             >>>     'video_attrs': True,
+            >>>     'disk_usage': True,
             >>>     'boxes': True,
             >>> }
             >>> cmdline = False
             >>> cls = CocoStatsCLI
+            >>> print('-- Test YAML format --')
+            >>> kw['format'] = 'yaml'
+            >>> cls.main(cmdline, **kw)
+            >>> print('-- Test Human format --')
+            >>> kw['format'] = 'human'
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
@@ -115,6 +124,7 @@ class CocoStatsCLI(scfg.DataConfig):
             except Exception:
                 pass
 
+        # FIXME: don't clobber global options
         import pandas as pd
         pd.set_option('max_colwidth', 256)
 
@@ -244,18 +254,22 @@ class CocoStatsCLI(scfg.DataConfig):
                         print('error getting max size')
                     image_size_info['errors'] = 'error getting max size'
 
-                if 0:
-                    # POC code for getting total disk size
-                    total_bytes = 0
-                    for coco_img in images.coco_images_iter():
-                        for fpath in coco_img.iter_image_filepaths():
-                            total_bytes += fpath.stat().st_size
-                    total_gb = total_bytes / 2 ** 30
-                    if human_readable:
-                        print(f'total_gb={total_gb}')
-
                 # print('dset.tag = {!r}'.format(dset.tag))
                 # print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
+
+        if config['disk_usage']:
+            if human_readable:
+                print('Disk usage stats')
+            stat_types['disk_usage'] = {}
+            for dset in datasets:
+                if human_readable:
+                    print('dset.tag = {!r}'.format(dset.tag))
+                disk_info = _dataset_disk_usage(dset)
+                stat_types['disk_usage'][dset.tag] = disk_info
+                if human_readable:
+                    disk_size = byte_str(disk_info['total_bytes'])
+                    if human_readable:
+                        print(f'Disk Usage: {disk_size}')
 
         if not human_readable:
             import kwutil
@@ -280,7 +294,7 @@ class CocoStatsCLI(scfg.DataConfig):
                 print(json.dumps(stat_lists, indent=' '))
             elif config.format == 'yaml':
                 import kwutil
-                print(kwutil.Yaml.dumps(stat_lists))
+                print(kwutil.Yaml.dumps(stat_lists, backend='pyyaml'))
             elif config.format == 'urepr':
                 print(ub.urepr(stat_lists, nl=-1))
             else:
@@ -315,6 +329,132 @@ class CocoStatsCLI(scfg.DataConfig):
         #     if config['boxes']:
         #         print('Box stats')
         #         print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
+
+
+def _dataset_disk_usage(dset):
+    """
+    Compute disk usage of all image assets referenced by this dataset.
+
+    Returns:
+        dict:
+            {
+                'num_files': int,
+                'total_bytes': int,
+                'total_gb': float,
+                'missing_files': List[str],
+            }
+    """
+    # Collect all filepaths from images. iter_image_filepaths() typically
+    # includes primary + auxiliary assets.
+    filepaths = []
+    for coco_img in dset.images().coco_images_iter():
+        for fpath in coco_img.iter_image_filepaths():
+            if fpath is not None:
+                filepaths.append(ub.Path(fpath))
+
+    # Also measure the size of this file if it exists.
+    fpath = dset.fpath
+    if fpath is not None:
+        filepaths.append(ub.Path(fpath))
+
+    # Deduplicate paths (use resolved paths to avoid double-counting symlinks)
+    unique_paths = []
+    seen = set()
+    for p in filepaths:
+        try:
+            r = p.resolve()
+        except Exception:
+            r = p
+        if r not in seen:
+            seen.add(r)
+            unique_paths.append(r)
+
+    total_bytes = 0
+    missing = []
+
+    for p in unique_paths:
+        try:
+            total_bytes += p.stat().st_size
+        except FileNotFoundError:
+            missing.append(str(p))
+        except OSError:
+            # Permissions or other oddities – just record as missing-ish
+            missing.append(str(p))
+
+    info = {
+        'num_files': len(unique_paths),
+        'total_bytes': int(total_bytes),
+    }
+    if missing:
+        info['missing_files'] = missing
+        info['num_missing_files'] = len(missing)
+    return info
+
+
+def byte_str(num, unit='auto', precision=2):
+    """
+    Automatically chooses relevant unit (KB, MB, or GB) for displaying some
+    number of bytes.
+
+    Args:
+        num (int): number of bytes
+        unit (str): which unit to use, can be auto, B, KB, MB, GB, TB, PB, EB,
+            ZB, or YB.
+        precision (int): number of decimals of precision
+
+    References:
+        https://en.wikipedia.org/wiki/Orders_of_magnitude_(data)
+
+    Returns:
+        str: string representing the number of bytes with appropriate units
+
+    Example:
+        >>> num_list = [1, 100, 1024,  1048576, 1073741824, 1099511627776]
+        >>> result = ub.urepr(list(map(byte_str, num_list)), nl=0)
+        >>> print(result)
+        ['0.00 KB', '0.10 KB', '1.00 KB', '1.00 MB', '1.00 GB', '1.00 TB']
+    """
+    abs_num = abs(num)
+    if unit == 'auto':
+        if abs_num < 2.0 ** 10:
+            unit = 'KB'
+        elif abs_num < 2.0 ** 20:
+            unit = 'KB'
+        elif abs_num < 2.0 ** 30:
+            unit = 'MB'
+        elif abs_num < 2.0 ** 40:
+            unit = 'GB'
+        elif abs_num < 2.0 ** 50:
+            unit = 'TB'
+        elif abs_num < 2.0 ** 60:
+            unit = 'PB'
+        elif abs_num < 2.0 ** 70:
+            unit = 'EB'
+        elif abs_num < 2.0 ** 80:
+            unit = 'ZB'
+        else:
+            unit = 'YB'
+    if unit.lower().startswith('b'):
+        num_unit = num
+    elif unit.lower().startswith('k'):
+        num_unit =  num / (2.0 ** 10)
+    elif unit.lower().startswith('m'):
+        num_unit =  num / (2.0 ** 20)
+    elif unit.lower().startswith('g'):
+        num_unit = num / (2.0 ** 30)
+    elif unit.lower().startswith('t'):
+        num_unit = num / (2.0 ** 40)
+    elif unit.lower().startswith('p'):
+        num_unit = num / (2.0 ** 50)
+    elif unit.lower().startswith('e'):
+        num_unit = num / (2.0 ** 60)
+    elif unit.lower().startswith('z'):
+        num_unit = num / (2.0 ** 70)
+    elif unit.lower().startswith('y'):
+        num_unit = num / (2.0 ** 80)
+    else:
+        raise ValueError('unknown num={!r} unit={!r}'.format(num, unit))
+    return ub.urepr(num_unit, precision=precision) + ' ' + unit
 
 
 __cli__ = CocoStatsCLI

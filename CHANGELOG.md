@@ -13,6 +13,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Reworked image association in detection metrics to reuse segmentation metrics code. The "name" is now used as the primary key, but fallbacks to older image id and filename methods are still supported.
 * Rework how special-cased labelme __metadata__ data is stored, use the COCO caption convention.
 
+### Added
+* Add `disk_usage` argument to kwcoco stats.
+
 ## Version 0.8.9 - Released 2025-11-25
 
 ### Added
