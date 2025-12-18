@@ -113,12 +113,12 @@ stages:
         item = cls(fpath)
         print(item.version)
     ")
-  - python -m pip install --prefer-binary -r requirements/gdal.txt  # manual test
+  - python -m pip install --prefer-binary -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -184,12 +184,12 @@ stages:
         item = cls(fpath)
         print(item.version)
     ")
-  - python -m pip install --prefer-binary -r requirements/gdal.txt  # manual test without uv
+  - python -m pip install --prefer-binary -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -256,12 +256,12 @@ stages:
         print(item.version)
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt # manual test without uv
+  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -328,12 +328,12 @@ stages:
         print(item.version)
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt  # manual test
+  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
