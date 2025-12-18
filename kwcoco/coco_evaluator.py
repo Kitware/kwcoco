@@ -224,6 +224,22 @@ class CocoEvaluator:
         >>> }
         >>> coco_eval = CocoEvaluator(config)
         >>> results = coco_eval.evaluate()
+
+    Example:
+        >>> # Test empty case.
+        >>> from kwcoco.coco_evaluator import CocoEvaluator
+        >>> from kwcoco.demo.perterb import perterb_coco
+        >>> import kwcoco
+        >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
+        >>> pred_dset = kwcoco.CocoDataset()
+        >>> for cat in true_dset.categories().objs:
+        >>>     pred_dset.ensure_category(cat['name'])
+        >>> config = {
+        >>>     'true_dataset': true_dset,
+        >>>     'pred_dataset': pred_dset,
+        >>> }
+        >>> coco_eval = CocoEvaluator(config)
+        >>> results = coco_eval.evaluate()
     """
 
     def __init__(coco_eval, config):
@@ -269,9 +285,10 @@ class CocoEvaluator:
         else:
             key_fallback = 'id'
         from kwcoco.metrics.helpers import associate_images
-        matches  = associate_images(
+        import kwcoco
+        matches = associate_images(
             true_coco, pred_coco, key_fallback=key_fallback,
-            valid_image_ids=None)
+            valid_image_ids=None, flatten_video_structure=True)
 
         # TODO: This is the pairwise mapping of true / predicted image-ids that
         # should be used in the scoring code.
@@ -305,8 +322,15 @@ class CocoEvaluator:
         gids = true_image_ids
 
         # Check for class definitions in true and predicted files.
-        true_classes = ub.peek(gid_to_true.values()).classes
-        pred_classes = ub.peek(gid_to_pred.values()).classes
+        if len(gid_to_true):
+            true_classes = ub.peek(gid_to_true.values()).classes
+        else:
+            true_classes = kwcoco.CategoryTree()
+
+        if len(gid_to_pred):
+            pred_classes = ub.peek(gid_to_pred.values()).classes
+        else:
+            pred_classes = kwcoco.CategoryTree()
 
         classes, unified_cid_maps = CocoEvaluator._rectify_classes(
             true_classes, pred_classes)
@@ -719,6 +743,7 @@ class CocoEvaluator:
                 ap_method=coco_eval.config['ap_method'],
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
+
             weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
             for minmax_key, minmax, new_weights in weight_gen:
                 cfsn_vecs.data['weight'] = new_weights

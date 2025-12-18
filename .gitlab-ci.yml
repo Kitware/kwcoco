@@ -113,12 +113,12 @@ stages:
         item = cls(fpath)
         print(item.version)
     ")
-  - python -m uv pip install -r requirements/gdal.txt
+  - python -m pip install --prefer-binary -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -184,12 +184,12 @@ stages:
         item = cls(fpath)
         print(item.version)
     ")
-  - python -m uv pip install -r requirements/gdal.txt
+  - python -m pip install --prefer-binary -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -256,12 +256,12 @@ stages:
         print(item.version)
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m uv pip install -r requirements/gdal-strict.txt
+  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -328,12 +328,12 @@ stages:
         print(item.version)
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m uv pip install -r requirements/gdal-strict.txt
+  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "UV_RESOLUTION=$UV_RESOLUTION"
   - echo "MOD_VERSION=$MOD_VERSION"
-  - python -m uv pip install "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
+  - python -m pip install --prefer-binary "kwcoco[$INSTALL_EXTRAS]==$MOD_VERSION" -f dist
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -359,10 +359,10 @@ stages:
   - echo "pytest command finished, moving the coverage file to the repo root"
 build/sdist:
   <<: *build_sdist_template
-  image: python:3.14
-test/sdist/minimal-loose/cp314-linux-x86_64:
+  image: python:3.13
+test/sdist/minimal-loose/cp313-linux-x86_64:
   <<: *test_minimal-loose_template
-  image: python:3.14
+  image: python:3.13
   needs:
   - build/sdist
 build/cp38-linux-x86_64:
@@ -505,7 +505,7 @@ test/full-strict/cp313-linux-x86_64:
   - build/cp313-linux-x86_64
 lint:
   <<: *common_template
-  image: python:3.14
+  image: python:3.13
   stage: lint
   before_script:
   - df -h
@@ -516,7 +516,7 @@ lint:
   allow_failure: true
 gpgsign/wheels:
   <<: *common_template
-  image: python:3.14
+  image: python:3.13
   stage: gpgsign
   artifacts:
     paths:
@@ -582,7 +582,7 @@ gpgsign/wheels:
     artifacts: true
 deploy/wheels:
   <<: *common_template
-  image: python:3.14
+  image: python:3.13
   stage: deploy
   only:
     refs:

@@ -1,7 +1,8 @@
 import ubelt as ub
 
 
-def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
+def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
+                     flatten_video_structure=False):
     """
     Builds an association between image-ids in two datasets.
 
@@ -19,12 +20,58 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
             This can either be "file_name" or "id" or None.
 
         valid_image_ids (set | None): if given, filter out matches where
-            the truth image ids are not in this set. We may remove this option
-            in the future.
+            the truth image ids (dset1) are not in this set. We may remove this
+            option in the future.
+
+        flatten_video_structure (bool):
+            If ``False``, return matches grouped by video under the ``"video"``
+            key. If ``True``, all matched images (including those from videos)
+            are flattened into the ``"image"`` entry and the ``"video"`` key is
+            omitted. Default is False.
+
+    Returns:
+        dict[str, dict]:
+            A dictionary describing associations between the two datasets.
+
+            If ``flatten_video_structure=False``, the dictionary has the following keys:
+
+            * ``"image"`` (dict):
+                Matches for images not belonging to any matched video, with:
+
+                * ``match_gids1`` (List[int]):
+                    Image ids from ``dset1``.
+
+                * ``match_gids2`` (List[int]):
+                    Corresponding image ids from ``dset2``.
+
+            * ``"video"`` (List[dict]):
+                Per-video match dictionaries, one for each video name common to
+                both datasets. Each dictionary contains:
+
+                * ``vidname`` (str):
+                    The shared video name.
+
+                * ``match_gids1`` (List[int]):
+                    Image ids from ``dset1`` belonging to this video.
+
+                * ``match_gids2`` (List[int]):
+                    Corresponding image ids from ``dset2``.
+
+            If ``flatten_video_structure=True``, the return value only contains the
+            ``"image"`` key, and all matched image ids (including those from
+            videos) are flattened into its ``match_gids1`` / ``match_gids2``
+            lists.
+
+            In all cases, ``match_gids1`` and ``match_gids2`` are aligned such
+            that indices correspond to the same logical image.
 
     TODO:
-        - [x] port to kwcoco proper
-        - [x] use in kwcoco evaluate_detections as a robust image/video association method
+        - [ ] It may be best to turn this into a class ImageAssignment that
+              can be configured to handle the assignment based on the use-case.
+              Perhaps we should always use file names, or names, or ids, or
+              maybe sometimes we should only associate if the video name and
+              image name is the same. This function is trying to be one size
+              fits all and that might not be possible.
 
     Example:
         >>> import kwcoco
@@ -132,7 +179,7 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
         # Filter invalid images
         for item in video_matches + [image_matches]:
             gids1 = item['match_gids1']
-            gids2 = item['match_gids1']
+            gids2 = item['match_gids2']
             new_gids1 = []
             new_gids2 = []
             for gid1, gid2 in zip(gids1, gids2):
@@ -141,4 +188,15 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None):
                     new_gids2.append(gid2)
             item['match_gids1'] = new_gids1
             item['match_gids2'] = new_gids2
+
+    if flatten_video_structure:
+        # The consumer does not care about videos, so we move all matches into
+        # the images item
+        del matches['video']
+        remain_gids1 = image_matches['match_gids1']
+        remain_gids2 = image_matches['match_gids2']
+        for item in video_matches:
+            remain_gids1.extend(item['match_gids1'])
+            remain_gids2.extend(item['match_gids2'])
+
     return matches

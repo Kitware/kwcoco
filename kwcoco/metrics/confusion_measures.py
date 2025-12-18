@@ -1245,17 +1245,69 @@ def populate_info(info):
         trunc_fpr_denom = finite_trunc_fp[-1] if len(finite_trunc_fp) else 0
         if trunc_fpr_denom == 0:
             trunc_fpr_denom = 1
-        info['trunc_tpr'] = info['trunc_tp_count'] / info['realpos_total']
-        info['trunc_fpr'] = info['trunc_fp_count'] / trunc_fpr_denom
-        try:
-            info['trunc_auc'] = sklearn.metrics.auc(info['trunc_fpr'], info['trunc_tpr'])
-        except ValueError:
-            # At least 2 points are needed to compute area under curve, but x.shape = 1
-            info['trunc_auc'] = np.nan
-            if len(info['trunc_fpr']) == 1 and len(info['trunc_tpr']) == 1:
-                if info['trunc_fpr'][0] == 0 and info['trunc_tpr'][0] == 1:
-                    # Hard code AUC in the perfect detection case
-                    info['trunc_auc'] = 1.0
+
+        info['trunc_tpr'] = trunc_tpr = info['trunc_tp_count'] / info['realpos_total']
+        info['trunc_fpr'] = trunc_fpr = info['trunc_fp_count'] / trunc_fpr_denom
+
+        # Compute AUC, with a principled fallback for degenerate ROC geometry.
+        #
+        # Standard ROC-AUC integrates TPR with respect to FPR. If FPR is
+        # constant across thresholds, the ROC curve collapses to a vertical
+        # line and the geometric area is zero/undefined due to zero measure in
+        # the FPR direction.  In that degenerate case, summarize classifier
+        # "goodness" using Youden's J:
+        #
+        #   J = TPR - FPR
+        #
+        # This choice is not arbitrary:
+        #   * J is the vertical distance above the chance line and is maximized
+        #     at the optimal ROC operating point.
+        #   * J corresponds to the Bayes-optimal threshold under equal
+        #     misclassification costs and unknown (or uniform) class priors.
+        #   * J depends only on ROC geometry and is invariant to monotone score
+        #     transformations, preserving ROC semantics.
+        #   * Mathematically, AUC is a functional on 2D ROC curves; Youden's J is
+        #     the induced functional on the 1D quotient space when the FPR
+        #     dimension collapses.
+        #
+        # There are only a small number of reasonable scalar summaries in this
+        # degenerate regime. All valid choices must collapse the ROC geometry to a
+        # quantity that depends only on vertical separation from the chance line.
+        # Common alternatives are closely related to Youden's J:
+        #
+        #   * max(TPR) at fixed FPR, which differs from J only by an additive
+        #     constant.
+        #   * Balanced accuracy = (TPR + (1 - FPR)) / 2, which is an affine
+        #     transform of J.
+        #   * Cost-sensitive utilities π*TPR - (1-π)*FPR, which reduce to J
+        #     when class priors and misclassification costs are taken to be
+        #     uniform.
+        #
+        # Other ad hoc combinations are not used because they do not preserve
+        # ROC ordering, may reward trivial classifiers, and do not agree with
+        # ROC-AUC in the non-degenerate setting. Using Youden's J therefore
+        # provides the simplest and most canonical extension.
+        #
+        # References:
+        #     https://en.wikipedia.org/wiki/Youden%27s_J_statistic
+        finite_trunc_fpr = trunc_fpr[np.isfinite(trunc_fpr)]
+        is_constant_fpr = (len(finite_trunc_fpr) > 0) and np.all(finite_trunc_fpr == finite_trunc_fpr[0])
+
+        if is_constant_fpr:
+            # Degenerate ROC (vertical line): use Youden's J as a 1D collapse of ROC.
+            diff = trunc_tpr - trunc_fpr
+            info['trunc_auc'] = np.nan if np.all(np.isnan(diff)) else np.nanmax(diff)
+        else:
+            try:
+                # Typical non-degenerate case: compute standard trapezoid AUC.
+                info['trunc_auc'] = sklearn.metrics.auc(trunc_fpr, trunc_tpr)
+            except ValueError:
+                # At least 2 points are needed to compute area under curve, but x.shape = 1
+                info['trunc_auc'] = np.nan
+                if len(trunc_fpr) == 1 and len(trunc_tpr) == 1:
+                    if trunc_fpr[0] == 0 and trunc_tpr[0] == 1:
+                        # Hard code AUC in the perfect detection case
+                        info['trunc_auc'] = 1.0
 
         info['auc'] = info['trunc_auc']
         """

@@ -16,6 +16,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Added
 * Add `disk_usage` argument to kwcoco stats.
 
+### Fixed
+* Fix detection evaluation crash when inputs are empty
+* Fix degenerate case of AUC to fallback on Youden's J statistic
+
 ## Version 0.8.9 - Released 2025-11-25
 
 ### Added

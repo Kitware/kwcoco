@@ -29,6 +29,11 @@ import ubelt as ub
 USE_NEG_INF = True
 
 
+# Indicate what columns we return to keep the single source of truth for these
+# names in this file. We may want to change the names at a later point.
+ASSIGN_COLUMNS = ['pred', 'true', 'score', 'weight', 'iou', 'txs', 'pxs']
+
+
 def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
                               iou_thresh=0.5, bg_cidx=-1, bias=0.0, classes=None,
                               compat='all', prioritize='iou',
