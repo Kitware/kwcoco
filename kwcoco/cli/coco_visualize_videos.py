@@ -26,6 +26,84 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         >>> }
         >>> CocoVisualizeVideosCLI.main(cmdline=False, **kw)
         >>> assert len(list(dpath.glob('**/*.jpg'))) > 0
+
+    Example:
+        >>> # Minimal example without annotations (no cv2 required)
+        >>> # xdoctest: +REQUIRES(module:kwimage)
+        >>> from kwcoco.cli.coco_visualize_videos import *  # NOQA
+        >>> import kwcoco
+        >>> import kwimage
+        >>> import numpy as np
+        >>> import ubelt as ub
+        >>> dpath = ub.Path.appdir('kwcoco/tests/visualize_videos_noanns').delete().ensuredir()
+        >>> dset = kwcoco.CocoDataset()
+        >>> vidid = dset.add_video(name='video1', width=64, height=64)
+        >>> for frame in range(2):
+        >>>     canvas = np.zeros((64, 64, 3), dtype=np.uint8)
+        >>>     canvas[..., 2] = 255
+        >>>     fpath = dpath / f'frame_{frame}.png'
+        >>>     kwimage.imwrite(fpath, canvas)
+        >>>     dset.add_image(
+        >>>         file_name=str(fpath),
+        >>>         width=64,
+        >>>         height=64,
+        >>>         video_id=vidid,
+        >>>         frame_index=frame,
+        >>>     )
+        >>> dset.fpath = dpath / 'data.kwcoco.json'
+        >>> dset.dump(dset.fpath)
+        >>> kw = {
+        >>>     'src': dset.fpath,
+        >>>     'viz_dpath': dpath / 'viz',
+        >>>     'workers': 0,
+        >>>     'draw_anns': False,
+        >>>     'draw_header': False,
+        >>>     'draw_chancode': False,
+        >>> }
+        >>> CocoVisualizeVideosCLI.main(cmdline=False, **kw)
+        >>> assert len(list((dpath / 'viz').glob('**/*.jpg'))) > 0
+
+    Example:
+        >>> # Example with annotations (requires cv2 for drawing)
+        >>> # xdoctest: +REQUIRES(module:kwimage)
+        >>> # xdoctest: +REQUIRES(module:cv2)
+        >>> from kwcoco.cli.coco_visualize_videos import *  # NOQA
+        >>> import kwcoco
+        >>> import kwimage
+        >>> import numpy as np
+        >>> import ubelt as ub
+        >>> dpath = ub.Path.appdir('kwcoco/tests/visualize_videos_anns').delete().ensuredir()
+        >>> dset = kwcoco.CocoDataset()
+        >>> vidid = dset.add_video(name='video1', width=64, height=64)
+        >>> catid = dset.add_category('thing', color='lime')
+        >>> for frame in range(2):
+        >>>     canvas = np.zeros((64, 64, 3), dtype=np.uint8)
+        >>>     canvas[..., 1] = 255
+        >>>     fpath = dpath / f'frame_{frame}.png'
+        >>>     kwimage.imwrite(fpath, canvas)
+        >>>     gid = dset.add_image(
+        >>>         file_name=str(fpath),
+        >>>         width=64,
+        >>>         height=64,
+        >>>         video_id=vidid,
+        >>>         frame_index=frame,
+        >>>     )
+        >>>     if frame == 0:
+        >>>         dset.add_annotation(
+        >>>             image_id=gid,
+        >>>             category_id=catid,
+        >>>             bbox=[10, 10, 20, 20],
+        >>>         )
+        >>> dset.fpath = dpath / 'data.kwcoco.json'
+        >>> dset.dump(dset.fpath)
+        >>> kw = {
+        >>>     'src': dset.fpath,
+        >>>     'viz_dpath': dpath / 'viz',
+        >>>     'workers': 0,
+        >>>     'draw_labels': False,
+        >>> }
+        >>> CocoVisualizeVideosCLI.main(cmdline=False, **kw)
+        >>> assert len(list((dpath / 'viz').glob('**/*.jpg'))) > 0
     """
     __command__ = 'visualize'
     __alias__ = ['visualize_videos']
