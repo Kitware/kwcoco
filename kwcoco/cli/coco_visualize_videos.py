@@ -30,97 +30,95 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
     __command__ = 'visualize'
     __alias__ = ['visualize_videos']
 
-    __default__ = {
-        'src': scfg.Value(None, help='Input kwcoco dataset', position=1),
+    src = scfg.Value(None, help='Input kwcoco dataset', position=1)
 
-        'viz_dpath': scfg.Value(None, help=ub.paragraph(
-            '''
-            Where to save the visualizations. If unspecified, writes them
-            adjacent to the input kwcoco file.
-            ''')),
+    viz_dpath = scfg.Value(None, help=ub.paragraph(
+        '''
+        Where to save the visualizations. If unspecified, writes them
+        adjacent to the input kwcoco file.
+        '''))
 
-        'video': scfg.Value(None, help=ub.paragraph(
-            '''
-            Video id/name selection. Accepts a YAML list or a comma-separated
-            list of names/ids. If unspecified, all videos are rendered.
-            ''')),
+    video = scfg.Value(None, help=ub.paragraph(
+        '''
+        Video id/name selection. Accepts a YAML list or a comma-separated
+        list of names/ids. If unspecified, all videos are rendered.
+        '''))
 
-        'gids': scfg.Value(None, help=ub.paragraph(
-            '''
-            Optional list of image ids to render. Accepts YAML list or
-            comma-separated ids. Applied after video selection.
-            ''')),
+    gids = scfg.Value(None, help=ub.paragraph(
+        '''
+        Optional list of image ids to render. Accepts YAML list or
+        comma-separated ids. Applied after video selection.
+        '''))
 
-        'select_images': scfg.Value(None, type=str, help=ub.paragraph(
-            '''
-            A jq-style query for image dictionaries. Requires the "jq" python
-            library. See kwcoco._helpers._query_image_ids for details.
-            ''')),
+    select_images = scfg.Value(None, type=str, help=ub.paragraph(
+        '''
+        A jq-style query for image dictionaries. Requires the "jq" python
+        library. See kwcoco._helpers._query_image_ids for details.
+        '''))
 
-        'select_videos': scfg.Value(None, type=str, help=ub.paragraph(
-            '''
-            A jq-style query for video dictionaries. Requires the "jq" python
-            library. See kwcoco._helpers._query_image_ids for details.
-            ''')),
+    select_videos = scfg.Value(None, type=str, help=ub.paragraph(
+        '''
+        A jq-style query for video dictionaries. Requires the "jq" python
+        library. See kwcoco._helpers._query_image_ids for details.
+        '''))
 
-        'include_loose': scfg.Value(True, isflag=True, help=ub.paragraph(
-            '''
-            If True, render images without a video in a "loose-images" folder.
-            ''')),
+    include_loose = scfg.Value(True, isflag=True, help=ub.paragraph(
+        '''
+        If True, render images without a video in a "loose-images" folder.
+        '''))
 
-        'workers': scfg.Value('auto', help='Number of parallel workers'),
+    workers = scfg.Value('auto', help='Number of parallel workers')
 
-        'space': scfg.Value('video', help='Render in image or video space'),
+    space = scfg.Value('video', help='Render in image or video space')
 
-        'max_dim': scfg.Value(1024, help='Resize if larger than this dimension'),
-        'min_dim': scfg.Value(256, help='Resize if smaller than this dimension'),
-        'resolution': scfg.Value(None, help='Output resolution (if supported)'),
+    max_dim = scfg.Value(1024, help='Resize if larger than this dimension')
+    min_dim = scfg.Value(256, help='Resize if smaller than this dimension')
+    resolution = scfg.Value(None, help='Output resolution (if supported)')
 
-        'channels': scfg.Value(None, type=str, help='Only visualize these channels'),
-        'any3': scfg.Value(False, help=ub.paragraph(
-            '''
-            If True, ensure any 3 channels are drawn as a false-color view. If
-            set to "only", other per-channel visualizations are suppressed.
-            ''')),
+    channels = scfg.Value(None, type=str, help='Only visualize these channels')
+    any3 = scfg.Value(False, help=ub.paragraph(
+        '''
+        If True, ensure any 3 channels are drawn as a false-color view. If
+        set to "only", other per-channel visualizations are suppressed.
+        '''))
 
-        'draw_imgs': scfg.Value(True, isflag=True, help='Draw images'),
-        'draw_anns': scfg.Value('auto', help=ub.paragraph(
-            '''
-            Draw annotations. When "auto", only draw if annotations exist.
-            ''')),
-        'draw_boxes': scfg.Value(True, help='Draw bounding boxes'),
-        'draw_segmentations': scfg.Value(True, help='Draw segmentation polygons'),
-        'draw_labels': scfg.Value(True, help='Draw annotation labels'),
-        'ann_thickness': scfg.Value(2, help='Annotation line thickness'),
-        'alpha': scfg.Value(None, help='Annotation transparency'),
-        'ann_score_thresh': scfg.Value(0, help='Drop annotations below this score'),
+    draw_imgs = scfg.Value(True, isflag=True, help='Draw images')
+    draw_anns = scfg.Value('auto', help=ub.paragraph(
+        '''
+        Draw annotations. When "auto", only draw if annotations exist.
+        '''))
+    draw_boxes = scfg.Value(True, help='Draw bounding boxes')
+    draw_segmentations = scfg.Value(True, help='Draw segmentation polygons')
+    draw_labels = scfg.Value(True, help='Draw annotation labels')
+    ann_thickness = scfg.Value(2, help='Annotation line thickness')
+    alpha = scfg.Value(None, help='Annotation transparency')
+    ann_score_thresh = scfg.Value(0, help='Drop annotations below this score')
 
-        'draw_valid_region': scfg.Value(False, help='Draw valid image regions'),
-        'draw_header': scfg.Value(True, help='Draw header text'),
-        'draw_chancode': scfg.Value(True, help='Draw channel code text'),
+    draw_valid_region = scfg.Value(False, help='Draw valid image regions')
+    draw_header = scfg.Value(True, help='Draw header text')
+    draw_chancode = scfg.Value(True, help='Draw channel code text')
 
-        'cmap': scfg.Value('viridis', type=str, help=ub.paragraph(
-            '''
-            Name of a colormap for single channel data. Can also be a YAML
-            mapping from channel name to colormap name.
-            ''')),
+    cmap = scfg.Value('viridis', type=str, help=ub.paragraph(
+        '''
+        Name of a colormap for single channel data. Can also be a YAML
+        mapping from channel name to colormap name.
+        '''))
 
-        'skip_missing': scfg.Value(True, isflag=True, help=ub.paragraph(
-            '''
-            If true, skip any image that does not have the requested channels.
-            ''')),
-        'skip_aggressive': scfg.Value(False, isflag=True, help=ub.paragraph(
-            '''
-            Aggressively skip frames that appear to be invalid.
-            ''')),
+    skip_missing = scfg.Value(True, isflag=True, help=ub.paragraph(
+        '''
+        If true, skip any image that does not have the requested channels.
+        '''))
+    skip_aggressive = scfg.Value(False, isflag=True, help=ub.paragraph(
+        '''
+        Aggressively skip frames that appear to be invalid.
+        '''))
 
-        'draw_track_trails': scfg.Value(False, isflag=True, help=ub.paragraph(
-            '''
-            Draw history of track locations.
-            ''')),
+    draw_track_trails = scfg.Value(False, isflag=True, help=ub.paragraph(
+        '''
+        Draw history of track locations.
+        '''))
 
-        'verbose': scfg.Value(0, isflag=True, help='verbosity level'),
-    }
+    verbose = scfg.Value(0, isflag=True, help='verbosity level')
 
     @classmethod
     def main(cls, cmdline=True, **kwargs):
