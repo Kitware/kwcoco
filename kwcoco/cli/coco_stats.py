@@ -95,7 +95,7 @@ class CocoStatsCLI(scfg.DataConfig):
             rich_print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
-            raise Exception('must specify source: {}'.format(config['src']))
+            raise ValueError('must specify source: {}'.format(config['src']))
 
         if isinstance(config['src'], str):
             fpaths = [config['src']]
@@ -125,197 +125,195 @@ class CocoStatsCLI(scfg.DataConfig):
             except Exception:
                 pass
 
-        # FIXME: don't clobber global options
         import pandas as pd
-        pd.set_option('max_colwidth', 256)
+        with pd.option_context('max_colwidth', 256):
+            stat_types = {}
 
-        stat_types = {}
-
-        if config['basic']:
-            stat_types['basic'] = tag_to_stats = {}
-            for dset in datasets:
-                tag_to_stats[dset.tag] = dset.basic_stats()
-            if human_readable:
-                df = pd.DataFrame.from_dict(tag_to_stats)
+            if config['basic']:
+                stat_types['basic'] = tag_to_stats = {}
+                for dset in datasets:
+                    tag_to_stats[dset.tag] = dset.basic_stats()
                 if human_readable:
-                    rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
-
-        if config['extended']:
-            stat_types['extended'] = tag_to_ext_stats = {}
-            for dset in datasets:
-                tag_to_ext_stats[dset.tag] = dset.extended_stats()
-
-            allkeys = sorted(set(ub.flatten(s.keys() for s in tag_to_ext_stats.values())))
-            for key in allkeys:
-                if human_readable:
-                    print('\n--{!r}'.format(key))
-                df = pd.DataFrame.from_dict(
-                    {k: v[key] for k, v in tag_to_ext_stats.items()})
-                if human_readable:
-                    rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
-
-        if config['catfreq']:
-            stat_types['catfreq'] = tag_to_freq = {}
-            for dset in datasets:
-                tag_to_freq[dset.tag] = dset.category_annotation_frequency()
-            df = pd.DataFrame.from_dict(tag_to_freq)
-            if human_readable:
-                rich_print(df.to_string(float_format=lambda x: '%0.3f' % x))
-
-        if config['video_attrs']:
-            if human_readable:
-                print('Video Attribute Histogram')
-            stat_types['video_attrs'] = {}
-            for dset in datasets:
-                attrs = dset.videos().attribute_frequency()
-                stat_types['video_attrs'][dset.tag] = attrs
-                if human_readable:
-                    print('hist(video_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
-
-        if config['image_attrs']:
-            if human_readable:
-                print('Image Attribute Histogram')
-            stat_types['image_attrs'] = {}
-            for dset in datasets:
-                if human_readable:
-                    print('dset.tag = {!r}'.format(dset.tag))
-                attrs = dset.images().attribute_frequency()
-                stat_types['image_attrs'][dset.tag] = attrs
-                if human_readable:
-                    print('hist(image_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
-
-        if config['annot_attrs']:
-            if human_readable:
-                print('Annot Attribute Histogram')
-            stat_types['annot_attrs'] = {}
-            for dset in datasets:
-                if human_readable:
-                    print('dset.tag = {!r}'.format(dset.tag))
-                attrs = dset.annots().attribute_frequency()
-                stat_types['annot_attrs'][dset.tag] = attrs
-                if human_readable:
-                    print('hist(annot_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
-
-        if config['channels']:
-            if human_readable:
-                print('Channel and sensor stats')
-            stat_types['channels'] = {}
-            for dset in datasets:
-                channel_info = _coco_channel_stats(dset)
-                stat_types['channels'][dset.tag] = channel_info
-                if human_readable:
-                    rich_print('dset.tag = {!r}'.format(dset.tag))
-                    rich_print(ub.urepr(channel_info, nl=2, sort=0))
-
-        if config['boxes']:
-            if human_readable:
-                print('Box stats')
-            stat_types['boxes'] = {}
-            for dset in datasets:
-                box_stats = dset.boxsize_stats()
-                if human_readable:
-                    print('dset.tag = {!r}'.format(dset.tag))
-                    print(ub.urepr(box_stats, nl=-1, precision=2))
-                stat_types['boxes'][dset.tag] = box_stats
-
-        if config['image_size']:
-            if human_readable:
-                print('Image size stats')
-            stat_types['image_size'] = {}
-            for dset in datasets:
-                if human_readable:
-                    print('dset.tag = {!r}'.format(dset.tag))
-                images = dset.images()
-                heights = np.array(images.lookup('height', np.nan))
-                widths = np.array(images.lookup('width', np.nan))
-                rt_areas = np.sqrt(heights * widths)
-                imgsize_df = pd.DataFrame({
-                    'height': heights,
-                    'widths': widths,
-                    'rt_areas': rt_areas,
-                })
-                stat_types['image_size'][dset.tag] = image_size_info = {}
-                size_stats = imgsize_df.describe()
-                image_size_info['size_stats'] = size_stats.to_dict()
-                if human_readable:
-                    print(size_stats)
-                idx = np.argmax(rt_areas)
-
-                try:
-                    biggest_image = images.take([idx]).coco_images[0]
-                    max_area_h = biggest_image.img['height']
-                    max_area_w = biggest_image.img['width']
+                    df = pd.DataFrame.from_dict(tag_to_stats)
                     if human_readable:
-                        print('Max image: {} x {}'.format(max_area_w, max_area_h))
-                    image_size_info['max_image_wh'] = (max_area_w, max_area_h)
-                    pixels = max_area_w * max_area_h
-                    total_disk_bytes = 0
-                    for fpath in list(biggest_image.iter_image_filepaths()):
-                        fpath = ub.Path(fpath)
-                        num_bytes = fpath.stat().st_size
-                        total_disk_bytes += num_bytes
-                    total_disk_gb = total_disk_bytes / 2 ** 30
-                    pixel_gb_per_bit = (pixels / 8) / 2 ** 30
-                    if human_readable:
-                        print('total_disk_gb = {!r}'.format(total_disk_gb))
-                        print('pixel_gb_per_bit = {!r}'.format(pixel_gb_per_bit))
-                    image_size_info['total_disk_gb'] = (total_disk_gb)
-                    image_size_info['pixel_gb_per_bit'] = (pixel_gb_per_bit)
-                except Exception:
-                    if human_readable:
-                        print('error getting max size')
-                    image_size_info['errors'] = 'error getting max size'
+                        rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
 
-                # print('dset.tag = {!r}'.format(dset.tag))
-                # print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
+            if config['extended']:
+                stat_types['extended'] = tag_to_ext_stats = {}
+                for dset in datasets:
+                    tag_to_ext_stats[dset.tag] = dset.extended_stats()
 
-        if config['disk_usage']:
-            if human_readable:
-                print('Disk usage stats')
-            stat_types['disk_usage'] = {}
-            for dset in datasets:
+                allkeys = sorted(set(ub.flatten(s.keys() for s in tag_to_ext_stats.values())))
+                for key in allkeys:
+                    if human_readable:
+                        print('\n--{!r}'.format(key))
+                    df = pd.DataFrame.from_dict(
+                        {k: v[key] for k, v in tag_to_ext_stats.items()})
+                    if human_readable:
+                        rich_print(df.T.to_string(float_format=lambda x: '%0.3f' % x))
+
+            if config['catfreq']:
+                stat_types['catfreq'] = tag_to_freq = {}
+                for dset in datasets:
+                    tag_to_freq[dset.tag] = dset.category_annotation_frequency()
+                df = pd.DataFrame.from_dict(tag_to_freq)
                 if human_readable:
-                    print('dset.tag = {!r}'.format(dset.tag))
-                disk_info = _dataset_disk_usage(dset)
-                stat_types['disk_usage'][dset.tag] = disk_info
+                    rich_print(df.to_string(float_format=lambda x: '%0.3f' % x))
+
+            if config['video_attrs']:
                 if human_readable:
-                    disk_size = byte_str(disk_info['total_bytes'])
+                    print('Video Attribute Histogram')
+                stat_types['video_attrs'] = {}
+                for dset in datasets:
+                    attrs = dset.videos().attribute_frequency()
+                    stat_types['video_attrs'][dset.tag] = attrs
                     if human_readable:
-                        print(f'Disk Usage: {disk_size}')
+                        print('hist(video_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
-        if not human_readable:
-            import kwutil
-            stat_types = kwutil.util_json.ensure_json_serializable(stat_types)
-            # Rotate dictionaries so the dataset is the top-level key
-            rotated_stat_type = {
-                dset.tag: {
-                    'fpath': dset.fpath,
-                    'tag': dset.tag
-                }
-                for dset in datasets
-            }
-            for type_key1, value1 in stat_types.items():
-                for tag_key2, value2 in value1.items():
-                    rotated_stat_type[tag_key2][type_key1] = value2
+            if config['image_attrs']:
+                if human_readable:
+                    print('Image Attribute Histogram')
+                stat_types['image_attrs'] = {}
+                for dset in datasets:
+                    if human_readable:
+                        print('dset.tag = {!r}'.format(dset.tag))
+                    attrs = dset.images().attribute_frequency()
+                    stat_types['image_attrs'][dset.tag] = attrs
+                    if human_readable:
+                        print('hist(image_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
-            # output stats as a List[dict]
-            stat_lists = list(rotated_stat_type.values())
+            if config['annot_attrs']:
+                if human_readable:
+                    print('Annot Attribute Histogram')
+                stat_types['annot_attrs'] = {}
+                for dset in datasets:
+                    if human_readable:
+                        print('dset.tag = {!r}'.format(dset.tag))
+                    attrs = dset.annots().attribute_frequency()
+                    stat_types['annot_attrs'][dset.tag] = attrs
+                    if human_readable:
+                        print('hist(annot_attrs) = {}'.format(ub.urepr(attrs, nl=1)))
 
-            if config.format == 'json':
-                import json
-                print(json.dumps(stat_lists, indent=' '))
-            elif config.format == 'yaml':
+            if config['channels']:
+                if human_readable:
+                    print('Channel and sensor stats')
+                stat_types['channels'] = {}
+                for dset in datasets:
+                    channel_info = _coco_channel_stats(dset)
+                    stat_types['channels'][dset.tag] = channel_info
+                    if human_readable:
+                        rich_print('dset.tag = {!r}'.format(dset.tag))
+                        rich_print(ub.urepr(channel_info, nl=2, sort=0))
+
+            if config['boxes']:
+                if human_readable:
+                    print('Box stats')
+                stat_types['boxes'] = {}
+                for dset in datasets:
+                    box_stats = dset.boxsize_stats()
+                    if human_readable:
+                        print('dset.tag = {!r}'.format(dset.tag))
+                        print(ub.urepr(box_stats, nl=-1, precision=2))
+                    stat_types['boxes'][dset.tag] = box_stats
+
+            if config['image_size']:
+                if human_readable:
+                    print('Image size stats')
+                stat_types['image_size'] = {}
+                for dset in datasets:
+                    if human_readable:
+                        print('dset.tag = {!r}'.format(dset.tag))
+                    images = dset.images()
+                    heights = np.array(images.lookup('height', np.nan))
+                    widths = np.array(images.lookup('width', np.nan))
+                    rt_areas = np.sqrt(heights * widths)
+                    imgsize_df = pd.DataFrame({
+                        'height': heights,
+                        'widths': widths,
+                        'rt_areas': rt_areas,
+                    })
+                    stat_types['image_size'][dset.tag] = image_size_info = {}
+                    size_stats = imgsize_df.describe()
+                    image_size_info['size_stats'] = size_stats.to_dict()
+                    if human_readable:
+                        print(size_stats)
+                    idx = np.argmax(rt_areas)
+
+                    try:
+                        biggest_image = images.take([idx]).coco_images[0]
+                        max_area_h = biggest_image.img['height']
+                        max_area_w = biggest_image.img['width']
+                        if human_readable:
+                            print('Max image: {} x {}'.format(max_area_w, max_area_h))
+                        image_size_info['max_image_wh'] = (max_area_w, max_area_h)
+                        pixels = max_area_w * max_area_h
+                        total_disk_bytes = 0
+                        for fpath in list(biggest_image.iter_image_filepaths()):
+                            fpath = ub.Path(fpath)
+                            num_bytes = fpath.stat().st_size
+                            total_disk_bytes += num_bytes
+                        total_disk_gb = total_disk_bytes / 2 ** 30
+                        pixel_gb_per_bit = (pixels / 8) / 2 ** 30
+                        if human_readable:
+                            print('total_disk_gb = {!r}'.format(total_disk_gb))
+                            print('pixel_gb_per_bit = {!r}'.format(pixel_gb_per_bit))
+                        image_size_info['total_disk_gb'] = (total_disk_gb)
+                        image_size_info['pixel_gb_per_bit'] = (pixel_gb_per_bit)
+                    except Exception:
+                        if human_readable:
+                            print('error getting max size')
+                        image_size_info['errors'] = 'error getting max size'
+
+                    # print('dset.tag = {!r}'.format(dset.tag))
+                    # print(ub.urepr(dset.boxsize_stats(), nl=-1, precision=2))
+
+            if config['disk_usage']:
+                if human_readable:
+                    print('Disk usage stats')
+                stat_types['disk_usage'] = {}
+                for dset in datasets:
+                    if human_readable:
+                        print('dset.tag = {!r}'.format(dset.tag))
+                    disk_info = _dataset_disk_usage(dset)
+                    stat_types['disk_usage'][dset.tag] = disk_info
+                    if human_readable:
+                        disk_size = byte_str(disk_info['total_bytes'])
+                        if human_readable:
+                            print(f'Disk Usage: {disk_size}')
+
+            if not human_readable:
                 import kwutil
-                print(kwutil.Yaml.dumps(stat_lists, backend='pyyaml'))
-            elif config.format == 'urepr':
-                print(ub.urepr(stat_lists, nl=-1))
-            else:
-                raise KeyError(config.format)
+                stat_types = kwutil.util_json.ensure_json_serializable(stat_types)
+                # Rotate dictionaries so the dataset is the top-level key
+                rotated_stat_type = {
+                    dset.tag: {
+                        'fpath': dset.fpath,
+                        'tag': dset.tag
+                    }
+                    for dset in datasets
+                }
+                for type_key1, value1 in stat_types.items():
+                    for tag_key2, value2 in value1.items():
+                        rotated_stat_type[tag_key2][type_key1] = value2
 
-        if config['embed']:
-            # Hidden hack
-            import xdev
-            xdev.embed()
+                # output stats as a List[dict]
+                stat_lists = list(rotated_stat_type.values())
+
+                if config.format == 'json':
+                    import json
+                    print(json.dumps(stat_lists, indent=' '))
+                elif config.format == 'yaml':
+                    import kwutil
+                    print(kwutil.Yaml.dumps(stat_lists, backend='pyyaml'))
+                elif config.format == 'urepr':
+                    print(ub.urepr(stat_lists, nl=-1))
+                else:
+                    raise KeyError(config.format)
+
+            if config['embed']:
+                # Hidden hack
+                import xdev
+                xdev.embed()
 
         # for dset in datasets:
         #     # dset = datasets[0]

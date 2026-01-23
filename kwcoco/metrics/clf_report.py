@@ -586,7 +586,7 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     ovr_metrics['weight'] = weight
 
     # weighted = ovr_metrics.drop(columns=['support', 'weight'])
-    weighted = ovr_metrics.copy()
+    weighted = ovr_metrics.astype(float)
     weighted.iloc[:] = weighted.values * weight.values[:, None]
     weighted_ave = weighted.sum(axis=0)
     weighted_ave['support'] = ovr_metrics['support'].sum()

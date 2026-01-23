@@ -68,7 +68,7 @@ class CocoFixup(scfg.DataConfig):
         rich_print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:
-            raise Exception('must specify source: {}'.format(config['src']))
+            raise ValueError('must specify source: {}'.format(config['src']))
         if config['dst'] is None:
             if config['inplace']:
                 config['dst'] = config['src']
@@ -78,7 +78,7 @@ class CocoFixup(scfg.DataConfig):
         try:
             from osgeo import gdal
             gdal.UseExceptions()
-        except Exception:
+        except ImportError:
             ...
 
         print('reading fpath = {!r}'.format(config['src']))
@@ -116,7 +116,9 @@ def find_corrupted_assets(dset, check_aux=True, workers=0,
     elif corrupted_assets == 'full':
         only_shape = False
     else:
-        raise Exception
+        raise ValueError(
+            "corrupted_assets must be 'only_shape' or 'full', got {!r}".format(
+                corrupted_assets))
 
     jobs = ub.JobPool(mode='process', max_workers=workers)
 
@@ -143,7 +145,7 @@ def find_corrupted_assets(dset, check_aux=True, workers=0,
             job.input_info = (img_idx, gpath, gid)
 
         if check_aux:
-            for asset_idx, aux in img.get('auxiliary', []):
+            for asset_idx, aux in enumerate(img.get('auxiliary', [])):
                 gpath = bundle_dpath / aux['file_name']
                 job = jobs.submit(_image_corruption_check, gpath, imread_kwargs=imread_kwargs)
                 job.input_info = (img_idx, gpath, gid, 'auxiliary', asset_idx)
