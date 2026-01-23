@@ -91,6 +91,56 @@ def test_with_one_image_and_no_truth():
     print(df.T.to_string())
 
 
+def test_score_kwcoco_exposes_errors(monkeypatch):
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+    from kwcoco.metrics import confusion_vectors
+    import kwimage
+    import pytest
+
+    classes = ['class_1']
+    dmet = DetectionMetrics(classes=classes)
+    dmet.add_truth(kwimage.Detections.random(0, classes=classes, rng=0), imgname='image1')
+    dmet.add_predictions(kwimage.Detections.random(0, classes=classes, rng=1), imgname='image1')
+
+    def raise_error(self, *args, **kwargs):
+        raise ValueError('kaboom')
+
+    monkeypatch.setattr(confusion_vectors.ConfusionVectors, 'binarize_ovr', raise_error)
+
+    info = dmet.score_kwcoco(strict=False)
+    assert info['perclass_error']['type'] == 'ValueError'
+    assert 'kaboom' in info['perclass_error']['message']
+
+    with pytest.raises(ValueError, match='kaboom'):
+        dmet.score_kwcoco(strict=True)
+
+
+def test_score_kwcoco_empty_predictions_and_truths():
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+    import kwimage
+    import numpy as np
+
+    classes = ['class_1']
+
+    true_dets = kwimage.Detections.random(1, classes=classes, rng=0)
+    pred_dets = kwimage.Detections.random(0, classes=classes, rng=1)
+    dmet = DetectionMetrics(classes=classes)
+    dmet.add_truth(true_dets, imgname='image1')
+    dmet.add_predictions(pred_dets, imgname='image1')
+    scores = dmet.score_kwcoco(stabalize_thresh=0)
+    assert np.isnan(scores['mAP'])
+    assert np.isnan(scores['perclass']['class_1']['ap'])
+
+    true_dets = kwimage.Detections.random(0, classes=classes, rng=2)
+    pred_dets = kwimage.Detections.random(1, classes=classes, rng=3)
+    dmet = DetectionMetrics(classes=classes)
+    dmet.add_truth(true_dets, imgname='image1')
+    dmet.add_predictions(pred_dets, imgname='image1')
+    scores = dmet.score_kwcoco(stabalize_thresh=0)
+    assert np.isclose(scores['mAP'], 0.0)
+    assert np.isclose(scores['perclass']['class_1']['ap'], 0.0)
+
+
 def test_with_multiple_images_and_some_have_no_truth():
     """
     Test case where there is no truth in an image.

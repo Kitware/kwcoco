@@ -158,13 +158,12 @@ def find_json_unserializable(data, quickcheck=False):
         >>>         assert part['data'] is curr
 
     Example:
-        >>> # xdoctest: +SKIP("TODO: circular ref detect algo is wrong, fix it")
         >>> from kwcoco.util.util_json import *  # NOQA
         >>> import pytest
         >>> # Test circular reference
         >>> data = [[], {'a': []}]
         >>> data[1]['a'].append(data)
-        >>> with pytest.raises(ValueError, match="Circular reference detected at.*1, 'a', 1*"):
+        >>> with pytest.raises(ValueError, match="Circular reference detected at.*1, 'a', 0*"):
         ...     parts = list(find_json_unserializable(data))
         >>> # Should be ok here
         >>> shared_data = {'shared': 1}
@@ -189,42 +188,49 @@ def find_json_unserializable(data, quickcheck=False):
             # is_serializable = True
             needs_check = False
 
-    # FIXME: the algo is wrong, fails when
-    CHECK_FOR_CIRCULAR_REFERENCES = 0
+    CHECK_FOR_CIRCULAR_REFERENCES = True
 
     if needs_check:
-        # mode = 'new'
-        # if mode == 'new':
         scalar_types = (int, float, str, type(None))
         container_types = (tuple, list, dict)
         serializable_types = scalar_types + container_types
-        walker = ub.IndexableWalker(data)
 
-        if CHECK_FOR_CIRCULAR_REFERENCES:
-            seen_ids = set()
-
-        for prefix, value in walker:
-
-            if CHECK_FOR_CIRCULAR_REFERENCES:
-                # FIXME: We need to know if this container id is in this paths
-                # ancestors. It is allowed to be elsewhere in the data
-                # structure (i.e. the pointer graph must be a DAG)
-                if isinstance(value, container_types):
-                    container_id = id(value)
-                    if container_id in seen_ids:
-                        circ_loc = {'loc': prefix, 'data': value}
+        def _walk(curr, prefix, ancestors):
+            if isinstance(curr, container_types):
+                if CHECK_FOR_CIRCULAR_REFERENCES:
+                    container_id = id(curr)
+                    if container_id in ancestors:
+                        circ_loc = {'loc': prefix, 'data': curr}
                         raise ValueError(f'Circular reference detected at {circ_loc}')
-                    seen_ids.add(container_id)
+                    ancestors.add(container_id)
+                try:
+                    if isinstance(curr, dict):
+                        for key, value in curr.items():
+                            if not isinstance(key, scalar_types):
+                                # Special case where a dict key is the error value
+                                # Purposely make loc non-hashable so its not confused with
+                                # an address. All we can know in this case is that they key
+                                # is at this level, there is no concept of where.
+                                yield {'loc': prefix + [['.keys', key]], 'data': key}
+                                continue
+                            if isinstance(value, container_types):
+                                yield from _walk(value, prefix + [key], ancestors)
+                            elif not isinstance(value, serializable_types):
+                                yield {'loc': prefix + [key], 'data': value}
+                    else:
+                        for idx, value in enumerate(curr):
+                            if isinstance(value, container_types):
+                                yield from _walk(value, prefix + [idx], ancestors)
+                            elif not isinstance(value, serializable_types):
+                                yield {'loc': prefix + [idx], 'data': value}
+                finally:
+                    if CHECK_FOR_CIRCULAR_REFERENCES:
+                        ancestors.remove(id(curr))
+            else:
+                if not isinstance(curr, scalar_types):
+                    yield {'loc': prefix, 'data': curr}
 
-            *root, key = prefix
-            if not isinstance(key, scalar_types):
-                # Special case where a dict key is the error value
-                # Purposely make loc non-hashable so its not confused with
-                # an address. All we can know in this case is that they key
-                # is at this level, there is no concept of where.
-                yield {'loc': root + [['.keys', key]], 'data': key}
-            elif not isinstance(value, serializable_types):
-                yield {'loc': prefix, 'data': value}
+        yield from _walk(data, [], set())
 
 
 def indexable_allclose(dct1, dct2, return_info=False):

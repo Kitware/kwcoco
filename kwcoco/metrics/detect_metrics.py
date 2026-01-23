@@ -525,15 +525,6 @@ class DetectionMetrics(ub.NiceRepr):
             true_dets = dmet.gid_to_true_dets[gid]
             pred_dets = dmet.gid_to_pred_dets[gid]
 
-            if len(true_dets) == 0:
-                print('foo')
-            if len(pred_dets) == 0:
-                # kwant breaks on 0 predictions, hack in a bad prediction
-                import kwimage
-                hack_ = kwimage.Detections.random(1)
-                hack_.scores[:] = 0
-                pred_dets = hack_
-
             true_kw18 = kw18.make_kw18_from_detections(true_dets,
                                                        frame_number=gid,
                                                        timestamp=gid)
@@ -590,7 +581,8 @@ class DetectionMetrics(ub.NiceRepr):
         return info
 
     def score_kwcoco(dmet, iou_thresh=0.5, bias=0, gids=None,
-                      compat='all', prioritize='iou', stabalize_thresh=7):
+                      compat='all', prioritize='iou', stabalize_thresh=7,
+                      strict=False):
         """
         our scoring method
 
@@ -626,7 +618,13 @@ class DetectionMetrics(ub.NiceRepr):
             cfsn_perclass = cfsn_vecs.binarize_ovr(mode=1)
             perclass = cfsn_perclass.measures(stabalize_thresh=stabalize_thresh)
         except Exception as ex:
-            print('warning: ex = {!r}'.format(ex))
+            if strict:
+                raise
+            info['perclass_error'] = {
+                'type': type(ex).__name__,
+                'message': str(ex),
+                'repr': repr(ex),
+            }
         else:
             info['perclass'] = perclass['perclass']
             info['mAP'] = perclass['mAP']
