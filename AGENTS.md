@@ -1,70 +1,79 @@
 # AGENTS.md
 
-This guide orients future AI coding agents and developers working in the **kwcoco** repository. It summarizes the project purpose, layout, setup, testing workflow, and conventions so you can quickly make informed changes.
+## Purpose
 
-## Project Snapshot
-- **Goal**: Python package and CLI for reading, writing, validating, and manipulating COCO-style datasets, extended for video, multispectral imagery, tracks, and richer metrics.
-- **Packaging**: `setup.py` is authoritative for builds; `pyproject.toml` holds metadata, coverage, and pytest settings—keep them synchronized when changing dependencies or options.
-- **Python policy**: Minimum supported is 3.8 and CI covers up through the latest released CPython (currently 3.13). We intentionally avoid upper bounds on Python and other dependencies unless required by a compatibility break; prefer widening support rather than pinning.
+**kwcoco**: Python package + CLI for COCO(-like) datasets, extended for **video**, **multispectral**, **tracks**, and richer **metrics**. Supports read/write/validate/transform and MS-COCO compatibility.
 
-## Repository Layout
-- `kwcoco/` – Main package (typed; `.pyi` stubs included). Highlights:
-  - `coco_dataset.py` plus helpers in `_helpers.py` and `abstract_coco_dataset.py`: core `CocoDataset` logic, indexing cache, bundle/reroot handling, hashing, and add/remove operations.
-  - `coco_image.py`, `channel_spec.py`, `sensorchan_spec.py`: image helpers, channel metadata parsing, multispectral utilities.
-  - `compat_dataset.py`: compatibility wrappers (pycocotools-like API, conversion helpers).
-  - `coco_objects1d.py`, `coco_evaluator.py`, `metrics/`: evaluation and metrics (classification/detection/segmentation; `metrics` has its own AGENTS.md scoped to that subpackage).
-  - `cli/`: `__main__.py` registers the `scriptconfig`-based CLI (stats, union/subset/split, validate, conform, reroot/move, toydata/demodata, eval, grab, info/tables, visual_stats, find_unregistered_images, etc.).
-  - `formats/`: converters to/from external formats; `demo/`: synthetic dataset generators used in docs/tests; `data/`: dataset access helpers; `rc/`: bundled resources; `util/`: geometry, delayed-image access, vectorized ops leveraging `ubelt`, `numpy`, and `delayed_image`.
-  - `coco_schema.*` & `coco_schema_informal.rst`: schema references; `kw18.py`/`kpf.py`: specialized format support.
-- `tests/`: Pytest-based suite plus xdoctests; mirrors major features (CLI, dataset ops, multispectral/video, metrics, SQL, keypoints, tracks, subsets, validation, PostgreSQL integration, etc.).
-- `examples/`: runnable scripts showing dataset transforms, PyTorch dataloading, visualization, multispectral/video usage.
-- `docs/`: Sphinx sources (`docs/source/manual/` for concepts/how-tos; `docs/source/auto/` for API references). `docs/format_notes.md` and `docs/dataset_api.txt` provide extra notes.
-- `dev/`: scratch/experiments not shipped.
-- Root helpers: `run_tests.py`, `run_doctests.sh`, `run_linter.sh`, `run_developer_setup.sh`, `clean.sh`, `publish.sh`.
-- Config: `pytest.ini` (pytest/xdoctest defaults), `pyproject.toml` (coverage, pytest opts, mypy hints), `requirements/` (grouped dependency sets), `requirements.txt` (aggregated runtime/tests/optional/postgresql), `MANIFEST.in`.
+## Build / Packaging
 
-## Environment Setup
-1. **Clone** and use Python 3.8+ (latest CPython versions should work; report regressions instead of pinning upper bounds).
-2. **Install deps**:
-   - Quick dev setup: `./run_developer_setup.sh` (installs `requirements.txt` then `pip install -e .`).
-   - Manual: `pip install -r requirements.txt` then `pip install -e .` (editable). Dependency subsets live in `requirements/` (e.g., `gdal.txt`, `graphics.txt`, `linting.txt`, `optional.txt`, `postgresql.txt`, `tests.txt`). GDAL wheels are available via the `girder.github.io/large_image_wheels` index noted in `pyproject.toml`.
-3. **Optional extras**: install graphics/backends (OpenCV, matplotlib), GDAL for geospatial rasters, PostgreSQL drivers for SQL backends, and torch-related deps if using dataloaders in examples/tests.
-4. **Environment variables**: `KWCOCO_USE_UJSON` enables faster JSON reads; otherwise standard `json` is used.
+* `setup.py` = authoritative build/install behavior.
+* `pyproject.toml` = metadata + pytest/coverage/mypy hints. Keep in sync when changing deps/options.
+* **Python**: min 3.8; CI targets latest CPython too. Avoid upper bounds on Python/deps unless a real break forces it.
 
-## Conventions and Deprecations
-- **Backward compatibility**: `compat_dataset.py` and CLI tools aim to remain a superset of MS-COCO; new features should not break existing MS-COCO datasets.
-- **Preferred over deprecated**:
-  - Use `bundle_dpath` for bundle roots; `img_root` is a deprecated alias still accepted by constructors.【F:kwcoco/coco_dataset.py†L6133-L6166】
-  - Use `video_ids` instead of the deprecated `vidids` argument in dataset selectors.【F:kwcoco/coco_dataset.py†L2861-L2904】
-  - Use `add_asset` for auxiliary imagery; `add_auxiliary_item` remains as a compatibility alias.【F:kwcoco/coco_dataset.py†L4327-L4358】
-- **Dependency policy**: avoid adding strict upper bounds unless necessary for a break; prefer ranges that keep future Python and library releases usable.
-- **Imports**: follow repo style—do not wrap imports in try/except to hide failures.
-- **Index integrity**: `CocoDataset` maintains raw `dataset` data and a cached `index` (`imgs`, `anns`, `cats`, `gid_to_aids`, etc.). Mutations to internal structures should invalidate/rebuild the index using existing helpers. Path resolution respects bundle roots; prefer reroot/bundle utilities over manual edits.
-- **Type hints**: `.pyi` stubs and `py.typed` are present; keep signatures synchronized when changing APIs.
+## Layout (high-signal)
 
-## Testing
-- **Full suite with coverage**: `python run_tests.py` (runs pytest over `kwcoco/` and `tests/`, enables `--xdoctest`, reports coverage via `pyproject.toml`).
-- **Doctests only**: `./run_doctests.sh` (xdoctest pass-through).
-- **Lint**: `./run_linter.sh` (flake8-focused strict check).
-- **Selective tests**: `pytest tests/test_<module>.py -k <expr>` or `pytest kwcoco/<module>.py` (note `pytest.ini` ignores `dev` and `docs`).
-- **SQL/PostgreSQL tests**: require database prerequisites; skip or adjust env if unavailable.
-- **Examples as smoke tests**: many scripts in `examples/` can validate usage; `kwcoco demo`/`toydata` CLI also provides quick datasets.
+* `kwcoco/`
 
-## Documentation
-- Primary user/developer docs in `docs/source/manual/` (getting started, coordinate spaces, vectorized interfaces, bundles, gotchas) and `docs/source/auto/` for API refs. Build locally with `make -C docs html` (requires docs dependencies from `requirements/docs.txt`).
-- `README.rst` offers overview, CLI synopsis, and feature list; keep in sync with major behavior changes.
-- Metric-specific docs live alongside code (see `kwcoco/metrics/AGENTS.md` for scoped guidance).
+  * `coco_dataset.py`, `_helpers.py`, `abstract_coco_dataset.py`: core `CocoDataset`, indexing cache, bundle/reroot, hashing, mutations.
+  * `coco_image.py`, `channel_spec.py`, `sensorchan_spec.py`: image + channel/sensor metadata, multispectral helpers.
+  * `compat_dataset.py`: pycocotools-like API + conversion compatibility.
+  * `coco_evaluator.py`, `coco_objects1d.py`, `metrics/`: eval + metrics (**metrics has its own AGENTS.md**).
+  * `cli/`: `python -m kwcoco` / `kwcoco` (`scriptconfig` CLI: stats/union/subset/split/validate/conform/reroot/toydata/demodata/eval/grab/info/visual_stats/etc.).
+  * `formats/` converters; `demo/` synthetic data; `data/` dataset access; `rc/` resources; `util/` geometry/delayed-image/vectorized ops.
+  * schema refs: `coco_schema.*`, `coco_schema_informal.rst`; specialized: `kw18.py`, `kpf.py`.
+* `tests/`: pytest + xdoctest; mirrors major features (CLI, dataset ops, video/multispectral, metrics, SQL, tracks, etc.).
+* `examples/`: runnable transforms / dataloading / viz.
+* `docs/`: Sphinx (`docs/source/manual/` concepts; `docs/source/auto/` API).
+* `dev/`: scratch (not shipped).
+* Root scripts: `run_tests.py`, `run_doctests.sh`, `run_linter.sh`, `run_developer_setup.sh`, `clean.sh`, `publish.sh`.
+* Deps/config: `requirements/` + `requirements.txt`, `pytest.ini`, `pyproject.toml`, `MANIFEST.in`.
 
-## Extending & Refactoring Tips
-- **Metrics**: follow guidance in `kwcoco/metrics/AGENTS.md` when touching evaluation logic; maintain compatibility with COCO conventions and existing tests.
-- **Schemas**: when modifying dataset structure, update `coco_schema.json`/`.pyi` and relevant validators; ensure conform/validate CLI commands reflect new fields.
-- **Docs/tests first**: add or update docstrings (doctests) and pytest cases for new behaviors. Prefer small, focused tests under `tests/` mirroring affected modules.
-- **Performance**: indexing and delayed image operations prioritize speed; avoid unnecessary copies and prefer vectorized operations or delayed images where possible.
+## Setup
 
-## Quick References
-- **CLI entry point**: `python -m kwcoco` or `kwcoco` after install.
-- **Toy data**: `kwcoco toydata --help` or use generators in `kwcoco/demo/` for synthetic datasets.
-- **SQL**: `coco_sql_dataset.py` provides SQLite/PostgreSQL support; some tests may need DB availability.
-- **Resources**: `kwcoco/rc/` holds bundled requirement files and assets consumed by certain commands.
+* Python 3.8+
+* Dev install (preferred): `./run_developer_setup.sh`
+* Manual: `pip install -e .[headless]`
+* Optional dep groups in `requirements/` (gdal/graphics/linting/optional/postgresql/tests/docs).
+* Env var: `KWCOCO_USE_UJSON=1` for faster JSON.
 
-Use this document as the starting point before changing code, adding features, or running tests. When in doubt, consult the relevant module’s docstrings and accompanying doctests.
+## Compatibility + Conventions
+
+* Maintain **MS-COCO superset** behavior; don’t break existing COCO datasets.
+* Prefer current names over deprecated aliases:
+
+  * `bundle_dpath` (deprecated alias: `img_root`)
+  * `video_ids` (deprecated: `vidids`)
+  * `add_asset` (compat alias: `add_auxiliary_item`)
+* Imports: don’t hide missing deps with try/except.
+* **Index integrity**: `CocoDataset` has raw `dataset` + cached `index` (`imgs`, `anns`, mappings, etc.). If you mutate internals, use existing helpers to invalidate/rebuild; avoid manual patching of caches.
+* Bundles/paths: prefer bundle/reroot utilities over manual path edits.
+* Typing: repo ships `.pyi` + `py.typed`; keep stubs/signatures aligned with code.
+
+## Testing / Quality
+
+* Full suite: `python run_tests.py` (pytest + `--xdoctest` + coverage).
+* Doctests: `./run_doctests.sh`
+* Lint: `./run_linter.sh`
+* Targeted: `pytest tests/test_<x>.py -k <expr>` or `pytest kwcoco/<file>.py`
+* SQL/Postgres tests require DB prereqs (skip/adjust env if unavailable).
+* Examples + `kwcoco demo` / `kwcoco toydata` are good smoke tests.
+
+## Docs
+
+* Build: `make -C docs html` (needs docs deps from `requirements/docs.txt`)
+* Keep `README.rst` aligned with major behavior changes.
+* Metric-specific guidance: `kwcoco/metrics/AGENTS.md`
+
+## Change Guidelines
+
+* Touching metrics: follow `kwcoco/metrics/AGENTS.md`; preserve COCO conventions + tests.
+* Schema changes: update schema refs + validators + CLI validate/conform behavior.
+* Add docs/tests with new behavior (doctests + pytest). Keep tests small and near affected features.
+* Performance: avoid copies; prefer vectorized ops / delayed images; be careful with indexing costs.
+
+## Quick Commands
+
+* CLI: `python -m kwcoco` or `kwcoco`
+* Toy data: `kwcoco toydata --help` (also `kwcoco/demo/`)
+* SQL backend: `coco_sql_dataset.py`
+* Resources: `kwcoco/rc/`
