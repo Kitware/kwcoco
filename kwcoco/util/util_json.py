@@ -134,8 +134,11 @@ def find_json_unserializable(data, quickcheck=False):
         >>> print('parts = {}'.format(ub.urepr(parts, nl=1)))
         >>> # Check expected structure of bad parts
         >>> assert len(parts) == 2
-        >>> part = parts[1]
-        >>> assert list(part['loc']) == [2, 'nest1', 1, 'bar']
+        >>> by_loc = {}
+        >>> for p in parts:
+        >>>     if all(not isinstance(k, list) for k in p['loc']):
+        >>>         by_loc[tuple(p['loc'])] = p
+        >>> assert list(by_loc[(2, 'nest1', 1, 'bar')]['loc']) == [2, 'nest1', 1, 'bar']
         >>> # We can use the "loc" to find the bad value
         >>> for part in parts:
         >>>     # "loc" is a list of directions containing which keys/indexes

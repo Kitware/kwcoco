@@ -525,6 +525,13 @@ class DetectionMetrics(ub.NiceRepr):
             true_dets = dmet.gid_to_true_dets[gid]
             pred_dets = dmet.gid_to_pred_dets[gid]
 
+            if len(pred_dets) == 0:
+                # kwant breaks on 0 predictions, hack in a bad prediction
+                import kwimage
+                hack_ = kwimage.Detections.random(1)
+                hack_.scores[:] = 0
+                pred_dets = hack_
+
             true_kw18 = kw18.make_kw18_from_detections(true_dets,
                                                        frame_number=gid,
                                                        timestamp=gid)
