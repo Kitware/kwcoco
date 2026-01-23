@@ -26,6 +26,7 @@ def main(cmdline=True, **kw):
         'coco_grab',
         'coco_info',
         'coco_plot_stats',
+        'coco_visualize_videos',
         'find_unregistered_images',
         'finish_install',
     ]
