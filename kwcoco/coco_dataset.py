@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 An implementation and extension of the original MS-COCO API [CocoFormat]_.
 
 The KWCoco format is backwards compatible with MS-COCO. It adds support for
@@ -56,22 +54,17 @@ References:
     .. [PyCocoToolsMask] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
     .. [CocoTutorial] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
 """
-import typing
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Callable, IO
 
-if typing.TYPE_CHECKING:
-    import kwcoco
+if TYPE_CHECKING:
+    from os import PathLike
     import numpy as np
     from numpy import ndarray
-    from os import PathLike
     from numpy.typing import ArrayLike
-    from typing import Dict, List, Tuple, Callable, Any, IO
     import networkx
-    import kwcoco.coco_objects1d
     import kwimage
-    import ubelt as ub
-    from collections.abc import Generator
-    from kwcoco.abstract_coco_dataset import AbstractCocoDataset
-    from types import ModuleType
+    import kwcoco
     from kwcoco.coco_image import CocoImage
 
 import copy
@@ -145,7 +138,7 @@ class MixinCocoDepricate:
     These functions are marked for deprecation and will be removed
     """
 
-    def keypoint_annotation_frequency(self):
+    def keypoint_annotation_frequency(self) -> Any:
         """
         DEPRECATED
 
@@ -185,7 +178,7 @@ class MixinCocoDepricate:
         kpname_to_num = ub.map_keys(kpcid_to_name, kpcid_to_num)
         return kpname_to_num
 
-    def category_annotation_type_frequency(self):
+    def category_annotation_type_frequency(self) -> Any:
         """
         DEPRECATED
 
@@ -222,7 +215,7 @@ class MixinCocoDepricate:
                 lambda k: k[0] if len(k) == 1 else k, hist)
         return catname_to_nannot_types
 
-    def imread(self, gid):
+    def imread(self, gid: Any) -> Any:
         """
         DEPRECATED: use load_image or delayed_image
 
@@ -243,7 +236,7 @@ class MixinCocoAccessors:
     TODO: better name
     """
 
-    def delayed_load(self, gid: int, channels: 'kwcoco.FusedChannelSpec | None' = None, space: str = 'image'):
+    def delayed_load(self, gid: int, channels: kwcoco.FusedChannelSpec | None = None, space: str = 'image') -> Any:
         """
         Experimental method
 
@@ -311,7 +304,7 @@ class MixinCocoAccessors:
         delayed = coco_img.imdelay(channels=channels, space=space)
         return delayed
 
-    def load_image(self, gid_or_img, channels=None):
+    def load_image(self, gid_or_img: int | dict, channels: str | None = None) -> np.ndarray:
         """
         Reads an image from disk and
 
@@ -337,7 +330,7 @@ class MixinCocoAccessors:
 
         return np_img
 
-    def get_image_fpath(self, gid_or_img, channels=None):
+    def get_image_fpath(self, gid_or_img: int | dict, channels: str | None = None) -> PathLike:
         """
         Returns the full path to the image
 
@@ -359,7 +352,7 @@ class MixinCocoAccessors:
             gpath = ub.Path(self.bundle_dpath) / img['file_name']
         return gpath
 
-    def _get_img_auxiliary(self, gid_or_img, channels):
+    def _get_img_auxiliary(self, gid_or_img: Any, channels: Any) -> Any:
         """ returns the auxiliary dictionary for a specific channel """
         img = self._resolve_to_img(gid_or_img)
         found = None
@@ -378,7 +371,7 @@ class MixinCocoAccessors:
                 'Image does not have auxiliary channels={}'.format(channels))
         return found
 
-    def get_auxiliary_fpath(self, gid_or_img, channels):
+    def get_auxiliary_fpath(self, gid_or_img: int | dict, channels: str) -> Any:
         """
         Returns the full path to auxiliary data for an image
 
@@ -398,7 +391,7 @@ class MixinCocoAccessors:
         fpath = ub.Path(self.bundle_dpath) / aux['file_name']
         return fpath
 
-    def load_annot_sample(self, aid_or_ann, image=None, pad=None):
+    def load_annot_sample(self, aid_or_ann: Any, image: ArrayLike | None = None, pad: Any | None = None) -> Any:
         """
         Reads the chip of an annotation. Note this is much less efficient than
         using a sampler, but it doesn't require disk cache.
@@ -440,7 +433,7 @@ class MixinCocoAccessors:
         }
         return sample
 
-    def _resolve_to_id(self, id_or_dict):
+    def _resolve_to_id(self, id_or_dict: Any) -> Any:
         """
         Ensures output is an id
         """
@@ -450,7 +443,7 @@ class MixinCocoAccessors:
             resolved_id = id_or_dict['id']
         return resolved_id
 
-    def _resolve_to_cid(self, id_or_name_or_dict):
+    def _resolve_to_cid(self, id_or_name_or_dict: Any) -> Any:
         """
         Ensures output is an category id
 
@@ -468,7 +461,7 @@ class MixinCocoAccessors:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
 
-    def _resolve_to_gid(self, id_or_name_or_dict):
+    def _resolve_to_gid(self, id_or_name_or_dict: Any) -> Any:
         """
         Ensures output is an category id
         """
@@ -480,7 +473,7 @@ class MixinCocoAccessors:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
 
-    def _resolve_to_vidid(self, id_or_name_or_dict):
+    def _resolve_to_vidid(self, id_or_name_or_dict: Any) -> Any:
         """
         Ensures output is an video id
         """
@@ -492,7 +485,7 @@ class MixinCocoAccessors:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
 
-    def _resolve_to_trackid(self, id_or_name_or_dict):
+    def _resolve_to_trackid(self, id_or_name_or_dict: Any) -> Any:
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
         elif isinstance(id_or_name_or_dict, str):
@@ -501,7 +494,7 @@ class MixinCocoAccessors:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
 
-    def _resolve_to_ann(self, aid_or_ann):
+    def _resolve_to_ann(self, aid_or_ann: Any) -> Any:
         """
         Ensures output is an annotation dictionary
         """
@@ -521,7 +514,7 @@ class MixinCocoAccessors:
             resolved_ann = aid_or_ann
         return resolved_ann
 
-    def _resolve_to_img(self, gid_or_img):
+    def _resolve_to_img(self, gid_or_img: Any) -> Any:
         """
         Ensures output is an image dictionary
         """
@@ -541,7 +534,7 @@ class MixinCocoAccessors:
             resolved_img = gid_or_img
         return resolved_img
 
-    def _resolve_to_kpcat(self, kp_identifier):
+    def _resolve_to_kpcat(self, kp_identifier: int | str | dict) -> dict:
         """
         Lookup a keypoint-category dict via its name or id
 
@@ -592,7 +585,7 @@ class MixinCocoAccessors:
             raise TypeError(type(kp_identifier))
         return kpcat
 
-    def _resolve_to_cat(self, cat_identifier):
+    def _resolve_to_cat(self, cat_identifier: int | str | dict) -> Any:
         """
         Lookup a coco-category dict via its name, alias, or id.
 
@@ -641,7 +634,7 @@ class MixinCocoAccessors:
             raise TypeError(type(cat_identifier))
         return cat
 
-    def _alias_to_cat(self, alias_catname):
+    def _alias_to_cat(self, alias_catname: str) -> dict:
         """
         Lookup a coco-category via its name or an "alias" name.
         In production code, use :func:`_resolve_to_cat` instead.
@@ -693,7 +686,7 @@ class MixinCocoAccessors:
 
         return fixed_cat
 
-    def category_graph(self):
+    def category_graph(self) -> networkx.DiGraph:
         """
         Construct a networkx category hierarchy
 
@@ -726,7 +719,7 @@ class MixinCocoAccessors:
                     graph.add_edge(u, v)
         return graph
 
-    def object_categories(self):
+    def object_categories(self) -> kwcoco.CategoryTree:
         """
         Construct a consistent CategoryTree representation of object classes
 
@@ -744,7 +737,7 @@ class MixinCocoAccessors:
         classes = CategoryTree(graph)
         return classes
 
-    def keypoint_categories(self):
+    def keypoint_categories(self) -> kwcoco.CategoryTree:
         """
         Construct a consistent CategoryTree representation of keypoint classes
 
@@ -779,7 +772,7 @@ class MixinCocoAccessors:
             classes = CategoryTree(graph)
         return classes
 
-    def _keypoint_category_names(self):
+    def _keypoint_category_names(self) -> list[str]:
         """
         Construct keypoint categories names.
 
@@ -806,7 +799,7 @@ class MixinCocoAccessors:
                     names.extend(cat['keypoints'])
             return names
 
-    def _lookup_kpnames(self, cid):
+    def _lookup_kpnames(self, cid: Any) -> Any:
         """ Get the keypoint categories for a certain class """
         kpnames = None
         orig_cat = self.cats[cid]
@@ -822,7 +815,7 @@ class MixinCocoAccessors:
                 raise KeyError('could not find keypoint names for cid={}, cat={}, orig_cat={}'.format(cid, cat, orig_cat))
         return kpnames
 
-    def _coco_image(self, gid):
+    def _coco_image(self, gid: Any) -> Any:
         ub.schedule_deprecation(
             'kwcoco', '_coco_image', 'method',
             migration='Use "coco_image" instead.',
@@ -830,7 +823,7 @@ class MixinCocoAccessors:
         )
         return self.coco_image(gid)
 
-    def coco_image(self, gid) -> CocoImage:
+    def coco_image(self, gid: int) -> CocoImage:
         """
         Args:
             gid (int): image id
@@ -851,7 +844,7 @@ class MixinCocoConstructors:
     """
 
     @classmethod
-    def coerce(cls, key, sqlview=False, verbose=0, **kw):
+    def coerce(cls, key: Any, sqlview: bool | str = False, verbose: int = 0, **kw: Any) -> Any:
         """
         Attempt to transform the input into the intended CocoDataset.
 
@@ -940,7 +933,7 @@ class MixinCocoConstructors:
         return self
 
     @classmethod
-    def demo(cls, key='photos', **kwargs):
+    def demo(cls, key: str = 'photos', **kwargs: Any) -> Any:
         """
         Create a toy coco dataset for testing and demo purposes
 
@@ -1232,7 +1225,7 @@ class MixinCocoConstructors:
         return self
 
     @classmethod
-    def random(cls, rng=None):
+    def random(cls, rng: Any = None) -> Any:
         """
         Creates a random CocoDataset according to distribution parameters
 
@@ -1245,7 +1238,7 @@ class MixinCocoConstructors:
         return dset
 
     @classmethod
-    def empty(CocoDataset):
+    def empty(CocoDataset: Any) -> Any:
         """
         Create an empty dataset
         """
@@ -1253,7 +1246,7 @@ class MixinCocoConstructors:
         return self
 
     @classmethod
-    def load(CocoDataset, file, bundle_dpath=None, autobuild=True):
+    def load(CocoDataset: Any, file: PathLike | IO, bundle_dpath: Any = None, autobuild: Any = True) -> CocoDataset:
         """
         Constructor from a open file or file path.
 
@@ -1293,7 +1286,7 @@ class MixinCocoConstructors:
         return coco_dset
 
     @classmethod
-    def from_data(CocoDataset, data, bundle_dpath=None, img_root=None):
+    def from_data(CocoDataset: Any, data: Any, bundle_dpath: Any = None, img_root: Any = None) -> CocoDataset:
         """
         Constructor from a json dictionary
 
@@ -1305,8 +1298,8 @@ class MixinCocoConstructors:
         return coco_dset
 
     @classmethod
-    def from_image_paths(CocoDataset, gpaths, bundle_dpath=None,
-                         img_root=None):
+    def from_image_paths(CocoDataset: Any, gpaths: list[str], bundle_dpath: Any = None,
+                         img_root: Any = None) -> CocoDataset:
         """
         Constructor from a list of images paths.
 
@@ -1329,7 +1322,7 @@ class MixinCocoConstructors:
         return coco_dset
 
     @classmethod
-    def from_class_image_paths(CocoDataset, root):
+    def from_class_image_paths(CocoDataset: Any, root: str | PathLike) -> CocoDataset:
         """
         Ingest classification data in the common format where images of
         different categories are stored in folders with the category label.
@@ -1356,8 +1349,8 @@ class MixinCocoConstructors:
         return coco_dset
 
     @classmethod
-    def coerce_multiple(cls, datas, workers=0, mode='process', verbose=0,
-                        postprocess=None, ordered=True, **kwargs):
+    def coerce_multiple(cls, datas: list, workers: int | str = 0, mode: str = 'process', verbose: int = 0,
+                        postprocess: Callable | None = None, ordered: bool = True, **kwargs: Any) -> Any:
         """
         Coerce multiple CocoDataset objects in parallel.
 
@@ -1426,8 +1419,8 @@ class MixinCocoConstructors:
                                       **kwargs)
 
     @classmethod
-    def load_multiple(cls, fpaths, workers=0, mode='process', verbose=1,
-                      postprocess=None, ordered=True, **kwargs):
+    def load_multiple(cls, fpaths: list[str | PathLike], workers: int = 0, mode: str = 'process', verbose: int = 1,
+                      postprocess: Callable | None = None, ordered: bool = True, **kwargs: Any) -> Any:
         """
         Load multiple CocoDataset objects in parallel.
 
@@ -1472,8 +1465,8 @@ class MixinCocoConstructors:
                                       **kwargs)
 
     @classmethod
-    def _load_multiple(cls, _loader, inputs, workers=0, mode='process',
-                       verbose=1, postprocess=None, ordered=True, **kwargs):
+    def _load_multiple(cls, _loader: Any, inputs: Any, workers: Any = 0, mode: Any = 'process',
+                       verbose: Any = 1, postprocess: Any = None, ordered: Any = True, **kwargs: Any) -> Any:
         """
         Shared logic for multiprocessing loaders.
 
@@ -1510,8 +1503,8 @@ class MixinCocoConstructors:
                 yield job.result()
 
     @classmethod
-    def from_coco_paths(CocoDataset, fpaths, max_workers=0, verbose=1,
-                        mode='thread', union='try'):
+    def from_coco_paths(CocoDataset: Any, fpaths: list[str], max_workers: int = 0, verbose: int = 1,
+                        mode: str = 'thread', union: str | bool = 'try') -> Any:
         """
         Constructor from multiple coco file paths.
 
@@ -1572,7 +1565,7 @@ class MixinCocoExtras:
     Misc functions for coco
     """
 
-    def _tree(self):
+    def _tree(self) -> Any:
         """
         developer helper
 
@@ -1599,7 +1592,7 @@ class MixinCocoExtras:
             raise Exception('We dont have a bundle')
         _ = ub.cmd('tree {}'.format(self.bundle_dpath), verbose=2)  # NOQA
 
-    def _dataset_id(self):
+    def _dataset_id(self) -> Any:
         """
         A human interpretable name that can be used to uniquely identify the
         dataset.
@@ -1623,7 +1616,7 @@ class MixinCocoExtras:
         dset_id = '_'.join([coco_fpath.parent.stem, coco_fpath.stem, hashid[0:8]])
         return dset_id
 
-    def _ensure_imgsize(self, workers=0, verbose=1, fail=False):
+    def _ensure_imgsize(self, workers: int = 0, verbose: int = 1, fail: bool = False) -> dict:
         """
         Populate the imgsize field if it does not exist.
 
@@ -1713,7 +1706,7 @@ class MixinCocoExtras:
         summary['bad_images'] = bad_images
         return summary
 
-    def _ensure_image_data(self, gids=None, verbose=1):
+    def _ensure_image_data(self, gids: list = None, verbose: Any = 1) -> Any:
         """
         Download data from "url" fields if specified.
 
@@ -1753,7 +1746,7 @@ class MixinCocoExtras:
             else:
                 raise Exception('missing image, but no url')
 
-    def missing_images(self, check_aux=True, verbose=0):
+    def missing_images(self, check_aux: bool = True, verbose: int = 0) -> list[tuple[int, str, int]]:
         """
         Check for images that don't exist
 
@@ -1786,7 +1779,7 @@ class MixinCocoExtras:
                         bad_paths.append((index, gpath, gid))
         return bad_paths
 
-    def corrupted_images(self, check_aux=True, verbose=0, workers=0):
+    def corrupted_images(self, check_aux: bool = True, verbose: int = 0, workers: int = 0) -> list[tuple[int, str, int]]:
         """
         Check for images that don't exist or can't be opened
 
@@ -1829,7 +1822,7 @@ class MixinCocoExtras:
 
         return bad_paths
 
-    def normalize_category_ids(self, start_id=None, order=None):
+    def normalize_category_ids(self, start_id: int | None = None, order: list[str] | str | None = None) -> Any:
         """
         Reassign category IDs to be consecutive integers starting at `start_id`.
 
@@ -1920,7 +1913,7 @@ class MixinCocoExtras:
         self._invalidate_hashid()
         self.rebuild_index()
 
-    def rename_categories(self, mapper, rebuild=True, merge_policy='ignore'):
+    def rename_categories(self, mapper: dict | Callable, rebuild: bool = True, merge_policy: str = 'ignore') -> None:
         """
         Rename categories with a potentially coarser categorization.
 
@@ -2076,13 +2069,13 @@ class MixinCocoExtras:
             self.index.clear()
         self._invalidate_hashid()
 
-    def _ensure_json_serializable(self):
+    def _ensure_json_serializable(self) -> Any:
         # inplace convert any ndarrays to lists
         # TODO: use the kwutil version
         from kwcoco.util.util_json import ensure_json_serializable
         _ = ensure_json_serializable(self.dataset, verbose=1)
 
-    def _aspycoco(self):
+    def _aspycoco(self) -> Any:
         """
         Converts to the official pycocotools.coco.COCO object
 
@@ -2095,13 +2088,13 @@ class MixinCocoExtras:
         pycoco.createIndex()
         return pycoco
 
-    def reroot(self, new_root=None,
-               old_prefix=None,
-               new_prefix=None,
-               absolute=False,
-               check=True,
-               safe=True,
-               verbose=0):
+    def reroot(self, new_root: str | PathLike | None = None,
+               old_prefix: str | None = None,
+               new_prefix: str | None = None,
+               absolute: bool = False,
+               check: bool = True,
+               safe: bool = True,
+               verbose: int = 0) -> Any:
         """
         Modify the prefix of the image/data paths onto a new image/data root.
 
@@ -2364,30 +2357,30 @@ class MixinCocoExtras:
         return self
 
     @property
-    def data_root(self):
+    def data_root(self) -> None:
         """ In the future we will deprecate data_root for bundle_dpath """
         return self.bundle_dpath
 
     @data_root.setter
-    def data_root(self, value):
+    def data_root(self, value: Any) -> None:
         self.bundle_dpath = value if value is None else os.fspath(value)
 
     @property
-    def img_root(self):
+    def img_root(self) -> None:
         """ In the future we will deprecate img_root for bundle_dpath """
         return self.bundle_dpath
 
     @img_root.setter
-    def img_root(self, value):
+    def img_root(self, value: Any) -> None:
         self.bundle_dpath = value
 
     @property
-    def data_fpath(self):
+    def data_fpath(self) -> None:
         """ data_fpath is an alias of fpath """
         return self.fpath
 
     @data_fpath.setter
-    def data_fpath(self, value):
+    def data_fpath(self, value: Any) -> None:
         self.fpath = value
 
 
@@ -2396,7 +2389,7 @@ class MixinCocoHashing:
     Mixin for creating and maintaining hashids (i.e. content identifiers)
     """
 
-    def _build_hashid(self, hash_pixels=False, verbose=0):
+    def _build_hashid(self, hash_pixels: bool = False, verbose: int = 0) -> str:
         """
         Construct a hash that uniquely identifies the state of this dataset.
 
@@ -2570,7 +2563,7 @@ class MixinCocoHashing:
         self.hashid_parts = hashid_parts
         return hashid
 
-    def _invalidate_hashid(self, parts=None):
+    def _invalidate_hashid(self, parts: Any = None) -> Any:
         """
         Called whenever the coco dataset is modified. It is possible to specify
         which parts were modified so unmodified parts can be reused next time
@@ -2587,7 +2580,7 @@ class MixinCocoHashing:
         else:
             self.hashid_parts = None
 
-    def _cached_hashid(self):
+    def _cached_hashid(self) -> Any:
         """
         Under Construction.
 
@@ -2647,7 +2640,7 @@ class MixinCocoHashing:
         return self.hashid
 
     @classmethod
-    def _cached_hashid_for(cls, fpath):
+    def _cached_hashid_for(cls, fpath: Any) -> Any:
         """
         Lookup the cached hashid for a kwcoco json file if it exists.
         """
@@ -2692,10 +2685,10 @@ class MixinCocoObjects:
     This is an alternative vectorized ORM-like interface to the coco dataset
     """
 
-    def annots(self, annot_ids=None, image_id=None, track_id=None, video_id=None,
-               image_name=None, track_name=None, video_name=None,
+    def annots(self, annot_ids: list[int] | None = None, image_id: int | None = None, track_id: int | None = None, video_id: int | None = None,
+               image_name: str | None = None, track_name: str | None = None, video_name: str | None = None,
                *,
-               trackid=None, aids=None, gid=None):
+               trackid: Any | None = None, aids: Any | None = None, gid: Any | None = None) -> kwcoco.coco_objects1d.Annots:
         """
         Return vectorized annotation objects
 
@@ -2785,8 +2778,8 @@ class MixinCocoObjects:
 
         return Annots(annot_ids, self)
 
-    def images(self, image_ids=None, video_id=None, names=None,
-               video_name=None, *, gids=None, vidid=None):
+    def images(self, image_ids: list[int] | None = None, video_id: int | None = None, names: list[str] | None = None,
+               video_name: str | None = None, *, gids: Any | None = None, vidid: Any | None = None) -> kwcoco.coco_objects1d.Images:
         """
         Return vectorized image objects
 
@@ -2845,7 +2838,7 @@ class MixinCocoObjects:
 
         return Images(image_ids, self)
 
-    def categories(self, category_ids=None, *, cids=None):
+    def categories(self, category_ids: list[int] | None = None, *, cids: Any | None = None) -> kwcoco.coco_objects1d.Categories:
         """
         Return vectorized category objects
 
@@ -2878,7 +2871,7 @@ class MixinCocoObjects:
             category_ids = sorted(self.index.cats.keys())
         return Categories(category_ids, self)
 
-    def videos(self, video_ids=None, names=None, *, vidids=None):
+    def videos(self, video_ids: list[int] | None = None, names: list[str] | None = None, *, vidids: Any | None = None) -> kwcoco.coco_objects1d.Videos:
         """
         Return vectorized video objects
 
@@ -2929,7 +2922,7 @@ class MixinCocoObjects:
             video_ids = [self.index.name_to_video[name]['id'] for name in names]
         return Videos(video_ids, self)
 
-    def tracks(self, track_ids=None, names=None, video_id=None, video_name=None):
+    def tracks(self, track_ids: list[int] | None = None, names: list[str] | None = None, video_id: int | None = None, video_name: str | None = None) -> kwcoco.coco_objects1d.Tracks:
         """
         Return vectorized track objects
 
@@ -2996,31 +2989,31 @@ class MixinCocoStats:
     """
 
     @property
-    def n_annots(self):
+    def n_annots(self) -> Any:
         """ The number of annotations in the dataset """
         return len(self.dataset.get('annotations', []))
 
     @property
-    def n_images(self):
+    def n_images(self) -> Any:
         """ The number of images in the dataset """
         return len(self.dataset.get('images', []))
 
     @property
-    def n_cats(self):
+    def n_cats(self) -> Any:
         """ The number of categories in the dataset """
         return len(self.dataset.get('categories', []))
 
     @property
-    def n_tracks(self):
+    def n_tracks(self) -> Any:
         """ The number of tracks in the dataset """
         return len(self.dataset.get('tracks', []))
 
     @property
-    def n_videos(self):
+    def n_videos(self) -> Any:
         """ The number of videos in the dataset """
         return len(self.dataset.get('videos', []))
 
-    def category_annotation_frequency(self):
+    def category_annotation_frequency(self) -> Any:
         """
         Reports the number of annotations of each category
 
@@ -3047,7 +3040,7 @@ class MixinCocoStats:
                                              key=lambda kv: (kv[1], kv[0])))
         return catname_to_nannots
 
-    def conform(self, **config):
+    def conform(self, **config: Any) -> None:
         """
         Make the COCO file conform a stricter spec, infers attributes where
         possible.
@@ -3189,7 +3182,7 @@ class MixinCocoStats:
                     ann['keypoints'] = pts.to_coco(style='orig')
         return self
 
-    def validate(self, **config):
+    def validate(self, **config: Any) -> dict:
         """
         Performs checks on this coco dataset.
 
@@ -3438,7 +3431,7 @@ class MixinCocoStats:
 
         return result
 
-    def stats(self, **kwargs):
+    def stats(self, **kwargs: Any) -> dict:
         """
         Compute summary statistics to describe the dataset at a high level
 
@@ -3507,7 +3500,7 @@ class MixinCocoStats:
             info['boxes'] = dset.boxsize_stats()
         return info
 
-    def basic_stats(self):
+    def basic_stats(self) -> Any:
         """
         Reports number of images, annotations, and categories.
 
@@ -3556,7 +3549,7 @@ class MixinCocoStats:
         ])
         return info
 
-    def extended_stats(self):
+    def extended_stats(self) -> Any:
         """
         Reports number of images, annotations, and categories.
 
@@ -3612,8 +3605,8 @@ class MixinCocoStats:
             ('imgs_with_annots', imgs_with_annots),
         ])
 
-    def boxsize_stats(self, anchors=None, perclass=True, gids=None, aids=None,
-                      verbose=0, clusterkw={}, statskw={}):
+    def boxsize_stats(self, anchors: int | None = None, perclass: bool = True, gids: list[int] | None = None, aids: list[int] | None = None,
+                      verbose: int = 0, clusterkw: dict = {}, statskw: dict = {}) -> dict[str, dict[str, dict | ndarray]]:
         """
         Compute statistics about bounding box sizes.
 
@@ -3712,7 +3705,7 @@ class MixinCocoStats:
         infos['all'] = all_info
         return infos
 
-    def find_representative_images(self, gids=None):
+    def find_representative_images(self, gids: None | list = None) -> list:
         r"""
         Find images that have a wide array of categories.
 
@@ -3810,7 +3803,7 @@ class MixinCocoDraw:
     Matplotlib / display functionality
     """
 
-    def draw_image(self, gid, channels=None):
+    def draw_image(self, gid: int, channels: kwcoco.ChannelSpec | None = None) -> ndarray:
         """
         Use kwimage to draw all annotations on an image and return the pixels
         as a numpy array.
@@ -3878,7 +3871,7 @@ class MixinCocoDraw:
         canvas = dets.draw_on(canvas)
         return canvas
 
-    def show_image(self, gid=None, aids=None, aid=None, channels=None, setlim=None, **kwargs):
+    def show_image(self, gid: int | None = None, aids: list | None = None, aid: int | None = None, channels: Any | None = None, setlim: None | str = None, **kwargs: Any) -> Any:
         """
         Use matplotlib to show an image with annotations overlaid
 
@@ -4198,7 +4191,7 @@ class MixinCocoDraw:
         return ax
 
 
-def _normalize_intensity_if_needed(canvas):
+def _normalize_intensity_if_needed(canvas: Any) -> Any:
     # We really need a function that can adapt to dynamic ranges
     # in a robust way that ensures at least something is visible.
     # Normalize intensity is pretty good, but has common edge cases.
@@ -4218,7 +4211,7 @@ class MixinCocoAddRemove:
     categories while maintaining lookup indexes.
     """
 
-    def add_video(self, name, id=None, **kw):
+    def add_video(self, name: str, id: None | int = None, **kw: Any) -> int:
         """
         Register a new video with the dataset
 
@@ -4275,7 +4268,7 @@ class MixinCocoAddRemove:
         # self._invalidate_hashid(['videos'])
         return id
 
-    def add_image(self, file_name=None, id=None, **kw):
+    def add_image(self, file_name: str | None = None, id: None | int = None, **kw: Any) -> int:
         """
         Register a new image with the dataset
 
@@ -4340,7 +4333,7 @@ class MixinCocoAddRemove:
         self._invalidate_hashid()
         return id
 
-    def add_asset(self, gid, file_name=None, channels=None, **kwargs):
+    def add_asset(self, gid: int, file_name: str | None = None, channels: str | kwcoco.FusedChannelSpec | None = None, **kwargs: Any) -> None:
         """
         Adds an auxiliary / asset item to the image dictionary.
 
@@ -4373,9 +4366,9 @@ class MixinCocoAddRemove:
     # TODO: deprecated add_auxiliary_item for add_asset
     add_auxiliary_item = add_asset
 
-    def add_annotation(self, image_id, category_id=None, bbox=ub.NoParam,
-                       segmentation=ub.NoParam, keypoints=ub.NoParam, id=None,
-                       track_id=None, **kw):
+    def add_annotation(self, image_id: int, category_id: int | None = None, bbox: list | kwimage.Boxes = ub.NoParam,
+                       segmentation: dict | list | Any = ub.NoParam, keypoints: Any = ub.NoParam, id: None | int = None,
+                       track_id: int | str | None = None, **kw: Any) -> int:
         """
         Register a new annotation with the dataset
 
@@ -4537,7 +4530,7 @@ class MixinCocoAddRemove:
         self._invalidate_hashid(['annotations'])
         return id
 
-    def add_category(self, name, supercategory=None, id=None, **kw):
+    def add_category(self, name: str, supercategory: str | None = None, id: int | None = None, **kw: Any) -> int:
         """
         Register a new category with the dataset
 
@@ -4589,7 +4582,7 @@ class MixinCocoAddRemove:
         self._invalidate_hashid(['categories'])
         return id
 
-    def add_track(self, name=None, id=None, **kw):
+    def add_track(self, name: str = None, id: int | None = None, **kw: Any) -> int:
         """
         Register a new track with the dataset
 
@@ -4650,7 +4643,7 @@ class MixinCocoAddRemove:
         self._invalidate_hashid(['tracks'])
         return id
 
-    def ensure_video(self, name, id=None, **kw):
+    def ensure_video(self, name: Any, id: None | int = None, **kw: Any) -> int:
         """
         Register a video if it is new or returns an existing id.
 
@@ -4684,7 +4677,7 @@ class MixinCocoAddRemove:
             id = obj['id']
         return id
 
-    def ensure_track(self, name, id=None, **kw):
+    def ensure_track(self, name: Any, id: None | int = None, **kw: Any) -> int:
         """
         Register a track if it is new or returns an existing id.
 
@@ -4718,7 +4711,7 @@ class MixinCocoAddRemove:
             id = obj['id']
         return id
 
-    def ensure_image(self, file_name, id=None, **kw):
+    def ensure_image(self, file_name: str, id: None | int = None, **kw: Any) -> int:
         """
         Register an image if it is new or returns an existing id.
 
@@ -4746,7 +4739,7 @@ class MixinCocoAddRemove:
             id = img['id']
         return id
 
-    def ensure_category(self, name, supercategory=None, id=None, **kw):
+    def ensure_category(self, name: Any, supercategory: Any | None = None, id: Any | None = None, **kw: Any) -> int:
         """
         Register a category if it is new or returns an existing id.
 
@@ -4769,7 +4762,7 @@ class MixinCocoAddRemove:
             id = cat['id']
         return id
 
-    def add_categories(self, cats):
+    def add_categories(self, cats: list[dict]) -> Any:
         """
         Faster less-safe multi-item alternative to add_category.
 
@@ -4798,7 +4791,7 @@ class MixinCocoAddRemove:
         self.index._add_categories(cats)
         self._invalidate_hashid(['categories'])
 
-    def add_keypoint_categories(self, keypoint_cats):
+    def add_keypoint_categories(self, keypoint_cats: Any) -> Any:
         """
         Faster less-safe multi-item alternative to add_category.
 
@@ -4828,7 +4821,7 @@ class MixinCocoAddRemove:
         self.index._add_keypoint_categories(keypoint_cats)
         self._invalidate_hashid(['keypoint_categories'])
 
-    def add_annotations(self, anns):
+    def add_annotations(self, anns: list[dict]) -> None:
         """
         Faster less-safe multi-item alternative to add_annotation.
 
@@ -4856,7 +4849,7 @@ class MixinCocoAddRemove:
         self.index._add_annotations(anns)
         self._invalidate_hashid(['annotations'])
 
-    def add_images(self, imgs):
+    def add_images(self, imgs: list[dict]) -> None:
         """
         Faster less-safe multi-item alternative
 
@@ -4889,7 +4882,7 @@ class MixinCocoAddRemove:
         self.index._add_images(imgs)
         self._invalidate_hashid(['images'])
 
-    def clear_images(self):
+    def clear_images(self) -> None:
         """
         Removes all images and annotations (but not categories)
 
@@ -4907,7 +4900,7 @@ class MixinCocoAddRemove:
         self.index._remove_all_images()
         self._invalidate_hashid(['images', 'annotations'])
 
-    def clear_annotations(self):
+    def clear_annotations(self) -> None:
         """
         Removes all annotations and tracks (but not images and categories)
 
@@ -4925,7 +4918,7 @@ class MixinCocoAddRemove:
         self.index._remove_all_annotations()
         self._invalidate_hashid(['annotations', 'tracks'])
 
-    def remove_annotation(self, aid_or_ann):
+    def remove_annotation(self, aid_or_ann: Any) -> None:
         """
         Remove a single annotation from the dataset
 
@@ -4947,7 +4940,7 @@ class MixinCocoAddRemove:
         self.index.clear()
         self._invalidate_hashid(['annotations'])
 
-    def remove_annotations(self, aids_or_anns, verbose=0, safe=True):
+    def remove_annotations(self, aids_or_anns: Any, verbose: int = 0, safe: bool = True) -> dict:
         """
         Remove multiple annotations from the dataset.
 
@@ -4998,8 +4991,8 @@ class MixinCocoAddRemove:
             self._invalidate_hashid(['annotations'])
         return remove_info
 
-    def remove_categories(self, cat_identifiers, keep_annots=False, verbose=0,
-                          safe=True):
+    def remove_categories(self, cat_identifiers: list, keep_annots: bool = False, verbose: int = 0,
+                          safe: bool = True) -> dict:
         """
         Remove categories and all annotations in those categories.
 
@@ -5075,8 +5068,8 @@ class MixinCocoAddRemove:
 
         return remove_info
 
-    def remove_tracks(self, track_identifiers, keep_annots=False, verbose=0,
-                      safe=True):
+    def remove_tracks(self, track_identifiers: list, keep_annots: bool = False, verbose: int = 0,
+                      safe: bool = True) -> dict:
         """
         Remove tracks and all annotations in those tracks.
 
@@ -5157,7 +5150,7 @@ class MixinCocoAddRemove:
 
         return remove_info
 
-    def remove_images(self, gids_or_imgs, verbose=0, safe=True):
+    def remove_images(self, gids_or_imgs: list, verbose: int = 0, safe: bool = True) -> dict:
         """
         Remove images and any annotations contained by them
 
@@ -5219,7 +5212,7 @@ class MixinCocoAddRemove:
 
         return remove_info
 
-    def remove_videos(self, vidids_or_videos, verbose=0, safe=True):
+    def remove_videos(self, vidids_or_videos: list, verbose: int = 0, safe: bool = True) -> dict:
         """
         Remove videos and any images / annotations contained by them
 
@@ -5278,7 +5271,7 @@ class MixinCocoAddRemove:
             self._invalidate_hashid(['videos', 'images', 'annotations'])
         return remove_info
 
-    def remove_annotation_keypoints(self, kp_identifiers):
+    def remove_annotation_keypoints(self, kp_identifiers: list) -> dict:
         """
         Removes all keypoints with a particular category
 
@@ -5303,7 +5296,7 @@ class MixinCocoAddRemove:
         remove_info = {'annotation_keypoints': num_kps_removed}
         return remove_info
 
-    def remove_keypoint_categories(self, kp_identifiers, clean_anns=True):
+    def remove_keypoint_categories(self, kp_identifiers: list, clean_anns: bool = True) -> dict:
         """
         Removes all keypoints of a particular category as well as all
         annotation keypoints with those ids.
@@ -5356,7 +5349,7 @@ class MixinCocoAddRemove:
         self.index._remove_keypoint_categories(remove_kpcids)
         return remove_info
 
-    def set_annotation_category(self, aid_or_ann, cid_or_cat):
+    def set_annotation_category(self, aid_or_ann: dict | int, cid_or_cat: dict | int) -> None:
         """
         Sets the category of a single annotation
 
@@ -5447,7 +5440,7 @@ class CocoIndex:
     # _set = ub.oset  # many operations are much slower for oset
     _set = set
 
-    def _images_set_sorted_by_frame_index(index, gids=None):
+    def _images_set_sorted_by_frame_index(index: Any, gids: Any = None) -> Any:
         """
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
@@ -5457,7 +5450,7 @@ class CocoIndex:
     # Backwards compat
     _set_sorted_by_frame_index = _images_set_sorted_by_frame_index
 
-    def _annots_set_sorted_by_frame_index(index, aids=None):
+    def _annots_set_sorted_by_frame_index(index: Any, aids: Any = None) -> Any:
         """
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
@@ -5467,7 +5460,7 @@ class CocoIndex:
         # return set(aids)
         return SortedSet(aids, key=partial(_lut_annot_frame_index, index.imgs, index.anns))
 
-    def __init__(index):
+    def __init__(index: Any) -> None:
         index.anns = None
         index.imgs = None
         index.videos = None
@@ -5489,12 +5482,12 @@ class CocoIndex:
         index._CHECKS = True
         # index.kpcid_to_aids = None  # TODO
 
-    def __bool__(index):
+    def __bool__(index: Any) -> Any:
         return index.anns is not None
 
     # On-demand lookup tables
     @property
-    def cid_to_gids(index):
+    def cid_to_gids(index: Any) -> Any:
         """
         Example:
             >>> import kwcoco
@@ -5503,18 +5496,18 @@ class CocoIndex:
         """
         from scriptconfig.dict_like import DictLike
         class ProxyCidToGids(DictLike):
-            def __init__(self, index):
+            def __init__(self, index: Any) -> Any:
                 self.index = index
-            def getitem(self, cid):
+            def getitem(self, cid: Any) -> Any:
                 aids = self.index.cid_to_aids[cid]
                 gids = {self.index.anns[aid]['image_id'] for aid in aids}
                 return gids
-            def keys(self):
+            def keys(self) -> Any:
                 return self.index.cid_to_aids.keys()
         cid_to_gids = ProxyCidToGids(index=index)
         return cid_to_gids
 
-    def _add_video(index, vidid, video):
+    def _add_video(index: Any, vidid: Any, video: Any) -> Any:
         if index.videos is not None:
             name = video['name']
             if index._CHECKS:
@@ -5526,7 +5519,7 @@ class CocoIndex:
                 index.vidid_to_gids[vidid] = index._images_set_sorted_by_frame_index()
             index.name_to_video[name] = video
 
-    def _add_image(index, gid, img):
+    def _add_image(index: Any, gid: Any, img: Any) -> Any:
         """
         Example:
             >>> # Test adding image to video that doesnt exist
@@ -5580,7 +5573,7 @@ class CocoIndex:
                     index.vidid_to_gids[vidid] = index._images_set_sorted_by_frame_index()
                     index.vidid_to_gids[vidid].add(gid)
 
-    def _add_images(index, imgs):
+    def _add_images(index: Any, imgs: Any) -> Any:
         """
         See ../dev/bench/bench_add_image_check.py
 
@@ -5612,7 +5605,7 @@ class CocoIndex:
                 for vidid, gids in vidid_to_gids.items():
                     index.vidid_to_gids[vidid].update(gids)
 
-    def _add_annotation(index, aid, gid, cid, tid, ann):
+    def _add_annotation(index: Any, aid: Any, gid: Any, cid: Any, tid: Any, ann: Any) -> Any:
         if index.anns is not None:
             index.anns[aid] = ann
             # Note: it should be ok to have None's here
@@ -5632,14 +5625,14 @@ class CocoIndex:
                     index.trackid_to_aids[tid] = index._annots_set_sorted_by_frame_index()
                 index.trackid_to_aids[tid].add(aid)
 
-    def _add_keypoint_categories(index, keypoint_cats):
+    def _add_keypoint_categories(index: Any, keypoint_cats: Any) -> Any:
         if index.kpcats is None:
             index.kpcats = {}
         ids = [obj['id'] for obj in keypoint_cats]
         new_objs = dict(zip(ids, keypoint_cats))
         index.kpcats.update(new_objs)
 
-    def _add_categories(index, cats):
+    def _add_categories(index: Any, cats: Any) -> Any:
         if index.cats is not None:
             ids = [obj['id'] for obj in cats]
             names = [obj['name'] for obj in cats]
@@ -5649,7 +5642,7 @@ class CocoIndex:
                 index.cid_to_aids[cid] = index._set()
                 index.name_to_cat[name] = cat
 
-    def _add_annotations(index, anns):
+    def _add_annotations(index: Any, anns: Any) -> Any:
         if index.anns is not None:
             aids = [ann['id'] for ann in anns]
             gids = [ann['image_id'] for ann in anns]
@@ -5669,19 +5662,19 @@ class CocoIndex:
                         index.trackid_to_aids[tid] = index._annots_set_sorted_by_frame_index()
                     index.trackid_to_aids[tid].add(aid)
 
-    def _add_category(index, cid, name, cat):
+    def _add_category(index: Any, cid: Any, name: Any, cat: Any) -> Any:
         if index.cats is not None:
             index.cats[cid] = cat
             index.cid_to_aids[cid] = index._set()
             index.name_to_cat[name] = cat
 
-    def _add_track(index, trackid, name, track):
+    def _add_track(index: Any, trackid: Any, name: Any, track: Any) -> Any:
         if index.tracks is not None:
             index.tracks[trackid] = track
             index.trackid_to_aids[trackid] = index._annots_set_sorted_by_frame_index()
             index.name_to_track[name] = track
 
-    def _remove_all_annotations(index):
+    def _remove_all_annotations(index: Any) -> Any:
         # Keep the category and image indexes alive
         if index.anns is not None:
             for _ in index.gid_to_aids.values():
@@ -5695,7 +5688,7 @@ class CocoIndex:
             index.trackid_to_aids.clear()
             index.name_to_track.clear()
 
-    def _remove_all_images(index):
+    def _remove_all_images(index: Any) -> Any:
         # Keep the category indexes alive
         if index.imgs is not None:
             index.imgs.clear()
@@ -5707,7 +5700,7 @@ class CocoIndex:
             for _ in index.vidid_to_gids.values():
                 _.clear()
 
-    def _remove_keypoint_categories(index, remove_kpcid, verbose=0):
+    def _remove_keypoint_categories(index: Any, remove_kpcid: Any, verbose: Any = 0) -> Any:
         if index.kpcats is not None:
             for kpcid in remove_kpcid:
                 del index.kpcats[kpcid]
@@ -5715,7 +5708,7 @@ class CocoIndex:
             if verbose > 2:
                 print('Updated category index')
 
-    def _remove_annotations(index, remove_aids, verbose=0):
+    def _remove_annotations(index: Any, remove_aids: Any, verbose: Any = 0) -> Any:
         if index.anns is not None:
             if verbose > 1:
                 print('Updating annotation index')
@@ -5730,7 +5723,7 @@ class CocoIndex:
                 index.gid_to_aids[gid].remove(aid)
                 index.anns.pop(aid)
 
-    def _remove_tracks(index, remove_trackids, verbose=0):
+    def _remove_tracks(index: Any, remove_trackids: Any, verbose: Any = 0) -> Any:
         # dynamically update the track index
         if index.tracks is not None:
             for tid in remove_trackids:
@@ -5740,7 +5733,7 @@ class CocoIndex:
             if verbose > 2:
                 print('Updated track index')
 
-    def _remove_categories(index, remove_cids, verbose=0):
+    def _remove_categories(index: Any, remove_cids: Any, verbose: Any = 0) -> Any:
         # dynamically update the category index
         if index.cats is not None:
             for cid in remove_cids:
@@ -5750,7 +5743,7 @@ class CocoIndex:
             if verbose > 2:
                 print('Updated category index')
 
-    def _remove_images(index, remove_gids, verbose=0):
+    def _remove_images(index: Any, remove_gids: Any, verbose: Any = 0) -> Any:
         # dynamically update the image index
         if index.imgs is not None:
             for gid in remove_gids:
@@ -5769,7 +5762,7 @@ class CocoIndex:
             if verbose > 2:
                 print('Updated image index')
 
-    def _remove_videos(index, remove_vidids, verbose=0):
+    def _remove_videos(index: Any, remove_vidids: Any, verbose: Any = 0) -> Any:
         # dynamically update the video index
         lut = index.videos
         if lut is not None:
@@ -5781,7 +5774,7 @@ class CocoIndex:
             if verbose > 2:
                 print('Updated video index')
 
-    def clear(index):
+    def clear(index: Any) -> None:
         index.anns = None
         index.imgs = None
         index.videos = None
@@ -5799,7 +5792,7 @@ class CocoIndex:
         index.name_to_track = None
         # index.kpcid_to_aids = None  # TODO?
 
-    def build(index, parent):
+    def build(index: Any, parent: kwcoco.CocoDataset) -> None:
         """
         Build all id-to-obj reverse indexes from scratch.
 
@@ -6011,15 +6004,15 @@ class MixinCocoIndex:
     Give the dataset top level access to index attributes
     """
     @property
-    def anns(self):
+    def anns(self) -> Any:
         return self.index.anns
 
     @property
-    def imgs(self):
+    def imgs(self) -> Any:
         return self.index.imgs
 
     @property
-    def cats(self):
+    def cats(self) -> Any:
         return self.index.cats
 
     # NOTE: API Issue, overloads previous method
@@ -6028,15 +6021,15 @@ class MixinCocoIndex:
     #     return self.index.videos
 
     @property
-    def gid_to_aids(self):
+    def gid_to_aids(self) -> Any:
         return self.index.gid_to_aids
 
     @property
-    def cid_to_aids(self):
+    def cid_to_aids(self) -> Any:
         return self.index.cid_to_aids
 
     @property
-    def name_to_cat(self):
+    def name_to_cat(self) -> Any:
         return self.index.name_to_cat
 
 
@@ -6149,8 +6142,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         >>> plt.show()
     """
 
-    def __init__(self, data=None, tag=None, bundle_dpath=None, img_root=None,
-                 fname=None, autobuild=True):
+    def __init__(self, data: str | PathLike | dict | None = None, tag: str | None = None, bundle_dpath: str | None = None, img_root: str | None = None,
+                 fname: Any | None = None, autobuild: bool = True) -> None:
         """
         Args:
 
@@ -6380,18 +6373,18 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             self.rebuild_index()
 
     @property
-    def fpath(self):
+    def fpath(self) -> None:
         """ In the future we will deprecate img_root for bundle_dpath """
         return self._fpath
 
     @fpath.setter
-    def fpath(self, value):
+    def fpath(self, value: Any) -> None:
         # Cant use update fpath because of reroot checks.
         # self._update_fpath(value)
         self._fpath = value
         self._infer_dirs()
 
-    def _update_fpath(self, new_fpath):
+    def _update_fpath(self, new_fpath: Any) -> Any:
         """
         Update the write location for this dataset and reroot if necessary.
 
@@ -6431,7 +6424,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             self._fpath = new_fpath
             self._infer_dirs()
 
-    def _infer_dirs(self):
+    def _infer_dirs(self) -> Any:
         """
         Ignore:
             self = dset
@@ -6453,7 +6446,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             self.assets_dpath = assets_dpath
             self.cache_dpath = cache_dpath
 
-    def __nice__(self):
+    def __nice__(self) -> Any:
         parts = []
         parts.append('tag={}'.format(self.tag))
         if self.dataset is not None:
@@ -6461,7 +6454,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             parts.append(info)
         return ', '.join(parts)
 
-    def copy(self):
+    def copy(self) -> Any:
         """
         Deep copies this object
 
@@ -6481,7 +6474,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new.rebuild_index()
         return new
 
-    def dumps(self, indent=None, newlines=False):
+    def dumps(self, indent: int | str | None = None, newlines: bool = False) -> Any:
         """
         Writes the dataset out to the json format
 
@@ -6543,7 +6536,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
 
         return text
 
-    def _compress_dump_to_fileptr(self, file, arcname=None, indent=None, newlines=False):
+    def _compress_dump_to_fileptr(self, file: Any, arcname: Any = None, indent: Any = None, newlines: Any = False) -> Any:
         """
         Experimental method to save compressed kwcoco files, may be folded into
         dump in the future.
@@ -6572,7 +6565,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             text = self.dumps(indent=indent, newlines=newlines)
             zfile.writestr(arcname, text.encode('utf8'))
 
-    def _dump(self, file, indent, newlines, compress):
+    def _dump(self, file: Any, indent: Any, newlines: Any, compress: Any) -> Any:
         """
         Case where we are dumping to an open file pointer.
         We assume this means the dataset has been written to disk.
@@ -6595,8 +6588,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                     raise
         self._state['was_saved'] = True
 
-    def dump(self, file=None, indent=None, newlines=False, temp_file='auto',
-             compress='auto', verbose=0):
+    def dump(self, file: PathLike | IO | None = None, indent: int | str | None = None, newlines: bool = False, temp_file: bool | str = 'auto',
+             compress: bool | str = 'auto', verbose: int = 0) -> None:
         """
         Writes the dataset out to the json format
 
@@ -6700,7 +6693,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         if verbose:
             print('done.')
 
-    def _check_json_serializable(self, verbose=1):
+    def _check_json_serializable(self, verbose: Any = 1) -> Any:
         """
         Debug which part of a coco dataset might not be json serializable
         """
@@ -6722,7 +6715,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             print('summary = {}'.format(summary))
         return bad_parts
 
-    def _check_integrity(self):
+    def _check_integrity(self) -> Any:
         """ perform most checks """
         self._check_index()
         self._check_pointers()
@@ -6731,7 +6724,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         # assert len(self.missing_images()) == 0
         return True
 
-    def _check_warnables(self):
+    def _check_warnables(self) -> Any:
         warning_checks = {}
         referenced_track_ids = set()
         for annot in self.dataset['annotations']:
@@ -6751,7 +6744,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             msg = 'Potential issues: {}'.format(list(failed_warnings))
             warnings.warn(msg)
 
-    def _check_index(self):
+    def _check_index(self) -> Any:
         """
         Example:
             >>> import kwcoco
@@ -6800,7 +6793,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                 'Failed index checks: {}'.format(list(failed_checks)))
         return True
 
-    def _check_pointers(self, verbose=1):
+    def _check_pointers(self, verbose: Any = 1) -> Any:
         """
         Check that all category and image ids referenced by annotations exist
         """
@@ -6873,12 +6866,12 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
             print('Pointers are consistent')
         return True
 
-    def _build_index(self):
+    def _build_index(self) -> Any:
         # use rebuild_index instead
         # ub.schedule_deprecation
         self.index.build(self)
 
-    def rebuild_index(self):
+    def rebuild_index(self) -> Any:
         """
         Build or rebuild the fast lookup index.
 
@@ -6887,7 +6880,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         """
         self.index.build(self)
 
-    def union(*others, disjoint_tracks=True, remember_parent=False, **kwargs):
+    def union(*others: Any, disjoint_tracks: bool = True, remember_parent: bool = False, **kwargs: Any) -> kwcoco.CocoDataset:
         """
         Combines multiple :class:`CocoDataset` items into one. Names and
         associations are retained, but ids may be different.
@@ -7340,7 +7333,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         new_dset = cls(merged, **kwargs)
         return new_dset
 
-    def subset(self, gids=None, video_ids=None, copy=False, autobuild=True, **kwargs):
+    def subset(self, gids: list[int] = None, video_ids: list[int] | None = None, copy: bool = False, autobuild: bool = True, **kwargs: Any) -> Any:
         """
         Return a subset of the larger coco dataset by specifying which images
         to port. All annotations in those images will be taken.
@@ -7463,8 +7456,8 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
                                autobuild=autobuild)
         return sub_dset
 
-    def view_sql(self, force_rewrite=False, memory=False, backend='sqlite',
-                 sql_db_fpath=None):
+    def view_sql(self, force_rewrite: bool = False, memory: bool = False, backend: str = 'sqlite',
+                 sql_db_fpath: str | PathLike | None = None) -> Any:
         """
         Create a cached SQL interface to this dataset suitable for large scale
         multiprocessing use cases.
@@ -7523,7 +7516,7 @@ class CocoDataset(AbstractCocoDataset, MixinCocoAddRemove, MixinCocoStats,
         return sql_dset
 
 
-def demo_coco_data():
+def demo_coco_data() -> Any:
     """
     Simple data for testing.
 
