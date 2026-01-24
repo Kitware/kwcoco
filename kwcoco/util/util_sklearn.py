@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Extensions to sklearn constructs
 """
 import warnings

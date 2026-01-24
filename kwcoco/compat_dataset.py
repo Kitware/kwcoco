@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 A wrapper around the basic kwcoco dataset with a pycocotools API.
 
 We do not recommend using this API because it has some idiosyncrasies, where

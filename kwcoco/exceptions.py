@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 class AddError(ValueError):
     """
     Generic error when trying to add a category/annotation/image

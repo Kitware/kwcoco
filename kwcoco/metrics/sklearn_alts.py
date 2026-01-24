@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Faster pure-python versions of sklearn functions that avoid expensive checks
 and label rectifications. It is assumed that all labels are consecutive
 non-negative integers.

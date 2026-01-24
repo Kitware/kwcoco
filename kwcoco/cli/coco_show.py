@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 import ubelt as ub
 import scriptconfig as scfg

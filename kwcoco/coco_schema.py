@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 The place where the formal KWCOCO schema is defined.
 
 CommandLine:

@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Defines a safer eval function
 """
 

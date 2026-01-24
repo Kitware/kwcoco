@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 """
 Wraps the logic in kwcoco/coco_evaluator.py with a command line script

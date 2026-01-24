@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 The :mod:`category_tree` module defines the :class:`CategoryTree` class, which
 is used for maintaining flat or hierarchical category information. The kwcoco
 version of this class only contains the datastructure and does not contain any

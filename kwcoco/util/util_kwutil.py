@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 This is a staging ground for utilities that may make there way into
 :mod:`kwutil` proper at some point in the future.
 """

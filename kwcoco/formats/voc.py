@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Helpers for the Pascal VOC format. (used by ImageNet)
 """
 

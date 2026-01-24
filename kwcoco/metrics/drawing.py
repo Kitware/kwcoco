@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import ubelt as ub
 import warnings

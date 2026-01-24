@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Add NaN parsing to normal ijson pure-python parsing backend.
 
 References:

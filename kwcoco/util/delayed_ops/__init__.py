@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Functionality has been ported to delayed_image
 """
 

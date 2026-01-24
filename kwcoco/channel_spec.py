@@ -5,6 +5,8 @@ image. This could be as simple as ``red|green|blue``, or more complex like:
 
 This functionality has been moved to "delayed_image".
 """
+from __future__ import annotations
+
 from delayed_image.channel_spec import FusedChannelSpec  # NOQA
 from delayed_image.channel_spec import ChannelSpec  # NOQA
 import ubelt as ub

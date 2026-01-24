@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Classes that store accumulated confusion measures (usually derived from
 confusion vectors).
 

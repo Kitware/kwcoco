@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 WIP:
 
 Conversions to and from KPF format.

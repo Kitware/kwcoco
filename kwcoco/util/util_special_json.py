@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Special non-general json functions
 """
 # import ubelt as ub

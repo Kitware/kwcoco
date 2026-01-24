@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ubelt as ub
 from scriptconfig.dict_like import DictLike as DictLike_  # FIXME: do we vendor or not?
 

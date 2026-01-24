@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 
 
 def coerce_num_workers(num_workers='auto', minimum=0):

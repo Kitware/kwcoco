@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ubelt as ub
 import numpy as np
 

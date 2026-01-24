@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 r"""
 Functional interface into defining jsonschema structures.
 

@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Downloads the CamVid data if necessary, and converts it to COCO.
 """
 from os.path import relpath

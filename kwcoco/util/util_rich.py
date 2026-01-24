@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Deprecated: use the one in kwutil instead
 """
 try:

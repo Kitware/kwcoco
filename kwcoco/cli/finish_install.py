@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python3
 # PYTHON_ARGCOMPLETE_OK
 import scriptconfig as scfg

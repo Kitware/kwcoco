@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
 if __name__ == '__main__':

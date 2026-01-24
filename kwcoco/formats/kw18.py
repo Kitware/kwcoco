@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 A helper for converting COCO to / from KW18 format.
 
 KW18 File Format

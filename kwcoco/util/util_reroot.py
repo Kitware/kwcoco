@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Rerooting is harder than you would think
 """
 import ubelt as ub

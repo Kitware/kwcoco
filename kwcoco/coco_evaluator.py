@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Evaluates a predicted coco dataset against a truth coco dataset.
 
 This currently computes detection-level metrics.

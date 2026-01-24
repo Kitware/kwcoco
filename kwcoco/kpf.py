@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ubelt as ub
 ub.schedule_deprecation(
     'kwcoco', 'kwcoco.kpf', 'module', 'use kwcoco.formats.kpf instead',

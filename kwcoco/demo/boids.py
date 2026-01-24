@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import kwarray
 import numpy as np
 import ubelt as ub

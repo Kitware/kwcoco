@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Ported to delayed_image
 """
 from delayed_image.lazy_loaders import LazyGDalFrameFile

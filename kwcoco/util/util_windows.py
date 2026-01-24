@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 def fix_msys_path(path):
     r"""
     Windows is so special. When using msys bash if you pass a path on the CLI

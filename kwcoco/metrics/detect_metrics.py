@@ -2,6 +2,8 @@
 TODO:
     - [ ] Does this rely on the image ids being the same? In either case document it.
 """
+from __future__ import annotations
+
 import numpy as np
 import ubelt as ub
 import networkx as nx
@@ -9,6 +11,12 @@ from kwcoco.metrics.confusion_vectors import ConfusionVectors
 from kwcoco.metrics.assignment import _assign_confusion_vectors, ASSIGN_COLUMNS
 # from .assignment import _assign_confusion_vectors
 
+import typing
+if typing.TYPE_CHECKING:
+    from typing import Dict, List
+    import kwimage
+    import kwcoco
+    from ubelt.util_const import NoParamType
 
 # Helper for xdev docstubs
 __docstubs__ = """
@@ -69,13 +77,16 @@ class DetectionMetrics(ub.NiceRepr):
         0.8582...
         >>> #print(dmet.score_coco()['mAP'])
     """
-    def __init__(dmet, classes=None):
+    gid_to_true_dets: Dict[int, kwimage.Detections]
+    gid_to_pred_dets: Dict[int, kwimage.Detections]
+
+    def __init__(dmet, classes: kwcoco.CategoryTree | None = None) -> None:
         dmet.classes = classes
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}
         dmet._imgname_to_gid = {}
 
-    def clear(dmet):
+    def clear(dmet) -> None:
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}
         dmet._imgname_to_gid = {}
@@ -90,7 +101,7 @@ class DetectionMetrics(ub.NiceRepr):
         }
         return ub.urepr(info)
 
-    def enrich_confusion_vectors(dmet, cfsn_vecs):
+    def enrich_confusion_vectors(dmet, cfsn_vecs) -> None:
         """
         Adds annotation id information into confusion vectors computed
         via this detection metrics object.

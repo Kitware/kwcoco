@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 These items were split out of coco_dataset.py which is becoming too big
 
 These are helper data structures used to do things like auto-increment ids,

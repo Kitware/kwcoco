@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Truncate utility based on python-slugify.
 
 https://pypi.org/project/python-slugify/1.2.2/

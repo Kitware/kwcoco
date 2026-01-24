@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 mkinit kwcoco.metrics -w --relative
 """
 # flake8: noqa

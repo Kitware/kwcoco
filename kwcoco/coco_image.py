@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Defines the CocoImage class which is an object oriented way of manipulating
 data pointed to by a COCO image dictionary.
 

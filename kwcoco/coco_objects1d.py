@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Vectorized ORM-like objects used in conjunction with coco_dataset.
 
 This powers the ``.images()``, ``.videos()``, and ``.annotation()`` methods of

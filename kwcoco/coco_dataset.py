@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 An implementation and extension of the original MS-COCO API [CocoFormat]_.
 
 The KWCoco format is backwards compatible with MS-COCO. It adds support for
@@ -54,6 +56,24 @@ References:
     .. [PyCocoToolsMask] https://github.com/nightrome/cocostuffapi/blob/master/PythonAPI/pycocotools/mask.py
     .. [CocoTutorial] https://www.immersivelimit.com/tutorials/create-coco-annotations-from-scratch/#coco-dataset-format
 """
+import typing
+
+if typing.TYPE_CHECKING:
+    import kwcoco
+    import numpy as np
+    from numpy import ndarray
+    from os import PathLike
+    from numpy.typing import ArrayLike
+    from typing import Dict, List, Tuple, Callable, Any, IO
+    import networkx
+    import kwcoco.coco_objects1d
+    import kwimage
+    import ubelt as ub
+    from collections.abc import Generator
+    from kwcoco.abstract_coco_dataset import AbstractCocoDataset
+    from types import ModuleType
+    from kwcoco.coco_image import CocoImage
+
 import copy
 import sys
 import itertools as it
@@ -223,7 +243,7 @@ class MixinCocoAccessors:
     TODO: better name
     """
 
-    def delayed_load(self, gid, channels=None, space='image'):
+    def delayed_load(self, gid: int, channels: 'kwcoco.FusedChannelSpec | None' = None, space: str = 'image'):
         """
         Experimental method
 
@@ -810,7 +830,7 @@ class MixinCocoAccessors:
         )
         return self.coco_image(gid)
 
-    def coco_image(self, gid):
+    def coco_image(self, gid) -> CocoImage:
         """
         Args:
             gid (int): image id

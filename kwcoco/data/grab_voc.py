@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ubelt as ub
 from os.path import exists
 from os.path import join

@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Downloads and converts CIFAR 10 and CIFAR 100 to kwcoco format
 """
 import ubelt as ub

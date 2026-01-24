@@ -1,6 +1,8 @@
 """
 Deprecated: use kwutil.Json instead
 """
+from __future__ import annotations
+
 import copy
 import numpy as np
 import ubelt as ub
@@ -10,12 +12,17 @@ import decimal
 import fractions
 import pathlib
 from typing import NamedTuple, Tuple, Any
+import typing
+
+if typing.TYPE_CHECKING:
+    from typing import Dict, List, Union
+    from collections.abc import Generator
 
 # backwards compat
 IndexableWalker = ub.IndexableWalker
 
 
-def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
+def ensure_json_serializable(dict_: Any, normalize_containers: bool = False, verbose: int = 0):
     """
     Attempt to convert common types (e.g. numpy) into something json compliant
 
@@ -97,7 +104,7 @@ def ensure_json_serializable(dict_, normalize_containers=False, verbose=0):
     return dict_
 
 
-def find_json_unserializable(data, quickcheck=False):
+def find_json_unserializable(data: object, quickcheck: bool = False) -> Generator[List[Dict], None, None]:
     """
     Recurse through json datastructure and find any component that
     causes a serialization error. Record the location of these errors
@@ -236,7 +243,7 @@ def find_json_unserializable(data, quickcheck=False):
         yield from _walk(data, [], set())
 
 
-def indexable_allclose(dct1, dct2, return_info=False):
+def indexable_allclose(dct1, dct2, return_info: bool = False):
     """
     Walks through two nested data structures and ensures that everything is
     roughly the same.
@@ -344,7 +351,7 @@ def indexable_diff(dct1, dct2, rtol=1e-05, atol=1e-08, equal_nan=False):
     return walker1.diff(dct2, rel_tol=rtol, abs_tol=atol, equal_nan=equal_nan)
 
 
-def coerce_indent(indent):
+def coerce_indent(indent: Union[int, str, None]):
     """
     Example:
         .. code:: python

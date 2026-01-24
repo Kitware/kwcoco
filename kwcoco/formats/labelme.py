@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Helpers for labelme files
 """
 import ubelt as ub

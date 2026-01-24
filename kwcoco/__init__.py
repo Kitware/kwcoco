@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 The Kitware COCO module defines a variant of the Microsoft COCO format,
 originally developed for the "collected images in context" object detection
 challenge. We are backwards compatible with the original module, but we also

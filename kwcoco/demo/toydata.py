@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Generates "toydata" for demo and testing purposes.
 
 Note:
