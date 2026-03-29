@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from ubelt import NoParam
 
 
@@ -218,6 +220,8 @@ class DictProxy2(DictInterface):
         >>> assert len(proxy_only - CURRENTLY_UNSUPPORTED) == 0
 
     """
+    _proxy: dict[str, Any]
+
     def __getitem__(self, key):
         return self._proxy[key]
 
@@ -356,7 +360,9 @@ class AliasedDictProxy(DictProxy2, metaclass=_AliasMetaclass):
         >>>     'foo_alias2': -12}
 
     """
-    __alias_to_primary__ = {}
+    __alias_to_aliases__: dict[str, list[str]]
+    __alias_to_primary__: dict[str, str] = {}
+    _proxy: dict[str, Any]
 
     def __getitem__(self, key):
         try:

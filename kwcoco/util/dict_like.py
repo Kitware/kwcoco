@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 import ubelt as ub
-from scriptconfig.dict_like import DictLike as DictLike_  # FIXME: do we vendor or not?
+from scriptconfig.dict_like import \
+    DictLike as DictLike_  # FIXME: do we vendor or not?
+
+# from sqlalchemy.dialects.postgresql import Any
 
 
 class DictLike(ub.NiceRepr):
@@ -169,6 +174,8 @@ class DictProxy(DictLike_):
     """
     Allows an object to proxy the behavior of a dict attribute
     """
+    proxy: dict[str, Any]
+
     def __getitem__(self, key):
         return self.proxy[key]
 

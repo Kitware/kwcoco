@@ -51,12 +51,14 @@ Example:
             file = io.StringIO(text)
             list(ijson_ext.items(file, 'bbox'))
 """
-from json.decoder import scanstring
+
+from __future__ import annotations
+
+import codecs
 import re
+from json.decoder import scanstring
 
 from ijson import common, utils
-import codecs
-
 
 LEXEME_RE = re.compile(r'[a-z0-9eEN\.\+-]+|\S')
 UNARY_LEXEMES = set('[]{},')
@@ -151,7 +153,11 @@ def Lexer(target):
                         break
                     buf += data
                     match = LEXEME_RE.search(buf, pos)
+                    if match is None:
+                        break
                     lexeme = match.group()
+                if match is None:
+                    break
                 send((discarded + match.start(), lexeme))
                 pos = match.end()
         else:

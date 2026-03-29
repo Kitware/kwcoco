@@ -3,12 +3,18 @@ from __future__ import annotations
 
 Rerooting is harder than you would think
 """
-import ubelt as ub
+from __future__ import annotations
+
 import os
+from typing import TYPE_CHECKING
 
+import ubelt as ub
 
-def special_reroot_single(dset, verbose=0):
+if TYPE_CHECKING:
     import kwcoco
+
+
+def special_reroot_single(dset: kwcoco.CocoDataset, verbose: int=0):
     bundle_dpath = ub.Path(dset.bundle_dpath).absolute()
     resolved_bundle_dpath = ub.Path(dset.bundle_dpath).resolve()
 
