@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import ubelt as ub
-from scriptconfig.dict_like import \
-    DictLike as DictLike_  # FIXME: do we vendor or not?
+from scriptconfig.dict_like import DictLike as DictLike_  # FIXME: do we vendor or not?
 
 # from sqlalchemy.dialects.postgresql import Any
 
