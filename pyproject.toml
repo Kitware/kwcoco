@@ -76,6 +76,7 @@ ignore-words-list = ["fpr", 'ANS', 'ans', 'numer', 'wont', 'cant', 'ANS', 'doesn
 exclude = []
 
 [tool.ty.rules]
+unused-ignore-comment = "ignore"
 unused-type-ignore-comment = "ignore"
 unresolved-import = "ignore"
 
@@ -89,3 +90,7 @@ ignore = [
 
 [tool.ruff.format]
 quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
