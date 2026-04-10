@@ -11,7 +11,7 @@ from collections import OrderedDict
 import decimal
 import fractions
 import pathlib
-from typing import NamedTuple, Tuple, Any
+from typing import NamedTuple, Tuple, Any, Union
 import typing
 
 if typing.TYPE_CHECKING:
@@ -66,6 +66,7 @@ def ensure_json_serializable(dict_: Any, normalize_containers: bool = False, ver
 
     walker = ub.IndexableWalker(dict_)
     for prefix, value in walker:
+        new_value: Union[list, int, float, complex, str]
         if isinstance(value, tuple):
             new_value = list(value)
             walker[prefix] = new_value

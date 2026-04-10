@@ -75,6 +75,10 @@ ignore-words-list = ["fpr", 'ANS', 'ans', 'numer', 'wont', 'cant', 'ANS', 'doesn
 [tool.ty.src]
 exclude = []
 
+[tool.ty.rules]
+unused-type-ignore-comment = "ignore"
+unresolved-import = "ignore"
+
 [tool.ruff.lint]
 # Select all rules (optional, if you want to explicitly select all)
 # select = ["ALL"]
