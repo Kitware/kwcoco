@@ -173,6 +173,7 @@ class DictProxy(DictLike_):
     """
     Allows an object to proxy the behavior of a dict attribute
     """
+
     proxy: dict[str, Any]
 
     def __getitem__(self, key):

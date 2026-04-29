@@ -9,6 +9,7 @@ def main():
     # There might not be a way to easily handle the cases that I
     # want to here. Might need to discuss this.
     import kwcoco
+
     gname = 'images/foo.png'
     remote = '/remote/path'
     host = ub.Path.appdir('kwcoco/tests/reroot').ensuredir()
@@ -16,19 +17,25 @@ def main():
     ub.ensuredir(dirname(fpath))
     # In this test the image exists on the host path
     import kwimage
+
     kwimage.imwrite(fpath, np.random.rand(8, 8))
     #
     cases = {}
     # * given absolute paths on current machine
     cases['abs_curr'] = kwcoco.CocoDataset.from_image_paths([join(host, gname)])
     # * given "remote" rooted relative paths on current machine
-    cases['rel_remoterooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], bundle_dpath=remote)
+    cases['rel_remoterooted_curr'] = kwcoco.CocoDataset.from_image_paths(
+        [gname], bundle_dpath=remote
+    )
     # * given "host" rooted relative paths on current machine
-    cases['rel_hostrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname], bundle_dpath=host)
+    cases['rel_hostrooted_curr'] = kwcoco.CocoDataset.from_image_paths(
+        [gname], bundle_dpath=host
+    )
     # * given unrooted relative paths on current machine
     cases['rel_unrooted_curr'] = kwcoco.CocoDataset.from_image_paths([gname])
     # * given absolute paths on another machine
     cases['abs_remote'] = kwcoco.CocoDataset.from_image_paths([join(remote, gname)])
+
     def report(dset, name):
         gid = 1
         rel_fpath = dset.index.imgs[gid]['file_name']
@@ -37,6 +44,7 @@ def main():
         print('   * strategy_name = {!r}'.format(name))
         print('       * rel_fpath = {!r}'.format(rel_fpath))
         print('       * ' + ub.color_text('abs_fpath = {!r}'.format(abs_fpath), color))
+
     for key, dset in cases.items():
         print('----')
         print('case key = {!r}'.format(key))
@@ -59,10 +67,14 @@ def main():
         dset_host_abs = dset.copy().reroot(host, absolute=True, check=0)
         report(dset_host_abs, 'dset_host_abs')
         #
-        dset_remote_rel = dset.copy().reroot(host, old_prefix=remote, absolute=False, check=0)
+        dset_remote_rel = dset.copy().reroot(
+            host, old_prefix=remote, absolute=False, check=0
+        )
         report(dset_remote_rel, 'dset_remote_rel')
         #
-        dset_remote_abs = dset.copy().reroot(host, old_prefix=remote, absolute=True, check=0)
+        dset_remote_abs = dset.copy().reroot(
+            host, old_prefix=remote, absolute=True, check=0
+        )
         report(dset_remote_abs, 'dset_remote_abs')
 
 
@@ -91,6 +103,7 @@ def demo_reroot_bug1():
     import kwcoco
     import ubelt as ub
     import kwimage
+
     dset = kwcoco.CocoDataset()
     dpath = ub.Path.appdir('kwcoco/tests/reroot').ensuredir()
     dset.fpath = dpath / 'data/repos/my_bundle1/data.kwcoco.json'
@@ -120,6 +133,7 @@ def demo_reroot_bug1():
         import os
         import ubelt as ub
         import kwimage
+
         dset1 = kwcoco.CocoDataset()
         dpath = ub.Path.appdir('kwcoco/tests/reroot').ensuredir()
 
@@ -152,5 +166,7 @@ def demo_reroot_bug1():
         dset3.reroot(absolute=True)
         dset3.fpath = bundle_dpath2 / 'data.kwcoco.json'
         new_prefix = os.path.relpath(bundle_dpath1, bundle_dpath2)
-        dset3.reroot(old_prefix=dset1.bundle_dpath, new_prefix=new_prefix, absolute=False)
+        dset3.reroot(
+            old_prefix=dset1.bundle_dpath, new_prefix=new_prefix, absolute=False
+        )
         dset3.imgs[1]

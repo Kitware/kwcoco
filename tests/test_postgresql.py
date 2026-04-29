@@ -10,6 +10,7 @@ def test_postgresql_cases():
     """
     import pytest
     import ubelt as ub
+
     try:
         import psycopg2  # NOQA
         import sqlalchemy  # NOQA
@@ -19,16 +20,47 @@ def test_postgresql_cases():
 
     from kwcoco.coco_sql_dataset import Image, Annotation
     from kwcoco.coco_sql_dataset import text, IS_GE_SQLALCH_2x
+
     dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
     # Add annots so there is an out of order track
     ooo_track_id = 9001
-    dct_dset.add_track(name="ooo_track", id=ooo_track_id)
-    dct_dset.add_annotation(**{'image_id': 6, 'track_id': ooo_track_id, 'bbox': [0, 0, 10, 10], 'category_id': 1})
-    dct_dset.add_annotation(**{'image_id': 3, 'track_id': ooo_track_id, 'bbox': [0, 0, 10, 10], 'category_id': 1})
-    dct_dset.add_annotation(**{'image_id': 5, 'track_id': ooo_track_id, 'bbox': [0, 0, 10, 10], 'category_id': 1})
-    dct_dset.add_annotation(**{'image_id': 4, 'track_id': ooo_track_id, 'bbox': [0, 0, 10, 10], 'category_id': 1})
+    dct_dset.add_track(name='ooo_track', id=ooo_track_id)
+    dct_dset.add_annotation(
+        **{
+            'image_id': 6,
+            'track_id': ooo_track_id,
+            'bbox': [0, 0, 10, 10],
+            'category_id': 1,
+        }
+    )
+    dct_dset.add_annotation(
+        **{
+            'image_id': 3,
+            'track_id': ooo_track_id,
+            'bbox': [0, 0, 10, 10],
+            'category_id': 1,
+        }
+    )
+    dct_dset.add_annotation(
+        **{
+            'image_id': 5,
+            'track_id': ooo_track_id,
+            'bbox': [0, 0, 10, 10],
+            'category_id': 1,
+        }
+    )
+    dct_dset.add_annotation(
+        **{
+            'image_id': 4,
+            'track_id': ooo_track_id,
+            'bbox': [0, 0, 10, 10],
+            'category_id': 1,
+        }
+    )
 
-    new_fpath = ub.Path(dct_dset.fpath).augment(stemsuffix='_with_ooo_track', multidot=True)
+    new_fpath = ub.Path(dct_dset.fpath).augment(
+        stemsuffix='_with_ooo_track', multidot=True
+    )
     dct_dset.fpath = new_fpath
     dct_dset.dump()
 
@@ -63,32 +95,44 @@ def test_postgresql_cases():
     #     raw_annot_table = pd.DataFrame(raw_tables['annotations'])
 
     # Check that raw lookups work where we explicitly cast the key (v1)
-    result = psql_dset.session.execute(text(ub.codeblock(
-        f'''
+    result = psql_dset.session.execute(
+        text(
+            ub.codeblock(
+                f"""
         SELECT annotations.id FROM annotations
         WHERE CAST(annotations.track_id as int) = {main_track_id}
-        '''
-    )))
+        """
+            )
+        )
+    )
     aids2 = [f[0] for f in result]
     assert list(aids2) == list(aids1)
 
     # Check that raw lookups work where we explicitly cast the key (v2)
-    result = psql_dset.session.execute(text(ub.codeblock(
-        F'''
+    result = psql_dset.session.execute(
+        text(
+            ub.codeblock(
+                f"""
         SELECT annotations.id FROM annotations
         WHERE annotations.track_id::int = {main_track_id}
-        '''
-    )))
+        """
+            )
+        )
+    )
     aids2 = [f[0] for f in result]
     assert list(aids2) == list(aids1)
 
     # Check that raw lookups work where we explicitly cast the query
-    result = psql_dset.session.execute(text(ub.codeblock(
-        f'''
+    result = psql_dset.session.execute(
+        text(
+            ub.codeblock(
+                f"""
         SELECT annotations.id FROM annotations
         WHERE annotations.track_id = to_jsonb({main_track_id})
-        '''
-    )))
+        """
+            )
+        )
+    )
     psql_dset.session.rollback()
     aids2 = [f[0] for f in result]
     assert list(aids2) == list(aids1)
@@ -107,6 +151,7 @@ def test_postgresql_cases():
     valattr = proxy.valattr
     key = ooo_track_id
     from sqlalchemy.dialects.postgresql import JSONB
+
     dialect_name = session.get_bind().dialect.name
 
     if IS_GE_SQLALCH_2x:
@@ -181,6 +226,7 @@ def test_postgresql_in_process_worker():
     """
     import pytest
     import ubelt as ub
+
     try:
         import psycopg2  # NOQA
         import sqlalchemy  # NOQA
@@ -188,6 +234,7 @@ def test_postgresql_in_process_worker():
         pytest.skip()
 
     import kwcoco
+
     dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
     # sql_dset = dct_dset.view_sql(backend='postgresql')
     sql_dset = dct_dset.view_sql(backend='sqlite')

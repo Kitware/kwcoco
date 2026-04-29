@@ -1,12 +1,13 @@
 """
 pip install lark
 """
+
 import ubelt as ub
 import lark
 
 
 SENSOR_CHAN_GRAMMAR = ub.codeblock(
-    '''
+    """
     // SENSOR_CHAN_GRAMMAR
     ?start: stream
 
@@ -50,10 +51,11 @@ SENSOR_CHAN_GRAMMAR = ub.codeblock(
     %import common.DIGIT
     %import common.LETTER
     %import common.INT
-    ''')
+    """
+)
 
 CHANNEL_ONLY_GRAMMAR = ub.codeblock(
-    '''
+    """
     // CHANNEL_ONLY_GRAMMAR
     ?start: stream
 
@@ -82,7 +84,8 @@ CHANNEL_ONLY_GRAMMAR = ub.codeblock(
     %import common.DIGIT
     %import common.LETTER
     %import common.INT
-    ''')
+    """
+)
 
 
 class Fused(ub.NiceRepr):
@@ -108,18 +111,17 @@ class SensorChan(ub.NiceRepr):
         # return f'SensorChan({self.sensor}:{self.chan})'
 
     def __str__(self):
-        return f"{self.sensor}:{self.chan}"
+        return f'{self.sensor}:{self.chan}'
         # return f'SensorChan({self.sensor}:{self.chan})'
 
 
 class NormalizeTransformer(lark.Transformer):
-
     def chan_id(self, items):
-        code, = items
+        (code,) = items
         return code.value
 
     def chan_single(self, items):
-        code, = items
+        (code,) = items
         return [code.value]
 
     def chan_getitem(self, items):
@@ -132,7 +134,10 @@ class NormalizeTransformer(lark.Transformer):
 
     def chan_getslice_ab(self, items):
         code, atok, btok = items
-        return ['{}.{}'.format(code, index) for index in range(int(atok.value), int(btok.value))]
+        return [
+            '{}.{}'.format(code, index)
+            for index in range(int(atok.value), int(btok.value))
+        ]
 
     def chan_code(self, items):
         return items[0]
@@ -166,11 +171,12 @@ class NormalizeTransformer(lark.Transformer):
         return flat
 
     def nosensor_chan(self, items):
-        item, = items
+        (item,) = items
         return [SensorChan('*', c) for c in item]
 
     def sensor_chan(self, items):
         import itertools as it
+
         assert len(items) == 2
         lhs, rhs = items
         new = []
@@ -179,7 +185,7 @@ class NormalizeTransformer(lark.Transformer):
         return new
 
     def stream_item(self, items):
-        item, = items
+        (item,) = items
         return item
 
     def stream(self, items):
@@ -193,16 +199,23 @@ def sensor_channel_lark():
 
     # https://github.com/lark-parser/lark/blob/master/docs/_static/lark_cheatsheet.pdf
 
-    sensor_channel_parser_cython = lark.Lark(SENSOR_CHAN_GRAMMAR,  start='start', parser='lalr', _plugins=lark_cython.plugins)
-    sensor_channel_parser_python = lark.Lark(SENSOR_CHAN_GRAMMAR,  start='start', parser='lalr')
+    sensor_channel_parser_cython = lark.Lark(
+        SENSOR_CHAN_GRAMMAR, start='start', parser='lalr', _plugins=lark_cython.plugins
+    )
+    sensor_channel_parser_python = lark.Lark(
+        SENSOR_CHAN_GRAMMAR, start='start', parser='lalr'
+    )
     # sensor_channel_parser = lark.Lark(SENSOR_CHAN_GRAMMAR,  start='start', parser='earley')
 
-    channel_only_parser_cython = lark.Lark(CHANNEL_ONLY_GRAMMAR,  start='start', parser='lalr', _plugins=lark_cython.plugins)
-    channel_only_parser_python = lark.Lark(CHANNEL_ONLY_GRAMMAR,  start='start', parser='lalr')
+    channel_only_parser_cython = lark.Lark(
+        CHANNEL_ONLY_GRAMMAR, start='start', parser='lalr', _plugins=lark_cython.plugins
+    )
+    channel_only_parser_python = lark.Lark(
+        CHANNEL_ONLY_GRAMMAR, start='start', parser='lalr'
+    )
 
     codes = [
-        '(S2,L8):(R|G|B.0:3,a),bc'
-        'R',
+        '(S2,L8):(R|G|B.0:3,a),bcR',
         'R|G',
         'R|G|mat.0',
         'R|G|mat.0:3',
@@ -250,7 +263,7 @@ def sensor_channel_lark():
         'R|G|mat:3,lwir|inv:3|nir',
         'R,G,B,d|e.3',
         'blue|green|red|nir|swir16|swir22,matseg_0|matseg_1|matseg_2|matseg_3|invariants.0:8|forest|built_up|water',
-        'R|G|B.0:9,nir|swir|mat.0|l3.2:4'
+        'R|G|B.0:9,nir|swir|mat.0|l3.2:4',
     ]
 
     # Lark is about 10x slower than existing code
@@ -259,6 +272,7 @@ def sensor_channel_lark():
         print('-----')
         print('code = {!r}'.format(code))
         import timerit
+
         ti = timerit.Timerit(100, bestof=10, verbose=1, unit='us')
 
         for timer in ti.reset('kwcoco.ChannelSpec'):

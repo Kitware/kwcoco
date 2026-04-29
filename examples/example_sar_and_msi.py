@@ -12,6 +12,7 @@ SeeAlso:
     Specifically, coco_populate_geo_heuristics will attempt to use geotiff
     metadata to populate the warp_aux_to_img transforms correctly.
 """
+
 import kwcoco
 import kwimage
 import ubelt as ub
@@ -61,11 +62,7 @@ def main():
         # the top-level file_name as None, and then add assets for each
         # physical file on disk. The image still needs to have a "width/height"
         # that the assets can (virtually) align to.
-        gid = dset.add_image(
-            name=image_name,
-            width=width1,
-            height=height1
-        )
+        gid = dset.add_image(name=image_name, width=width1, height=height1)
         coco_image = dset.coco_image(gid)
 
         # When images are at different resolutions, we need to ensure we
@@ -85,7 +82,7 @@ def main():
             height=height2,
             # Give a name to each channel in the image separated by a "|"
             channels='hh|vv',
-            warp_aux_to_img=kwimage.Affine.coerce({'scale': 2})
+            warp_aux_to_img=kwimage.Affine.coerce({'scale': 2}),
         )
         coco_image.add_asset(
             file_name=msi_fpath,
@@ -96,7 +93,7 @@ def main():
             # from delayed_image.channel_spec import ChannelSpec
             # ChannelSpec.coerce('msi.0:11').normalize()
             channels='msi.0:11',
-            warp_aux_to_img=kwimage.Affine.coerce({'scale': 4})
+            warp_aux_to_img=kwimage.Affine.coerce({'scale': 4}),
         )
 
     # This is what the underlying kwcoco representation of the data looks like
@@ -123,8 +120,8 @@ def main():
     # BUT, we can load "naive scale" corner-aligned crops by undoing the #
     # scale component of each transform.
     undone_parts, jagged_align = cropped.undo_warps(
-        remove=['scale'], squash_nans=True,
-        return_warps=True)
+        remove=['scale'], squash_nans=True, return_warps=True
+    )
 
     # Can call finalize on each individual part to get the native unscaled
     # component of the ratser.
@@ -135,6 +132,7 @@ def main():
         datas[part.channels.spec] = data
 
     print(ub.repr2(datas.map_values(lambda a: a.shape), nl=1))
+
 
 if __name__ == '__main__':
     """

@@ -70,6 +70,7 @@ TODO:
     - [ ] We get better speeds with raw SQL over alchemy. Can we mitigate the
         speed difference so we can take advantage of alchemy's expressiveness?
 """
+
 import json
 import numpy as np
 import ubelt as ub
@@ -79,8 +80,10 @@ from os.path import exists, dirname
 from kwcoco.util.dict_like import DictLike  # NOQA
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco.coco_dataset import (  # NOQA
-    MixinCocoAccessors, MixinCocoObjects,
-    MixinCocoStats, MixinCocoDraw
+    MixinCocoAccessors,
+    MixinCocoObjects,
+    MixinCocoStats,
+    MixinCocoDraw,
 )
 
 from packaging.version import parse as Version
@@ -115,6 +118,7 @@ try:
     from sqlalchemy.sql.schema import Column
     from sqlalchemy.sql.schema import Index
     from sqlalchemy.types import Float, Integer, String, JSON
+
     try:
         from sqlalchemy.orm import declarative_base
     except ImportError:
@@ -122,6 +126,7 @@ try:
     # from sqlalchemy.orm.decl_api import DeclarativeMeta
     import sqlalchemy
     import sqlite3
+
     sqlite3.register_adapter(np.int64, int)
     sqlite3.register_adapter(np.int32, int)
     CocoBase = declarative_base()
@@ -129,18 +134,23 @@ try:
     IS_GE_SQLALCH_2x = sqlalchemy_version >= Version('2.0.0')
 
     if IS_GE_SQLALCH_2x:
-        SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,
-                           sqlalchemy.exc.ProgrammingError,
-                           sqlalchemy.exc.OperationalError)
+        SQL_ERROR_TYPES = (
+            sqlalchemy.exc.InterfaceError,
+            sqlalchemy.exc.ProgrammingError,
+            sqlalchemy.exc.OperationalError,
+        )
     else:
-        SQL_ERROR_TYPES = (sqlalchemy.exc.InterfaceError,
-                           sqlalchemy.exc.ProgrammingError)
+        SQL_ERROR_TYPES = (
+            sqlalchemy.exc.InterfaceError,
+            sqlalchemy.exc.ProgrammingError,
+        )
     if 1:
         from sqlalchemy.dialects.postgresql import JSONB
+
         # References:
         # https://github.com/sqlalchemy/sqlalchemy/discussions/9530
         # Use JSON with SQLite and JSONB with PostgreSQL.
-        JSONVariant = JSON().with_variant(JSONB(), "postgresql")
+        JSONVariant = JSON().with_variant(JSONB(), 'postgresql')
 except ImportError:
     # Hack: xdoctest should have been able to figure out that
     # all of these tests were disabled due to the absence of sqlalchemy
@@ -160,10 +170,13 @@ except ImportError:
     IS_GE_SQLALCH_2x = False
 try:
     from psycopg2.extensions import register_adapter, AsIs
+
     def addapt_numpy_float64(numpy_float64):
         return AsIs(numpy_float64)
+
     def addapt_numpy_int64(numpy_int64):
         return AsIs(numpy_int64)
+
     register_adapter(np.float64, addapt_numpy_float64)
     register_adapter(np.int64, addapt_numpy_int64)
 except ImportError:
@@ -179,7 +192,9 @@ except ImportError:
 class Category(CocoBase):
     __tablename__ = 'categories'
     id = Column(Integer, primary_key=True, doc='unique internal id')
-    name = Column(String(256), doc='unique external name or identifier', index=True, unique=True)
+    name = Column(
+        String(256), doc='unique external name or identifier', index=True, unique=True
+    )
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
 
@@ -189,10 +204,14 @@ class Category(CocoBase):
 class KeypointCategory(CocoBase):
     __tablename__ = 'keypoint_categories'
     id = Column(Integer, primary_key=True, doc='unique internal id')
-    name = Column(String(256), doc='unique external name or identifier', index=True, unique=True)
+    name = Column(
+        String(256), doc='unique external name or identifier', index=True, unique=True
+    )
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
-    reflection_id = Column(Integer, doc='if augmentation reflects the image, change keypoint id to this')
+    reflection_id = Column(
+        Integer, doc='if augmentation reflects the image, change keypoint id to this'
+    )
 
     _unstructured = Column(JSON, default=dict())
 
@@ -226,7 +245,9 @@ class Image(CocoBase):
     channels = Column(JSON, doc='See ChannelSpec')
     warp_img_to_vid = Column(JSON, doc='See TransformSpec')
 
-    auxiliary = Column(JSON)  # TODO: change name to assets (or better yet make an assets table)
+    auxiliary = Column(
+        JSON
+    )  # TODO: change name to assets (or better yet make an assets table)
 
     _unstructured = Column(JSON, default=dict())
 
@@ -235,7 +256,13 @@ class Track(CocoBase):
     __tablename__ = 'tracks'
 
     # TODO: in the future we may enforce track-id is an integer
-    id = Column(JSONVariant, index=True, unique=False, primary_key=True, doc='unique internal id')
+    id = Column(
+        JSONVariant,
+        index=True,
+        unique=False,
+        primary_key=True,
+        doc='unique internal id',
+    )
     name = Column(String(512), nullable=True, index=True, unique=True)
     _unstructured = Column(JSON, default=dict())
 
@@ -276,6 +303,7 @@ class Annotation(CocoBase):
     caption = Column(JSON)
 
     _unstructured = Column(JSON, default=dict())
+
 
 # As long as the flavor of sql conforms to our raw sql commands set
 # this to 0, which uses the faster raw variant.
@@ -347,6 +375,7 @@ def _new_proxy_cache():
     # return None
     try:
         from ndsampler.utils import util_lru
+
         return util_lru.LRUDict.new(max_size=1000, impl='auto')
     except Exception:
         return {}
@@ -356,6 +385,7 @@ class SqlListProxy(ub.NiceRepr):
     """
     A view of an SQL table that behaves like a Python list
     """
+
     def __init__(proxy, session, cls):
         proxy.cls = cls
         proxy.session = session
@@ -379,8 +409,10 @@ class SqlListProxy(ub.NiceRepr):
             if proxy._colnames is None:
                 from sqlalchemy import inspect
                 import json
+
                 inspector = inspect(proxy.session.get_bind())
                 colinfo = inspector.get_columns(proxy.cls.__tablename__)
+
                 # Huge hack to fixup json columns.
                 # the session.execute seems to do this for
                 # some columns, but not all, hence the isinstance
@@ -389,6 +421,7 @@ class SqlListProxy(ub.NiceRepr):
                         return json.loads(x)
                     else:
                         return x
+
                 casters = []
                 for c in colinfo:
                     t = c['type']
@@ -404,7 +437,8 @@ class SqlListProxy(ub.NiceRepr):
 
             # Using raw SQL seems much faster
             result = proxy.session.execute(
-                'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+                'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__)
+            )
 
             for row in _raw_yielder(result):
                 cast_row = [f(x) for f, x in zip(proxy._casters, row)]
@@ -520,6 +554,7 @@ class SqlDictProxy(DictLike):
         >>> assert len(list(proxy.keys())) == 4
         >>> assert len(list(proxy.values())) == 4
     """
+
     def __init__(proxy, session, cls, keyattr=None, ignore_null=False):
         proxy.cls = cls
         proxy.session = session
@@ -548,7 +583,9 @@ class SqlDictProxy(DictLike):
         if proxy.keyattr is None:
             return 'id -> {}: {}'.format(proxy.cls.__tablename__, len(proxy))
         else:
-            return '{} -> {}: {}'.format(proxy.keyattr.name, proxy.cls.__tablename__, len(proxy))
+            return '{} -> {}: {}'.format(
+                proxy.keyattr.name, proxy.cls.__tablename__, len(proxy)
+            )
 
     def __contains__(proxy, key) -> bool:
         if proxy._cache is not None:
@@ -602,7 +639,7 @@ class SqlDictProxy(DictLike):
             exstr = str(ex)
             if "type 'object' is not supported" in exstr:
                 raise KeyError(key)
-            elif "unsupported type" in exstr:
+            elif 'unsupported type' in exstr:
                 raise KeyError(key)
             else:
                 raise
@@ -648,10 +685,12 @@ class SqlDictProxy(DictLike):
             keyattr = 'id' if proxy.keyattr is None else proxy.keyattr.key
             if proxy.ignore_null:
                 expr = 'SELECT {} FROM {} WHERE {} IS NOT NULL ORDER BY id'.format(
-                    keyattr, proxy.cls.__tablename__, keyattr)
+                    keyattr, proxy.cls.__tablename__, keyattr
+                )
             else:
                 expr = 'SELECT {} FROM {} ORDER BY id'.format(
-                    keyattr, proxy.cls.__tablename__)
+                    keyattr, proxy.cls.__tablename__
+                )
             result = proxy.session.execute(expr)
             for item in _raw_yielder(result):
                 yield item[0]
@@ -672,8 +711,10 @@ class SqlDictProxy(DictLike):
             if proxy._colnames is None:
                 from sqlalchemy import inspect
                 import json
+
                 inspector = inspect(proxy.session.get_bind())
                 colinfo = inspector.get_columns(proxy.cls.__tablename__)
+
                 # HACK: to fixup json columns, session.execute seems to fix
                 # the type for some columns, but not all, hence the isinstance
                 def _json_caster(x):
@@ -681,6 +722,7 @@ class SqlDictProxy(DictLike):
                         return json.loads(x)
                     else:
                         return x
+
                 casters = []
                 for c in colinfo:
                     t = c['type']
@@ -698,10 +740,10 @@ class SqlDictProxy(DictLike):
             if proxy.ignore_null:
                 keyattr = 'id' if proxy.keyattr is None else proxy.keyattr.key
                 expr = 'SELECT {} FROM {} WHERE {} IS NOT NULL ORDER BY id'.format(
-                    keyattr, proxy.cls.__tablename__, keyattr)
+                    keyattr, proxy.cls.__tablename__, keyattr
+                )
             else:
-                expr = (
-                    'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+                expr = 'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__)
             result = proxy.session.execute(expr)
 
             for row in _raw_yielder(result):
@@ -782,8 +824,16 @@ class SqlIdGroupDictProxy(DictLike):
         >>> assert len(keys) == len(vals)
         >>> assert dict(zip(keys, vals)) == dict(items)
     """
-    def __init__(proxy, session, valattr, keyattr, parent_keyattr=None,
-                 order_attr=None, order_id=None):
+
+    def __init__(
+        proxy,
+        session,
+        valattr,
+        keyattr,
+        parent_keyattr=None,
+        order_attr=None,
+        order_id=None,
+    ):
         """
         Args:
             session (sqlalchemy.orm.session.Session): the sqlalchemy session
@@ -836,7 +886,9 @@ class SqlIdGroupDictProxy(DictLike):
         if order_attr is not None:
             if order_attr.class_ is not valattr.class_:
                 if order_id is None:
-                    raise ValueError('Must specify the id to lookup into the order table')
+                    raise ValueError(
+                        'Must specify the id to lookup into the order table'
+                    )
                 else:
                     proxy.parent_order_id = order_attr.class_.id
                     proxy.parent_order_table = order_attr.class_
@@ -864,7 +916,7 @@ class SqlIdGroupDictProxy(DictLike):
                 if proxy.order_id is not None:
                     query = query.join(
                         proxy.parent_order_table,
-                        proxy.parent_order_id == proxy.order_id
+                        proxy.parent_order_id == proxy.order_id,
                     )
                 query = query.order_by(proxy.order_attr)
             item = [row[0] for row in query.all()]
@@ -902,8 +954,9 @@ class SqlIdGroupDictProxy(DictLike):
             if key in proxy._cache:
                 return True
         try:
-            query = (proxy.session.query(proxy.parent_keyattr)
-                     .filter(proxy.parent_keyattr == key))
+            query = proxy.session.query(proxy.parent_keyattr).filter(
+                proxy.parent_keyattr == key
+            )
             flag = query.count() > 0
         except SQL_ERROR_TYPES as ex:
             if 'unsupported type' in str(ex):
@@ -924,8 +977,9 @@ class SqlIdGroupDictProxy(DictLike):
                 'SELECT {} FROM {} ORDER BY {}'.format(
                     proxy.parent_keyattr.name,
                     proxy.parent_keyattr.class_.__tablename__,
-                    proxy.parent_keyattr.name
-                ))
+                    proxy.parent_keyattr.name,
+                )
+            )
             for item in _raw_yielder(result):
                 yield item[0]
 
@@ -949,7 +1003,8 @@ class SqlIdGroupDictProxy(DictLike):
                 session = proxy.session
                 table = keyattr.class_.__table__
                 query = session.query(keyattr, valattr).order_by(
-                    keyattr, proxy.order_attr)
+                    keyattr, proxy.order_attr
+                )
                 result = session.execute(query)
                 yielder = _raw_yielder(result)
             else:
@@ -961,12 +1016,13 @@ class SqlIdGroupDictProxy(DictLike):
                 expr = (
                     'SELECT {keycol}, {valcol} '
                     'FROM {table} '
-                    'ORDER BY {keycol}, {order_attr}').format(
-                        table=table,
-                        keycol=keycol,
-                        valcol=valcol,
-                        order_attr=groupcol,
-                    )
+                    'ORDER BY {keycol}, {order_attr}'
+                ).format(
+                    table=table,
+                    keycol=keycol,
+                    valcol=valcol,
+                    order_attr=groupcol,
+                )
                 result = proxy.session.execute(expr)
                 yielder = _raw_yielder(result)
 
@@ -1031,13 +1087,14 @@ class SqlIdGroupDictProxy(DictLike):
                     'SELECT {parent_keycol}, json_group_array({valcol}) '
                     'FROM {parent_table} '
                     'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
-                    'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
-                        parent_table=parent_table,
-                        table=table,
-                        parent_keycol=parent_keycol,
-                        keycol=keycol,
-                        valcol=valcol,
-                    )
+                    'GROUP BY {parent_keycol} ORDER BY {parent_keycol}'
+                ).format(
+                    parent_table=parent_table,
+                    table=table,
+                    parent_keycol=parent_keycol,
+                    keycol=keycol,
+                    valcol=valcol,
+                )
                 result = proxy.session.execute(expr)
                 for row in result.fetchall():
                     key = row[0]
@@ -1088,6 +1145,7 @@ class CocoSqlIndex:
     """
     Simulates the dictionary provided by :class:`kwcoco.coco_dataset.CocoIndex`
     """
+
     def __init__(index):
         index.anns = None
         index.imgs = None
@@ -1116,20 +1174,22 @@ class CocoSqlIndex:
         index.name_to_track = SqlDictProxy(session, Track, Track.name)
 
         # These indexes are allowed to have null keys
-        index.name_to_img = SqlDictProxy(session, Image, Image.name,
-                                         ignore_null=True)
-        index.file_name_to_img = SqlDictProxy(session, Image, Image.file_name,
-                                              ignore_null=True)
-        index.name_to_video = SqlDictProxy(session, Video, Video.name,
-                                           ignore_null=True)
+        index.name_to_img = SqlDictProxy(session, Image, Image.name, ignore_null=True)
+        index.file_name_to_img = SqlDictProxy(
+            session, Image, Image.file_name, ignore_null=True
+        )
+        index.name_to_video = SqlDictProxy(session, Video, Video.name, ignore_null=True)
 
         index.gid_to_aids = SqlIdGroupDictProxy(
-            session, Annotation.id, Annotation.image_id, Image.id)
+            session, Annotation.id, Annotation.image_id, Image.id
+        )
         index.cid_to_aids = SqlIdGroupDictProxy(
-            session, Annotation.id, Annotation.category_id, Category.id)
+            session, Annotation.id, Annotation.category_id, Category.id
+        )
 
         index.cid_to_gids = SqlIdGroupDictProxy(
-            session, Annotation.image_id, Annotation.category_id, Category.id)
+            session, Annotation.image_id, Annotation.category_id, Category.id
+        )
 
         if _USE_TRACK_LUT:
             index.trackid_to_aids = SqlIdGroupDictProxy(
@@ -1141,8 +1201,8 @@ class CocoSqlIndex:
             )
 
         index.vidid_to_gids = SqlIdGroupDictProxy(
-            session, Image.id, Image.video_id, Video.id,
-            order_attr=Image.frame_index)
+            session, Image.id, Image.video_id, Video.id, order_attr=Image.frame_index
+        )
 
         # Make a list like view for algorithms
         index.dataset = {
@@ -1203,6 +1263,7 @@ def _handle_sql_uri(uri):
     scheme, authority, path, query, fragment = uri_parsed
 
     from kwcoco.util import util_windows
+
     if util_windows.is_windows_path(uri):
         scheme = authority = None
         path = uri
@@ -1230,7 +1291,7 @@ def _handle_sql_uri(uri):
     if path == '/:memory:':
         local_path = None
     elif path.startswith(file_prefix):
-        local_path = path[len(file_prefix):]
+        local_path = path[len(file_prefix) :]
     else:
         local_path = None
 
@@ -1250,9 +1311,14 @@ def _handle_sql_uri(uri):
     return uri_info
 
 
-class CocoSqlDatabase(AbstractCocoDataset,
-                      MixinCocoAccessors, MixinCocoObjects, MixinCocoStats,
-                      MixinCocoDraw, ub.NiceRepr):
+class CocoSqlDatabase(
+    AbstractCocoDataset,
+    MixinCocoAccessors,
+    MixinCocoObjects,
+    MixinCocoStats,
+    MixinCocoDraw,
+    ub.NiceRepr,
+):
     """
     Provides an API nearly identical to :class:`kwcoco.CocoDatabase`, but uses
     an SQL backend data store. This makes it robust to copy-on-write memory
@@ -1331,13 +1397,13 @@ class CocoSqlDatabase(AbstractCocoDataset,
         """
         import kwcoco
         import pathlib
+
         if isinstance(data, (str, pathlib.Path)):
             data = os.fspath(data)
             basename = os.path.basename(data)
             if basename.endswith('.json') or '.kwcoco' in basename:
                 dct_db_fpath = data
-                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath,
-                                            backend=backend)
+                self = cached_sql_coco_view(dct_db_fpath=dct_db_fpath, backend=backend)
             else:
                 raise NotImplementedError
         elif isinstance(data, kwcoco.CocoDataset):
@@ -1449,6 +1515,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
         if _uri_info['scheme'].startswith('postgresql'):
             from sqlalchemy_utils import database_exists, create_database
+
             did_exist = database_exists(uri)
             if not did_exist:
                 if must_exist:
@@ -1535,6 +1602,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
             uri = _uri_info['normalized']
             from sqlalchemy_utils import drop_database
             from sqlalchemy_utils import database_exists
+
             if database_exists(uri):
                 if verbose:
                     print(f'deleting postgresql database: {uri}')
@@ -1619,6 +1687,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
         """
         from sqlalchemy import inspect
         import itertools as it
+
         counter = it.count()
         session = self.session
         inspector = inspect(self.engine)
@@ -1632,9 +1701,11 @@ class CocoSqlDatabase(AbstractCocoDataset,
             colnames = {c['name'] for c in colinfo}
             # TODO: is there a better way to grab this information?
             cls = CocoBase.TBLNAME_TO_CLASS[key]
-            for item in ub.ProgIter(dset.dataset.get(key, []),
-                                    desc='Populate {}'.format(key),
-                                    verbose=verbose):
+            for item in ub.ProgIter(
+                dset.dataset.get(key, []),
+                desc='Populate {}'.format(key),
+                verbose=verbose,
+            ):
                 item_ = ub.dict_isect(item, colnames)
                 # Everything else is a extra i.e. additional property
                 item_[UNSTRUCTURED] = ub.dict_diff(item, item_)
@@ -1703,6 +1774,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> print(table_df)
         """
         import pandas as pd
+
         try:
             if IS_GE_SQLALCH_2x:
                 # When pandas is < 1.5 and sqlalchemy is > 2.x this will fail
@@ -1723,9 +1795,10 @@ class CocoSqlDatabase(AbstractCocoDataset,
         column_infos = inspector.get_columns(table_name)
         column_names = [d['name'] for d in column_infos]
         stmt = ub.paragraph(
-            f'''
+            f"""
             SELECT * FROM {table_name}
-            ''')
+            """
+        )
         results = self.session.execute(text(stmt))
         rows = []
         for row_vals in results:
@@ -1754,8 +1827,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
             raw_tables[table_name] = rows
         return raw_tables
 
-    def _column_lookup(self, tablename, key, rowids, default=ub.NoParam,
-                       keepid=False, _join_optimize=1):
+    def _column_lookup(
+        self, tablename, key, rowids, default=ub.NoParam, keepid=False, _join_optimize=1
+    ):
         """
         Convenience method to lookup only a single column of information
 
@@ -1927,15 +2001,22 @@ class CocoSqlDatabase(AbstractCocoDataset,
             # %timeit isinstance(rowids, list)
             # %timeit str(rowids)
             # Statement generated with help from ChatGPT3.5
-            stmt = text(ub.paragraph(
-                '''
+            stmt = text(
+                ub.paragraph(
+                    """
                 WITH tmp_id_list AS (
                     SELECT unnest(array{rowids_text}) AS row_id
                 )
                 SELECT t.{column_name}
                 FROM {tablename} t
                 JOIN tmp_id_list ON t.id = tmp_id_list.row_id;
-                ''').format(tablename=tablename, rowids_text=rowids_text, column_name=column_name))
+                """
+                ).format(
+                    tablename=tablename,
+                    rowids_text=rowids_text,
+                    column_name=column_name,
+                )
+            )
             # print(stmt)
             resp = self.session.execute(stmt)
             values = [r[0] for r in resp.fetchall()]
@@ -1945,20 +2026,27 @@ class CocoSqlDatabase(AbstractCocoDataset,
             # self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
         else:
             # FIXME: Make this work for columns that need json decoding
-            stmt = text(ub.paragraph(
-                '''
+            stmt = text(
+                ub.paragraph(
+                    """
                 SELECT
                     {tablename}.{key}
                 FROM {tablename}
                 WHERE {tablename}.id = :rowid
-                ''').format(tablename=tablename, key=key))
+                """
+                ).format(tablename=tablename, key=key)
+            )
 
             # Gotta be a better way adapt to a variant type based on the dialect
             if IS_GE_SQLALCH_2x:
-                column_type = column_type._variant_mapping.get(self._dialect_name, column_type)
+                column_type = column_type._variant_mapping.get(
+                    self._dialect_name, column_type
+                )
             else:
                 if hasattr(column_type, 'mapping'):
-                    column_type = column_type.mapping.get(self._dialect_name, column_type)
+                    column_type = column_type.mapping.get(
+                        self._dialect_name, column_type
+                    )
 
             values = [
                 # self.anns[aid][key]
@@ -1967,7 +2055,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 for rowid in rowids
             ]
 
-        needs_json_decode = (column_type.__class__.__name__ == 'JSON')
+        needs_json_decode = column_type.__class__.__name__ == 'JSON'
         if needs_json_decode:
             if IS_GE_SQLALCH_2x:
                 # In sqlchemy 2.0 for track_ids the query seems to return them
@@ -1990,10 +2078,12 @@ class CocoSqlDatabase(AbstractCocoDataset,
                                 # I've countered the case where "v" is already
                                 # decoded string and not a json string.
                                 return v
+
                     values = [_hack_loads(v) for v in values]
                 else:
-                    values = [v if not isinstance(v, str) else json.loads(v)
-                              for v in values]
+                    values = [
+                        v if not isinstance(v, str) else json.loads(v) for v in values
+                    ]
             else:
                 ADDITIONAL_HACK = True
                 if ADDITIONAL_HACK:
@@ -2008,6 +2098,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
                                 # I've countered the case where "v" is already
                                 # decoded string and not a json string.
                                 return v
+
                     values = [_hack_loads(v) for v in values]
                 else:
                     values = [None if v is None else json.loads(v) for v in values]
@@ -2047,12 +2138,15 @@ class CocoSqlDatabase(AbstractCocoDataset,
         """
         colnames_list = ['{}.{}'.format(tablename, key) for key in keys]
         colnames = ', '.join(colnames_list)
-        stmt = text(ub.paragraph(
-            '''
+        stmt = text(
+            ub.paragraph(
+                """
             SELECT
                 {colnames}
             FROM {tablename} ORDER BY {tablename}.id
-            ''').format(colnames=colnames, tablename=tablename))
+            """
+            ).format(colnames=colnames, tablename=tablename)
+        )
         result = self.session.execute(stmt)
         rows = result.fetchall()
         return rows
@@ -2070,15 +2164,17 @@ class CocoSqlDatabase(AbstractCocoDataset,
             >>> print(targets.pandas())
         """
         import kwarray
+
         stmt = ub.paragraph(
-            '''
+            """
             SELECT
                 annotations.id, image_id, category_id,
                 _bbox_x + (_bbox_w / 2), _bbox_y + (_bbox_h / 2),
                 _bbox_w, _bbox_h, images.width, images.height
             FROM annotations
             JOIN images on images.id = annotations.image_id
-            ''')
+            """
+        )
         result = self.session.execute(text(stmt))
         rows = result.fetchall()
         aids, gids, cids, cxs, cys, ws, hs, img_ws, img_hs = list(zip(*rows))
@@ -2121,7 +2217,7 @@ class CocoSqlDatabase(AbstractCocoDataset,
 
     @property
     def data_fpath(self):
-        """ data_fpath is an alias of fpath """
+        """data_fpath is an alias of fpath"""
         return self.fpath
 
     @data_fpath.setter
@@ -2157,27 +2253,32 @@ class CocoSqlDatabase(AbstractCocoDataset,
                 coco_fpath = cand_fpath
                 break
         if coco_fpath is None:
-
             # Workaround for postgres where we cant reconstruct the name based
             # on database URI alone. This pairs with the cacher in
             # :func:`cached_sql_coco_view`.
-            orig_name_cacher = ub.Cacher(fname='postgress-original-name',
-                                         depends=[self.fpath],
-                                         appname='kwcoco/postgres-fpath-lut',
-                                         ext='.json')
+            orig_name_cacher = ub.Cacher(
+                fname='postgress-original-name',
+                depends=[self.fpath],
+                appname='kwcoco/postgres-fpath-lut',
+                ext='.json',
+            )
             cache_info = orig_name_cacher.tryload()
             if cache_info is not None:
                 coco_fpath = ub.Path(cache_info['dct_db_fpath'])
 
         if coco_fpath is None:
             import warnings
-            warnings.warn(ub.paragraph(
-                f'''
+
+            warnings.warn(
+                ub.paragraph(
+                    f"""
                 Requested _orig_coco_fpath for {self} with a sqlview path of
                 {view_fpath} but no candidate json or zip path seems to exist.
                 Returning None instead. This may lead to unexpected behavior.
                 We may replace this warning with an error in the future.
-                '''))
+                """
+                )
+            )
         return coco_fpath
 
     def _cached_hashid(self):
@@ -2188,25 +2289,26 @@ class CocoSqlDatabase(AbstractCocoDataset,
         """
         coco_fpath = self._orig_coco_fpath()
         if coco_fpath is None:
-            raise Exception(ub.paragraph(
-                '''
+            raise Exception(
+                ub.paragraph(
+                    """
                 There was a problem associating this SQL view back to the
                 original coco filepath
-                '''))
+                """
+                )
+            )
 
         # Logic to construct the cache name
         cache_miss = True
-        cache_dpath = (coco_fpath.parent / '_cache')
+        cache_dpath = coco_fpath.parent / '_cache'
         cache_fname = coco_fpath.name + '.hashid.cache'
         hashid_sidecar_fpath = cache_dpath / cache_fname
         # Generate current lookup key
         fpath_stat = coco_fpath.stat()
-        status_key = {
-            'st_size': fpath_stat.st_size,
-            'st_mtime': fpath_stat.st_mtime
-        }
+        status_key = {'st_size': fpath_stat.st_size, 'st_mtime': fpath_stat.st_mtime}
         if hashid_sidecar_fpath.exists():
             import json
+
             cached_data = json.loads(hashid_sidecar_fpath.read_text())
             if cached_data['status_key'] == status_key:
                 self.hashid = cached_data['hashid']
@@ -2228,8 +2330,9 @@ class CocoSqlDatabase(AbstractCocoDataset,
         return self.hashid
 
 
-def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
-                         force_rewrite=False, backend=None):
+def cached_sql_coco_view(
+    dct_db_fpath=None, sql_db_fpath=None, dset=None, force_rewrite=False, backend=None
+):
     """
     Attempts to load a cached SQL-View dataset, only loading and converting the
     json dataset if necessary.
@@ -2283,7 +2386,10 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
             # Very annoying.
             postgres_name = smart_truncate(
                 ub.augpath(dct_db_fpath, ext=ext),
-                trunc_loc=0, max_length=60, trunc_char='_').lstrip('/')
+                trunc_loc=0,
+                max_length=60,
+                trunc_char='_',
+            ).lstrip('/')
             prefix = f'postgresql+psycopg2://{user}:{passwd}@{host}:{port}'
             sql_db_fpath = prefix + '/' + postgres_name
             # ub.augpath(dct_db_fpath, prefix='_', ext=ext)
@@ -2293,14 +2399,18 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
             # database itself stored the relevant information about what source
             # it was populated from (as well as if there have been
             # modifications).
-            orig_name_cacher = ub.Cacher(fname='postgress-original-name',
-                                         depends=[sql_db_fpath],
-                                         appname='kwcoco/postgres-fpath-lut',
-                                         ext='.json')
-            orig_name_cacher.save({
-                'dct_db_fpath': os.fspath(dct_db_fpath),
-                'sql_db_fpath': os.fspath(sql_db_fpath),
-            })
+            orig_name_cacher = ub.Cacher(
+                fname='postgress-original-name',
+                depends=[sql_db_fpath],
+                appname='kwcoco/postgres-fpath-lut',
+                ext='.json',
+            )
+            orig_name_cacher.save(
+                {
+                    'dct_db_fpath': os.fspath(dct_db_fpath),
+                    'sql_db_fpath': os.fspath(sql_db_fpath),
+                }
+            )
 
         else:
             raise KeyError(backend)
@@ -2316,17 +2426,23 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
     if os.fspath(sql_db_fpath) == ':memory:':
         enable_cache = False
 
-    _cache_dpath = (ub.Path(bundle_dpath) / '_cache')
+    _cache_dpath = ub.Path(bundle_dpath) / '_cache'
 
     if enable_cache:
         _cache_dpath.ensuredir()
 
     # Note: we don't have a way of comparing timestamps for postgresql
     # databases, but that shouldn't matter too much
-    stamp = ub.CacheStamp('kwcoco-sql-cache-' + VERSION_PART,
-                          dpath=_cache_dpath, depends=[dct_db_fpath],
-                          product=cache_product, enabled=enable_cache,
-                          hasher=None, ext='.json', verbose=4)
+    stamp = ub.CacheStamp(
+        'kwcoco-sql-cache-' + VERSION_PART,
+        dpath=_cache_dpath,
+        depends=[dct_db_fpath],
+        product=cache_product,
+        enabled=enable_cache,
+        hasher=None,
+        ext='.json',
+        verbose=4,
+    )
 
     try:
         if stamp.expired():
@@ -2344,7 +2460,9 @@ def cached_sql_coco_view(dct_db_fpath=None, sql_db_fpath=None, dset=None,
             dset = kwcoco.CocoDataset(dct_db_fpath)
 
         # Write the cacheid when making a view, so the view can access it
-        print(f'Write sidecar hashid for {type(dset)}: {dset.fpath} before we convert to SQL')
+        print(
+            f'Write sidecar hashid for {type(dset)}: {dset.fpath} before we convert to SQL'
+        )
         hashid = dset._cached_hashid()
         print(f'hashid = {ub.urepr(hashid, nl=1)}')
 
@@ -2366,14 +2484,17 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False, backend=None)
         This function is fragile. It depends on looking at file modified
         timestamps to determine if it needs to write the dataset.
     """
-    return cached_sql_coco_view(dset=dset, sql_db_fpath=db_fpath,
-                                force_rewrite=force_rewrite, backend=backend)
+    return cached_sql_coco_view(
+        dset=dset, sql_db_fpath=db_fpath, force_rewrite=force_rewrite, backend=backend
+    )
 
 
 def demo(num=10, backend=None):
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo(
-        'vidshapes', num_videos=1, num_frames=num, image_size=(64, 64))
+        'vidshapes', num_videos=1, num_frames=num, image_size=(64, 64)
+    )
     HACK = 1
     if HACK:
         gids = list(dset.imgs.keys())
@@ -2394,38 +2515,38 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
     compare = {}
     compare['gid_to_aids'] = {
         tag1: dict(dset1.index.gid_to_aids),
-        tag2: dict(dset2.index.gid_to_aids)}
+        tag2: dict(dset2.index.gid_to_aids),
+    }
     compare['cid_to_aids'] = {
         tag1: dict(dset1.index.cid_to_aids),
-        tag2: dict(dset2.index.cid_to_aids)}
+        tag2: dict(dset2.index.cid_to_aids),
+    }
     compare['vidid_to_gids'] = {
         tag1: dict(dset1.index.vidid_to_gids),
-        tag2: dict(dset2.index.vidid_to_gids)}
+        tag2: dict(dset2.index.vidid_to_gids),
+    }
     for key, pair in compare.items():
         lut1 = pair[tag1]
         lut2 = pair[tag2]
         if lut1 != lut2:
             raise AssertionError(
-                'Failed {} on lut1={!r}, lut2={!r}'.format(key, lut1, lut2))
+                'Failed {} on lut1={!r}, lut2={!r}'.format(key, lut1, lut2)
+            )
     # ------
     # The row dictionaries may have extra Nones on the SQL side
     # So the comparison logic is slightly more involved here
     compare = {}
-    compare['imgs'] = {
-        tag1: dict(dset1.index.imgs),
-        tag2: dict(dset2.index.imgs)}
-    compare['anns'] = {
-        tag1: dict(dset1.index.anns),
-        tag2: dict(dset2.index.anns)}
-    compare['cats'] = {
-        tag1: dict(dset1.index.cats),
-        tag2: dict(dset2.index.cats)}
+    compare['imgs'] = {tag1: dict(dset1.index.imgs), tag2: dict(dset2.index.imgs)}
+    compare['anns'] = {tag1: dict(dset1.index.anns), tag2: dict(dset2.index.anns)}
+    compare['cats'] = {tag1: dict(dset1.index.cats), tag2: dict(dset2.index.cats)}
     compare['file_name_to_img'] = {
         tag1: dict(dset1.index.file_name_to_img),
-        tag2: dict(dset2.index.file_name_to_img)}
+        tag2: dict(dset2.index.file_name_to_img),
+    }
     compare['name_to_cat'] = {
         tag1: dict(dset1.index.name_to_cat),
-        tag2: dict(dset2.index.name_to_cat)}
+        tag2: dict(dset2.index.name_to_cat),
+    }
     special_cols = {'_bbox_x', '_bbox_y', '_bbox_w', '_bbox_h'}
     for key, pair in compare.items():
         lut1 = pair[tag1]
@@ -2532,6 +2653,7 @@ def _benchmark_dset_readtime(dset, tag='?', n=4, post_iterate=False):
     """
 
     import timerit
+
     ti = timerit.Timerit(n, bestof=2, verbose=2)
 
     for timer in ti.reset('{} dict(gid_to_aids)'.format(tag)):
@@ -2603,6 +2725,7 @@ def _benchmark_dset_readtime(dset, tag='?', n=4, post_iterate=False):
                 r = dset.annots().lookup(attr, default=None)
                 if post_iterate:
                     list(ub.IndexableWalker(r))
+
     _take_test('image_id')
     _lookup_test('image_id')
     _take_test('bbox')
@@ -2617,6 +2740,7 @@ def _benchmark_dict_proxy_ops(proxy):
     Get insight on the efficiency of operations
     """
     import timerit
+
     orig_mode = proxy.ALCHEMY_MODE
 
     ti = timerit.Timerit(1, bestof=1, verbose=2)
@@ -2683,8 +2807,16 @@ def devcheck():
 
     ti_sql = _benchmark_dset_readtime(self, 'sql')
     ti_dct = _benchmark_dset_readtime(dset, 'dct')
-    print('ti_sql.rankings = {}'.format(ub.urepr(ti_sql.rankings, nl=2, precision=6, align=':')))
-    print('ti_dct.rankings = {}'.format(ub.urepr(ti_dct.rankings, nl=2, precision=6, align=':')))
+    print(
+        'ti_sql.rankings = {}'.format(
+            ub.urepr(ti_sql.rankings, nl=2, precision=6, align=':')
+        )
+    )
+    print(
+        'ti_dct.rankings = {}'.format(
+            ub.urepr(ti_dct.rankings, nl=2, precision=6, align=':')
+        )
+    )
 
     # Read the sql tables into pandas
     # table_names = self.engine.table_names()  # deprecated
@@ -2696,6 +2828,7 @@ def devcheck():
         print(table_df)
 
     import ndsampler
+
     self.hashid = 'foobarjunk'
     sampler = ndsampler.CocoSampler(self, backend=None)
 
@@ -2706,6 +2839,7 @@ def devcheck():
     regions.get_negative()
 
     import timerit
+
     with timerit.Timer('annots'):
         self.annots()
 
@@ -2717,17 +2851,29 @@ def devcheck():
     query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
     print(query.statement)
 
-    query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)
-    stmt = query.statement.compile(compile_kwargs={"literal_binds": True})
+    query = (
+        proxy.session.query(proxy.cls)
+        .filter(proxy.cls.id.in_(chosen_gids))
+        .order_by(proxy.cls.id)
+    )
+    stmt = query.statement.compile(compile_kwargs={'literal_binds': True})
     print(stmt)
 
     with timerit.Timer('query with in hardcode'):
-        query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)
-        stmt = query.statement.compile(compile_kwargs={"literal_binds": True})
+        query = (
+            proxy.session.query(proxy.cls)
+            .filter(proxy.cls.id.in_(chosen_gids))
+            .order_by(proxy.cls.id)
+        )
+        stmt = query.statement.compile(compile_kwargs={'literal_binds': True})
         items0 = proxy.session.execute(str(stmt)).fetchall()  # NOQA
 
     with timerit.Timer('query with in'):
-        query = proxy.session.query(proxy.cls).filter(proxy.cls.id.in_(chosen_gids)).order_by(proxy.cls.id)
+        query = (
+            proxy.session.query(proxy.cls)
+            .filter(proxy.cls.id.in_(chosen_gids))
+            .order_by(proxy.cls.id)
+        )
         items1 = query.all()  # NOQA
 
     with timerit.Timer('naive'):

@@ -107,6 +107,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         >>> CocoVisualizeVideosCLI.main(cmdline=False, **kw)
         >>> assert len(list((dpath / 'viz').glob('**/*.jpg'))) > 0
     """
+
     __command__ = 'visualize'
     __alias__ = ['visualize_videos']
 
@@ -116,40 +117,67 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
 
     src = scfg.Value(None, help='Input kwcoco dataset', position=1)
 
-    viz_dpath = scfg.Value(None, help=ub.paragraph(
-        '''
+    viz_dpath = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         Where to save the visualizations. If unspecified, writes them
         adjacent to the input kwcoco file.
-        '''))
+        """
+        ),
+    )
 
-    video = scfg.Value(None, help=ub.paragraph(
-        '''
+    video = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         Video id/name selection. Accepts a YAML list or a comma-separated
         list of names/ids. If unspecified, all videos are rendered.
-        '''))
+        """
+        ),
+    )
 
-    gids = scfg.Value(None, help=ub.paragraph(
-        '''
+    gids = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         Optional list of image ids to render. Accepts YAML list or
         comma-separated ids. Applied after video selection.
-        '''))
+        """
+        ),
+    )
 
-    select_images = scfg.Value(None, type=str, help=ub.paragraph(
-        '''
+    select_images = scfg.Value(
+        None,
+        type=str,
+        help=ub.paragraph(
+            """
         A jq-style query for image dictionaries. Requires the "jq" python
         library. See kwcoco._helpers._query_image_ids for details.
-        '''))
+        """
+        ),
+    )
 
-    select_videos = scfg.Value(None, type=str, help=ub.paragraph(
-        '''
+    select_videos = scfg.Value(
+        None,
+        type=str,
+        help=ub.paragraph(
+            """
         A jq-style query for video dictionaries. Requires the "jq" python
         library. See kwcoco._helpers._query_image_ids for details.
-        '''))
+        """
+        ),
+    )
 
-    include_loose = scfg.Value(True, isflag=True, help=ub.paragraph(
-        '''
+    include_loose = scfg.Value(
+        True,
+        isflag=True,
+        help=ub.paragraph(
+            """
         If True, render images without a video in a "loose-images" folder.
-        '''))
+        """
+        ),
+    )
 
     workers = scfg.Value('auto', help='Number of parallel workers')
 
@@ -160,17 +188,25 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
     resolution = scfg.Value(None, help='Output resolution (if supported)')
 
     channels = scfg.Value(None, type=str, help='Only visualize these channels')
-    any3 = scfg.Value(False, help=ub.paragraph(
-        '''
+    any3 = scfg.Value(
+        False,
+        help=ub.paragraph(
+            """
         If True, ensure any 3 channels are drawn as a false-color view. If
         set to "only", other per-channel visualizations are suppressed.
-        '''))
+        """
+        ),
+    )
 
     draw_imgs = scfg.Value(True, isflag=True, help='Draw images')
-    draw_anns = scfg.Value('auto', help=ub.paragraph(
-        '''
+    draw_anns = scfg.Value(
+        'auto',
+        help=ub.paragraph(
+            """
         Draw annotations. When "auto", only draw if annotations exist.
-        '''))
+        """
+        ),
+    )
     draw_boxes = scfg.Value(True, help='Draw bounding boxes')
     draw_segmentations = scfg.Value(True, help='Draw segmentation polygons')
     draw_labels = scfg.Value(True, help='Draw annotation labels')
@@ -182,25 +218,45 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
     draw_header = scfg.Value(True, help='Draw header text')
     draw_chancode = scfg.Value(True, help='Draw channel code text')
 
-    cmap = scfg.Value('viridis', type=str, help=ub.paragraph(
-        '''
+    cmap = scfg.Value(
+        'viridis',
+        type=str,
+        help=ub.paragraph(
+            """
         Name of a colormap for single channel data. Can also be a YAML
         mapping from channel name to colormap name.
-        '''))
+        """
+        ),
+    )
 
-    skip_missing = scfg.Value(True, isflag=True, help=ub.paragraph(
-        '''
+    skip_missing = scfg.Value(
+        True,
+        isflag=True,
+        help=ub.paragraph(
+            """
         If true, skip any image that does not have the requested channels.
-        '''))
-    skip_aggressive = scfg.Value(False, isflag=True, help=ub.paragraph(
-        '''
+        """
+        ),
+    )
+    skip_aggressive = scfg.Value(
+        False,
+        isflag=True,
+        help=ub.paragraph(
+            """
         Aggressively skip frames that appear to be invalid.
-        '''))
+        """
+        ),
+    )
 
-    draw_track_trails = scfg.Value(False, isflag=True, help=ub.paragraph(
-        '''
+    draw_track_trails = scfg.Value(
+        False,
+        isflag=True,
+        help=ub.paragraph(
+            """
         Draw history of track locations.
-        '''))
+        """
+        ),
+    )
 
     verbose = scfg.Value(0, isflag=True, help='verbosity level')
 
@@ -251,8 +307,9 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
 
         if config['skip_missing'] and config['channels'] is not None:
             # Remove images that do not contain any of the requested channels.
-            requested_channels = kwcoco.ChannelSpec.coerce(
-                config['channels']).fuse().as_set()
+            requested_channels = (
+                kwcoco.ChannelSpec.coerce(config['channels']).fuse().as_set()
+            )
             coco_images = coco_dset.images(selected_gids).coco_images
             keep = []
             for coco_img in coco_images:
@@ -273,7 +330,9 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
                         if requested_channels & code:
                             keep.append(coco_img.img['id'])
             if config['verbose']:
-                print(f'Filtered {len(coco_images) - len(keep)} images without requested channels')
+                print(
+                    f'Filtered {len(coco_images) - len(keep)} images without requested channels'
+                )
             selected_gids = keep
 
         vidids, vidname_lut = _select_videos(coco_dset, config['video'])
@@ -290,12 +349,17 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
 
         pool = ub.JobPool(mode='thread', max_workers=max_workers)
 
-        for vidid, video in ub.ProgIter(video_items, desc='visualize videos', verbose=3):
+        for vidid, video in ub.ProgIter(
+            video_items, desc='visualize videos', verbose=3
+        ):
             video_name = str(video.get('name', 'unknown'))
             if vidid is None:
                 # Gather images without any video_id association.
                 loose_gids = [
-                    gid for gid, v in coco_dset.images().lookup('video_id', None, keepid=1).items()
+                    gid
+                    for gid, v in coco_dset.images()
+                    .lookup('video_id', None, keepid=1)
+                    .items()
                     if v is None
                 ]
                 gids = loose_gids
@@ -351,7 +415,9 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
                     verbose=config['verbose'],
                 )
 
-        for job in ub.ProgIter(pool.as_completed(), total=len(pool), desc='write frames', verbose=3):
+        for job in ub.ProgIter(
+            pool.as_completed(), total=len(pool), desc='write frames', verbose=3
+        ):
             try:
                 job.result()
             except SkipFrame:
@@ -368,6 +434,7 @@ def _coerce_id_list(value):
         return None
     try:
         import kwutil
+
         coerced = kwutil.Yaml.coerce(value)
         if isinstance(coerced, list):
             return [int(v) for v in coerced]
@@ -385,6 +452,7 @@ def _select_videos(coco_dset, video_spec):
         return None, {}
     try:
         import kwutil
+
         parsed = kwutil.Yaml.coerce(video_spec)
     except Exception:
         parsed = None
@@ -442,16 +510,18 @@ class TrackInfoLookup:
     The trail logic is intentionally simple and computed per-frame to avoid
     stateful caching complexity in this CLI implementation.
     """
+
     def __init__(self, dset):
         self.dset = dset
 
     def get_track_trail_by_video_id(self, video_id, image_id=None):
         import kwimage
+
         vid_images = self.dset.images(video_id=video_id)
         if image_id is not None:
             vid_gids = list(vid_images)
             max_index = vid_gids.index(image_id)
-            vid_gids = vid_gids[:max_index + 1]
+            vid_gids = vid_gids[: max_index + 1]
             vid_images = self.dset.images(vid_gids)
             max_frame_index = self.dset.imgs[image_id]['frame_index']
         else:
@@ -506,13 +576,13 @@ class TrackInfoLookup:
         return trails
 
 
-def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands,
-                            any3):
+def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands, any3):
     """
     Resolve which channel groups to request and how to visualize them.
     """
     from delayed_image import channel_spec
     import kwcoco
+
     if channels is not None:
         if isinstance(channels, list):
             channels = ','.join(channels)
@@ -549,12 +619,16 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands,
                 else:
                     # For small-but-large groups, split into single-channel views.
                     for part in group:
-                        chan_groups.append({'chan': kwcoco.FusedChannelSpec.coerce(part)})
+                        chan_groups.append(
+                            {'chan': kwcoco.FusedChannelSpec.coerce(part)}
+                        )
             else:
                 chan_groups.append({'chan': group})
 
     for row in chan_groups:
-        row['pname'] = row['chan'].path_sanitize() if row['chan'] is not None else 'null'
+        row['pname'] = (
+            row['chan'].path_sanitize() if row['chan'] is not None else 'null'
+        )
 
     if any3:
         if any3 == 'only':
@@ -562,8 +636,12 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands,
             chan_groups = []
         avail_channels = channels.fuse() if channels is not None else None
         if avail_channels is not None:
-            common_visualizers = list(map(kwcoco.FusedChannelSpec.coerce, [
-                'red|green|blue', 'r|g|b', 'pan', 'panchromatic']))
+            common_visualizers = list(
+                map(
+                    kwcoco.FusedChannelSpec.coerce,
+                    ['red|green|blue', 'r|g|b', 'pan', 'panchromatic'],
+                )
+            )
             found = None
             for cand in common_visualizers:
                 flag = (cand & avail_channels).spec == cand.spec
@@ -579,36 +657,38 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands,
     return chan_groups
 
 
-def _render_frame(coco_dset,
-                  img,
-                  anns,
-                  sub_dpath,
-                  space,
-                  channels,
-                  draw_imgs,
-                  draw_anns,
-                  draw_boxes,
-                  draw_segmentations,
-                  draw_labels,
-                  ann_thickness,
-                  alpha,
-                  ann_score_thresh,
-                  draw_valid_region,
-                  draw_header,
-                  draw_chancode,
-                  cmap,
-                  any3,
-                  max_dim,
-                  min_dim,
-                  resolution,
-                  skip_missing,
-                  skip_aggressive,
-                  draw_track_trails,
-                  local_frame_index,
-                  local_max_frame,
-                  video_name,
-                  dset_idstr,
-                  verbose):
+def _render_frame(
+    coco_dset,
+    img,
+    anns,
+    sub_dpath,
+    space,
+    channels,
+    draw_imgs,
+    draw_anns,
+    draw_boxes,
+    draw_segmentations,
+    draw_labels,
+    ann_thickness,
+    alpha,
+    ann_score_thresh,
+    draw_valid_region,
+    draw_header,
+    draw_chancode,
+    cmap,
+    any3,
+    max_dim,
+    min_dim,
+    resolution,
+    skip_missing,
+    skip_aggressive,
+    draw_track_trails,
+    local_frame_index,
+    local_max_frame,
+    video_name,
+    dset_idstr,
+    verbose,
+):
     import kwimage
 
     if local_max_frame is None:
@@ -628,7 +708,9 @@ def _render_frame(coco_dset,
         factor = 1
     else:
         # Compute scale for requested output resolution.
-        factor = coco_img._scalefactor_for_resolution(space=space, resolution=resolution)
+        factor = coco_img._scalefactor_for_resolution(
+            space=space, resolution=resolution
+        )
     warp_viz_from_space = kwimage.Affine.scale(factor)
 
     delayed = coco_img.imdelay(space=space, resolution=resolution, **finalize_opts)
@@ -645,7 +727,8 @@ def _render_frame(coco_dset,
     header_lines = _build_header_lines(coco_dset, img, video_name, dset_idstr)
 
     chan_groups = _resolve_channel_groups(
-        coco_img, channels, verbose, request_grouped_bands='default', any3=any3)
+        coco_img, channels, verbose, request_grouped_bands='default', any3=any3
+    )
 
     img_view_dpath = sub_dpath / '_imgs'
     ann_view_dpath = sub_dpath / '_anns'
@@ -682,7 +765,9 @@ def _render_frame(coco_dset,
             valid_image_poly = valid_image_poly.warp(viz_warp)
         if trails is not None:
             for trail in trails:
-                trail['motion_path']['vidspace_boxes'] = trail['motion_path']['vidspace_boxes'].warp(viz_warp)
+                trail['motion_path']['vidspace_boxes'] = trail['motion_path'][
+                    'vidspace_boxes'
+                ].warp(viz_warp)
 
     for chan_row in chan_groups:
         try:
@@ -740,31 +825,33 @@ def _compute_viz_scale(dsize, min_dim, max_dim):
     return viz_scale_factor
 
 
-def _draw_channel_group(coco_dset,
-                        frame_id,
-                        img,
-                        dets,
-                        trails,
-                        ann_view_dpath,
-                        img_view_dpath,
-                        delayed,
-                        chan_row,
-                        finalize_opts,
-                        skip_missing,
-                        skip_aggressive,
-                        cmap,
-                        header_lines,
-                        valid_image_poly,
-                        draw_imgs,
-                        draw_anns,
-                        draw_boxes,
-                        draw_labels,
-                        draw_segmentations,
-                        draw_header,
-                        draw_chancode,
-                        ann_thickness,
-                        alpha,
-                        verbose):
+def _draw_channel_group(
+    coco_dset,
+    frame_id,
+    img,
+    dets,
+    trails,
+    ann_view_dpath,
+    img_view_dpath,
+    delayed,
+    chan_row,
+    finalize_opts,
+    skip_missing,
+    skip_aggressive,
+    cmap,
+    header_lines,
+    valid_image_poly,
+    draw_imgs,
+    draw_anns,
+    draw_boxes,
+    draw_labels,
+    draw_segmentations,
+    draw_header,
+    draw_chancode,
+    ann_thickness,
+    alpha,
+    verbose,
+):
     """
     Draw a single channel group for a single frame and write to disk.
     """
@@ -781,7 +868,9 @@ def _draw_channel_group(coco_dset,
     if chan_group_obj is not None:
         chan_list = chan_group_obj.parsed
         chan_group = chan_group_obj.spec
-        chan_pname2 = kwcoco.FusedChannelSpec.coerce(chan_group).path_sanitize(maxlen=10)
+        chan_pname2 = kwcoco.FusedChannelSpec.coerce(chan_group).path_sanitize(
+            maxlen=10
+        )
         prefix = '_'.join([frame_id, chan_pname2])
     else:
         chan_group = None
@@ -814,12 +903,16 @@ def _draw_channel_group(coco_dset,
     if dmax > 1.0:
         # Apply robust normalization for non-uint8 ranges.
         mask = ~np.isnan(raw_canvas)
-        canvas = kwimage.normalize_intensity(raw_canvas, mask=mask, params={
-            'high': 0.90,
-            'mid': 0.5,
-            'low': 0.01,
-            'mode': 'linear',
-        })
+        canvas = kwimage.normalize_intensity(
+            raw_canvas,
+            mask=mask,
+            params={
+                'high': 0.90,
+                'mid': 0.5,
+                'low': 0.01,
+                'mode': 'linear',
+            },
+        )
         canvas = np.clip(canvas, 0, None)
 
     canvas = kwimage.nodata_checkerboard(canvas, on_value=0.3)
@@ -852,13 +945,16 @@ def _draw_channel_group(coco_dset,
             if isinstance(chan_to_cmap, str):
                 chan_to_cmap = {'__default__': chan_to_cmap}
             elif not isinstance(chan_to_cmap, dict):
-                raise TypeError(f'Did not coerce chan_to_cmap: {type(chan_to_cmap)} correctly')
+                raise TypeError(
+                    f'Did not coerce chan_to_cmap: {type(chan_to_cmap)} correctly'
+                )
 
             default_cmap_name = chan_to_cmap.get('__default__', 'viridis')
             cmap_name = chan_to_cmap.get(chan_group, default_cmap_name)
 
             try:
                 import matplotlib.cm  # NOQA
+
                 cmap_ = mpl.cm.get_cmap(cmap_name)
             except AttributeError:
                 cmap_ = mpl.colormaps[cmap_name]
@@ -882,17 +978,20 @@ def _draw_channel_group(coco_dset,
     if valid_image_poly is not None:
         if any([p.data['exterior'].data.size for p in valid_image_poly.data]):
             canvas = valid_image_poly.draw_on(
-                canvas, color='kitware_green', fill=False, border=True, alpha=alpha)
+                canvas, color='kitware_green', fill=False, border=True, alpha=alpha
+            )
 
     if draw_imgs:
         img_chan_dpath.ensuredir()
         img_canvas = kwimage.ensure_uint255(canvas, copy=True)
         if draw_chancode and chan_group is not None:
             img_canvas = kwimage.draw_text_on_image(
-                img_canvas, chan_group, (1, 2), valign='top', color='lime', border=3)
+                img_canvas, chan_group, (1, 2), valign='top', color='lime', border=3
+            )
         if draw_header:
-            img_header = kwimage.draw_header_text(image=img_canvas, text=header_text,
-                                                  stack=False, fit='shrink')
+            img_header = kwimage.draw_header_text(
+                image=img_canvas, text=header_text, stack=False, fit='shrink'
+            )
             img_canvas = kwimage.stack_images([img_header, img_canvas], axis=0)
         kwimage.imwrite(view_img_fpath, img_canvas)
 
@@ -916,14 +1015,17 @@ def _draw_channel_group(coco_dset,
                 trail_cxy = trail['motion_path']['vidspace_boxes'].xy_center
                 trail_colors = trail['motion_path']['track_colors'][1:]
                 ann_canvas = draw_polyline_on_image(
-                    ann_canvas, trail_cxy, color=trail_colors, thickness=thickness)
+                    ann_canvas, trail_cxy, color=trail_colors, thickness=thickness
+                )
         ann_canvas = kwimage.ensure_uint255(ann_canvas)
         if draw_chancode and chan_group is not None:
             ann_canvas = kwimage.draw_text_on_image(
-                ann_canvas, chan_group, (1, 2), valign='top', color='lime', border=3)
+                ann_canvas, chan_group, (1, 2), valign='top', color='lime', border=3
+            )
         if draw_header:
-            ann_header = kwimage.draw_header_text(image=ann_canvas, text=header_text,
-                                                  stack=False, fit='shrink')
+            ann_header = kwimage.draw_header_text(
+                image=ann_canvas, text=header_text, stack=False, fit='shrink'
+            )
             ann_canvas = kwimage.stack_images([ann_header, ann_canvas], axis=0)
         kwimage.imwrite(view_ann_fpath, ann_canvas)
 
@@ -933,11 +1035,13 @@ def draw_polyline_on_image(image, xy_pts, color=None, thickness=1):
     Draw a polyline on an image.
     """
     import kwimage
+
     if len(xy_pts) > 1:
         pts1 = xy_pts[0:-1]
         pts2 = xy_pts[1:]
         image = kwimage.draw_line_segments_on_image(
-            image, pts1, pts2, color=color, thickness=thickness)
+            image, pts1, pts2, color=color, thickness=thickness
+        )
     return image
 
 
@@ -953,13 +1057,12 @@ def perchannel_colorize(data, channel_colors=None):
         data = data[None, :, :]
 
     existing_colors = [
-        kwimage.Color.coerce(c).as01()
-        for c in channel_colors if c is not None
+        kwimage.Color.coerce(c).as01() for c in channel_colors if c is not None
     ]
 
     fill_colors = kwimage.Color.distinct(
-        num_channels - len(existing_colors),
-        existing=existing_colors)
+        num_channels - len(existing_colors), existing=existing_colors
+    )
     fill_color_iter = iter(fill_colors)
 
     resolved_channel_colors = []
@@ -997,6 +1100,7 @@ def ensure_false_color(canvas, method='ortho'):
     import kwarray
     import numpy as np
     import kwimage
+
     canvas = kwarray.atleast_nd(canvas, 3)
 
     if canvas.shape[2] in {1, 3}:
@@ -1006,10 +1110,11 @@ def ensure_false_color(canvas, method='ortho'):
             rng = kwarray.ensure_rng(canvas.shape[2])
             seedmat = rng.rand(canvas.shape[2], 3).T
             h, tau = np.linalg.qr(seedmat, mode='raw')
-            false_colored = (canvas @ h)
+            false_colored = canvas @ h
             rgb_canvas = kwarray.normalize(false_colored)
         elif method.lower() == 'pca':
             import sklearn
+
             dims = canvas.shape[0:2]
             in_channels = canvas.shape[2]
 

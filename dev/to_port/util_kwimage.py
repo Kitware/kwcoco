@@ -1,6 +1,7 @@
 """
 These functions might be added to kwimage
 """
+
 import numpy as np
 import cv2
 import ubelt as ub
@@ -51,6 +52,7 @@ def _auto_kernel_sigma(kernel=None, sigma=None, autokernel_mode='ours'):
         >>> sns.lineplot(data=df, x='s', y='k', hue='type')
     """
     import numbers
+
     if kernel is None and sigma is None:
         kernel = 3
 
@@ -118,6 +120,7 @@ def upweight_center_mask(shape):
         >>> kwplot.show_if_requested()
     """
     import kwimage
+
     shape, sigma = _auto_kernel_sigma(kernel=shape)
     sigma_x, sigma_y = sigma
     weights = kwimage.gaussian_patch(shape, sigma=(sigma_x, sigma_y))
@@ -126,7 +129,8 @@ def upweight_center_mask(shape):
     kernel = np.maximum(np.array(shape) // 8, 3)
     kernel = kernel + (1 - (kernel % 2))
     weights = kwimage.morphology(
-        weights, kernel=kernel, mode='dilate', element='rect', iterations=1)
+        weights, kernel=kernel, mode='dilate', element='rect', iterations=1
+    )
     weights = kwimage.ensure_float01(weights)
     weights = np.maximum(weights, 0.001)
     return weights
@@ -184,14 +188,13 @@ def perchannel_colorize(data, channel_colors=None):
         data = data[None, :, :]
 
     existing_colors = [
-        kwimage.Color.coerce(c).as01()
-        for c in channel_colors if c is not None
+        kwimage.Color.coerce(c).as01() for c in channel_colors if c is not None
     ]
 
     # Define default colors
     fill_colors = kwimage.Color.distinct(
-        num_channels - len(existing_colors),
-        existing=existing_colors)
+        num_channels - len(existing_colors), existing=existing_colors
+    )
     fill_color_iter = iter(fill_colors)
 
     resolved_channel_colors = []
@@ -251,6 +254,7 @@ def ensure_false_color(canvas, method='ortho'):
     import kwarray
     import numpy as np
     import kwimage
+
     canvas = kwarray.atleast_nd(canvas, 3)
 
     if canvas.shape[2] in {1, 3}:
@@ -267,15 +271,15 @@ def ensure_false_color(canvas, method='ortho'):
     #     lab_canvas = np.concatenate([L_part, a_part, b_part], axis=2)
     #     rgb_canvas = kwimage.convert_colorspace(lab_canvas, src_space='lab', dst_space='rgb')
     else:
-
         if method == 'ortho':
             rng = kwarray.ensure_rng(canvas.shape[2])
             seedmat = rng.rand(canvas.shape[2], 3).T
             h, tau = np.linalg.qr(seedmat, mode='raw')
-            false_colored = (canvas @ h)
+            false_colored = canvas @ h
             rgb_canvas = kwarray.normalize(false_colored)
         elif method.lower() == 'pca':
             import sklearn
+
             ndim = canvas.ndim
             dims = canvas.shape[0:2]
             if ndim == 2:
@@ -296,8 +300,9 @@ def ensure_false_color(canvas, method='ortho'):
     return rgb_canvas
 
 
-def colorize_label_image(labels, with_legend=True, label_mapping=None,
-                         label_to_color=None, legend_dpi=200):
+def colorize_label_image(
+    labels, with_legend=True, label_mapping=None, label_to_color=None, legend_dpi=200
+):
     """
     Rename to draw_label_image?
 
@@ -347,17 +352,21 @@ def colorize_label_image(labels, with_legend=True, label_mapping=None,
         >>> kwplot.imshow(canvas2, pnum=(1, 2, 2), fnum=1)
     """
     import kwimage
+
     unique_labels, inv = np.unique(labels, return_inverse=True)
 
     if np.isnan(unique_labels).any():
         # need specialized nan handling because we are going to use unique
         # values as keys in a dictionary.
         import math
+
         unique_labels = ['nan' if math.isnan(f) else f for f in unique_labels]
 
     if label_to_color is not None:
         used_labels = set(label_to_color) & set(unique_labels)
-        label_to_color_ = {k: kwimage.Color(c).as01() for k, c in label_to_color.items()}
+        label_to_color_ = {
+            k: kwimage.Color(c).as01() for k, c in label_to_color.items()
+        }
         existing = list(label_to_color_.values())
         uncolored_labels = list(set(unique_labels) - set(used_labels))
     else:
@@ -372,7 +381,9 @@ def colorize_label_image(labels, with_legend=True, label_mapping=None,
 
     unique_label_colors = [label_to_color_[c] for c in unique_labels]
     unique_label_colors = np.array(unique_label_colors)
-    colored_label_img = unique_label_colors[inv].reshape(labels.shape + (unique_label_colors.shape[-1],))
+    colored_label_img = unique_label_colors[inv].reshape(
+        labels.shape + (unique_label_colors.shape[-1],)
+    )
 
     # index_to_color = np.array([kwimage.Color('black').as01()] + label_colors)
     # colored_label_img = index_to_color[labels]
@@ -381,8 +392,12 @@ def colorize_label_image(labels, with_legend=True, label_mapping=None,
 
         label_to_color = ub.dzip(unique_labels, unique_label_colors)
         if label_mapping:
-            label_to_color = {str(k) if k not in label_mapping else str(k) + ': ' + str(label_mapping[k]): v
-                              for k, v in label_to_color.items()}
+            label_to_color = {
+                str(k)
+                if k not in label_mapping
+                else str(k) + ': ' + str(label_mapping[k]): v
+                for k, v in label_to_color.items()
+            }
 
         legend = kwplot.make_legend_img(label_to_color, dpi=legend_dpi)
 
@@ -410,8 +425,9 @@ def colorize_label_image(labels, with_legend=True, label_mapping=None,
             # if h1 > h2:
             #     legend = kwimage.imresize(legend, dsize=(None, h2))
 
-        canvas = kwimage.stack_images([colored_label_img, legend], axis=1,
-                                      bg_value='gray')
+        canvas = kwimage.stack_images(
+            [colored_label_img, legend], axis=1, bg_value='gray'
+        )
         # resize='smaller')
     else:
         canvas = colored_label_img
@@ -472,7 +488,7 @@ def local_variance(image, kernel, handle_nans=True):
         # What is a good replacement value?
         image_f[invalid_mask] = 0
     local_mean = cv2.boxFilter(image_f, ddepth=-1, ksize=ksize)
-    diff = (image_f - local_mean)
+    diff = image_f - local_mean
     square_diff = diff * diff
     local_vari = cv2.boxFilter(square_diff, ddepth=-1, ksize=ksize)
     if has_mask:
@@ -560,9 +576,16 @@ def find_lowvariance_regions(image, kernel=7):
     return labels
 
 
-def find_samecolor_regions(image, min_region_size=49, seed_method='grid',
-                           connectivity=8, scale=1.0, grid_stride='auto',
-                           PRINT_STEPS=0, values=None):
+def find_samecolor_regions(
+    image,
+    min_region_size=49,
+    seed_method='grid',
+    connectivity=8,
+    scale=1.0,
+    grid_stride='auto',
+    PRINT_STEPS=0,
+    values=None,
+):
     """
     Find large spatially connected regions in an image where all pixels have
     the same value.
@@ -805,8 +828,10 @@ def find_samecolor_regions(image, min_region_size=49, seed_method='grid',
 
     if 0:
         from kwimage.im_cv2 import _cv2_input_fixer_v2
+
         image, final_dtype = _cv2_input_fixer_v2(
-            image, allowed_types='uint8,float32', contiguous=True)
+            image, allowed_types='uint8,float32', contiguous=True
+        )
     else:
         if image.dtype.kind == 'f':
             if image.dtype.itemsize != 4:
@@ -866,13 +891,16 @@ def find_samecolor_regions(image, min_region_size=49, seed_method='grid',
     # Initialize floodfill flags
     ff_flags_base = 0
     ff_flags_base |= connectivity
-    ff_flags_base |= cv2.FLOODFILL_FIXED_RANGE  # only consider difference between the seed and the point to be filled
+    ff_flags_base |= (
+        cv2.FLOODFILL_FIXED_RANGE
+    )  # only consider difference between the seed and the point to be filled
     ff_flags_base |= cv2.FLOODFILL_MASK_ONLY
 
     prev_mask = mask.copy()
 
     if PRINT_STEPS:
         import rich
+
         regions_found = 0
 
     if values_of_interest is not None and seed_method != 'values':
@@ -923,7 +951,24 @@ def find_samecolor_regions(image, min_region_size=49, seed_method='grid',
             if already_filled:
                 rich.print(f'seed xys = ({check_x}, {check_y})')
                 rich.print('[yellow] already filled')
-                rich.print(ub.hzcat(list(map(str, ['\n' + str(image), ' ', '\n' + str(check_position), ' ', mask, ' ', accum_labels]))))
+                rich.print(
+                    ub.hzcat(
+                        list(
+                            map(
+                                str,
+                                [
+                                    '\n' + str(image),
+                                    ' ',
+                                    '\n' + str(check_position),
+                                    ' ',
+                                    mask,
+                                    ' ',
+                                    accum_labels,
+                                ],
+                            )
+                        )
+                    )
+                )
 
         if not already_filled:
             seed_point = (check_x, check_y)
@@ -933,9 +978,15 @@ def find_samecolor_regions(image, min_region_size=49, seed_method='grid',
             ff_flags = ff_flags_base | (cluster_label << 8)
 
             num, im, mask, rect = cv2.floodFill(
-                image, mask=mask, seedPoint=seed_point, newVal=1, loDiff=0, upDiff=0,
+                image,
+                mask=mask,
+                seedPoint=seed_point,
+                newVal=1,
+                loDiff=0,
+                upDiff=0,
                 # rect=None,
-                flags=ff_flags)
+                flags=ff_flags,
+            )
 
             fx, fy, fw, fh = rect
             sl = (slice(fy, fy + fh + 1), slice(fx, fx + fw + 1))
@@ -952,7 +1003,26 @@ def find_samecolor_regions(image, min_region_size=49, seed_method='grid',
                 else:
                     rich.print('[red] not a region')
                 delta = mask - prev_mask
-                rich.print(ub.hzcat(list(map(str, ['\n' + str(image), ' ', '\n' + str(check_position), ' ', mask, ' ', accum_labels, ' ', delta]))))
+                rich.print(
+                    ub.hzcat(
+                        list(
+                            map(
+                                str,
+                                [
+                                    '\n' + str(image),
+                                    ' ',
+                                    '\n' + str(check_position),
+                                    ' ',
+                                    mask,
+                                    ' ',
+                                    accum_labels,
+                                    ' ',
+                                    delta,
+                                ],
+                            )
+                        )
+                    )
+                )
 
             if num > min_region_size:
                 # use delta to work around an issue where the cluster label is
@@ -990,12 +1060,12 @@ def find_samecolor_regions(image, min_region_size=49, seed_method='grid',
 
     if scale != 1.0:
         final_labels = kwimage.imresize(
-            final_labels, dsize=orig_dsize, interpolation='nearest')
+            final_labels, dsize=orig_dsize, interpolation='nearest'
+        )
     return final_labels
 
 
-def find_high_frequency_values(image, values=None, abs_thresh=0.2,
-                               rel_thresh=None):
+def find_high_frequency_values(image, values=None, abs_thresh=0.2, rel_thresh=None):
     """
     Values that appear in the image very often, may be indicative of an
     artifact that we should remove.
@@ -1063,8 +1133,10 @@ def find_high_frequency_values(image, values=None, abs_thresh=0.2,
         >>> assert np.all(mask2[:16])
         >>> assert not np.any(mask2[16:])
     """
+
     def ratios(data):
         return data[:-1] / data[1:]
+
     import kwarray
     import numpy as np
 
@@ -1072,7 +1144,7 @@ def find_high_frequency_values(image, values=None, abs_thresh=0.2,
     if values_of_interest is not None and len(values_of_interest) == 1:
         # Optimization for a single bad values we care about.
         value_of_interest = ub.peek(values_of_interest)
-        flags = (image == value_of_interest)
+        flags = image == value_of_interest
         if len(flags.shape) > 2:
             axis = tuple(range(2, len(flags.shape)))
             flags = flags.all(axis=axis)
@@ -1101,8 +1173,8 @@ def find_high_frequency_values(image, values=None, abs_thresh=0.2,
 
         abs_score = ranked_counts / image.size
         rel_score = ratios(ranked_counts)
-        abs_score = abs_score[:len(rel_score)]
-        ranked_values = ranked_values[:len(rel_score)]
+        abs_score = abs_score[: len(rel_score)]
+        ranked_values = ranked_values[: len(rel_score)]
 
         if abs_thresh is not None:
             flags = abs_score > abs_thresh
@@ -1110,7 +1182,7 @@ def find_high_frequency_values(image, values=None, abs_thresh=0.2,
             flags = np.zeros(len(abs_score), dtype=bool)
 
         if rel_thresh is not None:
-            flags |= (rel_score > rel_thresh)
+            flags |= rel_score > rel_thresh
 
         bad_values = ranked_values[flags]
         image = kwarray.atleast_nd(image, 3)
@@ -1149,10 +1221,10 @@ def polygon_distance_transform(poly, shape):
         >>> kwplot.imshow(poly_mask.astype(np.float32), pnum=(1, 2, 2), title='poly-mask')
     """
     import cv2
+
     poly_mask = np.zeros(shape, dtype=np.uint8)
     poly_mask = poly.fill(poly_mask, value=1)
-    dist = cv2.distanceTransform(
-        src=poly_mask, distanceType=cv2.DIST_L2, maskSize=3)
+    dist = cv2.distanceTransform(src=poly_mask, distanceType=cv2.DIST_L2, maskSize=3)
     return dist, poly_mask
 
 
@@ -1236,6 +1308,7 @@ def devcheck_frame_poly_weights(poly, shape, dtype=np.uint8):
     kwplot.imshow(weights3, pnum=(1, 3, 3), title='variant2', cmap='viridis', data_colorbar=1)
     """
     import kwimage
+
     space_shape = (128, 128)
     space_dsize = space_shape[::-1]
     polys = [
@@ -1265,15 +1338,22 @@ def devcheck_frame_poly_weights(poly, shape, dtype=np.uint8):
     frame_poly_weights = np.maximum(frame_poly_weights, min_spacetime_weight)
     space_weights = kwarray.normalize(kwimage.gaussian_patch(space_shape, sigma=sigma))
     import kwplot
+
     kwplot.autompl()
     kwplot.imshow(frame_poly_weights_v1, pnum=(1, 3, 1))
     kwplot.imshow(frame_poly_weights, pnum=(1, 3, 2))
     kwplot.imshow(np.maximum(frame_poly_weights, space_weights), pnum=(1, 3, 3))
 
 
-def find_low_overlap_covering_boxes(polygons, scale, min_box_dim, max_box_dim,
-                                    merge_thresh=0.001, max_iters=100,
-                                    verbose=1):
+def find_low_overlap_covering_boxes(
+    polygons,
+    scale,
+    min_box_dim,
+    max_box_dim,
+    merge_thresh=0.001,
+    max_iters=100,
+    verbose=1,
+):
     """
     Given a set of polygons we want to find a small set of boxes that
     completely cover all of those polygons.
@@ -1363,8 +1443,12 @@ def find_low_overlap_covering_boxes(polygons, scale, min_box_dim, max_box_dim,
     polybbs = kwimage.Boxes.concatenate([p.to_boxes() for p in polygons])
     initial_candiate_bbs = polybbs.scale(scale, about='center')
     initial_candiate_bbs = initial_candiate_bbs.to_cxywh()
-    initial_candiate_bbs.data[..., 2] = np.maximum(initial_candiate_bbs.data[..., 2], min_box_dim)
-    initial_candiate_bbs.data[..., 3] = np.maximum(initial_candiate_bbs.data[..., 3], min_box_dim)
+    initial_candiate_bbs.data[..., 2] = np.maximum(
+        initial_candiate_bbs.data[..., 2], min_box_dim
+    )
+    initial_candiate_bbs.data[..., 3] = np.maximum(
+        initial_candiate_bbs.data[..., 3], min_box_dim
+    )
 
     candidate_bbs = initial_candiate_bbs
 
@@ -1387,8 +1471,12 @@ def find_low_overlap_covering_boxes(polygons, scale, min_box_dim, max_box_dim,
         # ws = hs = np.full(len(xs), fill_value=site_meters)
         # utm_boxes = kwimage.Boxes(np.stack([xs, ys, ws, hs], axis=1), 'cxywh').to_xywh()
 
-        boxes_gdf = gpd.GeoDataFrame(geometry=candidate_bbs.to_shapely(), crs=polygons_gdf.crs)
-        box_poly_overlap = util_gis.geopandas_pairwise_overlaps(boxes_gdf, polygons_gdf, predicate='contains')
+        boxes_gdf = gpd.GeoDataFrame(
+            geometry=candidate_bbs.to_shapely(), crs=polygons_gdf.crs
+        )
+        box_poly_overlap = util_gis.geopandas_pairwise_overlaps(
+            boxes_gdf, polygons_gdf, predicate='contains'
+        )
         cover_idxs = list(kwarray.setcover(box_poly_overlap).keys())
         keep_bbs = candidate_bbs.take(cover_idxs)
         box_ious = keep_bbs.ious(keep_bbs)
@@ -1415,10 +1503,16 @@ def find_low_overlap_covering_boxes(polygons, scale, min_box_dim, max_box_dim,
                     used.update(clique)
 
             unused = sorted(set(range(len(keep_bbs))) - used)
-            post_merge_bbs = kwimage.Boxes.concatenate([keep_bbs.take(unused)] + merged_boxes)
+            post_merge_bbs = kwimage.Boxes.concatenate(
+                [keep_bbs.take(unused)] + merged_boxes
+            )
 
-            boxes_gdf = gpd.GeoDataFrame(geometry=post_merge_bbs.to_shapely(), crs=polygons_gdf.crs)
-            box_poly_overlap = util_gis.geopandas_pairwise_overlaps(boxes_gdf, polygons_gdf, predicate='contains')
+            boxes_gdf = gpd.GeoDataFrame(
+                geometry=post_merge_bbs.to_shapely(), crs=polygons_gdf.crs
+            )
+            box_poly_overlap = util_gis.geopandas_pairwise_overlaps(
+                boxes_gdf, polygons_gdf, predicate='contains'
+            )
             cover_idxs = list(kwarray.setcover(box_poly_overlap).keys())
             new_cand_bbs = post_merge_bbs.take(cover_idxs)
         else:
@@ -1454,6 +1548,7 @@ def find_low_overlap_covering_boxes(polygons, scale, min_box_dim, max_box_dim,
 
     if 0:
         import kwplot
+
         kwplot.autoplt()
         kwplot.figure(fnum=1, doclf=1)
         polygons.draw(color='pink')
@@ -1463,7 +1558,9 @@ def find_low_overlap_covering_boxes(polygons, scale, min_box_dim, max_box_dim,
     return keep_bbs, overlap_idxs
 
 
-def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_box_dim, merge_thresh=0.001, max_iters=100):
+def find_low_overlap_covering_boxes_optimize(
+    polygons, scale, min_box_dim, max_box_dim, merge_thresh=0.001, max_iters=100
+):
     """
     A variant of the covering problem that doesn't work that well, but might in
     the future with tweaks.
@@ -1505,7 +1602,9 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
     # import kwarray
 
     start_scale = 2.0
-    polygon_boxes = kwimage.Boxes.concatenate([p.to_boxes() for p in polygons]).to_ltrb()
+    polygon_boxes = kwimage.Boxes.concatenate(
+        [p.to_boxes() for p in polygons]
+    ).to_ltrb()
     candidate_bbs = polygon_boxes.scale(start_scale, about='center').to_ltrb()
     orig_candidates = candidate_bbs.copy()
     import torch
@@ -1518,7 +1617,9 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
     # These will be soft bits that will indicate 1 or 0, and we will try to
     # force into an integer solution via rounding.
     indicator_logits = torch.nn.Parameter(
-        torch.rand(len(candidate_ltrb), dtype=torch.float, device=candidate_ltrb.device) * 0.2 + 0.8
+        torch.rand(len(candidate_ltrb), dtype=torch.float, device=candidate_ltrb.device)
+        * 0.2
+        + 0.8
     )
 
     parameters = [
@@ -1526,6 +1627,7 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
         indicator_logits,
     ]
     import torch_optimizer as optim
+
     optimizer = optim.RangerQH(parameters, lr=1e-2)
     # from torch.optim import SGD
     # optimizer = SGD(parameters, lr=1-1, weight_decay=1e-7)
@@ -1562,7 +1664,8 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
         # We want to minimize...
         objective = (
             # Total chosen area covered
-            chosen_area +
+            chosen_area
+            +
             # Overlap of the chosen boxes
             chosen_self_overlap
         )
@@ -1609,19 +1712,23 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
             drift = (candidate_ltrb.data - orig_candidates.data).abs().max().item()
             sat_overall = outputs['item_losses']['sat_overall'].sum().item()
             sat_critical = outputs['item_losses']['sat_critical'].sum().item()
-            prog.set_extra(f'{loss=} {total_grad=} {mean_grad=} {drift=} {sat_critical=} {sat_overall=}')
+            prog.set_extra(
+                f'{loss=} {total_grad=} {mean_grad=} {drift=} {sat_critical=} {sat_overall=}'
+            )
             optimizer.step()
 
     else:
 
         def draw_batch():
             import kwarray
+
             indicator_bits = kwarray.ArrayAPI.numpy(indicator_logits.sigmoid())
             orig_candidates.draw(color='red', linewidth=6)
             cover_boxes.numpy().draw(color='blue', setlim=1, alpha=indicator_bits, u=3)
             target_boxes.numpy().draw(color='orange', setlim='grow', linwidth=2)
 
         import kwplot
+
         sns = kwplot.autosns()
         plt = kwplot.autoplt()
         kwplot.figure(fnum=1, doclf=1)
@@ -1629,6 +1736,7 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
         plt.gca().set_title('find_low_overlap_covering_boxes')
 
         import xdev
+
         fnum = 2
         fig = kwplot.figure(fnum=fnum, doclf=True)
         fig.set_size_inches(15, 6)
@@ -1637,7 +1745,9 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
         _frame_idx = 0
 
         loss_records = []
-        loss_records = [g[0] for g in ub.group_items(loss_records, lambda x: x['step']).values()]
+        loss_records = [
+            g[0] for g in ub.group_items(loss_records, lambda x: x['step']).values()
+        ]
         step = 0
         _frame_idx = 0
 
@@ -1666,14 +1776,21 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
                 # item_losses_ = default_collate(outputs['item_losses'])
                 item_losses_ = outputs['item_losses']
                 item_losses = ub.map_vals(lambda x: sum(x).item(), item_losses_)
-                loss_records.extend([{'part': key, 'val': val, 'step': step} for key, val in item_losses.items()])
+                loss_records.extend(
+                    [
+                        {'part': key, 'val': val, 'step': step}
+                        for key, val in item_losses.items()
+                    ]
+                )
                 loss.backward()
                 total_grad = candidate_ltrb.grad.sum()
                 mean_grad = total_grad / candidate_ltrb.numel()
                 drift = (candidate_ltrb.data - orig_candidates.data).abs().max().item()
                 sat_overall = outputs['item_losses']['sat_overall'].sum().item()
                 sat_critical = outputs['item_losses']['sat_critical'].sum().item()
-                prog.set_extra(f'{loss=} {total_grad=} {mean_grad=} {drift=} {sat_critical=} {sat_overall=}')
+                prog.set_extra(
+                    f'{loss=} {total_grad=} {mean_grad=} {drift=} {sat_critical=} {sat_overall=}'
+                )
                 optimizer.step()
                 step += 1
 
@@ -1683,8 +1800,9 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
             draw_batch()
 
             fig = kwplot.figure(fnum=fnum, pnum=(1, 2, 2))
-            #kwplot.imshow(canvas, pnum=(1, 2, 1))
+            # kwplot.imshow(canvas, pnum=(1, 2, 1))
             import pandas as pd
+
             df = pd.DataFrame(loss_records)
             total_df = dict(list((df.groupby('part'))))['total']
             print(total_df)
@@ -1701,7 +1819,7 @@ def find_low_overlap_covering_boxes_optimize(polygons, scale, min_box_dim, max_b
             # img = render_figure_to_image(fig)
             # img = kwimage.convert_colorspace(img, src_space='bgr', dst_space='rgb')
             # fpath = join(dpath, 'frame_{:04d}.png'.format(_frame_idx))
-            #kwimage.imwrite(fpath, img)
+            # kwimage.imwrite(fpath, img)
             xdev.InteractiveIter.draw()
             if ex:
                 raise ex
@@ -1790,8 +1908,9 @@ def load_image_shape(fpath, backend='auto', include_channels=True):
                 if not _have_gdal():
                     continue
             try:
-                shape = load_image_shape(fpath, backend=candidate_backend,
-                                         include_channels=include_channels)
+                shape = load_image_shape(
+                    fpath, backend=candidate_backend, include_channels=include_channels
+                )
             except Exception as ex:
                 candidate_errors.append((candidate_backend, ex))
             else:
@@ -1808,6 +1927,7 @@ def load_image_shape(fpath, backend='auto', include_channels=True):
         # which gives little context and is ultimately not an issue if we can
         # fallback on gdal.
         from PIL import Image
+
         fpath = os.fspath(fpath)
         with Image.open(fpath) as pil_img:
             width, height = pil_img.size
@@ -1818,6 +1938,7 @@ def load_image_shape(fpath, backend='auto', include_channels=True):
                 shape = (height, width)
     elif backend == 'gdal':
         from osgeo import gdal
+
         fpath = os.fspath(fpath)
         gdal_dset = gdal.Open(fpath, gdal.GA_ReadOnly)
         if gdal_dset is None:
@@ -1832,6 +1953,7 @@ def load_image_shape(fpath, backend='auto', include_channels=True):
         gdal_dset = None
     elif backend == 'imagesize':
         import imagesize
+
         if include_channels:
             raise NotImplementedError('no way to get number of channels with imagesize')
         width, height = imagesize.get(fpath)
@@ -1850,7 +1972,9 @@ def _have_gdal():
         return True
 
 
-def draw_multiclass_clf_on_image(im, classes, probs=None, true_ohe=None, top_k=3, border=1):
+def draw_multiclass_clf_on_image(
+    im, classes, probs=None, true_ohe=None, top_k=3, border=1
+):
     """
     Draws multiclass classification label on an image.
 
@@ -1897,16 +2021,13 @@ def draw_multiclass_clf_on_image(im, classes, probs=None, true_ohe=None, top_k=3
         pred_score = probs[cidx]
         is_true = true_ohe[cidx]
         if is_true:
-            label = (f't:{class_name}@{pred_score:.2f}: {is_true}')
+            label = f't:{class_name}@{pred_score:.2f}: {is_true}'
         else:
-            label = (f'p:{class_name}@{pred_score:.2f}: {is_true}')
+            label = f'p:{class_name}@{pred_score:.2f}: {is_true}'
         lines.append(label)
     text = '\n'.join(lines)
 
-    fontkw = {
-        'fontScale': 1.0,
-        'thickness': 2
-    }
+    fontkw = {'fontScale': 1.0, 'thickness': 2}
     # color = 'dodgerblue' if pcx == tcx else 'orangered'
     if im is not None:
         im_ = kwimage.atleast_3channels(im)
@@ -1915,6 +2036,13 @@ def draw_multiclass_clf_on_image(im, classes, probs=None, true_ohe=None, top_k=3
         im_ = None
 
     org2 = np.array((2, 5))
-    canvas = kwimage.draw_text_on_image(im_, text, org=org2, color='kitware_green',
-                                        valign='top', border=border, **fontkw)
+    canvas = kwimage.draw_text_on_image(
+        im_,
+        text,
+        org=org2,
+        color='kitware_green',
+        valign='top',
+        border=border,
+        **fontkw,
+    )
     return canvas

@@ -38,6 +38,7 @@ frame of one track and all rows have the same number of columns. The fields are:
     (vehicle), or 3 (other).
     20) Activity ID -- refer to activities.txt for index and list of activities.
 """
+
 import kwarray
 import numpy as np
 
@@ -56,21 +57,28 @@ class KW18(kwarray.DataFrameArray):
 
     # Define the ordering of the kw18 columns
     DEFAULT_COLUMNS = [
-        'track_id',                                      # 1
-        'track_length',                                  # 2
-        'frame_number',                                  # 3
-        'tracking_plane_loc_x', 'tracking_plane_loc_y',  # 4-5
-        'velocity_x', 'velocity_y',                      # 6-7
-        'image_loc_x', 'image_loc_y',                    # 8-9
-        'img_bbox_tl_x', 'img_bbox_tl_y',                # 10-13
-        'img_bbox_br_x', 'img_bbox_br_y',
-        'area',                                          # 14
-        'world_loc_x', 'world_loc_y', 'world_loc_z',     # 15-17
-        'timestamp',                                     # 18
+        'track_id',  # 1
+        'track_length',  # 2
+        'frame_number',  # 3
+        'tracking_plane_loc_x',
+        'tracking_plane_loc_y',  # 4-5
+        'velocity_x',
+        'velocity_y',  # 6-7
+        'image_loc_x',
+        'image_loc_y',  # 8-9
+        'img_bbox_tl_x',
+        'img_bbox_tl_y',  # 10-13
+        'img_bbox_br_x',
+        'img_bbox_br_y',
+        'area',  # 14
+        'world_loc_x',
+        'world_loc_y',
+        'world_loc_z',  # 15-17
+        'timestamp',  # 18
         # kw18 can have more than 18 columns.
-        'confidence',                                    # 19
-        'object_type_id',                                # 20
-        'activity_type_id',                              # 21
+        'confidence',  # 19
+        'object_type_id',  # 20
+        'activity_type_id',  # 21
     ]
 
     def __init__(self, data):
@@ -83,6 +91,7 @@ class KW18(kwarray.DataFrameArray):
     @classmethod
     def demo(KW18):
         import kwcoco
+
         coco_dset = kwcoco.CocoDataset.demo('shapes8')
         self = KW18.from_coco(coco_dset)
         return self
@@ -90,6 +99,7 @@ class KW18(kwarray.DataFrameArray):
     @classmethod
     def from_coco(KW18, coco_dset):
         import kwimage
+
         raw = {col: None for col in KW18.DEFAULT_COLUMNS}
         anns = coco_dset.dataset['annotations']
         boxes = kwimage.Boxes(np.array([ann['bbox'] for ann in anns]), 'xywh')
@@ -208,6 +218,7 @@ class KW18(kwarray.DataFrameArray):
         """
         import kwcoco
         import ubelt as ub
+
         dset = kwcoco.CocoDataset()
 
         # kw18s don't have category names, so use ids as proxies
@@ -234,7 +245,7 @@ class KW18(kwarray.DataFrameArray):
                 file_name=file_name,
                 video_id=vidid,
                 frame_index=frame_num,
-                timestamp=timestamp
+                timestamp=timestamp,
             )
 
         for rx, row in self.iterrows():
@@ -262,7 +273,8 @@ class KW18(kwarray.DataFrameArray):
                 area=row['area'],
                 velocity=velocity,
                 world_loc=world_loc,
-                **kw)
+                **kw,
+            )
         return dset
 
     @classmethod
@@ -276,14 +288,14 @@ class KW18(kwarray.DataFrameArray):
             >>> print(kw18_dset.pandas())
         """
         import pandas as pd
+
         try:
             EmptyDataError = pd.errors.EmptyDataError
         except Exception:
             EmptyDataError = pd.io.common.EmptyDataError
 
         try:
-            df = pd.read_csv(
-                file, sep=' +', comment='#', header=None, engine='python')
+            df = pd.read_csv(file, sep=' +', comment='#', header=None, engine='python')
         except EmptyDataError:
             df = pd.DataFrame()
         renamer = dict(zip(df.columns, KW18.DEFAULT_COLUMNS))
@@ -302,6 +314,7 @@ class KW18(kwarray.DataFrameArray):
             >>> empty = KW18.loads('')
         """
         import io
+
         file = io.StringIO()
         file.write(text)
         file.seek(0)
@@ -310,6 +323,7 @@ class KW18(kwarray.DataFrameArray):
 
     def dump(self, file):
         import os
+
         if isinstance(file, (str, os.PathLike)):
             with open(file, 'w') as fp:
                 self.dump(fp)
@@ -327,6 +341,7 @@ class KW18(kwarray.DataFrameArray):
             >>> print(text)
         """
         import io
+
         file = io.StringIO()
         self.dump(file)
         file.seek(0)

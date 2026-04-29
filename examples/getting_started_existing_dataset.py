@@ -1,10 +1,10 @@
-
 def getting_started_existing_dataset():
     """
     If you want to start using the Python API. Just open IPython and try:
     """
 
     import kwcoco
+
     dset = kwcoco.CocoDataset('<DATASET_NAME>/data.kwcoco.json')
 
     """
@@ -21,8 +21,8 @@ def getting_started_existing_dataset():
 
 
 def the_core_dataset_backend():
-
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo('shapes2')
 
     # Make data slightly tider for display
@@ -40,6 +40,7 @@ def the_core_dataset_backend():
     from os.path import dirname
     import ubelt as ub
     import kwarray
+
     dset.reroot(dirname(dset.fpath), absolute=False)
     dset.remove_annotations(kwarray.shuffle(list(dset.anns.keys()))[10:])
 
@@ -47,7 +48,6 @@ def the_core_dataset_backend():
 
 
 def demo_vectorize_interface():
-
     """
     Ignore:
         >>> import kwcoco

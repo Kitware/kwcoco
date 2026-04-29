@@ -1,4 +1,3 @@
-
 def make_pycocotools_compliant(fpath):
     import kwcoco
     import kwimage
@@ -14,7 +13,7 @@ def make_pycocotools_compliant(fpath):
             ann['iscrowd'] = False
 
         if 'ignore' not in ann:
-            ann['ignore'] = ann.get('weight', 1.0) < .5
+            ann['ignore'] = ann.get('weight', 1.0) < 0.5
 
         if 'area' not in ann:
             # Use segmentation if available
@@ -34,4 +33,5 @@ if __name__ == '__main__':
         python make_pycocotools_compliant.py --help
     """
     import fire
+
     fire.Fire(make_pycocotools_compliant)

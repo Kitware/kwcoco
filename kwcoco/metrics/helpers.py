@@ -3,8 +3,9 @@ from __future__ import annotations
 import ubelt as ub
 
 
-def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
-                     flatten_video_structure=False):
+def associate_images(
+    dset1, dset2, key_fallback=None, valid_image_ids=None, flatten_video_structure=False
+):
     """
     Builds an association between image-ids in two datasets.
 
@@ -105,8 +106,7 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
         >>> assert not len(matches['image']['match_gids2'])
         >>> assert len(matches['video'])
     """
-    common_vidnames = (set(dset1.index.name_to_video) &
-                       set(dset2.index.name_to_video))
+    common_vidnames = set(dset1.index.name_to_video) & set(dset2.index.name_to_video)
 
     def image_keys(dset, gids):
         # Generate image "keys" that should be compatible between datasets
@@ -152,18 +152,21 @@ def associate_images(dset1, dset2, key_fallback=None, valid_image_ids=None,
         match_gids2 = list(ub.take(key_to_gid2, match_keys))
         all_match_gids1.update(match_gids1)
         all_match_gids2.update(match_gids2)
-        video_matches.append({
-            'vidname': vidname,
-            'match_gids1': match_gids1,
-            'match_gids2': match_gids2,
-        })
+        video_matches.append(
+            {
+                'vidname': vidname,
+                'match_gids1': match_gids1,
+                'match_gids2': match_gids2,
+            }
+        )
 
     # Associate loose images not belonging to any video
     unmatched_gid_to_key1 = ub.dict_diff(gid_to_key1, all_match_gids1)
     unmatched_gid_to_key2 = ub.dict_diff(gid_to_key2, all_match_gids2)
 
-    remain_keys = (set(unmatched_gid_to_key1.values()) &
-                   set(unmatched_gid_to_key2.values()))
+    remain_keys = set(unmatched_gid_to_key1.values()) & set(
+        unmatched_gid_to_key2.values()
+    )
     remain_gids1 = [key_to_gid1[key] for key in remain_keys]
     remain_gids2 = [key_to_gid2[key] for key in remain_keys]
 

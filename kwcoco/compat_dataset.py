@@ -15,6 +15,7 @@ The cool thing is that this extends the kwcoco API so you can drop this for
 compatibility with the old API, but you still get access to all of the kwcoco
 API including dynamic addition / removal of categories / annotations / images.
 """
+
 from kwcoco.coco_dataset import CocoDataset
 import itertools as it
 import ubelt as ub
@@ -56,15 +57,19 @@ class COCO(CocoDataset):
     @property
     def imgToAnns(self):
         from scriptconfig.dict_like import DictLike
+
         class ProxyImgToAnns(DictLike):
             def __init__(self, parent):
                 self.parent = parent
+
             def getitem(self, gid):
                 aids = self.parent.index.gid_to_aids[gid]
                 anns = list(ub.take(self.parent.index.anns, aids))
                 return anns
+
             def keys(self):
                 return self.parent.index.gid_to_aids.keys()
+
         imgToAnns = ProxyImgToAnns(parent=self)
         return imgToAnns
 
@@ -107,15 +112,26 @@ class COCO(CocoDataset):
             anns = self.dataset['annotations']
         else:
             if not len(imgIds) == 0:
-                lists = [self.imgToAnns[imgId]
-                         for imgId in imgIds if imgId in self.imgToAnns]
+                lists = [
+                    self.imgToAnns[imgId] for imgId in imgIds if imgId in self.imgToAnns
+                ]
                 anns = list(it.chain.from_iterable(lists))
             else:
                 anns = self.dataset['annotations']
-            anns = anns if len(catIds) == 0 else [
-                ann for ann in anns if ann['category_id'] in catIds]
-            anns = anns if len(areaRng) == 0 else [
-                ann for ann in anns if ann['area'] > areaRng[0] and ann['area'] < areaRng[1]]
+            anns = (
+                anns
+                if len(catIds) == 0
+                else [ann for ann in anns if ann['category_id'] in catIds]
+            )
+            anns = (
+                anns
+                if len(areaRng) == 0
+                else [
+                    ann
+                    for ann in anns
+                    if ann['area'] > areaRng[0] and ann['area'] < areaRng[1]
+                ]
+            )
         if iscrowd is not None:
             ids = [ann['id'] for ann in anns if ann['iscrowd'] == iscrowd]
         else:
@@ -153,10 +169,7 @@ class COCO(CocoDataset):
             if catNms:
                 cats = [cat for cat in cats if cat['name'] in catNms]
             if supNms:
-                cats = [
-                    cat for cat in cats if cat.get(
-                        'supercategory',
-                        None) in supNms]
+                cats = [cat for cat in cats if cat.get('supercategory', None) in supNms]
             if catIds:
                 cats = [cat for cat in cats if cat['id'] in catIds]
 
@@ -164,7 +177,7 @@ class COCO(CocoDataset):
         return ids
 
     def getImgIds(self, imgIds=[], catIds=[]):
-        '''
+        """
         Get img ids that satisfy given filter conditions.
 
         Args:
@@ -181,7 +194,7 @@ class COCO(CocoDataset):
             >>> self.getImgIds(imgIds=[1, 2])
             >>> self.getImgIds(catIds=[3, 6, 7])
             >>> self.getImgIds(catIds=[3, 6, 7], imgIds=[1, 2])
-        '''
+        """
         imgIds = imgIds if ub.iterable(imgIds) else [imgIds]
         catIds = catIds if ub.iterable(catIds) else [catIds]
 
@@ -288,6 +301,7 @@ class COCO(CocoDataset):
         import time
         import copy
         import kwimage
+
         res = COCO()
         res.dataset['images'] = [img for img in self.dataset['images']]
 
@@ -301,19 +315,21 @@ class COCO(CocoDataset):
             anns = resFile
         assert isinstance(anns, list), 'results in not an array of objects'
         annsImgIds = [ann['image_id'] for ann in anns]
-        assert set(annsImgIds) == (set(annsImgIds) & set(self.getImgIds())), \
+        assert set(annsImgIds) == (set(annsImgIds) & set(self.getImgIds())), (
             'Results do not correspond to current coco set'
+        )
         if len(anns):
             if 'caption' in anns[0]:
                 imgIds = set([img['id'] for img in res.dataset['images']]) & set(
-                    [ann['image_id'] for ann in anns])
+                    [ann['image_id'] for ann in anns]
+                )
                 res.dataset['images'] = [
-                    img for img in res.dataset['images'] if img['id'] in imgIds]
+                    img for img in res.dataset['images'] if img['id'] in imgIds
+                ]
                 for id, ann in enumerate(anns):
                     ann['id'] = id + 1
             elif 'bbox' in anns[0] and not anns[0]['bbox'] == []:
-                res.dataset['categories'] = copy.deepcopy(
-                    self.dataset['categories'])
+                res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
                 for id, ann in enumerate(anns):
                     bb = ann['bbox']
                     x1, x2, y1, y2 = [bb[0], bb[0] + bb[2], bb[1], bb[1] + bb[3]]
@@ -323,8 +339,7 @@ class COCO(CocoDataset):
                     ann['id'] = id + 1
                     ann['iscrowd'] = 0
             elif 'segmentation' in anns[0]:
-                res.dataset['categories'] = copy.deepcopy(
-                    self.dataset['categories'])
+                res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
                 for id, ann in enumerate(anns):
                     # Unlike the original, using kwimage will support multiple
                     # segmentation formats, even in legacy mode.
@@ -336,8 +351,7 @@ class COCO(CocoDataset):
                     ann['id'] = id + 1
                     ann['iscrowd'] = 0
             elif 'keypoints' in anns[0]:
-                res.dataset['categories'] = copy.deepcopy(
-                    self.dataset['categories'])
+                res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
                 for id, ann in enumerate(anns):
                     s = kwimage.Points.coerce(ann['keypoints']).to_coco()
                     if len(s):
@@ -358,13 +372,13 @@ class COCO(CocoDataset):
         return res
 
     def download(self, tarDir=None, imgIds=[]):
-        '''
+        """
         Download COCO images from mscoco.org server.
 
         Args:
             tarDir (str | PathLike | None): COCO results directory name
             imgIds (list): images to be downloaded
-        '''
+        """
         if tarDir is not None:
             self.reroot(tarDir)
         if not imgIds:
@@ -387,12 +401,14 @@ class COCO(CocoDataset):
         N = data.shape[0]
         ann = []
         for i in ub.ProgIter(range(N)):
-            ann += [{
-                'image_id': int(data[i, 0]),
-                'bbox': [data[i, 1], data[i, 2], data[i, 3], data[i, 4]],
-                'score': data[i, 5],
-                'category_id': int(data[i, 6]),
-            }]
+            ann += [
+                {
+                    'image_id': int(data[i, 0]),
+                    'bbox': [data[i, 1], data[i, 2], data[i, 3], data[i, 4]],
+                    'score': data[i, 5],
+                    'category_id': int(data[i, 6]),
+                }
+            ]
         return ann
 
     def annToRLE(self, ann):
@@ -423,6 +439,7 @@ class COCO(CocoDataset):
             >>> orig = self._aspycoco().annToRLE(self.anns[1])
         """
         import kwimage
+
         aid = ann['id']
         ann = self.anns[aid]
         t = self.imgs[ann['image_id']]
@@ -434,9 +451,9 @@ class COCO(CocoDataset):
             mask = sseg.to_mask(dims=dims)
             rle = mask.to_bytes_rle().data
         except NotImplementedError:
-            raise NotImplementedError((
-                'kwimage does not seem to have required '
-                'c-extensions for bytes RLE'))
+            raise NotImplementedError(
+                ('kwimage does not seem to have required c-extensions for bytes RLE')
+            )
         return rle
 
     def annToMask(self, ann):
@@ -467,6 +484,7 @@ class COCO(CocoDataset):
             >>> kwplot.show_if_requested()
         """
         import kwimage
+
         aid = ann['id']
         ann = self.anns[aid]
         data = ann['segmentation']

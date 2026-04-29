@@ -3,6 +3,7 @@ from __future__ import annotations
 
 Rerooting is harder than you would think
 """
+
 from __future__ import annotations
 
 import os
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     import kwcoco
 
 
-def special_reroot_single(dset: kwcoco.CocoDataset, verbose: int=0):
+def special_reroot_single(dset: kwcoco.CocoDataset, verbose: int = 0):
     bundle_dpath = ub.Path(dset.bundle_dpath).absolute()
     resolved_bundle_dpath = ub.Path(dset.bundle_dpath).resolve()
 
@@ -23,7 +24,7 @@ def special_reroot_single(dset: kwcoco.CocoDataset, verbose: int=0):
         coco_img: kwcoco.CocoImage = dset.coco_image(gid)
         for obj in coco_img.iter_asset_objs():
             old_fname = ub.Path(obj['file_name'])
-            fpath = (bundle_dpath / old_fname)
+            fpath = bundle_dpath / old_fname
             if fpath.exists():
                 new_fname = resolve_relative_to(fpath, resolved_bundle_dpath)
                 if new_fname != old_fname:

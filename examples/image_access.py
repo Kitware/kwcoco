@@ -1,4 +1,5 @@
 import kwcoco
+
 coco = kwcoco.CocoDataset.demo('vidshapes', num_frames=10, num_videos=1, verbose=0)
 # The "images" method provides a "vectorized" view into multiple images
 # In this case we have 10 of them
@@ -14,8 +15,9 @@ all_images.lookup('file_name')
 image_id: int = all_images.lookup('id')[0]
 # The vectorized interface is a convenience, if you want raw access to the
 # image dictionaries use the index to lookup information by id
-img : dict = coco.index.imgs[image_id]
+img: dict = coco.index.imgs[image_id]
 import ubelt as ub
+
 print(f'img = {ub.urepr(img, nl=1)}')
 
 
@@ -43,8 +45,8 @@ annot_ids: list[int] = coco.index.gid_to_aids[img['id']]
 annots = coco.annots(image_id=img['id'])
 
 
-
 from kwcoco.compat_dataset import COCO
+
 compat_coco = COCO(coco.dataset)
 id_ = 1
-compat_coco.getAnnIds([id_] )
+compat_coco.getAnnIds([id_])

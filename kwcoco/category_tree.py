@@ -7,6 +7,7 @@ version of this class only contains the datastructure and does not contain any
 torch operations. See the ndsampler version for the extension with torch
 operations.
 """
+
 import itertools as it
 import networkx as nx
 import ubelt as ub
@@ -104,6 +105,7 @@ class CategoryTree(ub.NiceRepr):
         <CategoryTree...nNodes=4, nodes=...'class_1', 'class_2', 'class_3', ...
         >>> kwcoco.CategoryTree.coerce(4)
     """
+
     def __init__(self, graph=None, checks=True):
         """
         Args:
@@ -123,7 +125,11 @@ class CategoryTree(ub.NiceRepr):
                 if not nx.is_forest(graph):
                     raise ValueError('The category graph must be a forest')
             if not isinstance(graph, nx.Graph):
-                raise TypeError('Input to CategoryTree must be a networkx graph not {}'.format(type(graph)))
+                raise TypeError(
+                    'Input to CategoryTree must be a networkx graph not {}'.format(
+                        type(graph)
+                    )
+                )
         self.graph = graph  # :type: nx.Graph
         # Note: nodes are class names
         self.id_to_node = None
@@ -238,8 +244,7 @@ class CategoryTree(ub.NiceRepr):
         """
         if isinstance(data, int):
             # An integer specifies the number of classes.
-            self = cls.from_mutex(
-                ['class_{}'.format(i + 1) for i in range(data)], **kw)
+            self = cls.from_mutex(['class_{}'.format(i + 1) for i in range(data)], **kw)
         elif isinstance(data, dict):
             # A dictionary is assumed to be in a special json format
             self = cls.from_json(data, **kw)
@@ -259,7 +264,9 @@ class CategoryTree(ub.NiceRepr):
             if len(kw):
                 raise ValueError(
                     'kwargs cannot with this cls={}, type(data)={}'.format(
-                        cls, type(data)))
+                        cls, type(data)
+                    )
+                )
         elif issubclass(cls, type(data)):
             # If we are an object that inherits from kwcoco.CategoryTree (e.g.
             # ndsampler.CategoryTree), but we are given a raw
@@ -269,7 +276,9 @@ class CategoryTree(ub.NiceRepr):
         else:
             raise TypeError(
                 'Unknown type cls={}, type(data)={}: data={!r}'.format(
-                    cls, type(data), data))
+                    cls, type(data), data
+                )
+            )
         return self
 
     @classmethod
@@ -292,6 +301,7 @@ class CategoryTree(ub.NiceRepr):
         """
         if key == 'coco':
             from kwcoco import coco_dataset
+
             dset = coco_dataset.CocoDataset.demo(**kwargs)
             dset.add_category('background', id=0)
             graph = dset.category_graph()
@@ -312,17 +322,20 @@ class CategoryTree(ub.NiceRepr):
                 graph.add_node(str(0))
             assert not kwargs
         elif key == 'animals_v1':
-            graph = nx.from_dict_of_lists({
-                'background': [],
-                'foreground': ['animal'],
-                'animal': ['mammal', 'fish', 'insect', 'reptile'],
-                'mammal': ['dog', 'cat', 'human', 'zebra'],
-                'zebra': ['grevys', 'plains'],
-                'grevys': ['fred'],
-                'dog': ['boxer', 'beagle', 'golden'],
-                'cat': ['maine coon', 'persian', 'sphynx'],
-                'reptile': ['bearded dragon', 't-rex'],
-            }, OrderedDiGraph)
+            graph = nx.from_dict_of_lists(
+                {
+                    'background': [],
+                    'foreground': ['animal'],
+                    'animal': ['mammal', 'fish', 'insect', 'reptile'],
+                    'mammal': ['dog', 'cat', 'human', 'zebra'],
+                    'zebra': ['grevys', 'plains'],
+                    'grevys': ['fred'],
+                    'dog': ['boxer', 'beagle', 'golden'],
+                    'cat': ['maine coon', 'persian', 'sphynx'],
+                    'reptile': ['bearded dragon', 't-rex'],
+                },
+                OrderedDiGraph,
+            )
         else:
             raise KeyError(key)
         self = cls(graph)
@@ -337,11 +350,7 @@ class CategoryTree(ub.NiceRepr):
         """
         for cid, node in self.id_to_node.items():
             # Skip if background already added
-            cat = {
-                'id': cid,
-                'name': node,
-                **self.graph.nodes[node]
-            }
+            cat = {'id': cid, 'name': node, **self.graph.nodes[node]}
             parents = list(self.graph.predecessors(node))
             if len(parents) == 1:
                 cat['supercategory'] = parents[0]
@@ -358,8 +367,9 @@ class CategoryTree(ub.NiceRepr):
             >>> self = kwcoco.CategoryTree.demo()
             >>> self.id_to_idx[1]
         """
-        return _calldict({cid: self.node_to_idx[node]
-                         for cid, node in self.id_to_node.items()})
+        return _calldict(
+            {cid: self.node_to_idx[node] for cid, node in self.id_to_node.items()}
+        )
 
     @ub.memoize_property
     def idx_to_id(self):
@@ -369,8 +379,7 @@ class CategoryTree(ub.NiceRepr):
             >>> self = kwcoco.CategoryTree.demo()
             >>> self.idx_to_id[0]
         """
-        return [self.node_to_id[node]
-                for node in self.idx_to_node]
+        return [self.node_to_id[node] for node in self.idx_to_node]
 
     @ub.memoize_method
     def idx_to_ancestor_idxs(self, include_self=True):
@@ -418,8 +427,7 @@ class CategoryTree(ub.NiceRepr):
             * from children to parents are negative (ancestors),
             * between unreachable nodes (wrt to forward and reverse graph) are nan.
         """
-        pdist = np.full((len(self), len(self)), fill_value=-np.nan,
-                        dtype=np.float32)
+        pdist = np.full((len(self), len(self)), fill_value=-np.nan, dtype=np.float32)
         for node1, dists in nx.all_pairs_shortest_path_length(self.graph):
             idx1 = self.node_to_idx[node1]
             for node2, dist in dists.items():
@@ -489,18 +497,21 @@ class CategoryTree(ub.NiceRepr):
         if True:
             # Reconstruct redundant items
             if 'node_to_idx' not in state:
-                state['node_to_idx'] = {node: idx for idx, node in
-                                        enumerate(state['idx_to_node'])}
+                state['node_to_idx'] = {
+                    node: idx for idx, node in enumerate(state['idx_to_node'])
+                }
             if 'node_to_id' not in state:
-                state['node_to_id'] = {node: id for id, node in
-                                       state['id_to_node'].items()}
+                state['node_to_id'] = {
+                    node: id for id, node in state['id_to_node'].items()
+                }
 
             if 'idx_groups' not in state:
                 node_groups = list(traverse_siblings(graph))
                 node_to_idx = state['node_to_idx']
                 try:
-                    state['idx_groups'] = [sorted([node_to_idx[n] for n in group])
-                                           for group in node_groups]
+                    state['idx_groups'] = [
+                        sorted([node_to_idx[n] for n in group]) for group in node_groups
+                    ]
                 except KeyError:
                     need_reindex = True
                     pass
@@ -515,11 +526,15 @@ class CategoryTree(ub.NiceRepr):
         if max_depth > 1:
             max_breadth = max(it.chain([0], map(len, self.idx_groups)))
             text = 'nNodes={}, maxDepth={}, maxBreadth={}, nodes={}'.format(
-                self.num_classes, max_depth, max_breadth, self.idx_to_node,
+                self.num_classes,
+                max_depth,
+                max_breadth,
+                self.idx_to_node,
             )
         else:
             text = 'nNodes={}, nodes={}'.format(
-                self.num_classes, self.idx_to_node,
+                self.num_classes,
+                self.idx_to_node,
             )
         return text
 
@@ -628,7 +643,7 @@ class CategoryTree(ub.NiceRepr):
             >>> new3.print_graph()
         """
         assert RESPECT_INPUT_ORDER, 'subgraph requires new input order logic'
-        new_graph  = self.graph.__class__()
+        new_graph = self.graph.__class__()
         for node in subnodes:
             node_data = self.graph.nodes[node]
             new_graph.add_node(node, **node_data)
@@ -684,8 +699,7 @@ class CategoryTree(ub.NiceRepr):
 
         # Find the sets of nodes that need to be softmax-ed together
         node_groups = list(traverse_siblings(self.graph))
-        idx_groups = [sorted([node_to_idx[n] for n in group])
-                      for group in node_groups]
+        idx_groups = [sorted([node_to_idx[n] for n in group]) for group in node_groups]
 
         # Set instance attributes
         self.id_to_node = id_to_node
@@ -710,6 +724,7 @@ class CategoryTree(ub.NiceRepr):
             pos = nx.drawing.nx_agraph.graphviz_layout(self.graph, prog='dot')
         except ImportError:
             import warnings
+
             warnings.warn('pygraphviz is not available')
             pos = None
         nx.draw_networkx(self.graph, pos=pos)
@@ -718,16 +733,19 @@ class CategoryTree(ub.NiceRepr):
 
     def forest_str(self):
         import networkx as nx
+
         text = nx.forest_str(self.graph)
         # print(text)
         return text
 
     def print_graph(self):
         import networkx as nx
+
         try:
             nx.write_network_text(self.graph)
         except AttributeError:
             from kwcoco.util import util_networkx
+
             util_networkx.write_network_text(self.graph)
 
     def normalize(self):
@@ -746,6 +764,7 @@ class CategoryTree(ub.NiceRepr):
             >>> self = kwcoco.CategoryTree(nx.relabel_nodes(orig.graph, str.upper))
             >>> norm = self.normalize()
         """
+
         # nx.adjacency_data(self.graph)
         def normalize_name(name):
             return name.lower().replace(' ', '')
@@ -788,17 +807,17 @@ class CategoryTree(ub.NiceRepr):
 
 
 def source_nodes(graph):
-    """ generates source nodes --- nodes without incoming edges """
+    """generates source nodes --- nodes without incoming edges"""
     return (n for n in graph.nodes() if graph.in_degree(n) == 0)
 
 
 def sink_nodes(graph):
-    """ generates source nodes --- nodes without incoming edges """
+    """generates source nodes --- nodes without incoming edges"""
     return (n for n in graph.nodes() if graph.out_degree(n) == 0)
 
 
 def traverse_siblings(graph, sources=None):
-    """ generates groups of nodes that have the same parent """
+    """generates groups of nodes that have the same parent"""
     if sources is None:
         sources = list(source_nodes(graph))
     yield sources
@@ -826,11 +845,13 @@ def tree_depth(graph, root=None):
     if root is not None:
         assert root in graph.nodes
     assert nx.is_forest(graph)
+
     def _inner(root):
         if root is None:
             return max(it.chain([0], (_inner(n) for n in source_nodes(graph))))
         else:
             return max(it.chain([0], (_inner(n) for n in graph.successors(root)))) + 1
+
     depth = _inner(root)
     return depth
 
@@ -842,6 +863,7 @@ def to_directed_nested_tuples(graph, with_data=True):
     Encodes each node and its children in a tuple as:
         (node, children)
     """
+
     def _represent_node(node):
         if with_data:
             node_data = graph.nodes[node]
@@ -873,6 +895,7 @@ def from_directed_nested_tuples(encoding):
         >>> assert recon_encoding == encoding
     """
     node_data_view = {}
+
     def _traverse_recon(tree):
         nodes = []
         edges = []
@@ -891,6 +914,7 @@ def from_directed_nested_tuples(encoding):
             nodes.extend(subnodes)
             edges.extend(subedges)
         return nodes, edges
+
     nodes, edges = _traverse_recon(encoding)
     graph = OrderedDiGraph()
     graph.add_nodes_from(nodes)
@@ -913,8 +937,11 @@ class _calldict(dict):
 
     def __call__(self):
         import warnings
-        warnings.warn('Calling id_to_idx as a method has been deprecated. '
-                      'Use this dict as a property')
+
+        warnings.warn(
+            'Calling id_to_idx as a method has been deprecated. '
+            'Use this dict as a property'
+        )
         return self
 
 
@@ -924,4 +951,5 @@ if __name__ == '__main__':
         xdoctest -m kwcoco.category_tree
     """
     import xdoctest
+
     xdoctest.doctest_module(__file__)

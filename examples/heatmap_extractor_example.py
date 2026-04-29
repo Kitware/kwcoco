@@ -30,6 +30,7 @@ And check stats / visualize the results:
     kwcoco show $HOME/.cache/kwcoco/heatmap_example/out.kwcoco.json --channels=salient
 
 """
+
 from __future__ import annotations
 import numpy as np
 import scriptconfig as scfg
@@ -62,19 +63,27 @@ class HeatmapExtractorConfig(scfg.DataConfig):
         >>> HeatmapExtractorConfig.main(argv=False, **kwargs)
         >>> assert (dpath / 'out.kwcoco.json').exists()
     """
-    coco_fpath = scfg.Value('special:vidshapes8', position=1,
-                            help='Input kwcoco dataset path or special name')
-    dst_coco_fpath = scfg.Value("heatmap.kwcoco.json", help="Output kwcoco file")
-    asset_dpath = scfg.Value("assets/heatmaps",
-                             help="Where to store written heatmaps (ideally next to dst_coco_fpath)")
-    heatmap_channel = scfg.Value("salient", help="Name of the output heatmap channel")
-    sigma = scfg.Value(7.0, help="Gaussian blur applied to whiteness response")
-    thresh = scfg.Value(0.3, help="Threshold floor for minimum heatmap value")
-    quantize = scfg.Value(True, isflag=True, help="Quantize (uint8/png) instead of float32/tif")
+
+    coco_fpath = scfg.Value(
+        'special:vidshapes8',
+        position=1,
+        help='Input kwcoco dataset path or special name',
+    )
+    dst_coco_fpath = scfg.Value('heatmap.kwcoco.json', help='Output kwcoco file')
+    asset_dpath = scfg.Value(
+        'assets/heatmaps',
+        help='Where to store written heatmaps (ideally next to dst_coco_fpath)',
+    )
+    heatmap_channel = scfg.Value('salient', help='Name of the output heatmap channel')
+    sigma = scfg.Value(7.0, help='Gaussian blur applied to whiteness response')
+    thresh = scfg.Value(0.3, help='Threshold floor for minimum heatmap value')
+    quantize = scfg.Value(
+        True, isflag=True, help='Quantize (uint8/png) instead of float32/tif'
+    )
 
     @classmethod
     def main(cls, argv=True, **kwargs):
-        config = cls.cli(argv=argv, data=kwargs, strict=True, verbose="auto")
+        config = cls.cli(argv=argv, data=kwargs, strict=True, verbose='auto')
 
         # --- inlined "run_heatmap_extractor" logic ---
         src_coco = kwcoco.CocoDataset.coerce(config.coco_fpath)
@@ -88,7 +97,7 @@ class HeatmapExtractorConfig(scfg.DataConfig):
 
         asset_dpath = ub.Path(config.asset_dpath).ensuredir()
 
-        for image_id in ub.ProgIter(list(pred_coco.imgs.keys()), desc="write heatmaps"):
+        for image_id in ub.ProgIter(list(pred_coco.imgs.keys()), desc='write heatmaps'):
             coco_img = pred_coco.coco_image(image_id)
 
             heatmap = _predict_image_heatmap(
@@ -97,19 +106,20 @@ class HeatmapExtractorConfig(scfg.DataConfig):
                 thresh=float(config.thresh),
             )
 
-            img_name = coco_img.img.get("name", f"image-{image_id}")
+            img_name = coco_img.img.get('name', f'image-{image_id}')
             stem = ub.Path(img_name).stem
 
             if bool(config.quantize):
                 # uint8 -> png (+ quantization metadata)
                 write_data, quantization = quantize_heatmap(
-                    heatmap, old_min=0.0, old_max=1.0, dtype=np.uint8)
-                heatmap_fname = f"{stem}_{config.heatmap_channel}.png"
+                    heatmap, old_min=0.0, old_max=1.0, dtype=np.uint8
+                )
+                heatmap_fname = f'{stem}_{config.heatmap_channel}.png'
                 write_kwargs = {}
             else:
                 # float32 -> tif (no quantization metadata)
                 write_data, quantization = heatmap.astype(np.float32, copy=False), None
-                heatmap_fname = f"{stem}_{config.heatmap_channel}.tif"
+                heatmap_fname = f'{stem}_{config.heatmap_channel}.tif'
                 write_kwargs = {}
 
             heatmap_fpath = asset_dpath / heatmap_fname
@@ -131,7 +141,7 @@ class HeatmapExtractorConfig(scfg.DataConfig):
             )
 
         pred_coco.dump(config.dst_coco_fpath, newlines=True)
-        print(f"Wrote {config.dst_coco_fpath}")
+        print(f'Wrote {config.dst_coco_fpath}')
         return pred_coco
 
 
@@ -193,7 +203,7 @@ def _predict_image_heatmap(coco_img, *, sigma: float, thresh: float) -> np.ndarr
     img = kwarray.atleast_nd(img, 3)
     rgb01 = kwimage.ensure_float01(img)
 
-    hsv = kwimage.convert_colorspace(rgb01, src_space="rgb", dst_space="hsv")
+    hsv = kwimage.convert_colorspace(rgb01, src_space='rgb', dst_space='hsv')
     sat = hsv[..., 1]
     val = hsv[..., 2]
 

@@ -8,6 +8,7 @@ def test_resolution_with_channels():
     tests if that bug is fixed.
     """
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
     coco_img = dset.coco_image(1)
     coco_img.img['resolution'] = '1 meter'
@@ -30,6 +31,7 @@ def test_resolution_with_channels():
 
 def test_coco_image_add_asset():
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
     coco_img = dset.images().coco_images[0]
 
@@ -64,6 +66,7 @@ def test_coco_image_add_asset():
     new_asset3['image_id'] = coco_img['id'] + 1000
 
     import pytest
+
     with pytest.raises(AssertionError):
         coco_img.add_asset(**new_asset3)
 
@@ -76,15 +79,18 @@ def test_imdelay_with_interpolation():
         xdoctest -m ./tests/test_coco_image.py test_imdelay_with_interpolation
     """
     import ubelt as ub
+
     dpath = ub.Path.appdir('kwcoco/tests/imdelay-with-interp').ensuredir()
 
     import kwimage
     import numpy as np
+
     imdata = (kwimage.checkerboard() * 255).astype(np.uint8)
     fpath = dpath / 'checkers.png'
     kwimage.imwrite(fpath, imdata)
 
     import kwcoco
+
     dset = kwcoco.CocoDataset()
     gid = dset.add_image(file_name=fpath, channels='gray', resolution='10 GSD')
     dset._ensure_imgsize()
@@ -104,7 +110,9 @@ def test_imdelay_with_interpolation():
 
     # Test to make sure imdelay respect interplation
     # Subsequent changes are still subject to the user overwriting these defaults.
-    scaled = coco_img.imdelay(interpolation='nearest', antialias=False, resolution='33GSD')
+    scaled = coco_img.imdelay(
+        interpolation='nearest', antialias=False, resolution='33GSD'
+    )
     data_scaled = scaled.finalize()
     scaled.write_network_text(fields=True)
     scaled = scaled.optimize()

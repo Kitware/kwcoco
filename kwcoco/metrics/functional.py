@@ -36,9 +36,9 @@ def fast_confusion_matrix(y_true, y_pred, n_labels, sample_weight=None):
         sample_weight = np.ones(len(y_true), dtype=np.uint8)
     # The accumulation dtype needs to have 64bits to avoid overflow
     dtype = np.float64 if sample_weight.dtype.kind == 'f' else np.int64
-    matrix = coo_matrix((sample_weight, (y_true, y_pred)),
-                        shape=(n_labels, n_labels),
-                        dtype=dtype).toarray()
+    matrix = coo_matrix(
+        (sample_weight, (y_true, y_pred)), shape=(n_labels, n_labels), dtype=dtype
+    ).toarray()
     return matrix
 
 
@@ -47,11 +47,12 @@ def _truncated_roc(y_df, bg_idx=-1, fp_cutoff=None):
     Computes truncated ROC info
     """
     import sklearn
+
     try:
         from sklearn.metrics._ranking import _binary_clf_curve
     except ImportError:
         from sklearn.metrics.ranking import _binary_clf_curve
-    y_true = (y_df['true'] == y_df['pred'])
+    y_true = y_df['true'] == y_df['pred']
     y_score = y_df['score']
     sample_weight = y_df['weight']
 
@@ -63,7 +64,8 @@ def _truncated_roc(y_df, bg_idx=-1, fp_cutoff=None):
     realpos_total = sample_weight[(y_df['txs'] >= 0)].sum()
 
     fp_count, tp_count, count_thresholds = _binary_clf_curve(
-        y_true, y_score, pos_label=1, sample_weight=sample_weight)
+        y_true, y_score, pos_label=1, sample_weight=sample_weight
+    )
 
     if len(count_thresholds) > 0 and count_thresholds[-1] == 0:
         # Chop off the last entry where it will jump
@@ -147,6 +149,7 @@ def _pr_curves(y):
         >>> _pr_curves(y1)
     """
     import sklearn
+
     # compute metrics on a per class basis
     if y is None:
         return np.nan, [], []
@@ -162,11 +165,14 @@ def _pr_curves(y):
         warnings.filterwarnings('ignore', message='invalid .* true_divide')
         is_correct = (y['true'] == y['pred']).astype(int)
         ap = sklearn.metrics.average_precision_score(
-            y_true=is_correct, y_score=y['score'],
+            y_true=is_correct,
+            y_score=y['score'],
             sample_weight=y['weight'],
         )
         prec, rec, thresholds = sklearn.metrics.precision_recall_curve(
-            is_correct, y['score'], sample_weight=y['weight'],
+            is_correct,
+            y['score'],
+            sample_weight=y['weight'],
         )
     return ap, prec, rec
 

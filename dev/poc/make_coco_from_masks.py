@@ -5,6 +5,7 @@ format.
 Currently, there is no mechanism to associate annotations with images, and that
 would need to be created for this script to be useful in real-world cases.
 """
+
 import scriptconfig as scfg
 import ubelt as ub
 import kwimage
@@ -40,8 +41,10 @@ def _make_intmask_demodata(rng=None):
             binmask = kwimage.Mask.random(shape=shape, rng=rng).data
             data[binmask > 0] = obj_idx
         return data
-    fpaths = [join(dpath, 'mask_{:04d}.png'.format(mask_idx))
-              for mask_idx in range(num_masks)]
+
+    fpaths = [
+        join(dpath, 'mask_{:04d}.png'.format(mask_idx)) for mask_idx in range(num_masks)
+    ]
     for fpath in fpaths:
         data = _random_multi_obj_mask(shape, rng=rng)
         kwimage.imwrite(fpath, data)
@@ -52,6 +55,7 @@ class MakeCocoFromMasksCLI(scfg.Config):
     """
     Create a COCO file from bitmasks
     """
+
     __command__ = 'coco_from_masks'
     default = {
         'src': scfg.PathList(help='a file, globstr, or comma-separated list of files'),
@@ -101,6 +105,7 @@ class MakeCocoFromMasksCLI(scfg.Config):
             >>> dset.annots().detections.data['segmentations'][0].data
         """
         import kwcoco
+
         config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=2)))
         serialization_method = config['serialization']
@@ -172,8 +177,11 @@ class MakeCocoFromMasksCLI(scfg.Config):
                     # category, but it seems like a recent change in kwcoco has
                     # broken that. That will be fixed in the future.
                     annot_id = coco_dset.add_annotation(
-                            image_id=image_id, category_id=category_id,
-                            bbox=bbox, segmentation=coco_sseg)
+                        image_id=image_id,
+                        category_id=category_id,
+                        bbox=bbox,
+                        segmentation=coco_sseg,
+                    )
                 else:
                     # But lets do it as if we were adding a segmentation to an
                     # existing dataset. In this case we access the
@@ -181,8 +189,8 @@ class MakeCocoFromMasksCLI(scfg.Config):
                     #
                     # First add the basic annotation
                     annot_id = coco_dset.add_annotation(
-                            image_id=image_id, category_id=category_id,
-                            bbox=bbox)
+                        image_id=image_id, category_id=category_id, bbox=bbox
+                    )
                     # Then use the annotation id to look up its coco-dictionary
                     # representation and simply add the segmentation field
                     ann = coco_dset.anns[annot_id]

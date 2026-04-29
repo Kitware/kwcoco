@@ -43,27 +43,35 @@ def main(cmdline=True, **kw):
     # Create a subparser that uses the first positional argument to run one of
     # the previous CLI interfaces.
     import os
+
     KWCOCO_LOOSE_CLI = os.environ.get('KWCOCO_LOOSE_CLI', '')
 
     from scriptconfig.modal import ModalCLI
-    modal = ModalCLI(description=ub.codeblock(
-        '''
+
+    modal = ModalCLI(
+        description=ub.codeblock(
+            """
         The Kitware COCO CLI
-        '''))
+        """
+        )
+    )
 
     def get_version(self):
         import kwcoco
+
         return kwcoco.__version__
+
     modal.__class__.version = property(get_version)
 
     for cli_module in cli_modules:
-
         cli_config = None
         if hasattr(cli_module, '__cli__'):
             # New way
             cli_config = cli_module.__cli__
         else:
-            raise NotImplementedError(f'modules must define the __cli__ attribute to be registered. Failed on {cli_module}')
+            raise NotImplementedError(
+                f'modules must define the __cli__ attribute to be registered. Failed on {cli_module}'
+            )
 
         # Update configs to have aliases / commands attributes
         # cli_modname = cli_module.__name__
@@ -72,7 +80,9 @@ def main(cmdline=True, **kw):
         alias = getattr(cli_module, '__alias__', getattr(cli_config, '__alias__', []))
         if isinstance(alias, str):
             alias = [alias]
-        command = getattr(cli_module, '__command__', getattr(cli_config, '__command__', None))
+        command = getattr(
+            cli_module, '__command__', getattr(cli_config, '__command__', None)
+        )
         if command is not None:
             cmdname_aliases.add(command)
         cmdname_aliases.update(alias)
@@ -88,6 +98,7 @@ def main(cmdline=True, **kw):
     if EASTER:
         if len(sys.argv) == 2 and sys.argv[1] in {'boid', 'boids'}:
             from kwcoco.demo.boids import _yeah_boid
+
             _yeah_boid()
             sys.exit(0)
 

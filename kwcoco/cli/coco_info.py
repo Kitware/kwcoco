@@ -10,6 +10,7 @@ class CocoFileHelper:
     Transparent opening of either a regular json file, or a json file inside of
     a zipfile. TODO: relate to ub.zopen?
     """
+
     def __init__(self, fpath, mode='r'):
         self.fpath = fpath
         self.file = None
@@ -19,10 +20,12 @@ class CocoFileHelper:
     def _open(self):
         import kwcoco
         import zipfile
+
         fpath = self.fpath
         if isinstance(fpath, kwcoco.CocoDataset):
             # Allow using a raw CocoDatset path for testing.
             import io
+
             file = io.StringIO()
             dset: kwcoco.CocoDatset = fpath
             dset.dump(file)
@@ -33,8 +36,8 @@ class CocoFileHelper:
             members = zfile.namelist()
             if len(members) != 1:
                 raise Exception(
-                    'Currently only zipfiles with exactly 1 '
-                    'kwcoco member are supported')
+                    'Currently only zipfiles with exactly 1 kwcoco member are supported'
+                )
             self.file = zfile.open(members[0], mode=self.mode)
         else:
             self.file = open(fpath, mode=self.mode)
@@ -79,25 +82,67 @@ class CocoInfoCLI(scfg.DataConfig):
     Note: there are issues with this tool when the sections are not in the
     expected order, or if the requested sections are empty. Help wanted.
     """
+
     __command__ = 'info'
     __alias__ = ['tables']
 
     src = scfg.Value(None, help='input kwcoco path', position=1)
 
-    show_info = scfg.Value('auto', isflag=True, help='The number of info dictionaries to show. if True, show all of them. The default of "auto" works around an issue. It is set to True if no other table is shown and 0 otherwise', short_alias=['i'])
-    show_licenses = scfg.Value(0, isflag=True, help='The number of licenses dictionaries to show. if True, show all of them', short_alias=['l'])
-    show_categories = scfg.Value(0, isflag=True, help='The number of category dictionaries to show. if True, show all of them', short_alias=['c'])
-    show_videos = scfg.Value(0, isflag=True, help='The number of video dictionaries to show. if True, show all of them', short_alias=['v'])
-    show_images = scfg.Value(0, isflag=True, help='The number of image dictionaries to show. if True, show all of them', short_alias=['g'])
+    show_info = scfg.Value(
+        'auto',
+        isflag=True,
+        help='The number of info dictionaries to show. if True, show all of them. The default of "auto" works around an issue. It is set to True if no other table is shown and 0 otherwise',
+        short_alias=['i'],
+    )
+    show_licenses = scfg.Value(
+        0,
+        isflag=True,
+        help='The number of licenses dictionaries to show. if True, show all of them',
+        short_alias=['l'],
+    )
+    show_categories = scfg.Value(
+        0,
+        isflag=True,
+        help='The number of category dictionaries to show. if True, show all of them',
+        short_alias=['c'],
+    )
+    show_videos = scfg.Value(
+        0,
+        isflag=True,
+        help='The number of video dictionaries to show. if True, show all of them',
+        short_alias=['v'],
+    )
+    show_images = scfg.Value(
+        0,
+        isflag=True,
+        help='The number of image dictionaries to show. if True, show all of them',
+        short_alias=['g'],
+    )
     # TODO:
-    show_tracks = scfg.Value(0, isflag=True, help='The number of track dictionaries to show. if True, show all of them', short_alias=['t'])
-    show_annotations = scfg.Value(0, isflag=True, help='The number of annotation dictionaries to show. if True, show all of them', short_alias=['a'])
+    show_tracks = scfg.Value(
+        0,
+        isflag=True,
+        help='The number of track dictionaries to show. if True, show all of them',
+        short_alias=['t'],
+    )
+    show_annotations = scfg.Value(
+        0,
+        isflag=True,
+        help='The number of annotation dictionaries to show. if True, show all of them',
+        short_alias=['a'],
+    )
 
     rich = scfg.Value(True, isflag=True, help='if True, try to use rich')
-    verbose = scfg.Value(0, isflag=True, help='if True, print extra information (i.e. the configuration). If false, then stdout should be redirectable as a regular json object')
+    verbose = scfg.Value(
+        0,
+        isflag=True,
+        help='if True, print extra information (i.e. the configuration). If false, then stdout should be redirectable as a regular json object',
+    )
 
     # TODO add more ways to query what parts we want to show
-    image_name = scfg.Value(None, help='If specified, lookup and show the image with this name')
+    image_name = scfg.Value(
+        None, help='If specified, lookup and show the image with this name'
+    )
 
     @classmethod
     def main(cls, argv=True, **kwargs):
@@ -149,6 +194,7 @@ class CocoInfoCLI(scfg.DataConfig):
                 raise ImportError
             from rich.markup import escape as _rich_escape
             from rich import print as _raw_rich_print
+
             def rich_print(msg):
                 _raw_rich_print(_rich_escape(msg))
         except ImportError:
@@ -190,6 +236,7 @@ class CocoInfoCLI(scfg.DataConfig):
         # import kwcoco
         from kwcoco.util import ijson_ext
         import json
+
         if config.src is None:
             raise ValueError('A source kwcoco file is required')
 
@@ -249,7 +296,9 @@ class CocoInfoCLI(scfg.DataConfig):
 
             if config.verbose:
                 print('parent_to_num = {}'.format(ub.urepr(parent_to_num, nl=1)))
-                print('parent_to_request = {}'.format(ub.urepr(parent_to_request, nl=1)))
+                print(
+                    'parent_to_request = {}'.format(ub.urepr(parent_to_request, nl=1))
+                )
 
             print('{')
 
@@ -267,7 +316,9 @@ class CocoInfoCLI(scfg.DataConfig):
                     print('{}')
                 else:
                     if USE_UREPR:
-                        _text = ub.urepr(info_section, nl=4, trailsep=False).replace('\'', '"')
+                        _text = ub.urepr(info_section, nl=4, trailsep=False).replace(
+                            "'", '"'
+                        )
                     else:
                         _text = json.dumps(info_section, indent=4)
                     rich_print(_text)
@@ -287,13 +338,11 @@ class CocoInfoCLI(scfg.DataConfig):
             # specified in parent-order.
             prev_parent = sentinel
             for parent in parent_order:
-
                 num_to_show = parent_to_num[parent]
                 request = parent_to_request.get(parent, {})
 
                 satisfied = num_to_show == 0 and not bool(request)
                 if not satisfied:
-
                     if prev_parent is not sentinel:
                         print(',')
 
@@ -305,7 +354,6 @@ class CocoInfoCLI(scfg.DataConfig):
                     num_shown = 0
 
                     for obj in obj_iter:
-
                         want_name = request.get('name')
 
                         show_this_one = False
@@ -314,7 +362,9 @@ class CocoInfoCLI(scfg.DataConfig):
                             show_this_one = True
 
                         if want_name is not None and obj['name'] == want_name:
-                            request.pop('name')  # Mark as satisfied? Probably a better way?
+                            request.pop(
+                                'name'
+                            )  # Mark as satisfied? Probably a better way?
                             show_this_one = True
 
                         if show_this_one:
@@ -322,7 +372,9 @@ class CocoInfoCLI(scfg.DataConfig):
                                 print(',')
                             # rich_print('{}'.format(ub.urepr(obj, nl=4, trailsep=False).replace('\'', '"')))
                             if USE_UREPR:
-                                _text = ub.urepr(obj, nl=4, trailsep=False).replace('\'', '"')
+                                _text = ub.urepr(obj, nl=4, trailsep=False).replace(
+                                    "'", '"'
+                                )
                             else:
                                 _text = json.dumps(obj, indent=4)
                             rich_print(_text)

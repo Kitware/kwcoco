@@ -108,6 +108,7 @@ TODO:
 
          https://www.researchgate.net/publication/314641363_A_new_algorithm_of_symbolic_expression_simplification_based_on_right-threaded_binary_tree/
 """
+
 import pymbolic as pmbl
 from pymbolic.mapper import IdentityMapper
 from pymbolic.primitives import Expression
@@ -128,14 +129,18 @@ class AutoInspectable(object):
     def _initkw(self):
         import inspect
         from collections import OrderedDict
+
         sig = inspect.signature(self.__class__)
         initkw = OrderedDict()
         for name, info in sig.parameters.items():
             if not hasattr(self, name):
-                raise NotImplementedError((
-                    'Unable to introspect init args because the class '
-                    'did not have attributes with the same names as the '
-                    'constructor arguments'))
+                raise NotImplementedError(
+                    (
+                        'Unable to introspect init args because the class '
+                        'did not have attributes with the same names as the '
+                        'constructor arguments'
+                    )
+                )
             initkw[name] = getattr(self, name)
         return initkw
 
@@ -149,21 +154,21 @@ class Warp(AutoExpression):
         self.sub_data = sub_data
         self.transform = transform
 
-    mapper_method = "map_warp"
+    mapper_method = 'map_warp'
 
 
 class ChanCat(AutoExpression):
     def __init__(self, components):
         self.components = components
 
-    mapper_method = "map_chancat"
+    mapper_method = 'map_chancat'
 
 
 class RawImage(AutoExpression):
     def __init__(self, data):
         self.data = data
 
-    mapper_method = "map_raw"
+    mapper_method = 'map_raw'
 
 
 class WarpFusionMapper(IdentityMapper):
@@ -200,6 +205,7 @@ class WarpFusionMapper(IdentityMapper):
                     yield from _flatten(c.components)
                 else:
                     yield c
+
         new_components = [self.rec(c) for c in _flatten(expr.components)]
         new = ChanCat(new_components)
         return new
@@ -221,7 +227,6 @@ class Transform:
 
     def __repr__(self):
         return 'Tranform({})'.format(self.f)
-
 
 
 def demo():
@@ -254,6 +259,7 @@ def demo():
     print('result3 = {!r}'.format(result3))
 
     # from pymbolic.interop.ast import ASTToPymbolic
+
 
 if __name__ == '__main__':
     """

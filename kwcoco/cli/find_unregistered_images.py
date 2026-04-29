@@ -53,18 +53,32 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
 
     Based on the value of "action" list these images or delete them.
     """
+
     __command__ = 'find_unregistered_images'
 
-    src = scfg.Value(None, nargs='+', help='all kwcoco paths that register data in this bundle', position=1)
+    src = scfg.Value(
+        None,
+        nargs='+',
+        help='all kwcoco paths that register data in this bundle',
+        position=1,
+    )
 
-    image_dpath = scfg.Value(None, help=ub.paragraph(
-        '''
+    image_dpath = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         if specified, only the specified path(s) will have unregistered images
         removed, otherwise this argument will be inferred as the bundle
         directories belonging to the specified kwcoco files.
-        '''))
+        """
+        ),
+    )
 
-    action = scfg.Value('ask', help='What to do when an unregistered images is found.', choices=['ask', 'delete', 'list'])
+    action = scfg.Value(
+        'ask',
+        help='What to do when an unregistered images is found.',
+        choices=['ask', 'delete', 'list'],
+    )
 
     io_workers = scfg.Value('avail', help='number of io workers')
 
@@ -83,17 +97,22 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
         """
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
         from kwcoco.util.util_rich import rich_print
+
         if config.verbose:
             rich_print('config = ' + ub.urepr(config, nl=1))
         import os
         import kwcoco
         from kwutil import util_path
+
         fpaths = util_path.coerce_patterned_paths(config.src)
 
         if config.verbose:
             rich_print('Will read fpaths = {}'.format(ub.urepr(fpaths, nl=1)))
-        datasets = list(kwcoco.CocoDataset.coerce_multiple(
-            fpaths, workers=config.io_workers, verbose=config.verbose))
+        datasets = list(
+            kwcoco.CocoDataset.coerce_multiple(
+                fpaths, workers=config.io_workers, verbose=config.verbose
+            )
+        )
 
         if config.image_dpath is None:
             image_dpaths = [ub.Path(d.bundle_dpath).absolute() for d in datasets]
@@ -104,12 +123,15 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
         image_dpaths = list(ub.unique(image_dpaths))
         if len(image_dpaths) > 1:
             # Should we remove this restriction?
-            raise NotImplementedError(ub.paragraph(
-                '''
+            raise NotImplementedError(
+                ub.paragraph(
+                    """
                 The case for more than 1 image dpath has not been tested. It
                 might work, if you remove this error. Please submit an MR if
                 that is the case
-                '''))
+                """
+                )
+            )
 
         fpath_sets = find_unregistered_images(datasets, image_dpaths)
         fpath_sets = ub.udict(fpath_sets)
@@ -121,8 +143,13 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
 
         if len(unregistered_fpaths) > 0:
             import rich.prompt
+
             if config.verbose:
-                rich_print('unregistered_fpaths = {}'.format(ub.urepr([os.fspath(f) for f in unregistered_fpaths], nl=1)))
+                rich_print(
+                    'unregistered_fpaths = {}'.format(
+                        ub.urepr([os.fspath(f) for f in unregistered_fpaths], nl=1)
+                    )
+                )
                 rich_print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))
             else:
                 for f in unregistered_fpaths:
@@ -130,7 +157,9 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
 
             action = config.action
             if action == 'ask':
-                ans = rich.prompt.Confirm.ask(f'Delete these {len(unregistered_fpaths)} unregistered files?')
+                ans = rich.prompt.Confirm.ask(
+                    f'Delete these {len(unregistered_fpaths)} unregistered files?'
+                )
                 action = 'delete' if ans else 'list'
 
             if action == 'list':
@@ -188,7 +217,6 @@ def _check_registered(dset):
     if registered_dups:
         print('ERROR: Duplicates')
         for fpath, idxs in registered_dups.items():
-
             found_dup_gids = []
             # No fast index for this.
             for gid in dset.images():
@@ -211,6 +239,7 @@ def _find_existing_images(image_dpath):
     Find images in a directory
     """
     import kwimage
+
     existing_image_paths = []
     for r, ds, fs in image_dpath.walk():
         for f in fs:

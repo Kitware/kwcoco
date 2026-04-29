@@ -9,6 +9,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
     """
     Remove, rename, reorder, re-id, or coarsen categories.
     """
+
     __command__ = 'modify_categories'
     __epilog__ = """
     Example Usage:
@@ -21,60 +22,99 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep=[] --keep_annots=True
         kwcoco modify_categories --src=special:shapes8 --dst modcats.json --start_id=0 --order "[star,background]"
     """
-    src = scfg.Value(None, help=(
-        'Path to the coco dataset'), position=1)
+    src = scfg.Value(None, help=('Path to the coco dataset'), position=1)
 
-    dst = scfg.Value(None, help=(
-        'Save the modified dataset to a new file'))
+    dst = scfg.Value(None, help=('Save the modified dataset to a new file'))
 
-    keep_annots = scfg.Value(False, help=(
-        'if False, removes annotations when categories are removed, '
-        'otherwise the annotations category is simply unset'))
+    keep_annots = scfg.Value(
+        False,
+        help=(
+            'if False, removes annotations when categories are removed, '
+            'otherwise the annotations category is simply unset'
+        ),
+    )
 
-    remove_empty_images = scfg.Value(False, isflag=True, help=(
-        'if True, removes images when categories are removed, '
-        'otherwise the images are simply kept as is'))
+    remove_empty_images = scfg.Value(
+        False,
+        isflag=True,
+        help=(
+            'if True, removes images when categories are removed, '
+            'otherwise the images are simply kept as is'
+        ),
+    )
 
-    remove = scfg.Value(None, help=ub.paragraph(
-        '''
+    remove = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         Category names to remove. Mutex with keep.
-        '''))
+        """
+        ),
+    )
 
-    keep = scfg.Value(None, help=ub.paragraph(
-        '''
+    keep = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         If specified, remove all other categories. Mutex with remove.
-        '''))
+        """
+        ),
+    )
 
-    rename = scfg.Value(None, type=str, help=ub.paragraph(
-        '''
+    rename = scfg.Value(
+        None,
+        type=str,
+        help=ub.paragraph(
+            """
         category mapping as a YAML dictionary. The old format format:
         "old1:new1,old2:new2" is still accepted, but may be removed in the
         future.
-        '''))
+        """
+        ),
+    )
 
-    start_id = scfg.Value(None, type=int, help=ub.paragraph(
-        '''
+    start_id = scfg.Value(
+        None,
+        type=int,
+        help=ub.paragraph(
+            """
         if specified, then normalize category IDs to be consecutive and
         start from this order.
-        '''))
+        """
+        ),
+    )
 
-    order = scfg.Value(None, type=str, help=ub.paragraph(
-        '''
+    order = scfg.Value(
+        None,
+        type=str,
+        help=ub.paragraph(
+            """
         if specified this is a YAML list, reorder to the first categories
         are in this order. Can also be "sort" to sort alphabetically.
         If using "rename", then use the new names here.
-        '''))
+        """
+        ),
+    )
 
-    compress = scfg.Value('auto', help=ub.paragraph(
-        '''
+    compress = scfg.Value(
+        'auto',
+        help=ub.paragraph(
+            """
         if True writes results with compression. DEPRECATED: just specify
         dst with a .zip suffix to compress
-        '''))
+        """
+        ),
+    )
 
-    verbose = scfg.Value(True, isflag=True, help=ub.paragraph(
-        '''
+    verbose = scfg.Value(
+        True,
+        isflag=True,
+        help=ub.paragraph(
+            """
         verbosity level
-        '''))
+        """
+        ),
+    )
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -125,13 +165,13 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
+
         if 0:
             config = cls.cli(data=kw, cmdline=cmdline, strict=True)
             print('config = {}'.format(ub.urepr(dict(config), nl=1)))
         else:
             # newstyle
-            config = cls.cli(data=kw, argv=cmdline, strict=True,
-                             verbose='auto')
+            config = cls.cli(data=kw, argv=cmdline, strict=True, verbose='auto')
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))
@@ -142,6 +182,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
 
         import networkx as nx
         import warnings
+
         if config.verbose:
             print('Input Categories:')
             try:
@@ -153,9 +194,12 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             # parse rename string
             try:
                 import kwutil
+
                 mapper = kwutil.Yaml.coerce(config.rename)
             except ImportError as ex:
-                print(f'Warning: ex={ex}. The kwutil package is required for YAML rename formatting')
+                print(
+                    f'Warning: ex={ex}. The kwutil package is required for YAML rename formatting'
+                )
             except Exception as ex:
                 print(f'Warning: ex={ex}. Prefer YAML for mapper')
                 mapper = None
@@ -171,13 +215,15 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             classes = set(dset.name_to_cat.keys())
             try:
                 import kwutil
+
                 keep = kwutil.Yaml.coerce(keep)
             except ImportError:
                 warnings.warn('kwutil is not available')
             if isinstance(keep, str):
                 warnings.warn(
                     'Keep is specified as a string. '
-                    'Did you mean to input a list? Auto fixing.')
+                    'Did you mean to input a list? Auto fixing.'
+                )
                 keep = [keep]
             remove = list(classes - set(keep))
         else:
@@ -186,6 +232,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         if remove is not None:
             try:
                 import kwutil
+
                 remove = kwutil.Yaml.coerce(remove)
             except ImportError:
                 warnings.warn('kwutil is not available')
@@ -198,14 +245,18 @@ class CocoModifyCatsCLI(scfg.DataConfig):
                 else:
                     remove_cids.append(cid)
             dset.remove_categories(
-                remove_cids, keep_annots=config['keep_annots'], verbose=1)
+                remove_cids, keep_annots=config['keep_annots'], verbose=1
+            )
 
         if config['remove_empty_images']:
-            noannot_images = [gid for gid, aids in dset.index.gid_to_aids.items() if len(aids) == 0]
+            noannot_images = [
+                gid for gid, aids in dset.index.gid_to_aids.items() if len(aids) == 0
+            ]
             dset.remove_images(noannot_images, verbose=3)
 
         if config['start_id'] is not None or config['order'] is not None:
             import kwutil
+
             start_id = config['start_id']
             order = kwutil.Yaml.coerce(config['order'])
             dset.normalize_category_ids(start_id=start_id, order=order)

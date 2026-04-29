@@ -1,4 +1,3 @@
-
 def dataset_modification_example_via_copy():
     """
     Say you are given a dataset as input and you need to add your own
@@ -7,6 +6,7 @@ def dataset_modification_example_via_copy():
     """
 
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo()
 
     # Do a deep copy of the dataset
@@ -17,6 +17,7 @@ def dataset_modification_example_via_copy():
 
     # Add your custom annotations (make sure they are in IMAGE pixel coords)
     import kwimage
+
     poly = kwimage.Polygon.random().scale((10, 20)).translate((0, 2))
     gid = 1
     my_new_ann = {

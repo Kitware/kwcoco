@@ -10,6 +10,7 @@ def get_images_with_videoid():
     """
     import kwcoco
     import ubelt as ub
+
     dset = kwcoco.CocoDataset.demo('vidshapes8-msi')
     video_id = 1
 
@@ -35,6 +36,7 @@ def get_all_channels_in_dataset():
     A. The better way is to use the CocoImage API.
     """
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo('vidshapes8-msi-multisensor')
 
     all_channels = []
@@ -48,6 +50,7 @@ def get_all_channels_in_dataset():
 
     # You can build a histogram if you want:
     import ubelt as ub
+
     hist = ub.ddict(lambda: 0)
     for channels in all_channels:
         hist[channels.spec] += 1
@@ -87,6 +90,7 @@ def what_order_are_images_returned_in():
     """
     import kwcoco
     import ndsampler
+
     dset = kwcoco.CocoDataset.demo('vidshapes1', num_frames=10)
     images = dset.images()
 
@@ -136,6 +140,7 @@ def remap_category_ids_demo():
     """
 
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo()
 
     existing_cids = dset.categories().lookup('id')
@@ -186,6 +191,7 @@ def filter_images_by_attribute():
     """
     import kwcoco
     import kwarray
+
     dset = kwcoco.CocoDataset.demo('vidshapes2', num_frames=10)
 
     # Add random attributes for the demo:
@@ -205,7 +211,7 @@ def filter_images_by_attribute():
     # same thing)
     list_of_image_ids: list[int] = dset.index.vidid_to_gids[1]
     images = dset.images(list_of_image_ids)
-    flags : list[bool] = [x == 0 for x in images.lookup('gt', default=None)]
+    flags: list[bool] = [x == 0 for x in images.lookup('gt', default=None)]
     filtered_images = images.compress(flags)
 
     filtered_image_ids: list[int] = list(filtered_images)
@@ -215,11 +221,15 @@ def filter_images_by_attribute():
     list_of_image_ids: list[int] = dset.index.vidid_to_gids[1]
     images = dset.images(list_of_image_ids)
 
-    filtered_image_dicts: list[dict] =  [img for img in images.objs if img.get('gt') == 0]
+    filtered_image_dicts: list[dict] = [
+        img for img in images.objs if img.get('gt') == 0
+    ]
     filtered_image_ids: list[int] = [img['id'] for img in filtered_image_dicts]
 
     # Option 4: A 1 liner
-    filtered_image_ids: list[int] = [img['id'] for img in dset.videos(video_ids=[1]).images[0].objs if img['gt'] == 0]
+    filtered_image_ids: list[int] = [
+        img['id'] for img in dset.videos(video_ids=[1]).images[0].objs if img['gt'] == 0
+    ]
 
 
 def convert_mscoco_dataset():

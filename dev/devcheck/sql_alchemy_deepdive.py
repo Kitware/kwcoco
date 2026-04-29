@@ -76,13 +76,15 @@ Ignore:
 References:
     https://stackoverflow.com/questions/9353822/connecting-postgresql-with-sqlalchemy
 """
+
 from kwcoco.coco_sql_dataset import *  # NOQA
 
 
 def testit():
     from sqlalchemy import create_engine
     from sqlalchemy_utils import database_exists, create_database
-    engine = create_engine("postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb")
+
+    engine = create_engine('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb')
     did_exist = database_exists(engine.url)
     if not did_exist:
         create_database(engine.url)
@@ -99,6 +101,7 @@ def values(proxy):
     """
     if proxy._colnames is None:
         from sqlalchemy import inspect
+
         inspector = inspect(proxy.session.get_bind())
         colinfo = inspector.get_columns(proxy.cls.__tablename__)
 
@@ -126,7 +129,8 @@ def values(proxy):
         result.fetchall()
         # Using raw SQL seems much faster
         result = proxy.session.execute(
-            'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+            'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__)
+        )
         rows = result._fetchall_impl()
         row = rows[0]
         # result.process_rows(rows)
@@ -140,8 +144,10 @@ def values(proxy):
         query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
         context = query._compile_context()
         result = proxy.session.execute(
-            'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+            'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__)
+        )
         from sqlalchemy.orm import loading
+
         cursor = result
         context.runid = loading._new_runid()
         context.post_load_paths = {}
@@ -161,9 +167,8 @@ def values(proxy):
         props = mapper._prop_set
         path = self.path
         from sqlalchemy.orm.util import _none_set
-        quick_populators = path.get(
-            context.attributes, "memoized_setups", _none_set
-        )
+
+        quick_populators = path.get(context.attributes, 'memoized_setups', _none_set)
         for prop in props:
             if prop in quick_populators:
                 # this is an inlined path just for column-based attributes.
@@ -184,7 +189,6 @@ def values(proxy):
             polymorphic_discriminator=self._polymorphic_discriminator,
         )
 
-
         for query_entity in query._entities:
             _instance, label_name = query_entity.row_processor(query, context, cursor)
             labels.append(label_name)
@@ -199,7 +203,8 @@ def values(proxy):
 
     # Using raw SQL seems much faster
     result = proxy.session.execute(
-        'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__))
+        'SELECT * FROM {} ORDER BY id'.format(proxy.cls.__tablename__)
+    )
 
     for row in _yield_per(result):
         # cast_row = [f(x) for f, x in zip(proxy._casters, row)]

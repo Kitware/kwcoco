@@ -17,6 +17,7 @@ The primary data we manipulate are arrays of "confusion" counts, i.e.
     * tn_count[i] - true negatives at the i-th threshold
 
 """
+
 import kwarray
 import numpy as np
 import ubelt as ub
@@ -52,6 +53,7 @@ class Measures(ub.NiceRepr, DictProxy):
         >>> self.draw(key='roc', pnum=(1, 2, 2))
         >>> kwplot.show_if_requested()
     """
+
     def __init__(self, info):
         self.proxy = info
 
@@ -104,6 +106,7 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> recon = Measures.from_json(info)
         """
         from kwcoco.util.util_json import ensure_json_serializable
+
         state = {}
         minimal = {
             'fp_count',
@@ -113,11 +116,8 @@ class Measures(ub.NiceRepr, DictProxy):
             'thresholds',
             'realpos_total',
             'realneg_total',
-
             'trunc_idx',
-
             'nsupport',
-
             'fp_cutoff',
             'stabalize_thresh',
             'cx',
@@ -131,8 +131,9 @@ class Measures(ub.NiceRepr, DictProxy):
             # 'max_mcc', '_max_mcc', 'max_g1', '_max_g1', 'max_f1',
             # '_max_f1', 'max_acc', '_max_acc',
             # 'trunc_tpr', 'trunc_fpr',
-
-            'trunc_auc', 'auc', 'ap',
+            'trunc_auc',
+            'auc',
+            'ap',
             # 'sklish_ap',
             'pycocotools_ap',
             # 'outlier_ap', 'sklearn',
@@ -204,12 +205,34 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> scalars = self.scalars()
             >>> print(f'scalars = {ub.urepr(scalars, nl=1)}')
         """
-        scalar_data = ub.dict_diff(self, [
-            'fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds',
-            'trunc_fpr', 'monotonic_ppv', 'trunc_fp_count', 'trunc_tp_count',
-            'trunc_tpr', 'trunc_thresholds', 'tpr', 'ppv', 'tpr', 'fpr', 'bm',
-            'mk', 'acc', 'tnr', 'npv', 'mcc', 'f1', 'g1',
-        ])
+        scalar_data = ub.dict_diff(
+            self,
+            [
+                'fp_count',
+                'tp_count',
+                'tn_count',
+                'fn_count',
+                'thresholds',
+                'trunc_fpr',
+                'monotonic_ppv',
+                'trunc_fp_count',
+                'trunc_tp_count',
+                'trunc_tpr',
+                'trunc_thresholds',
+                'tpr',
+                'ppv',
+                'tpr',
+                'fpr',
+                'bm',
+                'mk',
+                'acc',
+                'tnr',
+                'npv',
+                'mcc',
+                'f1',
+                'g1',
+            ],
+        )
         return scalar_data
 
     def counts(self):
@@ -220,8 +243,9 @@ class Measures(ub.NiceRepr, DictProxy):
         Returns:
             kwarray.DataFrameArray
         """
-        counts_df = ub.dict_isect(self, [
-            'fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds'])
+        counts_df = ub.dict_isect(
+            self, ['fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds']
+        )
         counts_df = kwarray.DataFrameArray(counts_df)
         return counts_df
 
@@ -257,6 +281,7 @@ class Measures(ub.NiceRepr, DictProxy):
             >>> self.draw('roc', doclf=1, fnum=3)
         """
         from kwcoco.metrics import drawing
+
         if key is None or key == 'thresh':
             return drawing.draw_threshold_curves(self, prefix=prefix, **kw)
         elif key == 'pr':
@@ -283,6 +308,7 @@ class Measures(ub.NiceRepr, DictProxy):
         if subplots == 'auto' or (isinstance(subplots, int) and subplots):
             subplots = ['pr', 'roc', 'thresh']
         import kwplot
+
         kwplot.figure(fnum=fnum, figtitle=title)
 
         pnum_ = kwplot.PlotNums(nSubplots=len(subplots))
@@ -305,6 +331,7 @@ class Measures(ub.NiceRepr, DictProxy):
                 some valid keys are: n, rng, p_rue, p_error, p_miss.
         """
         from kwcoco.metrics.confusion_vectors import BinaryConfusionVectors
+
         bin_cfsn = BinaryConfusionVectors.demo(**kwargs)
         measures = bin_cfsn.measures()
         return measures
@@ -506,7 +533,8 @@ class Measures(ub.NiceRepr, DictProxy):
             nonfinite_vals = []
         else:
             combo_thresh_asc, nonfinite_vals = _combine_threshold(
-                tocombine_thresh, thresh_bins, growth, precision)
+                tocombine_thresh, thresh_bins, growth, precision
+            )
             if nonfinite_vals:
                 # Force inclusion of non-finite thresholds
                 combo_thresh_asc = np.hstack([combo_thresh_asc, nonfinite_vals])
@@ -537,7 +565,6 @@ class Measures(ub.NiceRepr, DictProxy):
         # For each item to combine, find where its counts should go in the new
         # combined confusion array.
         for measures in tocombine:
-
             # this thresh is descending
             thresholds = measures['thresholds']
             # XX_pos[idx] is the number of *new* XX cases at index idx at
@@ -592,7 +619,7 @@ class Measures(ub.NiceRepr, DictProxy):
             'node',
             'cx',
             'stabalize_thresh',
-            'trunc_idx'
+            'trunc_idx',
         }
         rest = ub.dict_isect(tocombine[0], other)
         new_info.update(rest)
@@ -633,20 +660,30 @@ def _combine_threshold(tocombine_thresh, thresh_bins, growth, precision):
                 # Each item after the first is only allowed to contribute
                 # some of its thresholds defined by the base-e-log.
                 modulated_sizes = sorted([np.log(n) for n in num_per_item])
-                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+                max_num_thresholds = int(
+                    round(sum(modulated_sizes[:-1]) + max(num_per_item))
+                )
             elif growth == 'root':
                 # Each item after the first is only allowed to contribute
                 # some of its thresholds defined by the square root.
                 modulated_sizes = sorted([np.sqrt(n) for n in num_per_item])
-                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+                max_num_thresholds = int(
+                    round(sum(modulated_sizes[:-1]) + max(num_per_item))
+                )
             elif growth == 'half':
                 # Each item after the first is only allowed to contribute
                 # some of its thresholds, half of them.
                 modulated_sizes = sorted([n / 2 for n in num_per_item])
-                max_num_thresholds = int(round(sum(modulated_sizes[:-1]) + max(num_per_item)))
+                max_num_thresholds = int(
+                    round(sum(modulated_sizes[:-1]) + max(num_per_item))
+                )
             else:
                 raise KeyError(growth)
-            chosen_idxs = np.linspace(0, len(orig_finite_thresholds) - 1, max_num_thresholds).round().astype(int)
+            chosen_idxs = (
+                np.linspace(0, len(orig_finite_thresholds) - 1, max_num_thresholds)
+                .round()
+                .astype(int)
+            )
             chosen_idxs = np.unique(chosen_idxs)
             combo_thresh_asc = orig_finite_thresholds[chosen_idxs]
         elif precision is not None:
@@ -668,13 +705,24 @@ def _combine_threshold(tocombine_thresh, thresh_bins, growth, precision):
                 # even_slice = threshold_pool[:(len(threshold_pool) // 2) * 2]
                 # odd_slice = threshold_pool[1:(len(threshold_pool) // 2) * 2]
                 x = threshold_pool
-                even_slice = x[:(len(x) // 2) * 2]
-                odd_slice = x[1:len(x) - (len(x) % 2 == 0)]
-                mean_vals = np.r_[[0, threshold_pool[0]], even_slice, odd_slice, [1, threshold_pool[-1]]].reshape(-1, 2).mean(axis=1)
+                even_slice = x[: (len(x) // 2) * 2]
+                odd_slice = x[1 : len(x) - (len(x) % 2 == 0)]
+                mean_vals = (
+                    np.r_[
+                        [0, threshold_pool[0]],
+                        even_slice,
+                        odd_slice,
+                        [1, threshold_pool[-1]],
+                    ]
+                    .reshape(-1, 2)
+                    .mean(axis=1)
+                )
                 threshold_pool = np.hstack([mean_vals, threshold_pool])
                 threshold_pool = np.unique(threshold_pool)
 
-            chosen_idxs = np.linspace(0, len(threshold_pool) - 1, thresh_bins).round().astype(int)
+            chosen_idxs = (
+                np.linspace(0, len(threshold_pool) - 1, thresh_bins).round().astype(int)
+            )
             chosen_idxs = np.unique(chosen_idxs)
             combo_thresh_asc = threshold_pool[chosen_idxs]
         else:
@@ -741,6 +789,7 @@ def reversable_diff(arr, assume_sorted=1, reverse=False):
         >>>     print('recon_arr = {!r}'.format(recon_arr))
     """
     import math
+
     assert assume_sorted
     if len(arr) == 0:
         raise ValueError('todo: default value for empty')
@@ -766,16 +815,16 @@ def reversable_diff(arr, assume_sorted=1, reverse=False):
     prefix_len = first_finite_idx
     offset = arr[first_finite_idx]  # This is + C
     prefix = arr[:first_finite_idx]
-    suffix = arr[last_finite_idx + 1:]
-    finite_body = arr[first_finite_idx:last_finite_idx + 1]
+    suffix = arr[last_finite_idx + 1 :]
+    finite_body = arr[first_finite_idx : last_finite_idx + 1]
 
     diff_arr = np.r_[[0] * prefix_len, [offset], np.diff(finite_body), [0] * suffix_len]
 
     # The goal is to be able to recon perfectly
     def invert(diff_arr):
         recon_arr = np.cumsum(diff_arr)
-        recon_arr[0:len(prefix)] += prefix
-        recon_arr[len(recon_arr) - len(suffix):] += suffix
+        recon_arr[0 : len(prefix)] += prefix
+        recon_arr[len(recon_arr) - len(suffix) :] += suffix
         return recon_arr
 
     if reverse:
@@ -788,6 +837,7 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
     """
     A container class mapping categories to :class:`Measures`.
     """
+
     def __init__(self, cx_to_info):
         self.proxy = cx_to_info
 
@@ -819,20 +869,22 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
             >>> self.draw('roc', doclf=1, fnum=3)
         """
         from kwcoco.metrics import drawing
+
         if key == 'pr':
             return drawing.draw_perclass_prcurve(self, prefix=prefix, **kw)
         elif key == 'roc':
             return drawing.draw_perclass_roc(self, prefix=prefix, **kw)
         else:
-            return drawing.draw_perclass_thresholds(
-                self, key=key, prefix=prefix, **kw)
+            return drawing.draw_perclass_thresholds(self, key=key, prefix=prefix, **kw)
 
     def draw_roc(self, prefix='', **kw):
         from kwcoco.metrics import drawing
+
         return drawing.draw_perclass_roc(self, prefix=prefix, **kw)
 
     def draw_pr(self, prefix='', **kw):
         from kwcoco.metrics import drawing
+
         return drawing.draw_perclass_prcurve(self, prefix=prefix, **kw)
 
     def summary_plot(self, fnum=1, title='', subplots='auto'):
@@ -862,6 +914,7 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):
         if subplots == 'auto' or (isinstance(subplots, int) and subplots):
             subplots = ['pr', 'roc', 'mcc', 'f1', 'acc']
         import kwplot
+
         pnum_ = kwplot.PlotNums(nSubplots=len(subplots))
         kwplot.figure(fnum=fnum, doclf=True, figtitle=title)
         for key in subplots:
@@ -885,6 +938,7 @@ class MeasureCombiner:
         >>> print('combined = {!r}'.format(combined))
 
     """
+
     def __init__(self, precision=None, growth=None, thresh_bins=None):
         """
         Args:
@@ -936,8 +990,11 @@ class MeasureCombiner:
             self.measures = to_combine[0]
         else:
             self.measures = Measures.combine(
-                to_combine, precision=self.precision, growth=self.growth,
-                thresh_bins=self.thresh_bins)
+                to_combine,
+                precision=self.precision,
+                growth=self.growth,
+                thresh_bins=self.thresh_bins,
+            )
         self.queue = []
 
     def finalize(self):
@@ -973,6 +1030,7 @@ class OneVersusRestMeasureCombiner:
         >>> combined = ovr_combiner.finalize()
         >>> print('combined = {!r}'.format(combined))
     """
+
     def __init__(self, precision=None, growth=None, thresh_bins=None):
         self.catname_to_combiner = {}
         self.precision = precision
@@ -985,8 +1043,10 @@ class OneVersusRestMeasureCombiner:
         for catname, other_m in other['perclass'].items():
             if catname not in self.catname_to_combiner:
                 combiner = MeasureCombiner(
-                    precision=self.precision, growth=self.growth,
-                    thresh_bins=self.thresh_bins)
+                    precision=self.precision,
+                    growth=self.growth,
+                    thresh_bins=self.thresh_bins,
+                )
                 self.catname_to_combiner[catname] = combiner
             self.catname_to_combiner[catname].submit(other_m)
 
@@ -1096,6 +1156,7 @@ def populate_info(info):
     # This will hurt the scores (aka we may be bias against small
     # scenes), but this will ensure that big scenes are comparable
     from kwcoco.metrics import assignment
+
     if len(trunc_fp) == 0:
         trunc_fp = np.array([fp_cutoff])
         trunc_tp = np.array([0])
@@ -1121,10 +1182,11 @@ def populate_info(info):
         # It is very possible that we will divide by zero in this func
         warnings.filterwarnings('ignore', message='invalid .* true_divide')
         warnings.filterwarnings('ignore', message='invalid value')
-        warnings.filterwarnings('ignore', message='divide by zero',
-                                category=RuntimeWarning)
+        warnings.filterwarnings(
+            'ignore', message='divide by zero', category=RuntimeWarning
+        )
 
-        pred_pos = (tp + fp)  # number of predicted positives
+        pred_pos = tp + fp  # number of predicted positives
         ppv = tp / pred_pos  # precision
         ppv[np.isnan(ppv)] = 0
 
@@ -1134,7 +1196,7 @@ def populate_info(info):
             ppv = np.maximum.accumulate(ppv[::-1])[::-1]
 
         # can set tpr_denom denominator to one
-        tpr_denom = (tp + fn)  #
+        tpr_denom = tp + fn  #
         tpr_denom[~(tpr_denom > 0)] = 1
         tpr = tp / tpr_denom  # recall
 
@@ -1146,11 +1208,11 @@ def populate_info(info):
                 warnings.warn('realpos_total is inconsistent')
 
         if has_tn:
-            tnr_denom = (tn + fp)
+            tnr_denom = tn + fp
             tnr_denom[tnr_denom == 0] = 1
             tnr = tn / tnr_denom
 
-            pnv_denom = (tn + fn)
+            pnv_denom = tn + fn
             pnv_denom[pnv_denom == 0] = 1
             npv = tn / pnv_denom
 
@@ -1187,23 +1249,25 @@ def populate_info(info):
             p_denom = real_pos.copy()
             p_denom[p_denom == 0] = 1
             fnr = fn / p_denom  # miss-rate
-            fdr  = 1 - ppv  # false discovery rate
-            fmr  = 1 - npv  # false omission rate (for)
+            fdr = 1 - ppv  # false discovery rate
+            fmr = 1 - npv  # false omission rate (for)
 
             info['tnr'] = tnr
             info['npv'] = npv
             # info['mcc'] = np.sqrt(ppv * tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
-            info['mcc'] = np.sqrt(ppv_mul_tpr * tnr * npv) - np.sqrt(fdr * fnr * fpr * fmr)
+            info['mcc'] = np.sqrt(ppv_mul_tpr * tnr * npv) - np.sqrt(
+                fdr * fnr * fpr * fmr
+            )
 
         # f1_numer = (2 * ppv * tpr)
 
         # NOTE: F1 might be impacted by the monotonic flag
         # might need to refine that metric, probably in a backwards compatible
         # way
-        f1_numer = (2 * ppv_mul_tpr)
-        f1_denom = (ppv + tpr)
+        f1_numer = 2 * ppv_mul_tpr
+        f1_denom = ppv + tpr
         f1_denom[f1_denom == 0] = 1
-        info['f1'] =  f1_numer / f1_denom
+        info['f1'] = f1_numer / f1_denom
 
         if 0:
             # The IoU (or Jaccard) is directly related to F1 if we want it.
@@ -1233,7 +1297,9 @@ def populate_info(info):
                 else:
                     best_thresh = float(finite_thresh[max_idx])
                     best_measure = float(measure[max_idx])
-                    best_submeasures = {k: info[k][finite_flags][max_idx] for k in sub_keys}
+                    best_submeasures = {
+                        k: info[k][finite_flags][max_idx] for k in sub_keys
+                    }
                     best_submeasures['thresh'] = best_thresh
 
                 best_label = '{}={:0.2f}@{:0.2f}'.format(key, best_measure, best_thresh)
@@ -1242,6 +1308,7 @@ def populate_info(info):
                 info['_max_{}'.format(key)] = (best_measure, best_thresh)
 
         import sklearn.metrics  # NOQA
+
         finite_trunc_fp = info['trunc_fp_count']
         finite_trunc_fp = finite_trunc_fp[np.isfinite(finite_trunc_fp)]
         trunc_fpr_denom = finite_trunc_fp[-1] if len(finite_trunc_fp) else 0
@@ -1293,7 +1360,9 @@ def populate_info(info):
         # References:
         #     https://en.wikipedia.org/wiki/Youden%27s_J_statistic
         finite_trunc_fpr = trunc_fpr[np.isfinite(trunc_fpr)]
-        is_constant_fpr = (len(finite_trunc_fpr) > 0) and np.all(finite_trunc_fpr == finite_trunc_fpr[0])
+        is_constant_fpr = (len(finite_trunc_fpr) > 0) and np.all(
+            finite_trunc_fpr == finite_trunc_fpr[0]
+        )
 
         if is_constant_fpr:
             # Degenerate ROC (vertical line): use Youden's J as a 1D collapse of ROC.
@@ -1353,8 +1422,8 @@ def populate_info(info):
         SKLISH_AP = 1
         if SKLISH_AP:
             last_ind = tpr.searchsorted(tpr[-1])
-            rec  = np.r_[0, tpr[:last_ind + 1]]
-            prec = np.r_[1, ppv[:last_ind + 1]]
+            rec = np.r_[0, tpr[: last_ind + 1]]
+            prec = np.r_[1, ppv[: last_ind + 1]]
             # scores = np.r_[0, thresh[:last_ind + 1]]
 
             # Precisions are weighted by the change in recall
@@ -1375,12 +1444,12 @@ def populate_info(info):
             else:
                 feasible_tpr = tpr[feasible_idxs[-1]]
                 last_ind = tpr.searchsorted(feasible_tpr)
-                rc  = tpr[:last_ind + 1]
-                pr = ppv[:last_ind + 1]
+                rc = tpr[: last_ind + 1]
+                pr = ppv[: last_ind + 1]
 
                 recThrs = np.linspace(0, 1.0, R)
                 inds = np.searchsorted(rc, recThrs, side='left')
-                q  = np.zeros((R,))
+                q = np.zeros((R,))
                 # ss = np.zeros((R,))
 
                 try:
@@ -1423,6 +1492,7 @@ def populate_info(info):
             # This may become the de-facto scikit-learn implementation in the
             # future.
             from scipy import integrate
+
             # MODIFIED SKLEARN AVERAGE PRECISION FOR -INF THRESH
             #
             # Better way of marked unassigned truth as never-recallable.
@@ -1436,8 +1506,8 @@ def populate_info(info):
             else:
                 feasible_tpr = tpr[feasible_idxs[-1]]
                 last_ind = tpr.searchsorted(feasible_tpr)
-                rec  = np.r_[0, tpr[:last_ind + 1]]
-                prec = np.r_[1, ppv[:last_ind + 1]]
+                rec = np.r_[0, tpr[: last_ind + 1]]
+                prec = np.r_[1, ppv[: last_ind + 1]]
 
                 diff_items = np.diff(rec)
                 prec_items = prec[1:]

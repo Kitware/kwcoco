@@ -17,6 +17,7 @@ def setup_data():
     raw = kwimage.ensure_float01(raw)
 
     import kwcoco
+
     dset = kwcoco.CocoDataset()
     dset.fpath = demo_dpath / 'data.kwcoco.json'
 
@@ -30,7 +31,9 @@ def setup_data():
     for frame_idx, obs in enumerate(observations):
         warp_img_from_vid = obs['warp_img_from_vid']
 
-        ideal_img_frame = kwimage.warp_affine(raw, warp_img_from_vid, dsize='positive', border_value=float('nan'))
+        ideal_img_frame = kwimage.warp_affine(
+            raw, warp_img_from_vid, dsize='positive', border_value=float('nan')
+        )
         img_h, img_w = ideal_img_frame.shape[0:2]
 
         # pan is shifted a little bit
@@ -47,7 +50,12 @@ def setup_data():
 
         # Some assets are smaller than others
         warp_msi_from_img = kwimage.Affine.scale(0.5)
-        msi = kwimage.warp_affine(ideal_img_frame, warp_msi_from_img, dsize='positive', border_value=float('nan'))
+        msi = kwimage.warp_affine(
+            ideal_img_frame,
+            warp_msi_from_img,
+            dsize='positive',
+            border_value=float('nan'),
+        )
         red = msi[..., 0]
         green = msi[..., 1]
         blue = msi[..., 2]
@@ -57,21 +65,35 @@ def setup_data():
         kwimage.imwrite(green_fpath, green)
         kwimage.imwrite(blue_fpath, blue)
 
-        gid = dset.add_image(name=image_name, frame_index=frame_idx,
-                             width=img_w, height=img_h, video_id=video_id,
-                             warp_img_to_vid=warp_img_from_vid.inv())
+        gid = dset.add_image(
+            name=image_name,
+            frame_index=frame_idx,
+            width=img_w,
+            height=img_h,
+            video_id=video_id,
+            warp_img_to_vid=warp_img_from_vid.inv(),
+        )
 
         coco_img = dset.coco_image(gid)
 
-        coco_img.add_asset(pan_fpath, channels='pan', warp_aux_to_img=warp_pan_from_img.inv())
-        coco_img.add_asset(red_fpath, channels='red', warp_aux_to_img=warp_msi_from_img.inv())
-        coco_img.add_asset(green_fpath, channels='green', warp_aux_to_img=warp_msi_from_img.inv())
-        coco_img.add_asset(blue_fpath, channels='blue', warp_aux_to_img=warp_msi_from_img.inv())
+        coco_img.add_asset(
+            pan_fpath, channels='pan', warp_aux_to_img=warp_pan_from_img.inv()
+        )
+        coco_img.add_asset(
+            red_fpath, channels='red', warp_aux_to_img=warp_msi_from_img.inv()
+        )
+        coco_img.add_asset(
+            green_fpath, channels='green', warp_aux_to_img=warp_msi_from_img.inv()
+        )
+        coco_img.add_asset(
+            blue_fpath, channels='blue', warp_aux_to_img=warp_msi_from_img.inv()
+        )
     return dset
 
 
 def main():
     import kwimage
+
     dset = setup_data()
 
     def build_space_frames(space):
@@ -83,11 +105,17 @@ def main():
             frame_index = coco_img.img['frame_index']
             asset_stack = []
             for chan in coco_img.channels.fuse().to_list():
-                asset_data = coco_img.imdelay(chan, space=space).finalize(nodata_method='float')
+                asset_data = coco_img.imdelay(chan, space=space).finalize(
+                    nodata_method='float'
+                )
                 asset_data = kwimage.fill_nans_with_checkers(asset_data)
-                asset_data = kwimage.draw_header_text(asset_data, f'T={frame_index} : {chan}')
+                asset_data = kwimage.draw_header_text(
+                    asset_data, f'T={frame_index} : {chan}'
+                )
                 asset_stack.append(asset_data)
-            asset_row = kwimage.stack_images(asset_stack, axis=1, pad=10, bg_value=bg_value)
+            asset_row = kwimage.stack_images(
+                asset_stack, axis=1, pad=10, bg_value=bg_value
+            )
             frame_stack.append(asset_row)
         canvas = kwimage.stack_images(frame_stack, axis=0, pad=10, bg_value=bg_value)
         return canvas
@@ -97,27 +125,32 @@ def main():
     video_canvas = build_space_frames(space='video')
 
     import ubelt as ub
+
     asset_blurb = ub.codeblock(
-        '''
+        """
         This is a demonstration of "asset space".
         Each frame is a row, and each channel is a column.
         This is how images are saved on disk.
         Any alignment is delayed until the last possible moment.
-        ''')
+        """
+    )
     image_blurb = ub.codeblock(
-        '''
+        """
         This is a demonstration of "image space".
         Assets are aligned within an image, but are not necesarilly aligned across frames.
         The resolution is typically that of the largest asset in the image, but can be arbitrary.
-        ''')
+        """
+    )
     video_blurb = ub.codeblock(
-        '''
+        """
         This is a demonstration of "video space".
         Assets are aligned within an image and across frames.
         Resolution is usually set to that of some reference image, but it can be arbitrary.
-        ''')
+        """
+    )
 
     import kwplot
+
     kwplot.autompl()
     kwplot.imshow(asset_canvas, title=asset_blurb, fnum=1)
     kwplot.imshow(image_canvas, title=image_blurb, fnum=2)
@@ -133,15 +166,22 @@ def main():
     # t1 = kwimage.draw_header_text(None, 'Asset View', color='black', bg_color='white')
     # t2 = kwimage.draw_header_text(None, 'Image View', color='black', bg_color='white')
     # t3 = kwimage.draw_header_text(None, 'Video View', color='black', bg_color='white')
-    c1 = kwimage.draw_header_text(c1, 'Asset View', color='black', bg_color='white', fontScale=4, thickness=10)
-    c2 = kwimage.draw_header_text(c2, 'Image View', color='black', bg_color='white', fontScale=4, thickness=10)
-    c3 = kwimage.draw_header_text(c3, 'Video View', color='black', bg_color='white', fontScale=4, thickness=10)
+    c1 = kwimage.draw_header_text(
+        c1, 'Asset View', color='black', bg_color='white', fontScale=4, thickness=10
+    )
+    c2 = kwimage.draw_header_text(
+        c2, 'Image View', color='black', bg_color='white', fontScale=4, thickness=10
+    )
+    c3 = kwimage.draw_header_text(
+        c3, 'Video View', color='black', bg_color='white', fontScale=4, thickness=10
+    )
 
     together = kwimage.stack_images([c1, c2, c3], axis=1, bg_value='white', pad=64)
     kwimage.imwrite('together.jpg', kwimage.ensure_uint255(together))
     kwplot.imshow(together, fnum=4)
 
     kwplot.show_if_requested()
+
 
 if __name__ == '__main__':
     """

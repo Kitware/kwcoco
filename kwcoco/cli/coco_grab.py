@@ -34,21 +34,29 @@ class CocoGrabCLI(scfg.DataConfig):
     Example:
         kwcoco grab cifar10 camvid
     """
+
     __command__ = 'grab'
 
     __default__ = {
-        'names': scfg.Value([], nargs='+', position=1, help=ub.paragraph(
-            '''
+        'names': scfg.Value(
+            [],
+            nargs='+',
+            position=1,
+            help=ub.paragraph(
+                """
             Dataset names to grab. Valid values are cifar10, cifar100,
             domainnet, spacenet7, and camvid.
-            '''
-        )),
-
+            """
+            ),
+        ),
         'dpath': scfg.Path(
-            ub.Path.appdir('kwcoco', 'data', type='cache'), help=ub.paragraph(
-                '''
+            ub.Path.appdir('kwcoco', 'data', type='cache'),
+            help=ub.paragraph(
+                """
                 Download directory
-                '''))
+                """
+            ),
+        ),
     }
 
     @classmethod
@@ -66,27 +74,32 @@ class CocoGrabCLI(scfg.DataConfig):
         for name in names:
             if 'camvid' == name:
                 from kwcoco.data import grab_camvid
+
                 dset = grab_camvid.grab_coco_camvid()
                 ensured.append(dset)
 
             elif 'cifar10' == name:
                 from kwcoco.data import grab_cifar
+
                 dsets = grab_cifar.convert_cifar10(dpath=config.dpath)
                 ensured.extend(dsets)
 
             elif 'cifar100' == name:
                 from kwcoco.data import grab_cifar
+
                 dsets = grab_cifar.convert_cifar100(dpath=config.dpath)
                 ensured.extend(dsets)
 
             elif 'domainnet' == name:
                 from kwcoco.data import grab_domainnet
+
                 dsets = grab_domainnet.grab_domain_net()
                 for dset in dsets:
                     ensured.append(dset)
 
             elif 'spacenet7' == name:
                 from kwcoco.data import grab_spacenet
+
                 dsets = grab_spacenet.grab_spacenet7(config['dpath'])
                 for dset in dsets:
                     ensured.append(dset)

@@ -4,6 +4,7 @@ from __future__ import annotations
 This is a staging ground for utilities that may make there way into
 :mod:`kwutil` proper at some point in the future.
 """
+
 import ubelt as ub
 
 
@@ -14,6 +15,7 @@ class _DelayedFuture:
     Wraps a future object so we can execute logic when its result has been
     accessed.
     """
+
     def __init__(self, func, args, kwargs, parent):
         self.func = func
         self.args = args
@@ -66,8 +68,10 @@ class _DelayedBlockingJobQueue:
         >>>     f = futures.pop()
         >>>     f.result()
     """
+
     def __init__(self, max_unhandled_jobs, mode='thread', max_workers=None):
         from collections import deque
+
         self._unsubmitted = deque()
         self.pool = ub.Executor(mode=mode, max_workers=max_workers)
         self.max_unhandled_jobs = max_unhandled_jobs
@@ -90,10 +94,12 @@ class _DelayedBlockingJobQueue:
             delayed = self._unsubmitted.popleft()
             self._num_submitted_jobs += 1
             self._num_unhandled += 1
-            delayed.future = self.pool.submit(delayed.func, *delayed.args, **delayed.kwargs)
+            delayed.future = self.pool.submit(
+                delayed.func, *delayed.args, **delayed.kwargs
+            )
 
     def _job_result_accessed_callback(self, _):
-        """Called when the user handles a result """
+        """Called when the user handles a result"""
         self._num_handled_results += 1
         self._num_unhandled -= 1
         self._submit_if_room()
@@ -145,6 +151,7 @@ class _MaxQueuePool:
         result = future.result()
 
     """
+
     def __init__(self, max_queue_size=None, mode='thread', max_workers=0):
         if max_queue_size is None:
             max_queue_size = max_workers
@@ -153,6 +160,7 @@ class _MaxQueuePool:
             self.pool_queue = None
         else:
             from threading import BoundedSemaphore  # NOQA
+
             self.pool_queue = BoundedSemaphore(max_queue_size)
 
     def submit(self, function, *args, **kwargs):

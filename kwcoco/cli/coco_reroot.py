@@ -21,6 +21,7 @@ class CocoRerootCLI(scfg.DataConfig):
     TODO:
         - [ ] Evaluate that all tests cases work
     """
+
     __command__ = 'reroot'
 
     __epilog__ = """
@@ -30,37 +31,51 @@ class CocoRerootCLI(scfg.DataConfig):
         kwcoco reroot --src=special:shapes8 --dst rerooted.json
         kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rerooted.json
     """
-    src = scfg.Value(None, help=(
-        'Input coco dataset path'), position=1)
+    src = scfg.Value(None, help=('Input coco dataset path'), position=1)
 
-    dst = scfg.Value(None, help=(
-        'Output coco dataset path'), position=2)
+    dst = scfg.Value(None, help=('Output coco dataset path'), position=2)
 
-    new_prefix = scfg.Value(None, help=(
-        'New prefix to insert before every image file name.'))
+    new_prefix = scfg.Value(
+        None, help=('New prefix to insert before every image file name.')
+    )
 
-    old_prefix = scfg.Value(None, help=(
-        'Old prefix to remove from the start of every image file name.'))
+    old_prefix = scfg.Value(
+        None, help=('Old prefix to remove from the start of every image file name.')
+    )
 
-    absolute = scfg.Value(True, isflag=True, help=(
-        'If False, the output file uses relative paths'))
+    absolute = scfg.Value(
+        True, isflag=True, help=('If False, the output file uses relative paths')
+    )
 
-    check = scfg.Value(True, isflag=True, help=(
-        'If True, checks that all data exists'))
+    check = scfg.Value(True, isflag=True, help=('If True, checks that all data exists'))
 
-    autofix = scfg.Value(False, isflag=True, help=(
-        ub.paragraph(
-            '''
+    autofix = scfg.Value(
+        False,
+        isflag=True,
+        help=(
+            ub.paragraph(
+                """
             If True, attempts an automatic fix. This assumes that paths
             are prefixed with an absolute path belonging to a different
             machine, and it attempts to strip off a minimal prefix to
             find relative paths that do exist.
-            ''')))
+            """
+            )
+        ),
+    )
 
-    compress = scfg.Value('auto', help='if True writes results with compression. DEPRECATED. Just use a .zip suffix.')
+    compress = scfg.Value(
+        'auto',
+        help='if True writes results with compression. DEPRECATED. Just use a .zip suffix.',
+    )
 
-    inplace = scfg.Value(False, isflag=True, help=(
-        'if True and dst is unspecified then the output will overwrite the input'))
+    inplace = scfg.Value(
+        False,
+        isflag=True,
+        help=(
+            'if True and dst is unspecified then the output will overwrite the input'
+        ),
+    )
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -95,6 +110,7 @@ class CocoRerootCLI(scfg.DataConfig):
         """
         import kwcoco
         from os.path import dirname, abspath
+
         config = cls.cli(data=kw, cmdline=cmdline, strict=True)
 
         try:
@@ -132,7 +148,7 @@ class CocoRerootCLI(scfg.DataConfig):
             new_prefix=config['new_prefix'],
             old_prefix=config['old_prefix'],
             absolute=config['absolute'],
-            check=config['check']
+            check=config['check'],
         )
 
         dset.fpath = config['dst']
@@ -146,6 +162,7 @@ class CocoRerootCLI(scfg.DataConfig):
 
 def find_reroot_autofix(dset):
     import os
+
     # Given a set of missing images, is there a way we can autofix them?
     missing_tups = dset.missing_images()
     missing_gpaths = [t[1] for t in missing_tups]
@@ -166,10 +183,12 @@ def find_reroot_autofix(dset):
         for i in range(len(first_parts)):
             cand_path = bundle_dpath / ub.Path(*first_parts[i:])
             if cand_path.exists():
-                candidates.append({
-                    'old_prefix': os.fspath(ub.Path(*first_parts[:i])) + '/',
-                    'new_prefix': '',
-                })
+                candidates.append(
+                    {
+                        'old_prefix': os.fspath(ub.Path(*first_parts[:i])) + '/',
+                        'new_prefix': '',
+                    }
+                )
         if len(candidates) == 0:
             raise RuntimeError('Could not determine a valid autofix')
 
@@ -177,7 +196,8 @@ def find_reroot_autofix(dset):
         for candidate in candidates:
             try:
                 _check_candidates(
-                    candidate, bundle_dpath, missing_gpaths, fastfail=True)
+                    candidate, bundle_dpath, missing_gpaths, fastfail=True
+                )
             except FileNotFoundError:
                 ...
             else:
@@ -186,11 +206,16 @@ def find_reroot_autofix(dset):
 
     if not chosen:
         import rich
+
         rich.print('[red]ERROR: No candidate fixed all paths')
         # Give the user more info
         for candidate in candidates:
-            errors = _check_candidates(candidate, bundle_dpath, missing_gpaths, fastfail=False)
-            rich.print('candidate prefix replacement = {}'.format(ub.urepr(candidate, nl=1)))
+            errors = _check_candidates(
+                candidate, bundle_dpath, missing_gpaths, fastfail=False
+            )
+            rich.print(
+                'candidate prefix replacement = {}'.format(ub.urepr(candidate, nl=1))
+            )
             error1 = errors[0]
             print('error1 = {}'.format(ub.urepr(error1, nl=1)))
             rich.print(f'[red] Had {len(errors)} / {len(missing_gpaths)} errors')
@@ -200,6 +225,7 @@ def find_reroot_autofix(dset):
 
 def _check_candidates(candidate, bundle_dpath, missing_gpaths, fastfail=True):
     import os
+
     errors = []
     old_pref = os.fspath(candidate['old_prefix'])
     new_pref = os.fspath(candidate['new_prefix'])

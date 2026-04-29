@@ -1,6 +1,6 @@
-
 def test_column_based_keypoints_without_categories():
     import kwcoco
+
     keypoints = {
         'x': [0, 1, 2, 3],
         'y': [0, 1, 2, 3],
@@ -14,6 +14,7 @@ def test_column_based_keypoints_without_categories():
 
 def test_column_based_keypoints_with_categories():
     import kwcoco
+
     keypoints = {
         'x': [0, 1, 2, 3],
         'y': [0, 1, 2, 3],
@@ -39,19 +40,26 @@ def test_keypoint_formats():
     import ubelt as ub
 
     keypoint_classes = kwcoco.CategoryTree.coerce(['head', 'tail', 'ears', 'nose'])
-    object_classes_with_keypoints = kwcoco.CategoryTree.from_coco([{
-        'name': 'object',
-        'keypoints': list(keypoint_classes),
-        'skeleton': [[0, 3], [0, 2], [0, 1]],
-    }])
-    object_classes_without_keypoints = kwcoco.CategoryTree.from_coco([{
-        'name': 'object'
-    }])
-    points = kwimage.Points.from_coco({
-        'x': [4, 30, 770, 5148],
-        'y': [0, 1, 5, 2],
-        'keypoint_category_id': [2, 1, 3, 0],
-    }, classes=keypoint_classes)
+    object_classes_with_keypoints = kwcoco.CategoryTree.from_coco(
+        [
+            {
+                'name': 'object',
+                'keypoints': list(keypoint_classes),
+                'skeleton': [[0, 3], [0, 2], [0, 1]],
+            }
+        ]
+    )
+    object_classes_without_keypoints = kwcoco.CategoryTree.from_coco(
+        [{'name': 'object'}]
+    )
+    points = kwimage.Points.from_coco(
+        {
+            'x': [4, 30, 770, 5148],
+            'y': [0, 1, 5, 2],
+            'keypoint_category_id': [2, 1, 3, 0],
+        },
+        classes=keypoint_classes,
+    )
 
     # kwimage_points_variants = {
     #     'with_keypoint_catid': points,
@@ -90,9 +98,7 @@ def test_keypoint_formats():
         ('without_keypoints', 'null', 'new-v2'),
     }
     for variants in grid_items:
-        row = {
-            **variants
-        }
+        row = {**variants}
         object_classes = object_class_variants[variants['object_class_variant']]
         keypoint_classes = keypoint_class_variants[variants['keypoint_class_variant']]
         keypoints = keypoints_variants[variants['keypoints_variant']]
@@ -110,8 +116,12 @@ def test_keypoint_formats():
                 dset._build_index()
             image_id = dset.add_image(file_name='dummy.png')
             failpoint = 'CocoDataset.add_annotation'
-            dset.add_annotation(image_id=image_id, bbox=[0, 0, 100, 100],
-                                keypoints=keypoints, category_id=catid)
+            dset.add_annotation(
+                image_id=image_id,
+                bbox=[0, 0, 100, 100],
+                keypoints=keypoints,
+                category_id=catid,
+            )
             # Look at how the input was translated to coco
             # added_as = dset.annots().objs[0]['keypoints']
             failpoint = 'annots.detections'
@@ -156,6 +166,7 @@ def test_keypoint_formats():
     if 1:
         import pandas as pd
         import rich
+
         df = pd.DataFrame(results)
         try:
             df = df.drop(['traceback'], axis=1)

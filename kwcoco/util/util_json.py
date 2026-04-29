@@ -1,6 +1,7 @@
 """
 Deprecated: use kwutil.Json instead
 """
+
 from __future__ import annotations
 
 import copy
@@ -22,7 +23,9 @@ if typing.TYPE_CHECKING:
 IndexableWalker = ub.IndexableWalker
 
 
-def ensure_json_serializable(dict_: Any, normalize_containers: bool = False, verbose: int = 0):
+def ensure_json_serializable(
+    dict_: Any, normalize_containers: bool = False, verbose: int = 0
+):
     """
     Attempt to convert common types (e.g. numpy) into something json compliant
 
@@ -105,7 +108,9 @@ def ensure_json_serializable(dict_: Any, normalize_containers: bool = False, ver
     return dict_
 
 
-def find_json_unserializable(data: object, quickcheck: bool = False) -> Generator[List[Dict], None, None]:
+def find_json_unserializable(
+    data: object, quickcheck: bool = False
+) -> Generator[List[Dict], None, None]:
     """
     Recurse through json datastructure and find any component that
     causes a serialization error. Record the location of these errors
@@ -281,7 +286,9 @@ def indexable_allclose(dct1, dct2, return_info: bool = False):
         remove='1.1.0',
         warncls=Warning,
     )
-    return ub.IndexableWalker(dct1).allclose(dct2, return_info=return_info, rel_tol=1e-5, abs_tol=1e-8)
+    return ub.IndexableWalker(dct1).allclose(
+        dct2, return_info=return_info, rel_tol=1e-5, abs_tol=1e-8
+    )
 
 
 class Difference(NamedTuple):
@@ -289,6 +296,7 @@ class Difference(NamedTuple):
     A result class of indexable_diff that organizes what the difference between
     the indexables is.
     """
+
     path: Tuple
     value1: Any
     value2: Any
@@ -361,8 +369,9 @@ def coerce_indent(indent: Union[int, str, None]):
             print(repr(coerce_indent(3)))
     """
     if indent is not None and isinstance(indent, str):
-        assert indent.count(' ') == len(indent), (
-            'must be all spaces, got {!r}'.format(indent))
+        assert indent.count(' ') == len(indent), 'must be all spaces, got {!r}'.format(
+            indent
+        )
         indent = len(indent)
     if indent is None:
         ...

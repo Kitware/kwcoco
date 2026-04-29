@@ -18,6 +18,7 @@ class DemoTorchDataset(DatasetBase):
     References:
         https://discuss.pytorch.org/t/dataloader-and-postgres-or-other-sql-an-option/25927/7
     """
+
     def __init__(self, coco_dset):
         self.coco_dset = coco_dset
         # kwcoco.CocoDataset.coerce(coco_dset)
@@ -36,10 +37,7 @@ class DemoTorchDataset(DatasetBase):
         annot_ids = coco_dset.index.gid_to_aids[image_id]
 
         imdata = torch.from_numpy(imdata.astype(np.float32))
-        anns = [
-            coco_dset.index.anns[annot_id]
-            for annot_id in annot_ids
-        ]
+        anns = [coco_dset.index.anns[annot_id] for annot_id in annot_ids]
         item = {
             'imdata': imdata,
             'img': coco_image.img,
@@ -47,17 +45,22 @@ class DemoTorchDataset(DatasetBase):
         }
         return item
 
-    def make_loader(self, batch_size=1, num_workers=0, shuffle=False,
-                    pin_memory=False):
+    def make_loader(self, batch_size=1, num_workers=0, shuffle=False, pin_memory=False):
         loader = torch.utils.data.DataLoader(
-            self, batch_size=batch_size, num_workers=num_workers,
-            shuffle=shuffle, pin_memory=pin_memory, collate_fn=ub.identity,
-            worker_init_fn=worker_init_fn)
+            self,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            shuffle=shuffle,
+            pin_memory=pin_memory,
+            collate_fn=ub.identity,
+            worker_init_fn=worker_init_fn,
+        )
         return loader
 
 
 def worker_init_fn(worker_id):
     import torch.utils
+
     worker_info = torch.utils.data.get_worker_info()
     worker_id = worker_info.id
     print(f'[Worker {worker_id}] Initialize')
@@ -75,6 +78,7 @@ def test_torch_dataset_with_sql():
         xdoctest -m ~/code/kwcoco/tests/test_sql_with_torch_datasets.py test_torch_dataset_with_sql
     """
     import pytest
+
     if torch is None:
         pytest.skip('requires torch')
     try:
@@ -106,7 +110,9 @@ def test_torch_dataset_with_sql():
     batch_iter = iter(loader)
 
     total = 0
-    for batch in ub.ProgIter(batch_iter, total=len(loader), desc='data loading', verbose=3):
+    for batch in ub.ProgIter(
+        batch_iter, total=len(loader), desc='data loading', verbose=3
+    ):
         for item in batch:
             imdata = item['imdata']
             total += imdata.sum()

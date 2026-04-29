@@ -16,6 +16,7 @@ class CocoConformCLI(scfg.DataConfig):
     Other arguments like ``--legacy`` and ``--mmlab`` can be used to
     conform to specifications expected by external tooling.
     """
+
     __command__ = 'conform'
 
     __epilog__ = """
@@ -30,36 +31,61 @@ class CocoConformCLI(scfg.DataConfig):
 
     dst = scfg.Value(None, position=2, help='the location to save the output dataset.')
 
-    ensure_imgsize = scfg.Value(True, help=ub.paragraph(
-            '''
+    ensure_imgsize = scfg.Value(
+        True,
+        help=ub.paragraph(
+            """
             ensure each image has height and width attributes
-            '''))
+            """
+        ),
+    )
 
-    pycocotools_info = scfg.Value(True, help=ub.paragraph(
-            '''
+    pycocotools_info = scfg.Value(
+        True,
+        help=ub.paragraph(
+            """
             ensure information needed for pycocotools
-            '''))
+            """
+        ),
+    )
 
-    legacy = scfg.Value(False, help=ub.paragraph(
-            '''
+    legacy = scfg.Value(
+        False,
+        help=ub.paragraph(
+            """
             if True tries to convert to the original ms-coco format
-            '''))
+            """
+        ),
+    )
 
-    mmlab = scfg.Value(False, help=ub.paragraph(
-            '''
+    mmlab = scfg.Value(
+        False,
+        help=ub.paragraph(
+            """
             if True tries to convert data to be compatible with open-
             mmlab tooling
-            '''))
+            """
+        ),
+    )
 
     compress = scfg.Value('auto', help='if True writes results with compression')
 
-    workers = scfg.Value(8, help=ub.paragraph(
-            '''
+    workers = scfg.Value(
+        8,
+        help=ub.paragraph(
+            """
             number of background workers used for IO bound checks
-            '''))
+            """
+        ),
+    )
 
-    inplace = scfg.Value(False, isflag=True, help=(
-        'if True and dst is unspecified then the output will overwrite the input'))
+    inplace = scfg.Value(
+        False,
+        isflag=True,
+        help=(
+            'if True and dst is unspecified then the output will overwrite the input'
+        ),
+    )
 
     @classmethod
     def main(cls, cmdline=True, **kw):

@@ -4,6 +4,7 @@ def grab_mscoco_annotations():
     """
     import ubelt as ub
     from kwcoco.util import util_archive
+
     dpath = ub.Path.appdir('kwcoco/data/mscoco').ensuredir()
 
     mscoco_urls = {
@@ -26,9 +27,11 @@ def grab_mscoco_annotations():
 
 def test_standard_coco_dataset():
     import pytest
+
     pytest.skip('slow test')
 
     import kwcoco
+
     mscoco_fpaths = grab_mscoco_annotations()
 
     fpath = mscoco_fpaths['trainval2017']['instances_val2017.json']

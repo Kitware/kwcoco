@@ -26,6 +26,7 @@ def _trunc_op(string, max_length, trunc_loc, trunc_char='~'):
     """
     import ubelt as ub
     import numpy as np
+
     total_len = len(string)
     mid_pos = int(total_len * trunc_loc)
 
@@ -46,8 +47,8 @@ def _trunc_op(string, max_length, trunc_loc, trunc_char='~'):
             n_extra = actual_remove - (high_pos - low_pos)
             low_pos -= n_extra
 
-        really_removed = (high_pos - low_pos)
-        high_pos += (really_removed - actual_remove)
+        really_removed = high_pos - low_pos
+        high_pos += really_removed - actual_remove
 
         begin = string[:low_pos]
         mid = string[low_pos:high_pos]
@@ -60,8 +61,7 @@ def _trunc_op(string, max_length, trunc_loc, trunc_char='~'):
     return trunc_text
 
 
-def smart_truncate(string, max_length=0, separator=' ', trunc_loc=0.5,
-                   trunc_char='~'):
+def smart_truncate(string, max_length=0, separator=' ', trunc_loc=0.5, trunc_char='~'):
     """
     Truncate a string.
     :param string (str): string for modification

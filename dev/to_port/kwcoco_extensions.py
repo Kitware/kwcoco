@@ -6,6 +6,7 @@ We assume input is orthorectified.  We assume some GSD "target" gsd for video
 and image processing. Note a video GSD will typically be much higher (i.e.
 lower resolution) than an image GSD.
 """
+
 import warnings
 import numpy as np
 import ubelt as ub
@@ -24,12 +25,18 @@ except Exception:
     profile = ub.identity
 
 
-def filter_image_ids(coco_dset, gids=None, include_sensors=None,
-                     exclude_sensors=None, select_images=None,
-                     select_videos=None):
+def filter_image_ids(
+    coco_dset,
+    gids=None,
+    include_sensors=None,
+    exclude_sensors=None,
+    select_images=None,
+    select_videos=None,
+):
     """
     Filters to a specific set of images given query parameters
     """
+
     def coerce_set(x):
         return set(x.split(',')) if isinstance(x, str) else set(x)
 
@@ -48,9 +55,11 @@ def filter_image_ids(coco_dset, gids=None, include_sensors=None,
                 flags = [v in include and v not in exclude for v in values]
             table = table.compress(flags)
         return table
+
     valid_images = coco_dset.images(gids)
     valid_images = filter_by_attribute(
-        valid_images, 'sensor_coarse', include_sensors, exclude_sensors)
+        valid_images, 'sensor_coarse', include_sensors, exclude_sensors
+    )
     valid_gids = set(valid_images)
 
     if select_images is not None:
@@ -70,7 +79,7 @@ def filter_image_ids(coco_dset, gids=None, include_sensors=None,
                 print('The jq library is required to run a generic image query')
                 raise
             try:
-                query_text = ".images[] | select({}) | .id".format(select_images)
+                query_text = '.images[] | select({}) | .id'.format(select_images)
                 query = jq.compile(query_text)
                 image_selected_gids = set(query.input(coco_dset.dataset).all())
                 valid_gids &= image_selected_gids
@@ -94,15 +103,18 @@ def filter_image_ids(coco_dset, gids=None, include_sensors=None,
                 print('The jq library is required to run a generic image query')
                 raise
             try:
-                query_text = ".videos[] | select({}) | .id".format(select_videos)
+                query_text = '.videos[] | select({}) | .id'.format(select_videos)
                 query = jq.compile(query_text)
                 selected_vidids = query.input(coco_dset.dataset).all()
             except Exception:
                 print('JQ Query Failed: {}'.format(query_text))
                 raise
 
-        vid_selected_gids = set(ub.flatten(coco_dset.index.vidid_to_gids[vidid]
-                                           for vidid in selected_vidids))
+        vid_selected_gids = set(
+            ub.flatten(
+                coco_dset.index.vidid_to_gids[vidid] for vidid in selected_vidids
+            )
+        )
         valid_gids &= vid_selected_gids
 
     valid_gids = sorted(valid_gids)
@@ -175,22 +187,28 @@ def populate_watch_fields(
     # Load your KW-COCO dataset (conform populates information like image size)
     if conform:
         # Note: we will handle imgsize in a later part
-        coco_dset.conform(pycocotools_info=False, workers=workers,
-                          ensure_imgsize=False)
+        coco_dset.conform(pycocotools_info=False, workers=workers, ensure_imgsize=False)
 
     if 1:
         from geowatch import heuristics
+
         heuristics.register_known_fsspec_s3_buckets()
 
     if vidids is None:
         vidids = list(coco_dset.index.videos.keys())
         gids = list(coco_dset.index.imgs.keys())
     else:
-        gids = list(ub.flatten(coco_dset.images(video_id=video_id) for video_id in vidids))
+        gids = list(
+            ub.flatten(coco_dset.images(video_id=video_id) for video_id in vidids)
+        )
 
     coco_populate_geo_heuristics(
-        coco_dset, gids=gids, overwrite=overwrite, default_gsd=default_gsd,
-        workers=workers, mode=mode,
+        coco_dset,
+        gids=gids,
+        overwrite=overwrite,
+        default_gsd=default_gsd,
+        workers=workers,
+        mode=mode,
         enable_intensity_stats=enable_intensity_stats,
         enable_valid_region=enable_valid_region,
         remove_broken=remove_broken,
@@ -201,7 +219,10 @@ def populate_watch_fields(
     if 1:
         from geowatch import heuristics
         from kwutil import util_pattern
-        region_id_to_cleared = {d['region_id']: d['cleared'] for d in heuristics.REGION_STATUS}
+
+        region_id_to_cleared = {
+            d['region_id']: d['cleared'] for d in heuristics.REGION_STATUS
+        }
         pat = util_pattern.Pattern.coerce(r'\w+_R\d+(_\d+)?', 'regex')
         for video in coco_dset.videos().objs:
             video_name = video['name']
@@ -219,13 +240,16 @@ def populate_watch_fields(
     coco_dset._ensure_json_serializable()
 
 
-def coco_populate_geo_heuristics(coco_dset: kwcoco.CocoDataset,
-                                 gids=None,
-                                 overwrite=False,
-                                 default_gsd=None,
-                                 workers=0,
-                                 mode='thread',
-                                 remove_broken=False, **kw):
+def coco_populate_geo_heuristics(
+    coco_dset: kwcoco.CocoDataset,
+    gids=None,
+    overwrite=False,
+    default_gsd=None,
+    workers=0,
+    mode='thread',
+    remove_broken=False,
+    **kw,
+):
     """
     Example:
         >>> # xdoctest: +REQUIRES(env:DVC_DPATH)
@@ -252,19 +276,23 @@ def coco_populate_geo_heuristics(coco_dset: kwcoco.CocoDataset,
         >>>                              mode='process')
     """
     import rich
+
     gids = coco_dset.images(gids)._ids
     # Cant multiprocess because of SwigPyObjects... bleh
     # keep_geotiff_metadata must be False to use mode=process
     keep_geotiff_metadata = kw.get('keep_geotiff_metadata', False)
     if keep_geotiff_metadata and mode == 'process':
-        raise NotImplementedError(ub.paragraph(
-            '''
+        raise NotImplementedError(
+            ub.paragraph(
+                """
             Cannot keep keep geotiff metadata when using process parallelism.
 
             Need to serialize gdal objects (i.e. RPC transforms and
             SwigPyObject) returned from ``kwgis.gis.geotiff.geotiff_metadata``
             to be able do this.
-            '''))
+            """
+            )
+        )
 
     jobs = ub.JobPool(mode, max_workers=workers, transient=True)
     for gid in ub.ProgIter(gids, desc='submit populate imgs'):
@@ -274,8 +302,7 @@ def coco_populate_geo_heuristics(coco_dset: kwcoco.CocoDataset,
 
         job_args = (coco_img,)
         job_kwargs = dict(overwrite=overwrite, default_gsd=default_gsd, **kw)
-        job = jobs.submit(coco_populate_geo_img_heuristics2,
-                          *job_args, **job_kwargs)
+        job = jobs.submit(coco_populate_geo_img_heuristics2, *job_args, **job_kwargs)
         if 0:
             # For debugging
             job.job_func = coco_populate_geo_img_heuristics2
@@ -285,7 +312,9 @@ def coco_populate_geo_heuristics(coco_dset: kwcoco.CocoDataset,
 
     broken_image_ids = []
     working_image_ids = []
-    for job in ub.ProgIter(jobs.as_completed(), total=len(jobs), desc='collect populate imgs'):
+    for job in ub.ProgIter(
+        jobs.as_completed(), total=len(jobs), desc='collect populate imgs'
+    ):
         gid = job.gid
         try:
             img = job.result()
@@ -293,9 +322,11 @@ def coco_populate_geo_heuristics(coco_dset: kwcoco.CocoDataset,
             # Check for known error messages that might cause errors grabbing
             # data
             known_errors = {}
-            known_errors['has_404'] = remove_broken and "404" in repr(ex)
-            known_errors['has_acc_problem'] = "not recognized as a supported file format" in repr(ex)
-            known_errors['connection_reset'] = "Connection reset by peer" in repr(ex)
+            known_errors['has_404'] = remove_broken and '404' in repr(ex)
+            known_errors['has_acc_problem'] = (
+                'not recognized as a supported file format' in repr(ex)
+            )
+            known_errors['connection_reset'] = 'Connection reset by peer' in repr(ex)
             known_errors['failed_to_read'] = 'Failed to read' in repr(ex)
 
             print('')
@@ -316,6 +347,7 @@ def coco_populate_geo_heuristics(coco_dset: kwcoco.CocoDataset,
                 # Check for remote existence and handle the case where the data
                 # might be at a remote location
                 from geowatch.utils import util_fsspec
+
                 missing_paths = []
                 existing_paths = []
                 forbidden_paths = []
@@ -453,6 +485,7 @@ def coco_populate_geo_img_heuristics2(
         >>> coco_populate_geo_img_heuristics2(coco_img, overwrite=True)
     """
     from kwgis.gis.geotiff import geotiff_metadata
+
     bundle_dpath = coco_img.bundle_dpath
     img = coco_img.img
 
@@ -467,9 +500,13 @@ def coco_populate_geo_img_heuristics2(
     for obj in asset_objs:
         try:
             errors = _populate_canvas_obj(
-                bundle_dpath, obj, overwrite=overwrite, default_gsd=default_gsd,
+                bundle_dpath,
+                obj,
+                overwrite=overwrite,
+                default_gsd=default_gsd,
                 keep_geotiff_metadata=keep_geotiff_metadata,
-                enable_intensity_stats=enable_intensity_stats)
+                enable_intensity_stats=enable_intensity_stats,
+            )
             asset_errors.append(errors)
         except Exception as ex:
             if skip_populate_errors:
@@ -503,7 +540,7 @@ def coco_populate_geo_img_heuristics2(
             asset_dsizes = [
                 (asset['width'], asset['height'])
                 for asset in assets
-                if ("width" in asset) and ("height" in asset)
+                if ('width' in asset) and ('height' in asset)
             ]
             idx = ub.argmax(asset_dsizes)
             main_asset = assets[idx]
@@ -513,7 +550,9 @@ def coco_populate_geo_img_heuristics2(
 
             if 'warp_to_wld' in main_asset:
                 # Also update world information (does the image need this?)
-                img['wld_to_pxl'] = kwimage.Affine.coerce(main_asset['warp_to_wld']).inv().concise()
+                img['wld_to_pxl'] = (
+                    kwimage.Affine.coerce(main_asset['warp_to_wld']).inv().concise()
+                )
                 img['wld_crs_info'] = main_asset['wld_crs_info']
             else:
                 img.pop('wld_to_pxl', None)
@@ -521,7 +560,7 @@ def coco_populate_geo_img_heuristics2(
 
             _recompute_auxiliary_transforms(img)
 
-    if ('width' not in img or 'height' not in img):
+    if 'width' not in img or 'height' not in img:
         # or overwrite:
         # TODO: better test to see if we need to recompute auxiliary transforms
         _recompute_auxiliary_transforms(img)
@@ -535,6 +574,7 @@ def coco_populate_geo_img_heuristics2(
 
     if 'date_captured' in img:
         from kwutil import util_time
+
         img['timestamp'] = util_time.coerce_datetime(img['date_captured']).timestamp()
 
     if 'geos_corners' in primary_obj:
@@ -594,6 +634,7 @@ def _populate_valid_region(coco_img):
     """
     from kwgis.gis.geotiff import geotiff_metadata
     from geowatch.utils import util_raster
+
     # _ = ub.cmd('gdalinfo -stats {}'.format(fpath), check=True)
     bundle_dpath = coco_img.bundle_dpath
     img = coco_img.img
@@ -626,7 +667,9 @@ def _populate_valid_region(coco_img):
             metakw['elevation'] = 0
         info = geotiff_metadata(primary_fpath, **metakw)
 
-    warp_img_from_asset = kwimage.Affine.coerce(primary_obj.get('warp_aux_to_img', None))
+    warp_img_from_asset = kwimage.Affine.coerce(
+        primary_obj.get('warp_aux_to_img', None)
+    )
     if warp_img_from_asset.isclose_identity():
         kw_img_poly = kw_asset_poly
     else:
@@ -650,9 +693,15 @@ def _populate_valid_region(coco_img):
 
 
 @profile
-def _populate_canvas_obj(bundle_dpath, obj, overwrite=False, with_wgs=False,
-                         default_gsd=None, keep_geotiff_metadata=False,
-                         enable_intensity_stats=False):
+def _populate_canvas_obj(
+    bundle_dpath,
+    obj,
+    overwrite=False,
+    with_wgs=False,
+    default_gsd=None,
+    keep_geotiff_metadata=False,
+    enable_intensity_stats=False,
+):
     """
     obj can be an img or aux
 
@@ -669,6 +718,7 @@ def _populate_canvas_obj(bundle_dpath, obj, overwrite=False, with_wgs=False,
         keep_geotiff_metadata = False
     """
     from kwgis.gis.geotiff import geotiff_metadata
+
     sensor_coarse = obj.get('sensor_coarse', None)  # not reliable
     num_bands = obj.get('num_bands', None)
     channels = obj.get('channels', None)
@@ -701,8 +751,7 @@ def _populate_canvas_obj(bundle_dpath, obj, overwrite=False, with_wgs=False,
         if 'warp' in overwrite or warp_to_wld is None or approx_meter_gsd is None:
             try:
                 if info is None:
-                    info = geotiff_metadata(
-                        fpath, strict=True, **metakw)
+                    info = geotiff_metadata(fpath, strict=True, **metakw)
 
                 if keep_geotiff_metadata:
                     obj['geotiff_metadata'] = info
@@ -725,18 +774,22 @@ def _populate_canvas_obj(bundle_dpath, obj, overwrite=False, with_wgs=False,
 
                 geos_corners = info['geos_corners']
                 wld_crs_info = ub.dict_diff(info['wld_crs_info'], {'type'})
-                obj.update({
-                    'geos_corners': geos_corners,  # always in geojson
-                    'wld_crs_info': wld_crs_info,
-                })
+                obj.update(
+                    {
+                        'geos_corners': geos_corners,  # always in geojson
+                        'wld_crs_info': wld_crs_info,
+                    }
+                )
                 obj['band_metas'] = info['band_metas']
                 obj['is_rpc'] = info['is_rpc']
 
                 if with_wgs:
-                    obj.update({
-                        'wgs84_to_wld': info['wgs84_to_wld'],
-                        'wld_to_pxl': info['wld_to_pxl'],
-                    })
+                    obj.update(
+                        {
+                            'wgs84_to_wld': info['wgs84_to_wld'],
+                            'wld_to_pxl': info['wld_to_pxl'],
+                        }
+                    )
 
                 approx_meter_gsd = info['approx_meter_gsd']
             except exceptions.GeoMetadataNotFound as ex:
@@ -769,19 +822,23 @@ def _populate_canvas_obj(bundle_dpath, obj, overwrite=False, with_wgs=False,
             elif num_bands is not None:
                 channels = _num_band_hueristic(num_bands)
             else:
-                raise Exception(ub.paragraph(
-                    f'''
+                raise Exception(
+                    ub.paragraph(
+                        f"""
                     no methods to introspect channels
                     sensor_coarse={sensor_coarse},
                     num_bands={num_bands}
                     for obj={obj}
-                    '''))
+                    """
+                    )
+                )
             obj['channels'] = channels
 
         # TODO: determine nodata defaults based on sensor_coarse
 
         if enable_intensity_stats:
             from geowatch.cli import coco_spectra
+
             coco_spectra.ensure_intensity_sidecar(fpath)
 
         return errors
@@ -789,8 +846,9 @@ def _populate_canvas_obj(bundle_dpath, obj, overwrite=False, with_wgs=False,
 
 @ub.memoize
 def _is_writeable(dpath):
-    " https://stackoverflow.com/questions/2113427/determining-whether-a-directory-is-writeable "
+    "https://stackoverflow.com/questions/2113427/determining-whether-a-directory-is-writeable"
     import os
+
     return os.access(dpath, os.W_OK) and os.path.isdir(dpath)
 
 
@@ -927,6 +985,7 @@ def coco_populate_geo_video_stats(coco_dset, video_id, target_gsd='max-resolutio
         print('rasterio kw_poly.data = {!r}'.format(kw_poly.data))
     """
     from kwcoco.coco_image import CocoImage
+
     # Compute an image-to-video transform that aligns all frames to some
     # common resolution.
     video = coco_dset.index.videos[video_id]
@@ -950,17 +1009,23 @@ def coco_populate_geo_video_stats(coco_dset, video_id, target_gsd='max-resolutio
         if img_approx_meter_gsd is None or warp_wld_from_img is None:
             # Choose any one of the auxiliary images that has the required
             # attribute
-            aux_chosen = coco_img.primary_asset(requires=[
-                'warp_to_wld', 'approx_meter_gsd'])
+            aux_chosen = coco_img.primary_asset(
+                requires=['warp_to_wld', 'approx_meter_gsd']
+            )
             if aux_chosen is None:
-                raise Exception(ub.paragraph(
-                    '''
+                raise Exception(
+                    ub.paragraph(
+                        """
                     Image auxiliary images have no warp_to_wld and approx_meter
                     gsd. The auxiliary images may not have associated geo
                     metadata.
-                    '''))
+                    """
+                    )
+                )
 
-            warp_wld_from_asset = kwimage.Affine.coerce(aux_chosen.get('warp_to_wld', None))
+            warp_wld_from_asset = kwimage.Affine.coerce(
+                aux_chosen.get('warp_to_wld', None)
+            )
             warp_img_from_asset = kwimage.Affine.coerce(aux_chosen['warp_aux_to_img'])
 
             warp_asset_from_img = warp_img_from_asset.inv()
@@ -974,12 +1039,15 @@ def coco_populate_geo_video_stats(coco_dset, video_id, target_gsd='max-resolutio
             wld_crs_info = aux_chosen.get('wld_crs_info', None)
 
         if img_approx_meter_gsd is None or warp_wld_from_img is None:
-            raise Exception(ub.paragraph(
-                '''
+            raise Exception(
+                ub.paragraph(
+                    """
                 Both the base image and its auxiliary images do not seem to
                 have the required warp_to_wld and approx_meter_gsd fields.
                 The image may not have associated geo metadata.
-                '''))
+                """
+                )
+            )
 
         warp_wld_from_img = kwimage.Affine.coerce(warp_wld_from_img)
 
@@ -1021,7 +1089,9 @@ def coco_populate_geo_video_stats(coco_dset, video_id, target_gsd='max-resolutio
         else:
             target_gsd_ = target_gsd
             if not isinstance(target_gsd, numbers.Number):
-                raise TypeError('target_gsd must be a code or number = {}'.format(type(target_gsd)))
+                raise TypeError(
+                    'target_gsd must be a code or number = {}'.format(type(target_gsd))
+                )
         target_gsd_ = float(target_gsd_)
 
         # Compute the scale factor needed to be applied to each image to achieve
@@ -1043,8 +1113,7 @@ def coco_populate_geo_video_stats(coco_dset, video_id, target_gsd='max-resolutio
         # Align to the base reference frame closest to the target GSD, which
         # has the "to_target_scale_factor" that is closest to 1.0
         base_gid, base_info = min(
-            frame_infos.items(),
-            key=lambda kv: abs(1 - kv[1]['to_target_scale_factor'])
+            frame_infos.items(), key=lambda kv: abs(1 - kv[1]['to_target_scale_factor'])
         )
         scale = base_info['to_target_scale_factor']
         base_wld_crs_info = base_info['wld_crs_info']
@@ -1061,11 +1130,14 @@ def coco_populate_geo_video_stats(coco_dset, video_id, target_gsd='max-resolutio
         if 'valid_region_geos' in video:
             import geopandas as gpd
             from kwgis.utils import util_gis
+
             # Project the valid region onto video space
             valid_region_crs84 = kwimage.MultiPolygon.coerce(video['valid_region_geos'])
             wld_crs = base_wld_crs_info['auth']
             crs84 = util_gis.get_crs84()
-            crs84_region_gdf = gpd.GeoDataFrame({'geometry': [valid_region_crs84.to_shapely()]}, crs=crs84)
+            crs84_region_gdf = gpd.GeoDataFrame(
+                {'geometry': [valid_region_crs84.to_shapely()]}, crs=crs84
+            )
             wld_region_gdf = crs84_region_gdf.to_crs(wld_crs)
             wld_region_poly = wld_region_gdf['geometry'].iloc[0]
             wld_region_kwpoly = kwimage.MultiPolygon.from_shapely(wld_region_poly)
@@ -1073,8 +1145,11 @@ def coco_populate_geo_video_stats(coco_dset, video_id, target_gsd='max-resolutio
 
             if 0:
                 import kwplot
+
                 kwplot.autompl()
-                wld_map_gdf = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+                wld_map_gdf = gpd.read_file(
+                    gpd.datasets.get_path('naturalearth_lowres')
+                )
                 ax = wld_map_gdf.plot()
                 wld_region_gdf.to_crs('OGC:CRS84').plot(ax=ax, color='red')
                 wld_region_gdf.plot(ax=ax, color='red')
@@ -1103,14 +1178,18 @@ def coco_populate_geo_video_stats(coco_dset, video_id, target_gsd='max-resolutio
 
         if base_wld_crs_info != wld_crs_info:
             import warnings
-            warnings.warn(ub.paragraph(
-                f'''
+
+            warnings.warn(
+                ub.paragraph(
+                    f"""
                 Video alignment is warping images with different World
                 Coordinate Reference Systems, but still treating them as the
                 same. FIXME
                 base_wld_crs_info={base_wld_crs_info!r},
                 wld_crs_info={wld_crs_info!r}
-                '''))
+                """
+                )
+            )
 
 
 def check_kwcoco_spatial_transforms(coco_dset):
@@ -1132,7 +1211,6 @@ def check_kwcoco_spatial_transforms(coco_dset):
     import numpy as np
 
     for video in coco_dset.videos().objs:
-
         video_box = kwimage.Box.from_dsize((video['width'], video['height']))
         print('video_box = {}'.format(ub.urepr(video_box, nl=1)))
 
@@ -1141,7 +1219,6 @@ def check_kwcoco_spatial_transforms(coco_dset):
         images = coco_dset.images(video_id=video['id'])
 
         for coco_img in images.coco_images:
-
             image_box = kwimage.Box.from_dsize((coco_img['width'], coco_img['height']))
             sensor = coco_img['sensor_coarse']
 
@@ -1155,7 +1232,9 @@ def check_kwcoco_spatial_transforms(coco_dset):
             recon_video_box = image_box.scale(scale_vid_from_img).quantize()
             image_summary['scale_vid_from_img'] = scale_vid_from_img
             image_summary['reconstructed_video_box'] = recon_video_box
-            image_summary['img_gsd'] = video_target_gsd / (1 / np.mean(scale_vid_from_img))
+            image_summary['img_gsd'] = video_target_gsd / (
+                1 / np.mean(scale_vid_from_img)
+            )
 
             img = ub.udict(coco_img.img)
             img = img - {'has_predictions'}
@@ -1169,30 +1248,42 @@ def check_kwcoco_spatial_transforms(coco_dset):
                 warp_vid_from_asset = warp_vid_from_img @ warp_img_from_asset
 
                 scale_vid_from_asset = warp_vid_from_asset.decompose()['scale']
-                scale_asset_from_vid = np.mean(warp_vid_from_asset.inv().decompose()['scale'])
+                scale_asset_from_vid = np.mean(
+                    warp_vid_from_asset.inv().decompose()['scale']
+                )
 
                 asset_box = kwimage.Box.from_dsize((asset['width'], asset['height']))
                 recon_img_box = asset_box.scale(scale_img_from_asset)
                 recon_vid_box = asset_box.scale(scale_vid_from_asset)
                 fpath = ub.Path(coco_img.bundle_dpath) / asset['file_name']
                 gdal_dset = util_gdal.GdalOpen(fpath)
-                asset_shape = (gdal_dset.RasterYSize, gdal_dset.RasterXSize, gdal_dset.RasterCount)
+                asset_shape = (
+                    gdal_dset.RasterYSize,
+                    gdal_dset.RasterXSize,
+                    gdal_dset.RasterCount,
+                )
                 info = gdal_dset.info()
-                disk_gsd = np.mean(np.abs(kwimage.Affine.from_gdal(info['geoTransform']).decompose()['scale']))
-                asset_summaries.append({
-                    'video_box': video_box,
-                    'image_box': image_box,
-                    'asset_box': asset_box,
-                    'asset_disk_shape': asset_shape,
-                    'asset_disk_gsd': disk_gsd,
-
-                    'asset_gsd': video_target_gsd / scale_asset_from_vid,
-
-                    'scale_img_from_asset': scale_img_from_asset,
-                    'scale_vid_from_asset': scale_vid_from_asset,
-                    'reconstructed_img_box': recon_img_box.quantize(),
-                    'reconstructed_vid_box': recon_vid_box.quantize(),
-                })
+                disk_gsd = np.mean(
+                    np.abs(
+                        kwimage.Affine.from_gdal(info['geoTransform']).decompose()[
+                            'scale'
+                        ]
+                    )
+                )
+                asset_summaries.append(
+                    {
+                        'video_box': video_box,
+                        'image_box': image_box,
+                        'asset_box': asset_box,
+                        'asset_disk_shape': asset_shape,
+                        'asset_disk_gsd': disk_gsd,
+                        'asset_gsd': video_target_gsd / scale_asset_from_vid,
+                        'scale_img_from_asset': scale_img_from_asset,
+                        'scale_vid_from_asset': scale_vid_from_asset,
+                        'reconstructed_img_box': recon_img_box.quantize(),
+                        'reconstructed_vid_box': recon_vid_box.quantize(),
+                    }
+                )
                 # assert len(info['bands']) == coco_img.channels.numel()
 
             image_summary['assets'] = asset_summaries
@@ -1232,15 +1323,18 @@ def check_geo_transform_consistency(coco_dset):
 
         space_crs_infos_hash = space_crs_infos.map_values(ub.hash_data)
         if not ub.allsame(space_crs_infos_hash.values()):
-            errors.append({
-                'message': 'CRS is not the same in all spaces',
-                'data': {
-                    'space_crs_infos': space_crs_infos,
-                    'space_crs_infos_hash': space_crs_infos_hash,
+            errors.append(
+                {
+                    'message': 'CRS is not the same in all spaces',
+                    'data': {
+                        'space_crs_infos': space_crs_infos,
+                        'space_crs_infos_hash': space_crs_infos_hash,
+                    },
                 }
-            })
+            )
 
         import itertools as it
+
         ious = {}
         for s1, s2 in it.combinations(spaces, 2):
             if s1 in wld_boxes and s2 in wld_boxes:
@@ -1249,17 +1343,20 @@ def check_geo_transform_consistency(coco_dset):
                 ious[(s1, s2)] = b1.iou(b2)
 
         if not all(v > 0.95 for v in ious.values()):
-            errors.append({
-                'message': 'World boxes do not line up',
-                'data': {
-                    'wld_boxes': wld_boxes,
-                    'ious': ious,
-                },
-            })
+            errors.append(
+                {
+                    'message': 'World boxes do not line up',
+                    'data': {
+                        'wld_boxes': wld_boxes,
+                        'ious': ious,
+                    },
+                }
+            )
 
         # Compute any remaining warps to complete the graph
         import operator as op
         from functools import reduce
+
         missing_edges = set(nx.transitive_closure(graph_v3).edges) - graph_v3.edges
         missing_edges = [(u, v) for u, v in missing_edges if u != v]
         for n1, n2 in missing_edges:
@@ -1288,39 +1385,53 @@ def check_geo_transform_consistency(coco_dset):
                 warp_direct = graph_v3.edges[(n1, n2)]['warp']
                 effective = warp_indirect.inv() @ warp_direct
                 if not effective.isclose_identity(rtol=1e-3, atol=1e-3):
-                    errors.append({
-                        'message': 'Transforms are inconsistent',
-                        'data': {
-                            'nodes': (n1, n2),
-                            'path': path,
-                            'warp_indirect': warp_indirect.concise(),
-                            'warp_direct': warp_direct.concise(),
-                        },
-                    })
+                    errors.append(
+                        {
+                            'message': 'Transforms are inconsistent',
+                            'data': {
+                                'nodes': (n1, n2),
+                                'path': path,
+                                'warp_indirect': warp_indirect.concise(),
+                                'warp_direct': warp_direct.concise(),
+                            },
+                        }
+                    )
 
         if 0:
             from cmd_queue.util.util_networkx import write_network_text
+
             write_network_text(graph_v3)
 
         if errors:
             import copy
+
             node_summaries = copy.deepcopy(dict(graph_v3.nodes))
             # print(ub.urepr(dict(graph_v3.nodes)))
             for key, val in node_summaries.items():
                 if 'boxes' in val:
-                    val['boxes'] = ub.udict(val['boxes']).map_values(lambda x: x.bounding_box().to_xywh().astype(float).data)
+                    val['boxes'] = ub.udict(val['boxes']).map_values(
+                        lambda x: x.bounding_box().to_xywh().astype(float).data
+                    )
                 if 'box' in val:
                     val['box'] = val['box'].bounding_box().to_xywh().data
                 if 'corners_crs84' in val:
-                    val['corners_crs84'] = val['corners_crs84'].bounding_box().to_xywh().data
+                    val['corners_crs84'] = (
+                        val['corners_crs84'].bounding_box().to_xywh().data
+                    )
                 if 'wld_crs_info' in val:
                     val['wld_crs_info'] = val['wld_crs_info']['auth'][1]
 
                 val['warp_to'] = {}
                 for other, data in sorted(graph_v3.adj[key].items()):
-                    val['warp_to'][other] = ub.urepr(data['warp'].concise(), precision=2, nl=0)
+                    val['warp_to'][other] = ub.urepr(
+                        data['warp'].concise(), precision=2, nl=0
+                    )
                     ...
-            print('node_summaries = {}'.format(ub.urepr(node_summaries, nl=True, precision=2)))
+            print(
+                'node_summaries = {}'.format(
+                    ub.urepr(node_summaries, nl=True, precision=2)
+                )
+            )
 
         return errors
 
@@ -1330,17 +1441,22 @@ def check_geo_transform_consistency(coco_dset):
     all_errors = {}
 
     from kwutil import util_progress
+
     pman = util_progress.ProgressManager()
     with pman:
         # Create graphs with relationships between videos / images / assets
         import networkx as nx
-        for video_id in pman.progiter(coco_dset.videos(), desc='check video consistency'):
 
+        for video_id in pman.progiter(
+            coco_dset.videos(), desc='check video consistency'
+        ):
             video = coco_dset.index.videos[video_id]
 
             # vid_valid_crs84 = kwimage.MultiPolygon.coerce(video['valid_region_geos'])
             # vid_valid_vidspace = kwimage.MultiPolygon.coerce(video['valid_region'])
-            vid_box_vidspace = kwimage.Box.from_dsize((video['width'], video['height'])).to_polygon()
+            vid_box_vidspace = kwimage.Box.from_dsize(
+                (video['width'], video['height'])
+            ).to_polygon()
             warp_vid_from_wld = kwimage.Affine.coerce(video['warp_wld_to_vid'])
 
             graph_v1 = nx.DiGraph()
@@ -1358,13 +1474,18 @@ def check_geo_transform_consistency(coco_dset):
 
             # Warp the video box into world space
             graph_v1.nodes['wld']['boxes'] = {}
-            graph_v1.nodes['wld']['boxes']['vid'] = graph_v1.nodes['vid']['box'].warp(graph_v1.edges[('vid', 'wld')]['warp'])
+            graph_v1.nodes['wld']['boxes']['vid'] = graph_v1.nodes['vid']['box'].warp(
+                graph_v1.edges[('vid', 'wld')]['warp']
+            )
 
-            for gid in pman.progiter(coco_dset.images(), desc='check image consistency'):
-
+            for gid in pman.progiter(
+                coco_dset.images(), desc='check image consistency'
+            ):
                 coco_img = coco_dset.coco_image(gid)
                 img_corners_crs84 = kwimage.Polygon.coerce(coco_img['geos_corners'])
-                img_box_imgspace = kwimage.Box.from_dsize((coco_img['width'], coco_img['height'])).to_polygon()
+                img_box_imgspace = kwimage.Box.from_dsize(
+                    (coco_img['width'], coco_img['height'])
+                ).to_polygon()
                 warp_vid_from_img = kwimage.Affine.coerce(coco_img['warp_img_to_vid'])
 
                 if coco_img.get('wld_to_pxl', None) is not None:
@@ -1388,18 +1509,23 @@ def check_geo_transform_consistency(coco_dset):
                     graph_v2.add_edge('wld', 'img', warp=warp_img_from_wld)
                     graph_v2.add_edge('img', 'wld', warp=warp_img_from_wld.inv())
                     # Warp the image box into world space.
-                    graph_v2.nodes['wld']['boxes']['img'] = graph_v2.nodes['img']['box'].warp(graph_v2.edges[('img', 'wld')]['warp'])
+                    graph_v2.nodes['wld']['boxes']['img'] = graph_v2.nodes['img'][
+                        'box'
+                    ].warp(graph_v2.edges[('img', 'wld')]['warp'])
                     graph_v2.nodes['img']['wld_crs_info'] = coco_img['wld_crs_info']
 
                 for asset in coco_img.assets:
-
                     channels = asset['channels']
 
-                    asset_box_assetspace = kwimage.Box.from_dsize((asset['width'], asset['height'])).to_polygon()
+                    asset_box_assetspace = kwimage.Box.from_dsize(
+                        (asset['width'], asset['height'])
+                    ).to_polygon()
                     asset_corners_crs84 = kwimage.Polygon.coerce(asset['geos_corners'])
 
                     warp_wld_from_asset = kwimage.Affine.coerce(asset['warp_to_wld'])
-                    warp_img_from_asset = kwimage.Affine.coerce(asset['warp_aux_to_img'])
+                    warp_img_from_asset = kwimage.Affine.coerce(
+                        asset['warp_aux_to_img']
+                    )
 
                     # Create a copy of the existing image graph for this asset
                     graph_v3 = graph_v2.copy()
@@ -1416,7 +1542,9 @@ def check_geo_transform_consistency(coco_dset):
                     graph_v3.add_edge('img', 'asset', warp=warp_img_from_asset.inv())
 
                     # Warp the asset box into world space
-                    graph_v3.nodes['wld']['boxes']['asset'] = graph_v3.nodes['asset']['box'].warp(graph_v3.edges[('asset', 'wld')]['warp'])
+                    graph_v3.nodes['wld']['boxes']['asset'] = graph_v3.nodes['asset'][
+                        'box'
+                    ].warp(graph_v3.edges[('asset', 'wld')]['warp'])
 
                     ########
                     # Checks
@@ -1480,21 +1608,24 @@ def check_unique_channel_names(coco_dset, gids=None, verbose=0):
 
 def _check_unique_channel_names_in_image(coco_img):
     import kwcoco
+
     seen = set()
     for obj in coco_img.iter_asset_objs():
         chans = kwcoco.FusedChannelSpec.coerce(obj['channels'])
-        chan_list : list = chans.normalize().parsed
+        chan_list: list = chans.normalize().parsed
         intra_aux_duplicate = ub.find_duplicates(chan_list)
         if intra_aux_duplicate:
             raise AssertionError(
-                'Image has internal duplicate bands: {}'.format(
-                    intra_aux_duplicate))
+                'Image has internal duplicate bands: {}'.format(intra_aux_duplicate)
+            )
 
         inter_aux_duplicates = seen & set(chan_list)
         if inter_aux_duplicates:
             raise AssertionError(
                 'Image has inter-auxiliary duplicate bands: {}'.format(
-                    inter_aux_duplicates))
+                    inter_aux_duplicates
+                )
+            )
 
 
 def coco_list_asset_infos(coco_dset):
@@ -1533,6 +1664,7 @@ def check_geotiff_formats(coco_dset):
 def rewrite_geotiffs(coco_dset):
     import tempfile
     import pathlib
+
     blocksize = 96
     compress = 'NONE'
     asset_infos = coco_list_asset_infos(coco_dset)
@@ -1555,7 +1687,9 @@ def rewrite_geotiffs(coco_dset):
             workdir.mkdir(exist_ok=True)
             bakdir.mkdir(exist_ok=True)
 
-            tmpfile = tempfile.NamedTemporaryFile(suffix=orig_fpath.name, dir=workdir, delete=False)
+            tmpfile = tempfile.NamedTemporaryFile(
+                suffix=orig_fpath.name, dir=workdir, delete=False
+            )
             tmp_fpath = tmpfile.name
 
             options = [
@@ -1565,9 +1699,7 @@ def rewrite_geotiffs(coco_dset):
                 '-overwrite',
             ]
             if not info['has_geotransform']:
-                options += [
-                    '-to SRC_METHOD=NO_GEOTRANSFORM'
-                ]
+                options += ['-to SRC_METHOD=NO_GEOTRANSFORM']
             options += [
                 fpath,
                 tmp_fpath,
@@ -1580,6 +1712,7 @@ def rewrite_geotiffs(coco_dset):
 
             # Backup the original file
             import shutil
+
             shutil.move(fpath, bakdir)
 
             # Move the rewritten file into its place
@@ -1590,6 +1723,7 @@ def rewrite_geotiffs(coco_dset):
 
 def geotiff_format_info(fpath):
     from osgeo import gdal
+
     gdal_ds = gdal.Open(fpath, gdal.GA_ReadOnly)
     filelist = gdal_ds.GetFileList()
 
@@ -1609,11 +1743,11 @@ def geotiff_format_info(fpath):
     if ifd_offset is not None:
         ifd_offset = int(ifd_offset)
     block_offset = main_band.GetMetadataItem('BLOCK_OFFSET_0_0', 'TIFF')
-    structure = gdal_ds.GetMetadata("IMAGE_STRUCTURE")
-    compress = structure.get("COMPRESSION", 'NONE')
-    interleave = structure.get("INTERLEAVE", None)
+    structure = gdal_ds.GetMetadata('IMAGE_STRUCTURE')
+    compress = structure.get('COMPRESSION', 'NONE')
+    interleave = structure.get('INTERLEAVE', None)
 
-    has_external_overview = (filename + '.ovr' in filelist)
+    has_external_overview = filename + '.ovr' in filelist
 
     format_info = {
         'fpath': fpath,
@@ -1670,6 +1804,7 @@ def transfer_geo_metadata(coco_dset, gid):
     """
     from osgeo import gdal
     from kwgis.gis.geotiff import geotiff_metadata
+
     coco_img = coco_dset.coco_image(gid)
 
     assets_with_geo_info = {}
@@ -1693,8 +1828,10 @@ def transfer_geo_metadata(coco_dset, gid):
 
     if assets_without_geo_info:
         if not assets_with_geo_info:
+
             class Found(Exception):
                 pass
+
             try:
                 # If an asset in our local image has no data, we can
                 # check to see if anyone in the vide has data.
@@ -1718,13 +1855,18 @@ def transfer_geo_metadata(coco_dset, gid):
                                     raise Found
             except Found:
                 assets_with_geo_info[-1] = (obj, info)
-                warp_vid_from_geoimg = kwimage.Affine.coerce(other_coco_img.img['warp_img_to_vid'])
+                warp_vid_from_geoimg = kwimage.Affine.coerce(
+                    other_coco_img.img['warp_img_to_vid']
+                )
             else:
-                raise exceptions.GeoMetadataNotFound(ub.paragraph(
-                    '''
+                raise exceptions.GeoMetadataNotFound(
+                    ub.paragraph(
+                        """
                     There are images without geo data, but no other data within
                     this image has transferable geo-data
-                    '''))
+                    """
+                    )
+                )
 
         # Choose an object to register to (not sure if it matters which one)
         # choose arbitrary one for now.
@@ -1732,10 +1874,12 @@ def transfer_geo_metadata(coco_dset, gid):
 
         if geo_info['is_rpc']:
             raise NotImplementedError(
-                'Not sure how to do this if the target has RPC information')
+                'Not sure how to do this if the target has RPC information'
+            )
 
         warp_geoimg_from_geoaux = kwimage.Affine.coerce(
-            geo_obj.get('warp_aux_to_img', None))
+            geo_obj.get('warp_aux_to_img', None)
+        )
         warp_wld_from_geoaux = kwimage.Affine.coerce(geo_info['pxl_to_wld'])
 
         georef_crs_info = geo_info['wld_crs_info']
@@ -1748,20 +1892,19 @@ def transfer_geo_metadata(coco_dset, gid):
         warp_geoimg_from_vid = warp_vid_from_geoimg.inv()
         warp_geoaux_from_geoimg = warp_geoimg_from_geoaux.inv()
         warp_wld_from_img = (
-            warp_wld_from_geoaux @
-            warp_geoaux_from_geoimg @
-            warp_geoimg_from_vid @
-            warp_vid_from_img)
+            warp_wld_from_geoaux
+            @ warp_geoaux_from_geoimg
+            @ warp_geoimg_from_vid
+            @ warp_vid_from_img
+        )
 
         for _asset_idx, obj in assets_without_geo_info.items():
             fname = obj.get('file_name', None)
             fpath = join(coco_img.dset.bundle_dpath, fname)
 
-            warp_img_from_aux = kwimage.Affine.coerce(
-                obj.get('warp_aux_to_img', None))
+            warp_img_from_aux = kwimage.Affine.coerce(obj.get('warp_aux_to_img', None))
 
-            warp_wld_from_aux = (
-                warp_wld_from_img @ warp_img_from_aux)
+            warp_wld_from_aux = warp_wld_from_img @ warp_img_from_aux
 
             # Convert to gdal-style
             aff_geo_transform = warp_wld_from_aux.to_gdal()
@@ -1797,7 +1940,9 @@ def _search_video_for_other_geo_assets(coco_img, coco_dset):
     ### TODO: make use of me as a fallback in the transfer_geo_metadata2
     class Found(Exception):
         pass
+
     from kwgis.gis.geotiff import geotiff_metadata
+
     asset_with_geo_info = None
     gid = coco_img.img['id']
     try:
@@ -1822,14 +1967,19 @@ def _search_video_for_other_geo_assets(coco_img, coco_dset):
                         else:
                             raise Found
     except Found:
-        warp_vid_from_geoimg = kwimage.Affine.coerce(other_coco_img.img['warp_img_to_vid'])
+        warp_vid_from_geoimg = kwimage.Affine.coerce(
+            other_coco_img.img['warp_img_to_vid']
+        )
         asset_with_geo_info = (obj, info, warp_vid_from_geoimg)
     else:
-        raise exceptions.GeoMetadataNotFound(ub.paragraph(
-            '''
+        raise exceptions.GeoMetadataNotFound(
+            ub.paragraph(
+                """
             There are images without geo data, but no other data within
             this image has transferable geo-data
-            '''))
+            """
+            )
+        )
     return asset_with_geo_info
 
 
@@ -1878,7 +2028,9 @@ def transfer_geo_metadata2(coco_img, dry=0):
     actions = []
     if assets_without_geo_info:
         if not assets_with_geo_info:
-            raise exceptions.GeoMetadataNotFound('No other asset in this image has geo metadata')
+            raise exceptions.GeoMetadataNotFound(
+                'No other asset in this image has geo metadata'
+            )
 
         # Choose an object to register to (not sure if it matters which one)
         # choose arbitrary one for now.
@@ -1886,10 +2038,12 @@ def transfer_geo_metadata2(coco_img, dry=0):
 
         if geo_info['is_rpc']:
             raise NotImplementedError(
-                'Not sure how to do this if the target has RPC information')
+                'Not sure how to do this if the target has RPC information'
+            )
 
         warp_geoimg_from_geoaux = kwimage.Affine.coerce(
-            geo_obj.get('warp_aux_to_img', None))
+            geo_obj.get('warp_aux_to_img', None)
+        )
         warp_wld_from_geoaux = kwimage.Affine.coerce(geo_info['pxl_to_wld'])
 
         georef_crs_info = geo_info['wld_crs_info']
@@ -1902,20 +2056,19 @@ def transfer_geo_metadata2(coco_img, dry=0):
         warp_geoimg_from_vid = warp_vid_from_geoimg.inv()
         warp_geoaux_from_geoimg = warp_geoimg_from_geoaux.inv()
         warp_wld_from_img = (
-            warp_wld_from_geoaux @
-            warp_geoaux_from_geoimg @
-            warp_geoimg_from_vid @
-            warp_vid_from_img)
+            warp_wld_from_geoaux
+            @ warp_geoaux_from_geoimg
+            @ warp_geoimg_from_vid
+            @ warp_vid_from_img
+        )
 
         for _asset_idx, obj in assets_without_geo_info.items():
             fname = obj.get('file_name', None)
             fpath = join(coco_img.bundle_dpath, fname)
 
-            warp_img_from_aux = kwimage.Affine.coerce(
-                obj.get('warp_aux_to_img', None))
+            warp_img_from_aux = kwimage.Affine.coerce(obj.get('warp_aux_to_img', None))
 
-            warp_wld_from_aux = (
-                warp_wld_from_img @ warp_img_from_aux)
+            warp_wld_from_aux = warp_wld_from_img @ warp_img_from_aux
 
             # Convert to gdal-style
             a, b, c, d, e, f = warp_wld_from_aux.matrix.ravel()[0:6]
@@ -1929,9 +2082,11 @@ def transfer_geo_metadata2(coco_img, dry=0):
                 # need to figure out how to do this.
                 'georef_crs': georef_crs,
             }
-            actions.append({
-                'fpath': fpath,
-            })
+            actions.append(
+                {
+                    'fpath': fpath,
+                }
+            )
             if not dry:
                 _execute_transfer_task(task)
     # Just return what we did
@@ -1943,6 +2098,7 @@ def _execute_transfer_task(task):
     aff_geo_transform = task['aff_geo_transform']
     georef_crs = task['georef_crs']
     from osgeo import gdal
+
     dst_ds = gdal.Open(fpath, gdal.GA_Update)
     if dst_ds is None:
         raise Exception('error handling gdal')
@@ -1971,9 +2127,7 @@ def _make_coco_img_from_geotiff(tiff_fpath, name=None):
         obj['name'] = name
 
     bundle_dpath = '.'
-    obj = {
-        'file_name': tiff_fpath
-    }
+    obj = {'file_name': tiff_fpath}
     _populate_canvas_obj(bundle_dpath, obj)
     return obj
 
@@ -1987,7 +2141,14 @@ def _sensor_channel_hueristic(sensor_coarse, num_bands):
     that is, one sensor's 'red' is roughly similar to another's but not corrected to match.
     Bands without a common_name will have a sensor-unique prefix appended to prevent this behavior.
     """
-    from geowatch.utils.util_bands import WORLDVIEW2_PAN, WORLDVIEW2_MS4, WORLDVIEW2_MS8, SENTINEL2, LANDSAT8, LANDSAT7  # NOQA
+    from geowatch.utils.util_bands import (
+        WORLDVIEW2_PAN,
+        WORLDVIEW2_MS4,
+        WORLDVIEW2_MS8,
+        SENTINEL2,
+        LANDSAT8,
+        LANDSAT7,
+    )  # NOQA
 
     def code(bands, prefix):
         names = []
@@ -2008,7 +2169,7 @@ def _sensor_channel_hueristic(sensor_coarse, num_bands):
             channels = code(WORLDVIEW2_MS4, 'w')
         elif num_bands == 8:
             channels = code(WORLDVIEW2_MS8, 'w')
-            #channels = 'wv1|wv2|wv3|wv4|wv5|wv6|wv7|wv8'
+            # channels = 'wv1|wv2|wv3|wv4|wv5|wv6|wv7|wv8'
             # channels = 'cb|b|g|y|r|wv6|wv7|wv8'
         else:
             err = 1
@@ -2054,6 +2215,7 @@ def _sensor_channel_hueristic(sensor_coarse, num_bands):
 
 def _introspect_num_bands(fpath):
     from geowatch.utils import util_kwimage
+
     shape = util_kwimage.load_image_shape(fpath, backend=['gdal', 'pil'])
     if len(shape) == 1:
         return 1
@@ -2082,13 +2244,16 @@ def _recompute_auxiliary_transforms(img):
     """
     import kwimage
     from kwcoco.coco_image import CocoImage
+
     coco_img = CocoImage(img)
     base = coco_img.primary_asset(requires=['warp_to_wld'])
     if base is None:
         import warnings
+
         warnings.warn(
             'Cannot recompute auxiliary/asset transforms if no asset has a '
-            ' warp_to_wld attribute')
+            ' warp_to_wld attribute'
+        )
         return
     try:
         warp_wld_from_img = kwimage.Affine.coerce(base['warp_to_wld'])
@@ -2097,13 +2262,19 @@ def _recompute_auxiliary_transforms(img):
         raise
 
     warp_img_from_wld = warp_wld_from_img.inv()
-    img.update(ub.dict_isect(base, {
-        'geos_corners',
-        'wld_crs_info',
-        'width', 'height',
-        'wgs84_to_wld',
-        'wld_to_pxl',
-    }))
+    img.update(
+        ub.dict_isect(
+            base,
+            {
+                'geos_corners',
+                'wld_crs_info',
+                'width',
+                'height',
+                'wgs84_to_wld',
+                'wld_to_pxl',
+            },
+        )
+    )
     if 'width' not in img and 'height' not in img:
         if 'width' in base and 'height' in base:
             img['width'] = base['width']
@@ -2116,9 +2287,11 @@ def _recompute_auxiliary_transforms(img):
             asset['warp_aux_to_img'] = warp_img_from_asset.concise()
         else:
             import warnings
+
             warnings.warn(
                 'An asset could not have its warp_aux_to_img transform updated '
-                'because it does not have a warp_to_wld attribute')
+                'because it does not have a warp_to_wld attribute'
+            )
 
 
 def coco_channel_stats(coco_dset):
@@ -2172,9 +2345,9 @@ def coco_channel_stats(coco_dset):
     else:
         common_channels = FS.coerce(list(ub.oset.intersection(*osets))).concise()
         all_channels = FS.coerce(list(ub.oset.union(*osets))).concise()
-        all_sensorchan = kwcoco.SensorChanSpec.late_fuse(*[
-            kwcoco.SensorChanSpec.coerce(s)
-            for s in sensorchan_hist2.keys()]).concise()
+        all_sensorchan = kwcoco.SensorChanSpec.late_fuse(
+            *[kwcoco.SensorChanSpec.coerce(s) for s in sensorchan_hist2.keys()]
+        ).concise()
 
     info = {
         'single_chan_hist': single_chan_hist,
@@ -2199,16 +2372,22 @@ class TrackidGenerator:
 
     def update_generator(self):
         if self.dset is None:
-            raise Exception('cannot update unconnected generator. Manually exclude trackids')
+            raise Exception(
+                'cannot update unconnected generator. Manually exclude trackids'
+            )
         self.used_trackids.update(self.dset.index.trackid_to_aids.keys())
-        new_generator = filter(lambda x: x not in self.used_trackids,
-                               itertools.count(start=next(self.generator)))
+        new_generator = filter(
+            lambda x: x not in self.used_trackids,
+            itertools.count(start=next(self.generator)),
+        )
         self.generator = new_generator
 
     def exclude_trackids(self, trackids):
         if 0 and self.used_trackids.intersection(trackids):
-            print(f'warning: CocoDataset {self.dset.tag} with trackids '
-                  f'{self.used_trackids} already has trackids in {trackids}')
+            print(
+                f'warning: CocoDataset {self.dset.tag} with trackids '
+                f'{self.used_trackids} already has trackids in {trackids}'
+            )
         self.used_trackids.update(trackids)
 
     def __init__(self, coco_dset=None):
@@ -2230,6 +2409,7 @@ def coco_img_wld_info(coco_img):
     TODO: candidate for kwcoco.CocoImage method
     """
     from kwgis.utils import util_gis
+
     asset = coco_img.primary_asset(requires=['geos_corners'])
     if asset is None:
         raise KeyError(f'Geo-referenced asset not found for {coco_img}')
@@ -2308,6 +2488,7 @@ def warp_annot_segmentations_from_geos(coco_dset):
     import geopandas as gpd
     from kwgis.utils import util_gis
     from shapely.geometry import shape
+
     crs84 = util_gis.get_crs84()
 
     gdfs = []
@@ -2326,14 +2507,17 @@ def warp_annot_segmentations_from_geos(coco_dset):
                     geometry=[shape(p) for p in sseg_geos],
                     aid=annots.aids,
                 ),
-                crs=crs84)
+                crs=crs84,
+            )
             gdf = gdf.join(
-                pd.DataFrame(dict(
-                    gid=gid,
-                    wld_crs=wld_crs,
-                    warp_img_from_wld=[warp_img_from_wld.to_shapely()],
-                )),
-                how='cross'
+                pd.DataFrame(
+                    dict(
+                        gid=gid,
+                        wld_crs=wld_crs,
+                        warp_img_from_wld=[warp_img_from_wld.to_shapely()],
+                    )
+                ),
+                how='cross',
             )
             gdfs.append(gdf)
     if len(gdfs) > 0:
@@ -2343,7 +2527,8 @@ def warp_annot_segmentations_from_geos(coco_dset):
         gdf['wld_crs_str'] = gdf['wld_crs'].apply(lambda crs: crs.to_string())
 
         crs_groups = gdf.groupby('wld_crs_str')[
-            ['geometry', 'wld_crs', 'warp_img_from_wld', 'aid']]
+            ['geometry', 'wld_crs', 'warp_img_from_wld', 'aid']
+        ]
         for wld_crs_str, grp in crs_groups:
             wld_geom = grp.to_crs(grp['wld_crs'].iloc[0])
             # Some images will have the same transform, which makes the
@@ -2415,12 +2600,14 @@ def warp_annot_segmentations_to_geos(coco_dset):
                 crs=None,
             )
             gdf = gdf.join(
-                pd.DataFrame(dict(
-                    gid=gid,
-                    wld_crs=wld_crs,
-                    warp_wld_from_img=[warp_wld_from_img.to_shapely()]
-                )),
-                how='cross'
+                pd.DataFrame(
+                    dict(
+                        gid=gid,
+                        wld_crs=wld_crs,
+                        warp_wld_from_img=[warp_wld_from_img.to_shapely()],
+                    )
+                ),
+                how='cross',
             )
             gdfs.append(gdf)
     if len(gdfs) > 0:
@@ -2428,12 +2615,13 @@ def warp_annot_segmentations_to_geos(coco_dset):
 
         crs84_info = {
             'axis_mapping': 'OAMS_TRADITIONAL_GIS_ORDER',
-            'auth': ('EPSG', '4326')
+            'auth': ('EPSG', '4326'),
         }
         # Convert to string so we can crs as a group key
         gdf['wld_crs_str'] = gdf['wld_crs'].apply(lambda crs: crs.to_string())
         crs_groups = gdf.groupby('wld_crs_str')[
-            ['geometry', 'wld_crs', 'warp_wld_from_img', 'aid']]
+            ['geometry', 'wld_crs', 'warp_wld_from_img', 'aid']
+        ]
 
         gdf.loc[:, 'crs84_geoms'] = None
         for wld_crs_str, grp in crs_groups:
@@ -2500,13 +2688,16 @@ def visualize_rois(coco_dset, zoom=None):
         >>> visualize_rois(coco_dset)
     """
     import geopandas as gpd
+
     cov_image_gdf = covered_image_geo_regions(coco_dset)
     annot_gdf = covered_annot_geo_regions(coco_dset)
 
     import kwplot
+
     kwplot.autompl()
     # FIXME: use goedatasets instead
     import geodatasets
+
     wld_map_gdf = gpd.read_file(geodatasets.get_path('naturalearth.land'))
     # wld_map_gdf = gpd.read_file(
     #     gpd.datasets.get_path('naturalearth_lowres')
@@ -2564,11 +2755,19 @@ def covered_image_geo_regions(coco_dset, merge=False):
     import geopandas as gpd
     from shapely import ops
     import shapely
+
     # import geowatch
     rows = []
     columns = [
-        'geometry', 'date_captured', 'name', 'height', 'width', 'video_id',
-        'image_id', 'frame_index']
+        'geometry',
+        'date_captured',
+        'name',
+        'height',
+        'width',
+        'video_id',
+        'image_id',
+        'frame_index',
+    ]
     for gid, img in coco_dset.index.imgs.items():
         if 'geos_corners' in img:
             geos_corners = img['geos_corners']
@@ -2581,18 +2780,21 @@ def covered_image_geo_regions(coco_dset, merge=False):
             assert geos_crs_info['axis_mapping'] == 'OAMS_TRADITIONAL_GIS_ORDER'
             assert list(geos_crs_info['auth']) == ['EPSG', '4326']
         sh_img_poly = shapely.geometry.shape(geos_corners)
-        rows.append({
-            'geometry': sh_img_poly,
-            'date_captured': img.get('date_captured', None),
-            'name': img.get('name', None),
-            'height': img.get('height', None),
-            'width': img.get('width', None),
-            'video_id': img.get('video_id', None),
-            'image_id': gid,
-            'frame_index': img.get('frame_index', None),
-        })
+        rows.append(
+            {
+                'geometry': sh_img_poly,
+                'date_captured': img.get('date_captured', None),
+                'name': img.get('name', None),
+                'height': img.get('height', None),
+                'width': img.get('width', None),
+                'video_id': img.get('video_id', None),
+                'image_id': gid,
+                'frame_index': img.get('frame_index', None),
+            }
+        )
 
     from kwgis.utils import util_gis
+
     cov_poly_crs = util_gis.get_crs84()
     if merge:
         # df_input = [
@@ -2613,11 +2815,12 @@ def covered_image_geo_regions(coco_dset, merge=False):
             coverage_rois = [coverage_rois_]
         # geopandas uses traditional crs mappings
         cov_image_gdf = gpd.GeoDataFrame(
-            {'geometry': coverage_rois},
-            geometry='geometry', crs=cov_poly_crs)
+            {'geometry': coverage_rois}, geometry='geometry', crs=cov_poly_crs
+        )
     else:
-        cov_image_gdf = gpd.GeoDataFrame(rows, geometry='geometry',
-                                         columns=columns, crs=cov_poly_crs)
+        cov_image_gdf = gpd.GeoDataFrame(
+            rows, geometry='geometry', columns=columns, crs=cov_poly_crs
+        )
 
     return cov_image_gdf
 
@@ -2646,10 +2849,13 @@ def covered_video_geo_regions(coco_dset):
     rows = []
     for video_id, video in coco_dset.index.videos.items():
         if 'valid_region_geos' in video:
-            crs84_poly = kwimage.MultiPolygon.coerce(video['valid_region_geos']).to_shapely()
+            crs84_poly = kwimage.MultiPolygon.coerce(
+                video['valid_region_geos']
+            ).to_shapely()
         else:
             vidspace_poly = kwimage.Boxes(
-                [[0, 0, video['width'], video['height']]], 'xywh').to_polygons()[0]
+                [[0, 0, video['width'], video['height']]], 'xywh'
+            ).to_polygons()[0]
             if 'warp_wld_to_vid' in video:
                 auth = video['wld_crs_info']['auth']
                 vid_from_wld = kwimage.Affine.coerce(video['warp_wld_to_vid'])
@@ -2657,13 +2863,18 @@ def covered_video_geo_regions(coco_dset):
                 wld_poly = vidspace_poly.warp(wld_form_vid)
                 import pyproj
                 from shapely.ops import transform
+
                 crs = pyproj.CRS(':'.join(auth))
                 crs84 = util_gis.get_crs84()
-                project = pyproj.Transformer.from_crs(crs, crs84, always_xy=True).transform
+                project = pyproj.Transformer.from_crs(
+                    crs, crs84, always_xy=True
+                ).transform
                 wld_poly_ = wld_poly.to_shapely()
                 crs84_poly = transform(project, wld_poly_)
             else:
-                raise NotImplementedError('We dont have a way to get the geo bounds for a video')
+                raise NotImplementedError(
+                    'We dont have a way to get the geo bounds for a video'
+                )
         gids = coco_dset.index.vidid_to_gids[video_id]
         if gids:
             start_gid = gids[0]
@@ -2697,6 +2908,7 @@ def covered_annot_geo_regions(coco_dset, merge=False):
     import shapely
     import geopandas as gpd
     from shapely import ops
+
     aid_to_poly = {}
     for aid, ann in coco_dset.anns.items():
         ann_goes = ann['segmentation_geos']
@@ -2707,6 +2919,7 @@ def covered_annot_geo_regions(coco_dset, merge=False):
 
     # annot_crs = 'epsg:4326'
     from kwgis.utils import util_gis
+
     annot_crs = util_gis.get_crs84()
     # annot_crs = 'OGC:CRS84'
     if merge:
@@ -2726,31 +2939,33 @@ def covered_annot_geo_regions(coco_dset, merge=False):
                     img_rois = [img_rois_]
 
                 kw_img_rois = [
-                    kwimage.Polygon.from_shapely(p.convex_hull).bounding_box().to_polygons()[0]
-                    for p in img_rois]
+                    kwimage.Polygon.from_shapely(p.convex_hull)
+                    .bounding_box()
+                    .to_polygons()[0]
+                    for p in img_rois
+                ]
                 sh_img_rois = [p.to_shapely() for p in kw_img_rois]
                 gid_to_rois[gid] = sh_img_rois
 
         # TODO: if there are only midly overlapping regions, we should likely split
         # them up. We can also group by UTM coordinates to reduce computation.
-        sh_rois_ = ops.unary_union([
-            p.buffer(0) for rois in gid_to_rois.values()
-            for p in rois
-        ])
+        sh_rois_ = ops.unary_union(
+            [p.buffer(0) for rois in gid_to_rois.values() for p in rois]
+        )
         try:
             sh_rois = list(sh_rois_.geoms)
         except Exception:
             sh_rois = [sh_rois_]
         # geopandas uses traditional crs mappings
         cov_annot_gdf = gpd.GeoDataFrame(
-            {'geometry': sh_rois},
-            geometry='geometry', crs=annot_crs)
+            {'geometry': sh_rois}, geometry='geometry', crs=annot_crs
+        )
     else:
         sh_polys = list(aid_to_poly.values())
         aids = list(aid_to_poly.keys())
         cov_annot_gdf = gpd.GeoDataFrame(
-            {'geometry': sh_polys, 'aids': aids},
-            geometry='geometry', crs=annot_crs)
+            {'geometry': sh_polys, 'aids': aids}, geometry='geometry', crs=annot_crs
+        )
     return cov_annot_gdf
 
 
@@ -2823,8 +3038,7 @@ def associate_images(dset1, dset2, key_fallback=None):
         >>> assert not len(matches['image']['match_gids2'])
         >>> assert len(matches['video'])
     """
-    common_vidnames = (set(dset1.index.name_to_video) &
-                       set(dset2.index.name_to_video))
+    common_vidnames = set(dset1.index.name_to_video) & set(dset2.index.name_to_video)
 
     def image_keys(dset, gids):
         # Generate image "keys" that should be compatible between datasets
@@ -2870,18 +3084,21 @@ def associate_images(dset1, dset2, key_fallback=None):
         match_gids2 = list(ub.take(key_to_gid2, match_keys))
         all_match_gids1.update(match_gids1)
         all_match_gids2.update(match_gids2)
-        video_matches.append({
-            'vidname': vidname,
-            'match_gids1': match_gids1,
-            'match_gids2': match_gids2,
-        })
+        video_matches.append(
+            {
+                'vidname': vidname,
+                'match_gids1': match_gids1,
+                'match_gids2': match_gids2,
+            }
+        )
 
     # Associate loose images not belonging to any video
     unmatched_gid_to_key1 = ub.dict_diff(gid_to_key1, all_match_gids1)
     unmatched_gid_to_key2 = ub.dict_diff(gid_to_key2, all_match_gids2)
 
-    remain_keys = (set(unmatched_gid_to_key1.values()) &
-                   set(unmatched_gid_to_key2.values()))
+    remain_keys = set(unmatched_gid_to_key1.values()) & set(
+        unmatched_gid_to_key2.values()
+    )
     remain_gids1 = [key_to_gid1[key] for key in remain_keys]
     remain_gids2 = [key_to_gid2[key] for key in remain_keys]
 
@@ -2902,6 +3119,7 @@ def reorder_video_frames(dset):
     Reorder the image indexes in each video to ensure temporal ordering
     """
     from kwutil import util_time
+
     videos = dset.videos()
     info = []
     for video, images in zip(videos.objs, videos.images):
@@ -3013,6 +3231,7 @@ def pick_channels(coco_img, choices):
         found4=<FusedChannelSpec(pan)>
     """
     import kwcoco
+
     have_chans = coco_img.channels.fuse()
     for candidate in choices:
         candidate = kwcoco.FusedChannelSpec.coerce(candidate)

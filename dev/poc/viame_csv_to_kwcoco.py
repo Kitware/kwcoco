@@ -4,6 +4,7 @@ Basic script to convert VIAME-CSV to kwcoco
 References:
     https://viame.readthedocs.io/en/latest/section_links/detection_file_conversions.html
 """
+
 import ubelt as ub
 from os.path import dirname, join, isdir
 import scriptconfig as scfg
@@ -15,7 +16,10 @@ class ConvertConfig(scfg.Config):
         'dst': scfg.Value('out.kwcoco.json'),
         'new_root': None,
         'old_root': None,
-        'images': scfg.Value(None, help='image list file or path to image directory if the CSV does not specify image names'),
+        'images': scfg.Value(
+            None,
+            help='image list file or path to image directory if the CSV does not specify image names',
+        ),
     }
 
 
@@ -28,9 +32,12 @@ def coco_from_viame_csv(csv_fpaths, images=None):
             image_dpath = images
             all_gpaths = []
             import os
+
             for root, ds, fs in os.walk(image_dpath):
                 IMG_EXT = {'png', 'jpg', 'jpeg', 'tif', 'tiff'}
-                gpaths = [join(root, f) for f in fs if f.split('.')[-1].lower() in IMG_EXT]
+                gpaths = [
+                    join(root, f) for f in fs if f.split('.')[-1].lower() in IMG_EXT
+                ]
                 if len(gpaths) > 1 and len(ds) != 0:
                     raise Exception('Images must be in a leaf directory')
                 if len(all_gpaths) > 0:
@@ -45,6 +52,7 @@ def coco_from_viame_csv(csv_fpaths, images=None):
     indexed_images = None
 
     import kwcoco
+
     dset = kwcoco.CocoDataset()
     for csv_fpath in csv_fpaths:
         with open(csv_fpath, 'r') as file:

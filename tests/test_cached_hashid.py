@@ -1,4 +1,3 @@
-
 def test_cached_hashid_with_permissions():
     """
     Check to make sure requesting a cached hash id doesnt fail if we don't have
@@ -8,6 +7,7 @@ def test_cached_hashid_with_permissions():
     import ubelt as ub
     import os
     import stat
+
     dpath = ub.Path.appdir('kwcoco/tests/test_hashid').ensuredir()
     parent_mode = dpath.parent.stat().st_mode
     dpath.chmod(parent_mode)
@@ -24,8 +24,12 @@ def test_cached_hashid_with_permissions():
     print(stat.filemode(dpath.stat().st_mode))
 
     ro = (
-        stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH |
-        stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        stat.S_IRUSR
+        | stat.S_IRGRP
+        | stat.S_IROTH
+        | stat.S_IXUSR
+        | stat.S_IXGRP
+        | stat.S_IXOTH
     )
     dpath.chmod(ro)
 
@@ -39,6 +43,7 @@ def test_cached_hashid_with_permissions():
     # with pytest.warns(match='Cannot write a cached hashid'):
     #     ...
     import warnings
+
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='Cannot write a cached hashid')
         dset._cached_hashid()

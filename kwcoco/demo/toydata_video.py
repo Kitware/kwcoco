@@ -7,6 +7,7 @@ This is the video version of the toydata generator and should be preferred to
 the loose image version in toydata_image.
 
 """
+
 from os.path import join
 import os
 import numpy as np
@@ -20,11 +21,25 @@ TOYDATA_VIDEO_VERSION = 23
 
 
 def random_video_dset(
-        num_videos=1, num_frames=2, num_tracks=2, anchors=None,
-        image_size=(600, 600), verbose=3, render=False, aux=None,
-        multispectral=False, multisensor=False, rng=None, dpath=None,
-        max_speed=0.01, channels=None, background='noise',
-        timestamps=False, sensorchan=None, **kwargs):
+    num_videos=1,
+    num_frames=2,
+    num_tracks=2,
+    anchors=None,
+    image_size=(600, 600),
+    verbose=3,
+    render=False,
+    aux=None,
+    multispectral=False,
+    multisensor=False,
+    rng=None,
+    dpath=None,
+    max_speed=0.01,
+    channels=None,
+    background='noise',
+    timestamps=False,
+    sensorchan=None,
+    **kwargs,
+):
     """
     Create a toy Coco Video Dataset
 
@@ -111,9 +126,13 @@ def random_video_dset(
     """
     if 'gsize' in kwargs:  # nocover
         ub.schedule_deprecation(
-            modname='kwcoco', name='gsize', type='toydata argument',
+            modname='kwcoco',
+            name='gsize',
+            type='toydata argument',
             migration='use image_size instead',
-            deprecate='0.8.3', error='1.0.0', remove='1.1.0',
+            deprecate='0.8.3',
+            error='1.0.0',
+            remove='1.1.0',
         )
         image_size = kwargs.pop('gsize')
     if len(kwargs) != 0:
@@ -127,20 +146,36 @@ def random_video_dset(
         print('generate videos')
     vidid_iter = range(1, num_videos + 1)
     if verbose == 3:
-        vidid_iter = ub.ProgIter(vidid_iter, total=num_videos, desc='generate videos', verbose=1)
+        vidid_iter = ub.ProgIter(
+            vidid_iter, total=num_videos, desc='generate videos', verbose=1
+        )
     elif verbose > 3:
-        vidid_iter = ub.ProgIter(vidid_iter, total=num_videos, desc='generate videos', verbose=3)
+        vidid_iter = ub.ProgIter(
+            vidid_iter, total=num_videos, desc='generate videos', verbose=3
+        )
     for vidid in vidid_iter:
         # if verbose > 3:
         #     print('generate vidid = {!r}'.format(vidid))
         dset = random_single_video_dset(
-            image_size=image_size, num_frames=num_frames,
-            num_tracks=num_tracks, tid_start=tid_start, anchors=anchors,
-            gid_start=gid_start, video_id=vidid, render=False, autobuild=False,
-            aux=aux, multispectral=multispectral, multisensor=multisensor,
-            timestamps=timestamps, max_speed=max_speed, channels=channels,
+            image_size=image_size,
+            num_frames=num_frames,
+            num_tracks=num_tracks,
+            tid_start=tid_start,
+            anchors=anchors,
+            gid_start=gid_start,
+            video_id=vidid,
+            render=False,
+            autobuild=False,
+            aux=aux,
+            multispectral=multispectral,
+            multisensor=multisensor,
+            timestamps=timestamps,
+            max_speed=max_speed,
+            channels=channels,
             sensorchan=sensorchan,
-            rng=rng, verbose=verbose)
+            rng=rng,
+            verbose=verbose,
+        )
         try:
             gid_start = dset.dataset['images'][-1]['id'] + 1
             tid_start = dset.dataset['annotations'][-1]['track_id'] + 1
@@ -156,6 +191,7 @@ def random_video_dset(
         if verbose > 2:
             print('union videos')
         import kwcoco
+
         assert len(subsets) > 1, '{}'.format(len(subsets))
         dset = kwcoco.CocoDataset.union(*subsets)
 
@@ -176,8 +212,9 @@ def random_video_dset(
 
         if verbose > 2:
             print('rendering')
-        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw,
-                           verbose=verbose)
+        render_toy_dataset(
+            dset, rng=rng, dpath=dpath, renderkw=renderkw, verbose=verbose
+        )
         dset.fpath = join(dpath, 'data.kwcoco.json')
 
     if verbose > 2:
@@ -190,16 +227,28 @@ def random_video_dset(
     return dset
 
 
-def random_single_video_dset(image_size=(600, 600), num_frames=5,
-                             num_tracks=3, tid_start=1, gid_start=1,
-                             video_id=1, anchors=None, rng=None, render=False,
-                             dpath=None, autobuild=True, verbose=3, aux=None,
-                             multispectral=False, max_speed=0.01,
-                             channels=None,
-                             multisensor=False,
-                             timestamps=False,
-                             sensorchan=None,
-                             **kwargs):
+def random_single_video_dset(
+    image_size=(600, 600),
+    num_frames=5,
+    num_tracks=3,
+    tid_start=1,
+    gid_start=1,
+    video_id=1,
+    anchors=None,
+    rng=None,
+    render=False,
+    dpath=None,
+    autobuild=True,
+    verbose=3,
+    aux=None,
+    multispectral=False,
+    max_speed=0.01,
+    channels=None,
+    multisensor=False,
+    timestamps=False,
+    sensorchan=None,
+    **kwargs,
+):
     """
     Create the video scene layout of object positions.
 
@@ -396,13 +445,18 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     import kwcoco
     from kwarray import distributions
     from delayed_image import ChannelSpec, SensorChanSpec
+
     rng = kwarray.ensure_rng(rng)
 
     if 'gsize' in kwargs:  # nocover
         ub.schedule_deprecation(
-            modname='kwcoco', name='gsize', type='toydata argument',
+            modname='kwcoco',
+            name='gsize',
+            type='toydata argument',
             migration='use image_size instead',
-            deprecate='0.8.3', error='1.0.0', remove='1.1.0',
+            deprecate='0.8.3',
+            error='1.0.0',
+            remove='1.1.0',
         )
         image_size = kwargs.pop('gsize')
     assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
@@ -475,8 +529,12 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         assert channels is not None
         # todo: give users a way to specify (1) how many sensors, and (2)
         # what the channels for each sensor should be.
-        sensor_to_channels['sensor2'] = ChannelSpec.coerce('r|g|b,disparity,gauss,B8|B11')
-        sensor_to_channels['sensor3'] = ChannelSpec.coerce('r|g|b,flowx|flowy,distri,B10|B11')
+        sensor_to_channels['sensor2'] = ChannelSpec.coerce(
+            'r|g|b,disparity,gauss,B8|B11'
+        )
+        sensor_to_channels['sensor3'] = ChannelSpec.coerce(
+            'r|g|b,flowx|flowy,distri,B10|B11'
+        )
         sensor_to_channels['sensor4'] = ChannelSpec.coerce('B11,X.2,Y:2:6')
 
     if sensorchan is not None:
@@ -486,7 +544,9 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
         # multisensor, and multispectral. Just specify what you want.
         senorchan = SensorChanSpec.coerce(sensorchan)
         sensor_to_channels = {}
-        sensor_to_subchans = ub.group_items(senorchan.streams(), key=lambda x: x.sensor.spec)
+        sensor_to_subchans = ub.group_items(
+            senorchan.streams(), key=lambda x: x.sensor.spec
+        )
         for sensor, subchans in sensor_to_subchans.items():
             subspec = ','.join([c._chans.spec for c in subchans])
             chans = ChannelSpec.coerce(subspec)
@@ -577,9 +637,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
     # Generate paths in a way that they are dependent on each other
     paths = random_multi_object_path(
-        num_frames=num_frames,
-        num_objects=num_tracks, rng=rng,
-        max_speed=max_speed)
+        num_frames=num_frames, num_objects=num_tracks, rng=rng, max_speed=max_speed
+    )
 
     def warp_within_bounds(self, x_min, y_min, x_max, y_max):
         """
@@ -633,8 +692,8 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
 
         # Box scale
         video_boxes = kwimage.Boxes.random(
-            num=num_frames, scale=1.0, format='cxywh', rng=rng,
-            anchors=anchors_)
+            num=num_frames, scale=1.0, format='cxywh', rng=rng, anchors=anchors_
+        )
 
         # Smooth out varying box sizes
         alpha = rng.rand() * 0.1
@@ -729,8 +788,9 @@ def random_single_video_dset(image_size=(600, 600), num_frames=5,
     if renderkw is not None:
         if verbose > 2:
             print('rendering')
-        render_toy_dataset(dset, rng=rng, dpath=dpath, renderkw=renderkw,
-                           verbose=verbose)
+        render_toy_dataset(
+            dset, rng=rng, dpath=dpath, renderkw=renderkw, verbose=verbose
+        )
     if autobuild:
         dset._build_index()
     return dset
@@ -742,11 +802,14 @@ def populate_random_timestamps(coco_dset, timestamps=True, rng=None):
     """
     from kwarray.distributions import Uniform
     from kwutil import util_time
-    tskw = ub.udict({
-        'start_time': '1970-01-01',
-        'end_time': '2101-01-01',
-        'enabled': True,
-    })
+
+    tskw = ub.udict(
+        {
+            'start_time': '1970-01-01',
+            'end_time': '2101-01-01',
+            'enabled': True,
+        }
+    )
     if not isinstance(timestamps, dict):
         timestamps = {}
 
@@ -763,7 +826,8 @@ def populate_random_timestamps(coco_dset, timestamps=True, rng=None):
 
     # Hack in other metadata
     vidid_to_imgs = ub.group_items(
-        coco_dset.dataset['images'], key=lambda x: x['video_id'])
+        coco_dset.dataset['images'], key=lambda x: x['video_id']
+    )
 
     for vidid, imgs in vidid_to_imgs.items():
         imgs = sorted(imgs, key=lambda g: g.get('frame_index', None))
@@ -796,17 +860,21 @@ def _draw_video_sequence(dset, gids):
         for raw_data, chan_name in zip(chan_chw, chan_names):
             # norm_data = kwimage.normalize_intensity(raw_data.astype(np.float32)).clip(0, 1)
             norm_data = kwimage.normalize(raw_data.astype(np.float32)).clip(0, 1)
-            cells.append({
-                'norm_data': norm_data,
-                'raw_data': raw_data,
-                'text': chan_name,
-            })
+            cells.append(
+                {
+                    'norm_data': norm_data,
+                    'raw_data': raw_data,
+                    'text': chan_name,
+                }
+            )
         vertical_stack = []
         header_dims = {'width': max_width}
         header_part = kwimage.draw_header_text(
-            image=header_dims, fit=False,
+            image=header_dims,
+            fit=False,
             text='t={frame_index} gid={id}'.format(**coco_img.img),
-            color='salmon')
+            color='salmon',
+        )
         vertical_stack.append(header_part)
         for cell in cells:
             norm_data = cell['norm_data']
@@ -814,8 +882,8 @@ def _draw_video_sequence(dset, gids):
             cell_canvas = cell_canvas.clip(0, 1)
             cell_canvas = kwimage.atleast_3channels(cell_canvas)
             cell_canvas = kwimage.draw_text_on_image(
-                cell_canvas, cell['text'], (1, 1), valign='top',
-                color='white', border=3)
+                cell_canvas, cell['text'], (1, 1), valign='top', color='white', border=3
+            )
             vertical_stack.append(cell_canvas)
 
         vertical_stack = [kwimage.ensure_uint255(d) for d in vertical_stack]
@@ -874,6 +942,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
         >>> pnums = kwplot.PlotNums(nSubplots=len(gids))
     """
     import kwcoco
+
     rng = kwarray.ensure_rng(rng)
     dset._build_index()
 
@@ -921,10 +990,12 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
         imdata = img.pop('imdata', None)
         if imdata is not None:
             img_fpath = ub.Path(join(img_dpath, fname))
-            img.update({
-                'file_name': os.fspath(img_fpath.relative_to(bundle_dpath)),
-                'channels': main_chans,
-            })
+            img.update(
+                {
+                    'file_name': os.fspath(img_fpath.relative_to(bundle_dpath)),
+                    'channels': main_chans,
+                }
+            )
             kwimage.imwrite(img_fpath, imdata, **imwrite_kw)
 
         auxiliaries = img.pop('auxiliary', None)
@@ -932,19 +1003,22 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
             for auxdict in auxiliaries:
                 chan_part = kwcoco.ChannelSpec.coerce(auxdict['channels']).as_path()
                 aux_dpath = ub.ensuredir(
-                    (bundle_dpath, '_assets', 'auxiliary', 'aux_' + chan_part))
+                    (bundle_dpath, '_assets', 'auxiliary', 'aux_' + chan_part)
+                )
                 aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
                 ub.ensuredir(aux_dpath)
-                auxdict['file_name'] = os.fspath(ub.Path(aux_fpath).relative_to(bundle_dpath))
+                auxdict['file_name'] = os.fspath(
+                    ub.Path(aux_fpath).relative_to(bundle_dpath)
+                )
                 auxdata = auxdict.pop('imdata', None)
                 try:
                     from osgeo import gdal  # NOQA
+
                     kwimage.imwrite(
-                        aux_fpath, auxdata, backend='gdal', space=None,
-                        **imwrite_kw)
+                        aux_fpath, auxdata, backend='gdal', space=None, **imwrite_kw
+                    )
                 except Exception:
-                    kwimage.imwrite(
-                        aux_fpath, auxdata, space=None, **imwrite_kw)
+                    kwimage.imwrite(aux_fpath, auxdata, space=None, **imwrite_kw)
             img['auxiliary'] = auxiliaries
 
     dset._build_index()
@@ -1056,11 +1130,14 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         # Grab a background (probably amazon)
         vidspace_background = kwimage.grab_test_image(background, dsize=vid_dsize)
         vidspace_background = kwimage.ensure_float01(vidspace_background)
-        imgspace_background = kwimage.warp_affine(vidspace_background, coco_img.warp_img_from_vid, dsize=img_dsize)
+        imgspace_background = kwimage.warp_affine(
+            vidspace_background, coco_img.warp_img_from_vid, dsize=img_dsize
+        )
 
     categories = list(dset.name_to_cat.keys())
-    catpats = CategoryPatterns.coerce(categories, fg_scale=fg_scale,
-                                      fg_intensity=fg_intensity, rng=rng)
+    catpats = CategoryPatterns.coerce(
+        categories, fg_scale=fg_scale, fg_intensity=fg_intensity, rng=rng
+    )
 
     if with_kpts and newstyle:
         # TODO: add ensure keypoint category to dset
@@ -1075,27 +1152,39 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     annots = dset.annots(gid=gid)
 
     imdata, chan_to_auxinfo = render_background(
-        img, rng, gray, bg_intensity, bg_scale,
-        imgspace_background=imgspace_background)
-    imdata, chan_to_auxinfo = render_foreground(imdata, chan_to_auxinfo, dset,
-                                                annots, catpats, with_sseg,
-                                                with_kpts, dims, newstyle,
-                                                gray, rng)
+        img, rng, gray, bg_intensity, bg_scale, imgspace_background=imgspace_background
+    )
+    imdata, chan_to_auxinfo = render_foreground(
+        imdata,
+        chan_to_auxinfo,
+        dset,
+        annots,
+        catpats,
+        with_sseg,
+        with_kpts,
+        dims,
+        newstyle,
+        gray,
+        rng,
+    )
 
     if imdata is not None:
         imdata = (imdata * 255).astype(np.uint8)
         imdata = kwimage.atleast_3channels(imdata)
         main_channels = 'gray' if gray else 'r|g|b'
-        img.update({
-            'imdata': imdata,
-            'channels': main_channels,
-        })
+        img.update(
+            {
+                'imdata': imdata,
+                'channels': main_channels,
+            }
+        )
 
     for auxinfo in img.get('auxiliary', []):
         # Postprocess the auxiliary data so it looks interesting
         # It would be really cool if we could do this based on what
         # the simulated channel was.
         import kwcoco
+
         chankey = auxinfo['channels']
         auxdata = chan_to_auxinfo[chankey]['imdata']
         auxdata = kwarray.atleast_nd(auxdata, 3)
@@ -1116,14 +1205,16 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
                 mask = rng.randint(0, 2, size=maskshape, dtype=bool)
                 # mask = rng.rand(*maskshape) > 0.5
                 # NOTE: fourier mask takes a long time! Up to 80% of it!
-                auxdata[..., chan_idx] = kwimage.fourier_mask(auxdata[..., chan_idx], mask)[..., 0]
+                auxdata[..., chan_idx] = kwimage.fourier_mask(
+                    auxdata[..., chan_idx], mask
+                )[..., 0]
         auxdata = kwarray.normalize(auxdata)
         auxdata = auxdata.clip(0, 1)
         _dtype = auxinfo.pop('dtype', 'uint8').lower()
         if _dtype == 'uint8':
-            auxdata = (auxdata * int((2 ** 8) - 1)).astype(np.uint8)
+            auxdata = (auxdata * int((2**8) - 1)).astype(np.uint8)
         elif _dtype == 'uint16':
-            auxdata = (auxdata * int((2 ** 16) - 1)).astype(np.uint16)
+            auxdata = (auxdata * int((2**16) - 1)).astype(np.uint16)
         else:
             raise KeyError(_dtype)
         auxinfo['imdata'] = auxdata
@@ -1131,8 +1222,19 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
     return img
 
 
-def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
-                      with_sseg, with_kpts, dims, newstyle, gray, rng):
+def render_foreground(
+    imdata,
+    chan_to_auxinfo,
+    dset,
+    annots,
+    catpats,
+    with_sseg,
+    with_kpts,
+    dims,
+    newstyle,
+    gray,
+    rng,
+):
     """
     Renders demo annotations on top of a demo background
     """
@@ -1157,8 +1259,7 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
         if imdata is None:
             chip = None
         else:
-            data_slice, padding = kwarray.embed_slice(
-                chip_index, imdata.shape[0:2])
+            data_slice, padding = kwarray.embed_slice(chip_index, imdata.shape[0:2])
             # TODO: could have a kwarray function to expose this inverse slice
             # functionality. Also having a top-level call to apply an embedded
             # slice would be good
@@ -1174,8 +1275,8 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
         if chip is None or chip.size:
             # todo: no need to make kpts / sseg if not requested
             info = catpats.render_category(
-                catname, chip, xy_offset, dims, newstyle=newstyle,
-                size=size)
+                catname, chip, xy_offset, dims, newstyle=newstyle, size=size
+            )
 
             if imdata is not None:
                 fgdata = info['data']
@@ -1199,7 +1300,9 @@ def render_foreground(imdata, chan_to_auxinfo, dset, annots, catpats,
                         # transform annotation into aux space
                         warp_aux_to_img = auxinfo.get('warp_aux_to_img', None)
                         if warp_aux_to_img is not None:
-                            warp_aux_from_img = kwimage.Affine.coerce(warp_aux_to_img).inv().matrix
+                            warp_aux_from_img = (
+                                kwimage.Affine.coerce(warp_aux_to_img).inv().matrix
+                            )
                             seg_ = seg.warp(warp_aux_from_img)
                         else:
                             seg_ = seg
@@ -1220,8 +1323,9 @@ def render_background(img, rng, gray, bg_intensity, bg_scale, imgspace_backgroun
     else:
         if gray:
             gshape = (gh, gw, 1)
-            imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
-                                               rng=rng, dtype=np.float32)
+            imdata = kwarray.standard_normal(
+                gshape, mean=bg_intensity, std=bg_scale, rng=rng, dtype=np.float32
+            )
         else:
             gshape = (gh, gw, 3)
             # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
@@ -1242,6 +1346,7 @@ def render_background(img, rng, gray, bg_intensity, bg_scale, imgspace_backgroun
     chan_to_auxinfo = {}
     for auxinfo in img.get('auxiliary', []):
         import kwcoco
+
         chankey = auxinfo['channels']
         aux_bands = kwcoco.ChannelSpec.coerce(chankey).numel()
         aux_width = auxinfo.get('width', gw)
@@ -1250,12 +1355,15 @@ def render_background(img, rng, gray, bg_intensity, bg_scale, imgspace_backgroun
 
         # Generate in image space and then warp to asset-space
         img_shape = (gh, gw, aux_bands)
-        warp_aux_from_img = kwimage.Affine.coerce(auxinfo.get('warp_aux_to_img', None)).inv()
+        warp_aux_from_img = kwimage.Affine.coerce(
+            auxinfo.get('warp_aux_to_img', None)
+        ).inv()
 
         if chankey == 'gauss':
-            auxdata = np.stack([
-                kwimage.gaussian_patch(img_shape[0:2])
-                for b in range(aux_bands)], axis=2)
+            auxdata = np.stack(
+                [kwimage.gaussian_patch(img_shape[0:2]) for b in range(aux_bands)],
+                axis=2,
+            )
             auxdata = kwarray.normalize(auxdata) * rng.rand()
         elif chankey == 'distri':
             # Random distribution currently broken, fix later
@@ -1275,14 +1383,14 @@ def render_background(img, rng, gray, bg_intensity, bg_scale, imgspace_backgroun
             # Hack in background image data into the auxiliary bands
             new_bands = []
             import itertools as it
+
             for noise_band, bg_band in zip(chw_aux, it.repeat(chw_bg)):
                 new = (noise_band + bg_band) / 2
                 new_bands.append(new)
             auxdata = np.concatenate(new_bands, axis=0).transpose(1, 2, 0)
 
         # Warp the auxiliary data into asset space
-        auxdata = kwimage.warp_affine(auxdata, warp_aux_from_img,
-                                      dsize=asset_dsize)
+        auxdata = kwimage.warp_affine(auxdata, warp_aux_from_img, dsize=asset_dsize)
 
         # if True or True or True:
         #     auxdata[:] = 0
@@ -1301,11 +1409,13 @@ def false_color(twochan):
     """
     if 0:
         import sklearn
+
         model = sklearn.decomposition.PCA(3)
         X = twochan.reshape(-1, 2)
         model.fit(X)
     else:
         import sklearn
+
         ndim = twochan.ndim
         dims = twochan.shape[0:2]
         if ndim == 2:
@@ -1363,12 +1473,14 @@ def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
         >>> print(ub.hash_data(paths))
     """
     import kwarray
+
     rng = kwarray.ensure_rng(rng)
 
     USE_BOIDS = 1
 
     if USE_BOIDS:
         from kwcoco.demo.boids import Boids
+
         config = {
             'perception_thresh': 0.2,
             'max_speed': max_speed,
@@ -1389,6 +1501,7 @@ def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
 
         # TODO: can we do better?
         torch.optim.SGD
+
         class Positions(torch.nn.Module):
             def __init__(model):
                 super().__init__()
@@ -1400,7 +1513,7 @@ def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
 
                 # Push objects away from each other
                 utriu_dists = torch.nn.functional.pdist(model.pos)
-                respulsive = (1 / (utriu_dists ** 2)).sum() / num_objects
+                respulsive = (1 / (utriu_dists**2)).sum() / num_objects
                 loss_parts['repulsive'] = 0.01 * respulsive.sum()
 
                 # Push objects in random directions
@@ -1503,12 +1616,15 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
 
     if mode == 'boid':
         from kwcoco.demo.boids import Boids
+
         boids = Boids(1, rng=rng).initialize()
         path = boids.paths(num)[0]
     elif mode == 'walk':
         # TODO: can we do better?
         import torch
+
         torch.optim.SGD
+
         class Position(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -1533,6 +1649,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
 
     elif mode == 'bezier':
         import bezier
+
         # Create random bezier control points
         nodes_f = rng.rand(degree + 1, dimension).T  # F-contiguous
         curve = bezier.Curve(nodes_f, degree=degree)
@@ -1547,6 +1664,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
                     a, b = c.subdivide()
                     yield from recsub(a, d - 1)
                     yield from recsub(b, d - 1)
+
             c = curve
             subcurves = list(recsub(c, d=t))
             path_f = np.array([c.evaluate(0.0)[:, 0] for c in subcurves][0:num]).T

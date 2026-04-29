@@ -20,10 +20,17 @@ __notes__ = r"""
 """
 
 
-def animate_visualizations(viz_dpath, channels=None, video_names=None,
-                           frames_per_second=0.7, draw_anns=True,
-                           draw_imgs=True, workers=0, zoom_to_tracks=False,
-                           verbose=0):
+def animate_visualizations(
+    viz_dpath,
+    channels=None,
+    video_names=None,
+    frames_per_second=0.7,
+    draw_anns=True,
+    draw_imgs=True,
+    workers=0,
+    zoom_to_tracks=False,
+    verbose=0,
+):
     r"""
     Helper that roughly does the same thing as this bash script:
 
@@ -102,6 +109,7 @@ def animate_visualizations(viz_dpath, channels=None, video_names=None,
     # so we can leave refactoring as a todo.
 
     from kwutil import util_progress
+
     pman = util_progress.ProgressManager()
     pman.__enter__()
 
@@ -130,41 +138,57 @@ def animate_visualizations(viz_dpath, channels=None, video_names=None,
                     if channels is None:
                         channel_dpaths = [p for p in type_dpath.glob('*') if p.is_dir()]
                     else:
-                        channel_dpaths = [type_dpath / c.path_sanitize()
-                                          for c in channels.streams()]
+                        channel_dpaths = [
+                            type_dpath / c.path_sanitize() for c in channels.streams()
+                        ]
 
                     for chan_dpath in channel_dpaths:
                         frame_fpaths = sorted(chan_dpath.glob('*'))
                         if len(frame_fpaths):
                             if len(frame_fpaths) < 300:
-                                gif_fname = '{}{}_{}.gif'.format(track_name, type_, chan_dpath.name)
+                                gif_fname = '{}{}_{}.gif'.format(
+                                    track_name, type_, chan_dpath.name
+                                )
                                 gif_fpath = track_subdpath / gif_fname
                                 pool.submit(
-                                    gifify.ffmpeg_animate_frames, frame_fpaths,
-                                    gif_fpath, in_framerate=frames_per_second,
-                                    verbose=verbose_worker)
-                                outputs.append({
-                                    'fpath': gif_fpath,
-                                    'type': 'gif',
-                                })
-                            ani_fname = '{}{}_{}.mp4'.format(track_name, type_, chan_dpath.name)
+                                    gifify.ffmpeg_animate_frames,
+                                    frame_fpaths,
+                                    gif_fpath,
+                                    in_framerate=frames_per_second,
+                                    verbose=verbose_worker,
+                                )
+                                outputs.append(
+                                    {
+                                        'fpath': gif_fpath,
+                                        'type': 'gif',
+                                    }
+                                )
+                            ani_fname = '{}{}_{}.mp4'.format(
+                                track_name, type_, chan_dpath.name
+                            )
                             ani_fpath = track_subdpath / ani_fname
                             pool.submit(
-                                gifify.ffmpeg_animate_frames, frame_fpaths,
-                                ani_fpath, in_framerate=frames_per_second,
-                                verbose=verbose_worker)
-                            outputs.append({
-                                'fpath': ani_fpath,
-                                'type': 'mp4',
-                            })
+                                gifify.ffmpeg_animate_frames,
+                                frame_fpaths,
+                                ani_fpath,
+                                in_framerate=frames_per_second,
+                                verbose=verbose_worker,
+                            )
+                            outputs.append(
+                                {
+                                    'fpath': ani_fpath,
+                                    'type': 'mp4',
+                                }
+                            )
 
             else:
                 type_dpath = video_dpath / type_
                 if channels is None:
                     channel_dpaths = [p for p in type_dpath.glob('*') if p.is_dir()]
                 else:
-                    channel_dpaths = [type_dpath / c.path_sanitize()
-                                      for c in channels.streams()]
+                    channel_dpaths = [
+                        type_dpath / c.path_sanitize() for c in channels.streams()
+                    ]
                 for chan_dpath in channel_dpaths:
                     frame_fpaths = sorted(chan_dpath.glob('*'))
                     if len(frame_fpaths):
@@ -173,31 +197,49 @@ def animate_visualizations(viz_dpath, channels=None, video_names=None,
                             with_gif_resolved = len(frame_fpaths) < 300
 
                         if with_gif_resolved:
-                            gif_fname = '{}{}_{}.gif'.format(video_name, type_, chan_dpath.name)
+                            gif_fname = '{}{}_{}.gif'.format(
+                                video_name, type_, chan_dpath.name
+                            )
                             gif_fpath = video_dpath / gif_fname
                             pool.submit(
-                                gifify.ffmpeg_animate_frames, frame_fpaths, gif_fpath,
-                                in_framerate=frames_per_second, verbose=verbose_worker)
-                            outputs.append({
-                                'fpath': gif_fpath,
-                                'type': 'gif',
-                            })
+                                gifify.ffmpeg_animate_frames,
+                                frame_fpaths,
+                                gif_fpath,
+                                in_framerate=frames_per_second,
+                                verbose=verbose_worker,
+                            )
+                            outputs.append(
+                                {
+                                    'fpath': gif_fpath,
+                                    'type': 'gif',
+                                }
+                            )
 
                         if with_mp4:
-                            ani_fname = '{}{}_{}.mp4'.format(video_name, type_, chan_dpath.name)
+                            ani_fname = '{}{}_{}.mp4'.format(
+                                video_name, type_, chan_dpath.name
+                            )
                             ani_fpath = video_dpath / ani_fname
                             pool.submit(
-                                gifify.ffmpeg_animate_frames, frame_fpaths, ani_fpath,
-                                in_framerate=frames_per_second, verbose=verbose_worker)
-                            outputs.append({
-                                'fpath': ani_fpath,
-                                'type': 'mp4',
-                            })
+                                gifify.ffmpeg_animate_frames,
+                                frame_fpaths,
+                                ani_fpath,
+                                in_framerate=frames_per_second,
+                                verbose=verbose_worker,
+                            )
+                            outputs.append(
+                                {
+                                    'fpath': ani_fpath,
+                                    'type': 'mp4',
+                                }
+                            )
     prog.end()
 
     failed = []
     # for job in ub.ProgIter(pool.as_completed(), total=len(pool), desc='collect animate jobs'):
-    for job in pman.progiter(pool.as_completed(), total=len(pool), desc='collect animate jobs'):
+    for job in pman.progiter(
+        pool.as_completed(), total=len(pool), desc='collect animate jobs'
+    ):
         try:
             job.result()
         except Exception as ex:
@@ -224,4 +266,5 @@ if __name__ == '__main__':
         python ~/code/watch/geowatch/cli/animate_visualizations.py
     """
     import fire
+
     fire.Fire(animate_visualizations)

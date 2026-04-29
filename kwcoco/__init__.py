@@ -311,28 +311,30 @@ __submodules__ = {
 def lazy_import(module_name, submodules, submod_attrs):
     import importlib
     import os
+
     name_to_submod = {
-        func: mod for mod, funcs in submod_attrs.items()
-        for func in funcs
+        func: mod for mod, funcs in submod_attrs.items() for func in funcs
     }
 
     def __getattr__(name):
         if name in submodules:
             attr = importlib.import_module(
-                '{module_name}.{name}'.format(
-                    module_name=module_name, name=name)
+                '{module_name}.{name}'.format(module_name=module_name, name=name)
             )
         elif name in name_to_submod:
             submodname = name_to_submod[name]
             module = importlib.import_module(
                 '{module_name}.{submodname}'.format(
-                    module_name=module_name, submodname=submodname)
+                    module_name=module_name, submodname=submodname
+                )
             )
             attr = getattr(module, name)
         else:
             raise AttributeError(
                 'No {module_name} attribute {name}'.format(
-                    module_name=module_name, name=name))
+                    module_name=module_name, name=name
+                )
+            )
         globals()[name] = attr
         return attr
 
@@ -388,8 +390,22 @@ __getattr__ = lazy_import(
 def __dir__():
     return __all__
 
-__all__ = ['AbstractCocoDataset', 'CategoryTree', 'ChannelSpec', 'CocoDataset',
-           'CocoImage', 'CocoSqlDatabase', 'FusedChannelSpec',
-           'SensorChanSpec', 'abstract_coco_dataset', 'category_tree',
-           'channel_spec', 'coco_dataset', 'coco_image', 'coco_sql_dataset',
-           'exceptions', 'sensorchan_spec']
+
+__all__ = [
+    'AbstractCocoDataset',
+    'CategoryTree',
+    'ChannelSpec',
+    'CocoDataset',
+    'CocoImage',
+    'CocoSqlDatabase',
+    'FusedChannelSpec',
+    'SensorChanSpec',
+    'abstract_coco_dataset',
+    'category_tree',
+    'channel_spec',
+    'coco_dataset',
+    'coco_image',
+    'coco_sql_dataset',
+    'exceptions',
+    'sensorchan_spec',
+]

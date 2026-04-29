@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 
-
 def coerce_num_workers(num_workers='auto', minimum=0):
     """
     Return some number of CPUs based on a chosen heuristic
@@ -47,7 +46,6 @@ def coerce_num_workers(num_workers='auto', minimum=0):
         pass
 
     if isinstance(num_workers, str):
-
         num_workers = num_workers.lower()
 
         if num_workers == 'auto':
@@ -73,13 +71,16 @@ def coerce_num_workers(num_workers='auto', minimum=0):
                 # Mitigate attack surface by restricting builtin usage
                 max_chars = 32
                 builtins_passlist = ['min', 'max', 'round', 'sum']
-                num_workers = restricted_eval(expr, max_chars, local_dict,
-                                              builtins_passlist)
+                num_workers = restricted_eval(
+                    expr, max_chars, local_dict, builtins_passlist
+                )
             else:
                 # note: eval is not safe, maybe use numexpr instead
                 import numexpr
-                num_workers = numexpr.evaluate(expr, local_dict=local_dict,
-                                               global_dict=local_dict)
+
+                num_workers = numexpr.evaluate(
+                    expr, local_dict=local_dict, global_dict=local_dict
+                )
 
     if num_workers is not None:
         num_workers = max(int(num_workers), minimum)

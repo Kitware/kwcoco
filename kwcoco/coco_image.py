@@ -13,6 +13,7 @@ TODO:
     This file no longer is only images, it has logic for generic single-class
     objects. It should be refactored into coco_objects0d.py or something.
 """
+
 import ubelt as ub
 import os
 import numpy as np
@@ -44,6 +45,7 @@ class _CocoObject(AliasedDictProxy, ub.NiceRepr):
     """
     General coco scalar object
     """
+
     __alias_to_primary__ = {}
 
     def __init__(self, obj, dset=None, bundle_dpath=None):
@@ -164,17 +166,16 @@ class CocoImage(_CocoObject):
             datetime.datetime | None
         """
         from kwutil import util_time
-        candidate_keys = [
-            'datetime',
-            'timestamp',
-            'date_captured'
-        ]
+
+        candidate_keys = ['datetime', 'timestamp', 'date_captured']
         for k in candidate_keys:
             v = self.img.get(k)
             if v is not None:
                 return util_time.coerce_datetime(v)
-        raise KeyError(f'No keys {candidate_keys} to coerce datetime '
-                       'found in {list(self.img.keys())}')
+        raise KeyError(
+            f'No keys {candidate_keys} to coerce datetime '
+            'found in {list(self.img.keys())}'
+        )
 
     def annots(self):
         """
@@ -199,15 +200,14 @@ class CocoImage(_CocoObject):
         """
         from kwcoco.util.util_truncate import smart_truncate
         from functools import partial
+
         stats = ub.udict(self.stats())
         stats = stats.map_values(str)
-        stats = stats.map_values(
-            partial(smart_truncate, max_length=32, trunc_loc=0.5))
+        stats = stats.map_values(partial(smart_truncate, max_length=32, trunc_loc=0.5))
         return ub.urepr(stats, compact=1, nl=0)
 
     def stats(self):
-        """
-        """
+        """ """
         key_attrname = [
             ('wh', 'dsize'),
             ('n_chan', 'num_channels'),
@@ -248,7 +248,9 @@ class CocoImage(_CocoObject):
         """
         if '_unstructured' in self._proxy:
             # SQL compatibility
-            _keys = ub.flatten([self._proxy.keys(), self._proxy['_unstructured'].keys()])
+            _keys = ub.flatten(
+                [self._proxy.keys(), self._proxy['_unstructured'].keys()]
+            )
             return iter((k for k in _keys if k != '_unstructured'))
         else:
             return self._proxy.keys()
@@ -436,6 +438,7 @@ class CocoImage(_CocoObject):
             >>> assert self.primary_asset(as_dict=False)['file_name'] == '2'
         """
         import kwimage
+
         if requires is None:
             requires = []
         img = self.img
@@ -458,24 +461,27 @@ class CocoImage(_CocoObject):
             # Take frobenius norm to get "distance" between transform and
             # the identity. We want to find the auxiliary closest to the
             # identity transform.
-            warp_img_from_asset = kwimage.Affine.coerce(obj.get('warp_aux_to_img', None))
+            warp_img_from_asset = kwimage.Affine.coerce(
+                obj.get('warp_aux_to_img', None)
+            )
             fro_dist = np.linalg.norm(warp_img_from_asset - eye, ord='fro')
             w = obj.get('width', None) or 0
             h = obj.get('height', None) or 0
             if all(k in obj for k in requires):
-                candidates.append({
-                    'idx': idx,
-                    'area': w * h,
-                    'fro_dist': fro_dist,
-                    'obj': obj,
-                })
+                candidates.append(
+                    {
+                        'idx': idx,
+                        'area': w * h,
+                        'fro_dist': fro_dist,
+                        'obj': obj,
+                    }
+                )
 
         if len(candidates) == 0:
             return None
 
         idx = ub.argmin(
-            candidates, key=lambda val: (
-                val['fro_dist'], -val['area'], val['idx'])
+            candidates, key=lambda val: (val['fro_dist'], -val['area'], val['idx'])
         )
         obj = candidates[idx]['obj']
         if as_dict:
@@ -712,12 +718,22 @@ class CocoImage(_CocoObject):
         if self.dset is None:
             raise RuntimeError(
                 'Can only add an annotation through a CocoImage '
-                'if it is connected to its parent CocoDataset')
+                'if it is connected to its parent CocoDataset'
+            )
         return self.dset.add_annotation(image_id=self.img['id'], **ann)
 
-    def add_asset(self, file_name=None, channels=None, imdata=None,
-                  warp_aux_to_img=None, width=None, height=None,
-                  imwrite=False, image_id=None, **kw):
+    def add_asset(
+        self,
+        file_name=None,
+        channels=None,
+        imdata=None,
+        warp_aux_to_img=None,
+        width=None,
+        height=None,
+        imwrite=False,
+        image_id=None,
+        **kw,
+    ):
         """
         Adds an auxiliary / asset item to the image dictionary.
 
@@ -799,10 +815,14 @@ class CocoImage(_CocoObject):
 
         # Check type of resolution inputs.
         if not isinstance(width, int) and width is not None:
-            raise TypeError(f'"width" input is neither an int or None variable but type: "{type(width)}"')
+            raise TypeError(
+                f'"width" input is neither an int or None variable but type: "{type(width)}"'
+            )
 
         if not isinstance(height, int) and height is not None:
-            raise TypeError(f'"height" input is neither an int or None variable but type: "{type(height)}"')
+            raise TypeError(
+                f'"height" input is neither an int or None variable but type: "{type(height)}"'
+            )
 
         # Infer resolution inputs from image data.
         if width is None and imdata is not None:
@@ -815,14 +835,16 @@ class CocoImage(_CocoObject):
             img_width = img.get('width', None)
             img_height = img.get('height', None)
             if img_width is None or img_height is None:
-                raise ValueError('Parent image canvas has an unknown size. '
-                                 'Need to set width/height')
+                raise ValueError(
+                    'Parent image canvas has an unknown size. Need to set width/height'
+                )
             if width is None or height is None:
                 raise ValueError('Unable to infer warp_aux_to_img without width')
             # Assume we can just scale up the auxiliary data to match the image
             # space unless the user says otherwise
-            warp_aux_to_img = kwimage.Affine.scale((
-                img_width / width, img_height / height))
+            warp_aux_to_img = kwimage.Affine.scale(
+                (img_width / width, img_height / height)
+            )
         else:
             warp_aux_to_img = kwimage.Affine.coerce(warp_aux_to_img)
 
@@ -855,8 +877,7 @@ class CocoImage(_CocoObject):
         if imdata is not None:
             if imwrite:
                 if __debug__ and file_name is None:
-                    raise ValueError(
-                        'file_name must be given if imwrite is True')
+                    raise ValueError('file_name must be given if imwrite is True')
                 # if self.dset is None:
                 #     fpath = file_name
                 #     if not isabs(fpath):
@@ -882,9 +903,17 @@ class CocoImage(_CocoObject):
         if self.dset is not None:
             self.dset._invalidate_hashid()
 
-    def imdelay(self, channels=None, space='image', resolution=None,
-                bundle_dpath=None, interpolation='linear', antialias=True,
-                nodata_method=None, RESOLUTION_KEY=None):
+    def imdelay(
+        self,
+        channels=None,
+        space='image',
+        resolution=None,
+        bundle_dpath=None,
+        interpolation='linear',
+        antialias=True,
+        nodata_method=None,
+        RESOLUTION_KEY=None,
+    ):
         """
         Perform a delayed load on the data in this image.
 
@@ -1048,13 +1077,11 @@ class CocoImage(_CocoObject):
 
         # Get info about the primary image and check if its channels are
         # requested (if it even has any)
-        img_info = _delay_load_imglike(bundle_dpath, img,
-                                       nodata_method=nodata_method)
+        img_info = _delay_load_imglike(bundle_dpath, img, nodata_method=nodata_method)
         obj_info_list = [(img_info, img)]
         asset_list = img.get('auxiliary', img.get('assets', [])) or []
         for asset in asset_list:
-            info = _delay_load_imglike(bundle_dpath, asset,
-                                       nodata_method=nodata_method)
+            info = _delay_load_imglike(bundle_dpath, asset, nodata_method=nodata_method)
             obj_info_list.append((info, asset))
 
         chan_list = []
@@ -1074,8 +1101,10 @@ class CocoImage(_CocoObject):
                         warp_img_from_asset = obj.get('warp_aux_to_img', None)
                         # warp_img_from_asset = Affine.coerce(warp_img_from_asset)
                         chan = chan.warp(
-                            warp_img_from_asset, dsize=img_info['dsize'],
-                            interpolation=interpolation, antialias=antialias,
+                            warp_img_from_asset,
+                            dsize=img_info['dsize'],
+                            interpolation=interpolation,
+                            antialias=antialias,
                             lazy=True,
                         )
                     chan_list.append(chan)
@@ -1147,20 +1176,23 @@ class CocoImage(_CocoObject):
             elif space == 'video':
                 warp_vid_from_img = self.img.get('warp_img_to_vid', None)
                 delayed = delayed.warp(
-                    warp_vid_from_img, dsize=dsize,
+                    warp_vid_from_img,
+                    dsize=dsize,
                     interpolation=interpolation,
                     antialias=antialias,
-                    lazy=True)
+                    lazy=True,
+                )
             else:
                 raise KeyError('space = {}'.format(space))
 
         if resolution is not None:
             # Adjust to the requested resolution
             factor = self._scalefactor_for_resolution(
-                space=space, resolution=resolution,
-                RESOLUTION_KEY=RESOLUTION_KEY)
+                space=space, resolution=resolution, RESOLUTION_KEY=RESOLUTION_KEY
+            )
             delayed = delayed.scale(
-                factor, antialias=antialias, interpolation=interpolation)
+                factor, antialias=antialias, interpolation=interpolation
+            )
 
         return delayed
 
@@ -1173,6 +1205,7 @@ class CocoImage(_CocoObject):
             None | kwimage.MultiPolygon
         """
         import kwimage
+
         valid_coco_poly = self.img.get('valid_region', None)
         if valid_coco_poly is None:
             valid_poly = None
@@ -1200,6 +1233,7 @@ class CocoImage(_CocoObject):
             kwimage.Affine: The transformation matrix
         """
         import kwimage
+
         warp_img_to_vid = kwimage.Affine.coerce(self.img.get('warp_img_to_vid', None))
         if warp_img_to_vid.matrix is None:
             # Hack to ensure the matrix property always is an array
@@ -1222,6 +1256,7 @@ class CocoImage(_CocoObject):
         target resolution.
         """
         import kwimage
+
         if space == 'image':
             warp_space_from_img = kwimage.Affine(None)
         elif space == 'video':
@@ -1234,14 +1269,13 @@ class CocoImage(_CocoObject):
         else:
             # Requested the annotation at a resolution, so we need to apply a
             # scale factor
-            scale = self._scalefactor_for_resolution(space=space,
-                                                     resolution=resolution)
+            scale = self._scalefactor_for_resolution(space=space, resolution=resolution)
             warp_final_from_space = kwimage.Affine.scale(scale)
             warp_final_from_img = warp_final_from_space @ warp_space_from_img
         return warp_final_from_img
 
     def _annot_segmentation(self, ann, space='video', resolution=None):
-        """"
+        """ "
         Load annotation segmentations in a requested space at a target resolution.
 
         Example:
@@ -1261,13 +1295,16 @@ class CocoImage(_CocoObject):
             >>> print(f'vid_sseg_2m.area = {vid_sseg_2m.area}')
         """
         import kwimage
-        warp_final_from_img = self._warp_for_resolution(space=space, resolution=resolution)
+
+        warp_final_from_img = self._warp_for_resolution(
+            space=space, resolution=resolution
+        )
         img_sseg = kwimage.MultiPolygon.coerce(ann['segmentation'])
         warped_sseg = img_sseg.warp(warp_final_from_img)
         return warped_sseg
 
     def _annot_segmentations(self, anns, space='video', resolution=None):
-        """"
+        """ "
         Load multiple annotation segmentations in a requested space at a target
         resolution.
 
@@ -1288,7 +1325,10 @@ class CocoImage(_CocoObject):
             >>> print(f'vid_sseg_2m.area = {vid_sseg_2m[0].area}')
         """
         import kwimage
-        warp_final_from_img = self._warp_for_resolution(space=space, resolution=resolution)
+
+        warp_final_from_img = self._warp_for_resolution(
+            space=space, resolution=resolution
+        )
         warped_ssegs = []
         for ann in anns:
             img_sseg = kwimage.MultiPolygon.coerce(ann['segmentation'])
@@ -1355,10 +1395,12 @@ class CocoImage(_CocoObject):
                 assert img_resolution_expr is not None
                 img_resolution_info = coerce_resolution(img_resolution_expr)
                 img_resolution_mat = kwimage.Affine.scale(img_resolution_info['mag'])
-                vid_resolution = (self.warp_vid_from_img @ img_resolution_mat.inv()).inv()
+                vid_resolution = (
+                    self.warp_vid_from_img @ img_resolution_mat.inv()
+                ).inv()
                 vid_resolution_info = {
                     'mag': vid_resolution.decompose()['scale'],
-                    'unit': img_resolution_info['unit']
+                    'unit': img_resolution_info['unit'],
                 }
             else:
                 vid_resolution_info = coerce_resolution(vid_resolution_expr)
@@ -1371,21 +1413,29 @@ class CocoImage(_CocoObject):
                 assert vid_resolution_expr is not None
                 vid_resolution_info = coerce_resolution(vid_resolution_expr)
                 vid_resolution_mat = kwimage.Affine.scale(vid_resolution_info['mag'])
-                img_resolution = (self.warp_img_from_vid @ vid_resolution_mat.inv()).inv()
+                img_resolution = (
+                    self.warp_img_from_vid @ vid_resolution_mat.inv()
+                ).inv()
                 img_resolution_info = {
                     'mag': img_resolution.decompose()['scale'],
-                    'unit': vid_resolution_info['unit']
+                    'unit': vid_resolution_info['unit'],
                 }
             else:
                 img_resolution_info = coerce_resolution(img_resolution_expr)
             space_resolution_info = img_resolution_info
         elif space in {'asset', 'auxiliary'}:
             if channel is None:
-                raise ValueError('must specify a channel to ask for the asset resolution')
+                raise ValueError(
+                    'must specify a channel to ask for the asset resolution'
+                )
             # Use existing code to get the resolution of the image (could be more efficient)
-            space_resolution_info = self.resolution('image', RESOLUTION_KEY=RESOLUTION_KEY).copy()
+            space_resolution_info = self.resolution(
+                'image', RESOLUTION_KEY=RESOLUTION_KEY
+            ).copy()
             # Adjust the image resolution based on the asset scale factor
-            warp_img_from_aux = kwimage.Affine.coerce(self.find_asset_obj(channel).get('warp_aux_to_img', None))
+            warp_img_from_aux = kwimage.Affine.coerce(
+                self.find_asset_obj(channel).get('warp_aux_to_img', None)
+            )
             img_res_mat = kwimage.Affine.scale(space_resolution_info['mag'])
             aux_res_mat = img_res_mat @ warp_img_from_aux
             space_resolution_info['mag'] = np.array(aux_res_mat.decompose()['scale'])
@@ -1393,7 +1443,9 @@ class CocoImage(_CocoObject):
             raise KeyError(space)
         return space_resolution_info
 
-    def _scalefactor_for_resolution(self, space, resolution, channel=None, RESOLUTION_KEY=None):
+    def _scalefactor_for_resolution(
+        self, space, resolution, channel=None, RESOLUTION_KEY=None
+    ):
         """
         Given image or video space, compute the scale factor needed to achieve the
         target resolution.
@@ -1428,8 +1480,10 @@ class CocoImage(_CocoObject):
             scale_factor = (1.2857, 1.2857)
         """
         if resolution is None:
-            return (1., 1.)
-        space_resolution_info = self.resolution(space=space, channel=channel, RESOLUTION_KEY=RESOLUTION_KEY)
+            return (1.0, 1.0)
+        space_resolution_info = self.resolution(
+            space=space, channel=channel, RESOLUTION_KEY=RESOLUTION_KEY
+        )
         request_resolution_info = coerce_resolution(resolution)
         # If units are unspecified, assume they are compatible
         if space_resolution_info['unit'] is not None:
@@ -1440,19 +1494,21 @@ class CocoImage(_CocoObject):
         scale_factor = (x2 / x1, y2 / y1)
         return scale_factor
 
-    def _detections_for_resolution(coco_img, space='video', resolution=None,
-                                   aids=None, RESOLUTION_KEY=None):
+    def _detections_for_resolution(
+        coco_img, space='video', resolution=None, aids=None, RESOLUTION_KEY=None
+    ):
         """
         This is slightly less than ideal in terms of API, but it will work for
         now.
         """
         import kwimage
+
         assert space == 'video', 'other cases are not handled'
         # Build transform from image to requested space
         warp_vid_from_img = coco_img.warp_vid_from_img
-        scale = coco_img._scalefactor_for_resolution(space='video',
-                                                     resolution=resolution,
-                                                     RESOLUTION_KEY=RESOLUTION_KEY)
+        scale = coco_img._scalefactor_for_resolution(
+            space='video', resolution=resolution, RESOLUTION_KEY=RESOLUTION_KEY
+        )
         warp_req_from_vid = kwimage.Affine.scale(scale)
         warp_req_from_img = warp_req_from_vid @ warp_vid_from_img
 
@@ -1472,10 +1528,12 @@ class CocoImage(_CocoObject):
 
     # Deprecated aliases
     add_auxiliary_item = deprecated_function_alias(
-        'kwcoco', 'add_auxiliary_item', deprecate='now', new_func=add_asset)
+        'kwcoco', 'add_auxiliary_item', deprecate='now', new_func=add_asset
+    )
 
     delay = deprecated_function_alias(
-        'kwcoco', 'delay', new_func=imdelay, deprecate='now')
+        'kwcoco', 'delay', new_func=imdelay, deprecate='now'
+    )
 
     def show(self, **kwargs):
         """
@@ -1496,8 +1554,10 @@ class CocoImage(_CocoObject):
 
         """
         if self.dset is None:
-            raise Exception('Currently requires a connected dataset. '
-                            'This may be relaxed in the future')
+            raise Exception(
+                'Currently requires a connected dataset. '
+                'This may be relaxed in the future'
+            )
         return self.dset.show_image(self['id'], **kwargs)
 
     def draw(self, **kwargs):
@@ -1519,8 +1579,10 @@ class CocoImage(_CocoObject):
 
         """
         if self.dset is None:
-            raise Exception('Currently requires a connected dataset. '
-                            'This may be relaxed in the future')
+            raise Exception(
+                'Currently requires a connected dataset. '
+                'This may be relaxed in the future'
+            )
         return self.dset.draw_image(self['id'], **kwargs)
 
 
@@ -1580,6 +1642,7 @@ class CocoVideo(_CocoObject):
         >>> self = CocoVideo(obj, dset)
         >>> print(f'self={self}')
     """
+
     __alias_to_primary__ = {}
 
     def __nice__(self):
@@ -1598,6 +1661,7 @@ class CocoAnnotation(_CocoObject):
         >>> self = CocoAnnotation(obj, dset)
         >>> print(f'self={self}')
     """
+
     __alias_to_primary__ = {}
 
     def __nice__(self):
@@ -1616,6 +1680,7 @@ class CocoCategory(_CocoObject):
         >>> self = CocoCategory(obj, dset)
         >>> print(f'self={self}')
     """
+
     __alias_to_primary__ = {}
 
     def __nice__(self):
@@ -1634,6 +1699,7 @@ class CocoTrack(_CocoObject):
         >>> self = CocoTrack(obj, dset)
         >>> print(f'self={self}')
     """
+
     __alias_to_primary__ = {}
 
     def __nice__(self):
@@ -1670,9 +1736,13 @@ def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
         info['chan_construct'] = (DelayedIdentity, _kwargs)
     elif fname is not None:
         fpath = join(bundle_dpath, fname)
-        _kwargs = dict(fpath=fpath, channels=channels_, dsize=dsize,
-                       nodata_method=nodata_method,
-                       num_overviews=num_overviews)
+        _kwargs = dict(
+            fpath=fpath,
+            channels=channels_,
+            dsize=dsize,
+            nodata_method=nodata_method,
+            num_overviews=num_overviews,
+        )
         info['chan_construct'] = (DelayedLoad, _kwargs)
     info['quantization'] = quantization
     return info
@@ -1680,10 +1750,12 @@ def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
 
 def parse_quantity(expr):
     import re
+
     expr_pat = re.compile(
         r'^(?P<magnitude>[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)'
         '(?P<spaces> *)'
-        '(?P<unit>.*)$')
+        '(?P<unit>.*)$'
+    )
     match = expr_pat.match(expr.strip())
     if match is None:
         raise ValueError(f'Unable to parse {expr!r}')

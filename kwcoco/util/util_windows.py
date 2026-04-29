@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 def fix_msys_path(path):
     r"""
     Windows is so special. When using msys bash if you pass a path on the CLI
@@ -21,6 +22,7 @@ def fix_msys_path(path):
         >>> assert fix_msys_path(pathlib.Path(r'\z')) == pathlib.Path('Z:/')
     """
     import os
+
     was_pathlike = isinstance(path, os.PathLike)
     input_path = path
     new_path = path
@@ -28,6 +30,7 @@ def fix_msys_path(path):
         path = os.fspath(path)
     if isinstance(path, str):
         import re
+
         drive_pat = '(?P<drive>[A-Za-z])'
         slash_pat = r'[/\\]'
         pat1 = re.compile(f'^{slash_pat}{drive_pat}$')
@@ -52,6 +55,7 @@ def is_windows_path(path):
         >>> assert not is_windows_path('/foo')
     """
     import re
+
     drive_pat = '(?P<drive>[A-Za-z])'
     slash_pat = r'[/\\]'
     pat1 = re.compile(f'^{drive_pat}:$')

@@ -10,4 +10,5 @@ if __name__ == '__main__':
         python ~/code/kwcoco/coco_cli/__main__.py
     """
     from kwcoco.cli.__main__ import main
+
     main()

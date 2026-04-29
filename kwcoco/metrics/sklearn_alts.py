@@ -5,12 +5,12 @@ Faster pure-python versions of sklearn functions that avoid expensive checks
 and label rectifications. It is assumed that all labels are consecutive
 non-negative integers.
 """
+
 from scipy.sparse import coo_matrix
 import numpy as np
 
 
-def confusion_matrix(y_true, y_pred, n_labels=None, labels=None,
-                     sample_weight=None):
+def confusion_matrix(y_true, y_pred, n_labels=None, labels=None, sample_weight=None):
     """
     faster version of sklearn confusion matrix that avoids the
     expensive checks and label rectification
@@ -46,9 +46,9 @@ def confusion_matrix(y_true, y_pred, n_labels=None, labels=None,
         sample_weight = np.ones(len(y_true), dtype=int)
     if n_labels is None:
         n_labels = len(labels)
-    CM = coo_matrix((sample_weight, (y_true, y_pred)),
-                    shape=(n_labels, n_labels),
-                    dtype=np.int64).toarray()
+    CM = coo_matrix(
+        (sample_weight, (y_true, y_pred)), shape=(n_labels, n_labels), dtype=np.int64
+    ).toarray()
     return CM
 
 
@@ -122,11 +122,11 @@ def _binary_clf_curve2(y_true, y_score, pos_label=None, sample_weight=None):
     from sklearn.utils import check_consistent_length
     from sklearn.utils.multiclass import type_of_target
     from sklearn.utils.extmath import stable_cumsum
+
     # Check to make sure y_true is valid
     y_type = type_of_target(y_true)
-    if not (y_type == "binary" or
-            (y_type == "multiclass" and pos_label is not None)):
-        raise ValueError("{0} format is not supported".format(y_type))
+    if not (y_type == 'binary' or (y_type == 'multiclass' and pos_label is not None)):
+        raise ValueError('{0} format is not supported'.format(y_type))
 
     check_consistent_length(y_true, y_score, sample_weight)
     y_true = column_or_1d(y_true)
@@ -142,24 +142,28 @@ def _binary_clf_curve2(y_true, y_score, pos_label=None, sample_weight=None):
     # triggering a FutureWarning by calling np.array_equal(a, b)
     # when elements in the two arrays are not comparable.
     classes = np.unique(y_true)
-    if (pos_label is None and (
-            classes.dtype.kind in ('O', 'U', 'S') or
-            not (np.array_equal(classes, [0, 1]) or
-                 np.array_equal(classes, [-1, 1]) or
-                 np.array_equal(classes, [0]) or
-                 np.array_equal(classes, [-1]) or
-                 np.array_equal(classes, [1])))):
-        classes_repr = ", ".join(repr(c) for c in classes)
-        raise ValueError("y_true takes value in {{{classes_repr}}} and "
-                         "pos_label is not specified: either make y_true "
-                         "take value in {{0, 1}} or {{-1, 1}} or "
-                         "pass pos_label explicitly.".format(
-                             classes_repr=classes_repr))
+    if pos_label is None and (
+        classes.dtype.kind in ('O', 'U', 'S')
+        or not (
+            np.array_equal(classes, [0, 1])
+            or np.array_equal(classes, [-1, 1])
+            or np.array_equal(classes, [0])
+            or np.array_equal(classes, [-1])
+            or np.array_equal(classes, [1])
+        )
+    ):
+        classes_repr = ', '.join(repr(c) for c in classes)
+        raise ValueError(
+            'y_true takes value in {{{classes_repr}}} and '
+            'pos_label is not specified: either make y_true '
+            'take value in {{0, 1}} or {{-1, 1}} or '
+            'pass pos_label explicitly.'.format(classes_repr=classes_repr)
+        )
     elif pos_label is None:
-        pos_label = 1.
+        pos_label = 1.0
 
     # make y_true a boolean vector
-    y_true = (y_true == pos_label)
+    y_true = y_true == pos_label
 
     # Transform nans into negative infinity
     nan_flags = np.isnan(y_score)
@@ -167,19 +171,19 @@ def _binary_clf_curve2(y_true, y_score, pos_label=None, sample_weight=None):
         y_score[nan_flags] = -np.inf
 
     # sort scores and corresponding truth values
-    desc_score_indices = np.argsort(y_score, kind="mergesort")[::-1]
+    desc_score_indices = np.argsort(y_score, kind='mergesort')[::-1]
     y_score = y_score[desc_score_indices]
     y_true = y_true[desc_score_indices]
     if sample_weight is not None:
         weight = sample_weight[desc_score_indices]
     else:
-        weight = 1.
+        weight = 1.0
 
     # y_score typically has many tied values. Here we extract
     # the indices associated with the distinct values. We also
     # concatenate a value for the end of the curve.
 
-    with np.errstate(invalid="ignore"):
+    with np.errstate(invalid='ignore'):
         y_diff = np.diff(y_score)
     # Set difference between -inf to zero
     fix_flags = np.isinf(y_score[:-1]) & np.isnan(y_diff)

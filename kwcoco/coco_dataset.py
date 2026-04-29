@@ -953,6 +953,7 @@ class MixinCocoConstructors:
                 if verbose:
                     print(f'Reading {dset_fpath}')
                 from kwcoco.coco_sql_dataset import CocoSqlDatabase
+
                 self = CocoSqlDatabase(dset_fpath).connect()
             elif (
                 result.path.endswith('.json')
@@ -1348,14 +1349,10 @@ class MixinCocoConstructors:
         else:
             input_was_pathlike = True
         if input_was_pathlike:
-            coco_dset = cls(
-                fpath, bundle_dpath=bundle_dpath, autobuild=autobuild
-            )
+            coco_dset = cls(fpath, bundle_dpath=bundle_dpath, autobuild=autobuild)
         else:
             data = json_r.load(file)
-            coco_dset = cls(
-                data, bundle_dpath=bundle_dpath, autobuild=autobuild
-            )
+            coco_dset = cls(data, bundle_dpath=bundle_dpath, autobuild=autobuild)
         return coco_dset
 
     @classmethod
@@ -3686,6 +3683,7 @@ class MixinCocoStats:
                         )
                     else:
                         from delayed_image.channel_spec import FusedChannelSpec
+
                         channels = FusedChannelSpec.coerce(channels)
                         for chan in channels.as_list():
                             if chan in seen:
@@ -4125,9 +4123,7 @@ class MixinCocoDraw:
     Matplotlib / display functionality
     """
 
-    def draw_image(
-        self, gid: int, channels: ChannelSpec | None = None
-    ) -> ndarray:
+    def draw_image(self, gid: int, channels: ChannelSpec | None = None) -> ndarray:
         """
         Use kwimage to draw all annotations on an image and return the pixels
         as a numpy array.
@@ -6139,9 +6135,7 @@ class CocoIndex:
             for _ in index.vidid_to_gids.values():
                 _.clear()
 
-    def _remove_keypoint_categories(
-        index, remove_kpcid: Any, verbose: Any = 0
-    ) -> None:
+    def _remove_keypoint_categories(index, remove_kpcid: Any, verbose: Any = 0) -> None:
         if index.kpcats is not None:
             for kpcid in remove_kpcid:
                 del index.kpcats[kpcid]
@@ -7055,7 +7049,11 @@ class CocoDataset(
         return text
 
     def _compress_dump_to_fileptr(
-        self, file: Any, arcname: None | str = None, indent: int | str | None = None, newlines: bool = False
+        self,
+        file: Any,
+        arcname: None | str = None,
+        indent: int | str | None = None,
+        newlines: bool = False,
     ) -> Any:
         """
         Experimental method to save compressed kwcoco files, may be folded into
@@ -7086,7 +7084,9 @@ class CocoDataset(
             text = self.dumps(indent=indent, newlines=newlines)
             zfile.writestr(arcname, text.encode('utf8'))
 
-    def _dump(self, file: Any, indent: int | str | None, newlines: bool, compress: bool) -> None:
+    def _dump(
+        self, file: Any, indent: int | str | None, newlines: bool, compress: bool
+    ) -> None:
         """
         Case where we are dumping to an open file pointer.
         We assume this means the dataset has been written to disk.

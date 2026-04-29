@@ -16,34 +16,60 @@ class CocoSplitCLI(scfg.DataConfig):
     NOTE:
         This may currently have a bug with split sizes. Help wanted.
     """
+
     __command__ = 'split'
     __default__ = {
         'src': scfg.Value(None, help='input dataset to split', position=1),
-        'dst1': scfg.Value('split1.kwcoco.json', help='output path of the larger split'),
-        'dst2': scfg.Value('split2.kwcoco.json', help='output path of the smaller split'),
-
-        'train_fpath': scfg.Value(None, help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2'),
-        'vali_fpath': scfg.Value(None, help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2'),
-        'test_fpath': scfg.Value(None, help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2'),
-
-        'factor': scfg.Value(3, help='number of items in dset1 for each item in dset2. Also defines the maximum number of splits that could be written.'),
+        'dst1': scfg.Value(
+            'split1.kwcoco.json', help='output path of the larger split'
+        ),
+        'dst2': scfg.Value(
+            'split2.kwcoco.json', help='output path of the smaller split'
+        ),
+        'train_fpath': scfg.Value(
+            None,
+            help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2',
+        ),
+        'vali_fpath': scfg.Value(
+            None,
+            help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2',
+        ),
+        'test_fpath': scfg.Value(
+            None,
+            help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2',
+        ),
+        'factor': scfg.Value(
+            3,
+            help='number of items in dset1 for each item in dset2. Also defines the maximum number of splits that could be written.',
+        ),
         'rng': scfg.Value(None, help='A random seed for reproducible splits'),
-        'balance_categories': scfg.Value(True, help='if True tries to balance annotation categories across splits'),
-        'num_write': scfg.Value(1, isflag=True, help=ub.paragraph(
-            '''
+        'balance_categories': scfg.Value(
+            True, help='if True tries to balance annotation categories across splits'
+        ),
+        'num_write': scfg.Value(
+            1,
+            isflag=True,
+            help=ub.paragraph(
+                """
             The number of splits to write. Can be between 1 and ``factor``.
             In the case that ``num_write > ``, then dst1 and dst2 datasets
             must contain a {} format string specifier so each of the output
             filenames can be indexed.
-            ''')),
+            """
+            ),
+        ),
         'splitter': scfg.Value(
-            'auto', help=ub.paragraph(
-                '''
+            'auto',
+            help=ub.paragraph(
+                """
                 Split method to use.
                 Using "image" will randomly assign each image to a partition.
                 Using "video" will randomly assign each video to a partition.
                 Using "auto" chooses "video" if there are any, otherwise "image".
-                '''), choices=['auto', 'image', 'video']),
+                """
+            ),
+            choices=['auto', 'image', 'video'],
+        ),
         'compress': scfg.Value('auto', help='if True writes results with compression'),
     }
     __epilog__ = """
@@ -83,11 +109,13 @@ class CocoSplitCLI(scfg.DataConfig):
         if config['num_write'] > 1:
             if not set(str(config['dst1'])).issuperset(set('{}')):
                 raise Exception(
-                    'when num_write is True dst1 and dst2 must contain a {} format string placeholder')
+                    'when num_write is True dst1 and dst2 must contain a {} format string placeholder'
+                )
 
             if not set(str(config['dst2'])).issuperset(set('{}')):
                 raise Exception(
-                    'when num_write is True dst1 and dst2 must contain a {} format string placeholder')
+                    'when num_write is True dst1 and dst2 must contain a {} format string placeholder'
+                )
 
         print('reading fpath = {!r}'.format(config['src']))
         dset = kwcoco.CocoDataset.coerce(config['src'])
@@ -129,9 +157,9 @@ class CocoSplitCLI(scfg.DataConfig):
 
         shuffle = rng is not None
         factor = config['factor']
-        self = util_sklearn.StratifiedGroupKFold(n_splits=factor,
-                                                 random_state=rng,
-                                                 shuffle=shuffle)
+        self = util_sklearn.StratifiedGroupKFold(
+            n_splits=factor, random_state=rng, shuffle=shuffle
+        )
 
         dst1_fpath = config['dst1']
         dst2_fpath = config['dst2']
@@ -145,16 +173,26 @@ class CocoSplitCLI(scfg.DataConfig):
             assert dst2_fpath is None
 
         if config['balance_categories']:
-            split_idxs = list(self.split(X=final_group_gids, y=final_group_cids, groups=final_group_ids))
+            split_idxs = list(
+                self.split(
+                    X=final_group_gids, y=final_group_cids, groups=final_group_ids
+                )
+            )
         else:
-            split_idxs = list(self.split(X=final_group_gids, y=final_group_gids, groups=final_group_ids))
+            split_idxs = list(
+                self.split(
+                    X=final_group_gids, y=final_group_gids, groups=final_group_ids
+                )
+            )
 
         dumpkw = {
             'newlines': True,
             'compress': config['compress'],
         }
         for split_num, (idxs1, idxs2) in enumerate(split_idxs):
-            print(f'Build split {split_num} / {factor} with ratio {len(idxs1)}:{len(idxs2)}')
+            print(
+                f'Build split {split_num} / {factor} with ratio {len(idxs1)}:{len(idxs2)}'
+            )
             idxs1, idxs2 = split_idxs[0]
             gids1 = sorted(ub.unique(ub.take(final_group_gids, idxs1)))
             gids2 = sorted(ub.unique(ub.take(final_group_gids, idxs2)))

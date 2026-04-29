@@ -13,8 +13,8 @@ def box_area(boxes):
 
 @numba.njit(cache=True)
 def box_iou(b1, b2):
-    '''
-    
+    """
+
     Args:
         b1: np.ndarray (N, 4)
             Bounding boxes in (x1, y1, x2, y2) format.
@@ -23,7 +23,7 @@ def box_iou(b1, b2):
 
     Returns:
         np.ndarray (N, M) with box intersection-over-union for each pair between b1 and b2.
-    '''
+    """
     out = np.empty((b1.shape[0], b2.shape[0]))
 
     area2 = box_area(b2)
@@ -62,14 +62,14 @@ def assign_confusion_vectors(
     truth_gid: np.ndarray,
     truth_cid: np.ndarray,
     truth_boxes: np.ndarray,
-    iou_thres: float=0.5,
-    mutex: bool=True,
+    iou_thres: float = 0.5,
+    mutex: bool = True,
 ) -> np.ndarray:
-    '''Fast confusion vector assignment.
+    """Fast confusion vector assignment.
 
     Note: this function assumes that the predictions and ground truth are both sorted
     by gid, and will break if that assumption is violated.
-    '''
+    """
     res = []
     pstart, tstart = 0, 0
     pend, tend = 1, 1
@@ -128,7 +128,7 @@ def assign_confusion_vectors(
                 else:
                     # false positive
                     res.append([pcid[i], -1.0, s[i], -1.0, -1.0, i, pgid])
-                
+
             # false negatives
             for j in range(iou.shape[1]):
                 false_neg = True
@@ -138,7 +138,7 @@ def assign_confusion_vectors(
                         break
                 if false_neg:
                     res.append([-1.0, tcid[j], -np.inf, -1.0, j, -1.0, pgid])
-            
+
             pstart = pend
             tstart = tend
         # no truth annotations for this image, all preds are false positives
@@ -148,7 +148,7 @@ def assign_confusion_vectors(
                 res.append([pcid[i], -1.0, s[i], -1.0, -1.0, i, pgid])
             pstart = pend
         # no predictions for this image, all truths are false negatives
-        else: # pgid > tgid:
+        else:  # pgid > tgid:
             for i in range(tbox.shape[0]):
                 # false negative
                 res.append([-1.0, tcid[i], -np.inf, -1.0, i, -1.0, tgid])
@@ -156,14 +156,15 @@ def assign_confusion_vectors(
 
         if pstart >= pred_gid.shape[0] and tstart >= truth_gid.shape[0]:
             break
-    
+
     res = np.array(res)
     return res
 
 
-def confusion_vectors(truth: CocoDataset, pred: CocoDataset, iou_thres: float=0.5, mutex: bool=True):
-    '''Create confusion vectors from truth and pred CocoDatasets.
-    '''
+def confusion_vectors(
+    truth: CocoDataset, pred: CocoDataset, iou_thres: float = 0.5, mutex: bool = True
+):
+    """Create confusion vectors from truth and pred CocoDatasets."""
     pred_anns = pred.annots()
     truth_anns = truth.annots()
 
@@ -174,7 +175,10 @@ def confusion_vectors(truth: CocoDataset, pred: CocoDataset, iou_thres: float=0.
     scores = np.array(pred_anns.get('score'))
     psrt = np.lexsort((pred_anns.ids, pred_gid))
     pred_gid, pred_cid, pred_boxes, scores = (
-        pred_gid[psrt], pred_cid[psrt], pred_boxes[psrt], scores[psrt]
+        pred_gid[psrt],
+        pred_cid[psrt],
+        pred_boxes[psrt],
+        scores[psrt],
     )
 
     # get the truth data and order by (image_id, annotation_id)
@@ -182,7 +186,11 @@ def confusion_vectors(truth: CocoDataset, pred: CocoDataset, iou_thres: float=0.
     truth_cid = np.array(truth_anns.cids)
     truth_boxes = truth_anns.boxes.to_ltrb().data
     tsrt = np.lexsort((truth_anns.ids, truth_gid))
-    truth_gid, truth_cid, truth_boxes = truth_gid[tsrt], truth_cid[tsrt], truth_boxes[tsrt]
+    truth_gid, truth_cid, truth_boxes = (
+        truth_gid[tsrt],
+        truth_cid[tsrt],
+        truth_boxes[tsrt],
+    )
 
     # fast confusion vector assignment
     cv = assign_confusion_vectors(
@@ -194,11 +202,12 @@ def confusion_vectors(truth: CocoDataset, pred: CocoDataset, iou_thres: float=0.
         truth_cid,
         truth_boxes,
         iou_thres=iou_thres,
-        mutex=mutex
+        mutex=mutex,
     )
 
     # convert to pandas dataframe
     import pandas as pd
+
     cols = ['pred', 'true', 'score', 'iou', 'txs', 'pxs', 'gid']
     dt = [np.int32, np.int32, np.float32, np.float32, np.int32, np.int32, np.int32]
     cv = pd.DataFrame({k: v.astype(d) for k, v, d in zip(cols, cv.T, dt)}, columns=cols)
@@ -206,8 +215,7 @@ def confusion_vectors(truth: CocoDataset, pred: CocoDataset, iou_thres: float=0.
 
 
 def match_ids_by_filename(truth, pred):
-    '''Ensure that filenames and image ids match up between truth and prediction files.
-    '''
+    """Ensure that filenames and image ids match up between truth and prediction files."""
     name2id = {x['file_name'].rsplit('/', 1)[-1]: x['id'] for x in truth.imgs.values()}
     g2a = pred.index.gid_to_aids.copy()
     for x in pred.dataset['images']:
@@ -223,16 +231,16 @@ def match_ids_by_filename(truth, pred):
 def calculate_map(
     truth: CocoDataset,
     pred: CocoDataset,
-    iou_thres: float=0.5,
-    mutex: bool=True,
-    min_score: float=0.0,
+    iou_thres: float = 0.5,
+    mutex: bool = True,
+    min_score: float = 0.0,
 ):
     from kwcoco.metrics import ConfusionVectors
     import kwarray
 
     # Remap pred image IDs to match truth based on filename
     pred = match_ids_by_filename(truth, pred)
-    
+
     # Filter out any predictions with score < min_score
     to_remove = [aid for aid in pred.anns if pred.anns[aid]['score'] < min_score]
     if len(to_remove) > 0:
@@ -249,7 +257,9 @@ def calculate_map(
     cv.loc[cv.pred > -1, 'pred'] -= 1
 
     # Use kwcoco to compute metrics
-    confv = ConfusionVectors(kwarray.DataFrameArray(cv), [x['name'] for x in pred.cats.values()])
+    confv = ConfusionVectors(
+        kwarray.DataFrameArray(cv), [x['name'] for x in pred.cats.values()]
+    )
     perclass = confv.binarize_ovr()
     map = perclass.measures()['mAP']
 
@@ -275,7 +285,12 @@ if __name__ == '__main__':
     parser.add_argument('truth', type=Path, help=help['truth'])
     parser.add_argument('pred', type=Path, help=help['pred'])
     parser.add_argument('-i', '--iou', type=float, default=0.5, help=help['iou'])
-    parser.add_argument('--mutex', action=argparse.BooleanOptionalAction, default=True, help=help['mutex'])
+    parser.add_argument(
+        '--mutex',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=help['mutex'],
+    )
     parser.add_argument('--min-score', type=float, default=0.0, help=help['min-score'])
 
     args = parser.parse_args()

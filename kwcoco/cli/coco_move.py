@@ -13,6 +13,7 @@ class CocoMove(scfg.DataConfig):
 
     TODO: add option to move the assets as well?
     """
+
     __command__ = 'move'
     __alias__ = ['mv']
 
@@ -21,8 +22,7 @@ class CocoMove(scfg.DataConfig):
 
     absolute = scfg.Value(False, help=('If False, the output file uses relative paths'))
 
-    check = scfg.Value(True, help=(
-        'If True, checks that all data exists'))
+    check = scfg.Value(True, help=('If True, checks that all data exists'))
 
     @classmethod
     def main(CocoMove, cmdline=1, **kwargs):
@@ -49,6 +49,7 @@ class CocoMove(scfg.DataConfig):
         config = CocoMove.cli(cmdline=cmdline, data=kwargs, strict=True)
         rich_print('config = ' + ub.urepr(config, nl=1))
         import kwcoco
+
         print('loading = {}'.format(ub.urepr(config.src, nl=1)))
         dset = kwcoco.CocoDataset.coerce(config.src)
 

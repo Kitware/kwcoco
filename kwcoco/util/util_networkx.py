@@ -10,48 +10,48 @@ from networkx.utils import open_file
 
 
 class _AsciiBaseGlyphs:
-    empty = "+"
-    newtree_last = "+-- "
-    newtree_mid = "+-- "
-    endof_forest = "    "
-    within_forest = ":   "
-    within_tree = "|   "
+    empty = '+'
+    newtree_last = '+-- '
+    newtree_mid = '+-- '
+    endof_forest = '    '
+    within_forest = ':   '
+    within_tree = '|   '
 
 
 class AsciiDirectedGlyphs(_AsciiBaseGlyphs):
-    last = "L-> "
-    mid = "|-> "
-    backedge = "<-"
+    last = 'L-> '
+    mid = '|-> '
+    backedge = '<-'
 
 
 class AsciiUndirectedGlyphs(_AsciiBaseGlyphs):
-    last = "L-- "
-    mid = "|-- "
-    backedge = "-"
+    last = 'L-- '
+    mid = '|-- '
+    backedge = '-'
 
 
 class _UtfBaseGlyphs:
     # Notes on available box and arrow characters
     # https://en.wikipedia.org/wiki/Box-drawing_character
     # https://stackoverflow.com/questions/2701192/triangle-arrow
-    empty = "╙"
-    newtree_last = "╙── "
-    newtree_mid = "╟── "
-    endof_forest = "    "
-    within_forest = "╎   "
-    within_tree = "│   "
+    empty = '╙'
+    newtree_last = '╙── '
+    newtree_mid = '╟── '
+    endof_forest = '    '
+    within_forest = '╎   '
+    within_tree = '│   '
 
 
 class UtfDirectedGlyphs(_UtfBaseGlyphs):
-    last = "└─╼ "
-    mid = "├─╼ "
-    backedge = "╾"
+    last = '└─╼ '
+    mid = '├─╼ '
+    backedge = '╾'
 
 
 class UtfUndirectedGlyphs(_UtfBaseGlyphs):
-    last = "└── "
-    mid = "├── "
-    backedge = "─"
+    last = '└── '
+    mid = '├── '
+    backedge = '─'
 
 
 def generate_network_text(
@@ -138,18 +138,17 @@ def generate_network_text(
     if isinstance(with_labels, str):
         label_attr = with_labels
     elif with_labels:
-        label_attr = "label"
+        label_attr = 'label'
     else:
         label_attr = None
 
-    collapse_attr = "collapse"
+    collapse_attr = 'collapse'
 
     if max_depth == 0:
-        yield glyphs.empty + " ..."
+        yield glyphs.empty + ' ...'
     elif len(graph.nodes) == 0:
         yield glyphs.empty
     else:
-
         # If the nodes to traverse are unspecified, find the minimal set of
         # nodes that will reach the entire graph
         if sources is None:
@@ -182,7 +181,6 @@ def generate_network_text(
                     # any of that parents children, then we should emit an
                     # ellipsis at the end after this.
                     if num_skipped_children[parent] and parent is not None:
-
                         # Append the ellipsis to be emitted last
                         next_islast = True
                         try_frame = (node, Ellipsis, indents, next_islast)
@@ -219,8 +217,8 @@ def generate_network_text(
                     next_prefix = indents + [glyphs.within_tree]
 
             if node is Ellipsis:
-                label = " ..."
-                suffix = ""
+                label = ' ...'
+                suffix = ''
                 children = []
             else:
                 if label_attr is not None:
@@ -274,23 +272,23 @@ def generate_network_text(
                 other_parents = [p for p in pred[node] if p not in handled_parents]
                 if other_parents:
                     if label_attr is not None:
-                        other_parents_labels = ", ".join(
+                        other_parents_labels = ', '.join(
                             [
                                 str(graph.nodes[p].get(label_attr, p))
                                 for p in other_parents
                             ]
                         )
                     else:
-                        other_parents_labels = ", ".join(
+                        other_parents_labels = ', '.join(
                             [str(p) for p in other_parents]
                         )
-                    suffix = " ".join(["", glyphs.backedge, other_parents_labels])
+                    suffix = ' '.join(['', glyphs.backedge, other_parents_labels])
                 else:
-                    suffix = ""
+                    suffix = ''
 
             # Emit the line for this node, this will be called for each node
             # exactly once.
-            yield "".join(this_prefix + [label, suffix])
+            yield ''.join(this_prefix + [label, suffix])
 
             """
 
@@ -315,7 +313,7 @@ def generate_network_text(
                 stack.append(try_frame)
 
 
-@open_file(1, "w")
+@open_file(1, 'w')
 def write_network_text(
     graph,
     path=None,
@@ -323,7 +321,7 @@ def write_network_text(
     sources=None,
     max_depth=None,
     ascii_only=False,
-    end="\n",
+    end='\n',
 ):
     """Creates a nice text representation of a graph
 
@@ -436,7 +434,7 @@ def write_network_text(
     if path is None:
         # The path is unspecified, write to stdout
         _write = sys.stdout.write
-    elif hasattr(path, "write"):
+    elif hasattr(path, 'write'):
         # The path is already an open file
         _write = path.write
     elif callable(path):
@@ -471,7 +469,7 @@ def _find_sources(graph):
         supernode_to_nodes = {sn: [] for sn in scc_graph.nodes()}
         # Note: the order of mapping differs between pypy and cpython
         # so we have to loop over graph nodes for consistency
-        mapping = scc_graph.graph["mapping"]
+        mapping = scc_graph.graph['mapping']
         for n in graph.nodes:
             sn = mapping[n]
             supernode_to_nodes[sn].append(n)

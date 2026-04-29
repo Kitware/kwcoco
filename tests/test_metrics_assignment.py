@@ -15,23 +15,33 @@ def test_truth_reuse_policy():
     import ubelt as ub
     import kwimage
 
-    true_boxes = kwimage.Boxes(np.array([
-        [50,  50, 23, 31],
-        [51,  51, 23, 31],
-    ]), 'cxywh')
+    true_boxes = kwimage.Boxes(
+        np.array(
+            [
+                [50, 50, 23, 31],
+                [51, 51, 23, 31],
+            ]
+        ),
+        'cxywh',
+    )
 
-    pred_boxes = kwimage.Boxes(np.array([
-        [50,  50, 23, 31],
-        [50,  50, 23, 31],
-        [50,  50, 23, 31],
-        [50,  50, 23, 31],
-        [500,  500, 23, 31],
-    ]), 'cxywh')
+    pred_boxes = kwimage.Boxes(
+        np.array(
+            [
+                [50, 50, 23, 31],
+                [50, 50, 23, 31],
+                [50, 50, 23, 31],
+                [50, 50, 23, 31],
+                [500, 500, 23, 31],
+            ]
+        ),
+        'cxywh',
+    )
 
     true_dets = kwimage.Detections(
         boxes=true_boxes,
         weights=np.array([1] * len(true_boxes)),
-        class_idxs=np.array([0] * len(true_boxes))
+        class_idxs=np.array([0] * len(true_boxes)),
     )
 
     pred_dets = kwimage.Detections(
@@ -47,20 +57,33 @@ def test_truth_reuse_policy():
     iou_thresh = 0.1
     bias = 0.0
 
-    y1 = _assign_confusion_vectors(true_dets, pred_dets, bias=bias,
-                                   bg_weight=bg_weight, iou_thresh=iou_thresh,
-                                   compat=compat, truth_reuse_policy='never')
+    y1 = _assign_confusion_vectors(
+        true_dets,
+        pred_dets,
+        bias=bias,
+        bg_weight=bg_weight,
+        iou_thresh=iou_thresh,
+        compat=compat,
+        truth_reuse_policy='never',
+    )
     y1 = pd.DataFrame(y1)
     print(y1)
     # Test the policy
     truth_usage1 = ub.dict_hist(y1['txs'])
     truth_usage1.pop(-1, None)
     assert max(truth_usage1.values()) <= 1, (
-        'Truth only allowed to match a maximum of one time')
+        'Truth only allowed to match a maximum of one time'
+    )
 
-    y2 = _assign_confusion_vectors(true_dets, pred_dets, bias=bias,
-                                   bg_weight=bg_weight, iou_thresh=iou_thresh,
-                                   compat=compat, truth_reuse_policy='least_used')
+    y2 = _assign_confusion_vectors(
+        true_dets,
+        pred_dets,
+        bias=bias,
+        bg_weight=bg_weight,
+        iou_thresh=iou_thresh,
+        compat=compat,
+        truth_reuse_policy='least_used',
+    )
     y2 = pd.DataFrame(y2)
     print(y2)
 
@@ -71,11 +94,12 @@ def test_truth_reuse_policy():
         raise AssertionError(
             'Truth only allowed to match multiple times, but unused objects '
             'should be matched before increasing another the usage of a '
-            'different true box')
+            'different true box'
+        )
 
 
 @pytest.mark.parametrize(
-    "flatten_video_structure, expect_video_key",
+    'flatten_video_structure, expect_video_key',
     [
         (False, True),
         (True, False),
@@ -90,7 +114,9 @@ def test_basic_loose_image_matching(flatten_video_structure, expect_video_key):
     image_id2_a = dset2.add_image(name='a')
     _ = dset2.add_image(name='c')
 
-    matches = associate_images(dset1, dset2, flatten_video_structure=flatten_video_structure)
+    matches = associate_images(
+        dset1, dset2, flatten_video_structure=flatten_video_structure
+    )
 
     assert ('video' in matches) is expect_video_key
     assert set(matches['image']['match_gids1']) == {image_id1_a}
@@ -100,7 +126,7 @@ def test_basic_loose_image_matching(flatten_video_structure, expect_video_key):
 
 
 @pytest.mark.parametrize(
-    "flatten_video_structure",
+    'flatten_video_structure',
     [False, True],
 )
 def test_video_and_loose_matching_flatten_vs_group(flatten_video_structure):
@@ -120,7 +146,9 @@ def test_video_and_loose_matching_flatten_vs_group(flatten_video_structure):
     image_id1_la = dset1.add_image(name='la')
     image_id2_la = dset2.add_image(name='la')
 
-    matches = associate_images(dset1, dset2, flatten_video_structure=flatten_video_structure)
+    matches = associate_images(
+        dset1, dset2, flatten_video_structure=flatten_video_structure
+    )
 
     if not flatten_video_structure:
         assert set(matches.keys()) == {'image', 'video'}
@@ -136,7 +164,7 @@ def test_video_and_loose_matching_flatten_vs_group(flatten_video_structure):
 
 
 @pytest.mark.parametrize(
-    "flatten_video_structure",
+    'flatten_video_structure',
     [False, True],
 )
 def test_valid_image_ids_filters_matches(flatten_video_structure):
@@ -159,7 +187,8 @@ def test_valid_image_ids_filters_matches(flatten_video_structure):
 
     valid_image_ids = {image_id1_keep, image_id1_loose_keep}
     matches = associate_images(
-        dset1, dset2,
+        dset1,
+        dset2,
         flatten_video_structure=flatten_video_structure,
         valid_image_ids=valid_image_ids,
     )
@@ -172,15 +201,21 @@ def test_valid_image_ids_filters_matches(flatten_video_structure):
         assert set(matches['image']['match_gids2']) == {image_id2_loose_keep}
     else:
         assert 'video' not in matches
-        assert set(matches['image']['match_gids1']) == {image_id1_keep, image_id1_loose_keep}
-        assert set(matches['image']['match_gids2']) == {image_id2_keep, image_id2_loose_keep}
+        assert set(matches['image']['match_gids1']) == {
+            image_id1_keep,
+            image_id1_loose_keep,
+        }
+        assert set(matches['image']['match_gids2']) == {
+            image_id2_keep,
+            image_id2_loose_keep,
+        }
 
 
 @pytest.mark.parametrize(
-    "key_fallback, expect_exc",
+    'key_fallback, expect_exc',
     [
         (None, Exception),
-        ("bogus", KeyError),
+        ('bogus', KeyError),
     ],
 )
 def test_key_fallback_errors_when_names_missing(key_fallback, expect_exc):
@@ -196,13 +231,15 @@ def test_key_fallback_errors_when_names_missing(key_fallback, expect_exc):
 
 
 @pytest.mark.parametrize(
-    "key_fallback, add_kwargs1, add_kwargs2",
+    'key_fallback, add_kwargs1, add_kwargs2',
     [
-        ("file_name", dict(file_name="a.png"), dict(file_name="a.png")),
-        ("id", dict(id=10, file_name="x.png"), dict(id=10, file_name="y.png")),
+        ('file_name', dict(file_name='a.png'), dict(file_name='a.png')),
+        ('id', dict(id=10, file_name='x.png'), dict(id=10, file_name='y.png')),
     ],
 )
-def test_key_fallback_success_when_names_missing(key_fallback, add_kwargs1, add_kwargs2):
+def test_key_fallback_success_when_names_missing(
+    key_fallback, add_kwargs1, add_kwargs2
+):
     dset1 = kwcoco.CocoDataset()
     dset2 = kwcoco.CocoDataset()
 
@@ -213,7 +250,7 @@ def test_key_fallback_success_when_names_missing(key_fallback, add_kwargs1, add_
 
     assert set(matches['image']['match_gids1']) == {image_id1}
     assert set(matches['image']['match_gids2']) == {image_id2}
-    if key_fallback == "id":
+    if key_fallback == 'id':
         assert image_id1 == 10
         assert image_id2 == 10
 

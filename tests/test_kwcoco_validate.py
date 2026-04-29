@@ -3,6 +3,7 @@ import pytest
 
 def test_duplicate_single_band_validate():
     import kwcoco
+
     dset = kwcoco.CocoDataset()
 
     img = {
@@ -39,6 +40,7 @@ def test_duplicate_single_band_validate():
 
 def test_duplicate_multi_band_validate():
     import kwcoco
+
     dset = kwcoco.CocoDataset()
 
     aux1 = {

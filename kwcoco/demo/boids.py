@@ -271,26 +271,36 @@ class Boids(ub.NiceRepr):
         # align_steering[
         # com_steering = clamp_mag(com_steering, self.config['max_force'], axis=None)
 
-        align_steering = clamp_mag(align_steering, 0.33 * self.config['max_force'], axis=None)
-        com_steering = clamp_mag(com_steering, 0.33 * self.config['max_force'], axis=None)
+        align_steering = clamp_mag(
+            align_steering, 0.33 * self.config['max_force'], axis=None
+        )
+        com_steering = clamp_mag(
+            com_steering, 0.33 * self.config['max_force'], axis=None
+        )
 
         # Separation and obstical avoidance should override alignment and COM
-        sep_steering = clamp_mag(sep_steering, 1.0 * self.config['max_force'], axis=None)
+        sep_steering = clamp_mag(
+            sep_steering, 1.0 * self.config['max_force'], axis=None
+        )
 
         # Add some small random movement
-        rand_steering = clamp_mag(self.rng.randn(*self.pos.shape), 0.08 * self.config['max_force'], axis=None)
+        rand_steering = clamp_mag(
+            self.rng.randn(*self.pos.shape), 0.08 * self.config['max_force'], axis=None
+        )
 
         self.sep_steering = sep_steering
         self.com_steering = com_steering
         self.align_steering = align_steering
         self.rand_steering = rand_steering
 
-        steering = sum([
-            com_steering,
-            align_steering,
-            sep_steering,
-            rand_steering,
-        ])
+        steering = sum(
+            [
+                com_steering,
+                align_steering,
+                sep_steering,
+                rand_steering,
+            ]
+        )
 
         if 1:
             # # Edge avoidance
@@ -314,11 +324,13 @@ class Boids(ub.NiceRepr):
                 if len(rxs):
                     avoid_vec = edge_vec[rxs]
                     avoid_dist = edge_dist[rxs]
-                    avoid_vec = avoid_vec / (avoid_dist ** 3)
+                    avoid_vec = avoid_vec / (avoid_dist**3)
                     avoid_steering_ = avoid_vec - self.vel[rxs]
                     avoid_steering[rxs] += avoid_steering_
 
-            avoid_steering = clamp_mag(avoid_steering, 1.0 * self.config['max_force'], axis=None)
+            avoid_steering = clamp_mag(
+                avoid_steering, 1.0 * self.config['max_force'], axis=None
+            )
             steering += avoid_steering
             self.avoid_steering = avoid_steering
 
@@ -326,8 +338,8 @@ class Boids(ub.NiceRepr):
 
     def boundary_conditions(self):
         # Clamp positions
-        lower_boundry_violators = (self.pos < 0)
-        upper_boundry_violators = (self.pos > 1)
+        lower_boundry_violators = self.pos < 0
+        upper_boundry_violators = self.pos > 1
         if np.any(lower_boundry_violators):
             self.pos[lower_boundry_violators] = 0
             self.vel[lower_boundry_violators] *= -1.0  # bounce
@@ -461,14 +473,16 @@ def triu_condense_multi_index(multi_index, dims, symmetric=False):
         if np.any(rxs == cxs):
             raise NotImplementedError(
                 'multi_index contains diagonal elements, which are not '
-                'allowed in a condensed matrix')
+                'allowed in a condensed matrix'
+            )
 
         tril_flags = ~triu_flags
 
         if not symmetric:
             raise ValueError(
                 'multi_index cannot contain inputs from '
-                'lower triangle unless symmetric=True')
+                'lower triangle unless symmetric=True'
+            )
         else:
             rxs = rxs.copy()
             cxs = cxs.copy()
@@ -565,17 +579,17 @@ def closest_point_on_line_segment(pts, e1, e2):
     pv = pts - e1
     # Project pv onto de
     mag = np.linalg.norm(de, axis=1)
-    de_norm = (de / mag)
+    de_norm = de / mag
 
     pt_on_line_ = pv.dot(de_norm.T) * de_norm
 
     # Check if normalized dot product is between 0 and 1
     # Determines if pt is between 0,0 and de
-    t = (de.dot(pt_on_line_.T) / (mag ** 2))[0]
+    t = (de.dot(pt_on_line_.T) / (mag**2))[0]
 
     # t is an interpolation factor indicating how far past the line segment we
     # are. We are on the line segment if it is in the range 0 to 1.
-    oob_left  = t < 0
+    oob_left = t < 0
     oob_right = t > 1
 
     # Compute the point on the extended line defined by the line segment.
@@ -601,11 +615,15 @@ def _pygame_render_boids():
     if ASK_TO_INSTALL:
         if ub.modname_to_modpath('pygame') is None:
             from rich.prompt import Confirm
+
             ans = Confirm.ask('Pygame was not detected. Do you want to install it?')
             if ans:
                 import subprocess
                 import sys
-                subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pygame'])
+
+                subprocess.check_call(
+                    [sys.executable, '-m', 'pip', 'install', 'pygame']
+                )
 
     try:
         import pygame

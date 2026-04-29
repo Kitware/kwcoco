@@ -64,6 +64,7 @@ class Archive:
         >>> for fpath in extracted1:
         >>>     print(open(fpath, 'r').read())
     """
+
     _available_backends = {
         'tarfile': tarfile,
         'zipfile': zipfile,
@@ -149,7 +150,8 @@ class Archive:
             # a rework of makefile in tarfile.
             import io
             from tarfile import copyfileobj, ReadError
-            self.file._check("r")
+
+            self.file._check('r')
             tarinfo = self.file.getmember(name)
             source = self.file.fileobj
             source.seek(tarinfo.offset_data)
@@ -215,8 +217,7 @@ class Archive:
             print('Enumerate members')
         archive_namelist = list(ub.ProgIter(iter(self), desc='enumerate members'))
         unarchived_paths = []
-        for member in ub.ProgIter(archive_namelist, desc='extracting',
-                                  verbose=verbose):
+        for member in ub.ProgIter(archive_namelist, desc='extracting', verbose=verbose):
             fpath = join(output_dpath, member)
             unarchived_paths.append(fpath)
             if not overwrite and exists(fpath):
@@ -239,16 +240,19 @@ class Archive:
 def unarchive_file(archive_fpath, output_dpath='.', verbose=1, overwrite=True):
     import tarfile
     import zipfile
+
     if verbose:
-        print('Unarchive archive_fpath = {!r} in {}'.format(archive_fpath, output_dpath))
+        print(
+            'Unarchive archive_fpath = {!r} in {}'.format(archive_fpath, output_dpath)
+        )
     archive_file = None
 
     try:
         if tarfile.is_tarfile(archive_fpath):
             archive_file = tarfile.open(archive_fpath, 'r:gz')
             archive_namelist = [
-                mem.path for mem in ub.ProgIter(
-                    iter(archive_file), desc='enumerate members')
+                mem.path
+                for mem in ub.ProgIter(iter(archive_file), desc='enumerate members')
             ]
         elif zipfile.is_zipfile(archive_fpath):
             zip_file = zipfile.ZipFile(archive_fpath)
@@ -259,8 +263,7 @@ def unarchive_file(archive_fpath, output_dpath='.', verbose=1, overwrite=True):
             raise NotImplementedError
 
         unarchived_paths = []
-        for member in ub.ProgIter(archive_namelist, desc='extracting',
-                                  verbose=verbose):
+        for member in ub.ProgIter(archive_namelist, desc='extracting', verbose=verbose):
             fpath = join(output_dpath, member)
             unarchived_paths.append(fpath)
             if not overwrite and exists(fpath):

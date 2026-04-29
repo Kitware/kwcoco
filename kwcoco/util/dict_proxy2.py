@@ -220,6 +220,7 @@ class DictProxy2(DictInterface):
         >>> assert len(proxy_only - CURRENTLY_UNSUPPORTED) == 0
 
     """
+
     _proxy: dict[str, Any]
 
     def __getitem__(self, key):
@@ -243,6 +244,7 @@ class _AliasMetaclass(type):
     Populates the __alias_to_aliases__ field at class definition time to reduce
     the overhead of instance creation.
     """
+
     @staticmethod
     def __new__(mcls, name, bases, namespace, *args, **kwargs):
         secondary_to_primary = namespace.get('__alias_to_primary__')
@@ -360,6 +362,7 @@ class AliasedDictProxy(DictProxy2, metaclass=_AliasMetaclass):
         >>>     'foo_alias2': -12}
 
     """
+
     __alias_to_aliases__: dict[str, list[str]]
     __alias_to_primary__: dict[str, str] = {}
     _proxy: dict[str, Any]
@@ -398,6 +401,5 @@ class AliasedDictProxy(DictProxy2, metaclass=_AliasMetaclass):
         if key in self._proxy:
             return True
         return any(
-            alias in self._proxy
-            for alias in self.__alias_to_aliases__.get(key, [])
+            alias in self._proxy for alias in self.__alias_to_aliases__.get(key, [])
         )

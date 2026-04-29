@@ -5,7 +5,6 @@ mkinit kwcoco.metrics -w --relative
 """
 # flake8: noqa
 
-
 __submodules__ = [
     'detect_metrics',
     'confusion_vectors',
@@ -15,11 +14,28 @@ __submodules__ = [
 from . import detect_metrics
 from . import confusion_vectors
 
-from .detect_metrics import (DetectionMetrics, eval_detections_cli,)
-from .confusion_vectors import (BinaryConfusionVectors, ConfusionVectors,
-                                OneVsRestConfusionVectors,)
-from .confusion_measures import (Measures, PerClass_Measures,)
+from .detect_metrics import (
+    DetectionMetrics,
+    eval_detections_cli,
+)
+from .confusion_vectors import (
+    BinaryConfusionVectors,
+    ConfusionVectors,
+    OneVsRestConfusionVectors,
+)
+from .confusion_measures import (
+    Measures,
+    PerClass_Measures,
+)
 
-__all__ = ['BinaryConfusionVectors', 'ConfusionVectors', 'DetectionMetrics',
-           'Measures', 'OneVsRestConfusionVectors', 'PerClass_Measures',
-           'confusion_vectors', 'detect_metrics', 'eval_detections_cli']
+__all__ = [
+    'BinaryConfusionVectors',
+    'ConfusionVectors',
+    'DetectionMetrics',
+    'Measures',
+    'OneVsRestConfusionVectors',
+    'PerClass_Measures',
+    'confusion_vectors',
+    'detect_metrics',
+    'eval_detections_cli',
+]

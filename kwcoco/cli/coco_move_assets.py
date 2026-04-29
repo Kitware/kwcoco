@@ -20,11 +20,19 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
     This operation is not atomic and if it is interrupted then your kwcoco
     bundle may be put into a bad state.
     """
+
     src = scfg.Value('source asset file or folder')
     dst = scfg.Value('destination asset file or folder')
     io_workers = scfg.Value(0, help='io workers')
-    dry = scfg.Value(False, isflag=True, short_alias=['-n'], help='if True do a dry run, only report what would be done')
-    coco_fpaths = scfg.Value([], nargs='+', help='coco files modified by the move operation')
+    dry = scfg.Value(
+        False,
+        isflag=True,
+        short_alias=['-n'],
+        help='if True do a dry run, only report what would be done',
+    )
+    coco_fpaths = scfg.Value(
+        [], nargs='+', help='coco files modified by the move operation'
+    )
 
     @classmethod
     def main(cls, cmdline=1, **kwargs):
@@ -69,12 +77,16 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
             >>> main(cmdline=cmdline, **kwargs)
         """
         import rich
+
         config = CocoMoveAssetsCLI.cli(cmdline=cmdline, data=kwargs, strict=True)
         rich.print('config = ' + ub.urepr(config, nl=1))
         from kwutil import util_path
         import kwcoco
+
         coco_fpaths = util_path.coerce_patterned_paths(config.coco_fpaths)
-        dsets = list(kwcoco.CocoDataset.coerce_multiple(coco_fpaths, workers=config.io_workers))
+        dsets = list(
+            kwcoco.CocoDataset.coerce_multiple(coco_fpaths, workers=config.io_workers)
+        )
 
         mv_man = CocoMoveAssetManager(dsets, dry=config.dry)
         mv_man.submit(config.src, config.dst)
@@ -154,6 +166,7 @@ class CocoMoveAssetManager:
             print('Dry run, skip modify datasets')
             return
         import os
+
         for asset, s, d in self.impacted_assets:
             old_asset_fname = asset['file_name']
             old_asset_fpath = asset.image_filepath().absolute()
