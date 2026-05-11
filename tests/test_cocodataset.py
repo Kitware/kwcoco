@@ -227,3 +227,18 @@ def test_normalize_category_ids():
     start_id = -1
     self.normalize_category_ids(start_id=start_id, order=order)
     self.categories().lookup('name')[0:2] == order
+
+
+def test_boxsize_stats_handles_no_boxes():
+    import pytest
+    import kwcoco
+
+    dset = kwcoco.CocoDataset()
+    dset.add_image(file_name='empty.png')
+
+    infos = dset.boxsize_stats()
+    assert infos['perclass'] == {}
+    assert infos['all']['stats'] == {}
+
+    with pytest.raises(ValueError, match='without bounding boxes'):
+        dset.boxsize_stats(anchors=1)

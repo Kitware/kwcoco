@@ -203,11 +203,9 @@ class COCO(CocoDataset):
         else:
             valid_gids = set(imgIds)
 
-        if catIds:
-            hascat_gids = set()
-            for aids in ub.take(self.index.cid_to_aids, catIds):
-                hascat_gids |= set(self.annots(aids).lookup('image_id'))
-
+        for catId in catIds:
+            aids = self.index.cid_to_aids.get(catId, [])
+            hascat_gids = set(self.annots(aids).lookup('image_id'))
             valid_gids &= hascat_gids
         return sorted(valid_gids)
 

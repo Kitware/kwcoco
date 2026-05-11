@@ -56,7 +56,7 @@ References:
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Callable, IO
+from typing import TYPE_CHECKING, Any, Callable, IO, Iterable
 
 import copy
 import sys
@@ -1841,43 +1841,63 @@ class MixinCocoExtras:
         summary['bad_images'] = bad_images
         return summary
 
-    def _ensure_image_data(self, gids: list = None, verbose: int = 1):
+    def _ensure_image_data(self, gids: list | dict | int | None = None, verbose: int = 1) -> None:
         """
-        Download data from "url" fields if specified.
+        Download data from image ``url`` / ``coco_url`` fields if specified.
 
         Args:
-            gids (List): subset of images to download
+            gids (List[int | dict] | dict | int | None): subset of image ids
+                or image dictionaries to download. If unspecified, checks all
+                missing images in the dataset.
         """
 
-        def _gen_missing_imgs():
+        def _gen_missing_imgs() -> Iterable[dict]:
             for img in self.dataset['images']:
                 gpath = join(self.bundle_dpath, img['file_name'])
                 if not exists(gpath):
                     yield img
 
-        def _has_download_permission(_HAS_PREMISSION=[False]):
-            if not _HAS_PREMISSION[0] or ub.argflag(('-y', '--yes')):
+        def _coerce_img_iter(gids: list | dict | int | None) -> Iterable[dict]:
+            imgs: Iterable[dict]
+            if gids is None:
+                imgs = _gen_missing_imgs()
+            elif isinstance(gids, dict):
+                imgs = [gids]
+            else:
+                gid_or_imgs: list[int | dict] = list(
+                    gids if ub.iterable(gids) else [gids]
+                )
+                if gid_or_imgs and isinstance(gid_or_imgs[0], dict):
+                    imgs = gid_or_imgs
+                else:
+                    imgs = list(ub.take(self.imgs, gid_or_imgs))
+            return imgs
+
+        def _has_download_permission(_HAS_PERMISSION=[False]) -> bool:
+            # TODO: remove argv-global behavior from this library helper. The
+            # CLI should pass an explicit option sourced from argparse instead.
+            if not _HAS_PERMISSION[0] or ub.argflag(('-y', '--yes')):
                 try:
                     from rich.prompt import Confirm
 
                     ans = Confirm.ask('is it ok to download?')
                     if ans:
-                        _HAS_PREMISSION[0] = True
+                        _HAS_PERMISSION[0] = True
                 except ImportError:
                     ans = input('is it ok to download? (enter y for yes)')
                     if ans in ['yes', 'y']:
-                        _HAS_PREMISSION[0] = True
-            return _HAS_PREMISSION[0]
+                        _HAS_PERMISSION[0] = True
+            return _HAS_PERMISSION[0]
 
-        if gids is None:
-            gids = _gen_missing_imgs()
+        imgs: Iterable[dict] = _coerce_img_iter(gids)
 
-        for img in ub.ProgIter(gids, desc='ensure image data'):
-            if 'url' in img:
+        for img in ub.ProgIter(imgs, desc='ensure image data', verbose=verbose):
+            url: str | None = img.get('url', img.get('coco_url', None))
+            if url is not None:
                 if _has_download_permission():
                     gpath = join(self.bundle_dpath, img['file_name'])
                     ub.ensuredir(dirname(gpath))
-                    ub.grabdata(img['url'], gpath)
+                    ub.grabdata(url, gpath)
                 else:
                     raise Exception('no permission, abort')
             else:
@@ -4022,8 +4042,13 @@ class MixinCocoStats:
 
         if verbose:
             print('compute all bbox stats')
-        all_sizes = np.vstack(list(cname_to_box_sizes.values()))
-        all_info = _boxes_info(all_sizes)
+        if cname_to_box_sizes:
+            all_sizes = np.vstack(list(cname_to_box_sizes.values()))
+            all_info = _boxes_info(all_sizes)
+        else:
+            if anchors:
+                raise ValueError('Cannot compute anchor boxes without bounding boxes')
+            all_info = {'stats': {}}
         infos['all'] = all_info
         return infos
 

@@ -44,3 +44,17 @@ def test_polygon_schema():
             coco_poly = poly.to_coco(style='orig')
             jsonschema.validate(coco_poly, schema=coco_schema.MSCOCO_POLYGON)
             jsonschema.validate(coco_poly, schema=coco_schema.POLYGON)
+
+
+def test_jsonschema_element_default_containers_are_not_shared():
+    from kwcoco.util.jsonschema_elements import ARRAY, OBJECT
+
+    arr1 = ARRAY()
+    arr2 = ARRAY()
+    arr1['items']['sentinel'] = True
+    assert arr2['items'] == {}
+
+    obj1 = OBJECT()
+    obj2 = OBJECT()
+    obj1['properties']['sentinel'] = True
+    assert obj2['properties'] == {}

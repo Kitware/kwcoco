@@ -20,6 +20,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 * Fix detection evaluation crash when inputs are empty
 * Fix degenerate case of AUC to fallback on Youden's J statistic
+* Fix `boxsize_stats` on datasets with no bounding boxes.
+* Fix `ObjectGroups._lookup` to fail explicitly instead of recursing forever.
+* Fix legacy `compat_dataset.COCO.getImgIds` / `download` behavior to better match pycocotools.
+* Avoid shared mutable defaults in JSON schema helper constructors.
+* Use callable `dict` defaults for SQLAlchemy JSON columns to avoid shared mutable default state.
 
 ## Version 0.8.9 - Released 2025-11-25
 

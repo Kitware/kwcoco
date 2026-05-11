@@ -517,8 +517,16 @@ class ObjectGroups(ub.NiceRepr):
         self._groups = groups
         self._dset = dset
 
-    def _lookup(self, key):
-        return self._lookup(key)  # broken?
+    def _lookup(self, key: str) -> None:
+        """Deprecated private alias for :meth:`lookup`.
+
+        Historically this method was accidentally recursive. Keep the private
+        method as an explicit unsupported path instead of failing with an
+        unhelpful RecursionError.
+        """
+        raise NotImplementedError(
+            'ObjectGroups._lookup is not implemented; use ObjectGroups.lookup instead'
+        )
 
     def __getitem__(self, index):
         if isinstance(index, slice):

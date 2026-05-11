@@ -198,7 +198,7 @@ class Category(CocoBase):
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
 
-    _unstructured = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict)
 
 
 class KeypointCategory(CocoBase):
@@ -213,7 +213,7 @@ class KeypointCategory(CocoBase):
         Integer, doc='if augmentation reflects the image, change keypoint id to this'
     )
 
-    _unstructured = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict)
 
 
 class Video(CocoBase):
@@ -225,7 +225,7 @@ class Video(CocoBase):
     width = Column(Integer)
     height = Column(Integer)
 
-    _unstructured = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict)
 
 
 class Image(CocoBase):
@@ -249,7 +249,7 @@ class Image(CocoBase):
         JSON
     )  # TODO: change name to assets (or better yet make an assets table)
 
-    _unstructured = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict)
 
 
 class Track(CocoBase):
@@ -264,7 +264,7 @@ class Track(CocoBase):
         doc='unique internal id',
     )
     name = Column(String(512), nullable=True, index=True, unique=True)
-    _unstructured = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict)
 
 
 # The track LUT depends on some stuff in postgresql that I dont fully
@@ -302,7 +302,7 @@ class Annotation(CocoBase):
     iscrowd = Column(Integer)
     caption = Column(JSON)
 
-    _unstructured = Column(JSON, default=dict())
+    _unstructured = Column(JSON, default=dict)
 
 
 # As long as the flavor of sql conforms to our raw sql commands set
