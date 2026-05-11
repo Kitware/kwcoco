@@ -557,9 +557,14 @@ def _critical_loop(
             y_txs.append(tx)
 
     # All pred boxes have been assigned to a truth box or the background.
-    # Mark available true boxes we failed to predict as false negatives
+    # Mark available true boxes we failed to predict as false negatives.
+    # Ignored truths were intentionally removed from assignment consideration
+    # above, so do not reintroduce them here as missed detections.
     bg_px = -1
-    unused_txs = np.where(true_nmatches == 0)[0]
+    unused_flags = true_nmatches == 0
+    if ignore_classes is not None:
+        unused_flags = unused_flags & ~true_ignore_flags
+    unused_txs = np.where(unused_flags)[0]
     n = len(unused_txs)
 
     unused_y_true = true_dets.class_idxs[unused_txs].tolist()
