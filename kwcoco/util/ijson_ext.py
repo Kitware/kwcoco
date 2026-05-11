@@ -56,7 +56,7 @@ from __future__ import annotations
 
 import codecs
 import re
-from json.decoder import scanstring
+from json.decoder import scanstring # type: ignore[attr-defined]
 
 from ijson import common, utils
 
@@ -219,6 +219,7 @@ def parse_value(target, multivalue, use_float):
         else:
             pos, symbol = prev_pos, prev_symbol
             prev_pos, prev_symbol = None, None
+        assert symbol is not None
         try:
             state = state_stack[-1]
         except IndexError:

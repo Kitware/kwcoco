@@ -7,7 +7,7 @@ Deprecated: use the one in kwutil instead
 try:
     from functools import cache
 except ImportError:
-    from ubelt import memoize as cache
+    from ubelt import memoize as cache # type: ignore[no-redef]
 
 
 @cache

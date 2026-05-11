@@ -86,19 +86,21 @@ class Archive:
         """
         self.fpath = fpath
         self.mode = mode
-        self.file = file
-        self.backend = self._available_backends.get(backend, backend)
+        if isinstance(backend, str):
+            backend = self._available_backends.get(backend, None) or backend
+        self.backend = backend
 
         if file is None:
             file, backend = self._open(fpath, mode, backend)
-            self.file = file
             self.backend = backend
+        self.file = file
 
     @classmethod
     def _open(cls, fpath, mode, backend=None):
         fpath = os.fspath(fpath)
         exist_flag = os.path.exists(fpath)
-        backend = cls._available_backends.get(backend, backend)
+        if isinstance(backend, str):
+            backend = cls._available_backends.get(backend, None) or backend
         if backend is None:
             if fpath.endswith('.tar.gz'):
                 backend = tarfile
@@ -189,6 +191,7 @@ class Archive:
         if isinstance(data, str):
             return cls(data)
         if isinstance(data, zipfile.ZipFile):
+            assert data.fp is not None, 'ZipFile has no associated file object'
             fpath = data.fp.name
             return cls(fpath, file=data, backend=zipfile)
         else:
@@ -196,6 +199,7 @@ class Archive:
 
     def add(self, fpath, arcname=None):
         if arcname is None:
+            assert self.fpath is not None, 'fpath must be set to compute arcname'
             arcname = relpath(fpath, dirname(self.fpath))
         if self.backend is tarfile:
             self.file.add(fpath, arcname)
@@ -206,11 +210,11 @@ class Archive:
         return self.file.close()
 
     def __enter__(self):
-        self.__file__.__enter__()
+        self.file.__enter__()
         return self
 
     def __exit__(self, *args):
-        self.__file__.__exit__(*args)
+        self.file.__exit__(*args)
 
     def extractall(self, output_dpath='.', verbose=1, overwrite=True):
         if verbose:
@@ -255,10 +259,10 @@ def unarchive_file(archive_fpath, output_dpath='.', verbose=1, overwrite=True):
                 for mem in ub.ProgIter(iter(archive_file), desc='enumerate members')
             ]
         elif zipfile.is_zipfile(archive_fpath):
-            zip_file = zipfile.ZipFile(archive_fpath)
+            archive_file = zipfile.ZipFile(archive_fpath)
             if verbose:
                 print('Enumerate members')
-            archive_namelist = zip_file.namelist()
+            archive_namelist = archive_file.namelist()
         else:
             raise NotImplementedError
 
@@ -311,5 +315,7 @@ def _coerce_zipfile_compression(compression):
                     found = cand
                     break
             compression = found
+        if compression is None:
+            raise ValueError('No supported zipfile compression found')
         compression = getattr(zipfile, compression)
     return compression
