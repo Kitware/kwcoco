@@ -47,6 +47,7 @@ def animate_visualizations(
         >>> import ubelt as ub
         >>> dpath = ub.Path.appdir('geowatch/tests/ani_video').delete().ensuredir()
         >>> import kwcoco
+        >>> from delayed_image.channel_spec import ChannelSpec
         >>> from geowatch.utils import kwcoco_extensions
         >>> dset = kwcoco.CocoDataset.demo('vidshapes2-msi', num_frames=5)
         >>> img = dset.dataset['images'][0]
@@ -76,7 +77,7 @@ def animate_visualizations(
     from kwutil import util_parallel
 
     if channels is not None:
-        channels = kwcoco.ChannelSpec.coerce(channels)
+        channels = ChannelSpec.coerce(channels)
 
     workers = util_parallel.coerce_num_workers(workers)
     viz_dpath = ub.Path(viz_dpath)

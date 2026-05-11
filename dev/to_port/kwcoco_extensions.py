@@ -15,6 +15,8 @@ import kwutil
 import itertools
 import numbers
 import kwcoco
+from delayed_image.channel_spec import ChannelSpec, FusedChannelSpec
+from delayed_image.sensorchan_spec import SensorChanSpec
 
 from os.path import join
 from geowatch import exceptions
@@ -811,7 +813,7 @@ def _populate_canvas_obj(
             except Exception:
                 channels = obj.get('channels', None)
                 if channels is not None:
-                    num_bands = kwcoco.ChannelSpec(channels).numel()
+                    num_bands = ChannelSpec(channels).numel()
                 else:
                     raise
             obj['num_bands'] = num_bands
@@ -1611,7 +1613,7 @@ def _check_unique_channel_names_in_image(coco_img):
 
     seen = set()
     for obj in coco_img.iter_asset_objs():
-        chans = kwcoco.FusedChannelSpec.coerce(obj['channels'])
+        chans = FusedChannelSpec.coerce(obj['channels'])
         chan_list: list = chans.normalize().parsed
         intra_aux_duplicate = ub.find_duplicates(chan_list)
         if intra_aux_duplicate:
@@ -2332,21 +2334,21 @@ def coco_channel_stats(coco_dset):
         sensorchan = f'{sensor}:({chan})'
         sensorchan_hist2[sensorchan] += 1
 
-        for single_chan in kwcoco.ChannelSpec(chan).unique():
+        for single_chan in ChannelSpec(chan).unique():
             single_chan_hist[single_chan] += 1
 
-    CS = kwcoco.ChannelSpec
-    FS = kwcoco.FusedChannelSpec
+    CS = ChannelSpec
+    FS = FusedChannelSpec
     osets = [CS.coerce(c).fuse().to_oset() for c in chan_hist]
     if len(osets) == 0:
         common_channels = FS.coerce([])
         all_channels = FS.coerce([])
-        all_sensorchan = kwcoco.SensorChanSpec.coerce('')
+        all_sensorchan = SensorChanSpec.coerce('')
     else:
         common_channels = FS.coerce(list(ub.oset.intersection(*osets))).concise()
         all_channels = FS.coerce(list(ub.oset.union(*osets))).concise()
-        all_sensorchan = kwcoco.SensorChanSpec.late_fuse(
-            *[kwcoco.SensorChanSpec.coerce(s) for s in sensorchan_hist2.keys()]
+        all_sensorchan = SensorChanSpec.late_fuse(
+            *[SensorChanSpec.coerce(s) for s in sensorchan_hist2.keys()]
         ).concise()
 
     info = {
@@ -3234,6 +3236,6 @@ def pick_channels(coco_img, choices):
 
     have_chans = coco_img.channels.fuse()
     for candidate in choices:
-        candidate = kwcoco.FusedChannelSpec.coerce(candidate)
+        candidate = FusedChannelSpec.coerce(candidate)
         if candidate.issubset(have_chans):
             return candidate

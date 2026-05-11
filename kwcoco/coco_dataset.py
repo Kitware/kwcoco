@@ -4155,7 +4155,7 @@ class MixinCocoDraw:
 
         Args:
             gid (int): image id to draw
-            channels (kwcoco.ChannelSpec): the channel to draw on
+            channels (delayed_image.channel_spec.ChannelSpec): the channel to draw on
 
         Returns:
             ndarray: canvas

@@ -18,6 +18,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add channels option to coco stats.
 
 ### Fixed
+* Update internal and example channel-spec imports to use `delayed_image.channel_spec` / `delayed_image.sensorchan_spec`, respecting the scheduled `kwcoco.channel_spec` and `kwcoco.sensorchan_spec` deprecation errors in 0.9.0.
 * Fix detection evaluation so ignored truth annotations are not emitted as false negatives after being removed from assignment consideration. This may change classless detection scores for datasets that contain ignored truth regions/classes.
 * Fix detection evaluation crash when inputs are empty
 * Fix degenerate case of AUC to fallback on Youden's J statistic

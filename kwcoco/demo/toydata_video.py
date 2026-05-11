@@ -14,6 +14,7 @@ import numpy as np
 import ubelt as ub
 import kwarray
 import kwimage
+from delayed_image.channel_spec import ChannelSpec, FusedChannelSpec
 from kwcoco.demo.toypatterns import CategoryPatterns
 
 
@@ -1001,7 +1002,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
         auxiliaries = img.pop('auxiliary', None)
         if auxiliaries is not None:
             for auxdict in auxiliaries:
-                chan_part = kwcoco.ChannelSpec.coerce(auxdict['channels']).as_path()
+                chan_part = ChannelSpec.coerce(auxdict['channels']).as_path()
                 aux_dpath = ub.ensuredir(
                     (bundle_dpath, '_assets', 'auxiliary', 'aux_' + chan_part)
                 )
@@ -1188,7 +1189,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
         chankey = auxinfo['channels']
         auxdata = chan_to_auxinfo[chankey]['imdata']
         auxdata = kwarray.atleast_nd(auxdata, 3)
-        auxchan = kwcoco.FusedChannelSpec.coerce(chankey)
+        auxchan = FusedChannelSpec.coerce(chankey)
         for chan_idx, chan_name in enumerate(auxchan.as_list()):
             if chan_name == 'flowx':
                 try:
@@ -1348,7 +1349,7 @@ def render_background(img, rng, gray, bg_intensity, bg_scale, imgspace_backgroun
         import kwcoco
 
         chankey = auxinfo['channels']
-        aux_bands = kwcoco.ChannelSpec.coerce(chankey).numel()
+        aux_bands = ChannelSpec.coerce(chankey).numel()
         aux_width = auxinfo.get('width', gw)
         aux_height = auxinfo.get('height', gh)
         asset_dsize = (aux_width, aux_height)

@@ -335,6 +335,8 @@ def main(cmdline=True, **kwargs):
 
     Example:
         >>> import kwcoco
+        >>> from delayed_image.channel_spec import ChannelSpec, FusedChannelSpec
+        >>> from delayed_image.sensorchan_spec import SensorChanSpec
         >>> from geowatch.utils import kwcoco_extensions
         >>> from geowatch.cli.coco_visualize_videos import *  # NOQA
         >>> import ubelt as ub
@@ -517,7 +519,7 @@ def main(cmdline=True, **kwargs):
         channels = all_sensorchan
 
     # Expand certain channels
-    requested_sensorchan = kwcoco.SensorChanSpec.coerce(channels)
+    requested_sensorchan = SensorChanSpec.coerce(channels)
     requested_sensorchan.streams()
     expanded_streams = []
     chan_alias = {
@@ -584,7 +586,7 @@ def main(cmdline=True, **kwargs):
     )
 
     if config['skip_missing'] and channels is not None:
-        requested_channels = kwcoco.ChannelSpec.coerce(channels).fuse().as_set()
+        requested_channels = ChannelSpec.coerce(channels).fuse().as_set()
         print(f'requested_channels={requested_channels}')
         coco_images = coco_dset.images(selected_gids).coco_images
         keep = []
@@ -659,7 +661,7 @@ def main(cmdline=True, **kwargs):
             # Probably better to use multiple images from the sequence
             # to do normalization
             if channels is not None:
-                requested_channels = kwcoco.ChannelSpec.coerce(channels).fuse().as_set()
+                requested_channels = ChannelSpec.coerce(channels).fuse().as_set()
             else:
                 requested_channels = set()
                 for coco_img in coco_images:
@@ -1099,14 +1101,12 @@ def _resolve_channel_groups(
     """
     Resolve which channel groups should be requested.
     """
-    from delayed_image import channel_spec
-    import kwcoco
     import rich
 
     if channels is not None:
         if isinstance(channels, list):
             channels = ','.join(channels)  # hack
-        channels = channel_spec.ChannelSpec.coerce(channels)
+        channels = ChannelSpec.coerce(channels)
         chan_groups = [{'chan': chan_obj} for chan_obj in channels.streams()]
     else:
         if verbose > 0:
@@ -1130,18 +1130,18 @@ def _resolve_channel_groups(
             request_grouped_bands = ['red|green|blue', 'r|g|b', 'ir']
 
         for cand in request_grouped_bands:
-            cand = kwcoco.FusedChannelSpec.coerce(cand)
+            cand = FusedChannelSpec.coerce(cand)
             has_cand = (channels & cand).numel() == cand.numel()
             if has_cand:
                 channels = channels - cand
                 # todo: nicer way to join streams
-                # channels = kwcoco.ChannelSpec.coerce(channels.spec + ',' + cand.spec)
+                # channels = ChannelSpec.coerce(channels.spec + ',' + cand.spec)
                 channels = channels + cand
-                # kwcoco.ChannelSpec.coerce(channels.spec + ',' + cand.spec)
+                # ChannelSpec.coerce(channels.spec + ',' + cand.spec)
 
         initial_groups = channels.streams()
         chan_groups = []
-        group: kwcoco.FusedChannelSpec
+        group: FusedChannelSpec
         for group in initial_groups:
             if group.numel() > 3:
                 # For large group, just take the first 3 channels
@@ -1156,7 +1156,7 @@ def _resolve_channel_groups(
                     # For smaller groups split them into singles
                     for part in group:
                         chan_groups.append(
-                            {'chan': kwcoco.FusedChannelSpec.coerce(part)}
+                            {'chan': FusedChannelSpec.coerce(part)}
                         )
             else:
                 chan_groups.append(
@@ -1176,7 +1176,7 @@ def _resolve_channel_groups(
         avail_channels = channels.fuse()
         common_visualizers = list(
             map(
-                kwcoco.FusedChannelSpec.coerce,
+                FusedChannelSpec.coerce,
                 ['red|green|blue', 'r|g|b', 'pan', 'panchromatic'],
             )
         )
@@ -1190,7 +1190,7 @@ def _resolve_channel_groups(
         # Just show false color from the first few channels
         if found is None:
             first3 = avail_channels.as_list()[0:3]
-            found = kwcoco.FusedChannelSpec.coerce('|'.join(first3))
+            found = FusedChannelSpec.coerce('|'.join(first3))
         chan_groups.append(
             {
                 'pname': 'any3',
@@ -1735,7 +1735,7 @@ def draw_chan_group(
     if chan_group_obj is not None:
         chan_list = chan_group_obj.parsed
         chan_group = chan_group_obj.spec
-        chan_pname2 = kwcoco.FusedChannelSpec.coerce(chan_group).path_sanitize(
+        chan_pname2 = FusedChannelSpec.coerce(chan_group).path_sanitize(
             maxlen=10
         )
         prefix = '_'.join([frame_id, chan_pname2])

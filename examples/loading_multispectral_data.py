@@ -1,6 +1,7 @@
 def demo_load_msi_data():
     import kwcoco
     import kwimage
+    from delayed_image.channel_spec import FusedChannelSpec
 
     coco_dset = kwcoco.CocoDataset.demo('vidshapes8-msi')
     # Get the "CocoImage" for a gid (imaGe id)
@@ -29,7 +30,7 @@ def demo_load_msi_data():
     sampler = ndsampler.CocoSampler(coco_dset)
     tr = {
         'gid': gid,
-        'channels': kwcoco.FusedChannelSpec.coerce(channels),
+        'channels': FusedChannelSpec.coerce(channels),
         'space_slice': (slice(-10, 512), slice(20, 512)),
     }
     sample = sampler.load_sample(tr)

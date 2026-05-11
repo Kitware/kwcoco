@@ -205,7 +205,7 @@ VIDEO = OBJECT(
 CHANNELS = STRING(
     pattern='[^/]*',  # a simple check, full pattern is a context free grammar
     description=(
-        'A human readable channel name. Must be compatible with kwcoco.ChannelSpec'
+        'A human readable channel name. Must be compatible with delayed_image.channel_spec.ChannelSpec'
     ),
     title='CHANNEL_SPEC',
 )
