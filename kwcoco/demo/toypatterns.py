@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import cv2
 import kwarray
 import kwimage
@@ -36,8 +38,18 @@ class CategoryPatterns:
         {'name': 'star', 'id': 3, 'supercategory': 'vector', 'keypoints': []},
         {'name': 'octagon', 'id': 4, 'supercategory': 'vector', 'keypoints': []},
         {'name': 'diamond', 'id': 5, 'supercategory': 'vector', 'keypoints': []},
-        {'name': 'superstar', 'id': 6, 'supercategory': 'raster', 'keypoints': ['left_eye', 'right_eye']},
-        {'name': 'eff', 'id': 7, 'supercategory': 'raster', 'keypoints': ['top_tip', 'mid_tip', 'bot_tip']},
+        {
+            'name': 'superstar',
+            'id': 6,
+            'supercategory': 'raster',
+            'keypoints': ['left_eye', 'right_eye'],
+        },
+        {
+            'name': 'eff',
+            'id': 7,
+            'supercategory': 'raster',
+            'keypoints': ['top_tip', 'mid_tip', 'bot_tip'],
+        },
         {'name': 'raster', 'id': 8, 'supercategory': 'raster', 'keypoints': []},
         {'name': 'vector', 'id': 9, 'supercategory': 'shape', 'keypoints': []},
         {'name': 'shape', 'id': 10, 'keypoints': []},
@@ -75,13 +87,17 @@ class CategoryPatterns:
             if data is None:
                 # use defaults
                 catnames = CategoryPatterns._default_catnames
-                cname_to_cat = {c['name']: c for c in CategoryPatterns._default_categories}
+                cname_to_cat = {
+                    c['name']: c for c in CategoryPatterns._default_categories
+                }
                 arg = list(ub.take(cname_to_cat, catnames))
             elif ub.iterable(data) and len(data) > 0:
                 # choose specific categories
                 if isinstance(data[0], str):
                     catnames = data
-                    cname_to_cat = {c['name']: c for c in CategoryPatterns._default_categories}
+                    cname_to_cat = {
+                        c['name']: c for c in CategoryPatterns._default_categories
+                    }
                     arg = list(ub.take(cname_to_cat, catnames))
                 elif isinstance(data[0], dict):
                     arg = data
@@ -102,11 +118,14 @@ class CategoryPatterns:
 
         self._category_to_elemfunc = {
             'superstar': lambda x: Rasters.superstar(),
-            'eff':       lambda x: Rasters.eff(),
-            'box':     lambda x: (skimage.morphology.square(x), None),
-            'star':    lambda x: (star(x), None),
-            'circle':  lambda x: (skimage.morphology.disk(x), None),
-            'octagon': lambda x: (skimage.morphology.octagon(x // 2, int(x / (2 * np.sqrt(2)))), None),
+            'eff': lambda x: Rasters.eff(),
+            'box': lambda x: (skimage.morphology.square(x), None),
+            'star': lambda x: (star(x), None),
+            'circle': lambda x: (skimage.morphology.disk(x), None),
+            'octagon': lambda x: (
+                skimage.morphology.octagon(x // 2, int(x / (2 * np.sqrt(2)))),
+                None,
+            ),
             'diamond': lambda x: (skimage.morphology.diamond(x), None),
         }
         # Make generation of shapes a bit faster?
@@ -118,13 +137,14 @@ class CategoryPatterns:
 
         # keep track of which keypoints belong to which categories
         self.categories = categories
-        self.cname_to_kp = {c['name']: c.get('keypoints', [])
-                            for c in self.categories}
+        self.cname_to_kp = {c['name']: c.get('keypoints', []) for c in self.categories}
 
         self.obj_catnames = sorted([c['name'] for c in self.categories])
         self.kp_catnames = sorted(ub.flatten(self.cname_to_kp.values()))
 
-        kpname_to_cat = {c['name']: c for c in CategoryPatterns._default_keypoint_categories}
+        kpname_to_cat = {
+            c['name']: c for c in CategoryPatterns._default_keypoint_categories
+        }
         self.keypoint_categories = list(ub.take(kpname_to_cat, self.kp_catnames))
 
         # flatten list of all keypoint categories
@@ -132,12 +152,8 @@ class CategoryPatterns:
         #     ub.flatten([self.cname_to_kp.get(cname, [])
         #                 for cname in self.obj_catnames])
         # )
-        self.cname_to_cid = {
-            cat['name']: cat['id'] for cat in self.categories
-        }
-        self.cname_to_cx = {
-            cat['name']: cx for cx, cat in enumerate(self.categories)
-        }
+        self.cname_to_cid = {cat['name']: cat['id'] for cat in self.categories}
+        self.cname_to_cx = {cat['name']: cx for cx, cat in enumerate(self.categories)}
 
     def __len__(self):
         return len(self.obj_catnames)
@@ -161,8 +177,9 @@ class CategoryPatterns:
             except KeyError:
                 return default
 
-    def random_category(self, chip, xy_offset=None, dims=None,
-                        newstyle=True, size=None):
+    def random_category(
+        self, chip, xy_offset=None, dims=None, newstyle=True, size=None
+    ):
         """
         Example:
             >>> from kwcoco.demo.toypatterns import *  # NOQA
@@ -177,12 +194,13 @@ class CategoryPatterns:
         """
         cname = self.rng.choice(self.obj_catnames)
         info = self.render_category(
-                cname, chip, xy_offset=xy_offset, dims=dims, newstyle=newstyle,
-                size=size)
+            cname, chip, xy_offset=xy_offset, dims=dims, newstyle=newstyle, size=size
+        )
         return info
 
-    def render_category(self, cname, chip, xy_offset=None, dims=None,
-                        newstyle=True, size=None):
+    def render_category(
+        self, cname, chip, xy_offset=None, dims=None, newstyle=True, size=None
+    ):
         """
         Example:
             >>> from kwcoco.demo.toypatterns import *  # NOQA
@@ -206,8 +224,9 @@ class CategoryPatterns:
             globals().update(xdev.get_func_kwargs(self.random_category))
         """
         data, mask, kpts = self._from_elem(cname, chip, size=size)
-        info = self._package_info(cname, data, mask, kpts, xy_offset, dims,
-                                  newstyle=newstyle)
+        info = self._package_info(
+            cname, data, mask, kpts, xy_offset, dims, newstyle=newstyle
+        )
         return info
 
     def _todo_refactor_geometric_info(self, cname, xy_offset, dims):
@@ -245,8 +264,9 @@ class CategoryPatterns:
         if kpts_yx is not None:
             kp_catnames = list(kpts_yx.keys())
             xy = np.array([yx[::-1] for yx in kpts_yx.values()])
-            kpts = kwimage.Points(xy=xy, class_idxs=np.arange(len(xy)),
-                                  classes=kp_catnames)
+            kpts = kwimage.Points(
+                xy=xy, class_idxs=np.arange(len(xy)), classes=kp_catnames
+            )
             sf = np.array(dsize) / np.array(elem.shape[0:2][::-1])
             kpts = kpts.scale(sf)
         else:
@@ -285,9 +305,8 @@ class CategoryPatterns:
         }
         return info
 
-    def _package_info(self, cname, data, mask, kpts, xy_offset, dims,
-                      newstyle):
-        """ packages data from _from_elem into coco-like annotation """
+    def _package_info(self, cname, data, mask, kpts, xy_offset, dims, newstyle):
+        """packages data from _from_elem into coco-like annotation"""
         import kwimage
 
         if newstyle:
@@ -312,6 +331,7 @@ class CategoryPatterns:
         else:
             # old style keypoints
             import kwarray
+
             keypoints = kwarray.ArrayAPI.tolist(kpts.to_coco('orig'))
             segmentation = segmentation.data
 
@@ -348,8 +368,9 @@ class CategoryPatterns:
         if kpts_yx is not None:
             kp_catnames = list(kpts_yx.keys())
             xy = np.array([yx[::-1] for yx in kpts_yx.values()])
-            kpts = kwimage.Points(xy=xy, class_idxs=np.arange(len(xy)),
-                                  classes=kp_catnames)
+            kpts = kwimage.Points(
+                xy=xy, class_idxs=np.arange(len(xy)), classes=kp_catnames
+            )
             sf = np.array(size) / np.array(elem.shape[0:2][::-1])
             kpts = kpts.scale(sf)
         else:
@@ -364,10 +385,14 @@ class CategoryPatterns:
         fg_scale = np.float32(self.fg_scale)
 
         if chip is not None:
-            fgdata = kwarray.standard_normal(chip.shape, std=fg_scale,
-                                             mean=fg_intensity, rng=self.rng,
-                                             dtype=np.float32)
-            fgdata = np.clip(fgdata , 0, 1, out=fgdata)
+            fgdata = kwarray.standard_normal(
+                chip.shape,
+                std=fg_scale,
+                mean=fg_intensity,
+                rng=self.rng,
+                dtype=np.float32,
+            )
+            fgdata = np.clip(fgdata, 0, 1, out=fgdata)
             fga = kwimage.ensure_alpha_channel(fgdata, alpha=template)
             data = kwimage.overlay_alpha_images(fga, chip, keepalpha=False)
         else:
@@ -390,25 +415,28 @@ def star(a, dtype=np.uint8):
     m = 2 * a + 1
     n = a // 2
     selem_square = np.zeros((m + 2 * n, m + 2 * n), dtype=np.uint8)
-    selem_square[n: m + n, n: m + n] = 1
+    selem_square[n : m + n, n : m + n] = 1
 
     c = (m + 2 * n - 1) // 2
     if True:
         # We can do this much faster with opencv
         b = (m + 2 * n) - 1
-        vertices = np.array([
-            [0, c],
-            [c, 0],
-            [b, c],
-            [c, b],
-            [0, c],
-        ])
+        vertices = np.array(
+            [
+                [0, c],
+                [c, 0],
+                [b, c],
+                [c, b],
+                [0, c],
+            ]
+        )
         pts = vertices.astype(int)[:, None, :]
         mask = np.zeros_like(selem_square)
         mask = cv2.fillConvexPoly(mask, pts, color=1)
         selem_rotated = mask
     else:
         from skimage.morphology.convex_hull import convex_hull_image
+
         selem_rotated = np.zeros((m + 2 * n, m + 2 * n), dtype=np.float32)
         selem_rotated[0, c] = selem_rotated[-1, c] = 1
         selem_rotated[c, 0] = selem_rotated[c, -1] = 1
@@ -433,24 +461,27 @@ class Rasters:
             >>> kwplot.imshow(data)
 
         """
-        (_, i, O) = 0, 1.0, .5
-        patch = np.array([
-            [_, _, _, _, _, _, _, O, O, _, _, _, _, _, _, _],
-            [_, _, _, _, _, _, O, i, i, O, _, _, _, _, _, _],
-            [_, _, _, _, _, _, O, i, i, O, _, _, _, _, _, _],
-            [_, _, _, _, _, O, i, i, i, i, O, _, _, _, _, _],
-            [O, O, O, O, O, O, i, i, i, i, O, O, O, O, O, O],
-            [O, i, i, i, i, i, i, i, i, i, i, i, i, i, i, O],
-            [_, O, i, i, i, i, O, i, i, O, i, i, i, i, O, _],
-            [_, _, O, i, i, i, O, i, i, O, i, i, i, O, _, _],
-            [_, _, _, O, i, i, O, i, i, O, i, i, O, _, _, _],
-            [_, _, _, O, i, i, i, i, i, i, i, i, O, _, _, _],
-            [_, _, O, i, i, i, i, i, i, i, i, i, i, O, _, _],
-            [_, _, O, i, i, i, i, i, i, i, i, i, i, O, _, _],
-            [_, O, i, i, i, i, i, O, O, i, i, i, i, i, O, _],
-            [_, O, i, i, i, O, O, _, _, O, O, i, i, i, O, _],
-            [O, i, i, O, O, _, _, _, _, _, _, O, O, i, i, O],
-            [O, O, O, _, _, _, _, _, _, _, _, _, _, O, O, O]])
+        (_, i, O) = 0, 1.0, 0.5
+        patch = np.array(
+            [
+                [_, _, _, _, _, _, _, O, O, _, _, _, _, _, _, _],
+                [_, _, _, _, _, _, O, i, i, O, _, _, _, _, _, _],
+                [_, _, _, _, _, _, O, i, i, O, _, _, _, _, _, _],
+                [_, _, _, _, _, O, i, i, i, i, O, _, _, _, _, _],
+                [O, O, O, O, O, O, i, i, i, i, O, O, O, O, O, O],
+                [O, i, i, i, i, i, i, i, i, i, i, i, i, i, i, O],
+                [_, O, i, i, i, i, O, i, i, O, i, i, i, i, O, _],
+                [_, _, O, i, i, i, O, i, i, O, i, i, i, O, _, _],
+                [_, _, _, O, i, i, O, i, i, O, i, i, O, _, _, _],
+                [_, _, _, O, i, i, i, i, i, i, i, i, O, _, _, _],
+                [_, _, O, i, i, i, i, i, i, i, i, i, i, O, _, _],
+                [_, _, O, i, i, i, i, i, i, i, i, i, i, O, _, _],
+                [_, O, i, i, i, i, i, O, O, i, i, i, i, i, O, _],
+                [_, O, i, i, i, O, O, _, _, O, O, i, i, i, O, _],
+                [O, i, i, O, O, _, _, _, _, _, _, O, O, i, i, O],
+                [O, O, O, _, _, _, _, _, _, _, _, _, _, O, O, O],
+            ]
+        )
 
         keypoints_yx = {
             'left_eye': [7.5, 6.5],
@@ -472,31 +503,34 @@ class Rasters:
 
         """
         (_, O) = 0, 1.0
-        patch = np.array([
-            [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, _, O, O, O, O, O, O, O, O, O, O, O, O, O, O, _, _],
-            [_, _, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, _],
-            [_, _, _, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, _],
-            [_, _, _, O, O, O, O, O, O, O, O, O, O, O, O, O, O, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, O, O, O, O, O, O, O, _, _, _, _, _, _],
-            [_, _, O, O, O, O, O, O, O, O, O, O, O, O, O, _, _, _, _, _],
-            [_, _, O, O, O, O, O, O, O, O, O, O, O, O, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, O, O, O, O, O, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
-            [_, _, _, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _, _]])
+        patch = np.array(
+            [
+                [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, _, O, O, O, O, O, O, O, O, O, O, O, O, O, O, _, _],
+                [_, _, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, _],
+                [_, _, _, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, O, _],
+                [_, _, _, O, O, O, O, O, O, O, O, O, O, O, O, O, O, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, O, O, O, O, O, O, O, _, _, _, _, _, _],
+                [_, _, O, O, O, O, O, O, O, O, O, O, O, O, O, _, _, _, _, _],
+                [_, _, O, O, O, O, O, O, O, O, O, O, O, O, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, O, O, O, O, O, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+                [_, _, _, O, O, O, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+            ]
+        )
 
         keypoints_yx = {
             'top_tip': (2.5, 18.5),
@@ -505,10 +539,12 @@ class Rasters:
         }
         return patch, keypoints_yx
 
+
 if __name__ == '__main__':
     """
     CommandLine:
         python ~/code/kwcoco/kwcoco/demo/toypatterns.py
     """
     import xdoctest
+
     xdoctest.doctest_module(__file__)

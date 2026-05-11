@@ -71,6 +71,7 @@ def test_subset_cli_with_jq():
         import jq  # NOQA
     except Exception:
         import pytest
+
         pytest.skip('test requires jq')
     dset = _create_demo_dataset()
 
@@ -82,11 +83,7 @@ def test_subset_cli_with_jq():
     print('dset.fpath = {}'.format(ub.urepr(dset.fpath, nl=1)))
 
     dst_fpath1 = join(dpath, 'output.kwcoco.json')
-    config2 = {
-        'src': dset.fpath,
-        'dst': dst_fpath1,
-        'select_images': '.id % 2 == 0'
-    }
+    config2 = {'src': dset.fpath, 'dst': dst_fpath1, 'select_images': '.id % 2 == 0'}
     print('config2 = {}'.format(ub.urepr(config2, nl=1)))
     coco_subset.CocoSubsetCLI.main(cmdline=False, **config2)
     dst_dset1 = kwcoco.CocoDataset(dst_fpath1)

@@ -1,7 +1,10 @@
 import kwcoco
 import ubelt as ub
+
 # Make demo data
-coco_dset = kwcoco.CocoDataset.demo('vidshapes', num_videos=20, num_frames=20, image_size=(32, 32))
+coco_dset = kwcoco.CocoDataset.demo(
+    'vidshapes', num_videos=20, num_frames=20, image_size=(32, 32)
+)
 
 json_path = ub.Path(coco_dset.fpath)
 zip_path = json_path.augment(ext='.zip')

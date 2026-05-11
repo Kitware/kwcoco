@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 #!/usr/bin/env python3
 import scriptconfig as scfg
 import ubelt as ub
+
 """
 TODO:
     - [ ] Port logic from validate.
@@ -19,11 +22,21 @@ class CocoFixup(scfg.DataConfig):
 
     missing_assets = scfg.Value(True, help='if True remove missing assets')
 
-    corrupted_assets = scfg.Value(True, help=('if True remove corrupted assets. '
-                                              'Can also be only_shape for a quicker check.'))
+    corrupted_assets = scfg.Value(
+        True,
+        help=(
+            'if True remove corrupted assets. '
+            'Can also be only_shape for a quicker check.'
+        ),
+    )
 
-    inplace = scfg.Value(False, isflag=True, help=(
-        'if True and dst is unspecified then the output will overwrite the input'))
+    inplace = scfg.Value(
+        False,
+        isflag=True,
+        help=(
+            'if True and dst is unspecified then the output will overwrite the input'
+        ),
+    )
 
     workers = scfg.Value(0)
 
@@ -77,12 +90,14 @@ class CocoFixup(scfg.DataConfig):
 
         try:
             from osgeo import gdal
+
             gdal.UseExceptions()
         except ImportError:
             ...
 
         print('reading fpath = {!r}'.format(config['src']))
         import kwcoco
+
         dset = kwcoco.CocoDataset.coerce(config['src'])
         dst_fpath = ub.Path(config['dst'])
 
@@ -93,7 +108,9 @@ class CocoFixup(scfg.DataConfig):
             remove_missing_assets(dset)
 
         if config.corrupted_assets:
-            find_and_remove_corrupted_assets(dset, check_aux, workers, config.corrupted_assets)
+            find_and_remove_corrupted_assets(
+                dset, check_aux, workers, config.corrupted_assets
+            )
 
         remove_empty_videos(dset)
 
@@ -104,8 +121,7 @@ class CocoFixup(scfg.DataConfig):
         dset.dump()
 
 
-def find_corrupted_assets(dset, check_aux=True, workers=0,
-                          corrupted_assets='full'):
+def find_corrupted_assets(dset, check_aux=True, workers=0, corrupted_assets='full'):
     from kwcoco._helpers import _image_corruption_check
 
     if corrupted_assets is True:
@@ -118,7 +134,9 @@ def find_corrupted_assets(dset, check_aux=True, workers=0,
     else:
         raise ValueError(
             "corrupted_assets must be 'only_shape' or 'full', got {!r}".format(
-                corrupted_assets))
+                corrupted_assets
+            )
+        )
 
     jobs = ub.JobPool(mode='process', max_workers=workers)
 
@@ -131,32 +149,42 @@ def find_corrupted_assets(dset, check_aux=True, workers=0,
     imread_kwargs = {}
 
     img_enum = enumerate(dset.dataset['images'])
-    for img_idx, img in ub.ProgIter(img_enum,
-                                    total=len(dset.dataset['images']),
-                                    desc='submit corruption checks',
-                                    verbose=verbose):
+    for img_idx, img in ub.ProgIter(
+        img_enum,
+        total=len(dset.dataset['images']),
+        desc='submit corruption checks',
+        verbose=verbose,
+    ):
         gid = img.get('id', None)
         fname = img.get('file_name', None)
         if fname is not None:
             gpath = bundle_dpath / fname
-            job = jobs.submit(_image_corruption_check, gpath,
-                              imread_kwargs=imread_kwargs,
-                              only_shape=only_shape)
+            job = jobs.submit(
+                _image_corruption_check,
+                gpath,
+                imread_kwargs=imread_kwargs,
+                only_shape=only_shape,
+            )
             job.input_info = (img_idx, gpath, gid)
 
         if check_aux:
             for asset_idx, aux in enumerate(img.get('auxiliary', [])):
                 gpath = bundle_dpath / aux['file_name']
-                job = jobs.submit(_image_corruption_check, gpath, imread_kwargs=imread_kwargs)
+                job = jobs.submit(
+                    _image_corruption_check, gpath, imread_kwargs=imread_kwargs
+                )
                 job.input_info = (img_idx, gpath, gid, 'auxiliary', asset_idx)
             for asset_idx, aux in enumerate(img.get('assets', [])):
                 gpath = bundle_dpath / aux['file_name']
-                job = jobs.submit(_image_corruption_check, gpath, imread_kwargs=imread_kwargs)
+                job = jobs.submit(
+                    _image_corruption_check, gpath, imread_kwargs=imread_kwargs
+                )
                 job.input_info = (img_idx, gpath, gid, 'assets', asset_idx)
 
     corrupted_info = []
-    for job in jobs.as_completed(desc='check corrupted images',
-                                 progkw={'verbose': verbose}):
+    for job in jobs.as_completed(
+        desc='check corrupted images', progkw={'verbose': verbose}
+    ):
         info = job.result()
         if info['failed']:
             corrupted_info.append(job.input_info)
@@ -164,19 +192,21 @@ def find_corrupted_assets(dset, check_aux=True, workers=0,
     return corrupted_info
 
 
-def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0,
-                                     corrupted_assets='full'):
-
+def find_and_remove_corrupted_assets(
+    dset, check_aux=True, workers=0, corrupted_assets='full'
+):
     # FIND PART
     corrupted_info = find_corrupted_assets(
-        dset, check_aux=check_aux, workers=workers,
-        corrupted_assets=corrupted_assets)
+        dset, check_aux=check_aux, workers=workers, corrupted_assets=corrupted_assets
+    )
 
     # REMOVE PART
     gid_to_missing = ub.group_items(corrupted_info, key=lambda t: t[2])
     # print(f'gid_to_missing = {ub.urepr(gid_to_missing, nl=1)}')
     empty_gids = []
-    for gid, missing in ub.ProgIter(gid_to_missing.items(), desc='removing corrupted', verbose=3):
+    for gid, missing in ub.ProgIter(
+        gid_to_missing.items(), desc='removing corrupted', verbose=3
+    ):
         coco_img = dset.coco_image(gid)
         remove_main = coco_img_remove_empty_assets(coco_img, missing)
         # print(f'coco_img={coco_img}')
@@ -194,6 +224,7 @@ def find_and_remove_corrupted_assets(dset, check_aux=True, workers=0,
 def coco_img_remove_empty_assets(coco_img, missing):
     import os
     from os.path import join
+
     img = coco_img.img
 
     missing_fpaths = {os.fspath(t[1]) for t in missing}

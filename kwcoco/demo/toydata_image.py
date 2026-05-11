@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Generates "toydata" for demo and testing purposes.
 
 Loose image version of the toydata generators.
@@ -11,6 +13,7 @@ Note:
     redone using the tools built for `random_video_dset`, which have more
     extensible implementations.
 """
+
 import glob
 from os.path import basename
 from os.path import join
@@ -26,17 +29,19 @@ from kwcoco.demo.toypatterns import CategoryPatterns
 TOYDATA_IMAGE_VERSION = 20
 
 
-def demodata_toy_dset(image_size=(600, 600),
-                      n_imgs=5,
-                      verbose=3,
-                      rng=0,
-                      newstyle=True,
-                      dpath=None,
-                      fpath=None,
-                      bundle_dpath=None,
-                      aux=None,
-                      use_cache=True,
-                      **kwargs):
+def demodata_toy_dset(
+    image_size=(600, 600),
+    n_imgs=5,
+    verbose=3,
+    rng=0,
+    newstyle=True,
+    dpath=None,
+    fpath=None,
+    bundle_dpath=None,
+    aux=None,
+    use_cache=True,
+    **kwargs,
+):
     """
     Create a toy detection problem
 
@@ -123,9 +128,13 @@ def demodata_toy_dset(image_size=(600, 600),
 
     if 'gsize' in kwargs:  # nocover
         ub.schedule_deprecation(
-            modname='kwcoco', name='gsize', type='toydata argument',
+            modname='kwcoco',
+            name='gsize',
+            type='toydata argument',
             migration='use image_size instead',
-            deprecate='0.8.3', error='1.0.0', remove='1.1.0',
+            deprecate='0.8.3',
+            error='1.0.0',
+            remove='1.1.0',
         )
         image_size = kwargs.pop('gsize')
     if 'sensorchan' in kwargs:
@@ -144,24 +153,34 @@ def demodata_toy_dset(image_size=(600, 600),
 
     rng = kwarray.ensure_rng(rng)
 
-    catpats = CategoryPatterns.coerce([
-        # 'box',
-        # 'circle',
-        'star',
-        'superstar',
-        'eff',
-        # 'octagon',
-        # 'diamond'
-    ])
+    catpats = CategoryPatterns.coerce(
+        [
+            # 'box',
+            # 'circle',
+            'star',
+            'superstar',
+            'eff',
+            # 'octagon',
+            # 'diamond'
+        ]
+    )
 
     # TODO: expose to the user, but come up with a good specification.
-    anchors = np.array([
-        [1, 1], [2, 2], [1.5, 1], [2, 1], [3, 1], [3, 2], [2.5, 2.5],
-    ])
+    anchors = np.array(
+        [
+            [1, 1],
+            [2, 2],
+            [1.5, 1],
+            [2, 1],
+            [3, 1],
+            [3, 2],
+            [2.5, 2.5],
+        ]
+    )
     anchors = np.vstack([anchors, anchors[:, ::-1]])
     anchors = np.vstack([anchors, anchors * 1.5])
     # anchors = np.vstack([anchors, anchors * 2.0])
-    anchors /= (anchors.max() * 3)
+    anchors /= anchors.max() * 3
     anchors = np.array(sorted(set(map(tuple, anchors.tolist()))))
 
     # This configuration dictionary is what the cache depends on
@@ -197,14 +216,18 @@ def demodata_toy_dset(image_size=(600, 600),
 
     stamp = ub.CacheStamp(
         'toy_dset_stamp_v{:03d}'.format(TOYDATA_IMAGE_VERSION),
-        dpath=cache_dpath, depends=depends, verbose=verbose, enabled=0)
+        dpath=cache_dpath,
+        depends=depends,
+        verbose=verbose,
+        enabled=0,
+    )
 
     n_have = len(list(glob.glob(join(img_dpath, '*.png'))))
     # Hack: Only allow cache loading if the data seems to exist
     stamp.cacher.enabled = (n_have == n_imgs) and use_cache
 
     # TODO: parametarize
-    bg_intensity = .1
+    bg_intensity = 0.1
     fg_scale = 0.5
     bg_scale = 0.8
 
@@ -218,10 +241,12 @@ def demodata_toy_dset(image_size=(600, 600),
             'categories': [],
         }
 
-        dataset['categories'].append({
-            'id': 0,
-            'name': 'background',
-        })
+        dataset['categories'].append(
+            {
+                'id': 0,
+                'name': 'background',
+            }
+        )
 
         name_to_cid = {}
         for cat in catpats.categories:
@@ -245,26 +270,35 @@ def demodata_toy_dset(image_size=(600, 600),
 
         for __ in ub.ProgIter(range(n_imgs), label='creating data'):
             # TODO: parallelize
-            img, anns = demodata_toy_img(anchors, image_size=image_size,
-                                         categories=catpats, newstyle=newstyle,
-                                         fg_scale=fg_scale, bg_scale=bg_scale,
-                                         bg_intensity=bg_intensity, rng=rng,
-                                         aux=aux)
+            img, anns = demodata_toy_img(
+                anchors,
+                image_size=image_size,
+                categories=catpats,
+                newstyle=newstyle,
+                fg_scale=fg_scale,
+                bg_scale=bg_scale,
+                bg_intensity=bg_intensity,
+                rng=rng,
+                aux=aux,
+            )
             imdata = img.pop('imdata')
 
             gid = len(dataset['images']) + 1
             fname = 'img_{:05d}.png'.format(gid)
             fpath = join(img_dpath, fname)
-            img.update({
-                'id': gid,
-                'file_name': fpath,
-                'channels': 'rgb',
-            })
+            img.update(
+                {
+                    'id': gid,
+                    'file_name': fpath,
+                    'channels': 'rgb',
+                }
+            )
             auxiliaries = img.pop('auxiliary', None)
             if auxiliaries is not None:
                 for auxdict in auxiliaries:
                     aux_dpath = ub.ensuredir(
-                        (assets_dpath, 'auxiliary', auxdict['channels']))
+                        (assets_dpath, 'auxiliary', auxdict['channels'])
+                    )
                     aux_fpath = ub.augpath(join(aux_dpath, fname), ext='.tif')
                     ub.ensuredir(aux_dpath)
                     auxdata = (auxdict.pop('imdata') * 255).astype(np.uint8)
@@ -281,18 +315,19 @@ def demodata_toy_dset(image_size=(600, 600),
                         kpname = kpdict.pop('keypoint_category')
                         kpdict['keypoint_category_id'] = kpname_to_id[kpname]
                 cid = name_to_cid[ann.pop('category_name')]
-                ann.update({
-                    'id': len(dataset['annotations']) + 1,
-                    'image_id': gid,
-                    'category_id': cid,
-                })
+                ann.update(
+                    {
+                        'id': len(dataset['annotations']) + 1,
+                        'image_id': gid,
+                        'category_id': cid,
+                    }
+                )
                 dataset['annotations'].append(ann)
 
             kwimage.imwrite(fpath, imdata)
 
         fname = basename(dset_fpath)
-        dset = kwcoco.CocoDataset(dataset, bundle_dpath=bundle_dpath,
-                                  fname=fname)
+        dset = kwcoco.CocoDataset(dataset, bundle_dpath=bundle_dpath, fname=fname)
         dset.dset_fpath = dset_fpath
         if verbose:
             print('dump dset.dset_fpath = {!r}'.format(dset.dset_fpath))
@@ -310,11 +345,23 @@ def demodata_toy_dset(image_size=(600, 600),
     return dset
 
 
-def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
-                     n_annots=(0, 50), fg_scale=0.5, bg_scale=0.8,
-                     bg_intensity=0.1, fg_intensity=0.9,
-                     gray=True, centerobj=None, exact=False,
-                     newstyle=True, rng=None, aux=None, **kwargs):
+def demodata_toy_img(
+    anchors=None,
+    image_size=(104, 104),
+    categories=None,
+    n_annots=(0, 50),
+    fg_scale=0.5,
+    bg_scale=0.8,
+    bg_intensity=0.1,
+    fg_intensity=0.9,
+    gray=True,
+    centerobj=None,
+    exact=False,
+    newstyle=True,
+    rng=None,
+    aux=None,
+    **kwargs,
+):
     r"""
     Generate a single image with non-overlapping toy objects of available
     categories.
@@ -419,22 +466,28 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
 
     """
     import kwimage.algo  # NOQA
+
     if anchors is None:
-        anchors = [[.20, .20]]
+        anchors = [[0.20, 0.20]]
     anchors = np.asarray(anchors)
 
     if 'gsize' in kwargs:  # nocover
         ub.schedule_deprecation(
-            modname='kwcoco', name='gsize', type='toydata argument',
+            modname='kwcoco',
+            name='gsize',
+            type='toydata argument',
             migration='use image_size instead',
-            deprecate='0.8.3', error='1.0.0', remove='1.1.0',
+            deprecate='0.8.3',
+            error='1.0.0',
+            remove='1.1.0',
         )
         image_size = kwargs.pop('gsize')
     assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
 
     rng = kwarray.ensure_rng(rng)
-    catpats = CategoryPatterns.coerce(categories, fg_scale=fg_scale,
-                                      fg_intensity=fg_intensity, rng=rng)
+    catpats = CategoryPatterns.coerce(
+        categories, fg_scale=fg_scale, fg_intensity=fg_intensity, rng=rng
+    )
 
     if n_annots is None:
         n_annots = (0, 50)
@@ -450,11 +503,12 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
 
     while True:
         boxes = kwimage.Boxes.random(
-            num=num, scale=1.0, format='xywh', rng=rng, anchors=anchors)
+            num=num, scale=1.0, format='xywh', rng=rng, anchors=anchors
+        )
         boxes = boxes.scale(image_size)
         bw, bh = boxes.components[2:4]
         ar = np.maximum(bw, bh) / np.minimum(bw, bh)
-        flags = ((bw > 1) & (bh > 1) & (ar < 4))
+        flags = (bw > 1) & (bh > 1) & (ar < 4)
         boxes = boxes[flags.ravel()]
 
         if centerobj != 'pos' or len(boxes):
@@ -483,14 +537,15 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
     if len(boxes) > 1:
         tlbr_data = boxes.to_ltrb().data
         keep = kwimage.non_max_supression(
-            tlbr_data, scores=box_priority, thresh=0.0, impl=nms_impl)
+            tlbr_data, scores=box_priority, thresh=0.0, impl=nms_impl
+        )
         boxes = boxes[keep]
 
     if centerobj == 'neg':
         # The center of the image should be negative so remove the center box
         boxes = boxes[1:]
 
-    boxes = boxes.scale(.8).translate(.1 * min(image_size))
+    boxes = boxes.scale(0.8).translate(0.1 * min(image_size))
     boxes.data = boxes.data.astype(int)
 
     # Hack away zero width objects
@@ -503,8 +558,9 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
     # This is 2x as fast for image_size=(300,300)
     if gray:
         gshape = (gh, gw, 1)
-        imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
-                                           rng=rng, dtype=np.float32)
+        imdata = kwarray.standard_normal(
+            gshape, mean=bg_intensity, std=bg_scale, rng=rng, dtype=np.float32
+        )
     else:
         gshape = (gh, gw, 3)
         # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
@@ -531,8 +587,7 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
         chip_index = tuple([slice(tl_y, br_y), slice(tl_x, br_x)])
         chip = imdata[chip_index]
         xy_offset = (tl_x, tl_y)
-        info = catpats.random_category(chip, xy_offset, dims,
-                                       newstyle=newstyle)
+        info = catpats.random_category(chip, xy_offset, dims, newstyle=newstyle)
         fgdata = info['data']
         if gray:
             fgdata = fgdata.mean(axis=2, keepdims=True)
@@ -576,13 +631,15 @@ def demodata_toy_img(anchors=None, image_size=(104, 104), categories=None,
     if auxdata is not None:
         mask = rng.rand(*auxdata.shape[0:2]) > 0.5
         auxdata = kwimage.fourier_mask(auxdata, mask)
-        auxdata = (auxdata - auxdata.min())
-        auxdata = (auxdata / max(1e-8, auxdata.max()))
+        auxdata = auxdata - auxdata.min()
+        auxdata = auxdata / max(1e-8, auxdata.max())
         auxdata = auxdata.clip(0, 1)
         # Hack aux data is always disparity for now
-        img['auxiliary'] = [{
-            'imdata': auxdata,
-            'channels': 'disparity',
-        }]
+        img['auxiliary'] = [
+            {
+                'imdata': auxdata,
+                'channels': 'disparity',
+            }
+        ]
 
     return img, anns

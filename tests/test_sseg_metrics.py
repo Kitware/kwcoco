@@ -8,6 +8,7 @@ def test_single_image_sseg_with_weights():
     import numpy as np
     import ubelt as ub
     import kwimage
+
     dpath = ub.Path.appdir('kwcoco/tests/test_sseg_metrics').ensuredir()
 
     pred_bundle_dpath = (dpath / 'pred_bundle_1').ensuredir()
@@ -36,9 +37,12 @@ def test_single_image_sseg_with_weights():
 
         asset_fpath = pred_bundle_dpath / 'perfect_heatmap.png'
         kwimage.imwrite(asset_fpath, heatmap)
-        pred_coco_img.add_asset(asset_fpath, channels='salient',
-                                width=pred_coco_img.img['width'],
-                                height=pred_coco_img.img['height'])
+        pred_coco_img.add_asset(
+            asset_fpath,
+            channels='salient',
+            width=pred_coco_img.img['width'],
+            height=pred_coco_img.img['height'],
+        )
         config = {}
         true_dets = true_coco_img.annots().detections
         video1 = true_coco_img.video
@@ -46,8 +50,13 @@ def test_single_image_sseg_with_weights():
         config['salient_channel'] = 'salient'
 
         self = SingleImageSegmentationMetrics(
-            pred_coco_img, true_coco_img, true_classes, true_dets, config=config,
-            video1=video1)
+            pred_coco_img,
+            true_coco_img,
+            true_classes,
+            true_dets,
+            config=config,
+            video1=video1,
+        )
         # Should be nearly perfect at this point
         info = self.run()
         assert np.isclose(info['salient_measures']['ap'], 1)
@@ -68,9 +77,12 @@ def test_single_image_sseg_with_weights():
 
         asset_fpath = pred_bundle_dpath / 'imperfect_heatmap.png'
         kwimage.imwrite(asset_fpath, heatmap)
-        pred_coco_img.add_asset(asset_fpath, channels='salient',
-                                width=pred_coco_img.img['width'],
-                                height=pred_coco_img.img['height'])
+        pred_coco_img.add_asset(
+            asset_fpath,
+            channels='salient',
+            width=pred_coco_img.img['width'],
+            height=pred_coco_img.img['height'],
+        )
         config = {}
         true_dets = true_coco_img.annots().detections
         video1 = true_coco_img.video
@@ -78,8 +90,13 @@ def test_single_image_sseg_with_weights():
         config['salient_channel'] = 'salient'
 
         self = SingleImageSegmentationMetrics(
-            pred_coco_img, true_coco_img, true_classes, true_dets, config=config,
-            video1=video1)
+            pred_coco_img,
+            true_coco_img,
+            true_classes,
+            true_dets,
+            config=config,
+            video1=video1,
+        )
         # Should be nearly perfect at this point
         info = self.run()
         # Score should be much worse
@@ -109,9 +126,12 @@ def test_single_image_sseg_with_weights():
 
         asset_fpath = pred_bundle_dpath / 'imperfect_heatmap.png'
         kwimage.imwrite(asset_fpath, heatmap)
-        pred_coco_img.add_asset(asset_fpath, channels='salient',
-                                width=pred_coco_img.img['width'],
-                                height=pred_coco_img.img['height'])
+        pred_coco_img.add_asset(
+            asset_fpath,
+            channels='salient',
+            width=pred_coco_img.img['width'],
+            height=pred_coco_img.img['height'],
+        )
         config = {}
         true_dets = true_coco_img.annots().detections
         video1 = true_coco_img.video
@@ -119,8 +139,13 @@ def test_single_image_sseg_with_weights():
         config['salient_channel'] = 'salient'
 
         self = SingleImageSegmentationMetrics(
-            pred_coco_img, true_coco_img, true_classes, true_dets, config=config,
-            video1=video1)
+            pred_coco_img,
+            true_coco_img,
+            true_classes,
+            true_dets,
+            config=config,
+            video1=video1,
+        )
         # Should be nearly perfect at this point
         info = self.run()
         # Score should be much worse
@@ -128,8 +153,14 @@ def test_single_image_sseg_with_weights():
 
     if 0:
         import kwplot
+
         kwplot.autompl()
-        kwplot.imshow(info['true_saliency'].astype(np.float32), pnum=(1, 3, 1), fnum=1, title='true')
+        kwplot.imshow(
+            info['true_saliency'].astype(np.float32),
+            pnum=(1, 3, 1),
+            fnum=1,
+            title='true',
+        )
         kwplot.imshow(info['saliency_weights'], pnum=(1, 3, 2), fnum=1, title='weight')
         kwplot.imshow(info['salient_prob'], pnum=(1, 3, 3), fnum=1, title='pred')
 

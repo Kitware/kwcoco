@@ -1,9 +1,12 @@
 """
+from __future__ import annotations
+
 These items were split out of coco_dataset.py which is becoming too big
 
 These are helper data structures used to do things like auto-increment ids,
 recycle ids, do renaming, extend sortedcontainers etc...
 """
+
 import sortedcontainers
 
 
@@ -26,7 +29,7 @@ class _NextId:
         }
 
     def _update_unused(self, key):
-        """ Scans for what the next safe id can be for ``key`` """
+        """Scans for what the next safe id can be for ``key``"""
         try:
             item_list = self.parent.dataset[key]
             max_id = max(item['id'] for item in item_list) if item_list else 0
@@ -37,7 +40,7 @@ class _NextId:
         self.unused[key] = next_id
 
     def get(self, key):
-        """ Get the next safe item id for ``key`` """
+        """Get the next safe item id for ``key``"""
         if self.unused[key] is None:
             self._update_unused(key)
         new_id = self.unused[key]
@@ -76,6 +79,7 @@ class _ID_Remapper:
         new_tids = [0, 0, 1, 1, 2, 3]
         new_tids = [4, 5, 6, 7, 7, 8, 9, 10]
     """
+
     def __init__(self, reuse=False):
         self.blocklist = set()
         self.mapping = dict()
@@ -110,7 +114,7 @@ class _ID_Remapper:
         self.mapping = dict()
 
     def next_id(self):
-        """ Generate a new id that hasnt been used yet """
+        """Generate a new id that hasnt been used yet"""
         next_id = self._nextid
         self._nextid += 1
         return next_id
@@ -122,6 +126,7 @@ class _ID_Remapper:
 #     IGNORE = enum.auto()
 #     WARN = enum.auto()
 #     ERROR = enum.auto()
+
 
 class UniqueNameRemapper:
     """
@@ -148,6 +153,7 @@ class UniqueNameRemapper:
         >>>     self.remap('foo')
         >>> print(f'ex={ex}')
     """
+
     def __init__(self, policy='warn', name_type='unspecified'):
         """
         Args:
@@ -160,6 +166,7 @@ class UniqueNameRemapper:
                 an error or warning message is emitted.
         """
         import re
+
         self._seen = set()
         self.suffix_pat = re.compile(r'(.*)_v(\d+)')
         if policy not in {'ignore', 'warn', 'error'}:
@@ -197,9 +204,14 @@ class UniqueNameRemapper:
                 ...
             elif self.policy == 'warn':
                 import warnings
-                warnings.warn(f'A {self.name_type!r} name was renamed from {input_name!r} to {name!r}')
+
+                warnings.warn(
+                    f'A {self.name_type!r} name was renamed from {input_name!r} to {name!r}'
+                )
             elif self.policy == 'error':
-                raise Exception(f'A {self.name_type!r} name was renamed from {input_name!r} to {name!r}')
+                raise Exception(
+                    f'A {self.name_type!r} name was renamed from {input_name!r} to {name!r}'
+                )
 
         self._seen.add(name)
         return name
@@ -224,6 +236,7 @@ class _CategoryID_Remapper:
         >>>     9: {'name': 'cat6', 'id': 9},
         >>>     10: {'name': 'cat9', 'id': 10}}
     """
+
     def __init__(self):
         self._name_to_cat = {}
         self._id_to_cat = {}
@@ -232,6 +245,7 @@ class _CategoryID_Remapper:
 
     def remap(self, old_cat):
         import ubelt as ub
+
         catname = old_cat['name']
         new_cat = self._name_to_cat.get(catname, None)
         if new_cat is None:
@@ -338,8 +352,9 @@ def _image_corruption_check(fpath, only_shape=False, imread_kwargs=None):
     return info
 
 
-def _query_image_ids(coco_dset, select_images=None, select_videos=None,
-                     valid_image_ids=None):
+def _query_image_ids(
+    coco_dset, select_images=None, select_videos=None, valid_image_ids=None
+):
     """
     Filters to a specific set of images given query parameters based on
     json-query (jq).
@@ -442,6 +457,7 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None,
 
     """
     import ubelt as ub
+
     try:
         import kwutil
     except Exception:
@@ -475,7 +491,7 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None,
                 raise
 
             try:
-                query_text = ".images[] | select({}) | .id".format(select_images)
+                query_text = '.images[] | select({}) | .id'.format(select_images)
                 query = jq.compile(query_text)
                 image_selected_gids = set(query.input(coco_dset.dataset).all())
                 valid_image_ids &= image_selected_gids
@@ -504,15 +520,18 @@ def _query_image_ids(coco_dset, select_images=None, select_videos=None,
                 raise
 
             try:
-                query_text = ".videos[] | select({}) | .id".format(select_videos)
+                query_text = '.videos[] | select({}) | .id'.format(select_videos)
                 query = jq.compile(query_text)
                 selected_vidids = query.input(coco_dset.dataset).all()
             except Exception:
                 print('JQ Query Failed: {}'.format(query_text))
                 raise
 
-        vid_selected_gids = set(ub.flatten(coco_dset.index.vidid_to_gids[vidid]
-                                           for vidid in selected_vidids))
+        vid_selected_gids = set(
+            ub.flatten(
+                coco_dset.index.vidid_to_gids[vidid] for vidid in selected_vidids
+            )
+        )
         valid_image_ids &= vid_selected_gids
 
     valid_image_ids = sorted(valid_image_ids)

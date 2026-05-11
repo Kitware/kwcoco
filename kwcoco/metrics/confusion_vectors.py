@@ -1,15 +1,17 @@
 """
+from __future__ import annotations
+
 Classes that store raw confusion vectors, which can be accumulated into
 confusion measures.
 """
+
 import numpy as np
 import ubelt as ub
 import warnings
 from kwcoco.metrics.functional import fast_confusion_matrix
 from kwcoco.metrics.sklearn_alts import _binary_clf_curve2
 from kwcoco.category_tree import CategoryTree
-from kwcoco.metrics.confusion_measures import (
-    Measures, PerClass_Measures, populate_info)
+from kwcoco.metrics.confusion_measures import Measures, PerClass_Measures, populate_info
 
 
 class ConfusionVectors(ub.NiceRepr):
@@ -128,6 +130,7 @@ class ConfusionVectors(ub.NiceRepr):
         if concat_prob_columns and self.probs is not None:
             # Maybe add probabilities as columns?
             import pandas as pd
+
             probs_df = pd.DataFrame(self.probs, columns=self.classes)
             df = pd.concat([df, probs_df], axis=1)
         else:
@@ -138,6 +141,7 @@ class ConfusionVectors(ub.NiceRepr):
     def from_json(cls, state):
         import kwarray
         import kwcoco
+
         probs = state['probs']
         if probs is not None:
             probs = np.array(probs)
@@ -164,6 +168,7 @@ class ConfusionVectors(ub.NiceRepr):
             >>> print('cx_to_binvecs = {!r}'.format(cx_to_binvecs))
         """
         from kwcoco.metrics import DetectionMetrics
+
         default = {
             'nimgs': 10,
             'nboxes': (0, 10),
@@ -176,14 +181,27 @@ class ConfusionVectors(ub.NiceRepr):
         dmet = DetectionMetrics.demo(**demokw)
         # print('dmet = {!r}'.format(dmet))
         cfsn_vecs = dmet.confusion_vectors()
-        cfsn_vecs.data._data = ub.dict_isect(cfsn_vecs.data._data, [
-            'true', 'pred', 'score', 'weight',
-        ])
+        cfsn_vecs.data._data = ub.dict_isect(
+            cfsn_vecs.data._data,
+            [
+                'true',
+                'pred',
+                'score',
+                'weight',
+            ],
+        )
         return cfsn_vecs
 
     @classmethod
-    def from_arrays(ConfusionVectors, true, pred=None, score=None, weight=None,
-                    probs=None, classes=None):
+    def from_arrays(
+        ConfusionVectors,
+        true,
+        pred=None,
+        score=None,
+        weight=None,
+        probs=None,
+        classes=None,
+    ):
         """
         Construct confusion vector data structure from component arrays
 
@@ -204,6 +222,7 @@ class ConfusionVectors(ub.NiceRepr):
             object        2        1       0
         """
         import kwarray
+
         if pred is None:
             if probs is not None:
                 if isinstance(classes, CategoryTree):
@@ -276,16 +295,20 @@ class ConfusionVectors(ub.NiceRepr):
                 raise IndexError('y_pred contains invalid indices')
 
         matrix = fast_confusion_matrix(
-            y_true, y_pred, n_labels=len(cfsn_vecs.classes),
-            sample_weight=data.get('weight', None)
+            y_true,
+            y_pred,
+            n_labels=len(cfsn_vecs.classes),
+            sample_weight=data.get('weight', None),
         )
 
         import pandas as pd
-        cm = pd.DataFrame(matrix, index=list(cfsn_vecs.classes),
-                          columns=list(cfsn_vecs.classes))
+
+        cm = pd.DataFrame(
+            matrix, index=list(cfsn_vecs.classes), columns=list(cfsn_vecs.classes)
+        )
         if compress:
             iszero = matrix == 0
-            unused = (np.all(iszero, axis=0) & np.all(iszero, axis=1))
+            unused = np.all(iszero, axis=0) & np.all(iszero, axis=1)
             cm = cm[~unused].T[~unused].T
         cm.index.name = 'real'
         cm.columns.name = 'pred'
@@ -299,11 +322,14 @@ class ConfusionVectors(ub.NiceRepr):
             ConfusionVectors
         """
         import kwarray
+
         assert cfsn_vecs.probs is not None, 'need probs'
         if not isinstance(cfsn_vecs.classes, CategoryTree):
             raise TypeError('classes must be a kwcoco.CategoryTree')
 
-        descendent_map = cfsn_vecs.classes.idx_to_descendants_idxs(include_cfsn_vecs=True)
+        descendent_map = cfsn_vecs.classes.idx_to_descendants_idxs(
+            include_cfsn_vecs=True
+        )
         valid_descendant_mapping = ub.dict_isect(descendent_map, cxs)
         # mapping from current category indexes to the new coarse ones
         # Anything without an explicit key will be mapped to background
@@ -325,7 +351,9 @@ class ConfusionVectors(ub.NiceRepr):
             'gid': cfsn_vecs.data['gid'],
         }
         new_y_df = kwarray.DataFrameArray(new_y_df)
-        coarse_cfsn_vecs = ConfusionVectors(new_y_df, cfsn_vecs.classes, cfsn_vecs.probs)
+        coarse_cfsn_vecs = ConfusionVectors(
+            new_y_df, cfsn_vecs.classes, cfsn_vecs.probs
+        )
         return coarse_cfsn_vecs
 
     def binarize_classless(cfsn_vecs, negative_classes=None):
@@ -364,12 +392,15 @@ class ConfusionVectors(ub.NiceRepr):
 
         negative_cidxs = {-1}
         if negative_classes is not None:
+
             @ub.memoize
             def _lower_classes():
                 if cfsn_vecs.classes is None:
                     raise Exception(
-                        'classes must be known if negative_classes are strings')
+                        'classes must be known if negative_classes are strings'
+                    )
                 return [c.lower() for c in cfsn_vecs.classes]
+
             for c in negative_classes:
                 if isinstance(c, str):
                     classes = _lower_classes()
@@ -387,18 +418,15 @@ class ConfusionVectors(ub.NiceRepr):
             'is_true': ~is_false,
             'pred_score': cfsn_vecs.data['score'],
         }
-        extra = ub.dict_isect(cfsn_vecs.data._data, [
-            'txs', 'pxs', 'gid', 'weight'])
+        extra = ub.dict_isect(cfsn_vecs.data._data, ['txs', 'pxs', 'gid', 'weight'])
         _data.update(extra)
         bin_data = kwarray.DataFrameArray(_data)
         nocls_binvecs = BinaryConfusionVectors(bin_data)
         return nocls_binvecs
 
-    def binarize_ovr(cfsn_vecs,
-                     mode=1,
-                     keyby='name',
-                     ignore_classes={'ignore'},
-                     approx=False):
+    def binarize_ovr(
+        cfsn_vecs, mode=1, keyby='name', ignore_classes={'ignore'}, approx=False
+    ):
         """
         Transforms cfsn_vecs into one-vs-rest BinaryConfusionVectors for each
         category.
@@ -480,9 +508,11 @@ class ConfusionVectors(ub.NiceRepr):
 
             if mode == 0:
                 import warnings
+
                 warnings.warn(
                     'THIS CALCULATION MIGHT BE WRONG. MANY OTHERS '
-                    'IN THIS FILE WERE, AND I HAVE NOT CHECKED THIS ONE YET')
+                    'IN THIS FILE WERE, AND I HAVE NOT CHECKED THIS ONE YET'
+                )
 
                 # Lookup original probability predictions for the class of interest
                 new_scores = cfsn_vecs.probs[:, cx]
@@ -521,7 +551,6 @@ class ConfusionVectors(ub.NiceRepr):
             elif mode == 1:
                 # More VOC-like, not hierarchy friendly
                 if cfsn_vecs.probs is not None:
-
                     # TODO: perhaps we shouldn't use these or at least
                     # allow for configuration?
 
@@ -531,14 +560,17 @@ class ConfusionVectors(ub.NiceRepr):
                     pred_score = cfsn_vecs.probs[:, cx]
 
                     from kwcoco.metrics import assignment
+
                     if assignment.USE_NEG_INF:
                         pred_score[cfsn_vecs.data['pred'] == -1] = -np.inf
                 else:
                     if approx:
                         import warnings
+
                         warnings.warn(
                             'Binarize ovr is only approximate if not all '
-                            'probabilities are known')
+                            'probabilities are known'
+                        )
                     # If we don't know the probabilities for non-predicted
                     # categories then we have to guess.
                     is_true = cfsn_vecs.data['true'] == cx
@@ -548,6 +580,7 @@ class ConfusionVectors(ub.NiceRepr):
                     pred_score = data['score'].copy()
 
                     from kwcoco.metrics import assignment
+
                     if assignment.USE_NEG_INF:
                         missing_score = -np.inf
                     else:
@@ -557,11 +590,12 @@ class ConfusionVectors(ub.NiceRepr):
                     # other classes were predicted with a uniform prior
                     if approx == 0:
                         approx_score = np.full(
-                            sum(score_is_unknown),
-                            fill_value=missing_score)
+                            sum(score_is_unknown), fill_value=missing_score
+                        )
                     else:
-                        approx_score = ((1 - pred_score[score_is_unknown]) /
-                                        (len(classes) - 1))
+                        approx_score = (1 - pred_score[score_is_unknown]) / (
+                            len(classes) - 1
+                        )
 
                     # Except in the case where predicted class is -1. In this
                     # case no prediction was actually made (above a threshold)
@@ -578,8 +612,7 @@ class ConfusionVectors(ub.NiceRepr):
                     'pred_score': pred_score,
                 }
 
-                extra = ub.dict_isect(data._data, [
-                    'txs', 'pxs', 'gid', 'weight'])
+                extra = ub.dict_isect(data._data, ['txs', 'pxs', 'gid', 'weight'])
                 bin_data.update(extra)
 
                 bin_data = kwarray.DataFrameArray(bin_data)
@@ -607,6 +640,7 @@ class ConfusionVectors(ub.NiceRepr):
             >>> report = cfsn_vecs.classification_report(verbose=1)
         """
         from kwcoco.metrics import clf_report
+
         y_true = cfsn_vecs.data['true']
         y_pred = cfsn_vecs.data['pred']
         sample_weight = cfsn_vecs.data.get('weight', None)
@@ -637,6 +671,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         >>> self = cfsn_vecs.binarize_ovr(keyby='name')
         >>> print('self = {!r}'.format(self))
     """
+
     def __init__(self, cx_to_binvecs, classes):
         self.cx_to_binvecs = cx_to_binvecs
         self.classes = classes
@@ -663,8 +698,13 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
     def __getitem__(self, cx):
         return self.cx_to_binvecs[cx]
 
-    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=True,
-                 ap_method='pycocotools'):
+    def measures(
+        self,
+        stabalize_thresh=7,
+        fp_cutoff=None,
+        monotonic_ppv=True,
+        ap_method='pycocotools',
+    ):
         """
         Creates binary confusion measures for every one-versus-rest category.
 
@@ -689,15 +729,17 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
             >>> self = OneVsRestConfusionVectors.demo()
             >>> thresh_result = self.measures()['perclass']
         """
-        perclass = PerClass_Measures({
-            cx: binvecs.measures(
-                stabalize_thresh=stabalize_thresh,
-                fp_cutoff=fp_cutoff,
-                monotonic_ppv=monotonic_ppv,
-                ap_method=ap_method,
-            )
-            for cx, binvecs in self.cx_to_binvecs.items()
-        })
+        perclass = PerClass_Measures(
+            {
+                cx: binvecs.measures(
+                    stabalize_thresh=stabalize_thresh,
+                    fp_cutoff=fp_cutoff,
+                    monotonic_ppv=monotonic_ppv,
+                    ap_method=ap_method,
+                )
+                for cx, binvecs in self.cx_to_binvecs.items()
+            }
+        )
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='Mean of empty slice')
             mAUC = np.nanmean([item['trunc_auc'] for item in perclass.values()])
@@ -741,13 +783,16 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
     def __init__(self, data, cx=None, classes=None):
         import kwarray
+
         if data is None:
             # Init an empty object
-            data = kwarray.DataFrameArray({
-                'is_true': np.empty((0,), dtype=bool),
-                'pred_score': np.empty((0,), dtype=float),
-                'weight': np.empty((0,), dtype=float),
-            })
+            data = kwarray.DataFrameArray(
+                {
+                    'is_true': np.empty((0,), dtype=bool),
+                    'pred_score': np.empty((0,), dtype=float),
+                    'weight': np.empty((0,), dtype=float),
+                }
+            )
         elif isinstance(data, dict):
             data = kwarray.DataFrameArray(ub.map_vals(np.asarray, data))
 
@@ -784,13 +829,16 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> measures.draw('roc')
         """
         import kwarray
+
         rng = kwarray.ensure_rng(rng)
         score = rng.rand(n)
 
-        data = kwarray.DataFrameArray({
-            'is_true': (score > p_true).astype(np.uint8),
-            'pred_score': score,
-        })
+        data = kwarray.DataFrameArray(
+            {
+                'is_true': (score > p_true).astype(np.uint8),
+                'pred_score': score,
+            }
+        )
 
         flip_flags = rng.rand(n) < p_error
         data['is_true'][flip_flags] = 1 - data['is_true'][flip_flags]
@@ -809,17 +857,27 @@ class BinaryConfusionVectors(ub.NiceRepr):
         return self.classes[self.cx]
 
     def __nice__(self):
-        return ub.urepr({
-            'catname': self.catname,
-            'data': self.data.__nice__(),
-        }, nl=0, strvals=True, align=':')
+        return ub.urepr(
+            {
+                'catname': self.catname,
+                'data': self.data.__nice__(),
+            },
+            nl=0,
+            strvals=True,
+            align=':',
+        )
 
     def __len__(self):
         return len(self.data)
 
     # @ub.memoize_method
-    def measures(self, stabalize_thresh=7, fp_cutoff=None, monotonic_ppv=True,
-                 ap_method='pycocotools'):
+    def measures(
+        self,
+        stabalize_thresh=7,
+        fp_cutoff=None,
+        monotonic_ppv=True,
+        ap_method='pycocotools',
+    ):
         """
         Get statistics (F1, G1, MCC) versus thresholds
 
@@ -878,8 +936,9 @@ class BinaryConfusionVectors(ub.NiceRepr):
         """
         # compute tp, fp, tn, fn at each operating point
         # compute mcc, f1, g1, etc
-        info = self._binary_clf_curves(stabalize_thresh=stabalize_thresh,
-                                       fp_cutoff=fp_cutoff)
+        info = self._binary_clf_curves(
+            stabalize_thresh=stabalize_thresh, fp_cutoff=fp_cutoff
+        )
         info['monotonic_ppv'] = monotonic_ppv
         info['ap_method'] = ap_method
         info['cx'] = self.cx
@@ -935,7 +994,8 @@ class BinaryConfusionVectors(ub.NiceRepr):
                     sample_weight = np.ones(len(self))
                 npad = stabalize_thresh - len(self)
                 y_true, y_score, sample_weight = _stabalize_data(
-                    y_true, y_score, sample_weight, npad=npad)
+                    y_true, y_score, sample_weight, npad=npad
+                )
 
             # Get the total weight (typically number of) positive and negative
             # examples of this class
@@ -950,8 +1010,8 @@ class BinaryConfusionVectors(ub.NiceRepr):
             realneg_total = ((1 - y_true) * weight).sum()
 
             fps, tps, thresholds = _binary_clf_curve2(
-                y_true, y_score, pos_label=1.0,
-                sample_weight=sample_weight)
+                y_true, y_score, pos_label=1.0, sample_weight=sample_weight
+            )
 
             # Adjust weighted totals to be robust to floating point errors
             if np.isclose(realneg_total, fps[-1]):
@@ -972,18 +1032,18 @@ class BinaryConfusionVectors(ub.NiceRepr):
             'thresholds': thresholds,
             'realpos_total': realpos_total,
             'realneg_total': realneg_total,
-
             'nsupport': nsupport,
-
             'fp_cutoff': fp_cutoff,
             'stabalize_thresh': stabalize_thresh,
         }
 
         if self.cx is not None:
-            info.update({
-                'cx': self.cx,
-                'node': self.classes[self.cx],
-            })
+            info.update(
+                {
+                    'cx': self.cx,
+                    'node': self.classes[self.cx],
+                }
+            )
         return info
 
     def draw_distribution(self):
@@ -999,13 +1059,10 @@ class BinaryConfusionVectors(ub.NiceRepr):
             'true': y_score[y_true],
             'false': y_score[~y_true],
         }
-        color = {
-            'true': 'dodgerblue',
-            'false': 'red'
-        }
-        ydata = {k: np.histogram(v, bins=xdata)[0]
-                 for k, v in raw_scores.items()}
+        color = {'true': 'dodgerblue', 'false': 'red'}
+        ydata = {k: np.histogram(v, bins=xdata)[0] for k, v in raw_scores.items()}
         import kwplot
+
         return kwplot.multi_plot(xdata=xdata, ydata=ydata, color=color)
 
     def _3dplot(self):
@@ -1030,6 +1087,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         from mpl_toolkits.mplot3d import Axes3D  # NOQA
         import matplotlib as mpl  # NOQA
         import matplotlib.pyplot as plt
+
         info = self.measures()
 
         thresh = info['thresholds']
@@ -1070,7 +1128,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             for angle in range(0, 360):
                 ax.view_init(30, angle)
                 plt.draw()
-                plt.pause(.001)
+                plt.pause(0.001)
 
         # TODO: improve this visualization, can we color the lines better /
         # fill in the meshes with something meaningful?
@@ -1124,11 +1182,10 @@ def _stabalize_data(y_true, y_score, sample_weight, npad=7):
         min_score = 0.0
 
     pad_true = np.ones(npad, dtype=np.uint8)
-    pad_true[:npad // 2] = 0
+    pad_true[: npad // 2] = 0
 
-    pad_score = np.linspace(min_score, max_score, num=npad,
-                            endpoint=True)
-    pad_weight = np.exp(np.linspace(2.7, .01, npad))
+    pad_score = np.linspace(min_score, max_score, num=npad, endpoint=True)
+    pad_weight = np.exp(np.linspace(2.7, 0.01, npad))
     pad_weight /= pad_weight.sum()
 
     y_true = np.hstack([y_true, pad_true])
@@ -1143,4 +1200,5 @@ if __name__ == '__main__':
         python ~/code/kwcoco/kwcoco/metrics/confusion_vectors.py all
     """
     import xdoctest
+
     xdoctest.doctest_module(__file__)

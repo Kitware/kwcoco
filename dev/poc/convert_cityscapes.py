@@ -5,6 +5,7 @@ Requires the data is downloaded and unpacked. Might cleanup more later.
 
 def main():
     import ubelt as ub
+
     repo_dpath = ub.Path('.')
     dpath = repo_dpath / 'data'
 
@@ -31,6 +32,7 @@ def convert_cityscape_split(split_gt_dpath, split_img_root):
     import json
     import kwcoco
     import kwutil
+
     dset = kwcoco.CocoDataset()
     pman = kwutil.ProgressManager()
     with pman:
@@ -40,7 +42,10 @@ def convert_cityscape_split(split_gt_dpath, split_img_root):
             json_fpaths = list(vid_dpath.glob('*.json'))
             for json_fpath in pman.ProgIter(json_fpaths, desc='read json'):
                 rel_json_fpath = json_fpath.relative_to(split_gt_dpath)
-                rel_img_fpath = rel_json_fpath.parent / rel_json_fpath.stem.rsplit('_', 2)[0] + '_leftImg8bit.png'
+                rel_img_fpath = (
+                    rel_json_fpath.parent / rel_json_fpath.stem.rsplit('_', 2)[0]
+                    + '_leftImg8bit.png'
+                )
                 rel_img_fpath = split_img_root / rel_img_fpath
                 assert rel_img_fpath.exists()
 
@@ -59,6 +64,7 @@ def convert_cityscape_split(split_gt_dpath, split_img_root):
 
 def convert_cityscapes_json(data):
     import kwimage
+
     img = {}
     img['height'] = data['imgHeight']
     img['width'] = data['imgWidth']
@@ -67,6 +73,7 @@ def convert_cityscapes_json(data):
     for item in data['objects']:
         item['label']
         import numpy as np
+
         data = kwimage.Polygon.coerce(np.array(item['polygon']))
         ann = {}
         ann['category_name'] = item['label']

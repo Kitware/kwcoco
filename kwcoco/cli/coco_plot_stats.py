@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python3
 """
 CommandLine:
@@ -42,6 +44,7 @@ class PlotStatsCLI(scfg.DataConfig):
     """
     Inspect properties of dataset and write raw data tables and visual plots.
     """
+
     __command__ = 'plot_stats'
     __alias__ = ['visual_stats']
 
@@ -51,8 +54,10 @@ class PlotStatsCLI(scfg.DataConfig):
     # from kwcoco.cli.coco_plot_stats import Plots  # NOQA
     # print(', '.join(Plots.available_plot_funcs().keys()))
     # TODO: keep this in sync
-    plots = scfg.Value(None, help=ub.paragraph(
-        '''
+    plots = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         Names of specific plots to create. If unspecified, all plots are
         generated.
 
@@ -71,23 +76,37 @@ class PlotStatsCLI(scfg.DataConfig):
             polygon_centroid_relative_distribution,
             polygon_centroid_relative_distribution_jointplot,
             polygon_num_vertices_histogram
-        '''), nargs='+', position=2)
+        """
+        ),
+        nargs='+',
+        position=2,
+    )
 
-    dst_fpath = scfg.Value('auto', help='manifest of results. If unspecfied defaults to dst_dpath / "stats.json"')
+    dst_fpath = scfg.Value(
+        'auto',
+        help='manifest of results. If unspecfied defaults to dst_dpath / "stats.json"',
+    )
     dst_dpath = scfg.Value('./coco_annot_stats', help='directory to dump results')
 
-    with_process_context = scfg.Value(True, help='set to false to disable process contxt')
+    with_process_context = scfg.Value(
+        True, help='set to false to disable process contxt'
+    )
 
-    options = scfg.Value(None, help=ub.paragraph(
-        '''
+    options = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         YAML options specification
-        '''))
+        """
+        ),
+    )
 
     dpi = scfg.Value(300, help='dpi for figures')
 
     @classmethod
     def main(cls, cmdline=1, **kwargs):
         from kwcoco.util.util_rich import rich_print
+
         try:
             from rich.markup import escape
         except ImportError:
@@ -95,6 +114,7 @@ class PlotStatsCLI(scfg.DataConfig):
         config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
         rich_print('config = ' + escape(ub.urepr(config, nl=1)))
         run(config)
+
 
 __cli__ = PlotStatsCLI
 
@@ -154,13 +174,15 @@ def run(config):
     tables_fpath = dst_dpath / 'stats_tables.json'
 
     from kwcoco.util.util_rich import rich_print
+
     rich_print(f'Destination Path: [link={dst_dpath}]{dst_dpath}[/link]')
 
     if config.with_process_context:
         from kwutil.process_context import ProcessContext
+
         proc_context = ProcessContext(
             name='kwcoco.cli.coco_plot_stats',
-            config=kwutil.Json.ensure_serializable(config.to_dict())
+            config=kwutil.Json.ensure_serializable(config.to_dict()),
         )
         proc_context.start()
     else:
@@ -207,6 +229,7 @@ def run(config):
                     rich_print(f'[red] ERROR: in {func}')
                     rich_print(f'ex = {ub.urepr(ex, nl=1)}')
                     import traceback
+
                     traceback.print_exc()
                     if 0:
                         raise
@@ -247,6 +270,7 @@ def rerun_plots(tables_fpath):
     kwplot.autosns()
     """
     import kwutil
+
     tables_data = kwutil.Json.load(tables_fpath)
     plots_dpath = None
     nonsaved_data = None
@@ -262,6 +286,7 @@ def geospatial_stats(dset, images, perimage_data):
     import math
     import warnings
     import numpy as np
+
     ESTIMATE_SUNLIGHT = 1
     if ESTIMATE_SUNLIGHT:
         # This might be more of a domain-specific plugin feature, than
@@ -270,24 +295,28 @@ def geospatial_stats(dset, images, perimage_data):
         def coco_estimate_sunlight(dset, image_ids=None):
             try:
                 from kwgis.utils.util_sunlight import estimate_sunlight
+
                 # import suntime  # NOQA
                 import astral  # NOQA
                 import timezonefinder  # NOQA
                 import pytz  # NOQA
+
                 raise ImportError
             except ImportError as ex:
                 from kwutil.util_exception import add_exception_note
-                msg = f'''
+
+                msg = f"""
                     Missing requirements, please:
                     pip install astral suntime timezonefinder pytz kwgis
                     {ex}
-                    '''
+                    """
                 if 0:
                     raise add_exception_note(ex, ub.codeblock(msg))
                 else:
                     warnings.warn(msg)
             else:
                 from kwutil.util_math import Rational
+
                 sunlight_values = []
                 images = dset.images(image_ids)
                 for img in images.objs_iter():
@@ -298,7 +327,9 @@ def geospatial_stats(dset, images, perimage_data):
                         if isinstance(geos_point, float) and math.isnan(geos_point):
                             sunlight = math.nan
                         elif not isinstance(geos_point, dict):
-                            warnings.warn(f'Warning: unknown geos_point format {geos_point!r} in {img!r}')
+                            warnings.warn(
+                                f'Warning: unknown geos_point format {geos_point!r} in {img!r}'
+                            )
                             sunlight = np.nan
                         else:
                             coords = geos_point['coordinates']
@@ -352,18 +383,20 @@ def build_stats_data(dset):
 
         # Fixme, standardize timestamp field
         datetime = [
-            a or b for a, b in zip(images.get('timestamp', None),
-                                   images.get('datetime', None))
+            a or b
+            for a, b in zip(images.get('timestamp', None), images.get('datetime', None))
         ]
 
-        perimage_data = pd.DataFrame({
-            'anns_per_image': anns_per_image,
-            'width': image_widths,
-            'height': image_heights,
-            'datetime': datetime,
-        })
+        perimage_data = pd.DataFrame(
+            {
+                'anns_per_image': anns_per_image,
+                'width': image_widths,
+                'height': image_heights,
+                'datetime': datetime,
+            }
+        )
 
-        area = (perimage_data['width'] * perimage_data['height'])
+        area = perimage_data['width'] * perimage_data['height']
         area_sorted_idxs = area.sort_values().index
         img_dsizes = perimage_data.loc[area_sorted_idxs, ['width', 'height']]
         img_dsize_tuples = list(map(tuple, img_dsizes.values.tolist()))
@@ -424,7 +457,7 @@ def build_stats_data(dset):
         boxes = kwimage.Boxes.concatenate(alt_boxes)
         polys = kwimage.PolygonList(alt_polys)
 
-        box_width =  boxes.width.ravel()
+        box_width = boxes.width.ravel()
         box_height = boxes.height.ravel()
 
         box_canvas_width = np.array(annots.images.get('width'))
@@ -433,22 +466,31 @@ def build_stats_data(dset):
         # geoms = [p.to_shapely() for p in polys]
         geoms = alt_geoms
 
-        perannot_data = _DataFrame({
-            'geometry': geoms,
-            'annot_id': annots.ids,
-            'image_id': annots.image_id,
-            'box_rt_area': np.sqrt(boxes.area.ravel()),
-            'box_width': box_height,
-            'box_height': box_height,
-            'rel_box_width': box_width / box_canvas_width,
-            'rel_box_height': box_height / box_canvas_height,
-        })
+        perannot_data = _DataFrame(
+            {
+                'geometry': geoms,
+                'annot_id': annots.ids,
+                'image_id': annots.image_id,
+                'box_rt_area': np.sqrt(boxes.area.ravel()),
+                'box_width': box_height,
+                'box_height': box_height,
+                'rel_box_width': box_width / box_canvas_width,
+                'rel_box_height': box_height / box_canvas_height,
+            }
+        )
         perannot_data['num_vertices'] = perannot_data.geometry.apply(geometry_length)
 
         sorted_box_rt_area = perannot_data['box_rt_area'].sort_values()
         mean_box_rt_area_idx = sorted_box_rt_area.index[len(sorted_box_rt_area) // 2]
-        scalar_stats['median_box_rt_area'] = perannot_data.loc[mean_box_rt_area_idx, 'box_rt_area']
-        scalar_stats['median_box_dsize'] = tuple(map(float, perannot_data.loc[mean_box_rt_area_idx, ['box_width', 'box_height']]))
+        scalar_stats['median_box_rt_area'] = perannot_data.loc[
+            mean_box_rt_area_idx, 'box_rt_area'
+        ]
+        scalar_stats['median_box_dsize'] = tuple(
+            map(
+                float,
+                perannot_data.loc[mean_box_rt_area_idx, ['box_width', 'box_height']],
+            )
+        )
 
         try:
             perannot_data = polygon_shape_stats(perannot_data)
@@ -457,16 +499,36 @@ def build_stats_data(dset):
             raise
         else:
             sorted_sseg_rt_area = perannot_data['sseg_rt_area'].sort_values()
-            mean_sseg_rt_area_idx = sorted_sseg_rt_area.index[len(sorted_sseg_rt_area) // 2]
-            scalar_stats['median_sseg_rt_area'] = perannot_data.loc[mean_sseg_rt_area_idx, 'sseg_rt_area']
-            scalar_stats['median_sseg_box_dsize'] = tuple(map(float, perannot_data.loc[mean_box_rt_area_idx, ['box_width', 'box_height']]))
-            scalar_stats['median_sseg_obox_dsize'] = tuple(map(float, perannot_data.loc[mean_box_rt_area_idx, ['obox_major', 'obox_minor']]))
+            mean_sseg_rt_area_idx = sorted_sseg_rt_area.index[
+                len(sorted_sseg_rt_area) // 2
+            ]
+            scalar_stats['median_sseg_rt_area'] = perannot_data.loc[
+                mean_sseg_rt_area_idx, 'sseg_rt_area'
+            ]
+            scalar_stats['median_sseg_box_dsize'] = tuple(
+                map(
+                    float,
+                    perannot_data.loc[
+                        mean_box_rt_area_idx, ['box_width', 'box_height']
+                    ],
+                )
+            )
+            scalar_stats['median_sseg_obox_dsize'] = tuple(
+                map(
+                    float,
+                    perannot_data.loc[
+                        mean_box_rt_area_idx, ['obox_major', 'obox_minor']
+                    ],
+                )
+            )
 
         geometry = perannot_data['geometry']
         perannot_data['centroid_x'] = geometry.apply(lambda s: s.centroid.x)
         perannot_data['centroid_y'] = geometry.apply(lambda s: s.centroid.y)
         perannot_data['rel_centroid_x'] = perannot_data['centroid_x'] / box_canvas_width
-        perannot_data['rel_centroid_y'] = perannot_data['centroid_y'] / box_canvas_height
+        perannot_data['rel_centroid_y'] = (
+            perannot_data['centroid_y'] / box_canvas_height
+        )
 
         _summary_data = ub.udict(perannot_data.to_dict()) - {'geometry'}
         _summary_df = pd.DataFrame(_summary_data)
@@ -515,6 +577,7 @@ class Plots:
             >>> self.perannot_data
         """
         import kwcoco
+
         dpath = ub.Path.appdir('kwcoco/demo/vis_stats').ensuredir()
         src = kwcoco.CocoDataset.demo('vidshapes8', **kwargs)
         plots = prep_plots(src, plots_dpath=dpath, options=options)
@@ -545,27 +608,29 @@ class Plots:
             self.annot_max_x = boxes.br_x.max()
             self.annot_max_y = boxes.br_y.max()
 
-        self.perannot_data = pd.read_json(io.StringIO(json.dumps(tables_data['perannot_data'])), orient='table')
-        self.perimage_data = pd.read_json(io.StringIO(json.dumps(tables_data['perimage_data'])), orient='table')
+        self.perannot_data = pd.read_json(
+            io.StringIO(json.dumps(tables_data['perannot_data'])), orient='table'
+        )
+        self.perimage_data = pd.read_json(
+            io.StringIO(json.dumps(tables_data['perimage_data'])), orient='table'
+        )
         self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
         self.plot_functions = {}
 
-        figman = kwplot.FigureManager(
-            dpath=plots_dpath,
-            dpi=dpi,
-            verbose=1
-        )
+        figman = kwplot.FigureManager(dpath=plots_dpath, dpi=dpi, verbose=1)
         # define label mappings for humans
-        figman.labels.add_mapping({
-            'pd_datetime': 'Datetime',
-            # 'collection_size': '',
-            'num_vertices': 'Num Polygon Vertices',
-            'centroid_x': 'Polygon Centroid X',
-            'centroid_y': 'Polygon Centroid Y',
-            'obox_major': 'OBox Major Axes Length',
-            'obox_minor': 'OBox Minor Axes Length',
-            'sseg_rt_area': 'Polygon sqrt(Area)'
-        })
+        figman.labels.add_mapping(
+            {
+                'pd_datetime': 'Datetime',
+                # 'collection_size': '',
+                'num_vertices': 'Num Polygon Vertices',
+                'centroid_x': 'Polygon Centroid X',
+                'centroid_y': 'Polygon Centroid Y',
+                'obox_major': 'OBox Major Axes Length',
+                'obox_minor': 'OBox Minor Axes Length',
+                'sseg_rt_area': 'Polygon sqrt(Area)',
+            }
+        )
         self.figman = figman
         self.sns = sns
         self.kwplot = kwplot
@@ -581,6 +646,7 @@ class Plots:
         resolved = defaults.copy()
         if self.options is not None:
             import copy
+
             options = ub.udict(copy.deepcopy(self.options))
             if plot_name in options:
                 options.update(options[plot_name])
@@ -590,7 +656,10 @@ class Plots:
     @classmethod
     def available_plot_funcs(cls):
         import inspect
-        unbound_methods_items = inspect.getmembers(BuiltinPlots, predicate=inspect.isfunction)
+
+        unbound_methods_items = inspect.getmembers(
+            BuiltinPlots, predicate=inspect.isfunction
+        )
         unbound_methods = dict(unbound_methods_items)
         return unbound_methods
 
@@ -606,6 +675,7 @@ class Plots:
     def run(self, plot_keys):
         from kwcoco.util.util_rich import rich_print
         import kwutil
+
         pman = kwutil.util_progress.ProgressManager()
         with pman:
             # plot_func_keys = [
@@ -622,6 +692,7 @@ class Plots:
                     rich_print(f'[red] ERROR: in {func}')
                     rich_print(f'ex = {ub.urepr(ex, nl=1)}')
                     import traceback
+
                     traceback.print_exc()
                     if 0:
                         raise
@@ -647,11 +718,18 @@ class BuiltinPlots:
         """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax)
-        self.sns.scatterplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)
+        self.sns.scatterplot(
+            data=self.perannot_data,
+            x='centroid_x',
+            y='centroid_y',
+            ax=ax,
+            hue='sseg_rt_area',
+            alpha=0.8,
+        )
         ax.set_aspect('equal')
         ax.set_title('Polygon Absolute Centroid Positions')
-        #ax.set_xlim(0, max_width)
-        #ax.set_ylim(0, max_height)
+        # ax.set_xlim(0, max_width)
+        # ax.set_ylim(0, max_height)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
         self.figman.labels.relabel(ax)
@@ -668,12 +746,21 @@ class BuiltinPlots:
             >>> self['polygon_centroid_relative_distribution'](self)
         """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.kdeplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax)
-        self.sns.scatterplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)
+        self.sns.kdeplot(
+            data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax
+        )
+        self.sns.scatterplot(
+            data=self.perannot_data,
+            x='rel_centroid_x',
+            y='rel_centroid_y',
+            ax=ax,
+            hue='sseg_rt_area',
+            alpha=0.8,
+        )
         ax.set_aspect('equal')
         ax.set_title('Polygon Relative Centroid Positions')
-        #ax.set_xlim(0, max_width)
-        #ax.set_ylim(0, max_height)
+        # ax.set_xlim(0, max_width)
+        # ax.set_ylim(0, max_height)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
         ax.set_xlabel('Polygon X Centroid')
@@ -703,11 +790,13 @@ class BuiltinPlots:
                 marginal_kws=marginal_kws,
                 kind='hist',
             )
-            self.sns.jointplot(data=self.perannot_data, x='centroid_x', y='centroid_y', **jointplot_kws)
+            self.sns.jointplot(
+                data=self.perannot_data, x='centroid_x', y='centroid_y', **jointplot_kws
+            )
             ax = self.figman.fig.gca()
         ax.set_title('Polygon Absolute Centroid Positions')
-        #ax.set_xlim(0, max_width)
-        #ax.set_ylim(0, max_height)
+        # ax.set_xlim(0, max_width)
+        # ax.set_ylim(0, max_height)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
         self.figman.labels.relabel(ax)
@@ -740,7 +829,12 @@ class BuiltinPlots:
                 marginal_kws=marginal_kws,
                 kind='hist',
             )
-            self.sns.jointplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', **jointplot_kws)
+            self.sns.jointplot(
+                data=self.perannot_data,
+                x='rel_centroid_x',
+                y='rel_centroid_y',
+                **jointplot_kws,
+            )
             ax = self.figman.fig.gca()
             # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
         ax.set_title('Polygon Relative Centroid Positions')
@@ -762,15 +856,20 @@ class BuiltinPlots:
             >>> self['image_size_histogram'](self)
         """
         import kwplot
+
         # self.figman.figure(fnum=1, doclf=True).gca()
-        img_dsizes = [f'{w}✕{h}' for w, h in zip(self.perimage_data['width'], self.perimage_data['height'])]
+        img_dsizes = [
+            f'{w}✕{h}'
+            for w, h in zip(self.perimage_data['width'], self.perimage_data['height'])
+        ]
         self.perimage_data['img_dsizes'] = img_dsizes
         # self.sns.histplot(data=perimage_data, x='img_dsizes', ax=ax)
         data = self.perimage_data
         x = 'img_dsizes'
         snskw = dict(binwidth=1, discrete=True)
         ax_top, ax_bottom, split_y = kwplot.util_seaborn.histplot_splity(
-            data=data, x=x, **snskw)
+            data=data, x=x, **snskw
+        )
         ax_bottom.set_xlabel('Image Width ✕ Height')
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_title('Image Size Histogram')
@@ -809,9 +908,11 @@ class BuiltinPlots:
         """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
-        self.sns.scatterplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
-        #ax.set_xscale('log')
-        #ax.set_yscale('log')
+        self.sns.scatterplot(
+            data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax
+        )
+        # ax.set_xscale('log')
+        # ax.set_yscale('log')
         ax.set_title('Oriented Bounding Box Sizes')
         ax.set_aspect('equal')
         ax.set_xlim(0, ax.get_xlim()[1])
@@ -839,11 +940,13 @@ class BuiltinPlots:
                 marginal_kws=marginal_kws,
                 kind='hist',
             )
-            self.sns.jointplot(data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws)
+            self.sns.jointplot(
+                data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws
+            )
             ax = self.figman.fig.gca()
             # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
-        #ax.set_xscale('log')
-        #ax.set_yscale('log')
+        # ax.set_xscale('log')
+        # ax.set_yscale('log')
         ax.set_title('Oriented Bounding Box Sizes')
         # ax.set_aspect('equal')
         ax.set_xlim(0, ax.get_xlim()[1])
@@ -878,7 +981,9 @@ class BuiltinPlots:
                 # kind='scatter',
                 # hue='num_vertices'
             )
-            self.sns.jointplot(data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws)
+            self.sns.jointplot(
+                data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws
+            )
             ax = self.figman.fig.gca()
 
         ax.set_xscale('symlog')
@@ -902,8 +1007,12 @@ class BuiltinPlots:
             >>> self['polygon_area_vs_num_verts'](self)
         """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.kdeplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
-        self.sns.scatterplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
+        self.sns.kdeplot(
+            data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax
+        )
+        self.sns.scatterplot(
+            data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax
+        )
         # self.sns.jointplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices')
         self.figman.labels.relabel(ax)
         ax.set_xlim(0, ax.get_xlim()[1])
@@ -932,7 +1041,12 @@ class BuiltinPlots:
                 kind='hist',
                 # kind='scatter',
             )
-            self.sns.jointplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', **jointplot_kws)
+            self.sns.jointplot(
+                data=self.perannot_data,
+                x='sseg_rt_area',
+                y='num_vertices',
+                **jointplot_kws,
+            )
             ax = self.figman.fig.gca()
         # self.sns.kdeplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
         self.figman.labels.relabel(ax)
@@ -998,7 +1112,9 @@ class BuiltinPlots:
             >>> self['polygon_area_histogram_logscale'](self)
         """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, log_scale=True)
+        self.sns.histplot(
+            data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, log_scale=True
+        )
         # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
         self.figman.labels.relabel(ax)
         ax.set_title('Polygon sqrt(Area) Histogram')
@@ -1048,8 +1164,8 @@ class BuiltinPlots:
         split_y = 'auto'
         snskw = dict(binwidth=50, discrete=False, kde=True)
         ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(
-            data=self.perannot_data, x='sseg_rt_area', split_y=split_y,
-            **snskw)
+            data=self.perannot_data, x='sseg_rt_area', split_y=split_y, **snskw
+        )
         ax = ax_top
         fig = ax.figure
 
@@ -1060,7 +1176,7 @@ class BuiltinPlots:
         # ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
         ax.set_xlim(0, ax.get_xlim()[1])
 
-        ax_top.set_ylim(bottom=split_y)   # those limits are fake
+        ax_top.set_ylim(bottom=split_y)  # those limits are fake
         ax_bottom.set_ylim(0, split_y)
 
         # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
@@ -1093,7 +1209,13 @@ class BuiltinPlots:
             >>> self['anns_per_image_histogram'](self)
         """
         ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.histplot(data=self.perimage_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True)
+        self.sns.histplot(
+            data=self.perimage_data,
+            x='anns_per_image',
+            ax=ax,
+            binwidth=1,
+            discrete=True,
+        )
         ax.set_yscale('linear')
         ax.set_xlabel('Number of Annotations')
         ax.set_ylabel('Number of Images')
@@ -1113,15 +1235,18 @@ class BuiltinPlots:
             >>> self['anns_per_image_histogram_splity'](self)
         """
         # split_y = 'auto'
-        default_options = ub.udict({
-            'split_y': 'auto',
-        })
-        options = self.resolve_options(default_options, 'anns_per_image_histogram_splity')
+        default_options = ub.udict(
+            {
+                'split_y': 'auto',
+            }
+        )
+        options = self.resolve_options(
+            default_options, 'anns_per_image_histogram_splity'
+        )
         split_y = options['split_y']
         snskw = dict(binwidth=1, discrete=True)
         ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(
-            data=self.perimage_data, x='anns_per_image', split_y=split_y,
-            **snskw
+            data=self.perimage_data, x='anns_per_image', split_y=split_y, **snskw
         )
         ax = ax_top
         fig = ax.figure
@@ -1133,7 +1258,7 @@ class BuiltinPlots:
         ax_top.set_title('Number of Annotations per Image')
         ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
 
-        ax_top.set_ylim(bottom=split_y)   # those limits are fake
+        ax_top.set_ylim(bottom=split_y)  # those limits are fake
         ax_bottom.set_ylim(0, split_y)
 
         # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
@@ -1151,7 +1276,9 @@ class BuiltinPlots:
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         perimage_data = self.perimage_data
         perimage_ge1_data = perimage_data[perimage_data['anns_per_image'] >= 1]
-        self.sns.histplot(data=perimage_ge1_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True)
+        self.sns.histplot(
+            data=perimage_ge1_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True
+        )
         ax.set_yscale('linear')
         ax.set_xlabel('Number of Annotations')
         ax.set_ylabel('Number of Images')
@@ -1159,7 +1286,9 @@ class BuiltinPlots:
         self.figman.labels.relabel(ax)
         ax.set_xlim(1 - 0.5, self.max_anns_per_image + 0.5)
         # self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax)
-        self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax, hack_labels=0)
+        self.figman.labels.force_integer_ticks(
+            axis='x', method='ticker', ax=ax, hack_labels=0
+        )
         # ax.set_xticks(ax.get_xticks().astype(int))
 
         # ax.set_yscale('symlog', linthresh=10)
@@ -1175,6 +1304,7 @@ class BuiltinPlots:
         """
         import pandas as pd
         import numpy as np
+
         img_df = self.perimage_data.sort_values('datetime')
         img_df['pd_datetime'] = pd.to_datetime(img_df.datetime)
         img_df['collection_size'] = np.arange(1, len(img_df) + 1)
@@ -1199,6 +1329,7 @@ class BuiltinPlots:
         import kwutil
         import kwimage
         import kwplot
+
         img_df = self.perimage_data.sort_values('datetime')
         img_df['pd_datetime'] = pd.to_datetime(img_df.datetime)
         img_df['collection_size'] = np.arange(1, len(img_df) + 1)
@@ -1208,13 +1339,20 @@ class BuiltinPlots:
         # img_df['year_month'] = [x.strftime('%Y-%m') for x in datetimes]
         # img_df['month'] = [x.strftime('%m') for x in datetimes]
         img_df['time'] = [x.time() if not pd.isnull(x) else None for x in datetimes]
-        img_df['day_of_year'] = [x.timetuple().tm_yday if not pd.isnull(x) else None for x in datetimes]
-        img_df['hour_of_day'] = [None if z is None else z.hour + z.minute / 60 + z.second / 3600 for z in img_df['time']]
+        img_df['day_of_year'] = [
+            x.timetuple().tm_yday if not pd.isnull(x) else None for x in datetimes
+        ]
+        img_df['hour_of_day'] = [
+            None if z is None else z.hour + z.minute / 60 + z.second / 3600
+            for z in img_df['time']
+        ]
 
         self.snskw = {}
         has_sunlight = 'sunlight' in img_df.columns
         if has_sunlight and not img_df['sunlight'].isna().all():
-            palette = self.sns.color_palette("flare", n_colors=4, as_cmap=True).reversed()
+            palette = self.sns.color_palette(
+                'flare', n_colors=4, as_cmap=True
+            ).reversed()
             self.snskw['hue'] = 'sunlight'
             self.snskw['palette'] = palette
 
@@ -1223,14 +1361,19 @@ class BuiltinPlots:
         # self.sns.kdeplot(data=img_df, x='day_of_year', y='hour_of_day')
         # self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight_values')
         self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day')
-        self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', **self.snskw, legend=False)
+        self.sns.scatterplot(
+            data=img_df, x='day_of_year', y='hour_of_day', **self.snskw, legend=False
+        )
         # self.sns.kdeplot(data=img_df, x='hour_of_day', y='day_of_year')
         if has_sunlight:
-            kwplot.phantom_legend({
-                'Night': kwimage.Color.coerce(palette.colors[0]).as255(),
-                'Day': kwimage.Color.coerce(palette.colors[-1]).as255(),
-                'nan': 'blue',
-            }, mode='circle')
+            kwplot.phantom_legend(
+                {
+                    'Night': kwimage.Color.coerce(palette.colors[0]).as255(),
+                    'Day': kwimage.Color.coerce(palette.colors[-1]).as255(),
+                    'nan': 'blue',
+                },
+                mode='circle',
+            )
         ax.set_title('Time Captured')
         ax.set_xlabel('Day of Year')
         ax.set_ylabel('Hour of Day')
@@ -1254,10 +1397,13 @@ class BuiltinPlots:
             ~/code/kwimage/kwimage/_im_color_data.py
         """
         import kwimage
-        default_options = ub.udict({
-            'edgecolor': 'kitware_darkgray',
-            'facecolor': '#b1dfaa',
-        })
+
+        default_options = ub.udict(
+            {
+                'edgecolor': 'kitware_darkgray',
+                'facecolor': '#b1dfaa',
+            }
+        )
         options = self.resolve_options(default_options, 'all_polygons')
         ax = self.figman.figure(fnum=1, doclf=True).gca()
         # edgecolor = kwimage.Color.coerce('kitware_darkblue').as01()
@@ -1268,7 +1414,7 @@ class BuiltinPlots:
 
         edgecolor = kwimage.Color.coerce(options['edgecolor']).as01()
         # facecolor = kwimage.Color.coerce('kitware_green').as01()
-        #ad900d
+        # ad900d
         facecolor = kwimage.Color.coerce(options['facecolor']).as01()
         self.polys.draw(alpha=0.5, edgecolor=edgecolor, facecolor=facecolor)
         ax.set_xlabel('Image X Coordinate')
@@ -1278,9 +1424,13 @@ class BuiltinPlots:
         ax.set_xlim(0, self.annot_max_x)
         ax.set_ylim(0, self.annot_max_y)
         self.figman.labels.relabel(ax)
-        ax.set_ylim(0, self.annot_max_y)  # not sure why this needs to be after the relabel, should ideally fix that.
+        ax.set_ylim(
+            0, self.annot_max_y
+        )  # not sure why this needs to be after the relabel, should ideally fix that.
         ax.invert_yaxis()
-        self.figman.finalize('all_polygons.png', tight_layout=0)  # tight layout seems to cause issues here
+        self.figman.finalize(
+            'all_polygons.png', tight_layout=0
+        )  # tight layout seems to cause issues here
 
 
 def polygon_shape_stats(df):
@@ -1292,17 +1442,21 @@ def polygon_shape_stats(df):
     """
     import numpy as np
     import kwimage
+
     geometry = df['geometry']
+
     def hull_area(s):
         try:
             return s.convex_hull.area
         except Exception:
             return np.nan
+
     def sseg_area(s):
         try:
             return s.area
         except Exception:
             return np.nan
+
     df['hull_rt_area'] = np.sqrt(geometry.apply(hull_area))
     df['sseg_rt_area'] = np.sqrt(geometry.apply(sseg_area))
 

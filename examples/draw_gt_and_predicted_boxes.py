@@ -1,4 +1,3 @@
-
 def draw_true_and_pred_boxes(true_fpath, pred_fpath, gid, viz_fpath):
     """
     How do you generally visualize gt and predicted bounding boxes together?
@@ -33,6 +32,7 @@ def draw_true_and_pred_boxes(true_fpath, pred_fpath, gid, viz_fpath):
     """
     import kwimage
     import kwcoco
+
     true_dset = kwcoco.CocoDataset(true_fpath)
     pred_dset = kwcoco.CocoDataset(pred_fpath)
 

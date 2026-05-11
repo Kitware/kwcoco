@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Defines a safer eval function
 """
 
@@ -7,6 +9,7 @@ class RestrictedSyntaxError(Exception):
     """
     An exception raised by restricted_eval if a disallowed expression is given
     """
+
     pass
 
 
@@ -46,6 +49,7 @@ def restricted_eval(expr, max_chars=32, local_dict=None, builtins_passlist=None)
         >>>     result = restricted_eval(expr, max_chars, dict(a=3))
     """
     import builtins
+
     if len(expr) > max_chars:
         raise RestrictedSyntaxError(
             'num-workers-hueristic should be small text. '
@@ -60,15 +64,16 @@ def restricted_eval(expr, max_chars=32, local_dict=None, builtins_passlist=None)
         builtins_passlist = []
 
     _builtins_passlist = set(builtins_passlist)
-    allowed_builtins = {k: v for k, v in builtins.__dict__.items()
-                        if k in _builtins_passlist}
+    allowed_builtins = {
+        k: v for k, v in builtins.__dict__.items() if k in _builtins_passlist
+    }
 
     local_dict['__builtins__'] = allowed_builtins
     allowed_names = list(allowed_builtins.keys()) + list(local_dict.keys())
-    code = compile(expr, "<string>", "eval")
+    code = compile(expr, '<string>', 'eval')
     # Step 3
     for name in code.co_names:
         if name not in allowed_names:
-            raise RestrictedSyntaxError(f"Use of {name} not allowed")
+            raise RestrictedSyntaxError(f'Use of {name} not allowed')
     result = eval(code, local_dict, local_dict)
     return result

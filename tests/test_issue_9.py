@@ -4,6 +4,7 @@ def test_annot_groups_use_lists():
         https://gitlab.kitware.com/computer-vision/kwcoco/-/issues/9#note_1425119
     """
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo()
     images = dset.images()
     annot_groups = images.annots

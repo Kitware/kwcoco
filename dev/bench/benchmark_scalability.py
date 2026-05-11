@@ -16,10 +16,13 @@ def _iter_images_worker(dset):
 USE_TORCH = 1
 if USE_TORCH:
     import torch
+
     DatasetBase = torch.utils.data.Dataset
+
     class DemoTorchDataset(DatasetBase):
         def __init__(self, coco_dset):
             import kwcoco
+
             self.coco_dset = kwcoco.CocoDataset.coerce(coco_dset)
             self.gids = list(self.coco_dset.imgs.keys())
 
@@ -31,11 +34,18 @@ if USE_TORCH:
             img = self.coco_dset.index.imgs[gid]
             return img
 
-        def make_loader(self, batch_size=1, num_workers=0, shuffle=False,
-                        pin_memory=False):
+        def make_loader(
+            self, batch_size=1, num_workers=0, shuffle=False, pin_memory=False
+        ):
             loader = torch.utils.data.DataLoader(
-                self, batch_size=batch_size, num_workers=num_workers,
-                shuffle=shuffle, pin_memory=pin_memory, collate_fn=ub.identity, worker_init_fn=worker_init_fn)
+                self,
+                batch_size=batch_size,
+                num_workers=num_workers,
+                shuffle=shuffle,
+                pin_memory=pin_memory,
+                collate_fn=ub.identity,
+                worker_init_fn=worker_init_fn,
+            )
             return loader
 
     def worker_init_fn(worker_id):
@@ -67,7 +77,14 @@ def main():
     backend_to_paths = ub.ddict(list)
     for num_videos in num_videos_basis:
         print('num_videos = {!r}'.format(num_videos))
-        dset = kwcoco.CocoDataset.demo('vidshapes', num_videos=num_videos, num_frames=5, render=False, num_tracks=0, verbose=3)
+        dset = kwcoco.CocoDataset.demo(
+            'vidshapes',
+            num_videos=num_videos,
+            num_frames=5,
+            render=False,
+            num_tracks=0,
+            verbose=3,
+        )
         backend_to_paths['json'].append(dset.fpath)
         backend_to_paths['sqlite'].append(dset.view_sql(backend='sqlite').fpath)
         # backend_to_paths['postgresql'].append(dset.view_sql(backend='postgresql').fpath)
@@ -99,12 +116,14 @@ def main():
     for backend, paths in backend_to_paths.items():
         for fpath in paths:
             size_bytes = ub.Path(fpath).stat().st_size
-            benchmark_grid.append({
-                'backend': backend,
-                'fpath': fpath,
-                'size_bytes': size_bytes,
-                'size': round((size_bytes * ureg.byte).to('gigabyte'), 2),
-            })
+            benchmark_grid.append(
+                {
+                    'backend': backend,
+                    'fpath': fpath,
+                    'size_bytes': size_bytes,
+                    'size': round((size_bytes * ureg.byte).to('gigabyte'), 2),
+                }
+            )
 
     def log_task(task, ti, common):
         row = {
@@ -118,7 +137,6 @@ def main():
         return row
 
     for gridkw in ub.ProgIter(benchmark_grid, desc='benchmarks', verbose=3):
-
         fpath = gridkw['fpath']
         backend = gridkw['backend']
         size = gridkw['size']
@@ -187,10 +205,12 @@ def main():
             log_task(task, ti, common)
 
     import pandas as pd
+
     df = pd.DataFrame(measures)
     print(df.to_string())
 
     import kwplot
+
     sns = kwplot.autosns()
     plt = kwplot.autoplt()
 

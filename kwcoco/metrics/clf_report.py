@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 import numpy as np
 import ubelt as ub
@@ -11,10 +13,16 @@ import os
 ASCII_ONLY = os.environ.get('ASCII_ONLY', '')
 
 
-def classification_report(y_true, y_pred, target_names=None,
-                          sample_weight=None, verbose=False,
-                          remove_unsupported=False, log=None,
-                          ascii_only=False):
+def classification_report(
+    y_true,
+    y_pred,
+    target_names=None,
+    sample_weight=None,
+    verbose=False,
+    remove_unsupported=False,
+    log=None,
+    ascii_only=False,
+):
     r"""
     Computes a classification report which is a collection of various metrics
     commonly used to evaluate classification quality. This can handle binary
@@ -149,8 +157,11 @@ def classification_report(y_true, y_pred, target_names=None,
     # Pred data is on the cols.
 
     cm = sklearn.metrics.confusion_matrix(
-        y_true_, y_pred_, sample_weight=sample_weight,
-        labels=np.arange(len(target_names)))
+        y_true_,
+        y_pred_,
+        sample_weight=sample_weight,
+        labels=np.arange(len(target_names)),
+    )
     confusion = cm  # NOQA
 
     k = len(cm)  # number of classes
@@ -170,10 +181,13 @@ def classification_report(y_true, y_pred, target_names=None,
     n_fps = (cm - np.diagflat(np.diag(cm))).sum(axis=0)
 
     import warnings
+
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='invalid .* true_divide')
         warnings.filterwarnings('ignore', message='divide by zero')
-        warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
+        warnings.filterwarnings(
+            'ignore', message='invalid value encountered in double_scalars'
+        )
 
         tprs = n_tps / real_total  # true pos rate (recall)
         tpas = n_tps / pred_total  # true pos accuracy (precision)
@@ -204,28 +218,28 @@ def classification_report(y_true, y_pred, target_names=None,
         mccs = np.sign(bms) * np.sqrt(np.abs(bms * mks))
 
         import scipy
+
         # https://en.wikipedia.org/wiki/F1_score
         # f1_scores = scipy.stats.hmean(np.hstack([
         #     tpas[:, None],
         #     tprs[:, None]
         # ]), axis=1)
         f1_scores = 2 * (tpas * tprs) / (tpas + tprs)
-        g1_scores = scipy.stats.gmean(np.hstack([
-            tpas[:, None],
-            tprs[:, None]
-        ]), axis=1)
+        g1_scores = scipy.stats.gmean(np.hstack([tpas[:, None], tprs[:, None]]), axis=1)
 
-    perclass_data = ub.odict([
-        ('precision', tpas),
-        ('recall', tprs),
-        ('fpr', fprs),
-        ('markedness', mks),
-        ('bookmaker', bms),
-        ('mcc', mccs),
-        ('f1', f1_scores),
-        ('g1', g1_scores),
-        ('support', real_total),
-    ])
+    perclass_data = ub.odict(
+        [
+            ('precision', tpas),
+            ('recall', tprs),
+            ('fpr', fprs),
+            ('markedness', mks),
+            ('bookmaker', bms),
+            ('mcc', mccs),
+            ('f1', f1_scores),
+            ('g1', g1_scores),
+            ('support', real_total),
+        ]
+    )
 
     tpa = np.nansum(tpas * rprob)
     tpr = np.nansum(tprs * rprob)
@@ -242,19 +256,21 @@ def classification_report(y_true, y_pred, target_names=None,
     else:
         mcc_combo = np.nanmean(mccs_)
 
-    combined_data = ub.odict([
-        ('precision', tpa),
-        ('recall', tpr),
-        ('fpr', fpr),
-        ('markedness', mk),
-        ('bookmaker', bm),
-        # ('mcc', np.sign(bm) * np.sqrt(np.abs(bm * mk))),
-        ('mcc', mcc_combo),
-        # np.sign(bm) * np.sqrt(np.abs(bm * mk))),
-        ('f1', np.nanmean(f1_scores)),
-        ('g1', np.nanmean(g1_scores)),
-        ('support', real_total.sum()),
-    ])
+    combined_data = ub.odict(
+        [
+            ('precision', tpa),
+            ('recall', tpr),
+            ('fpr', fpr),
+            ('markedness', mk),
+            ('bookmaker', bm),
+            # ('mcc', np.sign(bm) * np.sqrt(np.abs(bm * mk))),
+            ('mcc', mcc_combo),
+            # np.sign(bm) * np.sqrt(np.abs(bm * mk))),
+            ('f1', np.nanmean(f1_scores)),
+            ('g1', np.nanmean(g1_scores)),
+            ('support', real_total.sum()),
+        ]
+    )
 
     # # Not sure how to compute this. Should it agree with the sklearn impl?
     # if verbose == 'hack':
@@ -328,7 +344,7 @@ def classification_report(y_true, y_pred, target_names=None,
     real_id = ['%s' % m for m in target_names]
     confusion_df = pd.DataFrame(confusion, columns=pred_id, index=real_id)
 
-    if ascii_only :
+    if ascii_only:
         sum_glyph = 'sum-'
     else:
         sum_glyph = 'Σ'
@@ -336,7 +352,9 @@ def classification_report(y_true, y_pred, target_names=None,
     sum_real_key = sum_glyph + 'r'
     sum_pred_key = sum_glyph + 'p'
 
-    to_append = pd.DataFrame([confusion.sum(axis=0)], columns=pred_id, index=[sum_pred_key])
+    to_append = pd.DataFrame(
+        [confusion.sum(axis=0)], columns=pred_id, index=[sum_pred_key]
+    )
     confusion_df = pd.concat([confusion_df, to_append], axis=0)
 
     confusion_df[sum_real_key] = np.hstack([confusion.sum(axis=1), [0]])
@@ -359,7 +377,9 @@ def classification_report(y_true, y_pred, target_names=None,
             times_glyph = '×'
 
         cfsm_str = confusion_df.to_string(float_format=lambda x: '%.1f' % (x,))
-        log('Confusion Matrix (real ' + times_glyph + ' pred) :\n' + ub.indent(cfsm_str))
+        log(
+            'Confusion Matrix (real ' + times_glyph + ' pred) :\n' + ub.indent(cfsm_str)
+        )
 
         # ut.cprint('\nExtended Report', 'turquoise')
         float_precision = 2
@@ -377,24 +397,29 @@ def classification_report(y_true, y_pred, target_names=None,
 
     try:
         with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
+            warnings.filterwarnings(
+                'ignore', message='invalid value encountered in double_scalars'
+            )
             warnings.filterwarnings('ignore', message='Mean of empty slice')
 
             mcc = sklearn.metrics.matthews_corrcoef(
-                y_true, y_pred, sample_weight=sample_weight)
+                y_true, y_pred, sample_weight=sample_weight
+            )
             # mcc = matthews_corrcoef(y_true, y_pred, sample_weight=sample_weight)
             # These scales are chosen somewhat arbitrarily in the context of a
             # computer vision application with relatively reasonable quality data
             # https://stats.stackexchange.com/questions/118219/how-to-interpret
-            mcc_significance_scales = ub.odict([
-                (1.0, 'perfect'),
-                (0.9, 'very strong'),
-                (0.7, 'strong'),
-                (0.5, 'significant'),
-                (0.3, 'moderate'),
-                (0.2, 'weak'),
-                (0.0, 'negligible'),
-            ])
+            mcc_significance_scales = ub.odict(
+                [
+                    (1.0, 'perfect'),
+                    (0.9, 'very strong'),
+                    (0.7, 'strong'),
+                    (0.5, 'significant'),
+                    (0.3, 'moderate'),
+                    (0.2, 'weak'),
+                    (0.0, 'negligible'),
+                ]
+            )
             for k, v in mcc_significance_scales.items():
                 if np.abs(mcc) >= k:
                     if verbose:
@@ -402,16 +427,23 @@ def classification_report(y_true, y_pred, target_names=None,
                     break
             if verbose:
                 float_precision = 2
-                log(('MCC\' = %.' + str(float_precision) + 'f') % (mcc,))
+                log(("MCC' = %." + str(float_precision) + 'f') % (mcc,))
             report['mcc'] = mcc
     except ValueError:
         report['mcc'] = None
     return report
 
 
-def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
-                              sample_weight=None, metrics=None, verbose=0,
-                              remove_unsupported=False, log=None):
+def ovr_classification_report(
+    mc_y_true,
+    mc_probs,
+    target_names=None,
+    sample_weight=None,
+    metrics=None,
+    verbose=0,
+    remove_unsupported=False,
+    log=None,
+):
     """
     One-vs-rest classification report
 
@@ -476,9 +508,12 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     bin_probs = np.empty((len(mc_probs), 2), dtype=mc_probs.dtype)
 
     import kwarray
+
     # Map everything onto 0-1 range
     ranked_cidxs = kwarray.argmaxima(mc_probs, 2, axis=1)
-    ranked_scores = np.array([a[x] for a, x in zip(mc_probs, ranked_cidxs)])  # probably better numpy way to do this
+    ranked_scores = np.array(
+        [a[x] for a, x in zip(mc_probs, ranked_cidxs)]
+    )  # probably better numpy way to do this
 
     mc_scores = kwarray.normalize(mc_probs, mode='linear')
     total_scores = mc_scores.sum(axis=1, keepdims=0)
@@ -487,17 +522,23 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
     class_metrics = ub.odict()
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='Mean of empty slice')
-        warnings.filterwarnings('ignore', message='invalid value encountered in true_divide')
-        warnings.filterwarnings('ignore', message='invalid value encountered in double_scalars')
+        warnings.filterwarnings(
+            'ignore', message='invalid value encountered in true_divide'
+        )
+        warnings.filterwarnings(
+            'ignore', message='invalid value encountered in double_scalars'
+        )
         warnings.filterwarnings('ignore', message='divide by zero')
-        warnings.filterwarnings('ignore', message='due to no true nor predicted samples')
+        warnings.filterwarnings(
+            'ignore', message='due to no true nor predicted samples'
+        )
         warnings.filterwarnings('ignore', message='ill-defined')
 
         for cidx in range(n_classes):
             k_metrics = ub.odict()
 
             class_score = mc_scores.T[cidx]
-            is_other = (ranked_cidxs != cidx)
+            is_other = ranked_cidxs != cidx
             other_score = np.array([a[f][0] for a, f in zip(ranked_scores, is_other)])
 
             # HEURISTIC:
@@ -529,28 +570,36 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
             if 'auc' in metrics:
                 try:
                     k_metrics['auc'] = sklearn.metrics.roc_auc_score(
-                        bin_truth, bin_probs, sample_weight=sample_weight)
+                        bin_truth, bin_probs, sample_weight=sample_weight
+                    )
                 except ValueError:
                     k_metrics['auc'] = np.nan
 
             if 'ap' in metrics:
                 k_metrics['ap'] = sklearn.metrics.average_precision_score(
-                    bin_truth, bin_probs, sample_weight=sample_weight,
+                    bin_truth,
+                    bin_probs,
+                    sample_weight=sample_weight,
                     # zero_division=1,
                     # np.nan
                 )
 
             if 'kappa' in metrics:
                 k_metrics['kappa'] = sklearn.metrics.cohen_kappa_score(
-                    k_true, k_pred, labels=[0, 1], sample_weight=sample_weight)
+                    k_true, k_pred, labels=[0, 1], sample_weight=sample_weight
+                )
 
             if 'mcc' in metrics:
                 k_metrics['mcc'] = sklearn.metrics.matthews_corrcoef(
-                    k_true, k_pred, sample_weight=sample_weight)
+                    k_true, k_pred, sample_weight=sample_weight
+                )
 
             if 'f1' in metrics:
                 k_metrics['f1'] = sklearn.metrics.fbeta_score(
-                    k_true, k_pred, beta=1.0, sample_weight=sample_weight,
+                    k_true,
+                    k_pred,
+                    beta=1.0,
+                    sample_weight=sample_weight,
                     zero_division=0,
                     # zero_division=1,
                     # zero_division=np.nan,
@@ -565,7 +614,9 @@ def ovr_classification_report(mc_y_true, mc_probs, target_names=None,
                 if sample_weight is None:
                     k_metrics['brier'] = mse.mean()
                 else:
-                    k_metrics['brier'] = (mse * sample_weight).sum() / sample_weight.sum()
+                    k_metrics['brier'] = (
+                        mse * sample_weight
+                    ).sum() / sample_weight.sum()
                 # NOTE: There is a bug here (but bug is in sklearn 0.19.1)
                 # brier = sklearn.metrics.brier_score_loss(rwants, rprobs)
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 import ubelt as ub
 import scriptconfig as scfg
@@ -44,56 +46,87 @@ class CocoValidateCLI(scfg.DataConfig):
     This also has the ability to fix corrupted assets by removing them, but
     that functionality may be moved to a new command in the future.
     """
+
     __command__ = 'validate'
 
     src = scfg.Value(None, position=1, help='path to datasets', nargs='+')
 
     schema = scfg.Value(True, isflag=True, help='if True, validate the json-schema')
 
-    unique = scfg.Value(True, isflag=True, help='if True, validate unique secondary keys')
+    unique = scfg.Value(
+        True, isflag=True, help='if True, validate unique secondary keys'
+    )
 
-    missing = scfg.Value(True, isflag=True, help='if True, validate registered files exist')
+    missing = scfg.Value(
+        True, isflag=True, help='if True, validate registered files exist'
+    )
 
-    corrupted = scfg.Value(False, isflag=True, help=ub.paragraph(
-            '''
+    corrupted = scfg.Value(
+        False,
+        isflag=True,
+        help=ub.paragraph(
+            """
             if True, validate data in registered files
-            '''))
+            """
+        ),
+    )
 
-    channels = scfg.Value(True, isflag=True, help=ub.paragraph(
-            '''
+    channels = scfg.Value(
+        True,
+        isflag=True,
+        help=ub.paragraph(
+            """
             if True, validate that channels in auxiliary/asset items are
             all unique.
-            '''))
+            """
+        ),
+    )
 
-    require_relative = scfg.Value(False, isflag=True, help=ub.paragraph(
-            '''
+    require_relative = scfg.Value(
+        False,
+        isflag=True,
+        help=ub.paragraph(
+            """
             if True, causes validation to fail if paths are non-
             portable, i.e. all paths must be relative to the bundle
             directory. if>0, paths must be relative to bundle root.
             if>1, paths must be inside bundle root.
-            '''))
+            """
+        ),
+    )
 
-    img_attrs = scfg.Value('warn', help=ub.paragraph(
-            '''
+    img_attrs = scfg.Value(
+        'warn',
+        help=ub.paragraph(
+            """
             if truthy, check that image attributes contain width and
             height entries. If 'warn', then warn if they do not exist.
             If 'error', then fail.
-            '''))
+            """
+        ),
+    )
 
     verbose = scfg.Value(1, help='verbosity flag')
 
     fastfail = scfg.Value(False, isflag=True, help='if True raise errors immediately')
 
-    workers = scfg.Value(0, isflag=True, help=ub.paragraph(
-            '''
+    workers = scfg.Value(
+        0,
+        isflag=True,
+        help=ub.paragraph(
+            """
             number of workers for checks that support parallelization
-            '''))
+            """
+        ),
+    )
 
     # TODO: Move these to a different tool. This should only validate,
     # not fix anything.
     # TODO: See new coco_fixup.py script and use that instead.
-    fix = scfg.Value(None, help=ub.paragraph(
-            '''
+    fix = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
             Code indicating strategy to attempt to fix the dataset. If
             None, do nothing. If remove, removes missing / corrupted
             images. Other strategies may be added in the future. This is
@@ -101,13 +134,19 @@ class CocoValidateCLI(scfg.DataConfig):
             And only one src dataset can be given.
 
             DEPRECATED. Use kwcoco fixup instead.
-            '''))
+            """
+        ),
+    )
 
-    dst = scfg.Value(None, help=ub.paragraph(
-            '''
+    dst = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
             Location to write a "fixed" coco file if a fix strategy is
             given.
-            '''))
+            """
+        ),
+    )
 
     __epilog__ = """
     Example Usage:
@@ -126,6 +165,7 @@ class CocoValidateCLI(scfg.DataConfig):
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
+
         config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(config, nl=1)))
 

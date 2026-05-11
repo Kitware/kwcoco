@@ -28,6 +28,7 @@ for key in dir(dset):
     self_val = getattr(dset, key)
 
     import inspect
+
     # inspect.ismethod(cls_val), inspect.ismethod(self_val), inspect.ismethod(self_val), inspect.ismethod(self_val)
     if cls_val is ub.NoParam:
         heuristic = 'unknown'
@@ -54,7 +55,9 @@ for key in dir(dset):
     groups[heuristic][method_definer].append(key)
 
 
-print('For Reference, the following are grouped attributes/methods of a kwcoco.CocoDataset')
+print(
+    'For Reference, the following are grouped attributes/methods of a kwcoco.CocoDataset'
+)
 print('{}'.format(ub.urepr(groups, sort=0, nl=3)))
 
 # Try and make a nice RTD RST style
@@ -65,16 +68,17 @@ aprint = autogen.append
 aprint('CocoDataset API')
 aprint('###############')
 aprint('')
-aprint(ub.paragraph(
-    '''
+aprint(
+    ub.paragraph(
+        """
     The following is a logical grouping of the public kwcoco.CocoDataset API
     attributes and methods.  See the in-code documentation for further details.
-    '''))
+    """
+    )
+)
 
 for group, def_to_items in groups.items():
-
     for definer, items in def_to_items.items():
-
         aprint('')
         subtitle = 'CocoDataset ' + group
         if definer is not None:

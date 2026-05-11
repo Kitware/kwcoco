@@ -2,6 +2,9 @@
 TODO:
     - [ ] Does this rely on the image ids being the same? In either case document it.
 """
+
+from __future__ import annotations
+
 import numpy as np
 import ubelt as ub
 import networkx as nx
@@ -9,6 +12,13 @@ from kwcoco.metrics.confusion_vectors import ConfusionVectors
 from kwcoco.metrics.assignment import _assign_confusion_vectors, ASSIGN_COLUMNS
 # from .assignment import _assign_confusion_vectors
 
+import typing
+
+if typing.TYPE_CHECKING:
+    from typing import Dict, List
+    import kwimage
+    import kwcoco
+    from ubelt.util_const import NoParamType
 
 # Helper for xdev docstubs
 __docstubs__ = """
@@ -69,13 +79,17 @@ class DetectionMetrics(ub.NiceRepr):
         0.8582...
         >>> #print(dmet.score_coco()['mAP'])
     """
-    def __init__(dmet, classes=None):
+
+    gid_to_true_dets: Dict[int, kwimage.Detections]
+    gid_to_pred_dets: Dict[int, kwimage.Detections]
+
+    def __init__(dmet, classes: kwcoco.CategoryTree | None = None) -> None:
         dmet.classes = classes
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}
         dmet._imgname_to_gid = {}
 
-    def clear(dmet):
+    def clear(dmet) -> None:
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}
         dmet._imgname_to_gid = {}
@@ -90,7 +104,7 @@ class DetectionMetrics(ub.NiceRepr):
         }
         return ub.urepr(info)
 
-    def enrich_confusion_vectors(dmet, cfsn_vecs):
+    def enrich_confusion_vectors(dmet, cfsn_vecs) -> None:
         """
         Adds annotation id information into confusion vectors computed
         via this detection metrics object.
@@ -99,6 +113,7 @@ class DetectionMetrics(ub.NiceRepr):
         confusion vectors.
         """
         import kwarray
+
         cfsn_data = cfsn_vecs.data
         all_gids = cfsn_data['gid']
         all_txs = cfsn_data['txs']
@@ -164,6 +179,7 @@ class DetectionMetrics(ub.NiceRepr):
 
         def _coco_to_dets(coco_dset, desc=''):
             import kwimage
+
             for gid in ub.ProgIter(gids, desc=desc, verbose=verbose):
                 img = coco_dset.imgs[gid]
                 imgname = img['file_name']
@@ -171,7 +187,8 @@ class DetectionMetrics(ub.NiceRepr):
                 annots = [coco_dset.anns[aid] for aid in aids]
                 # dets = true_coco.annots(gid=gid).detections
                 dets = kwimage.Detections.from_coco_annots(
-                    annots, dset=coco_dset, classes=classes)
+                    annots, dset=coco_dset, classes=classes
+                )
                 yield dets, imgname, gid
 
         for dets, imgname, gid in _coco_to_dets(true_coco, desc='add truth'):
@@ -230,11 +247,11 @@ class DetectionMetrics(ub.NiceRepr):
         dmet.gid_to_true_dets[gid] = true_dets
 
     def true_detections(dmet, gid):
-        """ gets Detections representation for groundtruth in an image """
+        """gets Detections representation for groundtruth in an image"""
         return dmet.gid_to_true_dets[gid]
 
     def pred_detections(dmet, gid):
-        """ gets Detections representation for predictions in an image """
+        """gets Detections representation for predictions in an image"""
         return dmet.gid_to_pred_dets[gid]
 
     @property
@@ -247,21 +264,33 @@ class DetectionMetrics(ub.NiceRepr):
         for dets in dmet.gid_to_true_dets.values():
             if dets.classes is not None:
                 import kwcoco
+
                 classes = kwcoco.CategoryTree.coerce(dets.classes)
                 return classes
 
     @classes.setter
     def classes(dmet, classes):
         import kwcoco
+
         if classes is not None:
             classes = kwcoco.CategoryTree.coerce(classes)
         dmet._classes = classes
 
-    def confusion_vectors(dmet, iou_thresh=0.5, bias=0, gids=None, compat='mutex',
-                          prioritize='iou', ignore_classes='ignore',
-                          background_class=ub.NoParam, verbose='auto',
-                          workers=0, track_probs='try', max_dets=None,
-                          truth_reuse_policy=False):
+    def confusion_vectors(
+        dmet,
+        iou_thresh=0.5,
+        bias=0,
+        gids=None,
+        compat='mutex',
+        prioritize='iou',
+        ignore_classes='ignore',
+        background_class=ub.NoParam,
+        verbose='auto',
+        workers=0,
+        track_probs='try',
+        max_dets=None,
+        truth_reuse_policy=False,
+    ):
         """
         Assigns predicted boxes to the true boxes so we can transform the
         detection problem into a classification problem for scoring.
@@ -364,19 +393,14 @@ class DetectionMetrics(ub.NiceRepr):
             globals().update(xdev.get_func_kwargs(dmet.confusion_vectors))
         """
         import kwarray
+
         _tracking_probs = bool(track_probs)
         iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh
 
-        iou_to_yaccum = {
-            t: ub.ddict(list)
-            for t in iou_thresh_list
-        }
+        iou_to_yaccum = {t: ub.ddict(list) for t in iou_thresh_list}
 
         if _tracking_probs:
-            iou_to_probaccum = {
-                t: []
-                for t in iou_thresh_list
-            }
+            iou_to_probaccum = {t: [] for t in iou_thresh_list}
 
         if gids is None:
             gids = sorted(dmet._imgname_to_gid.values())
@@ -401,21 +425,27 @@ class DetectionMetrics(ub.NiceRepr):
                     pass
 
         jobs = ub.JobPool(mode='process', max_workers=workers)
-        for gid in ub.ProgIter(gids, desc='submit assign jobs',
-                               verbose=verbose):
+        for gid in ub.ProgIter(gids, desc='submit assign jobs', verbose=verbose):
             true_dets = dmet.true_detections(gid)
             pred_dets = dmet.pred_detections(gid)
             job = jobs.submit(
-                _assign_confusion_vectors, true_dets, pred_dets,
-                bg_weight=1, iou_thresh=iou_thresh_list, bg_cidx=-1, bias=bias,
-                classes=classes, compat=compat, prioritize=prioritize,
-                ignore_classes=ignore_classes, max_dets=max_dets,
+                _assign_confusion_vectors,
+                true_dets,
+                pred_dets,
+                bg_weight=1,
+                iou_thresh=iou_thresh_list,
+                bg_cidx=-1,
+                bias=bias,
+                classes=classes,
+                compat=compat,
+                prioritize=prioritize,
+                ignore_classes=ignore_classes,
+                max_dets=max_dets,
                 truth_reuse_policy=truth_reuse_policy,
             )
             job.gid = gid
 
-        for job in ub.ProgIter(jobs.jobs, desc='assign detections',
-                               verbose=verbose):
+        for job in ub.ProgIter(jobs.jobs, desc='assign detections', verbose=verbose):
             iou_thresh_to_y = job.result()
             gid = job.gid
 
@@ -444,8 +474,9 @@ class DetectionMetrics(ub.NiceRepr):
                         # For unassigned truths, we need to create dummy probs
                         # where a background class has probability 1.
                         flags = pxs > -1
-                        probs = np.zeros((len(pxs), pred_probs.shape[1]),
-                                         dtype=np.float32)
+                        probs = np.zeros(
+                            (len(pxs), pred_probs.shape[1]), dtype=np.float32
+                        )
                         if background_class is not None:
                             bg_idx = classes.index(background_class)
                             probs[:, bg_idx] = 1
@@ -460,7 +491,9 @@ class DetectionMetrics(ub.NiceRepr):
 
         for t, y_accum in iou_to_yaccum.items():
             _data = {}
-            for k, v in ub.ProgIter(list(y_accum.items()), desc='ndarray convert', verbose=verbose):
+            for k, v in ub.ProgIter(
+                list(y_accum.items()), desc='ndarray convert', verbose=verbose
+            ):
                 # Try to use 32 bit types for large evaluation problems
                 kw = dict()
                 if k in {'iou', 'score', 'weight'}:
@@ -476,13 +509,12 @@ class DetectionMetrics(ub.NiceRepr):
             if len(_data) == 0:
                 # Handle empty input case - note: dtypes here are not correct
                 # but it works well enough.
-                _data = {
-                    k: np.empty((0,)) for k in ['gid'] + ASSIGN_COLUMNS
-                }
+                _data = {k: np.empty((0,)) for k in ['gid'] + ASSIGN_COLUMNS}
             cfsn_data = kwarray.DataFrameArray(_data)
 
             if 0:
                 import xdev
+
                 nbytes = 0
                 for k, v in _data.items():
                     nbytes += v.size * v.dtype.itemsize
@@ -496,8 +528,7 @@ class DetectionMetrics(ub.NiceRepr):
                     y_prob = None
             else:
                 y_prob = None
-            cfsn_vecs = ConfusionVectors(cfsn_data, classes=classes,
-                                         probs=y_prob)
+            cfsn_vecs = ConfusionVectors(cfsn_data, classes=classes, probs=y_prob)
             iou_to_cfsn[t] = cfsn_vecs
 
         if ub.iterable(iou_thresh):
@@ -512,12 +543,14 @@ class DetectionMetrics(ub.NiceRepr):
         """
         try:
             from kwil.misc import kwant
+
             if not kwant.is_available():
                 raise ImportError
         except ImportError:
             raise RuntimeError('kwant is not available')
 
         import kw18
+
         gids = list(dmet.gid_to_true_dets.keys())
         true_kw18s = []
         pred_kw18s = []
@@ -528,25 +561,26 @@ class DetectionMetrics(ub.NiceRepr):
             if len(pred_dets) == 0:
                 # kwant breaks on 0 predictions, hack in a bad prediction
                 import kwimage
+
                 hack_ = kwimage.Detections.random(1)
                 hack_.scores[:] = 0
                 pred_dets = hack_
 
-            true_kw18 = kw18.make_kw18_from_detections(true_dets,
-                                                       frame_number=gid,
-                                                       timestamp=gid)
-            pred_kw18 = kw18.make_kw18_from_detections(pred_dets,
-                                                       frame_number=gid,
-                                                       timestamp=gid)
+            true_kw18 = kw18.make_kw18_from_detections(
+                true_dets, frame_number=gid, timestamp=gid
+            )
+            pred_kw18 = kw18.make_kw18_from_detections(
+                pred_dets, frame_number=gid, timestamp=gid
+            )
             true_kw18s.append(true_kw18)
             pred_kw18s.append(pred_kw18)
 
         true_kw18 = true_kw18s
         pred_kw18 = pred_kw18s
 
-        roc_info = kwant.score_events(true_kw18s, pred_kw18s,
-                                      iou_thresh=iou_thresh, prefiltered=True,
-                                      verbose=3)
+        roc_info = kwant.score_events(
+            true_kw18s, pred_kw18s, iou_thresh=iou_thresh, prefiltered=True, verbose=3
+        )
 
         fp = roc_info['fp'].values
         tp = roc_info['tp'].values
@@ -557,9 +591,11 @@ class DetectionMetrics(ub.NiceRepr):
         tpr = roc_info['pd'].values
         fpr = fp / fp[0]
         import sklearn
+
         roc_auc = sklearn.metrics.auc(fpr, tpr)
 
         from kwcoco.metrics.functional import _average_precision
+
         ap = _average_precision(tpr, ppv)
 
         roc_info['fpr'] = fpr
@@ -573,23 +609,38 @@ class DetectionMetrics(ub.NiceRepr):
 
         if False:
             import kwplot
-            kwplot.autompl()
-            kwplot.multi_plot(roc_info['fa'], roc_info['pd'],
-                              xlabel='fa (fp count)',
-                              ylabel='pd (tpr)', fnum=1,
-                              title='kwant roc_auc={:.4f}'.format(roc_auc))
 
-            kwplot.multi_plot(tpr, ppv,
-                              xlabel='recall (fpr)',
-                              ylabel='precision (tpr)',
-                              fnum=2,
-                              title='kwant ap={:.4f}'.format(ap))
+            kwplot.autompl()
+            kwplot.multi_plot(
+                roc_info['fa'],
+                roc_info['pd'],
+                xlabel='fa (fp count)',
+                ylabel='pd (tpr)',
+                fnum=1,
+                title='kwant roc_auc={:.4f}'.format(roc_auc),
+            )
+
+            kwplot.multi_plot(
+                tpr,
+                ppv,
+                xlabel='recall (fpr)',
+                ylabel='precision (tpr)',
+                fnum=2,
+                title='kwant ap={:.4f}'.format(ap),
+            )
 
         return info
 
-    def score_kwcoco(dmet, iou_thresh=0.5, bias=0, gids=None,
-                      compat='all', prioritize='iou', stabalize_thresh=7,
-                      strict=False):
+    def score_kwcoco(
+        dmet,
+        iou_thresh=0.5,
+        bias=0,
+        gids=None,
+        compat='all',
+        prioritize='iou',
+        stabalize_thresh=7,
+        strict=False,
+    ):
         """
         our scoring method
 
@@ -616,10 +667,13 @@ class DetectionMetrics(ub.NiceRepr):
         Returns:
             dict
         """
-        cfsn_vecs = dmet.confusion_vectors(iou_thresh=iou_thresh, bias=bias,
-                                           gids=gids,
-                                           compat=compat,
-                                           prioritize=prioritize)
+        cfsn_vecs = dmet.confusion_vectors(
+            iou_thresh=iou_thresh,
+            bias=bias,
+            gids=gids,
+            compat=compat,
+            prioritize=prioritize,
+        )
         info = {}
         try:
             cfsn_perclass = cfsn_vecs.binarize_ovr(mode=1)
@@ -637,8 +691,14 @@ class DetectionMetrics(ub.NiceRepr):
             info['mAP'] = perclass['mAP']
         return info
 
-    def score_voc(dmet, iou_thresh=0.5, bias=1, method='voc2012', gids=None,
-                  ignore_classes='ignore'):
+    def score_voc(
+        dmet,
+        iou_thresh=0.5,
+        bias=1,
+        method='voc2012',
+        gids=None,
+        ignore_classes='ignore',
+    ):
         """
         score using voc method
 
@@ -651,6 +711,7 @@ class DetectionMetrics(ub.NiceRepr):
         """
         from kwcoco.metrics.assignment import _filter_ignore_regions
         from kwcoco.metrics import voc_metrics
+
         if gids is None:
             gids = sorted(dmet._imgname_to_gid.values())
         # Convert true/pred detections into VOC format
@@ -662,8 +723,11 @@ class DetectionMetrics(ub.NiceRepr):
 
             if ignore_classes is not None:
                 true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
-                    true_dets, pred_dets, ioaa_thresh=iou_thresh,
-                    ignore_classes=ignore_classes)
+                    true_dets,
+                    pred_dets,
+                    ioaa_thresh=iou_thresh,
+                    ignore_classes=ignore_classes,
+                )
                 true_dets = true_dets.compress(~true_ignore_flags)
                 pred_dets = pred_dets.compress(~pred_ignore_flags)
 
@@ -679,6 +743,7 @@ class DetectionMetrics(ub.NiceRepr):
         with inverse aid mappings
         """
         import kwcoco
+
         true = kwcoco.CocoDataset()
         pred = kwcoco.CocoDataset()
 
@@ -703,8 +768,7 @@ class DetectionMetrics(ub.NiceRepr):
             pred.add_image(imgname, id=gid)
 
         idx_to_id = {
-            idx: classes.index(node)
-            for idx, node in enumerate(classes.idx_to_node)
+            idx: classes.index(node) for idx, node in enumerate(classes.idx_to_node)
         }
 
         for gid, pred_dets in dmet.gid_to_pred_dets.items():
@@ -741,8 +805,9 @@ class DetectionMetrics(ub.NiceRepr):
 
         return pred, true, gt_aid_to_tx, dt_aid_to_px
 
-    def score_pycocotools(dmet, with_evaler=False, with_confusion=False,
-                          verbose=0, iou_thresholds=None):
+    def score_pycocotools(
+        dmet, with_evaler=False, with_confusion=False, verbose=0, iou_thresholds=None
+    ):
         """
         score using ms-coco method
 
@@ -811,7 +876,7 @@ class DetectionMetrics(ub.NiceRepr):
 
             for ann in cocoGt.dataset['annotations']:
                 w, h = ann['bbox'][-2:]
-                ann['ignore'] = ann['weight'] < .5
+                ann['ignore'] = ann['weight'] < 0.5
                 ann['area'] = w * h
                 ann['iscrowd'] = False
 
@@ -827,7 +892,9 @@ class DetectionMetrics(ub.NiceRepr):
             else:
                 iou_thresholds = np.array(iou_thresholds)
 
-                if len(iou_thresholds) != len(evaler.params.iouThrs) or np.allclose(iou_thresholds, evaler.params.iouThrs):
+                if len(iou_thresholds) != len(evaler.params.iouThrs) or np.allclose(
+                    iou_thresholds, evaler.params.iouThrs
+                ):
                     evaler.params.iouThrs = iou_thresholds
                     modified_params = True
 
@@ -870,9 +937,14 @@ class DetectionMetrics(ub.NiceRepr):
 
             for iou_thresh in iou_thresholds:
                 cfsn_vecs = pycocotools_confusion_vectors(
-                    dmet, evaler, iou_thresh=iou_thresh)
-                cfsn_vecs.data['pxs'] = np.array(list(ub.take(dt_aid_to_px, cfsn_vecs.data['dt_aid'], default=-1)))
-                cfsn_vecs.data['txs'] = np.array(list(ub.take(gt_aid_to_tx, cfsn_vecs.data['gt_aid'], default=-1)))
+                    dmet, evaler, iou_thresh=iou_thresh
+                )
+                cfsn_vecs.data['pxs'] = np.array(
+                    list(ub.take(dt_aid_to_px, cfsn_vecs.data['dt_aid'], default=-1))
+                )
+                cfsn_vecs.data['txs'] = np.array(
+                    list(ub.take(gt_aid_to_tx, cfsn_vecs.data['gt_aid'], default=-1))
+                )
                 iou_to_cfsn_vecs[iou_thresh] = cfsn_vecs
 
             pct_info['iou_to_cfsn_vecs'] = iou_to_cfsn_vecs
@@ -981,6 +1053,7 @@ class DetectionMetrics(ub.NiceRepr):
         import kwimage
         import kwarray
         import kwcoco
+
         # Parse kwargs
         rng = kwarray.ensure_rng(kwargs.get('rng', 0))
 
@@ -1007,19 +1080,24 @@ class DetectionMetrics(ub.NiceRepr):
         newstyle = kwargs.get('newstyle', False)
 
         if newstyle:
-            perterbkw = ub.dict_isect(kwargs, {
-                'rng': 0,
-                'box_noise': 0,
-                'cls_noise': 0,
-                'null_pred': False,
-                'with_probs': False,
-                'score_noise': 0.2,
-                'n_fp': 0,
-                'n_fn': 0,
-                'hacked': 1})
+            perterbkw = ub.dict_isect(
+                kwargs,
+                {
+                    'rng': 0,
+                    'box_noise': 0,
+                    'cls_noise': 0,
+                    'null_pred': False,
+                    'with_probs': False,
+                    'score_noise': 0.2,
+                    'n_fp': 0,
+                    'n_fn': 0,
+                    'hacked': 1,
+                },
+            )
 
             # TODO: use kwcoco.demo.perterb instead of rolling the logic here
             from kwcoco.demo import perterb
+
             # TODO: don't do any rendering
             # true_dset = kwcoco.CocoDataset.random()  # TODO
             true_dset = kwcoco.CocoDataset.demo('shapes{}'.format(nimgs))  # FIXME
@@ -1038,7 +1116,9 @@ class DetectionMetrics(ub.NiceRepr):
 
             # Build random variables
             from kwarray import distributions
+
             DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)
+
             def _parse_arg(key, default):
                 value = kwargs.get(key, default)
                 try:
@@ -1046,6 +1126,7 @@ class DetectionMetrics(ub.NiceRepr):
                     return (low, high + 1)
                 except Exception:
                     return (0, value + 1)
+
             nboxes_RV = DiscreteUniform(*_parse_arg('nboxes', 1))
             n_fp_RV = DiscreteUniform(*_parse_arg('n_fp', 0))
             n_fn_RV = DiscreteUniform(*_parse_arg('n_fn', 0))
@@ -1057,18 +1138,21 @@ class DetectionMetrics(ub.NiceRepr):
             # the overlap increases as the score noise increases.
             def _interp(v1, v2, alpha):
                 return v1 * alpha + (1 - alpha) * v2
+
             mid = 0.5
             # true_high = 2.0
             true_high = 1.0
-            true_low   = _interp(0, mid, score_noise)
+            true_low = _interp(0, mid, score_noise)
             false_high = _interp(true_high, mid - 1e-3, score_noise)
-            true_mean  = _interp(0.5, .8, score_noise)
-            false_mean = _interp(0.5, .2, score_noise)
+            true_mean = _interp(0.5, 0.8, score_noise)
+            false_mean = _interp(0.5, 0.2, score_noise)
 
             true_score_RV = distributions.TruncNormal(
-                mean=true_mean, std=.5, low=true_low, high=true_high, rng=rng)
+                mean=true_mean, std=0.5, low=true_low, high=true_high, rng=rng
+            )
             false_score_RV = distributions.TruncNormal(
-                mean=false_mean, std=.5, low=0, high=false_high, rng=rng)
+                mean=false_mean, std=0.5, low=0, high=false_high, rng=rng
+            )
 
             # Create the category hierarchy
             if isinstance(classes, int):
@@ -1094,7 +1178,6 @@ class DetectionMetrics(ub.NiceRepr):
             dmet.classes = classes
 
             for gid in range(nimgs):
-
                 # Sample random variables
                 nboxes_ = nboxes_RV()
                 n_fp_ = n_fp_RV()
@@ -1104,9 +1187,9 @@ class DetectionMetrics(ub.NiceRepr):
                 dmet._register_imagename(imgname, gid)
 
                 # Generate random ground truth detections
-                true_boxes = kwimage.Boxes.random(num=nboxes_, scale=scale,
-                                                  anchors=anchors, rng=rng,
-                                                  format='cxywh')
+                true_boxes = kwimage.Boxes.random(
+                    num=nboxes_, scale=scale, anchors=anchors, rng=rng, format='cxywh'
+                )
                 # Prevent 0 sized boxes: increase w/h by 1
                 true_boxes.data[..., 2:4] += 1
                 true_cxs = frgnd_cx_RV(len(true_boxes))
@@ -1117,8 +1200,7 @@ class DetectionMetrics(ub.NiceRepr):
                 pred_cxs = true_cxs.copy()
 
                 # Perterb box coordinates
-                pred_boxes.data = np.abs(pred_boxes.data.astype(float) +
-                                         box_noise_RV())
+                pred_boxes.data = np.abs(pred_boxes.data.astype(float) + box_noise_RV())
 
                 # Perterb class predictions
                 change = cls_noise_RV(len(pred_cxs))
@@ -1136,8 +1218,9 @@ class DetectionMetrics(ub.NiceRepr):
 
                 # Add false positive boxes
                 if n_fp_:
-                    false_boxes = kwimage.Boxes.random(num=n_fp_, scale=scale,
-                                                       rng=rng, format='cxywh')
+                    false_boxes = kwimage.Boxes.random(
+                        num=n_fp_, scale=scale, rng=rng, format='cxywh'
+                    )
                     false_cxs = frgnd_cx_RV(n_fp_)
                     false_scores = false_score_RV(n_fp_)
 
@@ -1148,16 +1231,16 @@ class DetectionMetrics(ub.NiceRepr):
                 # Transform the scores for the assigned class into a predicted
                 # probability for each class. (Currently a bit hacky).
                 class_probs = _demo_construct_probs(
-                    pred_cxs, pred_scores, classes, rng,
-                    hacked=kwargs.get('hacked', 1))
+                    pred_cxs, pred_scores, classes, rng, hacked=kwargs.get('hacked', 1)
+                )
 
-                true_dets = kwimage.Detections(boxes=true_boxes,
-                                               class_idxs=true_cxs,
-                                               weights=true_weights)
+                true_dets = kwimage.Detections(
+                    boxes=true_boxes, class_idxs=true_cxs, weights=true_weights
+                )
 
-                pred_dets = kwimage.Detections(boxes=pred_boxes,
-                                               class_idxs=pred_cxs,
-                                               scores=pred_scores)
+                pred_dets = kwimage.Detections(
+                    boxes=pred_boxes, class_idxs=pred_cxs, scores=pred_scores
+                )
 
                 # Hack in the probs
                 if with_probs:
@@ -1165,14 +1248,17 @@ class DetectionMetrics(ub.NiceRepr):
 
                 if null_pred:
                     pred_dets.data['class_idxs'] = np.array(
-                        [None] * len(pred_dets), dtype=object)
+                        [None] * len(pred_dets), dtype=object
+                    )
 
                 dmet.add_truth(true_dets, imgname=imgname)
                 dmet.add_predictions(pred_dets, imgname=imgname)
 
         return dmet
 
-    def summarize(dmet, out_dpath=None, plot=False, title='', with_bin='auto', with_ovr='auto'):
+    def summarize(
+        dmet, out_dpath=None, plot=False, title='', with_bin='auto', with_ovr='auto'
+    ):
         """
         Create summary one-versus-rest and binary metrics.
 
@@ -1365,7 +1451,12 @@ def pycocotools_confusion_vectors(dmet, evaler, iou_thresh=0.5, verbose=0):
             gid = info['image_id']
 
             # cidx = dmet.classes.id_to_idx[cid]
-            for dtid, gtid, score, ignore in zip(info['dtIds'], info['dtMatches'][0], info['dtScores'], info['dtIgnore'][0]):
+            for dtid, gtid, score, ignore in zip(
+                info['dtIds'],
+                info['dtMatches'][0],
+                info['dtScores'],
+                info['dtIgnore'][0],
+            ):
                 if gtid == 0:
                     y['pred'].append(cidx)
                     y['true'].append(-1)
@@ -1408,7 +1499,9 @@ def pycocotools_confusion_vectors(dmet, evaler, iou_thresh=0.5, verbose=0):
                 y_accum[k].extend(v)
 
         _data = {}
-        for k, v in ub.ProgIter(list(y_accum.items()), desc='ndarray convert', verbose=verbose):
+        for k, v in ub.ProgIter(
+            list(y_accum.items()), desc='ndarray convert', verbose=verbose
+        ):
             # Try to use 32 bit types for large evaluation problems
             kw = dict()
             if k in {'iou', 'score', 'weight'}:
@@ -1427,8 +1520,7 @@ def pycocotools_confusion_vectors(dmet, evaler, iou_thresh=0.5, verbose=0):
         #     y_prob = np.vstack(prob_accum)
         # else:
         y_prob = None
-        cfsn_vecs = ConfusionVectors(
-            cfsn_data, classes=dmet.classes, probs=y_prob)
+        cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes, probs=y_prob)
     return cfsn_vecs
 
 
@@ -1443,19 +1535,20 @@ def eval_detections_cli(**kw):
     import kwcoco
 
     ub.schedule_deprecation(
-        'kwcoco', name='kwcoco.metrics.detect_metrics.eval_detections_cli',
+        'kwcoco',
+        name='kwcoco.metrics.detect_metrics.eval_detections_cli',
         type='method',
-        deprecate='0.3.4', error='1.0.0', remove='1.1.0',
-        migration=(
-            'Use `kwcoco eval` in kwcoco.cli.coco_eval instead. '
-        )
+        deprecate='0.3.4',
+        error='1.0.0',
+        remove='1.1.0',
+        migration=('Use `kwcoco eval` in kwcoco.cli.coco_eval instead. '),
     )
 
     class EvalDetectionCLI(scfg.Config):
         default = {
             'true': scfg.Path(None, help='true coco dataset'),
             'pred': scfg.Path(None, help='predicted coco dataset'),
-            'out_dpath': scfg.Path('./out', help='output directory')
+            'out_dpath': scfg.Path('./out', help='output directory'),
         }
         pass
 
@@ -1467,6 +1560,7 @@ def eval_detections_cli(**kw):
     pred_coco = kwcoco.CocoDataset(config['pred'])
 
     from kwcoco.metrics.detect_metrics import DetectionMetrics
+
     dmet = DetectionMetrics.from_coco(true_coco, pred_coco)
 
     voc_info = dmet.score_voc()
@@ -1489,11 +1583,11 @@ def eval_detections_cli(**kw):
 
     draw = False
     if draw:
-
         mcc_idx = mcc_lim.argmax()
         f1_idx = f1.argmax()
 
         import kwplot
+
         plt = kwplot.autoplt()
 
         kwplot.multi_plot(
@@ -1501,7 +1595,8 @@ def eval_detections_cli(**kw):
             ydata=mcc_lim,
             xlabel='threshold',
             ylabel='mcc*',
-            fnum=1, pnum=(1, 4, 1),
+            fnum=1,
+            pnum=(1, 4, 1),
             title='MCC*',
             color=['blue'],
         )
@@ -1513,7 +1608,8 @@ def eval_detections_cli(**kw):
             ydata=tpr,
             xlabel='fp (fa)',
             ylabel='tpr (pd)',
-            fnum=1, pnum=(1, 4, 2),
+            fnum=1,
+            pnum=(1, 4, 2),
             title='ROC',
             color=['blue'],
         )
@@ -1525,7 +1621,8 @@ def eval_detections_cli(**kw):
             ydata=ppv,
             xlabel='tpr (recall)',
             ylabel='ppv (precision)',
-            fnum=1, pnum=(1, 4, 3),
+            fnum=1,
+            pnum=(1, 4, 3),
             title='PR',
             color=['blue'],
         )
@@ -1537,7 +1634,8 @@ def eval_detections_cli(**kw):
             ydata=f1,
             xlabel='threshold',
             ylabel='f1',
-            fnum=1, pnum=(1, 4, 4),
+            fnum=1,
+            pnum=(1, 4, 4),
             title='F1',
             color=['blue'],
         )
@@ -1547,16 +1645,18 @@ def eval_detections_cli(**kw):
 
 def _summarize(self, ap=1, iouThr=None, areaRngLbl='all', maxDets=100):
     import numpy as np
+
     p = self.params
     iStr = '{:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'  # noqa: E501
     titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
     typeStr = '(AP)' if ap == 1 else '(AR)'
-    iouStr = '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1]) \
-        if iouThr is None else '{:0.2f}'.format(iouThr)
+    iouStr = (
+        '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1])
+        if iouThr is None
+        else '{:0.2f}'.format(iouThr)
+    )
 
-    aind = [
-        i for i, aRng in enumerate(p.areaRngLbl) if aRng == areaRngLbl
-    ]
+    aind = [i for i, aRng in enumerate(p.areaRngLbl) if aRng == areaRngLbl]
     mind = [i for i, mDet in enumerate(p.maxDets) if mDet == maxDets]
     if ap == 1:
         # dimension of precision: [TxRxKxAxM]
@@ -1572,9 +1672,15 @@ def _summarize(self, ap=1, iouThr=None, areaRngLbl='all', maxDets=100):
                 catnames = [self.cocoGt.cats[cid]['name'] for cid in self.params.catIds]
                 catname_to_ap = ub.dzip(catnames, pct_perclass_ap)
                 pct_map = pct_perclass_ap.mean()
-                print('catname_to_ap = {}'.format(ub.urepr(catname_to_ap, nl=1, precision=2)))
+                print(
+                    'catname_to_ap = {}'.format(
+                        ub.urepr(catname_to_ap, nl=1, precision=2)
+                    )
+                )
                 # print('pct_perclass_ap = {}'.format(ub.urepr(pct_perclass_ap.tolist(), nl=1, precision=2)))
-                print('pct_map = {}'.format(ub.urepr(pct_map.tolist(), nl=0, precision=2)))
+                print(
+                    'pct_map = {}'.format(ub.urepr(pct_map.tolist(), nl=0, precision=2))
+                )
             else:
                 raise Exception('not known iou')
         if iouThr is not None:
@@ -1593,9 +1699,7 @@ def _summarize(self, ap=1, iouThr=None, areaRngLbl='all', maxDets=100):
         mean_s = -1
     else:
         mean_s = np.mean(s[s > -1])
-    print(
-        iStr.format(titleStr, typeStr, iouStr, areaRngLbl, maxDets,
-                    mean_s))
+    print(iStr.format(titleStr, typeStr, iouStr, areaRngLbl, maxDets, mean_s))
     return mean_s
 
 
@@ -1607,8 +1711,11 @@ def pct_summarize2(self):
             if areaRngLbl == 'all':
                 if len(self.params.iouThrs) > 1:
                     for iouThr in self.params.iouThrs:
-                        stats.append(_summarize(self, ap=ap, iouThr=iouThr,
-                                                areaRngLbl=areaRngLbl))
+                        stats.append(
+                            _summarize(
+                                self, ap=ap, iouThr=iouThr, areaRngLbl=areaRngLbl
+                            )
+                        )
     return stats
 
 
@@ -1618,4 +1725,5 @@ if __name__ == '__main__':
         python ~/code/kwcoco/kwcoco/metrics/detect_metrics.py all
     """
     import xdoctest
+
     xdoctest.doctest_module(__file__)

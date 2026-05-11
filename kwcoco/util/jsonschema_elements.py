@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 r"""
 Functional interface into defining jsonschema structures.
 
@@ -73,7 +75,7 @@ class Element(dict):
         'title': NotImplemented,
         'description': NotImplemented,
         'default': NotImplemented,
-        'examples': NotImplemented
+        'examples': NotImplemented,
     }
 
     def __init__(self, base, options={}, _magic=None):
@@ -113,6 +115,7 @@ class Element(dict):
         """
         import jsonschema
         from jsonschema.validators import validator_for
+
         if instance is ub.NoParam:
             cls = validator_for(self)
             cls.check_schema(self)
@@ -169,32 +172,41 @@ class ScalarElements:
         """
         https://json-schema.org/understanding-json-schema/reference/string.html
         """
-        return Element(base={'type': 'string'}, options={
-            'pattern': 'some regex',
-            'enum': ['Street', 'Avenue', 'Boulevard'],
-            })
+        return Element(
+            base={'type': 'string'},
+            options={
+                'pattern': 'some regex',
+                'enum': ['Street', 'Avenue', 'Boulevard'],
+            },
+        )
 
     @property
     def NUMBER(self):
         """
         https://json-schema.org/understanding-json-schema/reference/numeric.html#number
         """
-        return Element(base={'type': 'number'}, options={
-            'minimum': 0,
-            'maximum': 100,
-            'exclusiveMaximum': True,
-        })
+        return Element(
+            base={'type': 'number'},
+            options={
+                'minimum': 0,
+                'maximum': 100,
+                'exclusiveMaximum': True,
+            },
+        )
 
     @property
     def INTEGER(self):
         """
         https://json-schema.org/understanding-json-schema/reference/numeric.html#integer
         """
-        return Element(base={'type': 'integer'}, options={
+        return Element(
+            base={'type': 'integer'},
+            options={
                 'minimum': 0,
                 'maximum': 100,
                 'exclusiveMaximum': True,
-        })
+            },
+        )
 
 
 class QuantifierElements:
@@ -211,6 +223,7 @@ class QuantifierElements:
         >>> elem.NOT(elem.ANY).validate()
         >>> elem.ANY.validate()
     """
+
     @property
     def ANY(self):
         return Element({})
@@ -253,24 +266,29 @@ class ContainerElements:
             >>> schema.validate()
             {'type': 'array', 'items': {}, 'minItems': 3}
         """
+
         def _magic(kw):
             numItems = kw.pop('numItems', None)
             if numItems is not None:
-                kw.update({
-                    'minItems': numItems,
-                    'maxItems': numItems,
-                })
+                kw.update(
+                    {
+                        'minItems': numItems,
+                        'maxItems': numItems,
+                    }
+                )
             return kw
+
         self = Element(
-                base={'type': 'array', 'items': TYPE},
-                options={
-                    'contains': {'type': 'number'},
-                    'minItems': 2,
-                    'maxItems': 3,
-                    'uniqueItems': True,
-                    'additionalItems': {'type': 'string'}
-                    },
-                _magic=_magic)
+            base={'type': 'array', 'items': TYPE},
+            options={
+                'contains': {'type': 'number'},
+                'minItems': 2,
+                'maxItems': 3,
+                'uniqueItems': True,
+                'additionalItems': {'type': 'string'},
+            },
+            _magic=_magic,
+        )
         return self(**_magic(kw))
 
     def OBJECT(self, PROPERTIES={}, **kw):
@@ -315,26 +333,26 @@ class ContainerElements:
 
         """
         self = Element(
-                base={'type': 'object', 'properties': PROPERTIES},
-                options={
-                    'additionalProperties': False,
-                    'required': [],
-                    'propertyNames': [],
-                    'minProperties': 0,
-                    'maxProperties': float('inf'),
-                    'dependencies': {},
-                    'oneOf': {},  # hack to allow for multiple required
-                    'anyOf': {},  # hack to allow for multiple required
-                    }
-                )
+            base={'type': 'object', 'properties': PROPERTIES},
+            options={
+                'additionalProperties': False,
+                'required': [],
+                'propertyNames': [],
+                'minProperties': 0,
+                'maxProperties': float('inf'),
+                'dependencies': {},
+                'oneOf': {},  # hack to allow for multiple required
+                'anyOf': {},  # hack to allow for multiple required
+            },
+        )
         return self(**kw)
 
 
 class SchemaElements(
-            ScalarElements,
-            QuantifierElements,
-            ContainerElements,
-        ):
+    ScalarElements,
+    QuantifierElements,
+    ContainerElements,
+):
     """
     Functional interface into defining jsonschema structures.
 
@@ -416,4 +434,5 @@ if __name__ == '__main__':
         python ~/code/kwcoco/kwcoco/util/jsonschema_elements.py all
     """
     import xdoctest
+
     xdoctest.doctest_module(__file__)

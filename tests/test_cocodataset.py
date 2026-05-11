@@ -12,6 +12,7 @@ def test_category_rename_merge_policy():
 
     import kwcoco
     from kwcoco.util import util_json
+
     orig_dset = kwcoco.CocoDataset()
     orig_dset.add_category('a', a=1)
     orig_dset.add_category('b', b=2)
@@ -61,8 +62,16 @@ def test_category_rename_merge_policy():
     dset.rename_categories(mapping, merge_policy='ignore')
     got = dset.cats
     want = {
-        1: { 'id': 1, 'name': 'd', 'b': 2, },
-        2: { 'id': 2, 'name': 'e', }}
+        1: {
+            'id': 1,
+            'name': 'd',
+            'b': 2,
+        },
+        2: {
+            'id': 2,
+            'name': 'e',
+        },
+    }
     print('got = {}'.format(ub.urepr(got, nl=1)))
     print('want = {}'.format(ub.urepr(want, nl=1)))
     flag, info = util_json.indexable_allclose(got, want, return_info=True)
@@ -85,6 +94,7 @@ def test_category_rename_merge_policy():
 
 def test_copy_nextids():
     import kwcoco
+
     orig_dset = kwcoco.CocoDataset()
     orig_dset.add_category('a')
 
@@ -102,6 +112,7 @@ def test_copy_nextids():
 
 def test_only_null_category_id():
     import kwcoco
+
     orig_dset = kwcoco.CocoDataset()
 
     gid = orig_dset.add_image(file_name='foo')
@@ -119,6 +130,7 @@ def test_only_null_category_id():
 
 def test_partial_null_category_id():
     import kwcoco
+
     orig_dset = kwcoco.CocoDataset()
     orig_dset.add_category('a')
 
@@ -140,6 +152,7 @@ def test_dump():
     import tempfile
     import json
     import kwcoco
+
     self = kwcoco.CocoDataset.demo()
     file = tempfile.NamedTemporaryFile('w', delete=False)
     tmp_path = ub.Path(file.name)
@@ -157,6 +170,7 @@ def test_dump():
 def test_dump_causes_saved_status():
     import kwcoco
     import ubelt as ub
+
     dpath = ub.Path.appdir('kwcoco/test/test_dump_causes_saved_status').ensuredir()
     dset = kwcoco.CocoDataset.demo()
     fpath = dpath / 'mydata.kwcoco.json'
@@ -167,6 +181,7 @@ def test_dump_causes_saved_status():
 
 def test_ensure_video_does_not_duplicate():
     import kwcoco
+
     dset = kwcoco.CocoDataset()
     dset.ensure_video(name='foo')
     dset.ensure_video(name='foo')
@@ -177,19 +192,25 @@ def test_ensure_video_does_not_duplicate():
 def test_normalize_category_ids():
     import kwcoco
     import copy
+
     self = kwcoco.CocoDataset.demo()
     old_catlist = copy.deepcopy(self.dataset['categories'])
     old_catdict = copy.deepcopy(self.index.cats)
     self.normalize_category_ids(start_id=None)  # Should do nothing
     assert old_catlist == self.dataset['categories']
-    self.normalize_category_ids(start_id=None, order=['human'])  # reorder, but dont change ids
+    self.normalize_category_ids(
+        start_id=None, order=['human']
+    )  # reorder, but dont change ids
     assert old_catlist != self.dataset['categories'], 'order should change'
     assert old_catdict == self.index.cats, 'ids should not'
-    self.normalize_category_ids(start_id=3, order=['human'])  # reorder, but dont change ids
+    self.normalize_category_ids(
+        start_id=3, order=['human']
+    )  # reorder, but dont change ids
     assert old_catlist != self.dataset['categories'], 'order should change'
     assert old_catdict != self.index.cats, 'ids should change'
 
     import kwcoco
+
     self = kwcoco.CocoDataset.demo()
     self.normalize_category_ids(start_id=2)
     classes = self.object_categories()

@@ -1,4 +1,3 @@
-
 def test_frames_are_in_order():
     import kwcoco
     import ubelt as ub
@@ -19,11 +18,11 @@ def test_frames_are_in_order():
 
     # Add some number of videos
     vidid_pool = [
-        dset.add_video('vid_{:03d}'.format(vididx))
-        for vididx in range(total_videos)
+        dset.add_video('vid_{:03d}'.format(vididx)) for vididx in range(total_videos)
     ]
-    vidid_to_frame_pool = {vidid: ub.oset(range(max_frames_per_video))
-                           for vidid in vidid_pool}
+    vidid_to_frame_pool = {
+        vidid: ub.oset(range(max_frames_per_video)) for vidid in vidid_pool
+    }
 
     # Add some number of frames to the videos in a random order
     for imgidx in range(total_frames):
@@ -45,7 +44,8 @@ def test_frames_are_in_order():
 
         # Note: this check is always valid
         assert is_sorted(frame_idxs), (
-            'images in vidid_to_gids must be sorted by frame_index')
+            'images in vidid_to_gids must be sorted by frame_index'
+        )
 
     # Note: this check has a chance of failing for other params / seeds
     assert not all(gids_were_in_order), (
@@ -69,7 +69,8 @@ def test_frames_are_in_order():
 
             # Note: this check is always valid
             assert is_sorted(frame_idxs), (
-                'images in vidid_to_gids must be sorted by frame_index')
+                'images in vidid_to_gids must be sorted by frame_index'
+            )
 
         # Note: this check has a chance of failing for other params / seeds
         assert not all(gids_were_in_order), (
@@ -82,6 +83,7 @@ def test_lookup_annots_from_video():
     # TODO: check this in SQL as well
     import kwcoco
     import ubelt as ub
+
     dset = kwcoco.CocoDataset.demo('vidshapes8')
 
     # Run lookup from video id

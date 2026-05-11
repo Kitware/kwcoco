@@ -1,6 +1,9 @@
 """
+from __future__ import annotations
+
 Downloads the CamVid data if necessary, and converts it to COCO.
 """
+
 from os.path import relpath
 from os.path import exists
 from os.path import join
@@ -8,8 +11,7 @@ import ubelt as ub
 
 
 def _devcheck_sample_full_image():
-    """
-    """
+    """ """
     import kwimage
     import numpy as np
 
@@ -135,9 +137,15 @@ def _devcheck_load_sub_image():
 def grab_camvid_train_test_val_splits(coco_dset, mode='segnet'):
     # Use the split from SegNet: https://github.com/alexgkendall/SegNet-Tutorial
     split_files = {
-        'train': ub.grabdata('https://raw.githubusercontent.com/alexgkendall/SegNet-Tutorial/master/CamVid/train.txt'),
-        'vali': ub.grabdata('https://raw.githubusercontent.com/alexgkendall/SegNet-Tutorial/master/CamVid/val.txt'),
-        'test': ub.grabdata('https://raw.githubusercontent.com/alexgkendall/SegNet-Tutorial/master/CamVid/test.txt'),
+        'train': ub.grabdata(
+            'https://raw.githubusercontent.com/alexgkendall/SegNet-Tutorial/master/CamVid/train.txt'
+        ),
+        'vali': ub.grabdata(
+            'https://raw.githubusercontent.com/alexgkendall/SegNet-Tutorial/master/CamVid/val.txt'
+        ),
+        'test': ub.grabdata(
+            'https://raw.githubusercontent.com/alexgkendall/SegNet-Tutorial/master/CamVid/test.txt'
+        ),
     }
     gid_subsets = {}
     for tag, fpath in split_files.items():
@@ -145,8 +153,12 @@ def grab_camvid_train_test_val_splits(coco_dset, mode='segnet'):
         parts = text.replace('\n', ' ').split(' ')
         parts = [p for p in parts if p]
         from os.path import basename
+
         names = sorted(set(basename(p) for p in parts))
-        gids = [coco_dset.index.file_name_to_img['701_StillsRaw_full/' + name]['id'] for name in names]
+        gids = [
+            coco_dset.index.file_name_to_img['701_StillsRaw_full/' + name]['id']
+            for name in names
+        ]
         gid_subsets[tag] = gids
     return gid_subsets
 
@@ -167,6 +179,7 @@ def grab_camvid_sampler():
         >>>     img = sampler.load_image(gid)
     """
     import kwcoco
+
     dset = grab_coco_camvid()
     workdir = ub.Path.appdir('camvid').ensuredir()
     sampler = kwcoco.CocoSampler(dset, workdir=workdir)
@@ -193,6 +206,7 @@ def grab_coco_camvid():
             xdev.InteractiveIter.draw()
     """
     import kwcoco
+
     cache_dpath = ub.Path.appdir('kwcoco', 'camvid').ensuredir()
     coco_fpath = join(cache_dpath, 'camvid.mscoco.json')
 
@@ -201,9 +215,14 @@ def grab_coco_camvid():
 
     # Ubelt's stamp-based caches are super cheap and let you take control of
     # the data format.
-    stamp = ub.CacheStamp('camvid_coco', depends=[SCRIPT_VERSION],
-                          dpath=cache_dpath, product=coco_fpath,
-                          hasher='sha1', verbose=3)
+    stamp = ub.CacheStamp(
+        'camvid_coco',
+        depends=[SCRIPT_VERSION],
+        dpath=cache_dpath,
+        product=coco_fpath,
+        hasher='sha1',
+        verbose=3,
+    )
     if stamp.expired():
         camvid_raw_info = grab_raw_camvid()
         dset = convert_camvid_raw_to_coco(camvid_raw_info)
@@ -229,6 +248,7 @@ def grab_raw_camvid():
     Grab the raw camvid data.
     """
     import zipfile
+
     dpath = ub.Path.appdir('kwcoco', 'camvid').ensuredir()
 
     # url = 'http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/data/LabeledApproved_full.zip'
@@ -247,10 +267,13 @@ def grab_raw_camvid():
         zip_ref.close()
 
     import glob
-    img_paths = sorted([relpath(fpath, dset_root)
-                        for fpath in glob.glob(join(image_dpath, '*.png'))])
-    mask_paths = sorted([relpath(fpath, dset_root)
-                         for fpath in glob.glob(join(mask_dpath, '*.png'))])
+
+    img_paths = sorted(
+        [relpath(fpath, dset_root) for fpath in glob.glob(join(image_dpath, '*.png'))]
+    )
+    mask_paths = sorted(
+        [relpath(fpath, dset_root) for fpath in glob.glob(join(mask_dpath, '*.png'))]
+    )
 
     camvid_raw_info = {
         'img_paths': img_paths,
@@ -267,9 +290,9 @@ def rgb_to_cid(r, g, b):
 
 
 def cid_to_rgb(cid):
-    mask_b = (int(2 ** 8) - 1) << 0
-    mask_g = (int(2 ** 8) - 1) << 8
-    mask_r = (int(2 ** 8) - 1) << 16
+    mask_b = (int(2**8) - 1) << 0
+    mask_g = (int(2**8) - 1) << 8
+    mask_r = (int(2**8) - 1) << 16
 
     r = (cid & mask_b) >> 0
     g = (cid & mask_g) >> 8
@@ -301,10 +324,12 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
     import re
     import kwimage
     import kwcoco
+
     print('Converting CamVid to MS-COCO format')
 
     dset_root, img_paths, label_path, mask_paths = ub.take(
-        camvid_raw_info, 'dset_root, img_paths, label_path, mask_paths'.split(', '))
+        camvid_raw_info, 'dset_root, img_paths, label_path, mask_paths'.split(', ')
+    )
 
     img_infos = {
         'img_fname': img_paths,
@@ -368,7 +393,7 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
             mask_fpath = join(dset_root, img['segmentation'])
 
             rgb_mask = kwimage.imread(mask_fpath, space='rgb')
-            r, g, b  = rgb_mask.T.astype(np.int64)
+            r, g, b = rgb_mask.T.astype(np.int64)
             cid_mask = np.ascontiguousarray(rgb_to_cid(r, g, b).T)
 
             cids = set(np.unique(cid_mask)) - {0}
@@ -381,13 +406,17 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
                         total_bad = c_mask.sum()
                         if total_bad < 32:
                             if not once:
-                                print('gid 618 has a few known bad pixels, ignoring them')
+                                print(
+                                    'gid 618 has a few known bad pixels, ignoring them'
+                                )
                                 once = True
                             continue
                         else:
                             raise Exception('more bad pixels than expected')
                     else:
-                        raise Exception('UNKNOWN cid = {!r} in gid={!r}'.format(cid, gid))
+                        raise Exception(
+                            'UNKNOWN cid = {!r} in gid={!r}'.format(cid, gid)
+                        )
 
                     # bad_rgb = cid_to_rgb(cid)
                     # print('bad_rgb = {!r}'.format(bad_rgb))
@@ -399,7 +428,7 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
                 else:
                     ann = {
                         'category_id': cid,
-                        'image_id': gid
+                        'image_id': gid,
                         # 'segmentation': mask.to_coco()
                     }
                     assert cid in dset.cats
@@ -422,7 +451,7 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
             img = dset.imgs[gid]
             mask_fpath = join(dset_root, img['segmentation'])
             rgb_mask = kwimage.imread(mask_fpath, space='rgb')
-            r, g, b  = rgb_mask.T.astype(np.int64)
+            r, g, b = rgb_mask.T.astype(np.int64)
             cid_mask = np.ascontiguousarray(rgb_to_cid(r, g, b).T)
             cid_hist = ub.dict_hist(cid_mask.ravel())
 
@@ -431,16 +460,19 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
                 bad_cid_hist[cid] = cid_hist.pop(cid)
 
             import kwplot
+
             kwplot.autompl()
             kwplot.imshow(rgb_mask)
 
     if 0:
         import kwplot
+
         plt = kwplot.autoplt()
         plt.clf()
         dset.show_image(1)
 
         import xdev
+
         gid_list = list(dset.imgs)
         for gid in xdev.InteractiveIter(gid_list):
             dset.show_image(gid)
@@ -461,23 +493,19 @@ def _define_camvid_class_hierarcy(dset):
         # things that aren't
         'background': 'root',
         'system': 'root',
-
         # The system is made up of environmental components and actor
         # components.
         'environment': 'system',
         'actor': 'system',
-
         # Break actors (things with complex movement) into subtypes
         'life-conscious': 'actor',
         'vehicle-land': 'actor',
         'actor-other': 'actor',
-
         # Break the environment (things with simple movement) info subtypes
         'life-inanimate': 'environment',
         'civil-structure': 'environment',
         'civil-notice': 'environment',
         'transport-way': 'environment',
-
         # Subclassify transport mediums
         'drive-way': 'transport-way',
         'walk-way': 'transport-way',
@@ -540,6 +568,7 @@ def _define_camvid_class_hierarcy(dset):
     if 0:
         graph = dset.category_graph()
         import graphid
+
         graphid.util.show_nx(graph)
 
     # Add in some hierarchy information
@@ -560,6 +589,7 @@ def _define_camvid_class_hierarcy(dset):
 
         import xdev
         import kwplot
+
         kwplot.autompl()
         for aid in xdev.InteractiveIter(example_cat_aids):
             print('aid = {!r}'.format(aid))
@@ -621,6 +651,7 @@ def main():
         fpath = join(dpath, 'camvid-{}.mscoco.json'.format(tag))
         subset.fpath = fpath
         subset.dump()
+
 
 if __name__ == '__main__':
     """

@@ -1,5 +1,6 @@
 import kwcoco
 import ubelt as ub
+
 # import kwarray
 import numpy as np
 
@@ -11,8 +12,11 @@ def main():
         pip install pynndescent
     """
     import kwcoco
+
     # hard coded path
-    self = kwcoco.CocoDataset('/data/joncrall/dvc-repos/smart_phase3_data/Aligned-Drop8-ARA/KR_R002/imganns-KR_R002-rawbands.kwcoco.zip')
+    self = kwcoco.CocoDataset(
+        '/data/joncrall/dvc-repos/smart_phase3_data/Aligned-Drop8-ARA/KR_R002/imganns-KR_R002-rawbands.kwcoco.zip'
+    )
 
     cname_to_box_sizes = ub.ddict(list)
 
@@ -33,14 +37,17 @@ def main():
     box_sizes = np.vstack(list(cname_to_box_sizes.values()))
 
     import kwplot
+
     kwplot.autompl()
 
     import kwarray
+
     unique_boxes = kwarray.unique_rows(box_sizes)
     print(len(unique_boxes))
 
     # Get kmeans cluster labels (chosen K as 10)
     from sklearn import cluster
+
     num_anchors = 10
     defaultkw = {
         'n_clusters': num_anchors,
@@ -48,7 +55,7 @@ def main():
         'max_iter': 1000,
         'tol': 1e-6,
         'algorithm': 'elkan',
-        'verbose': 1
+        'verbose': 1,
     }
     kmkw = ub.dict_union(defaultkw, {})
     algo = cluster.KMeans(**kmkw)
@@ -56,6 +63,7 @@ def main():
 
     # Get finch cluster labels
     from finch import FINCH
+
     c, num_clust, req_c = FINCH(unique_boxes, distance='cosine', req_clust=10)
 
     unique_groups, groupxs = kwarray.group_indices(c.T[-1])
@@ -72,6 +80,7 @@ def main():
 
     import kwplot
     import pandas as pd
+
     sns = kwplot.autosns()
     data = pd.DataFrame({'width': unique_boxes.T[0], 'height': unique_boxes.T[1]})
     data['kmeans_label'] = [f'km-{label:02d}' for label in algo.labels_]

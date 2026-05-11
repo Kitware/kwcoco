@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ubelt as ub
 from os.path import exists
 from os.path import join
@@ -25,9 +27,27 @@ def convert_voc_to_coco(dpath=None):
     # TODO: convert segmentation information
 
     classes = [
-        'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat',
-        'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 'person',
-        'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
+        'aeroplane',
+        'bicycle',
+        'bird',
+        'boat',
+        'bottle',
+        'bus',
+        'car',
+        'cat',
+        'chair',
+        'cow',
+        'diningtable',
+        'dog',
+        'horse',
+        'motorbike',
+        'person',
+        'pottedplant',
+        'sheep',
+        'sofa',
+        'train',
+        'tvmonitor',
+    ]
     devkit_dpath = ensure_voc_data(dpath=dpath)
     root = out_dpath = dirname(devkit_dpath)
 
@@ -50,6 +70,7 @@ def convert_voc_to_coco(dpath=None):
 
     if 0:
         import xdev
+
         xdev.view_directory(out_dpath)
 
     def reroot_imgs(dset, root):
@@ -57,6 +78,7 @@ def convert_voc_to_coco(dpath=None):
             img['file_name'] = relpath(img['file_name'], root)
 
     import kwcoco
+
     t1 = kwcoco.CocoDataset(join(out_dpath, 'voc-train-2007.mscoco.json'))
     t2 = kwcoco.CocoDataset(join(out_dpath, 'voc-train-2012.mscoco.json'))
 
@@ -84,6 +106,7 @@ def convert_voc_to_coco(dpath=None):
     if 0:
         tv.img_root = root
         import kwplot
+
         kwplot.autompl()
         tv.show_image(2)
 
@@ -102,6 +125,7 @@ def _convert_voc_split(devkit_dpath, classes, split, year, root):
     """
     import kwcoco
     import xml.etree.ElementTree as ET
+
     dset = kwcoco.CocoDataset(tag='voc-{}-{}'.format(split, year))
 
     for catname in classes:
@@ -109,8 +133,7 @@ def _convert_voc_split(devkit_dpath, classes, split, year, root):
 
     gpaths, apaths = _read_split_paths(devkit_dpath, split, year)
 
-    KNOWN = {'object', 'segmented', 'size', 'source', 'filename', 'folder',
-             'owner'}
+    KNOWN = {'object', 'segmented', 'size', 'source', 'filename', 'folder', 'owner'}
 
     for gpath, apath in ub.ProgIter(zip(gpaths, apaths)):
         tree = ET.parse(apath)
@@ -127,20 +150,14 @@ def _convert_voc_split(devkit_dpath, classes, split, year, root):
             'height': int(tree.find('size').find('height').text),
             'depth': int(tree.find('size').find('depth').text),
             'segmented': int(tree.find('segmented').text),
-            'source': {
-                elem.tag: elem.text
-                for elem in list(tree.find('source'))
-            },
+            'source': {elem.tag: elem.text for elem in list(tree.find('source'))},
         }
 
         assert img.pop('depth') == 3
 
         owner = tree.find('owner')
         if owner is not None:
-            img['owner'] = {
-                elem.tag: elem.text
-                for elem in list(owner)
-            }
+            img['owner'] = {elem.tag: elem.text for elem in list(owner)}
 
         gid = dset.add_image(**img)
 
@@ -180,6 +197,7 @@ def _read_split_paths(devkit_dpath, split, year):
     """
     import glob
     import re
+
     split_idstrs = []
     data_dpath = join(devkit_dpath, 'VOC{}'.format(year))
     split_dpath = join(data_dpath, 'ImageSets', 'Main')
@@ -195,10 +213,8 @@ def _read_split_paths(devkit_dpath, split, year):
 
     image_dpath = join(data_dpath, 'JPEGImages')
     annot_dpath = join(data_dpath, 'Annotations')
-    gpaths = [join(image_dpath, '{}.jpg'.format(idstr))
-              for idstr in split_idstrs]
-    apaths = [join(annot_dpath, '{}.xml'.format(idstr))
-              for idstr in split_idstrs]
+    gpaths = [join(image_dpath, '{}.jpg'.format(idstr)) for idstr in split_idstrs]
+    apaths = [join(annot_dpath, '{}.xml'.format(idstr)) for idstr in split_idstrs]
     return gpaths, apaths
 
 
@@ -223,31 +239,53 @@ def ensure_voc_data(dpath=None, force=False, years=[2007, 2012]):
         # Old way
         # ub.cmd('tar xvf "{}" -C "{}"'.format(fpath1, dpath), verbout=1)
         import tarfile
+
         try:
             tar = tarfile.open(fpath1)
             tar.extractall(dpath)
         finally:
             tar.close()
 
-    fpath1 = ub.grabdata('http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCdevkit_08-Jun-2007.tar', dpath=dpath)
+    fpath1 = ub.grabdata(
+        'http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCdevkit_08-Jun-2007.tar',
+        dpath=dpath,
+    )
     if force or not exists(join(dpath, 'VOCdevkit', 'VOCcode')):
         extract_tarfile(fpath1, dpath)
 
     if 2007 in years:
         # VOC 2007 train+validation data
-        fpath2 = ub.grabdata('http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar', dpath=dpath)
-        if force or not exists(join(dpath, 'VOCdevkit', 'VOC2007', 'ImageSets', 'Main', 'bird_trainval.txt')):
+        fpath2 = ub.grabdata(
+            'http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar',
+            dpath=dpath,
+        )
+        if force or not exists(
+            join(
+                dpath, 'VOCdevkit', 'VOC2007', 'ImageSets', 'Main', 'bird_trainval.txt'
+            )
+        ):
             extract_tarfile(fpath2, dpath)
 
         # VOC 2007 test data
-        fpath3 = ub.grabdata('http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar', dpath=dpath)
-        if force or not exists(join(dpath, 'VOCdevkit', 'VOC2007', 'ImageSets', 'Main', 'bird_test.txt')):
+        fpath3 = ub.grabdata(
+            'http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar',
+            dpath=dpath,
+        )
+        if force or not exists(
+            join(dpath, 'VOCdevkit', 'VOC2007', 'ImageSets', 'Main', 'bird_test.txt')
+        ):
             extract_tarfile(fpath3, dpath)
 
     if 2012 in years:
         # VOC 2012 train+validation data
-        fpath4 = ub.grabdata('https://pjreddie.com/media/files/VOCtrainval_11-May-2012.tar', dpath=dpath)
-        if force or not exists(join(dpath, 'VOCdevkit', 'VOC2012', 'ImageSets', 'Main', 'bird_trainval.txt')):
+        fpath4 = ub.grabdata(
+            'https://pjreddie.com/media/files/VOCtrainval_11-May-2012.tar', dpath=dpath
+        )
+        if force or not exists(
+            join(
+                dpath, 'VOCdevkit', 'VOC2012', 'ImageSets', 'Main', 'bird_trainval.txt'
+            )
+        ):
             extract_tarfile(fpath4, dpath)
     return devkit_dpath
 
@@ -286,11 +324,12 @@ def ensure_voc_coco(dpath=None):
 
 def main():
     import scriptconfig as scfg
+
     class GrabVOC_Config(scfg.Config):
         __default__ = {
-            'dpath': scfg.Path(
-                ub.expandpath('~/data/VOC'), help='download location')
+            'dpath': scfg.Path(ub.expandpath('~/data/VOC'), help='download location')
         }
+
     config = GrabVOC_Config()
     paths = ensure_voc_coco(**config)
     print('paths = {}'.format(ub.urepr(paths, nl=1)))

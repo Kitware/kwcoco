@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Evaluates a predicted coco dataset against a truth coco dataset.
 
 This currently computes detection-level metrics.
@@ -64,6 +66,7 @@ Example:
     >>>     import xdev
     >>>     xdev.view_directory(dpath)
 """
+
 import os
 import scriptconfig as scfg
 import ubelt as ub
@@ -78,48 +81,96 @@ class CocoEvalConfig(scfg.DataConfig):
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
-    true_dataset = scfg.Value(None, type=str, position=1, help='coercable true detections', tags=['in_path'])
-    pred_dataset = scfg.Value(None, type=str, position=2, help='coercable predicted detections', tags=['in_path'])
-    ignore_classes = scfg.Value(None, type=list, help=ub.paragraph(
-            '''
+
+    true_dataset = scfg.Value(
+        None, type=str, position=1, help='coercable true detections', tags=['in_path']
+    )
+    pred_dataset = scfg.Value(
+        None,
+        type=str,
+        position=2,
+        help='coercable predicted detections',
+        tags=['in_path'],
+    )
+    ignore_classes = scfg.Value(
+        None,
+        type=list,
+        help=ub.paragraph(
+            """
             classes to ignore (give them zero weight)
-            '''), tags=['algo_param'])
-    implicit_negative_classes = scfg.Value(['background'], help=None, tags=['algo_param'])
+            """
+        ),
+        tags=['algo_param'],
+    )
+    implicit_negative_classes = scfg.Value(
+        ['background'], help=None, tags=['algo_param']
+    )
     implicit_ignore_classes = scfg.Value(['ignore'], help=None, tags=['algo_param'])
-    fp_cutoff = scfg.Value(float('inf'), help='False positive cutoff for ROC', tags=['algo_param'])
-    iou_thresh = scfg.Value(0.5, alias=['ovthresh'], help=ub.paragraph(
-            '''
+    fp_cutoff = scfg.Value(
+        float('inf'), help='False positive cutoff for ROC', tags=['algo_param']
+    )
+    iou_thresh = scfg.Value(
+        0.5,
+        alias=['ovthresh'],
+        help=ub.paragraph(
+            """
             One or more IoU overlap threshold for detection assignment
-            '''), tags=['algo_param'])
-    compat = scfg.Value('mutex', help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    compat = scfg.Value(
+        'mutex',
+        help=ub.paragraph(
+            """
             Matching strategy for which true annots are allowed to match
             which predicted annots. `mutex` means true boxes can only
             match predictions where the true class has highest
             probability (pycocotools setting). `all` means any class can
             match any other class. Dont use `ancestors`, it is broken.
-            '''), choices=['all', 'mutex', 'ancestors'], tags=['algo_param'])
-    monotonic_ppv = scfg.Value(True, help=ub.paragraph(
-            '''
+            """
+        ),
+        choices=['all', 'mutex', 'ancestors'],
+        tags=['algo_param'],
+    )
+    monotonic_ppv = scfg.Value(
+        True,
+        help=ub.paragraph(
+            """
             if True forces precision to be monotonic. Defaults to True
             for compatibility with pycocotools, but that might not be
             the best option.
-            '''), tags=['algo_param'])
-    ap_method = scfg.Value('pycocotools', help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    ap_method = scfg.Value(
+        'pycocotools',
+        help=ub.paragraph(
+            """
             Method for computing AP. Defaults to a setting comparable to
             pycocotools. Can also be set to sklearn to use an alternative
             method.
-            '''), tags=['algo_param'])
-    use_area_attr = scfg.Value('try', help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    use_area_attr = scfg.Value(
+        'try',
+        help=ub.paragraph(
+            """
             if True (pycocotools setting) uses the area coco attribute
             to filter area range instead of bbox area. Otherwise just
             filters based on bbox area. If 'try' then it tries to use it
             but will fallback if it does not exist.
-            '''), tags=['algo_param'])
-    area_range = scfg.Value(['all'], help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    area_range = scfg.Value(
+        ['all'],
+        help=ub.paragraph(
+            """
             Minimum and maximum object areas to consider. May specified
             as a comma-separated code: '<min>-<max>'. These ranges are
             inclusive. Also accepts scientific notation, inf, and
@@ -129,41 +180,85 @@ class CocoEvalConfig(scfg.DataConfig):
             e.g. 16x16 boxes are considered small, but 17x16 boxes are
             medium. These can be mixed an matched, e.g.:
             `--area_range=0-4e3,small,1024-inf`.
-            '''), tags=['algo_param'])
-    max_dets = scfg.Value(float('inf'), help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    max_dets = scfg.Value(
+        float('inf'),
+        help=ub.paragraph(
+            """
             maximum number of predictions to consider
-            '''), tags=['algo_param'])
-    truth_reuse_policy = scfg.Value(False, help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    truth_reuse_policy = scfg.Value(
+        False,
+        help=ub.paragraph(
+            """
             Experimental.
-            '''), tags=['algo_param'])
-    iou_bias = scfg.Value(1, help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    iou_bias = scfg.Value(
+        1,
+        help=ub.paragraph(
+            """
             pycocotools setting is 1, but 0 may be better
-            '''), tags=['algo_param'])
-    force_pycocoutils = scfg.Value(False, help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    force_pycocoutils = scfg.Value(
+        False,
+        help=ub.paragraph(
+            """
             ignore all other options and just use pycocoutils to score
-            '''), tags=['algo_param'])
-    assign_workers = scfg.Value(8, help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    assign_workers = scfg.Value(
+        8,
+        help=ub.paragraph(
+            """
             number of background workers for assignment
-            '''), tags=['perf_param'])
-    load_workers = scfg.Value(0, help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['perf_param'],
+    )
+    load_workers = scfg.Value(
+        0,
+        help=ub.paragraph(
+            """
             number of workers to load cached detections
-            '''), tags=['perf_param'])
-    classes_of_interest = scfg.Value(None, type=str, help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['perf_param'],
+    )
+    classes_of_interest = scfg.Value(
+        None,
+        type=str,
+        help=ub.paragraph(
+            """
             if specified only these classes are given weight. Input should be a
             YAML coercable list[str].
-            '''), tags=['algo_param'])
-    use_image_names = scfg.Value(False, help=ub.paragraph(
-            '''
+            """
+        ),
+        tags=['algo_param'],
+    )
+    use_image_names = scfg.Value(
+        False,
+        help=ub.paragraph(
+            """
             if True use image file_name to associate images instead of
             ids
-            '''), tags=['algo_param'])
+            """
+        ),
+        tags=['algo_param'],
+    )
 
     def __post_init__(self):
         # if self['ovthresh'] is not None:
@@ -261,6 +356,7 @@ class CocoEvaluator:
         and image ids.
         """
         import numpy as np
+
         # TODO: coerce into a cocodataset form if possible
         # TODO: Optionally:
         # * validate the input coco files,
@@ -272,11 +368,13 @@ class CocoEvaluator:
         # do not? This will be common if an external detector is used.
         load_workers = coco_eval.config['load_workers']
         gid_to_true, true_extra = CocoEvaluator._coerce_dets(
-            coco_eval.config['true_dataset'], workers=load_workers)
+            coco_eval.config['true_dataset'], workers=load_workers
+        )
 
         coco_eval.log('init pred dset')
         gid_to_pred, pred_extra = CocoEvaluator._coerce_dets(
-            coco_eval.config['pred_dataset'], workers=load_workers)
+            coco_eval.config['pred_dataset'], workers=load_workers
+        )
 
         true_coco = true_extra['coco_dset']
         pred_coco = pred_extra['coco_dset']
@@ -286,9 +384,14 @@ class CocoEvaluator:
             key_fallback = 'id'
         from kwcoco.metrics.helpers import associate_images
         import kwcoco
+
         matches = associate_images(
-            true_coco, pred_coco, key_fallback=key_fallback,
-            valid_image_ids=None, flatten_video_structure=True)
+            true_coco,
+            pred_coco,
+            key_fallback=key_fallback,
+            valid_image_ids=None,
+            flatten_video_structure=True,
+        )
 
         # TODO: This is the pairwise mapping of true / predicted image-ids that
         # should be used in the scoring code.
@@ -333,7 +436,8 @@ class CocoEvaluator:
             pred_classes = kwcoco.CategoryTree()
 
         classes, unified_cid_maps = CocoEvaluator._rectify_classes(
-            true_classes, pred_classes)
+            true_classes, pred_classes
+        )
         true_to_unified_cid = unified_cid_maps['true']
         pred_to_unified_cid = unified_cid_maps['pred']
 
@@ -348,8 +452,7 @@ class CocoEvaluator:
             pred_new_idxs.append(new_idx)
 
         needs_prob_remap = (
-            (pred_new_idxs == pred_old_idxs) or
-            (len(classes) != len(pred_classes))
+            (pred_new_idxs == pred_old_idxs) or (len(classes) != len(pred_classes))
         ) or True
 
         # Move truth to the unified class indices
@@ -358,9 +461,16 @@ class CocoEvaluator:
             new_classes = classes
             old_classes = det.meta['classes']
             old_cidxs = det.data['class_idxs']
-            old_cids = [None if cx is None else old_classes.idx_to_id[cx] for cx in old_cidxs]
-            new_cids = [None if cid is None else true_to_unified_cid.get(cid, cid) for cid in old_cids]
-            new_cidxs = np.array([None if c is None else new_classes.id_to_idx[c] for c in new_cids])
+            old_cids = [
+                None if cx is None else old_classes.idx_to_id[cx] for cx in old_cidxs
+            ]
+            new_cids = [
+                None if cid is None else true_to_unified_cid.get(cid, cid)
+                for cid in old_cids
+            ]
+            new_cidxs = np.array(
+                [None if c is None else new_classes.id_to_idx[c] for c in new_cids]
+            )
             det.meta['classes'] = new_classes
             det.data['class_idxs'] = new_cidxs
 
@@ -370,16 +480,25 @@ class CocoEvaluator:
             new_classes = classes
             old_classes = det.meta['classes']
             old_cidxs = det.data['class_idxs']
-            old_cids = [None if cx is None else old_classes.idx_to_id[cx] for cx in old_cidxs]
-            new_cids = [None if cid is None else pred_to_unified_cid.get(cid, cid) for cid in old_cids]
-            new_cidxs = np.array([None if c is None else new_classes.id_to_idx[c] for c in new_cids])
+            old_cids = [
+                None if cx is None else old_classes.idx_to_id[cx] for cx in old_cidxs
+            ]
+            new_cids = [
+                None if cid is None else pred_to_unified_cid.get(cid, cid)
+                for cid in old_cids
+            ]
+            new_cidxs = np.array(
+                [None if c is None else new_classes.id_to_idx[c] for c in new_cids]
+            )
             det.meta['classes'] = new_classes
             det.data['class_idxs'] = new_cidxs
 
             if needs_prob_remap and 'probs' in det.data:
                 # Ensure predicted probabilities are in the unified class space
                 old_probs = det.data['probs']
-                new_probs = np.zeros_like(old_probs, shape=(len(old_probs), len(classes)))
+                new_probs = np.zeros_like(
+                    old_probs, shape=(len(old_probs), len(classes))
+                )
                 if len(new_probs):
                     new_probs[:, pred_new_idxs] = old_probs[:, pred_old_idxs]
                 det.data['probs'] = new_probs
@@ -402,6 +521,7 @@ class CocoEvaluator:
     @classmethod
     def _rectify_classes(coco_eval, true_classes, pred_classes):
         import kwcoco
+
         # Determine if truth and model classes are compatible, attempt to remap
         # if possible.
         errors = []
@@ -411,13 +531,15 @@ class CocoEvaluator:
                 if node1 != node2:
                     errors.append(
                         'id={} exists in pred and true but have '
-                        'different names, {}, {}'.format(id1, node1, node2))
+                        'different names, {}, {}'.format(id1, node1, node2)
+                    )
             if node1 in pred_classes.node_to_id:
                 id2 = pred_classes.node_to_id[node1]
                 if id1 != id2:
                     errors.append(
                         'node={} exists in pred and true but have '
-                        'different ids, {}, {}'.format(node1, id1, id2))
+                        'different ids, {}, {}'.format(node1, id1, id2)
+                    )
 
         # TODO: determine if the class ids are the same, in which case we dont
         # need to do unification.
@@ -427,12 +549,16 @@ class CocoEvaluator:
             'true': {},
             'pred': {},
         }
+
         def _normalize_name(name):
             return name.lower().replace(' ', '_')
+
         pred_norm = {_normalize_name(name): name for name in pred_classes}
         true_norm = {_normalize_name(name): name for name in true_classes}
         # TODO: remove background hack, use "implicit_negative_classes" or "negative_classes"
-        unified_names = list(ub.unique(['background'] + list(pred_norm) + list(true_norm)))
+        unified_names = list(
+            ub.unique(['background'] + list(pred_norm) + list(true_norm))
+        )
         classes = kwcoco.CategoryTree.coerce(unified_names)
 
         # raise Exception('\n'.join(errors))
@@ -485,8 +611,10 @@ class CocoEvaluator:
         import kwimage
         import numpy as np
         import glob
+
         try:
             import ndsampler
+
             COCO_SAMPLER_CLS = ndsampler.CocoSampler
         except Exception:
             COCO_SAMPLER_CLS = None
@@ -525,7 +653,9 @@ class CocoEvaluator:
                 # remap truth cids to be consistent with "classes"
                 # cids = [cid_true_to_pred.get(cid, cid) for cid in cids]
 
-                cxs = np.array([None if c is None else classes.id_to_idx[c] for c in cids])
+                cxs = np.array(
+                    [None if c is None else classes.id_to_idx[c] for c in cids]
+                )
                 ssegs = [a.get('segmentation') for a in anns]
                 weights = [a.get('weight', 1) for a in anns]
 
@@ -558,7 +688,8 @@ class CocoEvaluator:
             extra['sampler'] = sampler = dataset
             coco_dset = sampler.dset
             gid_to_det, _extra = CocoEvaluator._coerce_dets(
-                coco_dset, verbose, workers=workers)
+                coco_dset, verbose, workers=workers
+            )
             extra.update(_extra)
         elif isinstance(dataset, (str, os.PathLike)):
             if exists(dataset):
@@ -582,7 +713,8 @@ class CocoEvaluator:
                     extra['dataset_fpath'] = coco_fpath = dataset
                     coco_dset = kwcoco.CocoDataset(coco_fpath)
                     gid_to_det, _extra = CocoEvaluator._coerce_dets(
-                        coco_dset, verbose, workers=workers)
+                        coco_dset, verbose, workers=workers
+                    )
                     extra.update(_extra)
                 else:
                     raise NotImplementedError
@@ -605,6 +737,7 @@ class CocoEvaluator:
             dmet = coco_eval._build_dmet()
         """
         from kwcoco.metrics import DetectionMetrics
+
         coco_eval._ensure_init()
         classes = coco_eval.classes
 
@@ -629,9 +762,10 @@ class CocoEvaluator:
         # TODO: we need to update DetectionMetrics so the alignment of images
         # is more explicit.
         dmet = DetectionMetrics(classes=classes)
-        for true_gid, pred_gid in ub.ProgIter(zip(coco_eval.true_image_ids,
-                                                  coco_eval.pred_image_ids),
-                                              total=len(coco_eval.true_image_ids)):
+        for true_gid, pred_gid in ub.ProgIter(
+            zip(coco_eval.true_image_ids, coco_eval.pred_image_ids),
+            total=len(coco_eval.true_image_ids),
+        ):
             pred_dets = gid_to_pred[pred_gid]
             true_dets = gid_to_true[true_gid]
             # Note: these require common identifiers.
@@ -658,6 +792,7 @@ class CocoEvaluator:
         import platform
         import kwarray
         import numpy as np
+
         coco_eval.log('evaluating')
         # print('coco_eval.config = {}'.format(ub.urepr(dict(coco_eval.config), nl=3)))
 
@@ -673,7 +808,10 @@ class CocoEvaluator:
         negative_classes = coco_eval.config['implicit_negative_classes']
 
         import kwutil
-        classes_of_interest = kwutil.Yaml.coerce(coco_eval.config['classes_of_interest'])
+
+        classes_of_interest = kwutil.Yaml.coerce(
+            coco_eval.config['classes_of_interest']
+        )
         print(f'classes_of_interest={classes_of_interest}')
 
         # classes_of_interest = coco_eval.config['classes_of_interest']
@@ -744,13 +882,18 @@ class CocoEvaluator:
             )
             orig_weights = cfsn_vecs.data['weight'].copy()
 
-            weight_gen = dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval)
+            weight_gen = dmet_area_weights(
+                dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval
+            )
             for minmax_key, minmax, new_weights in weight_gen:
                 cfsn_vecs.data['weight'] = new_weights
                 # Get classless and ovr binary detection measures
-                nocls_binvecs = cfsn_vecs.binarize_classless(negative_classes=negative_classes)
-                ovr_binvecs   = cfsn_vecs.binarize_ovr(
-                    ignore_classes=ignore_classes, approx=0, mode=1)
+                nocls_binvecs = cfsn_vecs.binarize_classless(
+                    negative_classes=negative_classes
+                )
+                ovr_binvecs = cfsn_vecs.binarize_ovr(
+                    ignore_classes=ignore_classes, approx=0, mode=1
+                )
                 nocls_measures = nocls_binvecs.measures(**measurekw)
                 ovr_measures = ovr_binvecs.measures(**measurekw)['perclass']
                 # print('minmax = {!r}'.format(minmax))
@@ -760,7 +903,10 @@ class CocoEvaluator:
                 meta['iou_thresh'] = iou_thresh
                 meta['area_minmax'] = minmax
                 result = CocoSingleResult(
-                    nocls_measures, ovr_measures, cfsn_vecs, meta,
+                    nocls_measures,
+                    ovr_measures,
+                    cfsn_vecs,
+                    meta,
                 )
                 # TODO: when making the ovr localization curves, it might be a good
                 # idea to include a second version where any COI prediction assigned
@@ -774,18 +920,19 @@ class CocoEvaluator:
                         vecs.data['weight'] = vecs.data['weight'].copy()
 
                         assert not np.may_share_memory(
-                            ovr_binvecs[key].data['weight'],
-                            vecs.data['weight'])
+                            ovr_binvecs[key].data['weight'], vecs.data['weight']
+                        )
 
                         # Find locations where the predictions or truth was COI
                         pred_coi = cfsn_vecs.data['pred'] == cx
                         # Find truth locations that are either background or this COI
                         true_coi_or_bg = kwarray.isect_flags(
-                                cfsn_vecs.data['true'], {cx, -1})
+                            cfsn_vecs.data['true'], {cx, -1}
+                        )
 
                         # Find locations where we predicted this COI, but truth was a
                         # valid classes, but not this non-COI
-                        ignore_flags = (pred_coi & (~true_coi_or_bg))
+                        ignore_flags = pred_coi & (~true_coi_or_bg)
                         vecs.data['weight'][ignore_flags] = 0
 
                     ovr_measures2 = ovr_binvecs2.measures(**measurekw)['perclass']
@@ -794,7 +941,12 @@ class CocoEvaluator:
 
                 reskey = ub.urepr(
                     dict(area_range=minmax_key, iou_thresh=iou_thresh),
-                    nl=0, explicit=1, itemsep='', nobr=1, sv=1)
+                    nl=0,
+                    explicit=1,
+                    itemsep='',
+                    nobr=1,
+                    sv=1,
+                )
                 resdata[reskey] = result
                 if coco_eval.config['force_pycocoutils']:
                     resdata['pct_stats'] = coco_scores['evalar_stats']
@@ -805,14 +957,16 @@ class CocoEvaluator:
         return results
 
 
-def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
-                      use_area_attr=False):
+def dmet_area_weights(
+    dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval, use_area_attr=False
+):
     """
     Hacky function to compute confusion vector ignore weights for different
     area thresholds. Needs to be slightly refactored.
     """
     import kwarray
     import numpy as np
+
     if use_area_attr:
         coco_true = coco_eval.true_extra['coco_dset']
         try:
@@ -824,11 +978,11 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
     for minmax_key in area_ranges:
         if isinstance(minmax_key, str):
             if minmax_key == 'small':
-                minmax = [0 ** 2, 32 ** 2]
+                minmax = [0**2, 32**2]
             elif minmax_key == 'medium':
-                minmax = [32 ** 2, 96 ** 2]
+                minmax = [32**2, 96**2]
             elif minmax_key == 'large':
-                minmax = [96 ** 2, 1e5 ** 2]
+                minmax = [96**2, 1e5**2]
             elif minmax_key == 'all':
                 minmax = [0, float('inf')]
             else:
@@ -871,14 +1025,14 @@ def dmet_area_weights(dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval,
             txs = cfsn_vecs.data['txs'][groupx]
             tx_flags = txs > -1
             tarea = true_area[txs[tx_flags]].ravel()
-            is_toob = ((tarea < area_min) | (tarea > area_max))
+            is_toob = (tarea < area_min) | (tarea > area_max)
             toob_idxs = groupx[tx_flags][is_toob]
 
             # Ignore any *unassigned* prediction outside the area bounds
             pxs = cfsn_vecs.data['pxs'][groupx]
             px_flags = (pxs > -1) & (txs < 0)
             parea = pred_area[pxs[px_flags]].ravel()
-            is_poob = ((parea < area_min) | (parea > area_max))
+            is_poob = (parea < area_min) | (parea > area_max)
             poob_idxs = groupx[px_flags][is_poob]
             new_ignore[poob_idxs] = True
             new_ignore[toob_idxs] = True
@@ -927,25 +1081,28 @@ class CocoResults(ub.NiceRepr, DictProxy):
         >>> results.dump(dpath / 'metrics.json', indent='    ')
 
     """
+
     def __init__(results, resdata=None):
         results.proxy = resdata
 
-    def dump_figures(results, out_dpath, expt_title=None, figsize='auto',
-                     tight=True):
+    def dump_figures(results, out_dpath, expt_title=None, figsize='auto', tight=True):
         for key, result in results.items():
             dpath = ub.ensuredir((os.fspath(out_dpath), key))
             if expt_title is None:
                 title = str(key)
             else:
                 title = expt_title + ' ' + str(key)
-            result.dump_figures(dpath, expt_title=title, figsize=figsize,
-                                tight=tight)
+            result.dump_figures(dpath, expt_title=title, figsize=figsize, tight=tight)
 
     def __json__(results):
         from kwcoco.util.util_json import ensure_json_serializable
+
         state = {
-            k: (ensure_json_serializable(v)
-                if not hasattr(v, '__json__') else v.__json__())
+            k: (
+                ensure_json_serializable(v)
+                if not hasattr(v, '__json__')
+                else v.__json__()
+            )
             for k, v in results.items()
         }
         # ensure_json_serializable(state, normalize_containers=True, verbose=0)
@@ -965,6 +1122,7 @@ class CocoResults(ub.NiceRepr, DictProxy):
         """
         import json
         import pathlib
+
         if isinstance(file, (str, pathlib.Path)):
             with open(file, 'w') as fp:
                 return result.dump(fp, indent=indent)
@@ -1017,20 +1175,25 @@ class CocoSingleResult(ub.NiceRepr):
         result.meta = meta
 
     def __nice__(result):
-        text = ub.urepr({
-            'nocls_measures': result.nocls_measures,
-            'ovr_measures': result.ovr_measures,
-        }, sv=1)
+        text = ub.urepr(
+            {
+                'nocls_measures': result.nocls_measures,
+                'ovr_measures': result.ovr_measures,
+            },
+            sv=1,
+        )
         return text
 
     @classmethod
     def from_json(cls, state):
         from kwcoco.metrics.confusion_vectors import Measures
         from kwcoco.metrics.confusion_vectors import PerClass_Measures
+
         state['nocls_measures'] = Measures.from_json(state['nocls_measures'])
         state['ovr_measures'] = PerClass_Measures.from_json(state['ovr_measures'])
         if state.get('cfsn_vecs', None):
             from kwcoco.metrics.confusion_vectors import ConfusionVectors
+
             state['cfsn_vecs'] = ConfusionVectors.from_json(state['cfsn_vecs'])
         else:
             state['cfsn_vecs'] = None
@@ -1045,6 +1208,7 @@ class CocoSingleResult(ub.NiceRepr):
             'meta': result.meta,
         }
         from kwcoco.util.util_json import ensure_json_serializable
+
         ensure_json_serializable(state, normalize_containers=True, verbose=0)
         return state
 
@@ -1053,6 +1217,7 @@ class CocoSingleResult(ub.NiceRepr):
         Serialize to json file
         """
         import json
+
         try:
             fpath = os.fspath(file)
         except TypeError:
@@ -1060,11 +1225,13 @@ class CocoSingleResult(ub.NiceRepr):
             json.dump(state, file, indent=indent)
         else:
             import safer
+
             with safer.open(fpath, 'w', temp_file=not ub.WIN32) as fp:
                 return result.dump(fp, indent=indent)
 
-    def dump_figures(result, out_dpath, expt_title=None, figsize='auto',
-                     tight=True, verbose=1):
+    def dump_figures(
+        result, out_dpath, expt_title=None, figsize='auto', tight=True, verbose=1
+    ):
         if expt_title is None:
             expt_title = result.meta.get('expt_title', '')
         metrics_dpath = ub.ensuredir(os.fspath(out_dpath))
@@ -1078,12 +1245,14 @@ class CocoSingleResult(ub.NiceRepr):
             print('drawing evaluation metrics')
         import kwplot
         import matplotlib as mpl  # NOQA
+
         # TODO: kwcoco matplotlib backend context
         ctx = kwplot.BackendContext(backend='Agg')
         ctx.__enter__()
 
         try:
             import seaborn
+
             seaborn.set()
         except Exception:
             pass
@@ -1117,11 +1286,15 @@ class CocoSingleResult(ub.NiceRepr):
             ovr_measures2 = result.ovr_measures2
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures2.draw(key='pr', fnum=2, prefix='coi-vs-bg-only')
-            _writefig(fig, metrics_dpath, 'ovr_pr_coi_vs_bg.png', figsize, verbose, tight)
+            _writefig(
+                fig, metrics_dpath, 'ovr_pr_coi_vs_bg.png', figsize, verbose, tight
+            )
 
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures2.draw(key='roc', fnum=2, prefix='coi-vs-bg-only')
-            _writefig(fig, metrics_dpath, 'ovr_roc_coi_vs_bg.png', figsize, verbose, tight)
+            _writefig(
+                fig, metrics_dpath, 'ovr_roc_coi_vs_bg.png', figsize, verbose, tight
+            )
 
         dump_config = {
             # 'keys': ['mcc', 'g1', 'f1', 'acc', 'ppv', 'tpr', 'mk', 'bm']
@@ -1130,7 +1303,9 @@ class CocoSingleResult(ub.NiceRepr):
         for key in dump_config['keys']:
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
             ovr_measures.draw(fnum=2, key=key)
-            _writefig(fig, metrics_dpath, 'ovr_{}.png'.format(key), figsize, verbose, tight)
+            _writefig(
+                fig, metrics_dpath, 'ovr_{}.png'.format(key), figsize, verbose, tight
+            )
 
         # NOTE: The threshold on these confusion matrices is VERY low.
         # FIXME: robustly skip in cases where predictions have no class information
@@ -1198,6 +1373,7 @@ def _load_dets(pred_fpaths, workers=0):
     """
     # Process mode is much faster than thread.
     import kwcoco
+
     jobs = ub.JobPool(mode='process', max_workers=workers)
     for single_pred_fpath in ub.ProgIter(pred_fpaths, desc='submit load dets jobs'):
         job = jobs.submit(_load_dets_worker, single_pred_fpath, with_coco=True)
@@ -1227,9 +1403,11 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
     """
     import kwcoco
     import kwimage
+
     single_img_coco = kwcoco.CocoDataset(single_pred_fpath, autobuild=False)
-    dets = kwimage.Detections.from_coco_annots(single_img_coco.dataset['annotations'],
-                                               dset=single_img_coco)
+    dets = kwimage.Detections.from_coco_annots(
+        single_img_coco.dataset['annotations'], dset=single_img_coco
+    )
     if len(single_img_coco.dataset['images']) == 1:
         # raise Exception('Expected predictions for a single image only')
         gid = single_img_coco.dataset['images'][0]['id']
@@ -1242,10 +1420,12 @@ def _load_dets_worker(single_pred_fpath, with_coco=True):
     else:
         return dets
 
+
 if __name__ == '__main__':
     """
     CommandLine:
         python ~/code/kwcoco/kwcoco/coco_evaluator.py
     """
     from kwcoco.cli import coco_eval as coco_eval_cli
+
     coco_eval_cli.main()

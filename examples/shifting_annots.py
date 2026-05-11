@@ -1,6 +1,7 @@
 """
 How to explicitly breakup a kwcoco file into smaller tiles.
 """
+
 import kwcoco
 import kwarray
 import kwimage
@@ -17,8 +18,9 @@ def main():
         img_shape = (img_height, img_width)
         window_shape = (128, 128)
 
-        slider = kwarray.SlidingWindow(shape=img_shape, window=window_shape,
-                                       allow_overshoot=True, keepbound=True)
+        slider = kwarray.SlidingWindow(
+            shape=img_shape, window=window_shape, allow_overshoot=True, keepbound=True
+        )
 
         image_dets: kwimage.Detections = dset.annots(gid=image_id).detections
 
@@ -27,7 +29,6 @@ def main():
 
         # Pure coco variant
         for space_slice in slider:
-
             tl_y = space_slice[0].start
             tl_x = space_slice[1].start
 
@@ -48,6 +49,7 @@ def main():
 
         ### ndsampler variant
         import ndsampler
+
         sampler = ndsampler.CocoSampler(dset)
 
         for space_slice in slider:

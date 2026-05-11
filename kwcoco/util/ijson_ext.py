@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Add NaN parsing to normal ijson pure-python parsing backend.
 
 References:
@@ -49,12 +51,14 @@ Example:
             file = io.StringIO(text)
             list(ijson_ext.items(file, 'bbox'))
 """
-from json.decoder import scanstring
+
+from __future__ import annotations
+
+import codecs
 import re
+from json.decoder import scanstring
 
 from ijson import common, utils
-import codecs
-
 
 LEXEME_RE = re.compile(r'[a-z0-9eEN\.\+-]+|\S')
 UNARY_LEXEMES = set('[]{},')
@@ -134,10 +138,9 @@ def Lexer(target):
                         except GeneratorExit:
                             data = ''
                         if not data:
-                            raise common.IncompleteJSONError(
-                                'Incomplete string lexeme')
+                            raise common.IncompleteJSONError('Incomplete string lexeme')
                         buf += data
-                send((discarded + pos, buf[pos:end + 1]))
+                send((discarded + pos, buf[pos : end + 1]))
                 pos = end + 1
             else:
                 while lexeme not in UNARY_LEXEMES and match.end() == len(buf):
@@ -149,7 +152,11 @@ def Lexer(target):
                         break
                     buf += data
                     match = LEXEME_RE.search(buf, pos)
+                    if match is None:
+                        break
                     lexeme = match.group()
+                if match is None:
+                    break
                 send((discarded + match.start(), lexeme))
                 pos = match.end()
         else:
@@ -179,7 +186,7 @@ _PARSE_OBJECT_KEY = 2
 _PARSE_OBJECT_END = 3
 
 # infinity singleton for overflow checks
-inf = float("inf")
+inf = float('inf')
 
 
 @utils.coroutine
@@ -203,7 +210,6 @@ def parse_value(target, multivalue, use_float):
     prev_pos, prev_symbol = None, None
     to_number = common.integer_or_float if use_float else common.integer_or_decimal
     while True:
-
         if prev_pos is None:
             pos, symbol = yield
             if (pos, symbol) == EOF:
@@ -268,27 +274,31 @@ def parse_value(target, multivalue, use_float):
             # A number
             else:
                 # JSON numbers can't contain leading zeros
-                if ((len(symbol) > 1 and symbol[0] == '0' and symbol[1] not in ('e', 'E', '.')) or
-                        (len(symbol) > 2 and symbol[0:2] == '-0' and symbol[2] not in ('e', 'E', '.'))):
-                    raise common.JSONError(
-                        'Invalid JSON number: %s' %
-                        (symbol,))
+                if (
+                    len(symbol) > 1
+                    and symbol[0] == '0'
+                    and symbol[1] not in ('e', 'E', '.')
+                ) or (
+                    len(symbol) > 2
+                    and symbol[0:2] == '-0'
+                    and symbol[2] not in ('e', 'E', '.')
+                ):
+                    raise common.JSONError('Invalid JSON number: %s' % (symbol,))
                 # Fractions need a leading digit and must be followed by a
                 # digit
                 if symbol[0] == '.' or symbol[-1] == '.':
-                    raise common.JSONError(
-                        'Invalid JSON number: %s' %
-                        (symbol,))
+                    raise common.JSONError('Invalid JSON number: %s' % (symbol,))
                 try:
                     number = to_number(symbol)
                     if number == inf:
-                        raise common.JSONError(
-                            "float overflow: %s" %
-                            (symbol,))
+                        raise common.JSONError('float overflow: %s' % (symbol,))
                 except BaseException:
-                    if 'true'.startswith(symbol) or 'false'.startswith(symbol) or 'null'.startswith(symbol):  # or 'NaN'.startswith(symbol):
-                        raise common.IncompleteJSONError(
-                            'Incomplete JSON content')
+                    if (
+                        'true'.startswith(symbol)
+                        or 'false'.startswith(symbol)
+                        or 'null'.startswith(symbol)
+                    ):  # or 'NaN'.startswith(symbol):
+                        raise common.IncompleteJSONError('Incomplete JSON content')
                     raise UnexpectedSymbol(symbol, pos)
                 else:
                     send(('number', number))
@@ -332,15 +342,16 @@ def parse_string(symbol):
     return scanstring(symbol, 1)[0]
 
 
-def basic_parse_basecoro(target, multiple_values=False, allow_comments=False,
-                         use_float=False):
-    '''
+def basic_parse_basecoro(
+    target, multiple_values=False, allow_comments=False, use_float=False
+):
+    """
     Iterator yielding unprefixed events.
     Parameters:
     - file: a readable file-like object with JSON input
-    '''
+    """
     if allow_comments:
-        raise ValueError("Comments are not supported by the python backend")
+        raise ValueError('Comments are not supported by the python backend')
     return utf8_encoder(Lexer(parse_value(target, multiple_values, use_float)))
 
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 import scriptconfig as scfg
 import ubelt as ub
@@ -7,10 +9,14 @@ class CocoToyDataCLI(scfg.DataConfig):
     """
     Create COCO toydata for demo and testing purposes.
     """
+
     __command__ = 'toydata'
     __alias__ = ['demodata']
-    key = scfg.Value('shapes8', position=1, help=ub.paragraph(
-            '''
+    key = scfg.Value(
+        'shapes8',
+        position=1,
+        help=ub.paragraph(
+            """
             Special demodata code. Basic options that define which
             flavor of demodata to generate are: `photos`, `shapes`, and
             `vidshapes`. A numeric suffix e.g. `vidshapes8` can be
@@ -27,28 +33,45 @@ class CocoToyDataCLI(scfg.DataConfig):
             videos with 5 frames each. (4) vidshapes2-speed0.1-frames7 -
             generate 2 videos with 7 frames where the objects move with
             with a speed of 0.1.
-            '''))
-    dst = scfg.Value(None, help=ub.paragraph(
-            '''
+            """
+        ),
+    )
+    dst = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
             Output path for the final kwcoco json file. Note, that even
             when given, a data.kwcoco.json file will also be generated
             in a bundle_dpath.
-            '''))
-    bundle_dpath = scfg.Value(None, help=ub.paragraph(
-            '''
+            """
+        ),
+    )
+    bundle_dpath = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
             Creates a bundled dataset in the specified location. If
             unspecified, a bundle name is generated based on the toydata
             config.
-            '''))
-    use_cache = scfg.Value(True, isflag=1, help=ub.paragraph(
-            '''
+            """
+        ),
+    )
+    use_cache = scfg.Value(
+        True,
+        isflag=1,
+        help=ub.paragraph(
+            """
             if False, this will force the dataset to be regenerated.
             Otherwise, it will only regenerate the data if it doesn't
             already exist.
-            '''))
+            """
+        ),
+    )
     verbose = scfg.Value(False, help='Verbosity')
 
-    sensorchan = scfg.Value(None, help='Control the sensor / channels with a sensorchanspec')
+    sensorchan = scfg.Value(
+        None, help='Control the sensor / channels with a sensorchanspec'
+    )
 
     __epilog__ = r"""
     Example Usage:
@@ -83,6 +106,7 @@ class CocoToyDataCLI(scfg.DataConfig):
             >>> cls.main(cmdline, **kw)
         """
         import kwcoco
+
         config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
@@ -94,22 +118,20 @@ class CocoToyDataCLI(scfg.DataConfig):
 
         if config['bundle_dpath'] is not None:
             bundle_dpath = config['bundle_dpath']
-            dset = kwcoco.CocoDataset.demo(config['key'],
-                                           bundle_dpath=bundle_dpath,
-                                           **demo_kwargs)
+            dset = kwcoco.CocoDataset.demo(
+                config['key'], bundle_dpath=bundle_dpath, **demo_kwargs
+            )
             # dset.reroot(absolute=True)
         else:
             if config['dst'] is not None:
                 fpath = config['dst']
                 dpath = ub.Path(fpath).parent
-                dset = kwcoco.CocoDataset.demo(config['key'],
-                                               dpath=dpath,
-                                               fpath=fpath,
-                                               **demo_kwargs)
+                dset = kwcoco.CocoDataset.demo(
+                    config['key'], dpath=dpath, fpath=fpath, **demo_kwargs
+                )
                 dset.fpath = fpath
             else:
-                dset = kwcoco.CocoDataset.demo(config['key'],
-                                               **demo_kwargs)
+                dset = kwcoco.CocoDataset.demo(config['key'], **demo_kwargs)
             dset.reroot(absolute=True, verbose=config['verbose'])
 
         if config['dst'] is not None:
@@ -117,6 +139,7 @@ class CocoToyDataCLI(scfg.DataConfig):
             print('Writing to dset.fpath = {!r}'.format(dset.fpath))
             dset.dump(dset.fpath, newlines=True)
         print(dset.fpath)
+
 
 __cli__ = CocoToyDataCLI
 

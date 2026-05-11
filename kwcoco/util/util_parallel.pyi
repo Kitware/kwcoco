@@ -1,3 +1,0 @@
-def coerce_num_workers(num_workers: int | str = 'auto',
-                       minimum: int = 0) -> int:
-    ...

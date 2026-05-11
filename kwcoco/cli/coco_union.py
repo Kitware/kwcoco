@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 import ubelt as ub
 import scriptconfig as scfg
@@ -7,28 +9,43 @@ class CocoUnionCLI(scfg.DataConfig):
     """
     Combine multiple COCO datasets into a single merged dataset.
     """
+
     __command__ = 'union'
 
     src = scfg.Value([], position=1, help='path to multiple input datasets', nargs='+')
 
     dst = scfg.Value('combo.kwcoco.json', help='path to output dataset')
 
-    absolute = scfg.Value(False, isflag=1, help=ub.paragraph(
-            '''
+    absolute = scfg.Value(
+        False,
+        isflag=1,
+        help=ub.paragraph(
+            """
             if True, converts paths to absolute paths before doing union
-            '''))
+            """
+        ),
+    )
 
-    remember_parent = scfg.Value(False, isflag=True, help=ub.paragraph(
-            '''
+    remember_parent = scfg.Value(
+        False,
+        isflag=True,
+        help=ub.paragraph(
+            """
             if True adds a union_parent item to each coco image and
             video that indicate which file it is from
-            '''))
+            """
+        ),
+    )
 
-    io_workers = scfg.Value('avail-2', help=ub.paragraph(
-        '''
+    io_workers = scfg.Value(
+        'avail-2',
+        help=ub.paragraph(
+            """
         number of workers to load input datasets. By default will use
         available CPUs minus 2.
-        '''))
+        """
+        ),
+    )
 
     compress = scfg.Value('auto', help='if True writes results with compression')
 
@@ -55,6 +72,7 @@ class CocoUnionCLI(scfg.DataConfig):
         """
         config = cls.cli(data=kw, cmdline=cmdline, strict=True)
         import kwcoco
+
         print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config.src is None:
@@ -64,6 +82,7 @@ class CocoUnionCLI(scfg.DataConfig):
             raise ValueError('Must provide at least one input dataset')
 
         from kwcoco.util.util_parallel import coerce_num_workers
+
         io_workers = config.io_workers
         io_workers = coerce_num_workers(io_workers)
         io_workers = min(io_workers, len(config.src))
@@ -75,15 +94,21 @@ class CocoUnionCLI(scfg.DataConfig):
         else:
             postprocess = None
 
-        datasets = list(kwcoco.CocoDataset.coerce_multiple(
-            config.src, postprocess=postprocess, ordered=True,
-            workers=io_workers, mode='process', autobuild=False,
-        ))
+        datasets = list(
+            kwcoco.CocoDataset.coerce_multiple(
+                config.src,
+                postprocess=postprocess,
+                ordered=True,
+                workers=io_workers,
+                mode='process',
+                autobuild=False,
+            )
+        )
 
         print('Finished loading. Starting union.')
         combo = kwcoco.CocoDataset.union(
-            *datasets,
-            remember_parent=config.remember_parent)
+            *datasets, remember_parent=config.remember_parent
+        )
 
         out_fpath = config.dst
         out_dpath = ub.Path(out_fpath).parent
@@ -110,6 +135,7 @@ def _postprocess_absolute(dset):
     dset._build_index()
     dset.reroot(absolute=True)
     return dset
+
 
 __cli__ = CocoUnionCLI
 

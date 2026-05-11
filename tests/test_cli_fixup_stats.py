@@ -34,7 +34,9 @@ def test_find_corrupted_assets_auxiliary_iteration(monkeypatch, tmp_path):
         return {'failed': False}
 
     monkeypatch.setattr(coco_fixup.ub, 'JobPool', DummyPool)
-    monkeypatch.setattr('kwcoco._helpers._image_corruption_check', fake_corruption_check)
+    monkeypatch.setattr(
+        'kwcoco._helpers._image_corruption_check', fake_corruption_check
+    )
 
     dset = kwcoco.CocoDataset()
     dset.bundle_dpath = tmp_path
@@ -50,7 +52,8 @@ def test_find_corrupted_assets_auxiliary_iteration(monkeypatch, tmp_path):
     ]
 
     corrupted = coco_fixup.find_corrupted_assets(
-        dset, check_aux=True, workers=0, corrupted_assets='full')
+        dset, check_aux=True, workers=0, corrupted_assets='full'
+    )
     assert corrupted == []
 
 
@@ -69,7 +72,9 @@ def test_coco_fixup_invalid_corrupted_assets(tmp_path):
     dset.bundle_dpath = tmp_path
     dset.dataset['images'] = []
 
-    with pytest.raises(ValueError, match="corrupted_assets must be 'only_shape' or 'full'"):
+    with pytest.raises(
+        ValueError, match="corrupted_assets must be 'only_shape' or 'full'"
+    ):
         coco_fixup.find_corrupted_assets(dset, corrupted_assets='bad')
 
 

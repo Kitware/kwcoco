@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 TODO:
     - [ ] _fast_pdist_priority: Look at absolute difference in sibling entropy
         when deciding whether to go up or down in the tree.
@@ -20,6 +22,7 @@ TODO:
         ducks in a row are annotated as separate object, and we only care about
         getting the group)
 """
+
 import warnings
 import networkx as nx
 import numpy as np
@@ -34,13 +37,20 @@ USE_NEG_INF = True
 ASSIGN_COLUMNS = ['pred', 'true', 'score', 'weight', 'iou', 'txs', 'pxs']
 
 
-def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
-                              iou_thresh=0.5, bg_cidx=-1, bias=0.0, classes=None,
-                              compat='all', prioritize='iou',
-                              ignore_classes='ignore',
-                              max_dets=None,
-                              truth_reuse_policy='never',
-                              ):
+def _assign_confusion_vectors(
+    true_dets,
+    pred_dets,
+    bg_weight=1.0,
+    iou_thresh=0.5,
+    bg_cidx=-1,
+    bias=0.0,
+    classes=None,
+    compat='all',
+    prioritize='iou',
+    ignore_classes='ignore',
+    max_dets=None,
+    truth_reuse_policy='never',
+):
     """
     Create confusion vectors for detections by assigning to ground true boxes
 
@@ -207,6 +217,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         globals().update(get_func_kwargs(_assign_confusion_vectors))
     """
     import kwarray
+
     valid_compat_keys = {'ancestors', 'mutex', 'all'}
     if compat not in valid_compat_keys:
         raise KeyError(compat)
@@ -225,6 +236,7 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
 
     if classes is None:
         import kwcoco
+
         # Build mutually exclusive category tree
         all_cxs = sorted(set(map(int, unique_pcxs)) | set(map(int, unique_tcxs)))
         all_cxs = list(range(max(all_cxs) + 1))
@@ -242,9 +254,15 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         cx_to_matchable_cxs = {cx: [cx] for cx in unique_pcxs}
     elif compat == 'ancestors':
         cx_to_matchable_cxs = {
-            cx: sorted([cx] + sorted(ub.take(
-                classes.node_to_idx,
-                nx.ancestors(classes.graph, classes.idx_to_node[cx]))))
+            cx: sorted(
+                [cx]
+                + sorted(
+                    ub.take(
+                        classes.node_to_idx,
+                        nx.ancestors(classes.graph, classes.idx_to_node[cx]),
+                    )
+                )
+            )
             for cx in unique_pcxs
         }
     elif compat == 'all':
@@ -274,22 +292,33 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         for cx, pred_idxs in zip(unique_pred_cxs, pgroupxs):
             true_idxs = cx_to_matchable_txs[cx]
             ious = pred_dets.boxes[pred_idxs].ious(
-                true_dets.boxes[true_idxs], bias=bias)
+                true_dets.boxes[true_idxs], bias=bias
+            )
             _px_to_iou = dict(zip(pred_idxs, ious))
             iou_lookup.update(_px_to_iou)
 
-    iou_thresh_list = (
-        [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh)
+    iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh
 
     iou_thresh_to_y = {}
     for iou_thresh_ in iou_thresh_list:
         isvalid_lookup = {px: ious > iou_thresh_ for px, ious in iou_lookup.items()}
 
-        y =  _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
-                            cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
-                            pdist_priority, cx_to_ancestors, bg_cidx,
-                            ignore_classes=ignore_classes, max_dets=max_dets,
-                            truth_reuse_policy=truth_reuse_policy)
+        y = _critical_loop(
+            true_dets,
+            pred_dets,
+            iou_lookup,
+            isvalid_lookup,
+            cx_to_matchable_txs,
+            bg_weight,
+            prioritize,
+            iou_thresh_,
+            pdist_priority,
+            cx_to_ancestors,
+            bg_cidx,
+            ignore_classes=ignore_classes,
+            max_dets=max_dets,
+            truth_reuse_policy=truth_reuse_policy,
+        )
         iou_thresh_to_y[iou_thresh_] = y
 
     if ub.iterable(iou_thresh):
@@ -298,10 +327,22 @@ def _assign_confusion_vectors(true_dets, pred_dets, bg_weight=1.0,
         return y
 
 
-def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
-                   cx_to_matchable_txs, bg_weight, prioritize, iou_thresh_,
-                   pdist_priority, cx_to_ancestors, bg_cidx, ignore_classes,
-                   max_dets, truth_reuse_policy):
+def _critical_loop(
+    true_dets,
+    pred_dets,
+    iou_lookup,
+    isvalid_lookup,
+    cx_to_matchable_txs,
+    bg_weight,
+    prioritize,
+    iou_thresh_,
+    pdist_priority,
+    cx_to_ancestors,
+    bg_cidx,
+    ignore_classes,
+    max_dets,
+    truth_reuse_policy,
+):
     """
     Args:
         true_dets (Detections):
@@ -362,7 +403,8 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
         # iou_thresh is being used as iooa not iou to determine which
         # pred regions are ignored.
         true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
-            true_dets, pred_dets, ioaa_thresh=iou_thresh_, ignore_classes=ignore_classes)
+            true_dets, pred_dets, ioaa_thresh=iou_thresh_, ignore_classes=ignore_classes
+        )
 
         # Remove ignored predicted regions from assignment consideration
         _pred_keep_flags = ~pred_ignore_flags[_pred_sortx]
@@ -434,11 +476,13 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                     # valid match with the highest iou
                     cand_nmatches = true_nmatches.compress(available)
                     cand_validmatch = cand_ious > iou_thresh_
-                    ovidx = kwarray.arglexmax([
-                        cand_ious,
-                        -cand_nmatches,
-                        cand_validmatch,
-                    ])
+                    ovidx = kwarray.arglexmax(
+                        [
+                            cand_ious,
+                            -cand_nmatches,
+                            cand_validmatch,
+                        ]
+                    )
                 else:
                     raise KeyError(truth_reuse_policy)
                 ovmax = cand_ious[ovidx]
@@ -446,7 +490,6 @@ def _critical_loop(true_dets, pred_dets, iou_lookup, isvalid_lookup,
                     tx = cand_true_idxs[ovidx]
 
             elif prioritize == 'correct' or prioritize == 'class':
-
                 if truth_reuse_policy != 'never':
                     raise NotImplementedError(truth_reuse_policy)
 
@@ -580,19 +623,17 @@ def _fast_pdist_priority(classes, prioritize, _cache={}):
                 # afterwards, nodes off the direct lineage are ignored.
                 valid_vals = pdist_priority[np.isfinite(pdist_priority)]
                 maxval = (valid_vals.max() - valid_vals.min()) + 1
-                is_ancestor = (pdist_priority >= 0)
-                is_descend = (pdist_priority < 0)
+                is_ancestor = pdist_priority >= 0
+                is_descend = pdist_priority < 0
                 # Prioritize ALL ancestors first
-                pdist_priority[is_ancestor] = (
-                    2 * maxval - pdist_priority[is_ancestor])
+                pdist_priority[is_ancestor] = 2 * maxval - pdist_priority[is_ancestor]
                 # Prioritize ALL descendants next
-                pdist_priority[is_descend] = (
-                    maxval + pdist_priority[is_descend])
+                pdist_priority[is_descend] = maxval + pdist_priority[is_descend]
                 pdist_priority[np.isnan(pdist_priority)] = -np.inf
             elif prioritize == 'class':
                 # Prioritizes the exact match first, and then it alternates
                 # between ancestors and desendants based on distance to self
-                pdist_priority[pdist_priority < -1] += .5
+                pdist_priority[pdist_priority < -1] += 0.5
                 pdist_priority = np.abs(pdist_priority)
                 pdist_priority[np.isnan(pdist_priority)] = np.inf
                 pdist_priority = 1 / (pdist_priority + 1)
@@ -603,8 +644,9 @@ def _fast_pdist_priority(classes, prioritize, _cache={}):
     return pdist_priority
 
 
-def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
-                           ignore_classes='ignore'):
+def _filter_ignore_regions(
+    true_dets, pred_dets, ioaa_thresh=0.5, ignore_classes='ignore'
+):
     """
     Determine which true and predicted detections should be ignored.
 
@@ -659,8 +701,7 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
                 return cname
         return name
 
-    ignore_classes = {_normalize_catname(c, true_dets.classes)
-                      for c in ignore_classes}
+    ignore_classes = {_normalize_catname(c, true_dets.classes) for c in ignore_classes}
 
     if true_dets.classes is not None:
         ignore_classes = ignore_classes & set(true_dets.classes)
@@ -668,9 +709,9 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
     # Filter out true detections labeled as "ignore"
     if true_dets.classes is not None and ignore_classes:
         import kwarray
+
         ignore_cidxs = [true_dets.classes.index(c) for c in ignore_classes]
-        true_ignore_flags = kwarray.isect_flags(
-            true_dets.class_idxs, ignore_cidxs)
+        true_ignore_flags = kwarray.isect_flags(true_dets.class_idxs, ignore_cidxs)
 
         if np.any(true_ignore_flags) and len(pred_dets):
             ignore_dets = true_dets.compress(true_ignore_flags)
@@ -685,21 +726,24 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
                 warnings.filterwarnings('ignore', message='invalid .* less')
                 warnings.filterwarnings('ignore', message='invalid .* greater_equal')
                 warnings.filterwarnings('ignore', message='invalid .* true_divide')
-                ignore_overlap = (pred_boxes.isect_area(ignore_boxes) /
-                                  pred_boxes.area).clip(0, 1).sum(axis=1)
+                ignore_overlap = (
+                    (pred_boxes.isect_area(ignore_boxes) / pred_boxes.area)
+                    .clip(0, 1)
+                    .sum(axis=1)
+                )
                 ignore_overlap = np.nan_to_num(ignore_overlap)
 
             ignore_idxs = np.where(ignore_overlap > ioaa_thresh)[0]
 
             if ignore_sseg is not None:
                 from shapely.ops import unary_union
+
                 # If the ignore region has segmentations further refine our
                 # estimate of which predictions should be ignored.
                 ignore_sseg = ignore_sseg.to_polygon_list()
                 box_polys = ignore_boxes.to_polygons()
                 ignore_polys = [
-                    bp if p is None else p
-                    for bp, p in zip(box_polys, ignore_sseg.data)
+                    bp if p is None else p for bp, p in zip(box_polys, ignore_sseg.data)
                 ]
 
                 # FIXME: to to_shapely method can break, not sure if this is
@@ -721,12 +765,13 @@ def _filter_ignore_regions(true_dets, pred_dets, ioaa_thresh=0.5,
                 for idx, pred_region in zip(ignore_idxs, cand_regions):
                     try:
                         isect = ignore_region.intersection(pred_region)
-                        overlap = (isect.area / pred_region.area)
+                        overlap = isect.area / pred_region.area
                         ignore_overlap[idx] = overlap
                     except Exception as ex:
                         warnings.warn('ex = {!r}'.format(ex))
             pred_ignore_flags = ignore_overlap > ioaa_thresh
     return true_ignore_flags, pred_ignore_flags
+
 
 if __name__ == '__main__':
     """
@@ -734,4 +779,5 @@ if __name__ == '__main__':
         python ~/code/kwcoco/kwcoco/metrics/assignment.py all
     """
     import xdoctest
+
     xdoctest.doctest_module(__file__)

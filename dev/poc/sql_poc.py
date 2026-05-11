@@ -1,6 +1,7 @@
 from sqlalchemy.sql.schema import Column
 from sqlalchemy.types import Float, Integer, String, JSON
 from sqlalchemy.ext.declarative import declarative_base
+
 # from sqlalchemy.orm import relationship
 import sqlalchemy
 import ubelt as ub
@@ -18,7 +19,9 @@ def column_names(cls):
 class Category(CocoBase):
     __tablename__ = 'categories'
     id = Column(Integer, primary_key=True, doc='unique internal id')
-    name = Column(String(256), doc='unique external name or identifier', index=True, unique=True)
+    name = Column(
+        String(256), doc='unique external name or identifier', index=True, unique=True
+    )
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
 
@@ -28,10 +31,14 @@ class Category(CocoBase):
 class KeypointCategory(CocoBase):
     __tablename__ = 'keypoint_categories'
     id = Column(Integer, primary_key=True, doc='unique internal id')
-    name = Column(String(256), doc='unique external name or identifier', index=True, unique=True)
+    name = Column(
+        String(256), doc='unique external name or identifier', index=True, unique=True
+    )
     alias = Column(JSON, doc='list of alter egos')
     supercategory = Column(String(256), doc='coarser category name')
-    reflection_id = Column(Integer, doc='if augmentation reflects the image, change keypoint id to this')
+    reflection_id = Column(
+        Integer, doc='if augmentation reflects the image, change keypoint id to this'
+    )
 
     foreign = Column(JSON)
 
@@ -105,9 +112,9 @@ class CocoSqlRuntime:
     """
     Singleton class
     """
+
     def __init__(self):
         self
-
 
 
 from scriptconfig.dict_like import DictLike  # NOQA
@@ -119,6 +126,7 @@ class SqlDictProxy(ub.NiceRepr, DictLike):
         session (Session): the sqlalchemy session
         cls (Type): the declarative sqlalchemy table class
     """
+
     def __init__(proxy, session, cls, keyattr=None):
         proxy.cls = cls
         proxy.session = session
@@ -182,6 +190,7 @@ class CocoSqlIndex(object):
     """
     Simulates the dictionary provided by CocoIndex
     """
+
     def __init__(index):
         index.anns = None
         index.imgs = None
@@ -199,8 +208,12 @@ class CocoSqlIndex(object):
         index.name_to_cat = SqlDictProxy(session, Category, Category.name)
         index.file_name_to_img = SqlDictProxy(session, Image, Image.file_name)
 
-        index.gid_to_aids = SqlIdGroupDictProxy(session, Annotation.id, Annotation.image_id)
-        index.cid_to_aids = SqlIdGroupDictProxy(session, Annotation.id, Annotation.category_id)
+        index.gid_to_aids = SqlIdGroupDictProxy(
+            session, Annotation.id, Annotation.image_id
+        )
+        index.cid_to_aids = SqlIdGroupDictProxy(
+            session, Annotation.id, Annotation.category_id
+        )
         index.vidid_to_gids = SqlIdGroupDictProxy(session, Image.id, Image.video_id)
 
 
@@ -234,6 +247,7 @@ class CocoSqlDatabase(object):
     def connect(self):
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
+
         # Create an engine that stores data at a specific uri location
         self.engine = create_engine(self.uri)
         if len(self.engine.table_names()) == 0:
@@ -253,6 +267,7 @@ class CocoSqlDatabase(object):
 
     def populate_from(self, dset):
         from sqlalchemy import inspect
+
         session = self.session
         inspector = inspect(self.engine)
         for key in self.engine.table_names():
@@ -296,6 +311,7 @@ class CocoSqlDatabase(object):
 
     def raw_table(self, table_name):
         import pandas as pd
+
         table_df = pd.read_sql_table(table_name, con=self.engine)
         return table_df
 
@@ -311,12 +327,10 @@ def ensure_sql_coco_view(dset):
     self = CocoSqlDatabase(db_uri)
 
     import os
+
     needs_rewrite = True
     if exists(db_fpath):
-        needs_rewrite = (
-            os.stat(dset.fpath).st_mtime >
-            os.stat(db_fpath).st_mtime
-        )
+        needs_rewrite = os.stat(dset.fpath).st_mtime > os.stat(db_fpath).st_mtime
     if needs_rewrite:
         # Write to the SQL instance
         self.delete()
@@ -333,6 +347,7 @@ def main():
     from sql_poc import CocoBase
     """
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo('vidshapes8')
     self = ensure_sql_coco_view(dset)
 
@@ -364,6 +379,7 @@ def test_sql_worker(self):
     print('self = {!r}'.format(self))
     print('self.anns = {!r}'.format(self.anns))
     print(self.anns[1])
+
 
 if __name__ == '__main__':
     """

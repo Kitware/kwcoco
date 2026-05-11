@@ -20,6 +20,7 @@ def have_postgresql():
 
 def test_coerce_as_postgresql():
     import pytest
+
     if not have_postgresql() or not have_sqlalchemy():
         pytest.skip()
     dct_dset = kwcoco.CocoDataset.coerce('special:shapes8')
@@ -31,6 +32,7 @@ def test_coerce_as_postgresql():
 
 def test_coerce_as_sqlite():
     import pytest
+
     if not have_sqlalchemy():
         pytest.skip()
     dct_dset = kwcoco.CocoDataset.coerce('special:shapes8')
@@ -56,6 +58,7 @@ def test_api_compatability_msi_ooo_tracks():
     video_id = dct_dset.add_video(name='ooo_video')
 
     import kwarray
+
     rng = kwarray.ensure_rng(0)
     frame_order = list(range(9))
     rng.shuffle(frame_order)
@@ -63,17 +66,23 @@ def test_api_compatability_msi_ooo_tracks():
     # Add images to the video out of order
     for frame_index in frame_order:
         frame_name = ub.hash_data(rng.rand())[0:8]
-        dct_dset.add_image(video_id=video_id, name=f'frame_{frame_name}', frame_index=frame_index)
+        dct_dset.add_image(
+            video_id=video_id, name=f'frame_{frame_name}', frame_index=frame_index
+        )
 
     image_ids = list(dct_dset.images(video_id=video_id))
     rng.shuffle(image_ids)
 
     # Add a track to the image out of order
     for image_id in image_ids:
-        dct_dset.add_annotation(**{'image_id': image_id, 'track_id': 9001, 'bbox': [0, 0, 10, 10]})
+        dct_dset.add_annotation(
+            **{'image_id': image_id, 'track_id': 9001, 'bbox': [0, 0, 10, 10]}
+        )
 
     dct_dset = kwcoco.CocoDataset.demo('vidshapes8-multisensor-msi')
-    dct_dset.fpath = ub.Path(dct_dset.fpath).augment(stemsuffix='_with_ooo_tracks', multidot=True)
+    dct_dset.fpath = ub.Path(dct_dset.fpath).augment(
+        stemsuffix='_with_ooo_tracks', multidot=True
+    )
     dct_dset.dump()
     dct_dset = kwcoco.CocoDataset(dct_dset.fpath)
     _api_compatability_tests(dct_dset)
@@ -163,16 +172,19 @@ def test_coerce_sql_from_zipfile():
     converts zip files as well as json files.
     """
     import pytest
+
     if not have_sqlalchemy():
         pytest.skip('requires sqlalchemy')
     import kwcoco
     import ubelt as ub
+
     dpath = ub.Path.appdir('kwcoco/tests/test_coerce_sql_from_zipfile')
     dpath.delete().ensuredir()
     dct_dset = kwcoco.CocoDataset.demo('vidshapes8-multisensor-msi')
     dct_dset.fpath = dpath / 'data.kwcoco.zip'
     dct_dset.dump()
     import zipfile
+
     assert zipfile.is_zipfile(dct_dset.fpath)
 
     # Initial coerce should do conversion
@@ -202,6 +214,7 @@ def test_python_index_maps():
     """
     import kwcoco
     import pytest
+
     if not have_sqlalchemy():
         pytest.skip('requires sqlalchemy')
     dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
@@ -232,7 +245,9 @@ def test_python_index_maps():
         if not exact_same:
             fudgable = sorted(set(dct_keys)) == sorted(set(sql_keys))
             if fudgable:
-                print(f'[yellow]WARNING index check key={key} had duplicate SQL keys, weird, FIXME')
+                print(
+                    f'[yellow]WARNING index check key={key} had duplicate SQL keys, weird, FIXME'
+                )
             else:
                 failures.append(key)
                 print(f'[red]FAILED index check key={key}')

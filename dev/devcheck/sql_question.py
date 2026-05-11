@@ -26,7 +26,6 @@ and images:
 ```
 """
 
-
 from sqlalchemy.sql.schema import Column
 from sqlalchemy.types import Integer, String, JSON
 from sqlalchemy.ext.declarative import declarative_base
@@ -71,6 +70,7 @@ def main():
     session.commit()
 
     import pandas as pd
+
     print(pd.read_sql_table('annotations', con=engine))
     print(pd.read_sql_table('images', con=engine))
 
@@ -99,15 +99,17 @@ def main():
         'SELECT {parent_keycol}, json_group_array({valcol}) '
         'FROM {parent_table} '
         'LEFT OUTER JOIN {table} ON {keycol} = {parent_keycol} '
-        'GROUP BY {parent_keycol} ORDER BY {parent_keycol}').format(
-            parent_table=parent_table,
-            table=table,
-            parent_keycol=parent_keycol,
-            keycol=keycol,
-            valcol=valcol,
-        )
+        'GROUP BY {parent_keycol} ORDER BY {parent_keycol}'
+    ).format(
+        parent_table=parent_table,
+        table=table,
+        parent_keycol=parent_keycol,
+        keycol=keycol,
+        valcol=valcol,
+    )
     print(expr)
     import json
+
     result = session.execute(expr)
     final = []
     for row in result.fetchall():
@@ -212,9 +214,8 @@ def main():
     But if I try to use parent_keyattr I get an error when I try the outer join
     """
 
-    query = (
-        session.query(parent_keyattr, grouped_vals)
-        .outerjoin(parent_table, parent_keyattr == keyattr)
+    query = session.query(parent_keyattr, grouped_vals).outerjoin(
+        parent_table, parent_keyattr == keyattr
     )
 
     """
@@ -275,7 +276,9 @@ def main():
 
     """
 
-    print(session.query(parent_keyattr.expression, grouped_vals).select_from(parent_table))
+    print(
+        session.query(parent_keyattr.expression, grouped_vals).select_from(parent_table)
+    )
 
     subq = session.query(parent_keyattr.expression, grouped_vals).subquery()
     y = subq.outerjoin(table, parent_keyattr == keyattr).select()
@@ -286,7 +289,9 @@ def main():
     print(subq)
     print(subq.outerjoin(table, parent_keyattr == keyattr))
 
-    x = session.query(parent_keyattr.expression, grouped_vals.select().select_from(parent_table)).subquery()
+    x = session.query(
+        parent_keyattr.expression, grouped_vals.select().select_from(parent_table)
+    ).subquery()
     x.outerjoin(table, parent_keyattr == keyattr)
     # .group_by(parent_keyattr).order_by(parent_keyattr)
     print(x)
@@ -314,8 +319,7 @@ def main():
     z = ojoin.select()
     session.execute(z).fetchall()
 
-    sel = sqlalchemy.select([parent_keyattr, grouped_vals]).select_from(
-    )
+    sel = sqlalchemy.select([parent_keyattr, grouped_vals]).select_from()
     print(sel)
     session.execute(sel)
 

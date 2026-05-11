@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Helpers for the Pascal VOC format. (used by ImageNet)
 """
 
@@ -8,6 +10,7 @@ def read_voc_image(xml_fpath, data_dpath='.'):
     import ubelt as ub
     import os
     import xml.etree.ElementTree as ET
+
     tree = ET.parse(xml_fpath)
 
     data_dpath = ub.Path(data_dpath)
@@ -41,10 +44,7 @@ def read_voc_image(xml_fpath, data_dpath='.'):
         except Exception:
             ...
         try:
-            img['source'] = {
-                elem.tag: elem.text
-                for elem in list(tree.find('source'))
-            }
+            img['source'] = {elem.tag: elem.text for elem in list(tree.find('source'))}
         except Exception:
             ...
 
@@ -52,10 +52,7 @@ def read_voc_image(xml_fpath, data_dpath='.'):
 
         owner = tree.find('owner')
         if owner is not None:
-            img['owner'] = {
-                elem.tag: elem.text
-                for elem in list(owner)
-            }
+            img['owner'] = {elem.tag: elem.text for elem in list(owner)}
 
         anns = []
         for obj in tree.findall('object'):
@@ -86,10 +83,12 @@ def read_voc_image(xml_fpath, data_dpath='.'):
                 ann['category_name'] = catname
             if diffc is not None:
                 difficult = 0 if diffc is None else int(diffc.text)
-                ann.update({
-                    'difficult': difficult,
-                    'weight': 1.0 - difficult,
-                })
+                ann.update(
+                    {
+                        'difficult': difficult,
+                        'weight': 1.0 - difficult,
+                    }
+                )
             anns.append(ann)
     except Exception:
         print(f'Error reading xml_fpath={xml_fpath}')
@@ -106,6 +105,7 @@ def add_vocdata_to_coco(image_xml_fpaths, data_dpath, workers=0, dset=None):
     """
     import kwcoco
     import ubelt as ub
+
     if dset is None:
         dset = kwcoco.CocoDataset()
 
@@ -114,7 +114,9 @@ def add_vocdata_to_coco(image_xml_fpaths, data_dpath, workers=0, dset=None):
         for xml_fpath in ub.ProgIter(image_xml_fpaths, desc='submit VOC convert jobs'):
             jobs.submit(read_voc_image, xml_fpath, data_dpath)
 
-        for job in ub.ProgIter(jobs, desc='collect VOC convert jobs', homogeneous=False):
+        for job in ub.ProgIter(
+            jobs, desc='collect VOC convert jobs', homogeneous=False
+        ):
             img, anns = job.result()
             image_id = dset.add_image(**img)
             for ann in anns:

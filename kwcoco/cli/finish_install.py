@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python3
 # PYTHON_ARGCOMPLETE_OK
 import scriptconfig as scfg
@@ -18,10 +20,15 @@ class FinishInstallCLI(scfg.DataConfig):
     This is a script that handles install logic that could not be added
     to the setup.py
     """
+
     __command__ = 'finish_install'
 
-    with_gdal = scfg.Value(True, isflag=True, help='if True, ensure osgeo / gdal is installed')
-    with_cv2_headless = scfg.Value(True, isflag=True, help='if True, ensure cv2 is installed')
+    with_gdal = scfg.Value(
+        True, isflag=True, help='if True, ensure osgeo / gdal is installed'
+    )
+    with_cv2_headless = scfg.Value(
+        True, isflag=True, help='if True, ensure cv2 is installed'
+    )
 
     strict = scfg.Value(False, isflag=True, help='if True, use strict versions')
 
@@ -37,6 +44,7 @@ class FinishInstallCLI(scfg.DataConfig):
         """
         import rich
         import sys
+
         config = FinishInstallCLI.cli(cmdline=cmdline, data=kwargs, strict=True)
         rich.print('config = ' + ub.urepr(config, nl=1))
 
@@ -47,15 +55,23 @@ class FinishInstallCLI(scfg.DataConfig):
                 '--find-links',
                 'https://girder.github.io/large_image_wheels',
             ]
-            ub.cmd([sys.executable, '-m', 'pip', 'install'] + options + requirements, verbose=3)
+            ub.cmd(
+                [sys.executable, '-m', 'pip', 'install'] + options + requirements,
+                verbose=3,
+            )
 
         if config.with_cv2_headless:
             # TODO: add logic for fixing a broken cv2 install.
-            requirements = get_optional_requirements('headless.txt', strict=config.strict)
+            requirements = get_optional_requirements(
+                'headless.txt', strict=config.strict
+            )
             options = [
                 '--prefer-binary',
             ]
-            ub.cmd([sys.executable, '-m', 'pip', 'install'] + options + requirements, verbose=3)
+            ub.cmd(
+                [sys.executable, '-m', 'pip', 'install'] + options + requirements,
+                verbose=3,
+            )
 
         want_system_exes = [
             # 'ffmpeg',
@@ -84,7 +100,9 @@ def get_optional_requirements(name, strict=False):
         raise
         requirement_path = None
     req_path = requirement_path(name)
-    requirements = parse_requirements(req_path, versions='strict' if strict else 'loose')
+    requirements = parse_requirements(
+        req_path, versions='strict' if strict else 'loose'
+    )
     requirements = [line for line in requirements if line.strip()]
     return requirements
 
@@ -103,7 +121,7 @@ def parse_requirements(fname='requirements.txt', versions='loose'):
     Returns:
         List[str]: list of requirements items
     """
-    from os.path import join,  dirname, exists
+    from os.path import join, dirname, exists
     import re
     import sys
 

@@ -1,6 +1,9 @@
 """
+from __future__ import annotations
+
 Deprecated: use the one in kwutil instead
 """
+
 try:
     from functools import cache
 except ImportError:

@@ -1,5 +1,6 @@
 def test_conform_mmlab():
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo('vidshapes8')
 
     # We dont include frame_id by default

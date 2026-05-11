@@ -5,7 +5,7 @@ from kwcoco.metrics.detections import detection_confusions
 
 
 def _multiclass_ap(y):
-    """ computes pr like lightnet from kwcoco confusions """
+    """computes pr like lightnet from kwcoco confusions"""
     y = y.sort_values('score', ascending=False)
 
     num_annotations = y[y.true >= 0].weight.sum()
@@ -42,14 +42,17 @@ def _multiclass_ap(y):
         precision.append(tp / np.maximum(fp + tp, np.finfo(np.float64).eps))
 
     import scipy
+
     num_of_samples = 100
 
     if len(precision) > 1 and len(recall) > 1:
         p = np.array(precision)
         r = np.array(recall)
         p_start = p[np.argmin(r)]
-        samples = np.arange(0., 1., 1.0 / num_of_samples)
-        interpolated = scipy.interpolate.interp1d(r, p, fill_value=(p_start, 0.), bounds_error=False)(samples)
+        samples = np.arange(0.0, 1.0, 1.0 / num_of_samples)
+        interpolated = scipy.interpolate.interp1d(
+            r, p, fill_value=(p_start, 0.0), bounds_error=False
+        )(samples)
         avg = sum(interpolated) / len(interpolated)
     elif len(precision) > 0 and len(recall) > 0:
         # 1 point on PR: AP is box between (0,0) and (p,r)
@@ -62,8 +65,9 @@ def _multiclass_ap(y):
 
 def voc_eval(lines, recs, classname, iou_thresh=0.5, method=False, bias=1):
     import copy
+
     # imagenames = ([x.strip().split(' ')[0] for x in lines])
-    imagenames = ([x[0] for x in lines])
+    imagenames = [x[0] for x in lines]
     # BUGFIX: the original code did not cast this to a set
     imagenames = set(imagenames)
     recs2 = copy.deepcopy(recs)
@@ -77,9 +81,7 @@ def voc_eval(lines, recs, classname, iou_thresh=0.5, method=False, bias=1):
         difficult = np.array([x['difficult'] for x in R]).astype(np.bool)
         det = [False] * len(R)
         npos = npos + sum(~difficult)
-        class_recs[imagename] = {'bbox': bbox,
-                                 'difficult': difficult,
-                                 'det': det}
+        class_recs[imagename] = {'bbox': bbox, 'difficult': difficult, 'det': det}
 
     splitlines = lines
     image_ids = [x[0] for x in splitlines]
@@ -113,14 +115,16 @@ def voc_eval(lines, recs, classname, iou_thresh=0.5, method=False, bias=1):
             iymin = np.maximum(BBGT[:, 1], bb[1])
             ixmax = np.minimum(BBGT[:, 2], bb[2])
             iymax = np.minimum(BBGT[:, 3], bb[3])
-            iw = np.maximum(ixmax - ixmin + bias, 0.)
-            ih = np.maximum(iymax - iymin + bias, 0.)
+            iw = np.maximum(ixmax - ixmin + bias, 0.0)
+            ih = np.maximum(iymax - iymin + bias, 0.0)
             inters = iw * ih
 
             # union
-            uni = ((bb[2] - bb[0] + bias) * (bb[3] - bb[1] + bias) +
-                   (BBGT[:, 2] - BBGT[:, 0] + bias) *
-                   (BBGT[:, 3] - BBGT[:, 1] + bias) - inters)
+            uni = (
+                (bb[2] - bb[0] + bias) * (bb[3] - bb[1] + bias)
+                + (BBGT[:, 2] - BBGT[:, 0] + bias) * (BBGT[:, 3] - BBGT[:, 1] + bias)
+                - inters
+            )
 
             overlaps = inters / uni
             ovmax = np.max(overlaps)
@@ -129,12 +133,12 @@ def voc_eval(lines, recs, classname, iou_thresh=0.5, method=False, bias=1):
         if ovmax > iou_thresh:
             if not R['difficult'][jmax]:
                 if not R['det'][jmax]:
-                    tp[d] = 1.
+                    tp[d] = 1.0
                     R['det'][jmax] = 1
                 else:
-                    fp[d] = 1.
+                    fp[d] = 1.0
         else:
-            fp[d] = 1.
+            fp[d] = 1.0
 
     # compute precision recall
     fp = np.cumsum(fp)
@@ -145,25 +149,25 @@ def voc_eval(lines, recs, classname, iou_thresh=0.5, method=False, bias=1):
     prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
 
     def voc_ap(rec, prec, use_07_metric=False):
-        """ ap = voc_ap(rec, prec, [use_07_metric])
+        """ap = voc_ap(rec, prec, [use_07_metric])
         Compute VOC AP given precision and recall.
         If use_07_metric is true, uses the
         VOC 07 11 point method (default:False).
         """
         if use_07_metric:
             # 11 point metric
-            ap = 0.
-            for t in np.arange(0., 1.1, 0.1):
+            ap = 0.0
+            for t in np.arange(0.0, 1.1, 0.1):
                 if np.sum(rec >= t) == 0:
                     p = 0
                 else:
                     p = np.max(prec[rec >= t])
-                ap = ap + p / 11.
+                ap = ap + p / 11.0
         else:
             # correct AP calculation
             # first append sentinel values at the end
-            mrec = np.concatenate(([0.], rec, [1.]))
-            mpre = np.concatenate(([0.], prec, [0.]))
+            mrec = np.concatenate(([0.0], rec, [1.0]))
+            mpre = np.concatenate(([0.0], prec, [0.0]))
 
             # compute the precision envelope
             for i in range(mpre.size - 1, 0, -1):
@@ -177,7 +181,7 @@ def voc_eval(lines, recs, classname, iou_thresh=0.5, method=False, bias=1):
             ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
         return ap
 
-    eav_ap = voc_ap(rec, prec, use_07_metric=method ==  'voc2007')
+    eav_ap = voc_ap(rec, prec, use_07_metric=method == 'voc2007')
     ap = _ave_precision(rec, prec, method)
 
     assert ap == eav_ap
@@ -194,6 +198,7 @@ def _devcheck_voc_consistency2():
     """
     import pandas as pd
     from kwcoco.metrics.detections import DetectionMetrics
+
     xdata = []
     ydatas = ub.ddict(list)
 
@@ -232,6 +237,7 @@ def _devcheck_voc_consistency2():
     print(ydf)
 
     import kwplot
+
     kwplot.autompl()
     kwplot.multi_plot(xdata=xdata, ydata=ydatas, fnum=1, doclf=True)
 
@@ -272,6 +278,7 @@ def _devcheck_voc_consistency():
     """
     import pandas as pd
     import kwcoco as nh
+
     # method = 'voc2012'
     method = 'voc2007'
 
@@ -288,9 +295,9 @@ def _devcheck_voc_consistency():
     nboxes = 5
     nbad = 1
 
-    bg_weight=1.0
-    iou_thresh=0.5
-    bg_cls=-1
+    bg_weight = 1.0
+    iou_thresh = 0.5
+    bg_cls = -1
 
     xdata = []
     ydatas = ub.ddict(list)
@@ -307,17 +314,24 @@ def _devcheck_voc_consistency():
         cid = true_coco.add_category('cat1')
         cid = pred_coco.add_category('cat1')
         for imgname in range(nimgs):
-
             # Create voc style data
             imgname = str(imgname)
             import kwimage
-            true_boxes = kwimage.Boxes.random(num=nboxes, scale=100., rng=rng, format='cxywh')
+
+            true_boxes = kwimage.Boxes.random(
+                num=nboxes, scale=100.0, rng=rng, format='cxywh'
+            )
             pred_boxes = true_boxes.copy()
             pred_boxes.data = pred_boxes.data.astype(float) + (rng.rand() * noise)
             if nbad:
-                pred_boxes.data = np.vstack([
-                    pred_boxes.data,
-                    kwimage.Boxes.random(num=nbad, scale=100., rng=rng, format='cxywh').data])
+                pred_boxes.data = np.vstack(
+                    [
+                        pred_boxes.data,
+                        kwimage.Boxes.random(
+                            num=nbad, scale=100.0, rng=rng, format='cxywh'
+                        ).data,
+                    ]
+                )
 
             true_cxs = rng.choice(classes, size=len(true_boxes))
             pred_cxs = true_cxs.copy()
@@ -333,13 +347,13 @@ def _devcheck_voc_consistency():
 
             recs[imgname] = []
             for bbox in true_boxes.to_tlbr().data:
-                recs[imgname].append({
-                    'bbox': bbox,
-                    'difficult': False,
-                    'name': classname
-                })
+                recs[imgname].append(
+                    {'bbox': bbox, 'difficult': False, 'name': classname}
+                )
 
-            for bbox, score in zip(pred_boxes.to_tlbr().data, np.arange(len(pred_boxes))):
+            for bbox, score in zip(
+                pred_boxes.to_tlbr().data, np.arange(len(pred_boxes))
+            ):
                 lines.append([imgname, score] + list(bbox))
                 # lines.append('{} {} {} {} {} {}'.format(imgname, score, *bbox))
 
@@ -347,27 +361,44 @@ def _devcheck_voc_consistency():
             gid = true_coco.add_image(imgname)
             gid = pred_coco.add_image(imgname)
             for bbox in true_boxes.to_xywh():
-                true_coco.add_annotation(gid, cid, bbox=bbox, iscrowd=False,
-                                         ignore=0, area=bbox.area[0])
+                true_coco.add_annotation(
+                    gid, cid, bbox=bbox, iscrowd=False, ignore=0, area=bbox.area[0]
+                )
             for bbox, score in zip(pred_boxes.to_xywh(), np.arange(len(pred_boxes))):
-                pred_coco.add_annotation(gid, cid, bbox=bbox, iscrowd=False,
-                                         ignore=0, score=score,
-                                         area=bbox.area[0])
+                pred_coco.add_annotation(
+                    gid,
+                    cid,
+                    bbox=bbox,
+                    iscrowd=False,
+                    ignore=0,
+                    score=score,
+                    area=bbox.area[0],
+                )
 
             # Create kwcoco style confusion data
             true_weights = np.array([1] * len(true_boxes))
             pred_scores = np.arange(len(pred_boxes))
 
-            y = pd.DataFrame(detection_confusions(true_boxes, true_cxs,
-                                                  true_weights, pred_boxes,
-                                                  pred_scores, pred_cxs,
-                                                  bg_weight=1.0, iou_thresh=0.5,
-                                                  bg_cls=-1, bias=bias))
+            y = pd.DataFrame(
+                detection_confusions(
+                    true_boxes,
+                    true_cxs,
+                    true_weights,
+                    pred_boxes,
+                    pred_scores,
+                    pred_cxs,
+                    bg_weight=1.0,
+                    iou_thresh=0.5,
+                    bg_cls=-1,
+                    bias=bias,
+                )
+            )
             y['gx'] = int(imgname)
-            y = (y)
+            y = y
             confusions.append(y)
 
         from pycocotools import cocoeval as coco_score
+
         cocoGt = true_coco._aspycoco()
         cocoDt = pred_coco._aspycoco()
 
@@ -380,9 +411,9 @@ def _devcheck_voc_consistency():
         y = pd.concat(confusions)
 
         mine_ap = score_detection_assignment(y, method=method)['ap']
-        voc_rec, voc_prec, voc_ap = voc_eval(lines, recs, classname,
-                                             iou_thresh=0.5, method=method,
-                                             bias=bias)
+        voc_rec, voc_prec, voc_ap = voc_eval(
+            lines, recs, classname, iou_thresh=0.5, method=method, bias=bias
+        )
         eav_prec, eav_rec, eav_ap1 = _multiclass_ap(y)
 
         eav_ap2 = _ave_precision(eav_rec, eav_prec, method=method)
@@ -405,5 +436,6 @@ def _devcheck_voc_consistency():
     print(ydf)
 
     import kwplot
+
     kwplot.autompl()
     kwplot.multi_plot(xdata=xdata, ydata=ydatas, fnum=1, doclf=True)

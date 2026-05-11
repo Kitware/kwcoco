@@ -1,12 +1,19 @@
 """
+from __future__ import annotations
+
 Special non-general json functions
 """
+
 # import ubelt as ub
-from packaging.version import parse as Version
-import os
+from __future__ import annotations
+
 import json as pjson
+import os
 from io import StringIO
 from types import ModuleType
+
+from packaging.version import parse as Version
+
 # The ujson library is faster than Python's json, but the API has some
 # limitations and requires a minimum version. Currently we only use it to read,
 # we have to wait for https://github.com/ultrajson/ultrajson/pull/518 to land
@@ -18,12 +25,19 @@ except ImportError:
 
 KWCOCO_USE_UJSON = bool(os.environ.get('KWCOCO_USE_UJSON'))
 
-if ujson is not None and Version(ujson.__version__) >= Version('5.2.0') and KWCOCO_USE_UJSON:
-    json_r: ModuleType = ujson
-    json_w: ModuleType = pjson
+json_r: ModuleType
+json_w: ModuleType
+
+if (
+    ujson is not None
+    and Version(ujson.__version__) >= Version('5.2.0')
+    and KWCOCO_USE_UJSON
+):
+    json_r = ujson
+    json_w = pjson
 else:
-    json_r: ModuleType = pjson
-    json_w: ModuleType = pjson
+    json_r = pjson
+    json_w = pjson
 
 
 def _json_dumps(data, indent=None):
@@ -32,7 +46,9 @@ def _json_dumps(data, indent=None):
     except Exception:
         if indent is not None:
             if isinstance(indent, str):
-                assert indent.count(' ') == len(indent), 'must be all spaces, got {!r}'.format(indent)
+                assert indent.count(' ') == len(indent), (
+                    'must be all spaces, got {!r}'.format(indent)
+                )
                 indent = len(indent)
         if indent is None:
             indent = 0
@@ -109,7 +125,9 @@ def _special_kwcoco_pretty_dumps_orig(data, indent=None):
                 if asset_key is not None:
                     topimg = img.copy()
                     aux_items = topimg.pop(asset_key)
-                    aux_items_repr = _json_lines_dumps(asset_key, aux_items, indent + indent)
+                    aux_items_repr = _json_lines_dumps(
+                        asset_key, aux_items, indent + indent
+                    )
                     topimg_repr = _json_dumps(topimg)
                     if len(topimg) == 0:
                         v2 = '{' + aux_items_repr + '}'

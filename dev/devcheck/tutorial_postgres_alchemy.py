@@ -19,29 +19,33 @@ pip install psycopg2-binary sqlalchemy_utils sqlalchemy
 
 def install_postgres_instructions():
     import ubelt as ub
+
     # import ustd as u
     parts = {}
     parts['install'] = ub.codeblock(
-        '''
+        """
         # Install PostgreSQL
         sudo apt install postgresql postgresql-contrib -y
-        ''')
+        """
+    )
 
     parts['start_service'] = ub.codeblock(
-        '''
+        """
         # Ensure it is started as a service
         sudo systemctl start postgresql.service
         sudo systemctl status postgresql.service
-        ''')
+        """
+    )
 
     parts['setup_env'] = ub.codeblock(
-        '''
+        """
         sudo -u postgres psql -c "CREATE EXTENSION btree_gist;"
-        ''')
+        """
+    )
 
     # FIXME: I'm not sure what best practice is here.
     parts['create_users'] = ub.codeblock(
-        '''
+        """
         # Create roles and users
         sudo -u postgres createuser --superuser --no-password Admin
         sudo -u postgres createuser --role=Admin admin
@@ -62,7 +66,8 @@ def install_postgres_instructions():
         sudo -u postgres createuser --role=Maintainer kwcoco
         sudo -u postgres psql -c "ALTER USER kwcoco WITH PASSWORD 'kwcoco_pw';"
         sudo -u postgres psql -c "ALTER USER kwcoco WITH CREATEDB;"
-        ''')
+        """
+    )
 
     # Move the database to some other directory
     # TODO
@@ -86,7 +91,8 @@ def use_postgresql_with_python():
     """
     from sqlalchemy import create_engine
     from sqlalchemy_utils import database_exists, create_database
-    engine = create_engine("postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb")
+
+    engine = create_engine('postgresql+psycopg2://kwcoco:kwcoco_pw@localhost:5432/mydb')
     print(f'engine={engine}')
     did_exist = database_exists(engine.url)
     print(f'did_exist={did_exist}')
@@ -128,11 +134,14 @@ def simple_declarative_schema():
 
     from sqlalchemy.schema import CreateTable
     from sqlalchemy.schema import CreateIndex
+
     print(CreateTable(User.__table__))
     # print(CreateIndex(User))
 
     # uri = 'sqlite:///test_sqlite_v7.sqlite'
-    uri = 'postgresql+psycopg2://admin:admin@localhost:5432/test_postgresql_v10.postgres'
+    uri = (
+        'postgresql+psycopg2://admin:admin@localhost:5432/test_postgresql_v10.postgres'
+    )
 
     engine = create_engine(uri)
     DBSession = sessionmaker(bind=engine)
@@ -148,11 +157,11 @@ def simple_declarative_schema():
         CustomBase.metadata.create_all(engine)
 
     user_infos = [
-        {'name': 'user1', 'loose_identifer': "AA" },
-        {'name': 'user2', 'loose_identifer': "33" },
-        {'name': 'user3', 'loose_identifer': 33 },
-        {'name': 'user4', 'loose_identifer': 33 },
-        {'name': 'user5', 'loose_identifer': "AA" },
+        {'name': 'user1', 'loose_identifer': 'AA'},
+        {'name': 'user2', 'loose_identifer': '33'},
+        {'name': 'user3', 'loose_identifer': 33},
+        {'name': 'user4', 'loose_identifer': 33},
+        {'name': 'user5', 'loose_identifer': 'AA'},
         {'name': 'user6', 'loose_identifer': None},
         {'name': 'user7', 'loose_identifer': [1, 'weird']},
     ]
@@ -164,14 +173,19 @@ def simple_declarative_schema():
 
     import pandas as pd
     import json
+
     table_df = pd.read_sql_table('users', con=engine)
     table_df['loose_identifer'] = table_df['loose_identifer'].apply(repr)
     print(table_df)
 
-    query = session.query(User.name, User.loose_identifer).filter(User.loose_identifer == json.dumps(33))
+    query = session.query(User.name, User.loose_identifer).filter(
+        User.loose_identifer == json.dumps(33)
+    )
     results = list(query.all())
     print(f'results={results}')
 
-    query = session.query(User.name, User.loose_identifer).filter(User.loose_identifer == json.dumps('33'))
+    query = session.query(User.name, User.loose_identifer).filter(
+        User.loose_identifer == json.dumps('33')
+    )
     results = list(query.all())
     print(f'results={results}')

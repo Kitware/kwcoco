@@ -1,6 +1,9 @@
 """
+from __future__ import annotations
+
 Helpers for labelme files
 """
+
 import ubelt as ub
 import os
 
@@ -55,6 +58,7 @@ def labelme_to_coco_structure(labelme_data, special_options=True):
     """
     import kwimage
     import numpy as np
+
     img = {
         'file_name': labelme_data['imagePath'],
         'width': labelme_data['imageWidth'],
@@ -93,7 +97,6 @@ def labelme_to_coco_structure(labelme_data, special_options=True):
             anns.append(ann)
         elif shape_type == 'point':
             if special_options:
-
                 OLD_META_METHOD = 0
                 if OLD_META_METHOD:
                     # Handle points in a special case.
@@ -101,7 +104,9 @@ def labelme_to_coco_structure(labelme_data, special_options=True):
                         if desc is not None:
                             if img.get('description'):
                                 print(f'img = {ub.urepr(img, nl=1)}')
-                                raise AssertionError('Multiple metadata points in an image')
+                                raise AssertionError(
+                                    'Multiple metadata points in an image'
+                                )
                             img['description'] = desc
                     else:
                         raise NotImplementedError(shape_type)
@@ -132,27 +137,28 @@ class LabelMeFile(ub.NiceRepr):
         >>> self = LabelMeFile.demo()
         >>> print(self.dumps())
     """
+
     # Keys for top level data
     __datakeys__ = [
-        "version",  # LabelMe version
-        "imageData",  # Can be populated with base64 image data
-        "imagePath",
-        "shapes",  # polygonal annotations
-        "flags",  # image level flags
-        "imageHeight",
-        "imageWidth",
+        'version',  # LabelMe version
+        'imageData',  # Can be populated with base64 image data
+        'imagePath',
+        'shapes',  # polygonal annotations
+        'flags',  # image level flags
+        'imageHeight',
+        'imageWidth',
     ]
     # Keys for data['shapes']
 
     # TODO: special class for shapes?
     __shapekeys__ = [
-        "label",
-        "points",
-        "group_id",
-        "shape_type",
-        "flags",
-        "description",
-        "mask",
+        'label',
+        'points',
+        'group_id',
+        'shape_type',
+        'flags',
+        'description',
+        'mask',
     ]
 
     def __init__(self, data, fpath=None):
@@ -202,7 +208,15 @@ class LabelMeFile(ub.NiceRepr):
                     'flags': {},
                     'group_id': None,
                     'label': 'category1',
-                    'points': [[1527.0, 2319.5], [1512.0, 2317.5], [1503.5, 2295.0], [1568.5, 2243.0], [1561.5, 2278.0], [1548.5, 2307.0], [1541.0, 2315.5]],
+                    'points': [
+                        [1527.0, 2319.5],
+                        [1512.0, 2317.5],
+                        [1503.5, 2295.0],
+                        [1568.5, 2243.0],
+                        [1561.5, 2278.0],
+                        [1548.5, 2307.0],
+                        [1541.0, 2315.5],
+                    ],
                     'shape_type': 'polygon',
                 },
                 {
@@ -210,7 +224,14 @@ class LabelMeFile(ub.NiceRepr):
                     'flags': {},
                     'group_id': None,
                     'label': 'category1',
-                    'points': [[1346.0, 2285.5], [1318.0, 2282.5], [1370.5, 2241.0], [1360.5, 2258.0], [1357.5, 2272.0], [1354.5, 2278.0]],
+                    'points': [
+                        [1346.0, 2285.5],
+                        [1318.0, 2282.5],
+                        [1370.5, 2241.0],
+                        [1360.5, 2258.0],
+                        [1357.5, 2272.0],
+                        [1354.5, 2278.0],
+                    ],
                     'shape_type': 'polygon',
                 },
                 {
@@ -247,13 +268,13 @@ class LabelMeFile(ub.NiceRepr):
             fpath = ub.Path(image_path).augment(ext='.json')
 
         data = {
-            "version": "5.0.1",  # LabelMe version
-            "flags": {},  # Additional flags
-            "imagePath": image_path,
-            "imageHeight": image_height,
-            "imageWidth": image_width,
-            "imageData": None,  # Can be populated with base64 image data
-            "shapes": [],  # List of shapes
+            'version': '5.0.1',  # LabelMe version
+            'flags': {},  # Additional flags
+            'imagePath': image_path,
+            'imageHeight': image_height,
+            'imageWidth': image_width,
+            'imageData': None,  # Can be populated with base64 image data
+            'shapes': [],  # List of shapes
         }
         self = cls(data, fpath)
         return self
@@ -267,6 +288,7 @@ class LabelMeFile(ub.NiceRepr):
             LabeMeFile
         """
         import kwutil
+
         try:
             fpath = os.fspath(file)
         except TypeError:
@@ -331,11 +353,14 @@ class LabelMeFile(ub.NiceRepr):
             if len(images) == 0:
                 raise ValueError('CocoDataset has no images!')
             elif len(images) > 1:
-                raise ValueError(ub.paragraph(
-                    '''
+                raise ValueError(
+                    ub.paragraph(
+                        """
                     CocoDataset has more than one image, Choose which image to
                     convert by specifing image_id.
-                    '''))
+                    """
+                    )
+                )
             image_id = list(images)[0]
 
         img = coco_dset.index.imgs[image_id]
@@ -365,6 +390,7 @@ class LabelMeFile(ub.NiceRepr):
 
             if segmentation:
                 import kwimage
+
                 sseg = kwimage.Segmentation.coerce(segmentation)
                 mpoly = sseg.to_multi_polygon()
                 group_id = None
@@ -385,10 +411,12 @@ class LabelMeFile(ub.NiceRepr):
                 # labelme does not have a mechanism for captions.
                 # Use points to encode fake caption metadata
                 assert catname == '__metadata__', 'cant handle real points'
-                fake_points = [[1., 1.]]
+                fake_points = [[1.0, 1.0]]
                 self.add_point(catname, fake_points, description=caption)
             else:
-                raise NotImplementedError(f'Unable to convert {ann} to a labelme object')
+                raise NotImplementedError(
+                    f'Unable to convert {ann} to a labelme object'
+                )
 
         return self
 
@@ -437,6 +465,7 @@ class LabelMeFile(ub.NiceRepr):
             >>> print(recon.dumps())
         """
         import kwcoco
+
         coco_dset = kwcoco.CocoDataset.empty()
         self.add_to_coco(coco_dset)
         return coco_dset
@@ -452,13 +481,13 @@ class LabelMeFile(ub.NiceRepr):
             flags (dict, optional): Additional flags for the shape.
         """
         shape = {
-            "label": label,
-            "points": points,
-            "shape_type": "point",
-            "flags": flags or {},
-            **kwargs
+            'label': label,
+            'points': points,
+            'shape_type': 'point',
+            'flags': flags or {},
+            **kwargs,
         }
-        self.data["shapes"].append(shape)
+        self.data['shapes'].append(shape)
 
     def add_polygon(self, label, points, group_id=None, flags=None, **kwargs):
         """
@@ -471,14 +500,14 @@ class LabelMeFile(ub.NiceRepr):
             flags (dict, optional): Additional flags for the shape.
         """
         shape = {
-            "label": label,
-            "points": points,
-            "group_id": group_id,
-            "shape_type": "polygon",
-            "flags": flags or {},
-            **kwargs
+            'label': label,
+            'points': points,
+            'group_id': group_id,
+            'shape_type': 'polygon',
+            'flags': flags or {},
+            **kwargs,
         }
-        self.data["shapes"].append(shape)
+        self.data['shapes'].append(shape)
 
     def add_rectangle(self, label, bbox, group_id=None, flags=None, **kwargs):
         """
@@ -492,14 +521,14 @@ class LabelMeFile(ub.NiceRepr):
         """
         x, y, w, h = bbox
         shape = {
-            "label": label,
-            "points": [[x, y], [x + w, y + h]],
-            "group_id": group_id,
-            "shape_type": "rectangle",
-            "flags": flags or {},
+            'label': label,
+            'points': [[x, y], [x + w, y + h]],
+            'group_id': group_id,
+            'shape_type': 'rectangle',
+            'flags': flags or {},
             **kwargs,
         }
-        self.data["shapes"].append(shape)
+        self.data['shapes'].append(shape)
 
     def dump(self, file=None):
         """
@@ -509,6 +538,7 @@ class LabelMeFile(ub.NiceRepr):
             output_path (str): Path where the JSON file will be saved.
         """
         import kwutil
+
         if file is None:
             file = self.fpath
         try:
@@ -531,4 +561,5 @@ class LabelMeFile(ub.NiceRepr):
             str
         """
         import kwutil
+
         return kwutil.Json.dumps(self.data)

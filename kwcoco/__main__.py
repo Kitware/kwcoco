@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 # PYTHON_ARGCOMPLETE_OK
 if __name__ == '__main__':
@@ -8,4 +10,5 @@ if __name__ == '__main__':
         python ~/code/kwcoco/coco_cli/__main__.py
     """
     from kwcoco.cli.__main__ import main
+
     main()

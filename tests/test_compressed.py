@@ -1,7 +1,9 @@
 def test_read_zipped_kwcoco():
     import kwcoco
+
     # import zipfile
     import ubelt as ub
+
     dset = kwcoco.CocoDataset.demo('vidshapes8')
 
     # Make a zipfile with a kwcoco file in it
@@ -11,6 +13,7 @@ def test_read_zipped_kwcoco():
     # Test that we can dump to a zipfile
     dset.dump(zip_fpath)
     import zipfile
+
     assert zipfile.is_zipfile(zip_fpath)
 
     # Test that the zipfile can be read
@@ -23,12 +26,14 @@ def test_compress_dump():
     import tempfile
     import kwcoco
     import ubelt as ub
+
     self = kwcoco.CocoDataset.demo()
     file = tempfile.NamedTemporaryFile('wb', delete=False)
     fpath = ub.Path(file.name)
     with file:
         self.dump(file, compress=True)
     import zipfile
+
     assert zipfile.is_zipfile(fpath)
     self2 = kwcoco.CocoDataset(fpath)
     assert self2.dataset == self.dataset
@@ -38,8 +43,10 @@ def test_compress_dump():
 
 def test_internal_archive_name():
     import kwcoco
+
     # import zipfile
     import ubelt as ub
+
     dset = kwcoco.CocoDataset.demo('vidshapes8')
 
     dpath = ub.Path.appdir('kwcoco/tests/test_compress').ensuredir()
@@ -47,6 +54,7 @@ def test_internal_archive_name():
     dset.dump()
 
     import zipfile
+
     zfile = zipfile.ZipFile(dset.fpath)
     assert zfile.namelist() == ['mydataset.kwcoco.json']
 

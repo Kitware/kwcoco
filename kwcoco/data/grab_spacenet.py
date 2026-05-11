@@ -1,9 +1,12 @@
 """
+from __future__ import annotations
+
 References:
     https://medium.com/the-downlinq/the-spacenet-7-multi-temporal-urban-development-challenge-algorithmic-baseline-4515ec9bd9fe
     https://arxiv.org/pdf/2102.11958.pdf
     https://spacenet.ai/sn7-challenge/
 """
+
 import ubelt as ub
 import os
 from kwcoco.util import util_archive
@@ -55,10 +58,16 @@ def grab_spacenet7(data_dpath):
             },
         ]
 
-        has_extracted = all([
-            d.exists() for d in [extract_dpath / 'csvs',
-                                 extract_dpath / 'test_public',
-                                 extract_dpath / 'train']])
+        has_extracted = all(
+            [
+                d.exists()
+                for d in [
+                    extract_dpath / 'csvs',
+                    extract_dpath / 'test_public',
+                    extract_dpath / 'train',
+                ]
+            ]
+        )
 
         for item in items:
             fname = pathlib.Path(item['uri']).name
@@ -73,7 +82,8 @@ def grab_spacenet7(data_dpath):
             for item in items:
                 if not item['fpath'].exists():
                     command = '{aws_exe} s3 cp {uri} {archive_dpath}'.format(
-                        aws_exe=aws_exe, uri=item['uri'], archive_dpath=archive_dpath)
+                        aws_exe=aws_exe, uri=item['uri'], archive_dpath=archive_dpath
+                    )
                     info = ub.cmd(command, verbose=3)
                     assert info['ret'] == 0
                     got_hash = ub.hash_file(item['fpath'], hasher='sha512')
@@ -83,7 +93,9 @@ def grab_spacenet7(data_dpath):
         if need_unarchive:
             for item in ub.ProgIter(items, desc='extract spacenet', verbose=3):
                 archive_fpath = item['fpath']
-                util_archive.unarchive_file(archive_fpath, extract_dpath, overwrite=0, verbose=2)
+                util_archive.unarchive_file(
+                    archive_fpath, extract_dpath, overwrite=0, verbose=2
+                )
 
         coco_dset = convert_spacenet_to_kwcoco(extract_dpath, coco_fpath)
         stamp.renew()
@@ -121,6 +133,7 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
     import kwimage
     import parse
     import datetime
+
     print('Convert Spacenet7 to kwcoco')
 
     coco_dset = kwcoco.CocoDataset()
@@ -147,7 +160,8 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
             gname = str(gpath.stem)
             nameinfo = s7_fname_fmt.parse(gname)
             timestamp = datetime.datetime(
-                year=nameinfo['year'], month=nameinfo['month'], day=1)
+                year=nameinfo['year'], month=nameinfo['month'], day=1
+            )
             gid = coco_dset.add_image(
                 file_name=str(gpath.relative_to(coco_dset.bundle_dpath)),
                 name=gname,
@@ -163,12 +177,14 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
 
     def _from_geojson2(geometry):
         import numpy as np
+
         coords = geometry['coordinates']
         exterior = np.array(coords[0])[:, 0:2]
         interiors = [np.array(h)[:, 0:2] for h in coords[1:]]
-        poly_data = dict(exterior=kwimage.Coords(exterior),
-                         interiors=[kwimage.Coords(hole)
-                                    for hole in interiors])
+        poly_data = dict(
+            exterior=kwimage.Coords(exterior),
+            interiors=[kwimage.Coords(hole) for hole in interiors],
+        )
         self = kwimage.Polygon(data=poly_data)
         return self
 
@@ -201,7 +217,7 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
                 'category_id': building_cid,
                 'track_id': prop['Id'],
                 'area': prop['area'],
-                'segmentation': poly.to_coco(style='new')
+                'segmentation': poly.to_coco(style='new'),
             }
             coco_dset.add_annotation(**ann)
 
@@ -221,7 +237,7 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
             'bbox': xywh,
             'image_id': gid,
             'category_id': ignore_cid,
-            'segmentation': poly.to_coco(style='new')
+            'segmentation': poly.to_coco(style='new'),
         }
         coco_dset.add_annotation(**ann)
 
@@ -232,6 +248,7 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
     # We will generally want an SQL cache when working with this dataset
     if ub.argflag('--sql-hack'):
         from kwcoco.coco_sql_dataset import CocoSqlDatabase
+
         CocoSqlDatabase.coerce(coco_dset)
 
     return coco_dset

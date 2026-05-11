@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 import numpy as np
 import ubelt as ub
@@ -24,6 +26,7 @@ class VOC_Metrics(ub.NiceRepr):
         classes (None | List[str] | kwcoco.CategoryTree):
             class names
     """
+
     def __init__(self, classes=None):
         self.recs = {}
         self.cx_to_lines = ub.ddict(list)
@@ -43,22 +46,18 @@ class VOC_Metrics(ub.NiceRepr):
         true_weights = true_dets.data.get('weights', None)
         if true_weights is None:
             true_weights = [1.0] * len(true_dets)
-        for bbox, cx, weight in zip(true_dets.boxes.to_ltrb().data,
-                                    true_dets.class_idxs,
-                                    true_weights):
-            self.recs[gid].append({
-                'bbox': bbox,
-                'difficult': weight < .5,
-                'name': cx
-            })
+        for bbox, cx, weight in zip(
+            true_dets.boxes.to_ltrb().data, true_dets.class_idxs, true_weights
+        ):
+            self.recs[gid].append({'bbox': bbox, 'difficult': weight < 0.5, 'name': cx})
 
     def add_predictions(self, pred_dets, gid):
         pred_scores = pred_dets.data.get('scores', None)
         if pred_scores is None:
             pred_scores = [1.0] * len(pred_dets)
-        for bbox, cx, score in zip(pred_dets.boxes.to_ltrb().data,
-                                   pred_dets.class_idxs,
-                                   pred_scores):
+        for bbox, cx, score in zip(
+            pred_dets.boxes.to_ltrb().data, pred_dets.class_idxs, pred_scores
+        ):
             voc_line = [gid, score] + list(bbox)
             self.cx_to_lines[cx].append(voc_line)
 
@@ -90,18 +89,27 @@ class VOC_Metrics(ub.NiceRepr):
         """
         from kwcoco.metrics.confusion_vectors import Measures
         from kwcoco.metrics.confusion_vectors import PerClass_Measures
+
         perclass = {}
         for cx in self.cx_to_lines.keys():
             lines = self.cx_to_lines[cx]
             classname = cx
-            roc_info = _voc_eval(lines, self.recs, classname,
-                                 iou_thresh=iou_thresh, bias=bias, method=method)
+            roc_info = _voc_eval(
+                lines,
+                self.recs,
+                classname,
+                iou_thresh=iou_thresh,
+                bias=bias,
+                method=method,
+            )
             roc_info['cx'] = cx
             if self.classes is not None:
                 catname = self.classes[cx]
-                roc_info.update({
-                    'node': catname,
-                })
+                roc_info.update(
+                    {
+                        'node': catname,
+                    }
+                )
                 perclass[catname] = Measures(roc_info)
             else:
                 perclass[cx] = Measures(roc_info)
@@ -151,6 +159,7 @@ def _pr_curves(y, method='voc2012'):
         >>> _pr_curves(y1)
     """
     import pandas as pd
+
     IS_PANDAS = isinstance(y, pd.DataFrame)
 
     if method not in ['sklearn', 'voc2007', 'voc2012']:
@@ -166,17 +175,21 @@ def _pr_curves(y, method='voc2012'):
     # http://scikit-learn.org/stable/modules/model_evaluation.html
     if method in {'sklearn', 'scikit-learn'}:
         import sklearn
+
         # In the future, we should simply use the sklearn version
         # which gives nice easy to reproduce results.
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='invalid .* true_divide')
             is_correct = (y['true'] == y['pred']).astype(int)
             ap = sklearn.metrics.average_precision_score(
-                y_true=is_correct, y_score=y['score'],
+                y_true=is_correct,
+                y_score=y['score'],
                 sample_weight=y['weight'],
             )
             prec, rec, thresholds = sklearn.metrics.precision_recall_curve(
-                is_correct, y['score'], sample_weight=y['weight'],
+                is_correct,
+                y['score'],
+                sample_weight=y['weight'],
             )
             return ap, prec, rec
     elif method == 'voc2007' or method == 'voc2012':
@@ -198,7 +211,7 @@ def _pr_curves(y, method='voc2012'):
                 dets = y.compress(y['pred'] > -1)
 
         if npos > 0 and len(dets) > 0:
-            tp = (dets['pred'] == dets['true'])
+            tp = dets['pred'] == dets['true']
             fp = 1 - tp
             fp_cum = np.cumsum(fp)
             tp_cum = np.cumsum(tp)
@@ -222,8 +235,7 @@ def _pr_curves(y, method='voc2012'):
     return ap, prec, rec
 
 
-def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
-              bias=1.0):
+def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012', bias=1.0):
     """
     VOC AP evaluation for a single category.
 
@@ -254,7 +266,8 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
         [1] http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCdevkit_18-May-2011.tar
     """
     import copy
-    imagenames = ([x[0] for x in lines])
+
+    imagenames = [x[0] for x in lines]
     recs2 = copy.deepcopy(recs)
 
     # BUGFIX: need to score images with no predictions / no truth
@@ -272,9 +285,7 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
         difficult = np.array([x['difficult'] for x in R]).astype(bool)
         det = [False] * len(R)
         npos = npos + sum(~difficult)
-        class_recs[imagename] = {'bbox': bbox,
-                                 'difficult': difficult,
-                                 'det': det}
+        class_recs[imagename] = {'bbox': bbox, 'difficult': difficult, 'det': det}
 
     # Unlike the original implementation our input is presplit
     splitlines = lines
@@ -298,7 +309,6 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
 
         # For each prediction
         for d in range(nd):
-
             # Check if it overlaps any true box.
             R = class_recs[image_ids[d]]
             bb = BB[d, :].astype(float)
@@ -312,14 +322,17 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
                 iymin = np.maximum(BBGT[:, 1], bb[1])
                 ixmax = np.minimum(BBGT[:, 2], bb[2])
                 iymax = np.minimum(BBGT[:, 3], bb[3])
-                iw = np.maximum(ixmax - ixmin + bias, 0.)
-                ih = np.maximum(iymax - iymin + bias, 0.)
+                iw = np.maximum(ixmax - ixmin + bias, 0.0)
+                ih = np.maximum(iymax - iymin + bias, 0.0)
                 inters = iw * ih
 
                 # union
-                uni = ((bb[2] - bb[0] + bias) * (bb[3] - bb[1] + bias) +
-                       (BBGT[:, 2] - BBGT[:, 0] + bias) *
-                       (BBGT[:, 3] - BBGT[:, 1] + bias) - inters)
+                uni = (
+                    (bb[2] - bb[0] + bias) * (bb[3] - bb[1] + bias)
+                    + (BBGT[:, 2] - BBGT[:, 0] + bias)
+                    * (BBGT[:, 3] - BBGT[:, 1] + bias)
+                    - inters
+                )
 
                 overlaps = inters / uni
                 ovmax = np.max(overlaps)
@@ -329,12 +342,12 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
                 if not R['difficult'][jmax]:
                     if not R['det'][jmax]:
                         # Mark that this true box has been used.
-                        is_tp[d] = 1.
+                        is_tp[d] = 1.0
                         R['det'][jmax] = 1
                     else:
-                        is_fp[d] = 1.
+                        is_fp[d] = 1.0
             else:
-                is_fp[d] = 1.
+                is_fp[d] = 1.0
 
         thresholds = confidence[sorted_ind]
         # compute precision recall
@@ -358,7 +371,7 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012',
         'fp_count': fp,
         'tp_count': tp,
         'fn_count': fn,
-        'tpr': rec,    # (true positive rate) == (recall)
+        'tpr': rec,  # (true positive rate) == (recall)
         'ppv': prec,  # (positive predictive value) == (precision)
         'thresholds': thresholds,
         'npos': npos,
@@ -390,18 +403,18 @@ def _voc_ave_precision(rec, prec, method='voc2012'):
     """
     if method == 'voc2007':
         # 11 point metric
-        ap = 0.
-        for t in np.arange(0., 1.1, 0.1):
+        ap = 0.0
+        for t in np.arange(0.0, 1.1, 0.1):
             if np.sum(rec >= t) == 0:
                 p = 0
             else:
                 p = np.max(prec[rec >= t])
-            ap = ap + p / 11.
+            ap = ap + p / 11.0
     elif method == 'voc2012':
         # correct AP calculation
         # first append sentinel values at the end
-        mrec = np.concatenate(([0.], rec, [1.]))
-        mpre = np.concatenate(([0.], prec, [0.]))
+        mrec = np.concatenate(([0.0], rec, [1.0]))
+        mpre = np.concatenate(([0.0], prec, [0.0]))
 
         # compute the precision envelope
         for i in range(mpre.size - 1, 0, -1):
@@ -418,6 +431,7 @@ def _voc_ave_precision(rec, prec, method='voc2012'):
         # Note: the voc rec, prec dont extend all the way to 1, so this AUC
         # might not be accurate.
         from sklearn.metrics import auc
+
         ap = auc(rec, prec)
         # ap = -np.sum(np.diff(rec[::-1]) * np.array(prec[::-1])[:-1])
     else:

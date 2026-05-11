@@ -17,8 +17,10 @@ augmentations. This can be done with the following command:
 
 Or just copy the doctest into IPython and run it.
 """
+
 try:
     import torch
+
     DatasetBase = torch.utils.data.Dataset
 except Exception:
     torch = None
@@ -77,16 +79,18 @@ class KWCocoSimpleTorchDataset(DatasetBase):
     """
 
     def __init__(self, coco_dset, input_dims=None, antialias=False, rng=None):
-
         # Store a pointer to the coco dataset
         self.coco_dset = kwcoco.CocoDataset.coerce(coco_dset)
 
         if input_dims is None:
-            raise ValueError(ub.paragraph(
-                '''
+            raise ValueError(
+                ub.paragraph(
+                    """
                 Must currently specify the height/width input dimensions to the
                 network, so we can resample to that expected shape.
-                '''))
+                """
+                )
+            )
 
         self.input_dims = input_dims
         self.antialias = antialias
@@ -163,8 +167,7 @@ class KWCocoSimpleTorchDataset(DatasetBase):
                 # horizontal flip with 0.5 probability
                 h, w = imdata.shape[0:2]
                 flip_transform = kwimage.Affine.affine(
-                    scale=(-1, 1),
-                    about=(w / 2, h / 2)
+                    scale=(-1, 1), about=(w / 2, h / 2)
                 )
                 aug_transform = flip_transform @ aug_transform
 
@@ -175,7 +178,7 @@ class KWCocoSimpleTorchDataset(DatasetBase):
                     # offset= not implemented as a distribution yet
                     shearx=0,
                     theta=0,
-                    rng=self.rng
+                    rng=self.rng,
                 )
                 aug_transform = random_transform @ aug_transform
 
@@ -188,12 +191,11 @@ class KWCocoSimpleTorchDataset(DatasetBase):
         input_dsize = self.input_dims[::-1]
 
         # Use imresize to finalize
-        imdata, info = kwimage.imresize(imdata, dsize=input_dsize,
-                                        antialias=self.antialias,
-                                        return_info=True)
+        imdata, info = kwimage.imresize(
+            imdata, dsize=input_dsize, antialias=self.antialias, return_info=True
+        )
 
-        resize_tf = kwimage.Affine.affine(offset=info['offset'],
-                                          scale=info['scale'])
+        resize_tf = kwimage.Affine.affine(offset=info['offset'], scale=info['scale'])
         dets = dets.warp(resize_tf.matrix)
 
         if 0:
@@ -205,7 +207,9 @@ class KWCocoSimpleTorchDataset(DatasetBase):
 
         cxywh = torch.from_numpy(dets.data['boxes'].to_cxywh().data)
         class_idxs = torch.from_numpy(dets.data['class_idxs'])
-        rgb_chw = torch.from_numpy(imdata.transpose(2, 0, 1)).float() / 255.  # Magic dataset-level normalization
+        rgb_chw = (
+            torch.from_numpy(imdata.transpose(2, 0, 1)).float() / 255.0
+        )  # Magic dataset-level normalization
 
         # It is best practices that a data loader returns a dictionary
         # so it is easy to add / remove data input and label information.
@@ -214,11 +218,10 @@ class KWCocoSimpleTorchDataset(DatasetBase):
             'inputs': {
                 'rgb': rgb_chw,
             },
-
             # Encode the truth labels for torch
             'labels': {
                 'cxywh': cxywh,
                 'class_idxs': class_idxs,
-            }
+            },
         }
         return item

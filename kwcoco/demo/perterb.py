@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ubelt as ub
 import numpy as np
 
@@ -53,6 +55,7 @@ def perterb_coco(coco_dset, **kwargs):
     """
     import kwimage
     import kwarray
+
     # Parse kwargs
     rng = kwarray.ensure_rng(kwargs.get('rng', 0))
 
@@ -69,7 +72,9 @@ def perterb_coco(coco_dset, **kwargs):
 
     # Build random variables
     from kwarray import distributions
+
     DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)
+
     def _parse_arg(key, default):
         value = kwargs.get(key, default)
         try:
@@ -77,6 +82,7 @@ def perterb_coco(coco_dset, **kwargs):
             return (low, high + 1)
         except Exception:
             return (value, value + 1)
+
     n_fp_RV = DiscreteUniform(*_parse_arg('n_fp', 0))
     n_fn_RV = DiscreteUniform(*_parse_arg('n_fn', 0))
 
@@ -87,19 +93,22 @@ def perterb_coco(coco_dset, **kwargs):
     # the overlap increases as the score noise increases.
     def _interp(v1, v2, alpha):
         return v1 * alpha + (1 - alpha) * v2
+
     mid = 0.5
     # true_high = 2.0
     true_high = 1.0
     false_low = 0.0
-    true_low   = _interp(0, mid, score_noise)
+    true_low = _interp(0, mid, score_noise)
     false_high = _interp(true_high, mid - 1e-3, score_noise)
-    true_mean  = _interp(0.5, .8, score_noise)
-    false_mean = _interp(0.5, .2, score_noise)
+    true_mean = _interp(0.5, 0.8, score_noise)
+    false_mean = _interp(0.5, 0.2, score_noise)
 
     true_score_RV = distributions.TruncNormal(
-        mean=true_mean, std=.5, low=true_low, high=true_high, rng=rng)
+        mean=true_mean, std=0.5, low=true_low, high=true_high, rng=rng
+    )
     false_score_RV = distributions.TruncNormal(
-        mean=false_mean, std=.5, low=false_low, high=false_high, rng=rng)
+        mean=false_mean, std=0.5, low=false_low, high=false_high, rng=rng
+    )
 
     # Create the category hierarchy
     classes = coco_dset.object_categories()
@@ -115,8 +124,7 @@ def perterb_coco(coco_dset, **kwargs):
 
     index_invalidated = False
 
-    for gid in ub.ProgIter(coco_dset.imgs.keys(), desc='perterb imgs',
-                           verbose=verbose):
+    for gid in ub.ProgIter(coco_dset.imgs.keys(), desc='perterb imgs', verbose=verbose):
         # Sample random variables
         n_fp_ = n_fp_RV()
         n_fn_ = n_fn_RV()
@@ -169,6 +177,7 @@ def perterb_coco(coco_dset, **kwargs):
         # Drop true positive boxes
         if n_fn_:
             import kwarray
+
             drop_idxs = kwarray.shuffle(np.arange(len(aids)), rng=rng)[0:n_fn_]
             remove_aids.extend(list(ub.take(aids, drop_idxs)))
 
@@ -179,8 +188,9 @@ def perterb_coco(coco_dset, **kwargs):
                 scale = (img['width'], img['height'])
             except KeyError:
                 scale = 100
-            false_boxes = kwimage.Boxes.random(num=n_fp_, scale=scale,
-                                               rng=rng, format='cxywh')
+            false_boxes = kwimage.Boxes.random(
+                num=n_fp_, scale=scale, rng=rng, format='cxywh'
+            )
             false_cxs = frgnd_cx_RV(n_fp_)
             false_scores = false_score_RV(n_fp_)
             false_dets = kwimage.Detections(
@@ -217,15 +227,17 @@ def perterb_coco(coco_dset, **kwargs):
         # Transform the scores for the assigned class into a predicted
         # probability for each class. (Currently a bit hacky).
         pred_probs = _demo_construct_probs(
-            pred_cxs, pred_scores, classes, rng,
-            hacked=kwargs.get('hacked', 1))
+            pred_cxs, pred_scores, classes, rng, hacked=kwargs.get('hacked', 1)
+        )
 
         for aid, prob in zip(annots.aids, pred_probs):
             new_dset.anns[aid]['prob'] = prob.tolist()
 
     # Hack in the per-class heatmaps
     if with_heatmaps:
-        for gid in ub.ProgIter(new_dset.images(), desc='Perterb heatmaps', verbose=verbose):
+        for gid in ub.ProgIter(
+            new_dset.images(), desc='Perterb heatmaps', verbose=verbose
+        ):
             annots = new_dset.annots(gid=gid)
             img = new_dset.index.imgs[gid]
             w = img['width']
@@ -234,7 +246,9 @@ def perterb_coco(coco_dset, **kwargs):
             # Build up basic prob masks
             heatmaps = np.zeros((c, h, w), dtype=np.float32)
             for ann in annots.objs:
-                poly = kwimage.Segmentation.coerce(ann['segmentation']).to_multi_polygon()
+                poly = kwimage.Segmentation.coerce(
+                    ann['segmentation']
+                ).to_multi_polygon()
                 cid = ann['category_id']
                 cidx = classes.id_to_idx[cid]
                 probs = heatmaps[cidx]
@@ -245,13 +259,15 @@ def perterb_coco(coco_dset, **kwargs):
             dims = (h, w)
             for cidx in range(len(classes)):
                 chan_data = heatmaps[cidx]
-                chan_data += (rng.randn(*dims) * 0.1)
+                chan_data += rng.randn(*dims) * 0.1
                 chan_data + chan_data.clip(0, 1)
                 chan_data = kwimage.gaussian_blur(chan_data, sigma=1.2)
                 chan_data = chan_data.clip(0, 1)
                 mask = rng.randn(*dims)
-                chan_data = chan_data * ((kwimage.fourier_mask(chan_data, mask)[..., 0]) + .5)
-                chan_data += (rng.randn(*dims) * 0.1)
+                chan_data = chan_data * (
+                    (kwimage.fourier_mask(chan_data, mask)[..., 0]) + 0.5
+                )
+                chan_data += rng.randn(*dims) * 0.1
                 chan_data = chan_data.clip(0, 1)
                 chan_datas.append(chan_data)
             hwc_probs = np.stack(chan_datas, axis=2)
@@ -310,7 +326,7 @@ def _demo_construct_probs(pred_cxs, pred_scores, classes, rng, hacked=1):
         class_energy = class_energy / class_energy.sum(axis=1, keepdims=True)
         for p, x, s in zip(class_energy, pred_cxs, pred_scores2):
             # ensure sum to 1 when classes are known mutex
-            rest = p[0:x].sum() + p[x + 1:].sum()
+            rest = p[0:x].sum() + p[x + 1 :].sum()
             if s <= 1:
                 p[:] = p * ((1 - s) / rest)
             p[x] = s

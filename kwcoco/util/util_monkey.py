@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 
 class SupressPrint:
     """
@@ -8,6 +10,7 @@ class SupressPrint:
         **kw: only accepts "enabled"
             enabled (bool, default=True): enables or disables this context
     """
+
     def __init__(self, *mods, **kw):
         enabled = kw.get('enabled', True)
         self.mods = mods
@@ -109,5 +112,8 @@ class Reloadable(type):
         This helps remind them to remove this in production
         """
         import warnings
-        warnings.warn(f'Adding the Reloadable metaclass to {cls}. Dont forget to remove')
+
+        warnings.warn(
+            f'Adding the Reloadable metaclass to {cls}. Dont forget to remove'
+        )
         return metaclass.add_metaclass(cls)

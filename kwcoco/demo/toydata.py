@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Generates "toydata" for demo and testing purposes.
 
 Note:
@@ -11,5 +13,9 @@ from .toydata_video import random_single_video_dset, random_video_dset
 from .toydata_image import demodata_toy_dset, demodata_toy_img
 
 
-__all__ = ['demodata_toy_dset', 'random_single_video_dset',
-           'random_video_dset', 'demodata_toy_img']
+__all__ = [
+    'demodata_toy_dset',
+    'random_single_video_dset',
+    'random_video_dset',
+    'demodata_toy_img',
+]

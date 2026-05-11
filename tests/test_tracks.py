@@ -1,18 +1,20 @@
-
-
 def test_track_order():
     """
     Test that annotations indexed by track-id are returned in temporal order.
     """
 
     import pytest
+
     pytest.skip()
 
     import kwcoco
+
     dset = kwcoco.CocoDataset.demo(
-        'vidshapes', image_size=(8, 8), num_videos=1, num_frames=10)
+        'vidshapes', image_size=(8, 8), num_videos=1, num_frames=10
+    )
     vid_gids = list(dset.videos().images[0])
     import kwarray
+
     rng = kwarray.ensure_rng(10279128)
     # Add images in randomized orders and assert they are always returned in a
     # sorted order.
@@ -29,12 +31,14 @@ def test_track_order():
 
 def test_track_structures():
     import kwcoco
+
     self = kwcoco.CocoDataset.demo('vidshapes1', use_cache=False, verbose=100)
     assert len(self.dataset['tracks']) == self.n_tracks
 
 
 def test_add_tracks():
     import kwcoco
+
     self = kwcoco.CocoDataset()
 
     video_id = self.add_video(name='video1', id=9001)

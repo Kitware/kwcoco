@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 import ubelt as ub
 import scriptconfig as scfg
@@ -7,27 +9,41 @@ class CocoSubsetCLI(scfg.DataConfig):
     """
     Take a subset of this dataset and write it to a new file
     """
+
     __command__ = 'subset'
 
     src = scfg.Value(None, position=1, help='input dataset path')
 
     dst = scfg.Value(None, position=2, help='output dataset path')
 
-    include_categories = scfg.Value(None, type=str, help=ub.paragraph(
-            '''
+    include_categories = scfg.Value(
+        None,
+        type=str,
+        help=ub.paragraph(
+            """
             a comma separated list of categories, if specified only
             images containing these categories will be included.
-            '''))  # TODO: pattern matching?
+            """
+        ),
+    )  # TODO: pattern matching?
 
-    gids = scfg.Value(None, alias=['image_ids'], help=ub.paragraph(
-            '''
+    gids = scfg.Value(
+        None,
+        alias=['image_ids'],
+        help=ub.paragraph(
+            """
             A comma separated list of image ids. If specified, only
             consider these image ids. DEPRECATED. Can pass a YAML list of
             integer image ids directly to select_images.
-            '''))
+            """
+        ),
+    )
 
-    select_images = scfg.Value(None, type=str, help=ub.paragraph(
-            '''
+    select_images = scfg.Value(
+        None,
+        type=str,
+        help=ub.paragraph(
+            """
             Can be a coercable YAML list of image ids, or...
 
             A json query (via the jq spec) that specifies which images
@@ -45,10 +61,14 @@ class CocoSubsetCLI(scfg.DataConfig):
             pngs. .myattr | in({"val1": 1, "val4": 1}) will take images
             where myattr is either val1 or val4. Requires the "jq"
             python library is installed.
-            '''))
+            """
+        ),
+    )
 
-    select_videos = scfg.Value(None, help=ub.paragraph(
-            '''
+    select_videos = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
             Can be a coercable YAML list of video ids, or...
 
             A json query (via the jq spec) that specifies which videos
@@ -59,31 +79,45 @@ class CocoSubsetCLI(scfg.DataConfig):
             will select only videos where the name starts with foo. Only
             applicable for dataset that contain videos. Requires the
             "jq" python library is installed.
-            '''))
+            """
+        ),
+    )
 
-    channels = scfg.Value(None, help=ub.paragraph(
-            '''
+    channels = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
             if specified select only images that contain these channels
             (specified as a delayed-image channel spec)
-            '''))
+            """
+        ),
+    )
 
     # FIXME: this can cause issues if the src kwcoco points to files
     # outside of its bundle directory. Is there an inuitive way to handle
     # this? Maybe this followed by a move-assets operation?
-    copy_assets = scfg.Value(False, help=ub.paragraph(
-            '''
+    copy_assets = scfg.Value(
+        False,
+        help=ub.paragraph(
+            """
             if True copy the assests to the new bundle directory
-            '''))
+            """
+        ),
+    )
 
     compress = scfg.Value('auto', help='if True writes results with compression')
 
-    absolute = scfg.Value('auto', help=ub.paragraph(
-            '''
+    absolute = scfg.Value(
+        'auto',
+        help=ub.paragraph(
+            """
             if True will reroot all paths to be absolute before writing.
             If "auto", becomes True if the dest dataset is written
             outside of the source bundle directory and copy_assets is
             False.
-            '''))
+            """
+        ),
+    )
 
     # TODO: Add more filter criteria
     #
@@ -146,8 +180,7 @@ class CocoSubsetCLI(scfg.DataConfig):
                 dst_bundle_dpath = dst_fpath.absolute().parent
 
                 # Destinations are different, we will need to force a reroot
-                absolute = (src_bundle_dpath.resolve() !=
-                            dst_bundle_dpath.resolve())
+                absolute = src_bundle_dpath.resolve() != dst_bundle_dpath.resolve()
             else:
                 absolute = False
         else:
@@ -170,6 +203,7 @@ class CocoSubsetCLI(scfg.DataConfig):
             # TODO use kwutil copy manager
             from os.path import join, dirname
             import shutil
+
             print('Copying assets')
             # new_dset.reroot(new_dset.bundle_dpath, old_prefix=dset.bundle_dpath)
             tocopy = []
@@ -273,29 +307,36 @@ def query_subset(dset, config):
             cid = dset._resolve_to_cat(cname)['id']
             chosen_cids.append(cid)
 
-        category_gids = set(ub.flatten(ub.take(
-            dset.index.cid_to_gids, set(chosen_cids))))
+        category_gids = set(
+            ub.flatten(ub.take(dset.index.cid_to_gids, set(chosen_cids)))
+        )
 
         valid_gids &= category_gids
 
     from kwcoco._helpers import _query_image_ids
+
     # TODO: more the rest of the filters into this helper and normalize them.
     valid_gids = _query_image_ids(
         coco_dset=dset,
         select_images=config['select_images'],
         select_videos=config['select_videos'],
-        valid_image_ids=valid_gids)
+        valid_image_ids=valid_gids,
+    )
 
     if config['channels'] is not None:
         from delayed_image.channel_spec import ChannelSpec
+
         requested_chans = ChannelSpec(config['channels'])
         valid_gids = [
-            gid for gid in valid_gids
-            if (requested_chans & dset.coco_image(gid).channels).numel() == requested_chans.numel()
+            gid
+            for gid in valid_gids
+            if (requested_chans & dset.coco_image(gid).channels).numel()
+            == requested_chans.numel()
         ]
 
     new_dset = dset.subset(valid_gids)
     return new_dset
+
 
 if __name__ == '__main__':
     __cli__.main()

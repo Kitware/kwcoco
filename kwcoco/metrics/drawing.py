@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import numpy as np
 import ubelt as ub
 import warnings
 
 
-def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
-                      fp_axis='count', **kw):
+def draw_perclass_roc(
+    cx_to_info, classes=None, prefix='', fnum=1, fp_axis='count', **kw
+):
     """
     Args:
         cx_to_info (kwcoco.metrics.confusion_measures.PerClass_Measures | Dict):
@@ -12,6 +15,7 @@ def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
         fp_axis (str): can be count or rate
     """
     import kwplot
+
     # Sort by descending AP
     cxs = list(cx_to_info.keys())
     priority = np.array([item['auc'] for item in cx_to_info.values()])
@@ -55,12 +59,19 @@ def draw_perclass_roc(cx_to_info, classes=None, prefix='', fnum=1,
             xydata[label] = (fpr, tpr)
 
     ax = kwplot.multi_plot(
-        xydata=xydata, fnum=fnum,
-        ylim=(0, 1), xpad=0.01, ypad=0.01,
-        xlabel=xlabel, ylabel='TPR',
+        xydata=xydata,
+        fnum=fnum,
+        ylim=(0, 1),
+        xpad=0.01,
+        ypad=0.01,
+        xlabel=xlabel,
+        ylabel='TPR',
         title=prefix + 'perclass mAUC={:.4f}'.format(mAUC),
         legend_loc='lower right',
-        color='distinct', linestyle='cycle', marker='cycle', **kw
+        color='distinct',
+        linestyle='cycle',
+        marker='cycle',
+        **kw,
     )
     return ax
 
@@ -134,6 +145,7 @@ def concice_si_display(val, eps=1e-8, precision=2, si_thresh=4):
         >>> print(concice_si_display(01.00000000000000000000000000043))
     """
     import math
+
     ndigits = 1 if val == 0 else int(math.log10(abs(val)))
     if ndigits <= 4 and (abs(val) > 1 or abs(val) < eps):
         try:
@@ -156,6 +168,7 @@ def format_scientific_notation(val, precision=2):
     val_str = ('{:.' + str(precision) + 'e}').format(val)
     lhs, rhs = val_str.split('e')
     import re
+
     trailing_zeros = re.compile(r'\.0*$')
     rhs = rhs.replace('+', '')
     rhs = rhs.lstrip('0')
@@ -238,6 +251,7 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
 
     """
     import kwplot
+
     # Sort by descending AP
     cxs = list(cx_to_info.keys())
     priority = np.array([item['ap'] for item in cx_to_info.values()])
@@ -281,11 +295,11 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
     if 0:
         import seaborn as sns
         import pandas as pd
+
         # sns.set()
         # TODO: deprecate multi_plot for seaborn?
         data_groups = {
-            key: {'recall': r, 'precision': p}
-            for key, (r, p) in xydata.items()
+            key: {'recall': r, 'precision': p} for key, (r, p) in xydata.items()
         }
         print('data_groups = {}'.format(ub.urepr(data_groups, nl=3)))
 
@@ -300,7 +314,9 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
         ax = fig.gca()
         longform = []
         for key, (r, p) in xydata.items():
-            subdata = pd.DataFrame.from_dict({'recall': r, 'precision': p, 'label': key})
+            subdata = pd.DataFrame.from_dict(
+                {'recall': r, 'precision': p, 'label': key}
+            )
             longform.append(subdata)
         data = pd.concat(longform)
 
@@ -308,8 +324,12 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
         # markers = ub.dzip(xydata.keys(), kwplot.distinct_markers(len(xydata)))
 
         sns.lineplot(
-            data=data, x='recall', y='precision',
-            hue='label', style='label', ax=ax,
+            data=data,
+            x='recall',
+            y='precision',
+            hue='label',
+            style='label',
+            ax=ax,
             # markers=markers,
             estimator=None,
             ci=0,
@@ -321,18 +341,28 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
 
     else:
         ax = kwplot.multi_plot(
-            xydata=xydata, fnum=fnum,
-            xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
-            xlabel='recall', ylabel='precision',
+            xydata=xydata,
+            fnum=fnum,
+            xlim=(0, 1),
+            ylim=(0, 1),
+            xpad=0.01,
+            ypad=0.01,
+            xlabel='recall',
+            ylabel='precision',
             err_style='bars',
             title=prefix + 'OVR mAP={:.4f}'.format(mAP),
             legend_loc='lower right',
-            color='distinct', linestyle='cycle', marker='cycle', **kw
+            color='distinct',
+            linestyle='cycle',
+            marker='cycle',
+            **kw,
         )
     return ax
 
 
-def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnum=1, **kw):
+def draw_perclass_thresholds(
+    cx_to_info, key='mcc', classes=None, prefix='', fnum=1, **kw
+):
     """
     Args:
         cx_to_info (kwcoco.metrics.confusion_measures.PerClass_Measures | Dict):
@@ -357,6 +387,7 @@ def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnu
         >>> kwplot.show_if_requested()
     """
     import kwplot
+
     # Sort by descending "best value"
     cxs = list(cx_to_info.keys())
 
@@ -390,12 +421,20 @@ def draw_perclass_thresholds(cx_to_info, key='mcc', classes=None, prefix='', fnu
         warnings.filterwarnings('ignore', 'Mean of empty slice', RuntimeWarning)
 
     ax = kwplot.multi_plot(
-        xydata=xydata, fnum=fnum,
-        xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
-        xlabel='threshold', ylabel=key,
+        xydata=xydata,
+        fnum=fnum,
+        xlim=(0, 1),
+        ylim=(0, 1),
+        xpad=0.01,
+        ypad=0.01,
+        xlabel='threshold',
+        ylabel=key,
         title=prefix + 'OVR {}'.format(key),
         legend_loc='lower right',
-        color='distinct', linestyle='cycle', marker='cycle', **kw
+        color='distinct',
+        linestyle='cycle',
+        marker='cycle',
+        **kw,
     )
     return ax
 
@@ -430,6 +469,7 @@ def draw_roc(info, prefix='', fnum=1, **kw):
         >>> kwplot.show_if_requested()
     """
     import kwplot
+
     try:
         fp_count = info['trunc_fp_count']
         fp_rate = info['trunc_fpr']
@@ -451,6 +491,7 @@ def draw_roc(info, prefix='', fnum=1, **kw):
     color = kw.pop('color', None)
     if color is None:
         import kwimage
+
         color = kwimage.Color.coerce('kitware_blue').as01()
 
     if 0:
@@ -458,6 +499,7 @@ def draw_roc(info, prefix='', fnum=1, **kw):
         fig = kwplot.figure(fnum=fnum)
         ax = fig.gca()
         import seaborn as sns
+
         xlabel = 'fpr (count={})'.format(falsepos_total)
         ylabel = 'tpr (count={})'.format(int(realpos_total))
         data = {
@@ -470,15 +512,22 @@ def draw_roc(info, prefix='', fnum=1, **kw):
         realpos_total_disp = concice_si_display(realpos_total)
 
         ax = kwplot.multi_plot(
-            list(fp_rate), list(tp_rate), marker='',
+            list(fp_rate),
+            list(tp_rate),
+            marker='',
             # xlabel='FA count (false positive count)',
             xlabel='fpr (count={})'.format(falsepos_total),
             ylabel='tpr (count={})'.format(realpos_total_disp),
             label=label,
             title=title,
-            ylim=(0, 1), ypad=1e-2,
-            xlim=(0, 1), xpad=1e-2,
-            fnum=fnum, color=color, **kw)
+            ylim=(0, 1),
+            ypad=1e-2,
+            xlim=(0, 1),
+            xpad=1e-2,
+            fnum=fnum,
+            color=color,
+            **kw,
+        )
 
     return ax
 
@@ -506,6 +555,7 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
         >>> kwplot.show_if_requested()
     """
     import kwplot
+
     aps = []
     ap = info['ap']
     if 'pr' in info:
@@ -532,17 +582,28 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
     color = kw.pop('color', None)
     if color is None:
         import kwimage
+
         color = kwimage.Color.coerce('kitware_green').as01()
 
     node = info.get('node', 'classless')
 
     ax = kwplot.multi_plot(
-        xdata=recall, ydata=precision, fnum=fnum, label=label,
-        xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
-        xlabel='recall', ylabel='precision',
+        xdata=recall,
+        ydata=precision,
+        fnum=fnum,
+        label=label,
+        xlim=(0, 1),
+        ylim=(0, 1),
+        xpad=0.01,
+        ypad=0.01,
+        xlabel='recall',
+        ylabel='precision',
         title=prefix + '{} AP={:.4f}'.format(node, ap),
         legend_loc='lower right',
-        color=color, linestyle='cycle', marker='cycle', **kw
+        color=color,
+        linestyle='cycle',
+        marker='cycle',
+        **kw,
     )
 
     # if 0:
@@ -593,6 +654,7 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     """
     import kwplot
     import kwimage
+
     thresh = info['thresholds']
 
     if keys is None:
@@ -642,13 +704,20 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
         idx_to_best_pt[idx] = (best_thresh, best_measure)
 
     ax = kwplot.multi_plot(
-        xydata=xydata, fnum=fnum,
-        xlim=(0, 1), ylim=(0, 1), xpad=0.01, ypad=0.01,
-        xlabel='threshold', ylabel=key,
+        xydata=xydata,
+        fnum=fnum,
+        xlim=(0, 1),
+        ylim=(0, 1),
+        xpad=0.01,
+        ypad=0.01,
+        xlabel='threshold',
+        ylabel=key,
         title=prefix + 'threshold curves',
         legend_loc='lower right',
         color=colors,
-        linestyle='cycle', marker='cycle', **kw
+        linestyle='cycle',
+        marker='cycle',
+        **kw,
     )
     ax.set_ylabel('quality')
     for idx, best_pt in idx_to_best_pt.items():
@@ -658,8 +727,14 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
 
         # ax.plot(best_thresh, best_measure, '*', color=color, edgecolor=edgecolor)
         ax.scatter(
-            best_thresh, best_measure, marker='*', edgecolor=edgecolor,
-            facecolor=color, s=120, zorder=10)
+            best_thresh,
+            best_measure,
+            marker='*',
+            edgecolor=edgecolor,
+            facecolor=color,
+            s=120,
+            zorder=10,
+        )
     return ax
 
 
@@ -669,14 +744,16 @@ def determenistic_colors(keys, preset_colors):
     needs_colors = set(keys) - set(known_colors)
     if needs_colors:
         import matplotlib as mpl
-        import matplotlib._cm  as _cm
+        import matplotlib._cm as _cm
+
         cm = mpl.colors.LinearSegmentedColormap.from_list(
-            'gist_rainbow', _cm.datad['gist_rainbow'],
-            mpl.rcParams['image.lut'])
+            'gist_rainbow', _cm.datad['gist_rainbow'], mpl.rcParams['image.lut']
+        )
         for color in needs_colors:
             # Get a randomized color that is determined by the name of the
             # color so it is at least consistent.
             import kwarray
+
             seed = int(ub.hash_data(color, base=10)[0:12])
             rng = kwarray.ensure_rng(seed)
             known_colors[color] = cm(rng.rand())
@@ -688,4 +765,5 @@ if __name__ == '__main__':
     xdoctest ~/code/kwcoco/kwcoco/metrics/drawing.py
     """
     import xdoctest
+
     xdoctest.doctest_module(__file__)

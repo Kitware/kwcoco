@@ -1,4 +1,6 @@
 """
+from __future__ import annotations
+
 Vectorized ORM-like objects used in conjunction with coco_dataset.
 
 This powers the ``.images()``, ``.videos()``, and ``.annotation()`` methods of
@@ -15,6 +17,7 @@ See:
     :func:`kwcoco.coco_dataset.MixinCocoObjects.tracks`
 
 """
+
 import collections.abc
 from os.path import join
 import numpy as np
@@ -151,11 +154,13 @@ class ObjectList1D(ub.NiceRepr):
             >>> assert len(list(objs_iter)) == 0, 'should be exhausted'
         """
         ub.schedule_deprecation(
-            'kwcoco', name='.objs_iter()', type='method',
-            deprecate='0.8.8', error='1.0.0', remove='1.1.0',
-            migration=(
-                'use `.objs` instead.'
-            )
+            'kwcoco',
+            name='.objs_iter()',
+            type='method',
+            deprecate='0.8.8',
+            error='1.0.0',
+            remove='1.1.0',
+            migration=('use `.objs` instead.'),
         )
         return ub.take(self._id_to_obj, self._ids)
 
@@ -344,14 +349,17 @@ class ObjectList1D(ub.NiceRepr):
             try:
                 # TODO: check if the column is in the structured schema
                 return self._dset._column_lookup(
-                    tablename=self._key, key=key, rowids=self._ids,
-                    default=default)
+                    tablename=self._key, key=key, rowids=self._ids, default=default
+                )
             except KeyError:
                 # We can read only the unstructured bit, which is the best we
                 # can do in this case.
                 _lutv = self._dset._column_lookup(
-                    tablename=self._key, key='_unstructured', rowids=self._ids,
-                    default=default)
+                    tablename=self._key,
+                    key='_unstructured',
+                    rowids=self._ids,
+                    default=default,
+                )
                 _lut = dict(zip(self._ids, _lutv))
         else:
             _lut = self._id_to_obj
@@ -422,7 +430,7 @@ class ObjectList1D(ub.NiceRepr):
         self._set(key, values)
 
     def _set(self, key, values):
-        """ faster less safe version of set """
+        """faster less safe version of set"""
         objs = ub.take(self._id_to_obj, self._ids)
         for obj, value in zip(objs, values):
             obj[key] = value
@@ -499,6 +507,7 @@ class ObjectGroups(ub.NiceRepr):
     """
     An object for holding a groups of :class:`ObjectList1D` objects
     """
+
     def __init__(self, groups, dset):
         """
         Args:
@@ -542,8 +551,7 @@ class ObjectGroups(ub.NiceRepr):
         num = len(self._groups)
         mean = np.mean(len_list)
         std = np.std(len_list)
-        nice = 'n={!r}, {}={:.1f}, {}={:.1f}'.format(
-            num, mu, mean, sigma, std)
+        nice = 'n={!r}, {}={:.1f}, {}={:.1f}'.format(num, mu, mean, sigma, std)
         return nice
 
 
@@ -563,6 +571,7 @@ class Categories(ObjectList1D):
         >>> print('self.name = {!r}'.format(self.name))
         >>> print('self.supercategory = {!r}'.format(self.supercategory))
     """
+
     def __init__(self, ids, dset):
         """
         Args:
@@ -600,6 +609,7 @@ class Videos(ObjectList1D):
         >>> print('self = {!r}'.format(self))
         self = <Videos(num=5) at ...>
     """
+
     def __init__(self, ids, dset):
         """
         Args:
@@ -621,8 +631,8 @@ class Videos(ObjectList1D):
             <ImageGroups(n=8, m=2.0, s=0.0)>
         """
         return ImageGroups(
-            [self._dset.images(video_id=vidid) for vidid in self._ids],
-            self._dset)
+            [self._dset.images(video_id=vidid) for vidid in self._ids], self._dset
+        )
 
 
 class Images(ObjectList1D):
@@ -658,11 +668,13 @@ class Images(ObjectList1D):
             CocoImage
         """
         ub.schedule_deprecation(
-            'kwcoco', name='Images.coco_images_iter()', type='method',
-            deprecate='0.8.8', error='1.0.0', remove='1.1.0',
-            migration=(
-                'use `.coco_images` instead.'
-            )
+            'kwcoco',
+            name='Images.coco_images_iter()',
+            type='method',
+            deprecate='0.8.8',
+            error='1.0.0',
+            remove='1.1.0',
+            migration=('use `.coco_images` instead.'),
         )
         yield from (self._dset.coco_image(gid) for gid in self)
 
@@ -784,8 +796,9 @@ class Images(ObjectList1D):
             >>> print(self.annots)
             <AnnotGroups(n=3, m=3.7, s=3.9)>
         """
-        return AnnotGroups([self._dset.annots(sorted(aids))
-                            for aids in self.aids], self._dset)
+        return AnnotGroups(
+            [self._dset.annots(sorted(aids)) for aids in self.aids], self._dset
+        )
 
 
 class Annots(ObjectList1D):
@@ -816,7 +829,7 @@ class Annots(ObjectList1D):
 
     @property
     def aids(self):
-        """ The annotation ids of this column of annotations """
+        """The annotation ids of this column of annotations"""
         return self._ids
 
     @property
@@ -931,6 +944,7 @@ class Annots(ObjectList1D):
             >>> print('dets.meta = {!r}'.format(dets.meta))
         """
         import kwimage
+
         anns = [self._id_to_obj[aid] for aid in self.aids]
         dets = kwimage.Detections.from_coco_annots(anns, dset=self._dset)
         # dets.data['aids'] = np.array(self.aids)
@@ -954,6 +968,7 @@ class Annots(ObjectList1D):
                        [156, 130,  45,  18]]))>
         """
         import kwimage
+
         xywh = self.lookup('bbox')
         boxes = kwimage.Boxes(xywh, 'xywh')
         return boxes
@@ -994,11 +1009,13 @@ class Annots(ObjectList1D):
             >>> print(self.xywh)
         """
         ub.schedule_deprecation(
-            'kwcoco', name='Annots.xywh', type='property',
-            deprecate='0.4.0', error='1.0.0', remove='1.1.0',
-            migration=(
-                'use `Annots.lookup("bbox")`.'
-            )
+            'kwcoco',
+            name='Annots.xywh',
+            type='property',
+            deprecate='0.4.0',
+            error='1.0.0',
+            remove='1.1.0',
+            migration=('use `Annots.lookup("bbox")`.'),
         )
 
         xywh = self.lookup('bbox')
@@ -1032,7 +1049,7 @@ class Tracks(ObjectList1D):
 
     @property
     def track_ids(self):
-        """ The annotation ids of this column of annotations """
+        """The annotation ids of this column of annotations"""
         return self._ids
 
     @property
@@ -1082,6 +1099,7 @@ class AnnotGroups(ObjectGroups):
         >>> print(group.lookup('category_id'))
         [[1, 2, 3, 4, 5, 5, 5, 5, 5], [6, 4], []]
     """
+
     _cls1d = Annots
 
     @property
@@ -1161,6 +1179,7 @@ class ImageGroups(ObjectGroups):
         >>> print(group.lookup('frame_index'))
         [[0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1]]
     """
+
     _cls1d = Images
 
 
@@ -1169,6 +1188,7 @@ class _BaseView(collections.abc.Sequence):
     This class works around a previous design decision where `.objs` was a
     property that returned a list instead of an iterator.
     """
+
     # Do we want this?
     # def __call__(self):
     #     """
@@ -1188,6 +1208,7 @@ class ObjView(_BaseView):
     """
     A proxy for an iterator over object dictionaries
     """
+
     def __init__(self, id_to_obj, ids):
         self._id_to_obj = id_to_obj
         self._ids = ids
@@ -1210,6 +1231,7 @@ class CocoImageView(_BaseView):
     """
     A proxy for an iterator over CocoImage objects
     """
+
     def __init__(self, getter, ids):
         self._getter = getter
         self._ids = ids

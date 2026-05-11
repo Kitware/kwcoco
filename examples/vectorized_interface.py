@@ -5,6 +5,7 @@ def demo_vectorized_interface():
     """
     import kwcoco
     import ubelt as ub
+
     # Dummy data for the demo
     coco_dset = kwcoco.CocoDataset.demo('vidshapes3', num_frames=5)
     # Reroot to make file-paths more readable in this demo as relative paths

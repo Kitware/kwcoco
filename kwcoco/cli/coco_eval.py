@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python
 """
 Wraps the logic in kwcoco/coco_evaluator.py with a command line script
@@ -15,27 +17,40 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     SeeAlso:
         python -m kwcoco.metrics.segmentation_metrics --help
     """
+
     __command__ = 'eval'
     __alias__ = ['eval_detections', 'evaluate_detections']
 
     # These should go into the CLI args, not the class config args
     expt_title = scfg.Value('', type=str, help='title for plots', tags=['perf_param'])
     draw = scfg.Value(True, isflag=1, help='draw metric plots', tags=['perf_param'])
-    out_dpath = scfg.Value('./coco_metrics', type=str, help='where to dump results', tags=['out_path'])
-    out_fpath = scfg.Value('auto', type=str, help=ub.paragraph(
-        '''
+    out_dpath = scfg.Value(
+        './coco_metrics', type=str, help='where to dump results', tags=['out_path']
+    )
+    out_fpath = scfg.Value(
+        'auto',
+        type=str,
+        help=ub.paragraph(
+            """
         Where to dump the json file containing result. If "auto",
         defaults to out_dpath / "metrics.json"
-        '''), tags=['out_path', 'primary'])
+        """
+        ),
+        tags=['out_path', 'primary'],
+    )
 
-    confusion_fpath = scfg.Value(None, help=ub.paragraph(
-        '''
+    confusion_fpath = scfg.Value(
+        None,
+        help=ub.paragraph(
+            """
         if specified, write a kwcoco file with confusion labels for further
         inspection and visualization. A script to perform visualization will
         also be written as a sidecar. Note, that multiple confusion files may
         be written if multiple thresholds are were requested, and this path
         will symlink to that final path.
-        '''))
+        """
+        ),
+    )
 
     @classmethod
     def main(cls, cmdline=True, **kw):
@@ -103,6 +118,7 @@ def main(cmdline=True, **kw):
     """
     import kwimage
     import kwarray
+
     cli_config = CocoEvalCLI.cli(cmdline=cmdline, data=kw)
     print('cli_config = {}'.format(ub.urepr(cli_config, nl=1)))
 
@@ -125,10 +141,7 @@ def main(cmdline=True, **kw):
     results.dump(metrics_fpath, indent='    ')
 
     if cli_config['draw']:
-        results.dump_figures(
-            out_dpath,
-            expt_title=cli_config['expt_title']
-        )
+        results.dump_figures(out_dpath, expt_title=cli_config['expt_title'])
 
     DO_CONFUSION_DUMP = cli_config.confusion_fpath is not None
     if DO_CONFUSION_DUMP:
@@ -146,11 +159,16 @@ def main(cmdline=True, **kw):
         for key, cfsn_dset in key_to_cfsn_dset.items():
             # augment confusion path based on key
             confusion_fpath = ub.Path(requested_confusion_fpath)
-            confusion_fpath = confusion_fpath.augment(stemsuffix='-' + key, multidot=True)
+            confusion_fpath = confusion_fpath.augment(
+                stemsuffix='-' + key, multidot=True
+            )
 
             try:
                 import kwutil
-                new_name = kwutil.util_path.sanitize_path_name(confusion_fpath.name, safe=True)
+
+                new_name = kwutil.util_path.sanitize_path_name(
+                    confusion_fpath.name, safe=True
+                )
                 confusion_fpath = confusion_fpath.parent / new_name
             except ImportError:
                 ...
@@ -164,7 +182,9 @@ def main(cmdline=True, **kw):
                 # Also write the confusion viz script, requires geowatch is
                 # installed (in the future geowatch visualize should be moved
                 # to kwcoco proper)
-                viz_script_fpath = confusion_fpath.augment(prefix='visualize_', ext='.sh')
+                viz_script_fpath = confusion_fpath.augment(
+                    prefix='visualize_', ext='.sh'
+                )
                 channels = cfsn_dset.coco_image(ub.peek(cfsn_dset.imgs)).channels
                 if channels is not None:
                     channel_spec = channels.spec
@@ -172,7 +192,7 @@ def main(cmdline=True, **kw):
                 else:
                     channel_arg = ''
                 viz_script_text = ub.codeblock(
-                    rf'''
+                    rf"""
                     #!/bin/bash
                     geowatch visualize {cfsn_dset.fpath} --smart --animate=False \
                         {channel_arg} \
@@ -180,7 +200,8 @@ def main(cmdline=True, **kw):
                         --draw_imgs=False --draw_anns=True \
                         --max_dim=640 --draw_chancode=False \
                         --draw_header=False
-                    ''')
+                    """
+                )
                 viz_script_fpath.write_text(viz_script_text)
                 try:
                     viz_script_fpath.chmod('+x')
@@ -188,10 +209,12 @@ def main(cmdline=True, **kw):
                     ...
 
         assert confusion_fpath is not None
-        ub.symlink(real_path=confusion_fpath,
-                   link_path=requested_confusion_fpath,
-                   overwrite=True,
-                   verbose=1)
+        ub.symlink(
+            real_path=confusion_fpath,
+            link_path=requested_confusion_fpath,
+            overwrite=True,
+            verbose=1,
+        )
 
     if 'coco_dset' in coco_eval.true_extra:
         truth_dset = coco_eval.true_extra['coco_dset']
@@ -209,8 +232,8 @@ def main(cmdline=True, **kw):
         for gid, groupx in zip(gids, groupxs):
             true_vec = results.cfsn_vecs.data['true'][groupx]
             pred_vec = results.cfsn_vecs.data['pred'][groupx]
-            is_true = (true_vec > 0)
-            is_pred = (pred_vec > 0)
+            is_true = true_vec > 0
+            is_pred = pred_vec > 0
             has_pred = is_true & is_pred
 
             stats = {
@@ -256,6 +279,7 @@ def build_confusion_datasets(coco_eval, results):
     For each result build the confusion dataset
     """
     import kwimage  # NOQA
+
     # CONFUSION_COLORS = {
     #     'pred_false_positive': kwimage.Color.coerce('kitware_red').ashex(),
     #     'pred_true_positive': kwimage.Color.coerce('kitware_blue').ashex(),
@@ -278,7 +302,6 @@ def build_confusion_datasets(coco_eval, results):
 
     assert len(results) == 1, 'not impl'
     for key, result in results.items():
-
         # TODO: add an info section about the confusion
 
         cfsn_dset = pred_dset.copy()
@@ -291,16 +314,19 @@ def build_confusion_datasets(coco_eval, results):
 
         # Mark the predicted annotations in the confusion dataset
         for ann in cfsn_dset.annots().objs_iter():
-            ann.update({
-                'role': 'pred',
-                'confusion': None,
-                'color': CONFUSION_COLORS[None],
-            })
+            ann.update(
+                {
+                    'role': 'pred',
+                    'confusion': None,
+                    'color': CONFUSION_COLORS[None],
+                }
+            )
 
         cfsn_vecs = result.cfsn_vecs
         bin_vecs = cfsn_vecs.binarize_classless()
-        for gid, tx, px in zip(bin_vecs.data['gid'], bin_vecs.data['txs'], bin_vecs.data['pxs']):
-
+        for gid, tx, px in zip(
+            bin_vecs.data['gid'], bin_vecs.data['txs'], bin_vecs.data['pxs']
+        ):
             pred_gid = gid  # is this the pred gid?
 
             true_dets = dmet.gid_to_true_dets[gid]

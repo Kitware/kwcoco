@@ -87,6 +87,7 @@ def test_with_one_image_and_no_truth():
                 row[f'{catname}_{metric}'] = measures[metric]
         rows.append(row)
     import pandas as pd
+
     df = pd.DataFrame(rows)
     print(df.T.to_string())
 
@@ -99,8 +100,12 @@ def test_score_kwcoco_exposes_errors(monkeypatch):
 
     classes = ['class_1']
     dmet = DetectionMetrics(classes=classes)
-    dmet.add_truth(kwimage.Detections.random(0, classes=classes, rng=0), imgname='image1')
-    dmet.add_predictions(kwimage.Detections.random(0, classes=classes, rng=1), imgname='image1')
+    dmet.add_truth(
+        kwimage.Detections.random(0, classes=classes, rng=0), imgname='image1'
+    )
+    dmet.add_predictions(
+        kwimage.Detections.random(0, classes=classes, rng=1), imgname='image1'
+    )
 
     def raise_error(self, *args, **kwargs):
         raise ValueError('kaboom')
@@ -162,7 +167,6 @@ def test_with_multiple_images_and_some_have_no_truth():
     # Generate multiple truth / predictions
     num_images = 10
     for image_idx in range(num_images):
-
         # For every even numbered image, force it to be empty, otherwise
         # use a random number of truth objects.
         num_truth = 0 if image_idx % 2 == 0 else rng.randint(max_tp)
@@ -170,7 +174,7 @@ def test_with_multiple_images_and_some_have_no_truth():
 
         # Generate random prediction by randomly droping truth, perterbing
         # them, and adding false positives
-        keep_flags = (rng.rand(len(true_dets)) > p_keep)
+        keep_flags = rng.rand(len(true_dets)) > p_keep
         transform = kwimage.Affine.scale(scale_distri.sample())
         true_subset = true_dets.compress(keep_flags).warp(transform)
         num_fp = rng.randint(max_fp)
@@ -280,17 +284,17 @@ def test_auc_all_tp_no_fp_regression():
 
     # 3 positives, explicitly 0 negatives
     info = {
-        "thresholds": np.array([0.9, 0.7, 0.5, -np.inf]),
-        "tp_count":   np.array([0,   1,   2,   3]),
-        "fp_count":   np.array([0,   0,   0,   0]),
-        "fn_count":   np.array([3,   2,   1,   0]),
-        "tn_count":   np.array([0,   0,   0,   0]),
-        "realpos_total": 3,
-        "realneg_total": 0,
+        'thresholds': np.array([0.9, 0.7, 0.5, -np.inf]),
+        'tp_count': np.array([0, 1, 2, 3]),
+        'fp_count': np.array([0, 0, 0, 0]),
+        'fn_count': np.array([3, 2, 1, 0]),
+        'tn_count': np.array([0, 0, 0, 0]),
+        'realpos_total': 3,
+        'realneg_total': 0,
     }
 
     m = Measures(info).reconstruct()
     print(f'm={m}')
 
-    assert m["trunc_auc"] == 1.0
-    assert m["auc"] == 1.0
+    assert m['trunc_auc'] == 1.0
+    assert m['auc'] == 1.0
