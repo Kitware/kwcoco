@@ -9,7 +9,8 @@ import os
 import tarfile
 import zipfile
 from os.path import relpath
-
+from typing import Dict, Tuple, Literal, Iterator
+from types import ModuleType
 
 class Archive:
     """
@@ -65,12 +66,18 @@ class Archive:
         >>>     print(open(fpath, 'r').read())
     """
 
-    _available_backends = {
+    _available_backends: Dict[str, ModuleType] = {
         'tarfile': tarfile,
         'zipfile': zipfile,
     }
 
-    def __init__(self, fpath=None, mode='r', backend=None, file=None):
+    def __init__(
+        self, 
+        fpath: str | None = None, 
+        mode: Literal['r', 'w'] = 'r', 
+        backend: str | ModuleType | None = None, 
+        file: tarfile.TarFile | zipfile.ZipFile| None = None
+    ) -> None:
         """
         Args:
             fpath (str | None): path to open
@@ -86,19 +93,31 @@ class Archive:
         """
         self.fpath = fpath
         self.mode = mode
-        self.file = file
-        self.backend = self._available_backends.get(backend, backend)
 
+        if isinstance(backend, str):
+            backend = self._available_backends.get(backend)
+            if backend is None:
+                raise ValueError("unknown backend")
+        
         if file is None:
+            if fpath is None:
+                raise ValueError("file and fpath are None")        
             file, backend = self._open(fpath, mode, backend)
-            self.file = file
-            self.backend = backend
+            
+        self.file = file
+        self.backend = backend
 
     @classmethod
-    def _open(cls, fpath, mode, backend=None):
+    def _open(
+        cls, 
+        fpath: str, 
+        mode: Literal['r', 'w'] = 'r',
+        backend: str | ModuleType | None = None,
+    ) -> Tuple[tarfile.TarFile | zipfile.ZipFile , ModuleType]:
         fpath = os.fspath(fpath)
         exist_flag = os.path.exists(fpath)
-        backend = cls._available_backends.get(backend, backend)
+        if isinstance(backend, str):
+            backend = cls._available_backends.get(backend, None) or backend
         if backend is None:
             if fpath.endswith('.tar.gz'):
                 backend = tarfile
@@ -111,6 +130,8 @@ class Archive:
                     backend = tarfile
                 else:
                     raise NotImplementedError('no-exist case')
+
+        file: tarfile.TarFile | zipfile.ZipFile
         if backend is zipfile:
             if exist_flag and not zipfile.is_zipfile(fpath):
                 raise Exception('corrupted zip?')
@@ -118,20 +139,25 @@ class Archive:
         elif backend is tarfile:
             if exist_flag and not tarfile.is_tarfile(fpath):
                 raise Exception('corrupted tar.gz?')
-            file = tarfile.open(fpath, mode + ':gz')
+            if mode == 'r':
+                tar_mode: Literal['r:gz', 'w:gz'] = 'r:gz'
+            else:
+                tar_mode = 'w:gz'
+            file = tarfile.open(fpath, tar_mode)
         else:
             raise NotImplementedError
         return file, backend
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return self.names()
 
-    def names(self):
+    def names(self) -> Iterator[str]:
+        from typing import cast
         if self.backend is tarfile:
-            return (mem.name for mem in self.file)
-        elif self.backend is zipfile:
+            return (mem.name for mem in cast(tarfile.TarFile, self.file))
+        else:
             # does zip have an iterable structure?
-            return iter(self.file.namelist())
+            return iter(cast(zipfile.ZipFile, self.file).namelist())
 
     def read(self, name, mode='rb'):
         """
@@ -189,6 +215,7 @@ class Archive:
         if isinstance(data, str):
             return cls(data)
         if isinstance(data, zipfile.ZipFile):
+            assert data.fp is not None, 'ZipFile has no associated file object'
             fpath = data.fp.name
             return cls(fpath, file=data, backend=zipfile)
         else:
@@ -196,6 +223,7 @@ class Archive:
 
     def add(self, fpath, arcname=None):
         if arcname is None:
+            assert self.fpath is not None, 'fpath must be set to compute arcname'
             arcname = relpath(fpath, dirname(self.fpath))
         if self.backend is tarfile:
             self.file.add(fpath, arcname)
@@ -206,11 +234,11 @@ class Archive:
         return self.file.close()
 
     def __enter__(self):
-        self.__file__.__enter__()
+        self.file.__enter__()
         return self
 
     def __exit__(self, *args):
-        self.__file__.__exit__(*args)
+        self.file.__exit__(*args)
 
     def extractall(self, output_dpath='.', verbose=1, overwrite=True):
         if verbose:
@@ -255,10 +283,10 @@ def unarchive_file(archive_fpath, output_dpath='.', verbose=1, overwrite=True):
                 for mem in ub.ProgIter(iter(archive_file), desc='enumerate members')
             ]
         elif zipfile.is_zipfile(archive_fpath):
-            zip_file = zipfile.ZipFile(archive_fpath)
+            archive_file = zipfile.ZipFile(archive_fpath)
             if verbose:
                 print('Enumerate members')
-            archive_namelist = zip_file.namelist()
+            archive_namelist = archive_file.namelist()
         else:
             raise NotImplementedError
 
@@ -311,5 +339,7 @@ def _coerce_zipfile_compression(compression):
                     found = cand
                     break
             compression = found
+        if compression is None:
+            raise ValueError('No supported zipfile compression found')
         compression = getattr(zipfile, compression)
     return compression

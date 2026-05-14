@@ -7,7 +7,8 @@ Deprecated: use the one in kwutil instead
 try:
     from functools import cache
 except ImportError:
-    from ubelt import memoize as cache
+    #TODO: remove when python 3.9 is the minimu and just use functools.cache
+    from ubelt import memoize as cache # type: ignore
 
 
 @cache

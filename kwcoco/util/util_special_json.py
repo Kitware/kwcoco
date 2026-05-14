@@ -19,7 +19,7 @@ from packaging.version import parse as Version
 # we have to wait for https://github.com/ultrajson/ultrajson/pull/518 to land
 # before we use it to write.
 try:
-    import ujson
+    import ujson # type: ignore
 except ImportError:
     ujson = None
 
