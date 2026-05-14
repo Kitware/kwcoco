@@ -56,7 +56,7 @@ from __future__ import annotations
 
 import codecs
 import re
-from json.decoder import scanstring # type: ignore[attr-defined]
+from json.decoder import scanstring # type: ignore
 
 from ijson import common, utils
 
