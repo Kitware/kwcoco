@@ -103,8 +103,9 @@ class Archive:
             if fpath is None:
                 raise ValueError("file and fpath are None")        
             file, backend = self._open(fpath, mode, backend)
-            self.file = file
-            self.backend = backend
+            
+        self.file = file
+        self.backend = backend
 
     @classmethod
     def _open(
