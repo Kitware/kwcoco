@@ -25,7 +25,7 @@ import warnings
 from kwcoco.util.dict_like import DictProxy
 
 
-class Measures(ub.NiceRepr, DictProxy):
+class Measures(ub.NiceRepr, DictProxy):  # type: ignore
     """
     Dict-like container for accumulated confusion counts and derived metrics.
 
@@ -833,7 +833,7 @@ def reversable_diff(arr, assume_sorted=1, reverse=False):
     return diff_arr, prefix, suffix
 
 
-class PerClass_Measures(ub.NiceRepr, DictProxy):
+class PerClass_Measures(ub.NiceRepr, DictProxy):  # type: ignore
     """
     A container class mapping categories to :class:`Measures`.
     """

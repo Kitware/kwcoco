@@ -348,7 +348,7 @@ class CategoryTree(ub.NiceRepr):
         Yields:
             Dict[str, Any]: coco category dictionaries
         """
-        for cid, node in self.id_to_node.items():
+        for cid, node in self.id_to_node.items():  # type: ignore
             # Skip if background already added
             cat = {'id': cid, 'name': node, **self.graph.nodes[node]}
             parents = list(self.graph.predecessors(node))
@@ -368,7 +368,7 @@ class CategoryTree(ub.NiceRepr):
             >>> self.id_to_idx[1]
         """
         return _calldict(
-            {cid: self.node_to_idx[node] for cid, node in self.id_to_node.items()}
+            {cid: self.node_to_idx[node] for cid, node in self.id_to_node.items()}  # type: ignore
         )
 
     @ub.memoize_property
@@ -379,7 +379,7 @@ class CategoryTree(ub.NiceRepr):
             >>> self = kwcoco.CategoryTree.demo()
             >>> self.idx_to_id[0]
         """
-        return [self.node_to_id[node] for node in self.idx_to_node]
+        return [self.node_to_id[node] for node in self.idx_to_node]  # type: ignore
 
     @ub.memoize_method
     def idx_to_ancestor_idxs(self, include_self=True):
@@ -391,8 +391,8 @@ class CategoryTree(ub.NiceRepr):
                 if True includes each node as its own ancestor.
         """
         lut = {
-            idx: set(ub.take(self.node_to_idx, nx.ancestors(self.graph, node)))
-            for idx, node in enumerate(self.idx_to_node)
+            idx: set(ub.take(self.node_to_idx, nx.ancestors(self.graph, node)))  # type: ignore
+            for idx, node in enumerate(self.idx_to_node)  # type: ignore
         }
         if include_self:
             for idx, idxs in lut.items():
@@ -409,8 +409,8 @@ class CategoryTree(ub.NiceRepr):
                 if True includes each node as its own descendant.
         """
         lut = {
-            idx: set(ub.take(self.node_to_idx, nx.descendants(self.graph, node)))
-            for idx, node in enumerate(self.idx_to_node)
+            idx: set(ub.take(self.node_to_idx, nx.descendants(self.graph, node)))  # type: ignore
+            for idx, node in enumerate(self.idx_to_node)  # type: ignore
         }
         if include_self:
             for idx, idxs in lut.items():
@@ -429,9 +429,9 @@ class CategoryTree(ub.NiceRepr):
         """
         pdist = np.full((len(self), len(self)), fill_value=-np.nan, dtype=np.float32)
         for node1, dists in nx.all_pairs_shortest_path_length(self.graph):
-            idx1 = self.node_to_idx[node1]
+            idx1 = self.node_to_idx[node1]  # type: ignore
             for node2, dist in dists.items():
-                idx2 = self.node_to_idx[node2]
+                idx2 = self.node_to_idx[node2]  # type: ignore
                 pdist[idx1, idx2] = dist
                 pdist[idx2, idx1] = -dist
         return pdist
@@ -444,17 +444,17 @@ class CategoryTree(ub.NiceRepr):
         return len(self.graph)
 
     def __iter__(self):
-        return iter(self.idx_to_node)
+        return iter(self.idx_to_node)  # type: ignore
 
     def __getitem__(self, index):
         """
         Returns:
             str
         """
-        return self.idx_to_node[index]
+        return self.idx_to_node[index]  # type: ignore
 
     def __contains__(self, node):
-        return node in self.idx_to_node
+        return node in self.idx_to_node  # type: ignore
 
     def __json__(self):
         """
@@ -524,7 +524,7 @@ class CategoryTree(ub.NiceRepr):
     def __nice__(self):
         max_depth = tree_depth(self.graph)
         if max_depth > 1:
-            max_breadth = max(it.chain([0], map(len, self.idx_groups)))
+            max_breadth = max(it.chain([0], map(len, self.idx_groups)))  # type: ignore
             text = 'nNodes={}, maxDepth={}, maxBreadth={}, nodes={}'.format(
                 self.num_classes,
                 max_depth,
@@ -591,7 +591,7 @@ class CategoryTree(ub.NiceRepr):
         Returns:
             int
         """
-        return self.node_to_idx[node]
+        return self.node_to_idx[node]  # type: ignore
 
     def take(self, indexes):
         """
@@ -603,7 +603,7 @@ class CategoryTree(ub.NiceRepr):
             >>> indexes = [1, 0, 2, 3]
             >>> print()
         """
-        subnodes = list(ub.take(self.idx_to_node, indexes))
+        subnodes = list(ub.take(self.idx_to_node, indexes))  # type: ignore
         return self.subgraph(subnodes)
 
     def subgraph(self, subnodes, closure=True):
@@ -777,7 +777,7 @@ class CategoryTree(ub.NiceRepr):
             new_node = normalize_name(old_node)
             new_data = old_data.copy()
             if 'id' not in old_data:
-                new_data['id'] = self.node_to_id[old_node]
+                new_data['id'] = self.node_to_id[old_node]  # type: ignore
             if 'supercategory' in old_data:
                 new_data['supercategory'] = normalize_name(old_data['supercategory'])
             if 'name' in old_data:

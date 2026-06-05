@@ -112,7 +112,7 @@ if TYPE_CHECKING:
 try:
     import ujson
 except ImportError:
-    ujson = None
+    ujson = None  # type: ignore
 
 KWCOCO_USE_UJSON = bool(os.environ.get('KWCOCO_USE_UJSON'))
 
@@ -182,11 +182,11 @@ class MixinCocoDepricate:
         )
         ann_kpcids = [
             kp['keypoint_category_id']
-            for ann in self.dataset['annotations']
+            for ann in self.dataset['annotations']  # type: ignore
             for kp in ann.get('keypoints', [])
         ]
         kpcid_to_name = {
-            kpcat['id']: kpcat['name'] for kpcat in self.dataset['keypoint_categories']
+            kpcat['id']: kpcat['name'] for kpcat in self.dataset['keypoint_categories']  # type: ignore
         }
         kpcid_to_num = ub.dict_hist(ann_kpcids, labels=list(kpcid_to_name.keys()))
         kpname_to_num = ub.map_keys(kpcid_to_name, kpcid_to_num)
@@ -226,9 +226,9 @@ class MixinCocoDepricate:
             """
             return tuple(sorted(set(ann) & {'bbox', 'line', 'keypoints'}))
 
-        for cid, aids in self.index.cid_to_aids.items():
-            name = self.cats[cid]['name']
-            hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))
+        for cid, aids in self.index.cid_to_aids.items():  # type: ignore
+            name = self.cats[cid]['name']  # type: ignore
+            hist = ub.dict_hist(map(_annot_type, ub.take(self.anns, aids)))  # type: ignore
             catname_to_nannot_types[name] = ub.map_keys(
                 lambda k: k[0] if len(k) == 1 else k, hist
             )
@@ -249,7 +249,7 @@ class MixinCocoDepricate:
             remove='1.1.0',
             migration=('use `self.coco_image(gid).imdelay().finalize()`.'),
         )
-        return self.load_image(gid)
+        return self.load_image(gid)  # type: ignore
 
 
 class MixinCocoAccessors:
@@ -357,8 +357,8 @@ class MixinCocoAccessors:
             gpath = self.get_image_fpath(gid_or_img, channels=channels)
             np_img = kwimage.imread(gpath)
         except Exception:
-            img = self._resolve_to_img(gid_or_img)
-            np_img = self.delayed_load(img['id'], channels=channels).finalize()
+            img = self._resolve_to_img(gid_or_img)  # type: ignore
+            np_img = self.delayed_load(img['id'], channels=channels).finalize()  # type: ignore
         return np_img
 
     def get_image_fpath(
@@ -382,7 +382,7 @@ class MixinCocoAccessors:
             gpath = self.get_auxiliary_fpath(gid_or_img, channels)
         else:
             img = self._resolve_to_img(gid_or_img)
-            gpath = ub.Path(self.bundle_dpath) / img['file_name']
+            gpath = ub.Path(self.bundle_dpath) / img['file_name']  # type: ignore
         return gpath
 
     def _get_img_auxiliary(self, gid_or_img: Any, channels: Any) -> Any:
@@ -422,7 +422,7 @@ class MixinCocoAccessors:
             >>> self.get_auxiliary_fpath(1, 'disparity')
         """
         aux = self._get_img_auxiliary(gid_or_img, channels)
-        fpath = ub.Path(self.bundle_dpath) / aux['file_name']
+        fpath = ub.Path(self.bundle_dpath) / aux['file_name']  # type: ignore
         return fpath
 
     def load_annot_sample(
@@ -494,7 +494,7 @@ class MixinCocoAccessors:
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
         elif isinstance(id_or_name_or_dict, str):
-            resolved_id = self.index.name_to_cat[id_or_name_or_dict]['id']
+            resolved_id = self.index.name_to_cat[id_or_name_or_dict]['id']  # type: ignore
         else:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
@@ -506,7 +506,7 @@ class MixinCocoAccessors:
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
         elif isinstance(id_or_name_or_dict, str):
-            resolved_id = self.index.file_name_to_img[id_or_name_or_dict]['id']
+            resolved_id = self.index.file_name_to_img[id_or_name_or_dict]['id']  # type: ignore
         else:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
@@ -518,7 +518,7 @@ class MixinCocoAccessors:
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
         elif isinstance(id_or_name_or_dict, str):
-            resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']
+            resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']  # type: ignore
         else:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
@@ -527,7 +527,7 @@ class MixinCocoAccessors:
         if isinstance(id_or_name_or_dict, numbers.Integral):
             resolved_id = id_or_name_or_dict
         elif isinstance(id_or_name_or_dict, str):
-            resolved_id = self.index.name_to_track[id_or_name_or_dict]['id']
+            resolved_id = self.index.name_to_track[id_or_name_or_dict]['id']  # type: ignore
         else:
             resolved_id = id_or_name_or_dict['id']
         return resolved_id
@@ -538,10 +538,10 @@ class MixinCocoAccessors:
         """
         if isinstance(aid_or_ann, numbers.Integral):
             resolved_ann = None
-            if self.anns is not None:
-                resolved_ann = self.anns[aid_or_ann]
+            if self.anns is not None:  # type: ignore
+                resolved_ann = self.anns[aid_or_ann]  # type: ignore
             else:
-                for ann in self.dataset['annotations']:
+                for ann in self.dataset['annotations']:  # type: ignore
                     if ann['id'] == aid_or_ann:
                         resolved_ann = ann
                         break
@@ -557,10 +557,10 @@ class MixinCocoAccessors:
         """
         if isinstance(gid_or_img, numbers.Integral):
             resolved_img = None
-            if self.imgs is not None:
-                resolved_img = self.imgs[gid_or_img]
+            if self.imgs is not None:  # type: ignore
+                resolved_img = self.imgs[gid_or_img]  # type: ignore
             else:
-                for img in self.dataset['images']:
+                for img in self.dataset['images']:  # type: ignore
                     if img['id'] == gid_or_img:
                         resolved_img = img
                         break
@@ -591,24 +591,24 @@ class MixinCocoAccessors:
             >>> with pytest.raises(KeyError):
             >>>     self._resolve_to_cat('human')
         """
-        if 'keypoint_categories' not in self.dataset:
+        if 'keypoint_categories' not in self.dataset:  # type: ignore
             raise NotImplementedError('Must have newstyle keypoints to use')
 
         # TODO: add keypoint categories to the index and optimize
         if isinstance(kp_identifier, numbers.Integral):
             kpcat = None
-            for _kpcat in self.dataset['keypoint_categories']:
+            for _kpcat in self.dataset['keypoint_categories']:  # type: ignore
                 if _kpcat['id'] == kp_identifier:
                     kpcat = _kpcat
             if kpcat is None:
                 raise KeyError('unable to find keypoint category')
         elif isinstance(kp_identifier, str):
             kpcat = None
-            for _kpcat in self.dataset['keypoint_categories']:
+            for _kpcat in self.dataset['keypoint_categories']:  # type: ignore
                 if _kpcat['name'] == kp_identifier:
                     kpcat = _kpcat
             if kpcat is None:
-                for _kpcat in self.dataset['keypoint_categories']:
+                for _kpcat in self.dataset['keypoint_categories']:  # type: ignore
                     alias = _kpcat.get('alias', {})
                     alias = alias if ub.iterable(alias) else {alias}
                     if kp_identifier in alias:
@@ -650,12 +650,12 @@ class MixinCocoAccessors:
             >>>     self._resolve_to_cat(32)
         """
         if isinstance(cat_identifier, numbers.Integral):
-            if self.cats:
-                cat = self.cats[cat_identifier]
+            if self.cats:  # type: ignore
+                cat = self.cats[cat_identifier]  # type: ignore
             else:
                 # If the index is not built
                 found = None
-                for cat in self.dataset['categories']:
+                for cat in self.dataset['categories']:  # type: ignore
                     if cat['id'] == cat_identifier:
                         found = cat
                         break
@@ -697,14 +697,14 @@ class MixinCocoAccessors:
         """
         if alias_catname is None:
             return None
-        if self.name_to_cat and alias_catname in self.name_to_cat:
+        if self.name_to_cat and alias_catname in self.name_to_cat:  # type: ignore
             fixed_catname = alias_catname
-            fixed_cat = self.name_to_cat[fixed_catname]
+            fixed_cat = self.name_to_cat[fixed_catname]  # type: ignore
         else:
             # Try to find an alias
             fixed_catname = None
             fixed_cat = None
-            for cat in self.dataset['categories']:
+            for cat in self.dataset['categories']:  # type: ignore
                 alias_list = cat.get('alias', [])
                 if isinstance(alias_list, str):
                     alias_list = [alias_list]
@@ -748,7 +748,7 @@ class MixinCocoAccessors:
         import networkx as nx
 
         graph = nx.DiGraph()
-        for cat in self.dataset['categories']:
+        for cat in self.dataset['categories']:  # type: ignore
             graph.add_node(cat['name'], **cat)
             if cat.get('supercategory', None) is not None:
                 u = cat['supercategory']
@@ -792,10 +792,10 @@ class MixinCocoAccessors:
         from kwcoco.category_tree import CategoryTree
 
         try:
-            if self.index.kpcats is not None:
-                kpcats = self.index.kpcats.values()
+            if self.index.kpcats is not None:  # type: ignore
+                kpcats = self.index.kpcats.values()  # type: ignore
             else:
-                kpcats = iter(self.dataset['keypoint_categories'])
+                kpcats = iter(self.dataset['keypoint_categories'])  # type: ignore
             kpcats = list(kpcats)
             if len(kpcats) == 0:
                 raise KeyError  # hack for old behavior
@@ -829,12 +829,12 @@ class MixinCocoAccessors:
             >>> names = self._keypoint_category_names()
             >>> print(names)
         """
-        kpcats = self.dataset.get('keypoint_categories', None)
+        kpcats = self.dataset.get('keypoint_categories', None)  # type: ignore
         if kpcats is not None:
-            return [c['name'] for c in self.dataset['keypoint_categories']]
+            return [c['name'] for c in self.dataset['keypoint_categories']]  # type: ignore
         else:
             names = []
-            cats = sorted(self.dataset['categories'], key=lambda c: c['id'])
+            cats = sorted(self.dataset['categories'], key=lambda c: c['id'])  # type: ignore
             for cat in cats:
                 if 'keypoints' in cat:
                     names.extend(cat['keypoints'])
@@ -843,15 +843,15 @@ class MixinCocoAccessors:
     def _lookup_kpnames(self, cid: int) -> list[str]:
         """Get the keypoint categories for a certain class"""
         kpnames = None
-        orig_cat = self.cats[cid]
+        orig_cat = self.cats[cid]  # type: ignore
         while kpnames is None:
             # Extract keypoint names for each annotation
-            cat = self.cats[cid]
+            cat = self.cats[cid]  # type: ignore
             parent = cat.get('supercategory', None)
             if 'keypoints' in cat:
                 kpnames = cat['keypoints']
             elif parent is not None:
-                cid = self.name_to_cat[cat['supercategory']]['id']
+                cid = self.name_to_cat[cat['supercategory']]['id']  # type: ignore
             else:
                 raise KeyError(
                     'could not find keypoint names for cid={}, cat={}, orig_cat={}'.format(
@@ -883,7 +883,7 @@ class MixinCocoAccessors:
         # Experimental
         from kwcoco.coco_image import CocoImage
 
-        img = self.index.imgs[gid]
+        img = self.index.imgs[gid]  # type: ignore
         image = CocoImage(img, dset=self)
         return image
 
@@ -1200,7 +1200,7 @@ class MixinCocoConstructors:
                         value = vidkw[key]
                     else:
                         value = {}
-                    value['background'] = 'amazon'
+                    value['background'] = 'amazon'  # type: ignore
 
                 vidkw[key] = value
 
@@ -1233,7 +1233,7 @@ class MixinCocoConstructors:
             fpath = vidkw.pop('fpath', None)
             bundle_dpath = vidkw.get('bundle_dpath', None)
             if fpath is not None:
-                bundle_dpath = ub.Path(fpath).parent
+                bundle_dpath = ub.Path(fpath).parent  # type: ignore
             elif dpath is not None:
                 bundle_dpath = dpath
 
@@ -1244,16 +1244,16 @@ class MixinCocoConstructors:
                 dpath = ub.Path.appdir('kwcoco', 'demo_vidshapes').ensuredir()
                 bundle_dpath = vidkw['bundle_dpath'] = join(dpath, tag)
 
-            cache_dpath = join(bundle_dpath, '_cache')
+            cache_dpath = join(bundle_dpath, '_cache')  # type: ignore
             if fpath is None:
-                fpath = join(bundle_dpath, 'data.kwcoco.json')
+                fpath = join(bundle_dpath, 'data.kwcoco.json')  # type: ignore
 
             stamp = ub.CacheStamp(
                 'vidshape_stamp_v{:03d}'.format(toydata_video.TOYDATA_VIDEO_VERSION),
                 dpath=cache_dpath,
                 depends=depends,
-                enabled=use_cache,
-                product=[fpath],
+                enabled=use_cache,  # type: ignore
+                product=[fpath],  # type: ignore
                 verbose=verbose,
                 meta=vidkw,
             )
@@ -1269,7 +1269,7 @@ class MixinCocoConstructors:
 
                 self.fpath = fpath
                 if fpath is not None:
-                    ub.Path(fpath).parent.ensuredir()
+                    ub.Path(fpath).parent.ensuredir()  # type: ignore
                     self.dump(fpath, newlines=True)
                     stamp.renew()
                     # Mark the state as if this file was loaded from disk This
@@ -1280,14 +1280,14 @@ class MixinCocoConstructors:
                     # on-disk dataset.
                     self._state['was_loaded'] = True
             else:
-                self = cls(data=fpath, bundle_dpath=bundle_dpath)
+                self = cls(data=fpath, bundle_dpath=bundle_dpath)  # type: ignore
 
         elif key == 'photos':
             dataset = demo_coco_data()
-            self = cls(dataset, tag=key)
+            self = cls(dataset, tag=key)  # type: ignore
         else:
             raise KeyError(key)
-        return self
+        return self  # type: ignore
 
     @classmethod
     def random(cls, rng: Any = None) -> Any:
@@ -1310,7 +1310,7 @@ class MixinCocoConstructors:
         Create an empty dataset
         """
         self = cls()
-        return self
+        return self  # type: ignore
 
     @classmethod
     def load(
@@ -1343,17 +1343,17 @@ class MixinCocoConstructors:
             >>>     dset2 = kwcoco.CocoDataset.load(file, bundle_dpath=bundle_dpath)
         """
         try:
-            fpath = os.fspath(file)
+            fpath = os.fspath(file)  # type: ignore
         except TypeError:
             input_was_pathlike = False
         else:
             input_was_pathlike = True
         if input_was_pathlike:
-            coco_dset = cls(fpath, bundle_dpath=bundle_dpath, autobuild=autobuild)
+            coco_dset = cls(fpath, bundle_dpath=bundle_dpath, autobuild=autobuild)  # type: ignore
         else:
             data = json_r.load(file)
-            coco_dset = cls(data, bundle_dpath=bundle_dpath, autobuild=autobuild)
-        return coco_dset
+            coco_dset = cls(data, bundle_dpath=bundle_dpath, autobuild=autobuild)  # type: ignore
+        return coco_dset  # type: ignore
 
     @classmethod
     def from_data(
@@ -1365,8 +1365,8 @@ class MixinCocoConstructors:
         Returns:
             CocoDataset:
         """
-        coco_dset = cls(data, bundle_dpath=bundle_dpath, img_root=img_root)
-        return coco_dset
+        coco_dset = cls(data, bundle_dpath=bundle_dpath, img_root=img_root)  # type: ignore
+        return coco_dset  # type: ignore
 
     @classmethod
     def from_image_paths(
@@ -1391,10 +1391,10 @@ class MixinCocoConstructors:
             >>> coco_dset = kwcoco.CocoDataset.from_image_paths(['a.png', 'b.png'])
             >>> assert coco_dset.n_images == 2
         """
-        coco_dset = cls(bundle_dpath=bundle_dpath, img_root=img_root)
+        coco_dset = cls(bundle_dpath=bundle_dpath, img_root=img_root)  # type: ignore
         for gpath in gpaths:
-            coco_dset.add_image(gpath)
-        return coco_dset
+            coco_dset.add_image(gpath)  # type: ignore
+        return coco_dset  # type: ignore
 
     @classmethod
     def from_class_image_paths(cls, root: str | PathLike) -> CocoDataset:
@@ -1413,17 +1413,17 @@ class MixinCocoConstructors:
 
         root = ub.Path(root)
         subdirs = [child for child in root.glob('*') if child.is_dir()]
-        coco_dset = cls(bundle_dpath=root)
+        coco_dset = cls(bundle_dpath=root)  # type: ignore
         for subdir in subdirs:
             catname = subdir.name
-            cat_id = coco_dset.ensure_category(catname)
+            cat_id = coco_dset.ensure_category(catname)  # type: ignore
             for gpath in subdir.glob('*'):
                 h, w = kwimage.load_image_shape(gpath)[0:2]
-                image_id = coco_dset.add_image(gpath)
-                coco_dset.add_annotation(
+                image_id = coco_dset.add_image(gpath)  # type: ignore
+                coco_dset.add_annotation(  # type: ignore
                     bbox=[0, 0, w, h], category_id=cat_id, image_id=image_id
                 )
-        return coco_dset
+        return coco_dset  # type: ignore
 
     @classmethod
     def coerce_multiple(
@@ -1604,7 +1604,7 @@ class MixinCocoConstructors:
                     postprocess=postprocess,
                     **kwargs,
                 )
-                job.job_idx = job_idx
+                job.job_idx = job_idx  # type: ignore
                 jobs.append(job)
 
             if ordered:
@@ -1612,15 +1612,15 @@ class MixinCocoConstructors:
             else:
                 from concurrent.futures import as_completed
 
-                _jobiter = as_completed(jobs)
+                _jobiter = as_completed(jobs)  # type: ignore
 
             _collect_prog = ub.ProgIter(
                 _jobiter, total=len(jobs), desc='loading kwcoco files', verbose=verbose
             )
             for job in _collect_prog:
                 # Clear the reference to this job
-                jobs[job.job_idx] = None
-                yield job.result()
+                jobs[job.job_idx] = None  # type: ignore
+                yield job.result()  # type: ignore
 
     @classmethod
     def from_coco_paths(
@@ -1717,7 +1717,7 @@ class MixinCocoExtras:
         """
         print('self.bundle_dpath = {!r}'.format(self.bundle_dpath))
         print('self.fpath = {!r}'.format(self.fpath))
-        print('self.tag = {!r}'.format(self.tag))
+        print('self.tag = {!r}'.format(self.tag))  # type: ignore
         if not self.bundle_dpath:
             raise Exception('We dont have a bundle')
         ub.cmd('tree {}'.format(self.bundle_dpath), verbose=2)
@@ -1739,7 +1739,7 @@ class MixinCocoExtras:
             >>> self = kwcoco.CocoDataset()
             >>> print(self._dataset_id())
         """
-        hashid = self._cached_hashid()
+        hashid = self._cached_hashid()  # type: ignore
         if self.fpath is None:
             raise Exception('Dataset doesnt have a fpath')
         coco_fpath = ub.Path(self.fpath)
@@ -1795,19 +1795,19 @@ class MixinCocoExtras:
         summary = {}
         bad_images = []
         if any(
-            'width' not in img or 'height' not in img for img in self.dataset['images']
+            'width' not in img or 'height' not in img for img in self.dataset['images']  # type: ignore
         ):
             import kwimage
 
-            if self.tag:
-                desc = 'populate imgsize for ' + self.tag
+            if self.tag:  # type: ignore
+                desc = 'populate imgsize for ' + self.tag  # type: ignore
             else:
                 desc = 'populate imgsize for untagged coco dataset'
 
             pool = ub.JobPool('thread', max_workers=workers)
             bundle_dpath = self.bundle_dpath
             for img in ub.ProgIter(
-                self.dataset['images'], verbose=verbose, desc='submit image size jobs'
+                self.dataset['images'], verbose=verbose, desc='submit image size jobs'  # type: ignore
             ):
                 auxiliary = img.get('auxiliary', img.get('assets', []))
                 for obj in [img] + auxiliary:
@@ -1827,10 +1827,10 @@ class MixinCocoExtras:
                 except Exception:
                     if fail:
                         raise
-                    bad_images.append(job.obj)
+                    bad_images.append(job.obj)  # type: ignore
                 else:
-                    job.obj['width'] = w
-                    job.obj['height'] = h
+                    job.obj['width'] = w  # type: ignore
+                    job.obj['height'] = h  # type: ignore
                     num_modified += 1
             summary['num_modified'] = num_modified
             summary['num_failed'] = len(bad_images)
@@ -1852,7 +1852,7 @@ class MixinCocoExtras:
         """
 
         def _gen_missing_imgs() -> Iterable[dict]:
-            for img in self.dataset['images']:
+            for img in self.dataset['images']:  # type: ignore
                 gpath = join(self.bundle_dpath, img['file_name'])
                 if not exists(gpath):
                     yield img
@@ -1864,13 +1864,13 @@ class MixinCocoExtras:
             elif isinstance(gids, dict):
                 imgs = [gids]
             else:
-                gid_or_imgs: list[int | dict] = list(
-                    gids if ub.iterable(gids) else [gids]
+                gid_or_imgs: list[int | dict] = list(  # type: ignore
+                    gids if ub.iterable(gids) else [gids]  # type: ignore
                 )
                 if gid_or_imgs and isinstance(gid_or_imgs[0], dict):
-                    imgs = gid_or_imgs
+                    imgs = gid_or_imgs  # type: ignore
                 else:
-                    imgs = list(ub.take(self.imgs, gid_or_imgs))
+                    imgs = list(ub.take(self.imgs, gid_or_imgs))  # type: ignore
             return imgs
 
         def _has_download_permission(_HAS_PERMISSION=[False]) -> bool:
@@ -1919,10 +1919,10 @@ class MixinCocoExtras:
             List[Tuple[int, str, int]]: bad indexes and paths and ids
         """
         bad_paths = []
-        img_enum = enumerate(self.dataset['images'])
+        img_enum = enumerate(self.dataset['images'])  # type: ignore
         for index, img in ub.ProgIter(
             img_enum,
-            total=len(self.dataset['images']),
+            total=len(self.dataset['images']),  # type: ignore
             desc='check for missing images',
             verbose=verbose,
         ):
@@ -1959,10 +1959,10 @@ class MixinCocoExtras:
 
         jobs = ub.JobPool(mode='process', max_workers=workers)
 
-        img_enum = enumerate(self.dataset['images'])
+        img_enum = enumerate(self.dataset['images'])  # type: ignore
         for index, img in ub.ProgIter(
             img_enum,
-            total=len(self.dataset['images']),
+            total=len(self.dataset['images']),  # type: ignore
             desc='submit corruption checks',
             verbose=verbose,
         ):
@@ -1971,20 +1971,20 @@ class MixinCocoExtras:
             if fname is not None:
                 gpath = join(self.bundle_dpath, fname)
                 job = jobs.submit(_image_corruption_check, gpath)
-                job.input_info = (index, gpath, gid)
+                job.input_info = (index, gpath, gid)  # type: ignore
 
             if check_aux:
                 for aux in img.get('auxiliary', img.get('assets', [])):
                     gpath = join(self.bundle_dpath, aux['file_name'])
                     job = jobs.submit(_image_corruption_check, gpath)
-                    job.input_info = (index, gpath, gid)
+                    job.input_info = (index, gpath, gid)  # type: ignore
 
         for job in jobs.as_completed(
             desc='check corrupted images', progkw={'verbose': verbose}
         ):
             info = job.result()
             if info['failed']:
-                bad_paths.append(job.input_info)
+                bad_paths.append(job.input_info)  # type: ignore
 
         return bad_paths
 
@@ -2036,7 +2036,7 @@ class MixinCocoExtras:
             [{'id': 100, 'name': 'superstar'}, {'id': 101, 'name': 'eff'}, {'id': 102, 'name': 'star'}]
         """
         # Get existing categories as a list of dicts
-        orig_categories = self.dataset['categories']
+        orig_categories = self.dataset['categories']  # type: ignore
 
         # Determine category ordering
         if order is None:
@@ -2049,13 +2049,13 @@ class MixinCocoExtras:
         else:
             # Assume order: List[str]
             orig_order = ub.oset([cat['name'] for cat in orig_categories])
-            suffix_order = list(orig_order - order)
+            suffix_order = list(orig_order - order)  # type: ignore
             new_catname_order = order + suffix_order
 
         if new_catname_order is not None:
             # If we are reordering the categoryes, build the new list
             new_categories = [
-                self.index.name_to_cat[name] for name in new_catname_order
+                self.index.name_to_cat[name] for name in new_catname_order  # type: ignore
             ]
         else:
             new_categories = orig_categories
@@ -2069,18 +2069,18 @@ class MixinCocoExtras:
                 cat['id'] = new_id
 
             # Update annotations
-            for ann in self.dataset['annotations']:
+            for ann in self.dataset['annotations']:  # type: ignore
                 old_cid = ann.get('category_id', None)
                 if old_cid is not None:
                     ann['category_id'] = cat_id_map[old_cid]
 
         if new_catname_order is not None:
             # If we reordered the categories, replace the dataset category list
-            self.dataset['categories'][:] = new_categories
+            self.dataset['categories'][:] = new_categories  # type: ignore
 
         # Invalidate and rebuild index
-        self._invalidate_hashid()
-        self.rebuild_index()
+        self._invalidate_hashid()  # type: ignore
+        self.rebuild_index()  # type: ignore
 
     def rename_categories(
         self,
@@ -2120,10 +2120,10 @@ class MixinCocoExtras:
             >>> }
             >>> self.rename_categories(mapper)
         """
-        old_cats = self.dataset['categories']
+        old_cats = self.dataset['categories']  # type: ignore
 
         # Ignore identity mappings
-        mapper = {k: v for k, v in mapper.items() if k != v}
+        mapper = {k: v for k, v in mapper.items() if k != v}  # type: ignore
 
         # Perform checks to determine what bookkeeping needs to be done
         orig_cnames = {cat['name'] for cat in old_cats}
@@ -2146,7 +2146,7 @@ class MixinCocoExtras:
             # In the simple case we are just changing the labels, so
             # nothing special needs to happen.
             for key, value in mapper.items():
-                for cat in self.dataset['categories']:
+                for cat in self.dataset['categories']:  # type: ignore
                     if cat['name'] == key:
                         cat['name'] = value
         else:
@@ -2154,9 +2154,9 @@ class MixinCocoExtras:
             orig_cats = {cat['name']: cat for cat in old_cats}
 
             # Remember all annotations of the original categories
-            src_cids = [self.index.name_to_cat[c]['id'] for c in src_cnames]
+            src_cids = [self.index.name_to_cat[c]['id'] for c in src_cnames]  # type: ignore
             src_cname_to_aids = {
-                c: self.index.cid_to_aids[cid] for c, cid in zip(src_cnames, src_cids)
+                c: self.index.cid_to_aids[cid] for c, cid in zip(src_cnames, src_cids)  # type: ignore
             }
 
             # Track which srcs each dst is constructed from
@@ -2205,7 +2205,7 @@ class MixinCocoExtras:
             # Apply category deltas
 
             # Remove category names that were renamed
-            self.remove_categories(rm_cnames, keep_annots=True)
+            self.remove_categories(rm_cnames, keep_annots=True)  # type: ignore
 
             # Update any existing categories that were merged
             for cname in sorted(update_cnames):
@@ -2223,31 +2223,31 @@ class MixinCocoExtras:
 
             # Add new category names that were created
             for cname in sorted(add_cnames):
-                self.add_category(**new_cats[cname])
+                self.add_category(**new_cats[cname])  # type: ignore
 
             # Apply the annotation deltas
             for src, aids in src_cname_to_aids.items():
-                cat = self.name_to_cat[mapper[src]]
+                cat = self.name_to_cat[mapper[src]]  # type: ignore
                 cid = cat['id']
                 for aid in aids:
-                    self.anns[aid]['category_id'] = cid
+                    self.anns[aid]['category_id'] = cid  # type: ignore
 
             # force rebuild if any annotations we changed
             if src_cname_to_aids:
                 rebuild = True
 
         if rebuild:
-            self.rebuild_index()
+            self.rebuild_index()  # type: ignore
         else:
-            self.index.clear()
-        self._invalidate_hashid()
+            self.index.clear()  # type: ignore
+        self._invalidate_hashid()  # type: ignore
 
     def _ensure_json_serializable(self) -> None:
         # inplace convert any ndarrays to lists
         # TODO: use the kwutil version
         from kwcoco.util.util_json import ensure_json_serializable
 
-        _ = ensure_json_serializable(self.dataset, verbose=1)
+        _ = ensure_json_serializable(self.dataset, verbose=1)  # type: ignore
 
     def _aspycoco(self) -> Any:
         """
@@ -2259,7 +2259,7 @@ class MixinCocoExtras:
         from pycocotools import coco
 
         pycoco = coco.COCO()
-        pycoco.dataset = self.dataset
+        pycoco.dataset = self.dataset  # type: ignore
         pycoco.createIndex()
         return pycoco
 
@@ -2393,10 +2393,10 @@ class MixinCocoExtras:
             print(f' * check={check}')
             if verbose > 2:
                 # First assets
-                if len(self.dataset['images']):
+                if len(self.dataset['images']):  # type: ignore
                     from kwcoco.coco_image import CocoImage
 
-                    first_image = CocoImage(self.dataset['images'][0], dset=self)
+                    first_image = CocoImage(self.dataset['images'][0], dset=self)  # type: ignore
                     first_image_filepaths = list(
                         first_image.iter_image_filepaths(with_bundle=False)
                     )
@@ -2474,14 +2474,14 @@ class MixinCocoExtras:
 
         # from kwcoco.util import util_reroot
 
-        num_images = len(self.imgs)
+        num_images = len(self.imgs)  # type: ignore
         enable_prog = verbose > 0
 
         if safe:
             # First compute all new values in memory but don't overwrite
             gid_to_new = {}
             prog = ub.ProgIter(
-                self.imgs.items(),
+                self.imgs.items(),  # type: ignore
                 total=num_images,
                 enabled=enable_prog,
                 desc='prepare reroot',
@@ -2504,7 +2504,7 @@ class MixinCocoExtras:
                 except Exception:
                     # img_repr = ub.urepr(img)
                     asset_fpaths = list(
-                        self.coco_image(img['id']).iter_image_filepaths()
+                        self.coco_image(img['id']).iter_image_filepaths()  # type: ignore
                     )
                     raise Exception(
                         'Failed to reroot gid={} with fpaths={}'.format(
@@ -2520,7 +2520,7 @@ class MixinCocoExtras:
                 desc='finalize reroot',
             )
             for gid, new in prog:
-                img = self.imgs[gid]
+                img = self.imgs[gid]  # type: ignore
                 img['file_name'] = new.get('file_name', None)
                 if 'auxiliary' in new:
                     for aux_fname, aux in zip(new['auxiliary'], img['auxiliary']):
@@ -2530,7 +2530,7 @@ class MixinCocoExtras:
                         aux['file_name'] = aux_fname
         else:
             prog = ub.ProgIter(
-                self.imgs.values(),
+                self.imgs.values(),  # type: ignore
                 total=num_images,
                 enabled=enable_prog,
                 desc='rerooting',
@@ -2548,7 +2548,7 @@ class MixinCocoExtras:
                     # img_repr = ub.urepr(img)
                     # raise Exception('Failed to reroot img={}'.format(ub.urepr(img)))
                     asset_fpaths = list(
-                        self.coco_image(img['id']).iter_image_filepaths()
+                        self.coco_image(img['id']).iter_image_filepaths()  # type: ignore
                     )
                     raise Exception(
                         'Failed to reroot gid={} with fpaths={}'.format(
@@ -2556,24 +2556,24 @@ class MixinCocoExtras:
                         )
                     )
 
-        if self.index:
+        if self.index:  # type: ignore
             # Only need to recompute the self.index.file_name_to_img
             # We dont have to invalidate everything
             # FIXME: the index should have some method for doing this
             # (ideally lazilly)
-            self.index.file_name_to_img = {
+            self.index.file_name_to_img = {  # type: ignore
                 img['file_name']: img
-                for img in self.index.imgs.values()
+                for img in self.index.imgs.values()  # type: ignore
                 if img.get('file_name', None) is not None
             }
 
         self.bundle_dpath = new_bundle_dpath
-        return self
+        return self  # type: ignore
 
     @property
     def data_root(self) -> PathLike | None:
         """In the future we will deprecate data_root for bundle_dpath"""
-        return self.bundle_dpath
+        return self.bundle_dpath  # type: ignore
 
     @data_root.setter
     def data_root(self, value: Any) -> None:
@@ -2582,7 +2582,7 @@ class MixinCocoExtras:
     @property
     def img_root(self) -> PathLike | None:
         """In the future we will deprecate img_root for bundle_dpath"""
-        return self.bundle_dpath
+        return self.bundle_dpath  # type: ignore
 
     @img_root.setter
     def img_root(self, value: Any) -> None:
@@ -2689,10 +2689,10 @@ class MixinCocoHashing:
         gids = None
         if hash_pixels:
             if not hashid_parts['images'].get('pixels', None):
-                gids = sorted(self.imgs.keys())
+                gids = sorted(self.imgs.keys())  # type: ignore
                 gpaths = [
-                    join(self.bundle_dpath, gname)
-                    for gname in self.images(gids).lookup('file_name')
+                    join(self.bundle_dpath, gname)  # type: ignore
+                    for gname in self.images(gids).lookup('file_name')  # type: ignore
                 ]
                 gpath_sha512s = [
                     ub.hash_file(gpath, hasher='sha512')
@@ -2716,8 +2716,8 @@ class MixinCocoHashing:
                 # return sorted(d.items())
 
             if not hashid_parts['annotations'].get('json', None):
-                aids = sorted(self.anns.keys())
-                _anns_ordered = (self.anns[aid] for aid in aids)
+                aids = sorted(self.anns.keys())  # type: ignore
+                _anns_ordered = (self.anns[aid] for aid in aids)  # type: ignore
                 anns_ordered = [_ditems(ann) for ann in _anns_ordered]
                 try:
                     anns_text = json_w.dumps(anns_ordered)
@@ -2741,8 +2741,8 @@ class MixinCocoHashing:
 
             if not hashid_parts['images'].get('json', None):
                 if gids is None:
-                    gids = sorted(self.imgs.keys())
-                imgs_text = json_w.dumps([_ditems(self.imgs[gid]) for gid in gids])
+                    gids = sorted(self.imgs.keys())  # type: ignore
+                imgs_text = json_w.dumps([_ditems(self.imgs[gid]) for gid in gids])  # type: ignore
                 hashid_parts['images']['json'] = ub.hash_data(
                     imgs_text, hasher='sha512'
                 )
@@ -2752,8 +2752,8 @@ class MixinCocoHashing:
                 reuse_parts.append('images.json')
 
             if not hashid_parts['categories'].get('json', None):
-                cids = sorted(self.cats.keys())
-                cats_text = json_w.dumps([_ditems(self.cats[cid]) for cid in cids])
+                cids = sorted(self.cats.keys())  # type: ignore
+                cats_text = json_w.dumps([_ditems(self.cats[cid]) for cid in cids])  # type: ignore
                 hashid_parts['categories']['json'] = ub.hash_data(
                     cats_text, hasher='sha512'
                 )
@@ -2793,7 +2793,7 @@ class MixinCocoHashing:
         TODO:
             - [ ] Rename to _notify_modification --- or something like that
         """
-        self._state['was_modified'] = True
+        self._state['was_modified'] = True  # type: ignore
         self.hashid = None
         if parts is not None and self.hashid_parts is not None:
             for part in parts:
@@ -2816,10 +2816,10 @@ class MixinCocoHashing:
             - [ ] This is reasonably stable, elevate this to a public API function.
         """
         cache_miss = True
-        enable_cache = self._state['was_loaded'] and not self._state['was_modified']
+        enable_cache = self._state['was_loaded'] and not self._state['was_modified']  # type: ignore
         # print(f'[kwcoco-dct-cache] self._state={self._state}')
         if enable_cache:
-            coco_fpath = ub.Path(self.fpath)
+            coco_fpath = ub.Path(self.fpath)  # type: ignore
             enable_cache = coco_fpath.exists()
 
         # print(f'[kwcoco-dct-cache] enable_cache={enable_cache}')
@@ -2984,34 +2984,34 @@ class MixinCocoObjects:
         # name to id resolution
 
         if track_name is not None:
-            track_id = self.index.name_to_track[track_name]['id']
+            track_id = self.index.name_to_track[track_name]['id']  # type: ignore
 
         if video_name is not None:
-            video_id = self.index.name_to_video[video_name]['id']
+            video_id = self.index.name_to_video[video_name]['id']  # type: ignore
 
         if image_name is not None:
-            image_id = self.index.name_to_img[image_name]['id']
+            image_id = self.index.name_to_img[image_name]['id']  # type: ignore
 
         # id lookups
 
         if image_id is not None:
-            annot_ids = sorted(self.index.gid_to_aids[image_id])
+            annot_ids = sorted(self.index.gid_to_aids[image_id])  # type: ignore
 
         if track_id is not None:
-            annot_ids = self.index.trackid_to_aids[track_id]
+            annot_ids = self.index.trackid_to_aids[track_id]  # type: ignore
 
         if video_id is not None:
             annot_ids = sorted(
                 ub.flatten(
                     [
-                        self.index.gid_to_aids[gid]
-                        for gid in self.index.vidid_to_gids[video_id]
+                        self.index.gid_to_aids[gid]  # type: ignore
+                        for gid in self.index.vidid_to_gids[video_id]  # type: ignore
                     ]
                 )
             )
 
         if annot_ids is None:
-            annot_ids = sorted(self.index.anns.keys())
+            annot_ids = sorted(self.index.anns.keys())  # type: ignore
 
         return Annots(annot_ids, self)
 
@@ -3074,16 +3074,16 @@ class MixinCocoObjects:
             video_id = vidid
 
         if video_name is not None:
-            video_id = self.index.name_to_video[video_name]['id']
+            video_id = self.index.name_to_video[video_name]['id']  # type: ignore
 
         if video_id is not None:
-            image_ids = self.index.vidid_to_gids[video_id]
+            image_ids = self.index.vidid_to_gids[video_id]  # type: ignore
 
         if names is not None:
-            image_ids = [self.index.name_to_img[name]['id'] for name in names]
+            image_ids = [self.index.name_to_img[name]['id'] for name in names]  # type: ignore
 
         if image_ids is None:
-            image_ids = sorted(self.index.imgs.keys())
+            image_ids = sorted(self.index.imgs.keys())  # type: ignore
 
         return Images(image_ids, self)
 
@@ -3123,7 +3123,7 @@ class MixinCocoObjects:
         if category_ids is None:
             # Question: why are we sorting here? Maybe this was handling some
             # Python 3.6 case? Do we still need to?  Would it break UX?
-            category_ids = sorted(self.index.cats.keys())
+            category_ids = sorted(self.index.cats.keys())  # type: ignore
         return Categories(category_ids, self)
 
     def videos(
@@ -3182,10 +3182,10 @@ class MixinCocoObjects:
                 )
             video_ids = vidids
         if video_ids is None:
-            video_ids = sorted(self.index.videos.keys())
+            video_ids = sorted(self.index.videos.keys())  # type: ignore
 
         if names is not None:
-            video_ids = [self.index.name_to_video[name]['id'] for name in names]
+            video_ids = [self.index.name_to_video[name]['id'] for name in names]  # type: ignore
         return Videos(video_ids, self)
 
     def tracks(
@@ -3235,23 +3235,23 @@ class MixinCocoObjects:
             >>> assert len(tracks) == 2
         """
         if track_ids is None:
-            track_ids = sorted(self.index.tracks.keys())
+            track_ids = sorted(self.index.tracks.keys())  # type: ignore
 
         if names is not None:
-            track_ids = [self.index.name_to_track[name]['id'] for name in names]
+            track_ids = [self.index.name_to_track[name]['id'] for name in names]  # type: ignore
 
         if video_name is not None:
             # TODO handle more mutex checks
             assert video_id is None, 'video_name is mutex with video_id'
-            video_id = self.index.name_to_video[video_name]['id']
+            video_id = self.index.name_to_video[video_name]['id']  # type: ignore
 
         if video_id is not None:
             # Note: this is an inefficient lookup
             annot_ids = sorted(
                 ub.flatten(
                     [
-                        self.index.gid_to_aids[gid]
-                        for gid in self.index.vidid_to_gids[video_id]
+                        self.index.gid_to_aids[gid]  # type: ignore
+                        for gid in self.index.vidid_to_gids[video_id]  # type: ignore
                     ]
                 )
             )
@@ -3268,27 +3268,27 @@ class MixinCocoStats:
     @property
     def n_annots(self) -> int:
         """The number of annotations in the dataset"""
-        return len(self.dataset.get('annotations', []))
+        return len(self.dataset.get('annotations', []))  # type: ignore
 
     @property
     def n_images(self) -> int:
         """The number of images in the dataset"""
-        return len(self.dataset.get('images', []))
+        return len(self.dataset.get('images', []))  # type: ignore
 
     @property
     def n_cats(self) -> int:
         """The number of categories in the dataset"""
-        return len(self.dataset.get('categories', []))
+        return len(self.dataset.get('categories', []))  # type: ignore
 
     @property
     def n_tracks(self) -> int:
         """The number of tracks in the dataset"""
-        return len(self.dataset.get('tracks', []))
+        return len(self.dataset.get('tracks', []))  # type: ignore
 
     @property
     def n_videos(self) -> int:
         """The number of videos in the dataset"""
-        return len(self.dataset.get('videos', []))
+        return len(self.dataset.get('videos', []))  # type: ignore
 
     def category_annotation_frequency(self) -> dict:
         """
@@ -3311,8 +3311,8 @@ class MixinCocoStats:
             }
         """
         catname_to_nannots = ub.map_keys(
-            lambda x: None if x is None else self.cats[x]['name'],
-            ub.map_vals(len, self.index.cid_to_aids),
+            lambda x: None if x is None else self.cats[x]['name'],  # type: ignore
+            ub.map_vals(len, self.index.cid_to_aids),  # type: ignore
         )
         catname_to_nannots = ub.odict(
             sorted(catname_to_nannots.items(), key=lambda kv: (kv[1], kv[0]))
@@ -3355,15 +3355,15 @@ class MixinCocoStats:
         """
 
         if config.get('ensure_imgsize', True):
-            self._ensure_imgsize(workers=config.get('workers', 8))
+            self._ensure_imgsize(workers=config.get('workers', 8))  # type: ignore
 
-            for vidid, gids in self.index.vidid_to_gids.items():
+            for vidid, gids in self.index.vidid_to_gids.items():  # type: ignore
                 if len(gids):
                     # Each image in a video should be the same size (unless we
                     # implement some transform from image to video space)
                     # populate each video with the consistent width/height
-                    video = self.index.videos[vidid]
-                    vid_frames = self.images(gids)
+                    video = self.index.videos[vidid]  # type: ignore
+                    vid_frames = self.images(gids)  # type: ignore
                     width_cand = vid_frames.lookup('width')
                     height_cand = vid_frames.lookup('height')
                     if ub.allsame(height_cand) and ub.allsame(width_cand):
@@ -3371,7 +3371,7 @@ class MixinCocoStats:
                         video['height'] = height_cand[0]
 
         if config.get('pycocotools_info', True):
-            for ann in ub.ProgIter(self.dataset['annotations'], desc='update anns'):
+            for ann in ub.ProgIter(self.dataset['annotations'], desc='update anns'):  # type: ignore
                 if 'iscrowd' not in ann:
                     ann['iscrowd'] = False
 
@@ -3414,23 +3414,23 @@ class MixinCocoStats:
 
         if config.get('mmlab', False):
             # Add support for open-mmlab coco dataset ingestion
-            if self.dataset.get('videos', None):
-                for images in self.videos().images:
+            if self.dataset.get('videos', None):  # type: ignore
+                for images in self.videos().images:  # type: ignore
                     # mmdet wants the frame_id property
                     for frame_index, img in enumerate(images.objs):
                         img['frame_id'] = frame_index
                 # mmdet wants the instance_id property
-                for ann in enumerate(self.dataset['annotations']):
+                for ann in enumerate(self.dataset['annotations']):  # type: ignore
                     if 'track_id' in ann:
-                        ann['instance_id'] = ann['track_id']
+                        ann['instance_id'] = ann['track_id']  # type: ignore
 
         if config.get('legacy', False):
             try:
-                kpcats = self.keypoint_categories()
+                kpcats = self.keypoint_categories()  # type: ignore
             except Exception:
                 kpcats = None
             for ann in ub.ProgIter(
-                self.dataset['annotations'], desc='update orig coco anns'
+                self.dataset['annotations'], desc='update orig coco anns'  # type: ignore
             ):
                 # Use segmentation if available
                 if 'segmentation' in ann:
@@ -3477,7 +3477,7 @@ class MixinCocoStats:
                     # each category, currently it is arbitrary
                     pts = kwimage.Points.from_coco(ann['keypoints'], classes=kpcats)
                     ann['keypoints'] = pts.to_coco(style='orig')
-        return self
+        return self  # type: ignore
 
     def validate(self, **config: Any) -> dict:
         """
@@ -3564,7 +3564,7 @@ class MixinCocoStats:
             if verbose:
                 print('Validate json-schema')
             try:
-                COCO_SCHEMA.validate(dset.dataset)
+                COCO_SCHEMA.validate(dset.dataset)  # type: ignore
             except jsonschema.exceptions.ValidationError as ex:
                 err = ex
                 print(f'err.absolute_path={err.absolute_path}')
@@ -3688,7 +3688,7 @@ class MixinCocoStats:
             _check_attrs(dset, table_key='annotations', col_key='bbox', required=False)
 
         if config.get('channels', True):
-            for img in self.dataset.get('images', []):
+            for img in self.dataset.get('images', []):  # type: ignore
                 seen = set()
                 assets = img.get('auxiliary', []) + img.get('assets', [])
 
@@ -3715,7 +3715,7 @@ class MixinCocoStats:
                                 )
                             seen.add(chan)
         if config.get('missing', True):
-            missing = dset.missing_images(check_aux=True, verbose=verbose)
+            missing = dset.missing_images(check_aux=True, verbose=verbose)  # type: ignore
             if missing:
                 msg = ub.paragraph(
                     f"""
@@ -3727,7 +3727,7 @@ class MixinCocoStats:
                 result['missing'] = missing
 
         if config.get('corrupted', False):
-            corrupted = dset.corrupted_images(
+            corrupted = dset.corrupted_images(  # type: ignore
                 check_aux=True, verbose=verbose, workers=config.get('workers', 0)
             )
             if corrupted:
@@ -3742,8 +3742,8 @@ class MixinCocoStats:
 
         if config.get('require_relative', False):
             rr = config.get('require_relative', False)
-            for gid in dset.imgs.keys():
-                coco_img = dset.coco_image(gid)
+            for gid in dset.imgs.keys():  # type: ignore
+                coco_img = dset.coco_image(gid)  # type: ignore
                 for obj in coco_img.iter_asset_objs():
                     fname = ub.Path(obj['file_name'])
                     if rr > 0:
@@ -3809,15 +3809,15 @@ class MixinCocoStats:
             return varied_attrs
 
         if config.get('image_attrs', True):
-            image_attrs = varied(dset.index.imgs)
+            image_attrs = varied(dset.index.imgs)  # type: ignore
             info['image_attrs'] = image_attrs
 
         if config.get('annot_attrs', True):
-            annot_attrs = varied(dset.index.anns)
+            annot_attrs = varied(dset.index.anns)  # type: ignore
             info['annot_attrs'] = annot_attrs
 
         if config.get('video_attrs', True):
-            annot_attrs = varied(dset.index.videos)
+            annot_attrs = varied(dset.index.videos)  # type: ignore
             info['video_attrs'] = annot_attrs
 
         if config.get('boxes', False):
@@ -3859,9 +3859,9 @@ class MixinCocoStats:
 
         n_tracks = self.n_tracks
 
-        if len(self.index.trackid_to_aids) > n_tracks + 3:
-            n_tracks = len(self.index.trackid_to_aids)
-            if None in self.index.trackid_to_aids:
+        if len(self.index.trackid_to_aids) > n_tracks + 3:  # type: ignore
+            n_tracks = len(self.index.trackid_to_aids)  # type: ignore
+            if None in self.index.trackid_to_aids:  # type: ignore
                 n_tracks -= 1
 
         info = ub.odict(
@@ -3898,10 +3898,10 @@ class MixinCocoStats:
         if hasattr(self, '_all_rows_column_lookup'):
             # Hack for SQL speed, still slow though
             aid_to_cid = dict(
-                self._all_rows_column_lookup('annotations', ['id', 'category_id'])
+                self._all_rows_column_lookup('annotations', ['id', 'category_id'])  # type: ignore
             )
             gid_to_cidfreq = {}
-            for gid, aids in self.index.gid_to_aids.items():
+            for gid, aids in self.index.gid_to_aids.items():  # type: ignore
                 gid_to_cidfreq[gid] = ub.dict_hist(ub.take(aid_to_cid, aids))
             # for gid, aids in self.index.gid_to_aids.items():
             #     cids = self._column_lookup(
@@ -3911,17 +3911,17 @@ class MixinCocoStats:
             # this is slow for sql.
             gid_to_cidfreq = ub.map_vals(
                 lambda aids: ub.dict_hist(
-                    [self.anns[aid]['category_id'] for aid in aids]
+                    [self.anns[aid]['category_id'] for aid in aids]  # type: ignore
                 ),
-                self.index.gid_to_aids,
+                self.index.gid_to_aids,  # type: ignore
             )
         gid_to_cids = {
             gid: list(cidfreq.keys()) for gid, cidfreq in gid_to_cidfreq.items()
         }
-        trackid_to_aids = ub.udict(self.index.trackid_to_aids) - {None}
+        trackid_to_aids = ub.udict(self.index.trackid_to_aids) - {None}  # type: ignore
 
         img_has_anns = [
-            int(len(aids) > 0) for gid, aids in self.index.gid_to_aids.items()
+            int(len(aids) > 0) for gid, aids in self.index.gid_to_aids.items()  # type: ignore
         ]
         imgs_with_annots = kwarray.stats_dict(
             img_has_anns, n_extreme=True, quantile=False
@@ -3929,11 +3929,11 @@ class MixinCocoStats:
 
         return ub.odict(
             [
-                ('annots_per_img', mapping_stats(self.index.gid_to_aids)),
-                ('imgs_per_cat', mapping_stats(self.index.cid_to_gids)),
+                ('annots_per_img', mapping_stats(self.index.gid_to_aids)),  # type: ignore
+                ('imgs_per_cat', mapping_stats(self.index.cid_to_gids)),  # type: ignore
                 ('cats_per_img', mapping_stats(gid_to_cids)),
-                ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),
-                ('imgs_per_video', mapping_stats(self.index.vidid_to_gids)),
+                ('annots_per_cat', mapping_stats(self.index.cid_to_aids)),  # type: ignore
+                ('imgs_per_video', mapping_stats(self.index.vidid_to_gids)),  # type: ignore
                 ('annots_per_track', mapping_stats(trackid_to_aids)),
                 ('imgs_with_annots', imgs_with_annots),
             ]
@@ -3998,15 +3998,15 @@ class MixinCocoStats:
             raise ValueError('specifying gids and aids is mutually exclusive')
 
         if gids is not None:
-            aids = ub.flatten(ub.take(self.index.gid_to_aids, gids))
+            aids = ub.flatten(ub.take(self.index.gid_to_aids, gids))  # type: ignore
         if aids is not None:
-            anns = ub.take(self.anns, aids)
+            anns = ub.take(self.anns, aids)  # type: ignore
         else:
-            anns = self.dataset.get('annotations', [])
+            anns = self.dataset.get('annotations', [])  # type: ignore
 
         for ann in anns:
             if 'bbox' in ann:
-                cname = self.cats[ann['category_id']]['name']
+                cname = self.cats[ann['category_id']]['name']  # type: ignore
                 cname_to_box_sizes[cname].append(ann['bbox'][2:4])
         cname_to_box_sizes = ub.map_vals(np.array, cname_to_box_sizes)
 
@@ -4050,7 +4050,7 @@ class MixinCocoStats:
                 raise ValueError('Cannot compute anchor boxes without bounding boxes')
             all_info = {'stats': {}}
         infos['all'] = all_info
-        return infos
+        return infos  # type: ignore
 
     def find_representative_images(self, gids: None | list = None) -> list:
         r"""
@@ -4085,17 +4085,17 @@ class MixinCocoStats:
         import kwarray
 
         if gids is None:
-            gids = sorted(self.imgs.keys())
-            gid_to_aids = self.index.gid_to_aids
+            gids = sorted(self.imgs.keys())  # type: ignore
+            gid_to_aids = self.index.gid_to_aids  # type: ignore
         else:
-            gid_to_aids = ub.dict_subset(self.index.gid_to_aids, gids)
+            gid_to_aids = ub.dict_subset(self.index.gid_to_aids, gids)  # type: ignore
 
-        all_cids = set(self.index.cid_to_aids.keys())
+        all_cids = set(self.index.cid_to_aids.keys())  # type: ignore
 
         # Select representative images to draw such that each category
         # appears at least once.
         gid_to_cidfreq = ub.map_vals(
-            lambda aids: ub.dict_hist([self.anns[aid]['category_id'] for aid in aids]),
+            lambda aids: ub.dict_hist([self.anns[aid]['category_id'] for aid in aids]),  # type: ignore
             gid_to_aids,
         )
 
@@ -4128,7 +4128,7 @@ class MixinCocoStats:
         candidate_sets = ub.dict_diff(candidate_sets, cover1)
 
         cover2 = kwarray.setcover(
-            candidate_sets, items=all_cids, set_weights=large_image_weights
+            candidate_sets, items=all_cids, set_weights=large_image_weights  # type: ignore
         )
         selected.update(cover2)
         candidate_sets = ub.dict_diff(candidate_sets, cover2)
@@ -4177,7 +4177,7 @@ class MixinCocoDraw:
         import kwimage
 
         # Load the raw image pixels
-        coco_img = self.coco_image(gid)
+        coco_img = self.coco_image(gid)  # type: ignore
         delayed = coco_img.imdelay(space='image', channels=channels)
 
         if delayed.channels is not None and delayed.channels.numel() > 3:
@@ -4193,25 +4193,25 @@ class MixinCocoDraw:
         canvas = _normalize_intensity_if_needed(canvas)
 
         # Get annotation IDs from this image
-        aids = self.index.gid_to_aids[gid]
+        aids = self.index.gid_to_aids[gid]  # type: ignore
         # Grab relevant annotation dictionaries
-        anns = [self.anns[aid] for aid in aids]
+        anns = [self.anns[aid] for aid in aids]  # type: ignore
         # Transform them into a kwimage.Detections datastructure
 
         dset = self
         try:
-            classes = dset.object_categories()
+            classes = dset.object_categories()  # type: ignore
         except Exception:
-            classes = list(dset.name_to_cat.keys())
+            classes = list(dset.name_to_cat.keys())  # type: ignore
         try:
-            kp_classes = dset.keypoint_categories()
+            kp_classes = dset.keypoint_categories()  # type: ignore
         except Exception:
             # hack
             anns = [ann.copy() for ann in anns]
             for ann in anns:
                 ann.pop('keypoints', None)
             kp_classes = None
-        cats = dset.dataset['categories']
+        cats = dset.dataset['categories']  # type: ignore
         # dets = kwimage.Detections.from_coco_annots(anns, dset=self)
         dets = kwimage.Detections.from_coco_annots(
             anns, classes=classes, cats=cats, kp_classes=kp_classes
@@ -4286,7 +4286,7 @@ class MixinCocoDraw:
             kwplot.figure(**figkw)
 
         if gid is None:
-            primary_ann = self.anns[aid]
+            primary_ann = self.anns[aid]  # type: ignore
             gid = primary_ann['image_id']
 
         show_all = kwargs.get('show_all', True)
@@ -4299,9 +4299,9 @@ class MixinCocoDraw:
         if aids is not None:
             highlight_aids.update(aids)
 
-        coco_img = self.coco_image(gid)
+        coco_img = self.coco_image(gid)  # type: ignore
         img = coco_img.img
-        aids = self.index.gid_to_aids.get(img['id'], [])
+        aids = self.index.gid_to_aids.get(img['id'], [])  # type: ignore
 
         # Collect annotation overlays
         colored_segments = defaultdict(list)
@@ -4314,7 +4314,7 @@ class MixinCocoDraw:
 
         if show_annots:
             for aid in aids:
-                ann = self.anns[aid]
+                ann = self.anns[aid]  # type: ignore
 
                 if 'keypoints' in ann:
                     cid = ann['category_id']
@@ -4332,7 +4332,7 @@ class MixinCocoDraw:
                             )
                         else:
                             try:
-                                kpnames = self._lookup_kpnames(cid)
+                                kpnames = self._lookup_kpnames(cid)  # type: ignore
                             except KeyError:
                                 kpnames = None
                             kpts = np.array(ann['keypoints']).reshape(-1, 3)
@@ -4351,13 +4351,13 @@ class MixinCocoDraw:
                 elif 'line' in ann:
                     x1, y1 = ann['line'][0:2]
                 elif 'keypoints' in ann:
-                    x1, y1 = xys.min(axis=0)
+                    x1, y1 = xys.min(axis=0)  # type: ignore
                 else:
                     raise Exception(f'no bbox, line, or keypoint position: ann={ann}')
 
                 cid = ann.get('category_id', None)
                 if cid is not None:
-                    cat = self.cats[cid]
+                    cat = self.cats[cid]  # type: ignore
                     catname = cat['name']
                 else:
                     cat = None
@@ -4367,7 +4367,7 @@ class MixinCocoDraw:
                     'verticalalignment': 'top',
                     'backgroundcolor': (0, 0, 0, 0.3),
                     'color': 'white',
-                    'fontproperties': mpl.font_manager.FontProperties(
+                    'fontproperties': mpl.font_manager.FontProperties(  # type: ignore
                         size=6, family='monospace'
                     ),
                 }
@@ -4389,7 +4389,7 @@ class MixinCocoDraw:
                         colored_segments[color].append([pt1, pt2])
                 elif 'bbox' in ann:
                     [x, y, w, h] = ann['bbox']
-                    rect = mpl.patches.Rectangle(
+                    rect = mpl.patches.Rectangle(  # type: ignore
                         (x, y), w, h, facecolor='none', edgecolor=color
                     )
                     rects.append(rect)
@@ -4431,7 +4431,7 @@ class MixinCocoDraw:
                             polykw = {}
                             if catcolor is not None:
                                 polykw['color'] = catcolor
-                            poly = mpl.patches.Polygon(poly_xys, **polykw)
+                            poly = mpl.patches.Polygon(poly_xys, **polykw)  # type: ignore
                             try:
                                 # hack
                                 poly.area = sseg.to_shapely().area
@@ -4525,7 +4525,7 @@ class MixinCocoDraw:
                 sortx = np.argsort(areas)[::-1]
                 sseg_polys = list(ub.take(sseg_polys, sortx))
 
-            poly_col = mpl.collections.PatchCollection(
+            poly_col = mpl.collections.PatchCollection(  # type: ignore
                 sseg_polys, match_original=True, alpha=0.4
             )
             ax.add_collection(poly_col)
@@ -4533,15 +4533,15 @@ class MixinCocoDraw:
         # Show all annotations inside it
         if kwargs.get('show_boxes', True):
             for x1, y1, catname, textkw in texts:
-                ax.text(x1, y1, catname, **textkw)
+                ax.text(x1, y1, catname, **textkw)  # type: ignore
 
             for color, segments in colored_segments.items():
-                line_col = mpl.collections.LineCollection(
+                line_col = mpl.collections.LineCollection(  # type: ignore
                     segments, linewidths=2, color=color
                 )
                 ax.add_collection(line_col)
 
-            rect_col = mpl.collections.PatchCollection(rects, match_original=True)
+            rect_col = mpl.collections.PatchCollection(rects, match_original=True)  # type: ignore
             ax.add_collection(rect_col)
             if keypoints:
                 xs, ys = np.vstack(keypoints).T
@@ -4618,23 +4618,23 @@ class MixinCocoAddRemove:
             >>> self.remove_images([gid2])
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
         """
-        index = self.index
+        index = self.index  # type: ignore
         if index.videos is not None and name in index.name_to_video:
             raise exceptions.DuplicateAddError(f'Video name={name} already exists')
         if id is not None and index.videos is not None and id in index.videos:
             raise exceptions.DuplicateAddError(f'Video id={id} already exists')
         if id is None:
-            id = self._next_ids.get('videos')
+            id = self._next_ids.get('videos')  # type: ignore
         video = ub.odict()
         video['id'] = id
         video['name'] = name
         video.update(**kw)
         try:
-            self.dataset['videos'].append(video)
+            self.dataset['videos'].append(video)  # type: ignore
         except KeyError:
-            self.dataset['videos'] = []
-            self.dataset['videos'].append(video)
-        self.index._add_video(id, video)
+            self.dataset['videos'] = []  # type: ignore
+            self.dataset['videos'].append(video)  # type: ignore
+        self.index._add_video(id, video)  # type: ignore
         # self._invalidate_hashid(['videos'])
         return id
 
@@ -4679,10 +4679,10 @@ class MixinCocoAddRemove:
             >>> gid = self.add_image(gname)
             >>> assert self.imgs[gid]['file_name'] == gname
         """
-        index = self.index
+        index = self.index  # type: ignore
 
         try:
-            norm_file_name = os.fspath(file_name)
+            norm_file_name = os.fspath(file_name)  # type: ignore
         except TypeError:
             norm_file_name = file_name
 
@@ -4691,18 +4691,18 @@ class MixinCocoAddRemove:
                 'Image with file_name={} already exists'.format(norm_file_name)
             )
 
-        if id is not None and self.imgs and id in self.imgs:
+        if id is not None and self.imgs and id in self.imgs:  # type: ignore
             raise exceptions.DuplicateAddError('Image id={} already exists'.format(id))
         if id is None:
-            id = self._next_ids.get('images')
+            id = self._next_ids.get('images')  # type: ignore
 
         img = dict()
         img['id'] = int(id)
         img['file_name'] = norm_file_name
         img.update(**kw)
-        self.index._add_image(id, img)
-        self.dataset['images'].append(img)
-        self._invalidate_hashid()
+        self.index._add_image(id, img)  # type: ignore
+        self.dataset['images'].append(img)  # type: ignore
+        self._invalidate_hashid()  # type: ignore
         return id
 
     def add_asset(
@@ -4738,7 +4738,7 @@ class MixinCocoAddRemove:
             >>> dset.add_asset(gid, 'path/fake_B0.tif', channels='B0', width=200,
             >>>                height=200, warp_aux_to_img={'scale': 1.0})
         """
-        coco_img = self.coco_image(gid)
+        coco_img = self.coco_image(gid)  # type: ignore
         coco_img.add_asset(file_name=file_name, channels=channels, **kwargs)
 
     # TODO: deprecated add_auxiliary_item for add_asset
@@ -4867,13 +4867,13 @@ class MixinCocoAddRemove:
             >>> print('ann = {}'.format(ub.urepr(ann, nl=2)))
         """
         try:
-            import kwimage
+            import kwimage  # type: ignore
         except ImportError:
-            kwimage = None
+            kwimage = None  # type: ignore
 
         if id is None:
-            id = self._next_ids.get('annotations')
-        elif self.anns and id in self.anns:
+            id = self._next_ids.get('annotations')  # type: ignore
+        elif self.anns and id in self.anns:  # type: ignore
             raise IndexError('Annot id={} already exists'.format(id))
 
         ann = dict()
@@ -4884,9 +4884,9 @@ class MixinCocoAddRemove:
         if kwimage is not None and hasattr(bbox, 'to_coco'):
             # to_coco works different for boxes atm, might update in future
             try:
-                ann['bbox'] = ub.peek(bbox.to_coco(style='new'))
+                ann['bbox'] = ub.peek(bbox.to_coco(style='new'))  # type: ignore
             except Exception:
-                ann['bbox'] = bbox.to_xywh().data.tolist()
+                ann['bbox'] = bbox.to_xywh().data.tolist()  # type: ignore
         elif bbox is not ub.NoParam:
             ann['bbox'] = bbox
         else:
@@ -4900,7 +4900,7 @@ class MixinCocoAddRemove:
             assert keypoints is ub.NoParam
 
         if kwimage is not None and hasattr(segmentation, 'to_coco'):
-            ann['segmentation'] = segmentation.to_coco(style='new')
+            ann['segmentation'] = segmentation.to_coco(style='new')  # type: ignore
         elif segmentation is not ub.NoParam:
             ann['segmentation'] = segmentation
         else:
@@ -4911,9 +4911,9 @@ class MixinCocoAddRemove:
 
         ann.update(**kw)
 
-        self.dataset['annotations'].append(ann)
-        self.index._add_annotation(id, image_id, category_id, track_id, ann)
-        self._invalidate_hashid(['annotations'])
+        self.dataset['annotations'].append(ann)  # type: ignore
+        self.index._add_annotation(id, image_id, category_id, track_id, ann)  # type: ignore
+        self._invalidate_hashid(['annotations'])  # type: ignore
         return id
 
     def add_category(
@@ -4950,14 +4950,14 @@ class MixinCocoAddRemove:
             >>> with pytest.raises(ValueError):
             >>>     self.add_category('dog', supercategory='object')
         """
-        index = self.index
+        index = self.index  # type: ignore
         if index.cats and name in index.name_to_cat:
             raise exceptions.DuplicateAddError(
                 'Category name={!r} already exists'.format(name)
             )
 
         if id is None:
-            id = self._next_ids.get('categories')
+            id = self._next_ids.get('categories')  # type: ignore
         elif index.cats and id in index.cats:
             raise exceptions.DuplicateAddError(
                 'Category id={} already exists'.format(id)
@@ -4971,14 +4971,14 @@ class MixinCocoAddRemove:
         cat.update(**kw)
 
         # Add to raw data structure
-        self.dataset['categories'].append(cat)
+        self.dataset['categories'].append(cat)  # type: ignore
 
         # And add to the indexes
         index._add_category(id, name, cat)
-        self._invalidate_hashid(['categories'])
+        self._invalidate_hashid(['categories'])  # type: ignore
         return id
 
-    def add_track(self, name: str = None, id: int | None = None, **kw: Any) -> int:
+    def add_track(self, name: str = None, id: int | None = None, **kw: Any) -> int:  # type: ignore
         """
         Register a new track with the dataset
 
@@ -5004,7 +5004,7 @@ class MixinCocoAddRemove:
             >>> with pytest.raises(ValueError):
             >>>     self.add_track('dog')
         """
-        index = self.index
+        index = self.index  # type: ignore
 
         if name is None:
             # auto choose name
@@ -5022,7 +5022,7 @@ class MixinCocoAddRemove:
             )
 
         if id is None:
-            id = self._next_ids.get('tracks')
+            id = self._next_ids.get('tracks')  # type: ignore
         elif index.tracks and id in index.tracks:
             raise exceptions.DuplicateAddError('Track id={} already exists'.format(id))
 
@@ -5033,13 +5033,13 @@ class MixinCocoAddRemove:
 
         # Add to raw data structure
         try:
-            self.dataset['tracks'].append(track)
+            self.dataset['tracks'].append(track)  # type: ignore
         except KeyError:
-            self.dataset['tracks'] = [track]
+            self.dataset['tracks'] = [track]  # type: ignore
 
         # And add to the indexes
         index._add_track(id, name, track)
-        self._invalidate_hashid(['tracks'])
+        self._invalidate_hashid(['tracks'])  # type: ignore
         return id
 
     def ensure_video(self, name: Any, id: None | int = None, **kw: Any) -> int:
@@ -5072,7 +5072,7 @@ class MixinCocoAddRemove:
         try:
             id = self.add_video(name=name, id=id, **kw)
         except exceptions.DuplicateAddError:
-            obj = self.index.name_to_video[name]
+            obj = self.index.name_to_video[name]  # type: ignore
             id = obj['id']
         return id
 
@@ -5106,7 +5106,7 @@ class MixinCocoAddRemove:
         try:
             id = self.add_track(name=name, id=id, **kw)
         except exceptions.DuplicateAddError:
-            obj = self.index.name_to_track[name]
+            obj = self.index.name_to_track[name]  # type: ignore
             id = obj['id']
         return id
 
@@ -5134,7 +5134,7 @@ class MixinCocoAddRemove:
         try:
             id = self.add_image(file_name=file_name, id=id, **kw)
         except exceptions.DuplicateAddError:
-            img = self.index.file_name_to_img[file_name]
+            img = self.index.file_name_to_img[file_name]  # type: ignore
             id = img['id']
         return id
 
@@ -5162,7 +5162,7 @@ class MixinCocoAddRemove:
         try:
             id = self.add_category(name=name, supercategory=supercategory, id=id, **kw)
         except exceptions.DuplicateAddError:
-            cat = self.index.name_to_cat[name]
+            cat = self.index.name_to_cat[name]  # type: ignore
             id = cat['id']
         return id
 
@@ -5191,9 +5191,9 @@ class MixinCocoAddRemove:
             >>> self.add_categories(cats)
             >>> assert self.n_cats == 8 and self._check_integrity()
         """
-        self.dataset['categories'].extend(cats)
-        self.index._add_categories(cats)
-        self._invalidate_hashid(['categories'])
+        self.dataset['categories'].extend(cats)  # type: ignore
+        self.index._add_categories(cats)  # type: ignore
+        self._invalidate_hashid(['categories'])  # type: ignore
 
     def add_keypoint_categories(self, keypoint_cats: Any) -> Any:
         """
@@ -5219,11 +5219,11 @@ class MixinCocoAddRemove:
             >>> kp_identifiers = keypoint_cats
             >>> self.remove_keypoint_categories(kp_identifiers, clean_anns=False)
         """
-        if 'keypoint_categories' not in self.dataset:
-            self.dataset['keypoint_categories'] = []
-        self.dataset['keypoint_categories'].extend(keypoint_cats)
-        self.index._add_keypoint_categories(keypoint_cats)
-        self._invalidate_hashid(['keypoint_categories'])
+        if 'keypoint_categories' not in self.dataset:  # type: ignore
+            self.dataset['keypoint_categories'] = []  # type: ignore
+        self.dataset['keypoint_categories'].extend(keypoint_cats)  # type: ignore
+        self.index._add_keypoint_categories(keypoint_cats)  # type: ignore
+        self._invalidate_hashid(['keypoint_categories'])  # type: ignore
 
     def add_annotations(self, anns: list[dict]) -> None:
         """
@@ -5249,9 +5249,9 @@ class MixinCocoAddRemove:
             >>> self.add_annotations(anns)
             >>> assert self.n_annots == 11 and self._check_integrity()
         """
-        self.dataset['annotations'].extend(anns)
-        self.index._add_annotations(anns)
-        self._invalidate_hashid(['annotations'])
+        self.dataset['annotations'].extend(anns)  # type: ignore
+        self.index._add_annotations(anns)  # type: ignore
+        self._invalidate_hashid(['annotations'])  # type: ignore
 
     def add_images(self, imgs: list[dict]) -> None:
         """
@@ -5282,9 +5282,9 @@ class MixinCocoAddRemove:
             >>> self.add_images(imgs)
             >>> assert self.n_images == 3 and self._check_integrity()
         """
-        self.dataset['images'].extend(imgs)
-        self.index._add_images(imgs)
-        self._invalidate_hashid(['images'])
+        self.dataset['images'].extend(imgs)  # type: ignore
+        self.index._add_images(imgs)  # type: ignore
+        self._invalidate_hashid(['images'])  # type: ignore
 
     def clear_images(self) -> None:
         """
@@ -5299,10 +5299,10 @@ class MixinCocoAddRemove:
         """
         # self.dataset['images'].clear()
         # self.dataset['annotations'].clear()
-        del self.dataset['images'][:]
-        del self.dataset['annotations'][:]
-        self.index._remove_all_images()
-        self._invalidate_hashid(['images', 'annotations'])
+        del self.dataset['images'][:]  # type: ignore
+        del self.dataset['annotations'][:]  # type: ignore
+        self.index._remove_all_images()  # type: ignore
+        self._invalidate_hashid(['images', 'annotations'])  # type: ignore
 
     def clear_annotations(self) -> None:
         """
@@ -5316,11 +5316,11 @@ class MixinCocoAddRemove:
             n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8, n_tracks: 0
         """
         # self.dataset['annotations'].clear()
-        self.dataset['annotations'].clear()
-        if 'tracks' in self.dataset:
-            self.dataset['tracks'].clear()
-        self.index._remove_all_annotations()
-        self._invalidate_hashid(['annotations', 'tracks'])
+        self.dataset['annotations'].clear()  # type: ignore
+        if 'tracks' in self.dataset:  # type: ignore
+            self.dataset['tracks'].clear()  # type: ignore
+        self.index._remove_all_annotations()  # type: ignore
+        self._invalidate_hashid(['annotations', 'tracks'])  # type: ignore
 
     def remove_annotation(self, aid_or_ann: Any) -> None:
         """
@@ -5339,10 +5339,10 @@ class MixinCocoAddRemove:
             >>> self._check_integrity()
         """
         # Do the simple thing, its O(n) anyway,
-        remove_ann = self._resolve_to_ann(aid_or_ann)
-        self.dataset['annotations'].remove(remove_ann)
-        self.index.clear()
-        self._invalidate_hashid(['annotations'])
+        remove_ann = self._resolve_to_ann(aid_or_ann)  # type: ignore
+        self.dataset['annotations'].remove(remove_ann)  # type: ignore
+        self.index.clear()  # type: ignore
+        self._invalidate_hashid(['annotations'])  # type: ignore
 
     def remove_annotations(
         self, aids_or_anns: Any, verbose: int = 0, safe: bool = True
@@ -5376,9 +5376,9 @@ class MixinCocoAddRemove:
             # TODO: it would be nice if this mapping was as part of the index.
             aid_to_index = {
                 ann['id']: index
-                for index, ann in enumerate(self.dataset['annotations'])
+                for index, ann in enumerate(self.dataset['annotations'])  # type: ignore
             }
-            remove_aids = list(map(self._resolve_to_id, aids_or_anns))
+            remove_aids = list(map(self._resolve_to_id, aids_or_anns))  # type: ignore
             if safe:
                 remove_aids = sorted(set(remove_aids))
             remove_info['annotations'] = len(remove_aids)
@@ -5389,11 +5389,11 @@ class MixinCocoAddRemove:
 
             remove_idxs = list(ub.take(aid_to_index, remove_aids))
 
-            self.index._remove_annotations(remove_aids, verbose=verbose)
+            self.index._remove_annotations(remove_aids, verbose=verbose)  # type: ignore
 
-            _delitems(self.dataset['annotations'], remove_idxs)
+            _delitems(self.dataset['annotations'], remove_idxs)  # type: ignore
 
-            self._invalidate_hashid(['annotations'])
+            self._invalidate_hashid(['annotations'])  # type: ignore
         return remove_info
 
     def remove_categories(
@@ -5438,22 +5438,22 @@ class MixinCocoAddRemove:
                 remove_cids = set()
                 for identifier in cat_identifiers:
                     try:
-                        cid = self._resolve_to_cid(identifier)
+                        cid = self._resolve_to_cid(identifier)  # type: ignore
                         remove_cids.add(cid)
                     except Exception:
                         pass
                 remove_cids = sorted(remove_cids)
             else:
-                remove_cids = list(map(self._resolve_to_cid, cat_identifiers))
+                remove_cids = list(map(self._resolve_to_cid, cat_identifiers))  # type: ignore
             # First remove any annotation that belongs to those categories
-            if self.index.cid_to_aids:
+            if self.index.cid_to_aids:  # type: ignore
                 remove_aids = list(
-                    it.chain(*[self.index.cid_to_aids[cid] for cid in remove_cids])
+                    it.chain(*[self.index.cid_to_aids[cid] for cid in remove_cids])  # type: ignore
                 )
             else:
                 remove_aids = [
                     ann['id']
-                    for ann in self.dataset['annotations']
+                    for ann in self.dataset['annotations']  # type: ignore
                     if ann['category_id'] in remove_cids
                 ]
 
@@ -5461,7 +5461,7 @@ class MixinCocoAddRemove:
                 # Simply remove category information instead of removing the
                 # entire annotation.
                 for aid in remove_aids:
-                    self.anns[aid].pop('category_id')
+                    self.anns[aid].pop('category_id')  # type: ignore
             else:
                 rminfo = self.remove_annotations(remove_aids, verbose=verbose)
                 remove_info.update(rminfo)
@@ -5470,14 +5470,14 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing {} category entries'.format(len(remove_cids)))
             id_to_index = {
-                cat['id']: index for index, cat in enumerate(self.dataset['categories'])
+                cat['id']: index for index, cat in enumerate(self.dataset['categories'])  # type: ignore
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(id_to_index, remove_cids))
-            _delitems(self.dataset['categories'], remove_idxs)
+            _delitems(self.dataset['categories'], remove_idxs)  # type: ignore
 
-            self.index._remove_categories(remove_cids, verbose=verbose)
-            self._invalidate_hashid(['categories', 'annotations'])
+            self.index._remove_categories(remove_cids, verbose=verbose)  # type: ignore
+            self._invalidate_hashid(['categories', 'annotations'])  # type: ignore
 
         return remove_info
 
@@ -5527,20 +5527,20 @@ class MixinCocoAddRemove:
                 remove_trackids = set()
                 for identifier in track_identifiers:
                     try:
-                        trackid = self._resolve_to_trackid(identifier)
+                        trackid = self._resolve_to_trackid(identifier)  # type: ignore
                         remove_trackids.add(trackid)
                     except Exception:
                         pass
                 remove_trackids = sorted(remove_trackids)
             else:
-                remove_trackids = list(map(self._resolve_to_trackid, track_identifiers))
+                remove_trackids = list(map(self._resolve_to_trackid, track_identifiers))  # type: ignore
 
             # First remove any annotation that belongs to those tracks
-            if self.index.trackid_to_aids:
+            if self.index.trackid_to_aids:  # type: ignore
                 remove_aids = list(
                     it.chain(
                         *[
-                            self.index.trackid_to_aids[trackid]
+                            self.index.trackid_to_aids[trackid]  # type: ignore
                             for trackid in remove_trackids
                         ]
                     )
@@ -5548,7 +5548,7 @@ class MixinCocoAddRemove:
             else:
                 remove_aids = [
                     ann['id']
-                    for ann in self.dataset['annotations']
+                    for ann in self.dataset['annotations']  # type: ignore
                     if ann['track_id'] in remove_trackids
                 ]
 
@@ -5556,7 +5556,7 @@ class MixinCocoAddRemove:
                 # Simply remove track information instead of removing the
                 # entire annotation.
                 for aid in remove_aids:
-                    self.anns[aid].pop('track_id')
+                    self.anns[aid].pop('track_id')  # type: ignore
             else:
                 rminfo = self.remove_annotations(remove_aids, verbose=verbose)
                 remove_info.update(rminfo)
@@ -5565,14 +5565,14 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing {} track entries'.format(len(remove_trackids)))
             id_to_index = {
-                track['id']: index for index, track in enumerate(self.dataset['tracks'])
+                track['id']: index for index, track in enumerate(self.dataset['tracks'])  # type: ignore
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(id_to_index, remove_trackids))
-            _delitems(self.dataset['tracks'], remove_idxs)
+            _delitems(self.dataset['tracks'], remove_idxs)  # type: ignore
 
-            self.index._remove_tracks(remove_trackids, verbose=verbose)
-            self._invalidate_hashid(['tracks', 'annotations'])
+            self.index._remove_tracks(remove_trackids, verbose=verbose)  # type: ignore
+            self._invalidate_hashid(['tracks', 'annotations'])  # type: ignore
 
         return remove_info
 
@@ -5610,18 +5610,18 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing images')
 
-            remove_gids = list(map(self._resolve_to_gid, gids_or_imgs))
+            remove_gids = list(map(self._resolve_to_gid, gids_or_imgs))  # type: ignore
             if safe:
                 remove_gids = sorted(set(remove_gids))
             # First remove any annotation that belongs to those images
-            if self.index.gid_to_aids:
+            if self.index.gid_to_aids:  # type: ignore
                 remove_aids = list(
-                    it.chain(*[self.index.gid_to_aids[gid] for gid in remove_gids])
+                    it.chain(*[self.index.gid_to_aids[gid] for gid in remove_gids])  # type: ignore
                 )
             else:
                 remove_aids = [
                     ann['id']
-                    for ann in self.dataset['annotations']
+                    for ann in self.dataset['annotations']  # type: ignore
                     if ann['image_id'] in remove_gids
                 ]
 
@@ -5632,14 +5632,14 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing {} image entries'.format(len(remove_gids)))
             id_to_index = {
-                img['id']: index for index, img in enumerate(self.dataset['images'])
+                img['id']: index for index, img in enumerate(self.dataset['images'])  # type: ignore
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(id_to_index, remove_gids))
-            _delitems(self.dataset['images'], remove_idxs)
+            _delitems(self.dataset['images'], remove_idxs)  # type: ignore
 
-            self.index._remove_images(remove_gids, verbose=verbose)
-            self._invalidate_hashid(['images', 'annotations'])
+            self.index._remove_images(remove_gids, verbose=verbose)  # type: ignore
+            self._invalidate_hashid(['images', 'annotations'])  # type: ignore
 
         return remove_info
 
@@ -5674,21 +5674,21 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing videos')
 
-            remove_vidids = list(map(self._resolve_to_vidid, vidids_or_videos))
+            remove_vidids = list(map(self._resolve_to_vidid, vidids_or_videos))  # type: ignore
             if safe:
                 remove_vidids = sorted(set(remove_vidids))
             # First remove any annotation that belongs to those images
-            if self.index.vidid_to_gids:
+            if self.index.vidid_to_gids:  # type: ignore
                 remove_gids = list(
                     it.chain(
-                        *[self.index.vidid_to_gids[vidid] for vidid in remove_vidids]
+                        *[self.index.vidid_to_gids[vidid] for vidid in remove_vidids]  # type: ignore
                     )
                 )
             else:
                 remove_gids = [
                     ann['id']
-                    for ann in self.dataset['videos']
-                    if ann['image_id'] in remove_gids
+                    for ann in self.dataset['videos']  # type: ignore
+                    if ann['image_id'] in remove_gids  # type: ignore
                 ]
 
             rminfo = self.remove_images(remove_gids, verbose=verbose, safe=safe)
@@ -5698,14 +5698,14 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing {} video entries'.format(len(remove_vidids)))
             id_to_index = {
-                video['id']: index for index, video in enumerate(self.dataset['videos'])
+                video['id']: index for index, video in enumerate(self.dataset['videos'])  # type: ignore
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(id_to_index, remove_vidids))
-            _delitems(self.dataset['videos'], remove_idxs)
+            _delitems(self.dataset['videos'], remove_idxs)  # type: ignore
 
-            self.index._remove_videos(remove_vidids, verbose=verbose)
-            self._invalidate_hashid(['videos', 'images', 'annotations'])
+            self.index._remove_videos(remove_vidids, verbose=verbose)  # type: ignore
+            self._invalidate_hashid(['videos', 'images', 'annotations'])  # type: ignore
         return remove_info
 
     def remove_annotation_keypoints(self, kp_identifiers: list) -> dict:
@@ -5720,10 +5720,10 @@ class MixinCocoAddRemove:
         """
         # kpnames = {k['name'] for k in remove_kpcats}
         # TODO: needs optimization
-        remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))
+        remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))  # type: ignore
         kpcids = {k['id'] for k in remove_kpcats}
         num_kps_removed = 0
-        for ann in self.dataset['annotations']:
+        for ann in self.dataset['annotations']:  # type: ignore
             remove_idxs = [
                 kp_idx
                 for kp_idx, kp in enumerate(ann['keypoints'])
@@ -5762,7 +5762,7 @@ class MixinCocoAddRemove:
             >>> assert self._resolve_to_kpcat('right_eye')['reflection_id'] is None
         """
         remove_info = {'keypoint_categories': None, 'annotation_keypoints': None}
-        remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))
+        remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))  # type: ignore
 
         # This is expensive, should make it optional.
         if clean_anns:
@@ -5772,18 +5772,18 @@ class MixinCocoAddRemove:
         remove_kpcids = {k['id'] for k in remove_kpcats}
 
         for kpcat in remove_kpcats:
-            self.dataset['keypoint_categories'].remove(kpcat)
+            self.dataset['keypoint_categories'].remove(kpcat)  # type: ignore
 
         # handle reflection ids
         remove_reflect_ids = 0
-        for kpcat in self.dataset['keypoint_categories']:
+        for kpcat in self.dataset['keypoint_categories']:  # type: ignore
             if kpcat.get('reflection_id', None) in remove_kpcids:
                 kpcat['reflection_id'] = None
                 remove_reflect_ids += 1
 
         remove_info['reflection_ids'] = remove_reflect_ids
         remove_info['keypoint_categories'] = len(remove_kpcats)
-        self.index._remove_keypoint_categories(remove_kpcids)
+        self.index._remove_keypoint_categories(remove_kpcids)  # type: ignore
         return remove_info
 
     def set_annotation_category(
@@ -5810,17 +5810,17 @@ class MixinCocoAddRemove:
             >>> assert sum(new_freq.values()) == sum(old_freq.values())
             >>> assert new_freq['kitten'] == 1
         """
-        new_cid = self._resolve_to_cid(cid_or_cat)
-        ann = self._resolve_to_ann(aid_or_ann)
+        new_cid = self._resolve_to_cid(cid_or_cat)  # type: ignore
+        ann = self._resolve_to_ann(aid_or_ann)  # type: ignore
         aid = ann['id']
-        if self.index:
+        if self.index:  # type: ignore
             if 'category_id' in ann:
                 old_cid = ann['category_id']
-                self.index.cid_to_aids[old_cid].remove(aid)
+                self.index.cid_to_aids[old_cid].remove(aid)  # type: ignore
         ann['category_id'] = new_cid
-        if self.index:
-            self.index.cid_to_aids[new_cid].add(aid)
-        self._invalidate_hashid(['annotations'])
+        if self.index:  # type: ignore
+            self.index.cid_to_aids[new_cid].add(aid)  # type: ignore
+        self._invalidate_hashid(['annotations'])  # type: ignore
 
 
 class CocoIndex:
@@ -5941,7 +5941,7 @@ class CocoIndex:
             def __init__(self, index):
                 self.index = index
 
-            def getitem(self, cid: Any) -> Any:
+            def getitem(self, cid: Any) -> Any:  # type: ignore
                 aids = self.index.cid_to_aids[cid]
                 gids = {self.index.anns[aid]['image_id'] for aid in aids}
                 return gids
@@ -5956,14 +5956,14 @@ class CocoIndex:
         if index.videos is not None:
             name = video['name']
             if index._CHECKS:
-                if name in index.name_to_video:
+                if name in index.name_to_video:  # type: ignore
                     raise exceptions.DuplicateAddError(
                         'video with name={} already exists'.format(name)
                     )
             index.videos[vidid] = video
-            if vidid not in index.vidid_to_gids:
-                index.vidid_to_gids[vidid] = index._images_set_sorted_by_frame_index()
-            index.name_to_video[name] = video
+            if vidid not in index.vidid_to_gids:  # type: ignore
+                index.vidid_to_gids[vidid] = index._images_set_sorted_by_frame_index()  # type: ignore
+            index.name_to_video[name] = video  # type: ignore
 
     def _add_image(index, gid: int, img: dict) -> None:
         """
@@ -5988,22 +5988,22 @@ class CocoIndex:
                     raise exceptions.InvalidAddError(
                         'at least one of file_name or name must be specified'
                     )
-                if file_name in index.file_name_to_img:
+                if file_name in index.file_name_to_img:  # type: ignore
                     raise exceptions.DuplicateAddError(
                         'image with file_name={} already exists'.format(file_name)
                     )
-                if name in index.name_to_img:
+                if name in index.name_to_img:  # type: ignore
                     raise exceptions.DuplicateAddError(
                         'image with name={} already exists'.format(name)
                     )
             index.imgs[gid] = img
-            index.gid_to_aids[gid] = index._set()
+            index.gid_to_aids[gid] = index._set()  # type: ignore
 
             if file_name is not None:
-                index.file_name_to_img[file_name] = img
+                index.file_name_to_img[file_name] = img  # type: ignore
 
             if name is not None:
-                index.name_to_img[name] = img
+                index.name_to_img[name] = img  # type: ignore
 
             if 'video_id' in img:
                 if img.get('frame_index', None) is None:
@@ -6012,17 +6012,17 @@ class CocoIndex:
                     )
                 vidid = img['video_id']
                 try:
-                    index.vidid_to_gids[vidid].add(gid)
+                    index.vidid_to_gids[vidid].add(gid)  # type: ignore
                 except KeyError:
                     # Should warning messages contain data-specific info?
                     # msg = ('Adding image-id={} to '
                     #        'non-existing video-id={}').format(gid, vidid)
                     msg = 'Adding image to non-existing video'
                     warnings.warn(msg)
-                    index.vidid_to_gids[vidid] = (
+                    index.vidid_to_gids[vidid] = (  # type: ignore
                         index._images_set_sorted_by_frame_index()
                     )
-                    index.vidid_to_gids[vidid].add(gid)
+                    index.vidid_to_gids[vidid].add(gid)  # type: ignore
 
     def _add_images(index, imgs: list[dict]) -> None:
         """
@@ -6038,18 +6038,18 @@ class CocoIndex:
             gids = [img['id'] for img in imgs]
             new_imgs = dict(zip(gids, imgs))
             index.imgs.update(new_imgs)
-            index.file_name_to_img.update(
+            index.file_name_to_img.update(  # type: ignore
                 {
                     img['file_name']: img
                     for img in imgs
                     if img.get('file_name', None) is not None
                 }
             )
-            index.name_to_img.update(
+            index.name_to_img.update(  # type: ignore
                 {img['name']: img for img in imgs if img.get('name', None) is not None}
             )
             for gid in gids:
-                index.gid_to_aids[gid] = index._set()
+                index.gid_to_aids[gid] = index._set()  # type: ignore
 
             if index.vidid_to_gids:
                 vidid_to_gids = ub.group_items(
@@ -6065,11 +6065,11 @@ class CocoIndex:
         if index.anns is not None:
             index.anns[aid] = ann
             # Note: it should be ok to have None's here
-            index.gid_to_aids[gid].add(aid)
-            index.cid_to_aids[cid].add(aid)
+            index.gid_to_aids[gid].add(aid)  # type: ignore
+            index.cid_to_aids[cid].add(aid)  # type: ignore
             # index.trackid_to_aids[tid].add(aid)
             try:
-                index.trackid_to_aids[tid].add(aid)
+                index.trackid_to_aids[tid].add(aid)  # type: ignore
             except KeyError:
                 if tid is not None:
                     msg = 'Adding annotation to non-existing track'
@@ -6078,10 +6078,10 @@ class CocoIndex:
                 if tid is None:
                     index.trackid_to_aids[tid] = set()
                 else:
-                    index.trackid_to_aids[tid] = (
+                    index.trackid_to_aids[tid] = (  # type: ignore
                         index._annots_set_sorted_by_frame_index()
                     )
-                index.trackid_to_aids[tid].add(aid)
+                index.trackid_to_aids[tid].add(aid)  # type: ignore
 
     def _add_keypoint_categories(index, keypoint_cats: list[dict]) -> None:
         if index.kpcats is None:
@@ -6097,8 +6097,8 @@ class CocoIndex:
             new_objs = dict(zip(ids, cats))
             index.cats.update(new_objs)
             for cid, cat, name in zip(ids, cats, names):
-                index.cid_to_aids[cid] = index._set()
-                index.name_to_cat[name] = cat
+                index.cid_to_aids[cid] = index._set()  # type: ignore
+                index.name_to_cat[name] = cat  # type: ignore
 
     def _add_annotations(index, anns: list[dict]) -> None:
         if index.anns is not None:
@@ -6109,55 +6109,55 @@ class CocoIndex:
             new_anns = dict(zip(aids, anns))
             index.anns.update(new_anns)
             for gid, cid, tid, aid in zip(gids, cids, tids, aids):
-                index.gid_to_aids[gid].add(aid)
-                index.cid_to_aids[cid].add(aid)
+                index.gid_to_aids[gid].add(aid)  # type: ignore
+                index.cid_to_aids[cid].add(aid)  # type: ignore
                 try:
-                    index.trackid_to_aids[tid].add(aid)
+                    index.trackid_to_aids[tid].add(aid)  # type: ignore
                 except KeyError:
                     if tid is None:
-                        index.trackid_to_aids[tid] = set()
+                        index.trackid_to_aids[tid] = set()  # type: ignore
                     else:
-                        index.trackid_to_aids[tid] = (
+                        index.trackid_to_aids[tid] = (  # type: ignore
                             index._annots_set_sorted_by_frame_index()
                         )
-                    index.trackid_to_aids[tid].add(aid)
+                    index.trackid_to_aids[tid].add(aid)  # type: ignore
 
     def _add_category(index, cid: int, name: str, cat: dict) -> None:
         if index.cats is not None:
             index.cats[cid] = cat
-            index.cid_to_aids[cid] = index._set()
-            index.name_to_cat[name] = cat
+            index.cid_to_aids[cid] = index._set()  # type: ignore
+            index.name_to_cat[name] = cat  # type: ignore
 
     def _add_track(index, trackid: int, name: str, track: dict) -> None:
         if index.tracks is not None:
             index.tracks[trackid] = track
-            index.trackid_to_aids[trackid] = index._annots_set_sorted_by_frame_index()
-            index.name_to_track[name] = track
+            index.trackid_to_aids[trackid] = index._annots_set_sorted_by_frame_index()  # type: ignore
+            index.name_to_track[name] = track  # type: ignore
 
     def _remove_all_annotations(index) -> None:
         # Keep the category and image indexes alive
         if index.anns is not None:
-            for _ in index.gid_to_aids.values():
+            for _ in index.gid_to_aids.values():  # type: ignore
                 _.clear()
-            for _ in index.cid_to_aids.values():
+            for _ in index.cid_to_aids.values():  # type: ignore
                 _.clear()
             # for _ in index.trackid_to_aids.values():
             #     _.clear()
             index.anns.clear()
-            index.tracks.clear()
-            index.trackid_to_aids.clear()
-            index.name_to_track.clear()
+            index.tracks.clear()  # type: ignore
+            index.trackid_to_aids.clear()  # type: ignore
+            index.name_to_track.clear()  # type: ignore
 
     def _remove_all_images(index) -> None:
         # Keep the category indexes alive
         if index.imgs is not None:
             index.imgs.clear()
-            index.anns.clear()
-            index.gid_to_aids.clear()
-            index.file_name_to_img.clear()
-            for _ in index.cid_to_aids.values():
+            index.anns.clear()  # type: ignore
+            index.gid_to_aids.clear()  # type: ignore
+            index.file_name_to_img.clear()  # type: ignore
+            for _ in index.cid_to_aids.values():  # type: ignore
                 _.clear()
-            for _ in index.vidid_to_gids.values():
+            for _ in index.vidid_to_gids.values():  # type: ignore
                 _.clear()
 
     def _remove_keypoint_categories(index, remove_kpcid: Any, verbose: Any = 0) -> None:
@@ -6178,9 +6178,9 @@ class CocoIndex:
                 gid = ann['image_id']
                 cid = ann.get('category_id', None)
                 track_id = ann.get('track_id', None)
-                index.trackid_to_aids[track_id].remove(aid)
-                index.cid_to_aids[cid].remove(aid)
-                index.gid_to_aids[gid].remove(aid)
+                index.trackid_to_aids[track_id].remove(aid)  # type: ignore
+                index.cid_to_aids[cid].remove(aid)  # type: ignore
+                index.gid_to_aids[gid].remove(aid)  # type: ignore
                 index.anns.pop(aid)
 
     def _remove_tracks(index, remove_trackids: Any, verbose: Any = 0) -> None:
@@ -6188,8 +6188,8 @@ class CocoIndex:
         if index.tracks is not None:
             for tid in remove_trackids:
                 track = index.tracks.pop(tid)
-                del index.trackid_to_aids[tid]
-                del index.name_to_track[track['name']]
+                del index.trackid_to_aids[tid]  # type: ignore
+                del index.name_to_track[track['name']]  # type: ignore
             if verbose > 2:
                 print('Updated track index')
 
@@ -6198,8 +6198,8 @@ class CocoIndex:
         if index.cats is not None:
             for cid in remove_cids:
                 cat = index.cats.pop(cid)
-                del index.cid_to_aids[cid]
-                del index.name_to_cat[cat['name']]
+                del index.cid_to_aids[cid]  # type: ignore
+                del index.name_to_cat[cat['name']]  # type: ignore
             if verbose > 2:
                 print('Updated category index')
 
@@ -6209,15 +6209,15 @@ class CocoIndex:
             for gid in remove_gids:
                 img = index.imgs[gid]
                 vidid = img.get('video_id', None)
-                if vidid in index.vidid_to_gids:
-                    index.vidid_to_gids[vidid].remove(gid)
-                del index.gid_to_aids[gid]
+                if vidid in index.vidid_to_gids:  # type: ignore
+                    index.vidid_to_gids[vidid].remove(gid)  # type: ignore
+                del index.gid_to_aids[gid]  # type: ignore
                 gname = img.get('file_name', None)
                 if gname is not None:
-                    del index.file_name_to_img[gname]
+                    del index.file_name_to_img[gname]  # type: ignore
                 name = img.get('name', None)
                 if name is not None:
-                    del index.name_to_img[name]
+                    del index.name_to_img[name]  # type: ignore
                 del index.imgs[gid]
             if verbose > 2:
                 print('Updated image index')
@@ -6228,7 +6228,7 @@ class CocoIndex:
         if lut is not None:
             for item_id in remove_vidids:
                 item = lut.pop(item_id)
-                del index.vidid_to_gids[item_id]
+                del index.vidid_to_gids[item_id]  # type: ignore
                 if index.name_to_video is not None:
                     del index.name_to_video[item['name']]
             if verbose > 2:
@@ -6428,7 +6428,7 @@ class CocoIndex:
 
         for vidid in videos.keys():
             if vidid not in vidid_to_gids:
-                vidid_to_gids[vidid] = index._set()
+                vidid_to_gids[vidid] = index._set()  # type: ignore
 
         # create class members
         index._id_lookup = {
@@ -6503,15 +6503,15 @@ class MixinCocoIndex:
 
     @property
     def anns(self) -> dict[int, dict]:
-        return self.index.anns
+        return self.index.anns  # type: ignore
 
     @property
     def imgs(self) -> dict[int, dict]:
-        return self.index.imgs
+        return self.index.imgs  # type: ignore
 
     @property
     def cats(self) -> dict[int, dict]:
-        return self.index.cats
+        return self.index.cats  # type: ignore
 
     # NOTE: API Issue, overloads previous method
     # @property
@@ -6520,15 +6520,15 @@ class MixinCocoIndex:
 
     @property
     def gid_to_aids(self) -> dict[int, list[int]]:
-        return self.index.gid_to_aids
+        return self.index.gid_to_aids  # type: ignore
 
     @property
     def cid_to_aids(self) -> dict[int, list[int]]:
-        return self.index.cid_to_aids
+        return self.index.cid_to_aids  # type: ignore
 
     @property
     def name_to_cat(self) -> dict[str, dict]:
-        return self.index.name_to_cat
+        return self.index.name_to_cat  # type: ignore
 
 
 class CocoDataset(
@@ -6793,7 +6793,7 @@ class CocoDataset(
             if fname == 'data.kwcoco.json':
                 if bundle_dpath is not None:
                     bundle_dpath = dirname(fpath)
-                key = basename(bundle_dpath)
+                key = basename(bundle_dpath)  # type: ignore
             else:
                 key = fname
 
@@ -6986,7 +6986,7 @@ class CocoDataset(
         parts = []
         parts.append('tag={}'.format(self.tag))
         if self.dataset is not None:
-            info = ub.urepr(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)
+            info = ub.urepr(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)  # type: ignore
             parts.append(info)
         return ', '.join(parts)
 
@@ -7204,7 +7204,7 @@ class CocoDataset(
         indent = coerce_indent(indent)
 
         if file is None:
-            file = self.fpath
+            file = self.fpath  # type: ignore
 
         try:
             fpath = os.fspath(file)  # type: ignore
@@ -7235,11 +7235,11 @@ class CocoDataset(
             if temp_file == 'auto':
                 temp_file = not ub.WIN32
 
-            with safer.open(fpath, mode, temp_file=temp_file) as fp:
+            with safer.open(fpath, mode, temp_file=temp_file) as fp:  # type: ignore
                 self._dump(fp, indent=indent, newlines=newlines, compress=compress)  # type: ignore
         else:
             # We are likely dumping to a real file.
-            self._dump(file, indent=indent, newlines=newlines, compress=compress)
+            self._dump(file, indent=indent, newlines=newlines, compress=compress)  # type: ignore
 
         if verbose:
             print('done.')
@@ -7332,7 +7332,7 @@ class CocoDataset(
         )
         checks['name_to_track'] = self.index.name_to_track == new.index.name_to_track
 
-        one_to_many1: dict = self.index.trackid_to_aids
+        one_to_many1: dict = self.index.trackid_to_aids  # type: ignore
         one_to_many2: dict = new.index.trackid_to_aids  # type: ignore
 
         missing2 = ub.dict_diff(one_to_many1, one_to_many2)
@@ -7370,21 +7370,21 @@ class CocoDataset(
             gid = ann['image_id']
             trackid = ann.get('track_id', None)
 
-            if cid not in self.index.cats:
+            if cid not in self.index.cats:  # type: ignore
                 if cid is not None:
                     errors.append('aid={} references bad cid={}'.format(aid, cid))
             else:
                 if self.index.cats[cid]['id'] != cid:  # type: ignore
                     errors.append('cid={} has a bad index'.format(cid))
 
-            if gid not in self.index.imgs:
+            if gid not in self.index.imgs:  # type: ignore
                 errors.append('aid={} references bad gid={}'.format(aid, gid))
             else:
-                if self.index.imgs[gid]['id'] != gid:
+                if self.index.imgs[gid]['id'] != gid:  # type: ignore
                     errors.append('gid={} has a bad index'.format(gid))
 
             if trackid is not None:
-                if trackid not in self.index.tracks:
+                if trackid not in self.index.tracks:  # type: ignore
                     warnings.append(
                         'aid={} references bad track_id={}'.format(aid, trackid)
                     )
@@ -7402,7 +7402,7 @@ class CocoDataset(
                     warnings.append(
                         'gid={} references bad video_id={}'.format(gid, vidid)
                     )
-                elif self.index.videos[vidid]['id'] != vidid:
+                elif self.index.videos[vidid]['id'] != vidid:  # type: ignore
                     errors.append('video_id={} has a bad index'.format(vidid))
 
         if 'categories' in self.dataset:
@@ -7420,7 +7420,7 @@ class CocoDataset(
             )
             for track in iter_:
                 track_id = track['id']
-                if self.index.tracks[track_id]['id'] != track_id:
+                if self.index.tracks[track_id]['id'] != track_id:  # type: ignore
                     errors.append(f'track_id={track_id} has a bad index')
 
         if 'videos' in self.dataset:
@@ -7924,7 +7924,7 @@ class CocoDataset(
 
         dset_roots = [dset.bundle_dpath for dset in others]
         dset_roots = [normpath(r) if r is not None else None for r in dset_roots]
-        items = [join('.', p) for p in dset_roots]
+        items = [join('.', p) for p in dset_roots]  # type: ignore
         common_root = longest_common_prefix(items, sep=os.path.sep)
 
         relative_dsets = [
@@ -7940,7 +7940,7 @@ class CocoDataset(
 
     def subset(
         self,
-        gids: list[int] = None,
+        gids: list[int] = None,  # type: ignore
         video_ids: list[int] | None = None,
         copy: bool = False,
         autobuild: bool = True,
@@ -8051,7 +8051,7 @@ class CocoDataset(
             new_dataset['videos'] = chosen_vids
 
         sub_aids = sorted(
-            [aid for gid in chosen_gids for aid in self.index.gid_to_aids.get(gid, [])]
+            [aid for gid in chosen_gids for aid in self.index.gid_to_aids.get(gid, [])]  # type: ignore
         )
         new_dataset['annotations'] = list(ub.take(self.index.anns, sub_aids))  # type: ignore
 
@@ -8062,7 +8062,7 @@ class CocoDataset(
             )
             new_dataset['tracks'] = list(self.tracks(sub_track_ids).objs_iter())
 
-        new_dataset['img_root'] = self.dataset.get('img_root', None)
+        new_dataset['img_root'] = self.dataset.get('img_root', None)  # type: ignore
 
         if copy:
             from copy import deepcopy

@@ -44,7 +44,7 @@ class _NextId:
         if self.unused[key] is None:
             self._update_unused(key)
         new_id = self.unused[key]
-        self.unused[key] += 1
+        self.unused[key] += 1  # type: ignore
         return new_id
 
 
@@ -459,9 +459,9 @@ def _query_image_ids(
     import ubelt as ub
 
     try:
-        import kwutil
+        import kwutil  # type: ignore
     except Exception:
-        kwutil = None
+        kwutil = None  # type: ignore
 
     # TODO: sane messages depending on if kwutil / jq are installed or not
 

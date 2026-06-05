@@ -93,7 +93,7 @@ class ObjectList1D(ub.NiceRepr):
         """
         if isinstance(index, slice):
             subids = self._ids[index]
-            newself = self.__class__(subids, self._dset)
+            newself = self.__class__(subids, self._dset)  # type: ignore
             return newself
         else:
             return self._ids[index]
@@ -125,7 +125,7 @@ class ObjectList1D(ub.NiceRepr):
             ObjectList1D
         """
         subids = list(ub.unique(self._ids))
-        newself = self.__class__(subids, self._dset)
+        newself = self.__class__(subids, self._dset)  # type: ignore
         return newself
 
     @property
@@ -194,7 +194,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> assert len(self.take([0, 2, 3])) == 3
         """
         subids = list(ub.take(self._ids, idxs))
-        newself = self.__class__(subids, self._dset)
+        newself = self.__class__(subids, self._dset)  # type: ignore
         return newself
 
     def compress(self, flags):

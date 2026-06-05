@@ -313,7 +313,7 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012', bias=1.0
             R = class_recs[image_ids[d]]
             bb = BB[d, :].astype(float)
             ovmax = -np.inf
-            BBGT = R['bbox'].astype(float)
+            BBGT = R['bbox'].astype(float)  # type: ignore
 
             if BBGT.size > 0:
                 # compute overlaps
@@ -343,7 +343,7 @@ def _voc_eval(lines, recs, classname, iou_thresh=0.5, method='voc2012', bias=1.0
                     if not R['det'][jmax]:
                         # Mark that this true box has been used.
                         is_tp[d] = 1.0
-                        R['det'][jmax] = 1
+                        R['det'][jmax] = 1  # type: ignore
                     else:
                         is_fp[d] = 1.0
             else:

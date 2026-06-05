@@ -135,14 +135,14 @@ try:
 
     if IS_GE_SQLALCH_2x:
         SQL_ERROR_TYPES = (
-            sqlalchemy.exc.InterfaceError,
-            sqlalchemy.exc.ProgrammingError,
-            sqlalchemy.exc.OperationalError,
+            sqlalchemy.exc.InterfaceError,  # type: ignore
+            sqlalchemy.exc.ProgrammingError,  # type: ignore
+            sqlalchemy.exc.OperationalError,  # type: ignore
         )
     else:
         SQL_ERROR_TYPES = (
-            sqlalchemy.exc.InterfaceError,
-            sqlalchemy.exc.ProgrammingError,
+            sqlalchemy.exc.InterfaceError,  # type: ignore
+            sqlalchemy.exc.ProgrammingError,  # type: ignore
         )
     if 1:
         from sqlalchemy.dialects.postgresql import JSONB
@@ -155,15 +155,15 @@ except ImportError:
     # Hack: xdoctest should have been able to figure out that
     # all of these tests were disabled due to the absence of sqlalchemy
     # but apparently it has a bug. We can remove this hack once that is fixed
-    sqlalchemy_version_str = None
+    sqlalchemy_version_str = None  # type: ignore
     sqlalchemy_version = None
-    sqlalchemy = None
-    Float = ub.identity
-    String = ub.identity
-    JSON = ub.identity
-    Integer = ub.identity
-    Column = ub.identity
-    Index = ub.identity
+    sqlalchemy = None  # type: ignore
+    Float = ub.identity  # type: ignore
+    String = ub.identity  # type: ignore
+    JSON = ub.identity  # type: ignore
+    Integer = ub.identity  # type: ignore
+    Column = ub.identity  # type: ignore
+    Index = ub.identity  # type: ignore
     CocoBase = FallbackCocoBase
     JSONVariant = None
     SQL_ERROR_TYPES = (Exception,)
@@ -186,7 +186,7 @@ except ImportError:
 try:
     from sqlalchemy.sql import text
 except ImportError:
-    text = ub.identity
+    text = ub.identity  # type: ignore
 
 
 class Category(CocoBase):
@@ -1697,7 +1697,7 @@ class CocoSqlDatabase(
         batch_size = 100000
 
         for key in table_names:
-            colinfo = inspector.get_columns(key)
+            colinfo = inspector.get_columns(key)  # type: ignore
             colnames = {c['name'] for c in colinfo}
             # TODO: is there a better way to grab this information?
             cls = CocoBase.TBLNAME_TO_CLASS[key]  # type: ignore
@@ -1792,7 +1792,7 @@ class CocoSqlDatabase(
 
     def raw_table(self, table_name):
         inspector = sqlalchemy.inspect(self.engine)  # type: ignore
-        column_infos = inspector.get_columns(table_name)
+        column_infos = inspector.get_columns(table_name)  # type: ignore
         column_names = [d['name'] for d in column_infos]
         stmt = ub.paragraph(
             f"""
@@ -1820,7 +1820,7 @@ class CocoSqlDatabase(
             ...     print(pd.DataFrame(table))
         """
         inspector = sqlalchemy.inspect(self.engine)  # type: ignore
-        table_names = inspector.get_table_names()
+        table_names = inspector.get_table_names()  # type: ignore
         raw_tables = {}
         for table_name in table_names:
             rows = self.raw_table(table_name)
@@ -2204,7 +2204,7 @@ class CocoSqlDatabase(
 
     def _table_names(self):
         inspector = sqlalchemy.inspect(self.engine)  # type: ignore  # type: ignore
-        table_names = inspector.get_table_names()
+        table_names = inspector.get_table_names()  # type: ignore
         return table_names
 
     @property
@@ -2656,55 +2656,55 @@ def _benchmark_dset_readtime(dset, tag='?', n=4, post_iterate=False):
 
     ti = timerit.Timerit(n, bestof=2, verbose=2)
 
-    for timer in ti.reset('{} dict(gid_to_aids)'.format(tag)):
+    for timer in ti.reset('{} dict(gid_to_aids)'.format(tag)):  # type: ignore
         with timer:
             r = dict(dset.index.gid_to_aids)
             if post_iterate:
                 list(ub.IndexableWalker(r))
 
-    for timer in ti.reset('{} dict(cid_to_aids)'.format(tag)):
+    for timer in ti.reset('{} dict(cid_to_aids)'.format(tag)):  # type: ignore
         with timer:
             r = dict(dset.index.cid_to_aids)
             if post_iterate:
                 list(ub.IndexableWalker(r))
 
-    for timer in ti.reset('{} dict(imgs)'.format(tag)):
+    for timer in ti.reset('{} dict(imgs)'.format(tag)):  # type: ignore
         with timer:
             r = dict(dset.index.imgs)
             if post_iterate:
                 list(ub.IndexableWalker(r))
 
-    for timer in ti.reset('{} dict(cats)'.format(tag)):
+    for timer in ti.reset('{} dict(cats)'.format(tag)):  # type: ignore
         with timer:
             r = dict(dset.index.cats)
             if post_iterate:
                 list(ub.IndexableWalker(r))
 
-    for timer in ti.reset('{} dict(anns)'.format(tag)):
+    for timer in ti.reset('{} dict(anns)'.format(tag)):  # type: ignore
         with timer:
             r = dict(dset.index.anns)
             if post_iterate:
                 list(ub.IndexableWalker(r))
 
-    for timer in ti.reset('{} dict(vidid_to_gids)'.format(tag)):
+    for timer in ti.reset('{} dict(vidid_to_gids)'.format(tag)):  # type: ignore
         with timer:
             r = dict(dset.index.vidid_to_gids)
             if post_iterate:
                 list(ub.IndexableWalker(r))
 
-    for timer in ti.reset('{} ann list iteration'.format(tag)):
+    for timer in ti.reset('{} ann list iteration'.format(tag)):  # type: ignore
         with timer:
             r = list(dset.dataset['annotations'])
             if post_iterate:
                 list(ub.IndexableWalker(r))
 
-    for timer in ti.reset('{} ann dict iteration'.format(tag)):
+    for timer in ti.reset('{} ann dict iteration'.format(tag)):  # type: ignore
         with timer:
             r = list(dset.index.anns.items())
             if post_iterate:
                 list(ub.IndexableWalker(r))
 
-    for timer in ti.reset('{} ann random lookup'.format(tag)):
+    for timer in ti.reset('{} ann random lookup'.format(tag)):  # type: ignore
         aids = list(dset.index.anns.keys())[0:10]
         with timer:
             for aid in aids:
@@ -2713,14 +2713,14 @@ def _benchmark_dset_readtime(dset, tag='?', n=4, post_iterate=False):
                     list(ub.IndexableWalker(r))
 
     def _take_test(attr):
-        for timer in ti.reset('{} take ann.{}'.format(tag, attr)):
+        for timer in ti.reset('{} take ann.{}'.format(tag, attr)):  # type: ignore
             with timer:
                 r = [ann.get(attr, None) for ann in dset.dataset['annotations']]
                 if post_iterate:
                     list(ub.IndexableWalker(r))
 
     def _lookup_test(attr):
-        for timer in ti.reset('{} annots.lookup({})'.format(tag, attr)):
+        for timer in ti.reset('{} annots.lookup({})'.format(tag, attr)):  # type: ignore
             with timer:
                 r = dset.annots().lookup(attr, default=None)
                 if post_iterate:
@@ -2748,42 +2748,42 @@ def _benchmark_dict_proxy_ops(proxy):
     results = ub.ddict(dict)
 
     proxy.ALCHEMY_MODE = 1
-    for timer in ti.reset('keys alc sql'):
+    for timer in ti.reset('keys alc sql'):  # type: ignore
         with timer:
             results['keys']['alc'] = list(proxy.keys())
 
     proxy.ALCHEMY_MODE = 0
-    for timer in ti.reset('keys raw sql'):
+    for timer in ti.reset('keys raw sql'):  # type: ignore
         with timer:
             results['keys']['raw'] = list(proxy.keys())
 
     proxy.ALCHEMY_MODE = 1
-    for timer in ti.reset('values alc sql'):
+    for timer in ti.reset('values alc sql'):  # type: ignore
         with timer:
             results['vals']['alc'] = list(proxy.values())
 
     proxy.ALCHEMY_MODE = 0
-    for timer in ti.reset('values raw sql'):
+    for timer in ti.reset('values raw sql'):  # type: ignore
         with timer:
             results['vals']['raw'] = list(proxy.values())
 
     proxy.ALCHEMY_MODE = 1
-    for timer in ti.reset('naive values'):
+    for timer in ti.reset('naive values'):  # type: ignore
         with timer:
             results['vals']['alc-naive'] = [proxy[key] for key in proxy.keys()]
 
     proxy.ALCHEMY_MODE = 0
-    for timer in ti.reset('naive values'):
+    for timer in ti.reset('naive values'):  # type: ignore
         with timer:
             results['vals']['raw-naive'] = [proxy[key] for key in proxy.keys()]
 
     proxy.ALCHEMY_MODE = 1
-    for timer in ti.reset('items alc sql'):
+    for timer in ti.reset('items alc sql'):  # type: ignore
         with timer:
             results['items']['alc'] = list(proxy.items())
 
     proxy.ALCHEMY_MODE = 0
-    for timer in ti.reset('items raw sql'):
+    for timer in ti.reset('items raw sql'):  # type: ignore
         with timer:
             results['items']['raw'] = list(proxy.items())
 
