@@ -397,10 +397,10 @@ class DetectionMetrics(ub.NiceRepr):
         _tracking_probs = bool(track_probs)
         iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh
 
-        iou_to_yaccum = {t: ub.ddict(list) for t in iou_thresh_list}
+        iou_to_yaccum = {t: ub.ddict(list) for t in iou_thresh_list}  # type: ignore
 
         if _tracking_probs:
-            iou_to_probaccum = {t: [] for t in iou_thresh_list}
+            iou_to_probaccum = {t: [] for t in iou_thresh_list}  # type: ignore
 
         if gids is None:
             gids = sorted(dmet._imgname_to_gid.values())
@@ -443,11 +443,11 @@ class DetectionMetrics(ub.NiceRepr):
                 max_dets=max_dets,
                 truth_reuse_policy=truth_reuse_policy,
             )
-            job.gid = gid
+            job.gid = gid  # type: ignore
 
         for job in ub.ProgIter(jobs.jobs, desc='assign detections', verbose=verbose):
             iou_thresh_to_y = job.result()
-            gid = job.gid
+            gid = job.gid  # type: ignore
 
             for t, y in iou_thresh_to_y.items():
                 y_accum = iou_to_yaccum[t]
@@ -1117,7 +1117,7 @@ class DetectionMetrics(ub.NiceRepr):
             # Build random variables
             from kwarray import distributions
 
-            DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)
+            DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)  # type: ignore
 
             def _parse_arg(key, default):
                 value = kwargs.get(key, default)

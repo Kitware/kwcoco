@@ -45,7 +45,7 @@ def confusion_matrix(y_true, y_pred, n_labels=None, labels=None, sample_weight=N
     if sample_weight is None:
         sample_weight = np.ones(len(y_true), dtype=int)
     if n_labels is None:
-        n_labels = len(labels)
+        n_labels = len(labels)  # type: ignore
     CM = coo_matrix(
         (sample_weight, (y_true, y_pred)), shape=(n_labels, n_labels), dtype=np.int64
     ).toarray()

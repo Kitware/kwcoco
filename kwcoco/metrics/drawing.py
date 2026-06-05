@@ -37,7 +37,7 @@ def draw_perclass_roc(
     for cx in cxs:
         info = cx_to_info[cx]
 
-        catname = classes[cx] if isinstance(cx, int) else cx
+        catname = classes[cx] if isinstance(cx, int) else cx  # type: ignore
 
         try:
             auc = info['trunc_auc']
@@ -261,7 +261,7 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
     xydata = ub.odict()
     for cx in cxs:
         info = cx_to_info[cx]
-        catname = classes[cx] if isinstance(cx, int) else cx
+        catname = classes[cx] if isinstance(cx, int) else cx  # type: ignore
         ap = info['ap']
         if 'pr' in info:
             pr = info['pr']
@@ -401,7 +401,7 @@ def draw_perclass_thresholds(
     xydata = ub.odict()
     for cx in cxs:
         info = cx_to_info[cx]
-        catname = classes[cx] if isinstance(cx, int) else cx
+        catname = classes[cx] if isinstance(cx, int) else cx  # type: ignore
 
         thresholds = info['thresholds']
         measure = info[key]
@@ -747,16 +747,16 @@ def determenistic_colors(keys, preset_colors):
         import matplotlib._cm as _cm
 
         cm = mpl.colors.LinearSegmentedColormap.from_list(
-            'gist_rainbow', _cm.datad['gist_rainbow'], mpl.rcParams['image.lut']
+            'gist_rainbow', _cm.datad['gist_rainbow'], mpl.rcParams['image.lut']  # type: ignore
         )
         for color in needs_colors:
             # Get a randomized color that is determined by the name of the
             # color so it is at least consistent.
             import kwarray
 
-            seed = int(ub.hash_data(color, base=10)[0:12])
+            seed = int(ub.hash_data(color, base=10)[0:12])  # type: ignore
             rng = kwarray.ensure_rng(seed)
-            known_colors[color] = cm(rng.rand())
+            known_colors[color] = cm(rng.rand())  # type: ignore
     return known_colors
 
 

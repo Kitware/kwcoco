@@ -300,7 +300,7 @@ def _assign_confusion_vectors(
     iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh
 
     iou_thresh_to_y = {}
-    for iou_thresh_ in iou_thresh_list:
+    for iou_thresh_ in iou_thresh_list:  # type: ignore
         isvalid_lookup = {px: ious > iou_thresh_ for px, ious in iou_lookup.items()}
 
         y = _critical_loop(
@@ -476,13 +476,12 @@ def _critical_loop(
                     # valid match with the highest iou
                     cand_nmatches = true_nmatches.compress(available)
                     cand_validmatch = cand_ious > iou_thresh_
-                    ovidx = kwarray.arglexmax(
-                        [
+                    _items = [
                             cand_ious,
                             -cand_nmatches,
                             cand_validmatch,
-                        ]
-                    )
+                    ]
+                    ovidx = kwarray.arglexmax(_items)  # type: ignore
                 else:
                     raise KeyError(truth_reuse_policy)
                 ovmax = cand_ious[ovidx]
@@ -512,7 +511,7 @@ def _critical_loop(
                     cand_class_priority = pdist_priority[pred_cx][cand_true_cxs]
 
                     # ovidx = ub.argmax(zip(cand_class_priority, cand_ious))
-                    ovidx = kwarray.arglexmax([cand_ious, cand_class_priority])
+                    ovidx = kwarray.arglexmax([cand_ious, cand_class_priority])  # type: ignore
 
                     ovmax = cand_ious[ovidx]
                     tx = cand_true_idxs[ovidx]

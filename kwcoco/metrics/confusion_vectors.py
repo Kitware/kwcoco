@@ -304,7 +304,7 @@ class ConfusionVectors(ub.NiceRepr):
         import pandas as pd
 
         cm = pd.DataFrame(
-            matrix, index=list(cfsn_vecs.classes), columns=list(cfsn_vecs.classes)
+            matrix, index=list(cfsn_vecs.classes), columns=list(cfsn_vecs.classes)  # type: ignore
         )
         if compress:
             iszero = matrix == 0
@@ -515,7 +515,7 @@ class ConfusionVectors(ub.NiceRepr):
                 )
 
                 # Lookup original probability predictions for the class of interest
-                new_scores = cfsn_vecs.probs[:, cx]
+                new_scores = cfsn_vecs.probs[:, cx]  # type: ignore
 
                 # Determine which truth items have compatible classes
                 # Note: we ignore any truth-label that is COARSER than the
@@ -831,7 +831,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         import kwarray
 
         rng = kwarray.ensure_rng(rng)
-        score = rng.rand(n)
+        score = rng.rand(n)  # type: ignore
 
         data = kwarray.DataFrameArray(
             {
@@ -840,10 +840,10 @@ class BinaryConfusionVectors(ub.NiceRepr):
             }
         )
 
-        flip_flags = rng.rand(n) < p_error
+        flip_flags = rng.rand(n) < p_error  # type: ignore
         data['is_true'][flip_flags] = 1 - data['is_true'][flip_flags]
 
-        miss_flags = rng.rand(n) < p_miss
+        miss_flags = rng.rand(n) < p_miss  # type: ignore
         data['pred_score'][miss_flags] = -np.inf
 
         classes = ['c1', 'c2', 'c3']
@@ -854,7 +854,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
     def catname(self):
         if self.cx is None:
             return None
-        return self.classes[self.cx]
+        return self.classes[self.cx]  # type: ignore
 
     def __nice__(self):
         return ub.urepr(
@@ -975,7 +975,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
         data = self.data
         y_true = data['is_true'].astype(np.uint8)
         y_score = data['pred_score']
-        sample_weight = data._data.get('weight', None)
+        sample_weight = data._data.get('weight', None)  # type: ignore
 
         npad = 0
         if len(self) == 0:
@@ -1041,7 +1041,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             info.update(
                 {
                     'cx': self.cx,
-                    'node': self.classes[self.cx],
+                    'node': self.classes[self.cx],  # type: ignore
                 }
             )
         return info

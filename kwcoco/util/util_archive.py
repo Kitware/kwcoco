@@ -177,14 +177,14 @@ class Archive:
             import io
             from tarfile import copyfileobj, ReadError
 
-            self.file._check('r')
-            tarinfo = self.file.getmember(name)
-            source = self.file.fileobj
+            self.file._check('r')  # type: ignore
+            tarinfo = self.file.getmember(name)  # type: ignore
+            source = self.file.fileobj  # type: ignore
             source.seek(tarinfo.offset_data)
-            bufsize = self.file.copybufsize
+            bufsize = self.file.copybufsize  # type: ignore
             target = io.BytesIO()
             if tarinfo.sparse is not None:
-                for offset, size in tarinfo.sparse:
+                for offset, size in tarinfo.sparse:  # type: ignore
                     target.seek(offset)
                     copyfileobj(source, target, size, ReadError, bufsize)
                 target.seek(tarinfo.size)
@@ -195,7 +195,7 @@ class Archive:
             data = target.read()
         elif self.backend is zipfile:
             # does zip have an iterable structure?
-            data = self.file.read(name)
+            data = self.file.read(name)  # type: ignore
         else:
             raise NotImplementedError
 
@@ -226,9 +226,9 @@ class Archive:
             assert self.fpath is not None, 'fpath must be set to compute arcname'
             arcname = relpath(fpath, dirname(self.fpath))
         if self.backend is tarfile:
-            self.file.add(fpath, arcname)
+            self.file.add(fpath, arcname)  # type: ignore
         if self.backend is zipfile:
-            self.file.write(fpath, arcname)
+            self.file.write(fpath, arcname)  # type: ignore
 
     def close(self):
         return self.file.close()

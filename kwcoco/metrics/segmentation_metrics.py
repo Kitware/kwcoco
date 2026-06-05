@@ -233,7 +233,7 @@ def main(cmdline=True, **kwargs):
     eval_fpath = full_config['eval_fpath']
     eval_dpath = full_config['eval_dpath']
 
-    config = full_config - {'true_dataset', 'pred_dataset', 'eval_dpath', 'eval_fpath'}
+    config = full_config - {'true_dataset', 'pred_dataset', 'eval_dpath', 'eval_fpath'}  # type: ignore
     evaluate_segmentations(true_coco, pred_coco, eval_dpath, eval_fpath, config)
 
 
@@ -411,7 +411,7 @@ class SingleImageSegmentationMetrics:
             img1 = self.true_coco_img.img
             dsize = np.array((img1['width'], img1['height']))
         elif score_space == 'video':
-            dsize = np.array((video1['width'], video1['height']))
+            dsize = np.array((video1['width'], video1['height']))  # type: ignore
         else:
             raise KeyError(score_space)
 
@@ -447,11 +447,11 @@ class SingleImageSegmentationMetrics:
         for stream in self.pred_coco_img.channels.streams():
             have = stream.intersection(self.true_classes)
             predicted_classes.extend(have.parsed)
-        self.classes_of_interest = ub.oset(predicted_classes) - (
-            self._behavor_to_classes['negative']
-            | self._behavor_to_classes['background']
-            | self._behavor_to_classes['ignore']
-            | self._behavor_to_classes['undistinguished']
+        self.classes_of_interest = ub.oset(predicted_classes) - (  # type: ignore
+            self._behavor_to_classes['negative']  # type: ignore
+            | self._behavor_to_classes['background']  # type: ignore 
+            | self._behavor_to_classes['ignore']  # type: ignore
+            | self._behavor_to_classes['undistinguished']  # type: ignore
         )
 
         # Determine if saliency has been predicted
@@ -964,6 +964,7 @@ def draw_chunked_confusion(
     """
     color_labels = ['TN', 'TP', 'FN', 'FP']
 
+    assert config is not None
     score_space = config.get('score_space', 'video')
 
     colors = list(ub.take(CONFUSION_COLOR_SCHEME, color_labels))
@@ -1773,7 +1774,8 @@ def evaluate_segmentations(
                 class_measure_combiner.combine()
 
             if draw_heatmaps:
-                heatmap_dpath = (ub.Path(eval_dpath) / 'heatmaps').ensuredir()
+                assert eval_dpath is not None
+                heatmap_dpath = (ub.Path(eval_dpath) / 'heatmaps').ensuredir() 
                 # Let the draw executor release any memory it can
                 remaining_draw_jobs = []
                 if VERBOSE_DEBUG:
@@ -1830,8 +1832,8 @@ def evaluate_segmentations(
     if eval_dpath is not None:
         perimage_table_fpath = eval_dpath / 'perimage_table.json'
         perimage_summary_fpath = eval_dpath / 'perimage_summary.json'
-        perimage_table_fpath.write_text(df.to_json(orient='table', indent=4))
-        perimage_summary_fpath.write_text(df_summary.to_json(orient='table', indent=4))
+        perimage_table_fpath.write_text(df.to_json(orient='table', indent=4))  # type: ignore
+        perimage_summary_fpath.write_text(df_summary.to_json(orient='table', indent=4))  # type: ignore
 
     # Finalize all of the aggregated measures
     print('Finalize salient measures')
@@ -2334,8 +2336,8 @@ def _poc_online_binary_saliency_measures_demo():
     num_items = 10
     for _ in range(num_items):
         # Pretend we have some truth labels and prediction probabilities
-        truth = rng.rand(32, 32) > 0.5
-        probs = rng.rand(32, 32)
+        truth = rng.rand(32, 32) > 0.5  # type: ignore
+        probs = rng.rand(32, 32)  # type: ignore
         bin_sseg_metrics.add_item(truth, probs)
 
     final_measures = bin_sseg_metrics.measures()

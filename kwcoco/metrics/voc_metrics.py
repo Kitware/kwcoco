@@ -211,7 +211,7 @@ def _pr_curves(y, method='voc2012'):
                 dets = y.compress(y['pred'] > -1)
 
         if npos > 0 and len(dets) > 0:
-            tp = dets['pred'] == dets['true']
+            tp = dets['pred'] == dets['true']  # type: ignore
             fp = 1 - tp
             fp_cum = np.cumsum(fp)
             tp_cum = np.cumsum(tp)

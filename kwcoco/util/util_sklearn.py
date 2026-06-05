@@ -39,7 +39,7 @@ class StratifiedGroupKFold(_BaseKFold):
             n_splits=n_splits, shuffle=shuffle, random_state=random_state
         )
 
-    def _make_test_folds(self, X, y=None, groups=None):
+    def _make_test_folds(self, X, y=None, groups=None):  # type: ignore
         """
         Args:
             X (ndarray): data
@@ -152,12 +152,12 @@ class StratifiedGroupKFold(_BaseKFold):
 
         return test_folds
 
-    def _iter_test_masks(self, X, y=None, groups=None):
+    def _iter_test_masks(self, X, y=None, groups=None):  # type: ignore
         test_folds = self._make_test_folds(X, y, groups)
         for i in range(self.n_splits):
             yield test_folds == i
 
-    def split(self, X, y, groups=None):
+    def split(self, X, y, groups=None):  # type: ignore
         """Generate indices to split data into training and test set."""
         y = check_array(y, ensure_2d=False, dtype=None)
         return super(StratifiedGroupKFold, self).split(X, y, groups)

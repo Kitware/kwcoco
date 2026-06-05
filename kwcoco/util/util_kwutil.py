@@ -73,7 +73,7 @@ class _DelayedBlockingJobQueue:
         from collections import deque
 
         self._unsubmitted = deque()
-        self.pool = ub.Executor(mode=mode, max_workers=max_workers)
+        self.pool = ub.Executor(mode=mode, max_workers=max_workers)  # type: ignore
         self.max_unhandled_jobs = max_unhandled_jobs
         self._num_handled_results = 0
         self._num_submitted_jobs = 0
@@ -155,7 +155,7 @@ class _MaxQueuePool:
     def __init__(self, max_queue_size=None, mode='thread', max_workers=0):
         if max_queue_size is None:
             max_queue_size = max_workers
-        self.pool = ub.Executor(mode=mode, max_workers=max_workers)
+        self.pool = ub.Executor(mode=mode, max_workers=max_workers)  # type: ignore
         if 'serial' in self.pool.backend.__class__.__name__.lower():
             self.pool_queue = None
         else:
