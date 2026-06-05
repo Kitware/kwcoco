@@ -112,7 +112,7 @@ class CocoStatsCLI(scfg.DataConfig):
         try:
             from rich import print as rich_print
         except ImportError:
-            rich_print = print
+            rich_print = print # type: ignore
 
         human_readable = config.format == 'human'
 
@@ -238,7 +238,7 @@ class CocoStatsCLI(scfg.DataConfig):
                     stat_types['channels'][dset.tag] = channel_info
                     if human_readable:
                         rich_print('dset.tag = {!r}'.format(dset.tag))
-                        rich_print(ub.urepr(channel_info, nl=2, sort=0))
+                        rich_print(ub.urepr(channel_info, nl=2, sort=0))  # type: ignore
 
             if config['boxes']:
                 if human_readable:
@@ -513,7 +513,7 @@ def _dataset_disk_usage(dset):
         'total_bytes': int(total_bytes),
     }
     if missing:
-        info['missing_files'] = missing
+        info['missing_files'] = missing  # type: ignore
         info['num_missing_files'] = len(missing)
     return info
 

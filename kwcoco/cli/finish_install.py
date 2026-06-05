@@ -45,8 +45,8 @@ class FinishInstallCLI(scfg.DataConfig):
         import rich
         import sys
 
-        config = FinishInstallCLI.cli(cmdline=cmdline, data=kwargs, strict=True)
-        rich.print('config = ' + ub.urepr(config, nl=1))
+        config = FinishInstallCLI.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
+        rich.print('config = ' + ub.urepr(config, nl=1))  # type: ignore
 
         if config.with_gdal:
             requirements = get_optional_requirements('gdal.txt', config.strict)

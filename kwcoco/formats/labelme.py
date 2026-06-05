@@ -312,7 +312,7 @@ class LabelMeFile(ub.NiceRepr):
     def reroot(self, absolute=True):
         assert not absolute
         old_fpath = self.data['imagePath']
-        parent_dpath = ub.Path(self.fpath).parent
+        parent_dpath = ub.Path(self.fpath).parent  # type: ignore
         abs_fpath = parent_dpath / old_fpath
         rel_fpath = ub.Path(abs_fpath).relative_to(parent_dpath)
         self.data['imagePath'] = os.fspath(rel_fpath)
@@ -386,7 +386,7 @@ class LabelMeFile(ub.NiceRepr):
             # HACK: store more information than necessary in the labelme file
             # TODO: think about if we want to support round tripping and
             # how to improve this encoding for that case.
-            extra = ub.udict(ann) - {'category_id', 'segmentation', 'bbox', 'image_id'}
+            extra = ub.udict(ann) - {'category_id', 'segmentation', 'bbox', 'image_id'}  # type: ignore
 
             if segmentation:
                 import kwimage
@@ -542,7 +542,7 @@ class LabelMeFile(ub.NiceRepr):
         if file is None:
             file = self.fpath
         try:
-            fpath = os.fspath(file)
+            fpath = os.fspath(file)  # type: ignore
         except TypeError:
             input_was_pathlike = False
         else:

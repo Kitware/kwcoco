@@ -71,7 +71,7 @@ def grab_spacenet7(data_dpath):
 
         for item in items:
             fname = pathlib.Path(item['uri']).name
-            item['fpath'] = archive_dpath / fname
+            item['fpath'] = archive_dpath / fname  # type: ignore
 
         need_download_archive = not has_extracted
         if need_download_archive:
@@ -80,7 +80,7 @@ def grab_spacenet7(data_dpath):
                 raise Exception('requires aws exe')
 
             for item in items:
-                if not item['fpath'].exists():
+                if not item['fpath'].exists():  # type: ignore
                     command = '{aws_exe} s3 cp {uri} {archive_dpath}'.format(
                         aws_exe=aws_exe, uri=item['uri'], archive_dpath=archive_dpath
                     )
@@ -160,7 +160,9 @@ def convert_spacenet_to_kwcoco(extract_dpath, coco_fpath):
             gname = str(gpath.stem)
             nameinfo = s7_fname_fmt.parse(gname)
             timestamp = datetime.datetime(
-                year=nameinfo['year'], month=nameinfo['month'], day=1
+                year=nameinfo['year'],   # type: ignore
+                month=nameinfo['month'],   # type: ignore
+                day=1  # type: ignore
             )
             gid = coco_dset.add_image(
                 file_name=str(gpath.relative_to(coco_dset.bundle_dpath)),

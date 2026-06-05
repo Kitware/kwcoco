@@ -78,7 +78,7 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
         """
         import rich
 
-        config = CocoMoveAssetsCLI.cli(cmdline=cmdline, data=kwargs, strict=True)
+        config = CocoMoveAssetsCLI.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
         rich.print('config = ' + ub.urepr(config, nl=1))
         from kwutil import util_path
         import kwcoco
@@ -167,7 +167,7 @@ class CocoMoveAssetManager:
             return
         import os
 
-        for asset, s, d in self.impacted_assets:
+        for asset, s, d in self.impacted_assets: # type: ignore
             old_asset_fname = asset['file_name']
             old_asset_fpath = asset.image_filepath().absolute()
             fpath_rel_src = old_asset_fpath.relative_to(s)
@@ -196,11 +196,11 @@ class CocoMoveAssetManager:
             return
 
         # Check that the kwcoco files are working
-        for dset in self.impacted_dsets.values():
+        for dset in self.impacted_dsets.values(): # type: ignore
             assert not dset.missing_images()
 
         # Rewrite the kwcoco files
-        for dset in self.impacted_dsets.values():
+        for dset in self.impacted_dsets.values():  # type: ignore
             dset.dump()
 
     def run(self):

@@ -70,7 +70,7 @@ class CocoFixup(scfg.DataConfig):
             >>> assert dst_dset.n_images < src_dset.n_images
             >>> assert dst_dset.n_videos < src_dset.n_videos
         """
-        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
+        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True) # type: ignore
 
         try:
             import rich
@@ -165,7 +165,7 @@ def find_corrupted_assets(dset, check_aux=True, workers=0, corrupted_assets='ful
                 imread_kwargs=imread_kwargs,
                 only_shape=only_shape,
             )
-            job.input_info = (img_idx, gpath, gid)
+            job.input_info = (img_idx, gpath, gid)  # type: ignore
 
         if check_aux:
             for asset_idx, aux in enumerate(img.get('auxiliary', [])):
@@ -173,13 +173,13 @@ def find_corrupted_assets(dset, check_aux=True, workers=0, corrupted_assets='ful
                 job = jobs.submit(
                     _image_corruption_check, gpath, imread_kwargs=imread_kwargs
                 )
-                job.input_info = (img_idx, gpath, gid, 'auxiliary', asset_idx)
+                job.input_info = (img_idx, gpath, gid, 'auxiliary', asset_idx)  # type: ignore
             for asset_idx, aux in enumerate(img.get('assets', [])):
                 gpath = bundle_dpath / aux['file_name']
                 job = jobs.submit(
                     _image_corruption_check, gpath, imread_kwargs=imread_kwargs
                 )
-                job.input_info = (img_idx, gpath, gid, 'assets', asset_idx)
+                job.input_info = (img_idx, gpath, gid, 'assets', asset_idx)  # type: ignore
 
     corrupted_info = []
     for job in jobs.as_completed(
@@ -187,7 +187,7 @@ def find_corrupted_assets(dset, check_aux=True, workers=0, corrupted_assets='ful
     ):
         info = job.result()
         if info['failed']:
-            corrupted_info.append(job.input_info)
+            corrupted_info.append(job.input_info)  # type: ignore
 
     return corrupted_info
 

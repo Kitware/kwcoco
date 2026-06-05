@@ -23,7 +23,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
 
     # These should go into the CLI args, not the class config args
     expt_title = scfg.Value('', type=str, help='title for plots', tags=['perf_param'])
-    draw = scfg.Value(True, isflag=1, help='draw metric plots', tags=['perf_param'])
+    draw = scfg.Value(True, isflag=1, help='draw metric plots', tags=['perf_param'])  # type: ignore
     out_dpath = scfg.Value(
         './coco_metrics', type=str, help='where to dump results', tags=['out_path']
     )
@@ -122,7 +122,7 @@ def main(cmdline=True, **kw):
     cli_config = CocoEvalCLI.cli(cmdline=cmdline, data=kw)
     print('cli_config = {}'.format(ub.urepr(cli_config, nl=1)))
 
-    eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__)
+    eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__) # type: ignore
 
     coco_eval = coco_evaluator.CocoEvaluator(eval_config)
     coco_eval._init()
@@ -249,7 +249,7 @@ def main(cmdline=True, **kw):
         stat_gids = [gid]
 
         rng = kwarray.ensure_rng(None)
-        random_gids = rng.choice(gids, size=5).tolist()
+        random_gids = rng.choice(gids, size=5).tolist()  # type: ignore
 
         found_gids = truth_dset.find_representative_images(gids)
         draw_gids = list(ub.unique(found_gids + stat_gids + random_gids))
@@ -269,7 +269,7 @@ def main(cmdline=True, **kw):
     try:
         from rich import print as rich_print
     except ImportError:
-        rich_print = print
+        rich_print = print  # type: ignore
     else:
         rich_print(f'Eval Dpath: [link={out_dpath}]{out_dpath}[/link]')
 
@@ -309,7 +309,7 @@ def build_confusion_datasets(coco_eval, results):
 
         # Ensure true and pred categories exist in the cfsn dataset
         for cat in true_dset.categories().objs:
-            new_cat = ub.udict(cat) - {'id'}
+            new_cat = ub.udict(cat) - {'id'} # type: ignore
             cfsn_dset.ensure_category(**new_cat)
 
         # Mark the predicted annotations in the confusion dataset
@@ -357,8 +357,8 @@ def build_confusion_datasets(coco_eval, results):
                     true_ann['color'] = CONFUSION_COLORS['true_false_negative']
                 else:
                     true_ann['confusion'] = 'true_positive'
-                    true_ann['score'] = pred_ann.get('score', None)
-                    true_ann['matching_pred_annot_id'] = pred_ann['id']
+                    true_ann['score'] = pred_ann.get('score', None)  # type: ignore
+                    true_ann['matching_pred_annot_id'] = pred_ann['id']  # type: ignore
                     true_ann['color'] = CONFUSION_COLORS['true_true_positive']
 
                 # Update the category id (requires categories were ported)
@@ -381,4 +381,4 @@ if __name__ == '__main__':
         --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
         --out_dpath=$HOME/.cache/kwcoco/tests/eval/out
     """
-    __cli__._main()
+    __cli__._main()  # type: ignore

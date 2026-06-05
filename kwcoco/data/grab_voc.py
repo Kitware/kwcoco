@@ -145,12 +145,12 @@ def _convert_voc_split(devkit_dpath, classes, split, year, root):
         assert not unknown
 
         img = {
-            'file_name': relpath(gpath, root),
-            'width': int(tree.find('size').find('width').text),
-            'height': int(tree.find('size').find('height').text),
-            'depth': int(tree.find('size').find('depth').text),
-            'segmented': int(tree.find('segmented').text),
-            'source': {elem.tag: elem.text for elem in list(tree.find('source'))},
+            'file_name': relpath(gpath, root),  # type: ignore
+            'width': int(tree.find('size').find('width').text),  # type: ignore
+            'height': int(tree.find('size').find('height').text),  # type: ignore
+            'depth': int(tree.find('size').find('depth').text),  # type: ignore
+            'segmented': int(tree.find('segmented').text),  # type: ignore
+            'source': {elem.tag: elem.text for elem in list(tree.find('source'))},  # type: ignore
         }
 
         assert img.pop('depth') == 3
@@ -164,15 +164,15 @@ def _convert_voc_split(devkit_dpath, classes, split, year, root):
         for obj in tree.findall('object'):
             bbox = obj.find('bndbox')
             # Make pixel indexes 0-based
-            x1 = float(bbox.find('xmin').text) - 1
-            y1 = float(bbox.find('ymin').text) - 1
-            x2 = float(bbox.find('xmax').text) - 1
-            y2 = float(bbox.find('ymax').text) - 1
+            x1 = float(bbox.find('xmin').text) - 1  # type: ignore
+            y1 = float(bbox.find('ymin').text) - 1  # type: ignore
+            x2 = float(bbox.find('xmax').text) - 1  # type: ignore
+            y2 = float(bbox.find('ymax').text) - 1  # type: ignore
 
             diffc = obj.find('difficult')
-            difficult = 0 if diffc is None else int(diffc.text)
+            difficult = 0 if diffc is None else int(diffc.text)  # type: ignore
 
-            catname = obj.find('name').text.lower().strip()
+            catname = obj.find('name').text.lower().strip()  # type: ignore
             w = x2 - x1
             h = y2 - y1
             ann = {
@@ -203,7 +203,7 @@ def _read_split_paths(devkit_dpath, split, year):
     split_dpath = join(data_dpath, 'ImageSets', 'Main')
     pattern = join(split_dpath, '*_' + split + '.txt')
     for p in sorted(glob.glob(pattern)):
-        rows = [list(re.split(' +', t)) for t in ub.readfrom(p).split('\n') if t]
+        rows = [list(re.split(' +', t)) for t in ub.readfrom(p).split('\n') if t]  # type: ignore
         # code = -1 if the image does not contain the object
         # code = 1 if the image contains at least one instance
         # code = 0 if the image contains only hard instances of the object

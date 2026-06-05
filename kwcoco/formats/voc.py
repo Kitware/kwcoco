@@ -14,11 +14,11 @@ def read_voc_image(xml_fpath, data_dpath='.'):
     tree = ET.parse(xml_fpath)
 
     data_dpath = ub.Path(data_dpath)
-    dname = tree.find('folder').text
-    fname = tree.find('filename').text
+    dname = tree.find('folder').text  # type: ignore
+    fname = tree.find('filename').text  # type: ignore
 
     # try:
-    fpath = data_dpath / dname / fname
+    fpath = data_dpath / dname / fname  # type: ignore
     # assert fpath.exists()
     # except AssertionError:
     #     # hack for imagenet (TODO: can we generalize)
@@ -34,17 +34,17 @@ def read_voc_image(xml_fpath, data_dpath='.'):
     try:
         img = {
             'file_name': fpath,
-            'width': int(tree.find('size').find('width').text),
-            'height': int(tree.find('size').find('height').text),
-            'depth': int(tree.find('size').find('depth').text),
+            'width': int(tree.find('size').find('width').text),  # type: ignore
+            'height': int(tree.find('size').find('height').text),  # type: ignore
+            'depth': int(tree.find('size').find('depth').text),  # type: ignore
         }
         img['orig_xml_fpath'] = os.fspath(xml_fpath)
         try:
-            img['segmented'] = int(tree.find('segmented').text)
+            img['segmented'] = int(tree.find('segmented').text)  # type: ignore
         except Exception:
             ...
         try:
-            img['source'] = {elem.tag: elem.text for elem in list(tree.find('source'))}
+            img['source'] = {elem.tag: elem.text for elem in list(tree.find('source'))}  # type: ignore
         except Exception:
             ...
 
@@ -59,10 +59,10 @@ def read_voc_image(xml_fpath, data_dpath='.'):
             bbox = obj.find('bndbox')
             if bbox is not None:
                 # Make pixel indexes 0-based
-                x1 = float(bbox.find('xmin').text) - 1
-                y1 = float(bbox.find('ymin').text) - 1
-                x2 = float(bbox.find('xmax').text) - 1
-                y2 = float(bbox.find('ymax').text) - 1
+                x1 = float(bbox.find('xmin').text) - 1  # type: ignore
+                y1 = float(bbox.find('ymin').text) - 1  # type: ignore
+                x2 = float(bbox.find('xmax').text) - 1  # type: ignore
+                y2 = float(bbox.find('ymax').text) - 1  # type: ignore
                 w = x2 - x1
                 h = y2 - y1
                 bbox = [x1, y1, w, h]
@@ -73,7 +73,7 @@ def read_voc_image(xml_fpath, data_dpath='.'):
 
             catname_xml = obj.find('name')
             if catname_xml is not None:
-                catname = obj.find('name').text.lower().strip()
+                catname = obj.find('name').text.lower().strip()  # type: ignore
             else:
                 catname = None
             ann = {}
@@ -82,7 +82,7 @@ def read_voc_image(xml_fpath, data_dpath='.'):
             if catname is not None:
                 ann['category_name'] = catname
             if diffc is not None:
-                difficult = 0 if diffc is None else int(diffc.text)
+                difficult = 0 if diffc is None else int(diffc.text)  # type: ignore
                 ann.update(
                     {
                         'difficult': difficult,

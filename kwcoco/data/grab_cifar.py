@@ -21,7 +21,7 @@ def _convert_cifar_to_kwcoco(dpath, cifar_dset, cifar_name, classes):
     stamp = ub.CacheStamp(
         'convert_cifar',
         dpath=dpath,
-        depends=[cifar_name, CONVERSION_VERSION],
+        depends=[cifar_name, CONVERSION_VERSION],  # type: ignore
         verbose=3,
     )
     if stamp.expired():
@@ -233,7 +233,7 @@ def convert_cifar100(dpath=None):
     cifar_name = 'cifar100-train'
     DATASET = torchvision.datasets.CIFAR100
     cifar_dset = DATASET(
-        root=ub.ensuredir((dpath, 'download')), download=True, train=True
+        root=ub.ensuredir((dpath, 'download')), download=True, train=True  # type: ignore
     )
     meta_fpath = os.path.join(cifar_dset.root, cifar_dset.base_folder, 'meta')
     meta_dict = pickle.load(open(meta_fpath, 'rb'))
@@ -243,7 +243,9 @@ def convert_cifar100(dpath=None):
     cifar_name = 'cifar100-test'
     DATASET = torchvision.datasets.CIFAR100
     cifar_dset = DATASET(
-        root=ub.ensuredir((dpath, 'download')), download=True, train=False
+        root=ub.ensuredir((dpath, 'download')),   # type: ignore
+        download=True,   # type: ignore
+        train=False  # type: ignore
     )
     meta_fpath = os.path.join(cifar_dset.root, cifar_dset.base_folder, 'meta')
     meta_dict = pickle.load(open(meta_fpath, 'rb'))

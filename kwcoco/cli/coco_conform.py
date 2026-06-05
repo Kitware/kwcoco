@@ -116,7 +116,7 @@ class CocoConformCLI(scfg.DataConfig):
 
         dset = kwcoco.CocoDataset.coerce(config['src'])
 
-        config_ = ub.udict(config) - {'src', 'dst', 'compress'}
+        config_ = ub.udict(config) - {'src', 'dst', 'compress'}  # type: ignore
         dset.conform(**config_)
 
         dset.fpath = config['dst']

@@ -292,7 +292,7 @@ class KW18(kwarray.DataFrameArray):
         try:
             EmptyDataError = pd.errors.EmptyDataError
         except Exception:
-            EmptyDataError = pd.io.common.EmptyDataError
+            EmptyDataError = pd.io.common.EmptyDataError  # type: ignore
 
         try:
             df = pd.read_csv(file, sep=' +', comment='#', header=None, engine='python')

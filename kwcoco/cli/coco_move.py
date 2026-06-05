@@ -44,9 +44,9 @@ class CocoMove(scfg.DataConfig):
         try:
             from rich import print as rich_print
         except ImportError:
-            rich_print = print
+            rich_print = print # type: ignore
 
-        config = CocoMove.cli(cmdline=cmdline, data=kwargs, strict=True)
+        config = CocoMove.cli(cmdline=cmdline, data=kwargs, strict=True) # type: ignore
         rich_print('config = ' + ub.urepr(config, nl=1))
         import kwcoco
 

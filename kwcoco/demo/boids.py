@@ -154,18 +154,18 @@ class Boids(ub.NiceRepr):
 
     def initialize(self):
         # Generate random starting positions, velocities, and accelerations
-        self.pos = self.rng.rand(self.num, self.dims)
-        self.vel = self.rng.randn(self.num, self.dims) * self.config['max_speed']
-        self.acc = self.rng.randn(self.num, self.dims) * self.config['max_force']
+        self.pos = self.rng.rand(self.num, self.dims)  # type: ignore
+        self.vel = self.rng.randn(self.num, self.dims) * self.config['max_speed']  # type: ignore
+        self.acc = self.rng.randn(self.num, self.dims) * self.config['max_force']  # type: ignore
         return self
 
     def update_neighbors(self):
         # TODO: this should be done with a fast spatial index, but
         # unfortunately I don't see any existing implementations that make it
         # easy to support moving points.
-        utriu_dists = pdist(self.pos)
+        utriu_dists = pdist(self.pos)  # type: ignore
         utriu_flags = utriu_dists < self.config['perception_thresh']
-        utriu_rx, utriu_cx = np.triu_indices(len(self.pos), k=1)
+        utriu_rx, utriu_cx = np.triu_indices(len(self.pos), k=1)  # type: ignore
 
         utriu_neighb_rxs = utriu_rx[utriu_flags]
         utriu_neighb_cxs = utriu_cx[utriu_flags]
@@ -192,7 +192,7 @@ class Boids(ub.NiceRepr):
         # self.rx_to_neighb_utriu_idxs = rx_to_neighb_utriu_idxs
 
         # Compute speed and direction of every boid
-        self.speeds = np.linalg.norm(self.vel, axis=1)
+        self.speeds = np.linalg.norm(self.vel, axis=1)  # type: ignore
         self.dirs = self.vel / np.maximum(self.speeds[:, None], 1e-9)
 
     def compute_forces(self):
@@ -201,7 +201,7 @@ class Boids(ub.NiceRepr):
 
         # Randomly drop perception of neighbors
         # neighbors[self.rng.rand(*neighbors.shape) > 0.3] = 0
-        num = len(self.pos)
+        num = len(self.pos)  # type: ignore
 
         align_steering = np.zeros((num, 2))
         com_steering = np.zeros((num, 2))
@@ -214,38 +214,38 @@ class Boids(ub.NiceRepr):
             # Each boid wants its direction to agree with the
             # the average direction of its neighbors
             if 1:
-                neigh_vel = self.vel[cxs]
+                neigh_vel = self.vel[cxs]  # type: ignore
                 ave_vel = neigh_vel.mean(axis=0)
                 ave_speed = np.linalg.norm(ave_vel)
                 if ave_speed > 0:
                     ave_dir = (ave_vel / ave_speed) * max_speed
                 else:
                     ave_dir = ave_vel
-                align_steering_ = ave_dir - self.vel[rx]
+                align_steering_ = ave_dir - self.vel[rx]  # type: ignore
                 align_steering[rx] = align_steering_
 
             # Cohesion
             # Each boid wants to be in the center of its neighbors
             if 1:
-                center_of_mass = self.pos[cxs].mean(axis=0)
-                com_vec = center_of_mass - self.pos[rx]
+                center_of_mass = self.pos[cxs].mean(axis=0)  # type: ignore
+                com_vec = center_of_mass - self.pos[rx]  # type: ignore
                 com_dist = np.linalg.norm(com_vec)
                 if com_dist > 0:
                     com_dir = (com_vec / com_dist) * max_speed
                 else:
                     com_dir = com_vec
-                com_steering_ = com_dir - self.vel[rx]
+                com_steering_ = com_dir - self.vel[rx]  # type: ignore
                 com_steering[rx] = com_steering_
 
             # Separation
             # Each boid does not want to be too close to its neighbors
             if 1:
-                neigh_vec = self.pos[rx] - self.pos[cxs]
+                neigh_vec = self.pos[rx] - self.pos[cxs]  # type: ignore
 
                 # utriu_idxs = self.rx_to_neighb_utriu_idxs[rx]
                 # neigh_dist1 = self.utriu_dists[utriu_idxs][:, None]
                 # neigh_dist = neigh_dist1
-                neigh_dist2 = np.linalg.norm(neigh_vec, axis=1, keepdims=1)
+                neigh_dist2 = np.linalg.norm(neigh_vec, axis=1, keepdims=1)  # type: ignore
                 neigh_dist = neigh_dist2
                 assert neigh_dist.max() <= self.config['perception_thresh']
 
@@ -255,7 +255,7 @@ class Boids(ub.NiceRepr):
                 neigh_dir = neigh_vec[flags] / (neigh_dist[flags] ** 2)
 
                 ave_neigh_dir = neigh_dir.mean(axis=0)
-                sep_steering_ = ave_neigh_dir - self.vel[rx]
+                sep_steering_ = ave_neigh_dir - self.vel[rx]  # type: ignore
                 sep_steering[rx] = sep_steering_
 
         def dist_point_to_line(line_pts, pt):
@@ -285,7 +285,7 @@ class Boids(ub.NiceRepr):
 
         # Add some small random movement
         rand_steering = clamp_mag(
-            self.rng.randn(*self.pos.shape), 0.08 * self.config['max_force'], axis=None
+            self.rng.randn(*self.pos.shape), 0.08 * self.config['max_force'], axis=None  # type: ignore
         )
 
         self.sep_steering = sep_steering
@@ -317,7 +317,7 @@ class Boids(ub.NiceRepr):
                 e1, e2 = edge
                 edge_pt = closest_point_on_line_segment(self.pos, e1, e2)
                 edge_vec = self.pos - edge_pt
-                edge_dist = np.linalg.norm(edge_vec, axis=1, keepdims=1)
+                edge_dist = np.linalg.norm(edge_vec, axis=1, keepdims=1)  # type: ignore
                 flags = ((edge_dist < edge_thresh) & (edge_dist > 0)).ravel()
                 rxs = np.where(flags)[0]
 
@@ -325,7 +325,7 @@ class Boids(ub.NiceRepr):
                     avoid_vec = edge_vec[rxs]
                     avoid_dist = edge_dist[rxs]
                     avoid_vec = avoid_vec / (avoid_dist**3)
-                    avoid_steering_ = avoid_vec - self.vel[rxs]
+                    avoid_steering_ = avoid_vec - self.vel[rxs]  # type: ignore
                     avoid_steering[rxs] += avoid_steering_
 
             avoid_steering = clamp_mag(
@@ -338,15 +338,15 @@ class Boids(ub.NiceRepr):
 
     def boundary_conditions(self):
         # Clamp positions
-        lower_boundry_violators = self.pos < 0
-        upper_boundry_violators = self.pos > 1
+        lower_boundry_violators = self.pos < 0  # type: ignore
+        upper_boundry_violators = self.pos > 1  # type: ignore
         if np.any(lower_boundry_violators):
-            self.pos[lower_boundry_violators] = 0
+            self.pos[lower_boundry_violators] = 0  # type: ignore
             self.vel[lower_boundry_violators] *= -1.0  # bounce
             self.acc[lower_boundry_violators] *= -1.0
 
         if np.any(upper_boundry_violators):
-            self.pos[upper_boundry_violators] = 1
+            self.pos[upper_boundry_violators] = 1  # type: ignore
             self.vel[upper_boundry_violators] *= -1.0
             self.acc[upper_boundry_violators] *= -1.0
 
@@ -357,8 +357,8 @@ class Boids(ub.NiceRepr):
         self.boundary_conditions()
         force = self.compute_forces()
         self.acc += force
-        self.pos += self.vel
-        self.vel += self.acc
+        self.pos += self.vel  # type: ignore
+        self.vel += self.acc  # type: ignore
 
         self.acc = clamp_mag(self.acc, self.config['max_force'], axis=1)
         self.vel = clamp_mag(self.vel, self.config['max_speed'], axis=1)

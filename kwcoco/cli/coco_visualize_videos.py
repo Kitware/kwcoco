@@ -948,7 +948,7 @@ def _draw_channel_group(
                 )
 
             default_cmap_name = chan_to_cmap.get('__default__', 'viridis')
-            cmap_name = chan_to_cmap.get(chan_group, default_cmap_name)
+            cmap_name = chan_to_cmap.get(chan_group, default_cmap_name)  # type: ignore
 
             try:
                 import matplotlib.cm  # NOQA
@@ -1055,7 +1055,7 @@ def perchannel_colorize(data, channel_colors=None):
         data = data[None, :, :]
 
     existing_colors = [
-        kwimage.Color.coerce(c).as01() for c in channel_colors if c is not None
+        kwimage.Color.coerce(c).as01() for c in channel_colors if c is not None  # type: ignore
     ]
 
     fill_colors = kwimage.Color.distinct(
@@ -1064,7 +1064,7 @@ def perchannel_colorize(data, channel_colors=None):
     fill_color_iter = iter(fill_colors)
 
     resolved_channel_colors = []
-    for c in channel_colors:
+    for c in channel_colors:  # type: ignore
         if c is None:
             c = next(fill_color_iter)
         else:
@@ -1106,7 +1106,7 @@ def ensure_false_color(canvas, method='ortho'):
     else:
         if method == 'ortho':
             rng = kwarray.ensure_rng(canvas.shape[2])
-            seedmat = rng.rand(canvas.shape[2], 3).T
+            seedmat = rng.rand(canvas.shape[2], 3).T  # type: ignore
             h, tau = np.linalg.qr(seedmat, mode='raw')
             false_colored = canvas @ h
             rgb_canvas = kwarray.normalize(false_colored)

@@ -111,7 +111,7 @@ class PlotStatsCLI(scfg.DataConfig):
             from rich.markup import escape
         except ImportError:
             from ubelt import identity as escape
-        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
+        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
         rich_print('config = ' + escape(ub.urepr(config, nl=1)))
         run(config)
 
@@ -153,7 +153,7 @@ def prep_plots(src, plots_dpath=None, options=None, dpi=300):
 
     print('Preparing plots')
     plots = Plots(plots_dpath, tables_data, nonsaved_data, options, dpi=dpi)
-    plots.scalar_stats = scalar_stats
+    plots.scalar_stats = scalar_stats  # type: ignore
     return plots
 
 
@@ -278,7 +278,7 @@ def rerun_plots(tables_fpath):
     options = None
     plots = Plots(plots_dpath, tables_data, nonsaved_data, options, dpi=dpi)
     self = plots  # NOQA
-    BuiltinPlots.polygon_area_vs_num_verts(self)
+    BuiltinPlots.polygon_area_vs_num_verts(self)  # type: ignore
     # plots.plot_functions['polygon_area_vs_num_verts'](self)
 
 
@@ -530,11 +530,11 @@ def build_stats_data(dset):
             perannot_data['centroid_y'] / box_canvas_height
         )
 
-        _summary_data = ub.udict(perannot_data.to_dict()) - {'geometry'}
+        _summary_data = ub.udict(perannot_data.to_dict()) - {'geometry'}  # type: ignore
         _summary_df = pd.DataFrame(_summary_data)
         tables_data = {}
-        tables_data['perannot_data'] = json.loads(_summary_df.to_json(orient='table'))
-        tables_data['perimage_data'] = json.loads(perimage_data.to_json(orient='table'))
+        tables_data['perannot_data'] = json.loads(_summary_df.to_json(orient='table'))  # type: ignore
+        tables_data['perimage_data'] = json.loads(perimage_data.to_json(orient='table'))  # type: ignore
 
         # Data that we don't serialize, but some plots depend on.
         nonsaved_data = {
@@ -573,8 +573,8 @@ class Plots:
         Example:
             >>> # xdoctest: +REQUIRES(module:kwplot)
             >>> self = Plots.demo(timestamps=True)
-            >>> self.perimage_data
-            >>> self.perannot_data
+            >>> self.perimage_data  # type: ignore
+            >>> self.perannot_data  # type: ignore
         """
         import kwcoco
 
@@ -608,13 +608,13 @@ class Plots:
             self.annot_max_x = boxes.br_x.max()
             self.annot_max_y = boxes.br_y.max()
 
-        self.perannot_data = pd.read_json(
+        self.perannot_data = pd.read_json(  # type: ignore
             io.StringIO(json.dumps(tables_data['perannot_data'])), orient='table'
         )
-        self.perimage_data = pd.read_json(
+        self.perimage_data = pd.read_json(  # type: ignore
             io.StringIO(json.dumps(tables_data['perimage_data'])), orient='table'
         )
-        self.max_anns_per_image = self.perimage_data['anns_per_image'].max()
+        self.max_anns_per_image = self.perimage_data['anns_per_image'].max()  # type: ignore
         self.plot_functions = {}
 
         figman = kwplot.FigureManager(dpath=plots_dpath, dpi=dpi, verbose=1)
@@ -631,10 +631,10 @@ class Plots:
                 'sseg_rt_area': 'Polygon sqrt(Area)',
             }
         )
-        self.figman = figman
-        self.sns = sns
-        self.kwplot = kwplot
-        self.perimage_data = self.perimage_data
+        self.figman = figman  # type: ignore
+        self.sns = sns  # type: ignore
+        self.kwplot = kwplot  # type: ignore
+        self.perimage_data = self.perimage_data  # type: ignore
 
         # Might want to modify to make this nicer for interactive / reloading
         # use cases
@@ -716,10 +716,10 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['polygon_centroid_absolute_distribution'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.kdeplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax)
-        self.sns.scatterplot(
-            data=self.perannot_data,
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        self.sns.kdeplot(data=self.perannot_data, x='centroid_x', y='centroid_y', ax=ax)  # type: ignore
+        self.sns.scatterplot(  # type: ignore
+            data=self.perannot_data,  # type: ignore
             x='centroid_x',
             y='centroid_y',
             ax=ax,
@@ -732,10 +732,10 @@ class BuiltinPlots:
         # ax.set_ylim(0, max_height)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
-        self.figman.labels.relabel(ax)
+        self.figman.labels.relabel(ax)  # type: ignore
         ax.set_aspect('equal')
         ax.invert_yaxis()
-        self.figman.finalize('polygon_centroid_absolute_distribution.png')
+        self.figman.finalize('polygon_centroid_absolute_distribution.png')  # type: ignore
 
     def polygon_centroid_relative_distribution(self):
         """
@@ -745,12 +745,12 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['polygon_centroid_relative_distribution'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.kdeplot(
-            data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        self.sns.kdeplot(  # type: ignore
+            data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax  # type: ignore
         )
-        self.sns.scatterplot(
-            data=self.perannot_data,
+        self.sns.scatterplot(  # type: ignore
+            data=self.perannot_data,  # type: ignore
             x='rel_centroid_x',
             y='rel_centroid_y',
             ax=ax,
@@ -765,10 +765,10 @@ class BuiltinPlots:
         ax.set_ylim(0, ax.get_ylim()[1])
         ax.set_xlabel('Polygon X Centroid')
         ax.set_ylabel('Polygon Y Centroid')
-        self.figman.labels.relabel(ax)
+        self.figman.labels.relabel(ax)  # type: ignore
         ax.set_aspect('equal')
         ax.invert_yaxis()
-        self.figman.finalize('polygon_centroid_relative_distribution.png')
+        self.figman.finalize('polygon_centroid_relative_distribution.png')  # type: ignore
 
     def polygon_centroid_absolute_distribution_jointplot(self):
         """
@@ -778,9 +778,9 @@ class BuiltinPlots:
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_centroid_absolute_distribution_jointplot'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
-            self.figman.fig.clf()
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):  # type: ignore
+            self.figman.fig.clf()  # type: ignore
             marginal_kws = dict()
             joint_kws = dict()
             # marginal_kws['log_scale'] = True
@@ -790,19 +790,19 @@ class BuiltinPlots:
                 marginal_kws=marginal_kws,
                 kind='hist',
             )
-            self.sns.jointplot(
-                data=self.perannot_data, x='centroid_x', y='centroid_y', **jointplot_kws
+            self.sns.jointplot(  # type: ignore
+                data=self.perannot_data, x='centroid_x', y='centroid_y', **jointplot_kws  # type: ignore
             )
-            ax = self.figman.fig.gca()
+            ax = self.figman.fig.gca()  # type: ignore
         ax.set_title('Polygon Absolute Centroid Positions')
         # ax.set_xlim(0, max_width)
         # ax.set_ylim(0, max_height)
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
-        self.figman.labels.relabel(ax)
+        self.figman.labels.relabel(ax)  # type: ignore
         # ax.set_aspect('equal')
         ax.invert_yaxis()
-        self.figman.finalize('polygon_centroid_absolute_distribution_jointplot.png')
+        self.figman.finalize('polygon_centroid_absolute_distribution_jointplot.png')  # type: ignore
 
     def polygon_centroid_relative_distribution_jointplot(self):
         """
@@ -812,14 +812,14 @@ class BuiltinPlots:
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_centroid_relative_distribution_jointplot'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
 
-        # self.sns.kdeplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax)
-        # self.sns.scatterplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)
+        # self.sns.kdeplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax)  # type: ignore
+        # self.sns.scatterplot(data=self.perannot_data, x='rel_centroid_x', y='rel_centroid_y', ax=ax, hue='sseg_rt_area', alpha=0.8)  # type: ignore
 
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
-            self.figman.fig.clf()
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):  # type: ignore
+            self.figman.fig.clf()  # type: ignore
             marginal_kws = dict()
             joint_kws = dict()
             # marginal_kws['log_scale'] = True
@@ -829,23 +829,23 @@ class BuiltinPlots:
                 marginal_kws=marginal_kws,
                 kind='hist',
             )
-            self.sns.jointplot(
-                data=self.perannot_data,
+            self.sns.jointplot(  # type: ignore
+                data=self.perannot_data,  # type: ignore
                 x='rel_centroid_x',
                 y='rel_centroid_y',
                 **jointplot_kws,
             )
-            ax = self.figman.fig.gca()
-            # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
+            ax = self.figman.fig.gca()  # type: ignore
+            # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)  # type: ignore
         ax.set_title('Polygon Relative Centroid Positions')
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
         ax.set_xlabel('Polygon X Centroid')
         ax.set_ylabel('Polygon Y Centroid')
-        self.figman.labels.relabel(ax)
+        self.figman.labels.relabel(ax)  # type: ignore
         # ax.set_aspect('equal')
         ax.invert_yaxis()
-        self.figman.finalize('polygon_centroid_relative_distribution_jointplot.png')
+        self.figman.finalize('polygon_centroid_relative_distribution_jointplot.png')  # type: ignore
 
     def image_size_histogram(self):
         """
@@ -857,14 +857,14 @@ class BuiltinPlots:
         """
         import kwplot
 
-        # self.figman.figure(fnum=1, doclf=True).gca()
+        # self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
         img_dsizes = [
             f'{w}✕{h}'
-            for w, h in zip(self.perimage_data['width'], self.perimage_data['height'])
+            for w, h in zip(self.perimage_data['width'], self.perimage_data['height'])  # type: ignore
         ]
-        self.perimage_data['img_dsizes'] = img_dsizes
-        # self.sns.histplot(data=perimage_data, x='img_dsizes', ax=ax)
-        data = self.perimage_data
+        self.perimage_data['img_dsizes'] = img_dsizes  # type: ignore
+        # self.sns.histplot(data=perimage_data, x='img_dsizes', ax=ax)  # type: ignore
+        data = self.perimage_data  # type: ignore
         x = 'img_dsizes'
         snskw = dict(binwidth=1, discrete=True)
         ax_top, ax_bottom, split_y = kwplot.util_seaborn.histplot_splity(
@@ -873,7 +873,7 @@ class BuiltinPlots:
         ax_bottom.set_xlabel('Image Width ✕ Height')
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_title('Image Size Histogram')
-        self.figman.finalize('image_size_histogram.png', fig=ax_top.figure)
+        self.figman.finalize('image_size_histogram.png', fig=ax_top.figure)  # type: ignore
 
     def image_size_scatter(self):
         """
@@ -883,20 +883,20 @@ class BuiltinPlots:
             >>> self = Plots.demo(timestamps=True, image_size='random', num_frames=100)
             >>> self['image_size_scatter'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        # self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)
-        # self.sns.stripplot(data=self.perimage_data, x='width', y='height', ax=ax)
-        self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)
-        self.sns.scatterplot(data=self.perimage_data, x='width', y='height', ax=ax)
-        # self.sns.swarmplot(data=self.perimage_data, x='width', y='height', ax=ax)
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        # self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)  # type: ignore
+        # self.sns.stripplot(data=self.perimage_data, x='width', y='height', ax=ax)  # type: ignore
+        self.sns.kdeplot(data=self.perimage_data, x='width', y='height', ax=ax)  # type: ignore
+        self.sns.scatterplot(data=self.perimage_data, x='width', y='height', ax=ax)  # type: ignore
+        # self.sns.swarmplot(data=self.perimage_data, x='width', y='height', ax=ax)  # type: ignore
         ax.set_title('Image Size Distribution')
         # ax.set_aspect('equal')
         ax.set_ylabel('Image Height')
         ax.set_xlabel('Image Width')
         # ax.set_xlim(0, ax.get_xlim()[1])
         # ax.set_ylim(0, ax.get_ylim()[1])
-        self.figman.labels.relabel(ax)
-        self.figman.finalize('image_size_scatter.png')
+        self.figman.labels.relabel(ax)  # type: ignore
+        self.figman.finalize('image_size_scatter.png')  # type: ignore
 
     def obox_size_distribution(self):
         """
@@ -906,10 +906,10 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['obox_size_distribution'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
-        self.sns.scatterplot(
-            data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)  # type: ignore
+        self.sns.scatterplot(  # type: ignore
+            data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax  # type: ignore
         )
         # ax.set_xscale('log')
         # ax.set_yscale('log')
@@ -917,8 +917,8 @@ class BuiltinPlots:
         ax.set_aspect('equal')
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
-        self.figman.labels.relabel(ax)
-        self.figman.finalize('obox_size_distribution.png')
+        self.figman.labels.relabel(ax)  # type: ignore
+        self.figman.finalize('obox_size_distribution.png')  # type: ignore
 
     def obox_size_distribution_jointplot(self):
         """
@@ -928,9 +928,9 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['obox_size_distribution_jointplot'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
-            self.figman.fig.clf()
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):  # type: ignore
+            self.figman.fig.clf()  # type: ignore
             marginal_kws = dict()
             joint_kws = dict()
             # marginal_kws['log_scale'] = True
@@ -940,19 +940,19 @@ class BuiltinPlots:
                 marginal_kws=marginal_kws,
                 kind='hist',
             )
-            self.sns.jointplot(
-                data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws
+            self.sns.jointplot(  # type: ignore
+                data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws  # type: ignore
             )
-            ax = self.figman.fig.gca()
-            # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
+            ax = self.figman.fig.gca()  # type: ignore
+            # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)  # type: ignore
         # ax.set_xscale('log')
         # ax.set_yscale('log')
         ax.set_title('Oriented Bounding Box Sizes')
         # ax.set_aspect('equal')
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
-        self.figman.labels.relabel(ax)
-        self.figman.finalize('obox_size_distribution_jointplot.png')
+        self.figman.labels.relabel(ax)  # type: ignore
+        self.figman.finalize('obox_size_distribution_jointplot.png')  # type: ignore
 
     def obox_size_distribution_logscale(self):
         """
@@ -962,13 +962,13 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['obox_size_distribution_logscale'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
-        # self.sns.scatterplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        # self.sns.kdeplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)  # type: ignore
+        # self.sns.scatterplot(data=self.perannot_data, x='obox_major', y='obox_minor', ax=ax)  # type: ignore
 
-        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):  # type: ignore
             # TODO: logscale on boxes
-            self.figman.fig.clf()
+            self.figman.fig.clf()  # type: ignore
             marginal_kws = dict()
             joint_kws = dict()
             marginal_kws['log_scale'] = True
@@ -981,22 +981,22 @@ class BuiltinPlots:
                 # kind='scatter',
                 # hue='num_vertices'
             )
-            self.sns.jointplot(
-                data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws
+            self.sns.jointplot(  # type: ignore
+                data=self.perannot_data, x='obox_major', y='obox_minor', **jointplot_kws  # type: ignore
             )
-            ax = self.figman.fig.gca()
+            ax = self.figman.fig.gca()  # type: ignore
 
         ax.set_xscale('symlog')
         ax.set_yscale('symlog')
         ax.set_title('Oriented Bounding Box Sizes')
         # ax.set_aspect('equal')
         # TODO: set better min
-        minx = self.perannot_data['obox_major'].min()
-        miny = self.perannot_data['obox_minor'].min()
+        minx = self.perannot_data['obox_major'].min()  # type: ignore
+        miny = self.perannot_data['obox_minor'].min()  # type: ignore
         ax.set_xlim(minx, ax.get_xlim()[1])
         ax.set_ylim(miny, ax.get_ylim()[1])
-        self.figman.labels.relabel(ax)
-        self.figman.finalize('obox_size_distribution_logscale.png')
+        self.figman.labels.relabel(ax)  # type: ignore
+        self.figman.finalize('obox_size_distribution_logscale.png')  # type: ignore
 
     def polygon_area_vs_num_verts(self):
         """
@@ -1006,19 +1006,19 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['polygon_area_vs_num_verts'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.kdeplot(
-            data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        self.sns.kdeplot(  # type: ignore
+            data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax  # type: ignore
         )
-        self.sns.scatterplot(
-            data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax
+        self.sns.scatterplot(  # type: ignore
+            data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax  # type: ignore
         )
-        # self.sns.jointplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices')
-        self.figman.labels.relabel(ax)
+        # self.sns.jointplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices')  # type: ignore
+        self.figman.labels.relabel(ax)  # type: ignore
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_ylim(0, ax.get_ylim()[1])
         ax.set_title('Polygon Area vs Num Vertices')
-        self.figman.finalize('polygon_area_vs_num_verts.png')
+        self.figman.finalize('polygon_area_vs_num_verts.png')  # type: ignore
 
     def polygon_area_vs_num_verts_jointplot(self):
         """
@@ -1028,9 +1028,9 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['polygon_area_vs_num_verts_jointplot'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
-            self.figman.fig.clf()
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):  # type: ignore
+            self.figman.fig.clf()  # type: ignore
             marginal_kws = dict()
             joint_kws = dict()
             # marginal_kws['log_scale'] = True
@@ -1041,25 +1041,25 @@ class BuiltinPlots:
                 kind='hist',
                 # kind='scatter',
             )
-            self.sns.jointplot(
-                data=self.perannot_data,
+            self.sns.jointplot(  # type: ignore
+                data=self.perannot_data,  # type: ignore
                 x='sseg_rt_area',
                 y='num_vertices',
                 **jointplot_kws,
             )
-            ax = self.figman.fig.gca()
-        # self.sns.kdeplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)
-        self.figman.labels.relabel(ax)
+            ax = self.figman.fig.gca()  # type: ignore
+        # self.sns.kdeplot(data=self.perannot_data, x='sseg_rt_area', y='num_vertices', ax=ax)  # type: ignore
+        self.figman.labels.relabel(ax)  # type: ignore
 
-        minx = self.perannot_data['sseg_rt_area'].min()
-        miny = self.perannot_data['num_vertices'].min()
+        minx = self.perannot_data['sseg_rt_area'].min()  # type: ignore
+        miny = self.perannot_data['num_vertices'].min()  # type: ignore
         ax.set_xlim(minx, ax.get_xlim()[1])
         ax.set_ylim(miny, ax.get_ylim()[1])
 
         # ax.set_xlim(0, ax.get_xlim()[1])
         # ax.set_ylim(0, ax.get_ylim()[1])
         ax.set_title('Polygon Area vs Num Vertices')
-        self.figman.finalize('polygon_area_vs_num_verts_jointplot.png')
+        self.figman.finalize('polygon_area_vs_num_verts_jointplot.png')  # type: ignore
 
     def polygon_area_vs_num_verts_jointplot_logscale(self):
         """
@@ -1069,12 +1069,12 @@ class BuiltinPlots:
             >>> self = Plots.demo(timestamps=True)
             >>> self['polygon_area_vs_num_verts_jointplot_logscale'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
 
         x = 'sseg_rt_area'
         y = 'num_vertices'
         # Hack for logscale to work
-        perannot_data = self.perannot_data.copy()
+        perannot_data = self.perannot_data.copy()  # type: ignore
         perannot_data[perannot_data[y] == 0] = float('nan')
         perannot_data[perannot_data[x] == 0] = float('nan')
         maxx = perannot_data[x].max()
@@ -1082,8 +1082,8 @@ class BuiltinPlots:
         minx = perannot_data[x].min()
         miny = perannot_data[y].min()
 
-        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):
-            self.figman.fig.clf()
+        with self.kwplot.util_seaborn.MonkeyPatchPyPlotFigureContext(self.figman.fig):  # type: ignore
+            self.figman.fig.clf()  # type: ignore
             marginal_kws = dict()
             joint_kws = dict()
             marginal_kws['log_scale'] = True
@@ -1094,14 +1094,14 @@ class BuiltinPlots:
                 kind='hist',
                 # kind='scatter',
             )
-            self.sns.jointplot(data=perannot_data, x=x, y=y, **jointplot_kws)
-            ax = self.figman.fig.gca()
-        self.figman.labels.relabel(ax)
+            self.sns.jointplot(data=perannot_data, x=x, y=y, **jointplot_kws)  # type: ignore
+            ax = self.figman.fig.gca()  # type: ignore
+        self.figman.labels.relabel(ax)  # type: ignore
         ax.set_xlim(minx, maxx)
         ax.set_ylim(miny, maxy)
 
         ax.set_title('Polygon Area vs Num Vertices')
-        self.figman.finalize('polygon_area_vs_num_verts_jointplot_logscale.png')
+        self.figman.finalize('polygon_area_vs_num_verts_jointplot_logscale.png')  # type: ignore
 
     def polygon_area_histogram_logscale(self):
         """
@@ -1111,19 +1111,19 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['polygon_area_histogram_logscale'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.histplot(
-            data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, log_scale=True
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        self.sns.histplot(  # type: ignore
+            data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, log_scale=True  # type: ignore
         )
-        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
-        self.figman.labels.relabel(ax)
+        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)  # type: ignore
+        self.figman.labels.relabel(ax)  # type: ignore
         ax.set_title('Polygon sqrt(Area) Histogram')
         # TODO: better min. Figman needs a good way of helping with this.
         ax.set_xlim(10, ax.get_xlim()[1])
         ax.set_ylabel('Number of Annotations')
         # ax.set_yscale('symlog')
         # ax.set_xscale('symlog')
-        self.figman.finalize('polygon_area_histogram_logscale.png')
+        self.figman.finalize('polygon_area_histogram_logscale.png')  # type: ignore
 
     def polygon_area_histogram(self):
         """
@@ -1133,16 +1133,16 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['polygon_area_histogram'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, binwidth=32, log_scale=True)
-        self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
-        self.figman.labels.relabel(ax)
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True, binwidth=32, log_scale=True)  # type: ignore
+        self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)  # type: ignore
+        self.figman.labels.relabel(ax)  # type: ignore
         ax.set_title('Polygon sqrt(Area) Histogram')
         ax.set_xlim(10, ax.get_xlim()[1])
         ax.set_ylabel('Number of Annotations')
         # ax.set_yscale('symlog')
         # ax.set_xscale('symlog')
-        self.figman.finalize('polygon_area_histogram.png')
+        self.figman.finalize('polygon_area_histogram.png')  # type: ignore
 
     def polygon_area_histogram_splity(self):
         """
@@ -1152,19 +1152,19 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['polygon_area_histogram_splity'](self)
         """
-        # ax = self.figman.figure(fnum=1, doclf=True).gca()
-        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)
-        # self.figman.labels.relabel(ax)
+        # ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        # self.sns.histplot(data=self.perannot_data, x='sseg_rt_area', ax=ax, kde=True)  # type: ignore
+        # self.figman.labels.relabel(ax)  # type: ignore
         # ax.set_title('Polygon sqrt(Area) Histogram')
         # ax.set_xlim(0, ax.get_xlim()[1])
         # ax.set_ylabel('Number of Annotations')
         # ax.set_yscale('symlog')
-        # self.figman.finalize('polygon_area_histogram.png')
+        # self.figman.finalize('polygon_area_histogram.png')  # type: ignore
 
         split_y = 'auto'
         snskw = dict(binwidth=50, discrete=False, kde=True)
-        ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(
-            data=self.perannot_data, x='sseg_rt_area', split_y=split_y, **snskw
+        ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(  # type: ignore
+            data=self.perannot_data, x='sseg_rt_area', split_y=split_y, **snskw  # type: ignore
         )
         ax = ax_top
         fig = ax.figure
@@ -1173,15 +1173,15 @@ class BuiltinPlots:
         ax_bottom.set_ylabel('Number of Annotations')
         ax_top.set_ylabel('')
         ax_top.set_title('Polygon sqrt(Area) Histogram')
-        # ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
+        # ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)  # type: ignore
         ax.set_xlim(0, ax.get_xlim()[1])
 
         ax_top.set_ylim(bottom=split_y)  # those limits are fake
         ax_bottom.set_ylim(0, split_y)
 
-        # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
-        # self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)
-        self.figman.finalize('polygon_area_histogram_splity.png', fig=fig)
+        # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)  # type: ignore
+        # self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)  # type: ignore
+        self.figman.finalize('polygon_area_histogram_splity.png', fig=fig)  # type: ignore
 
     def polygon_num_vertices_histogram(self):
         """
@@ -1191,14 +1191,14 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['polygon_num_vertices_histogram'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.histplot(data=self.perannot_data, x='num_vertices', ax=ax)
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        self.sns.histplot(data=self.perannot_data, x='num_vertices', ax=ax)  # type: ignore
         ax.set_title('Polygon Number of Vertices Histogram')
         ax.set_ylabel('Number of Annotations')
         ax.set_xlim(0, ax.get_xlim()[1])
         ax.set_yscale('linear')
-        self.figman.labels.relabel(ax)
-        self.figman.finalize('polygon_num_vertices_histogram.png')
+        self.figman.labels.relabel(ax)  # type: ignore
+        self.figman.finalize('polygon_num_vertices_histogram.png')  # type: ignore
 
     def anns_per_image_histogram(self):
         """
@@ -1208,9 +1208,9 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['anns_per_image_histogram'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.histplot(
-            data=self.perimage_data,
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        self.sns.histplot(  # type: ignore
+            data=self.perimage_data,  # type: ignore
             x='anns_per_image',
             ax=ax,
             binwidth=1,
@@ -1220,11 +1220,11 @@ class BuiltinPlots:
         ax.set_xlabel('Number of Annotations')
         ax.set_ylabel('Number of Images')
         ax.set_title('Number of Annotations per Image')
-        ax.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
-        self.figman.labels.relabel(ax)
+        ax.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)  # type: ignore
+        self.figman.labels.relabel(ax)  # type: ignore
         # ax.set_yscale('symlog', linthresh=10)
-        self.figman.labels.force_integer_xticks()
-        self.figman.finalize('anns_per_image_histogram.png')
+        self.figman.labels.force_integer_xticks()  # type: ignore
+        self.figman.finalize('anns_per_image_histogram.png')  # type: ignore
 
     def anns_per_image_histogram_splity(self):
         """
@@ -1240,13 +1240,13 @@ class BuiltinPlots:
                 'split_y': 'auto',
             }
         )
-        options = self.resolve_options(
+        options = self.resolve_options(  # type: ignore
             default_options, 'anns_per_image_histogram_splity'
         )
         split_y = options['split_y']
         snskw = dict(binwidth=1, discrete=True)
-        ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(
-            data=self.perimage_data, x='anns_per_image', split_y=split_y, **snskw
+        ax_top, ax_bottom, split_y = self.kwplot.util_seaborn.histplot_splity(  # type: ignore
+            data=self.perimage_data, x='anns_per_image', split_y=split_y, **snskw  # type: ignore
         )
         ax = ax_top
         fig = ax.figure
@@ -1256,14 +1256,14 @@ class BuiltinPlots:
         ax_bottom.set_ylabel('Number of Images')
         ax_top.set_ylabel('')
         ax_top.set_title('Number of Annotations per Image')
-        ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)
+        ax_bottom.set_xlim(0 - 0.5, self.max_anns_per_image + 1.5)  # type: ignore
 
         ax_top.set_ylim(bottom=split_y)  # those limits are fake
         ax_bottom.set_ylim(0, split_y)
 
-        # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)
-        self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)
-        self.figman.finalize('anns_per_image_histogram_splity.png', fig=fig)
+        # self.figman.labels.force_integer_ticks(axis='x', method='ticker', ax=ax_bottom)  # type: ignore
+        self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax_bottom)  # type: ignore
+        self.figman.finalize('anns_per_image_histogram_splity.png', fig=fig)  # type: ignore
 
     def anns_per_image_histogram_ge1(self):
         """
@@ -1273,26 +1273,26 @@ class BuiltinPlots:
             >>> self = Plots.demo()
             >>> self['anns_per_image_histogram_ge1'](self)
         """
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        perimage_data = self.perimage_data
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        perimage_data = self.perimage_data  # type: ignore
         perimage_ge1_data = perimage_data[perimage_data['anns_per_image'] >= 1]
-        self.sns.histplot(
+        self.sns.histplot(  # type: ignore
             data=perimage_ge1_data, x='anns_per_image', ax=ax, binwidth=1, discrete=True
         )
         ax.set_yscale('linear')
         ax.set_xlabel('Number of Annotations')
         ax.set_ylabel('Number of Images')
         ax.set_title('Number of Annotations per Image\n(with at least 1 annotation)')
-        self.figman.labels.relabel(ax)
-        ax.set_xlim(1 - 0.5, self.max_anns_per_image + 0.5)
-        # self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax)
-        self.figman.labels.force_integer_ticks(
+        self.figman.labels.relabel(ax)  # type: ignore
+        ax.set_xlim(1 - 0.5, self.max_anns_per_image + 0.5)  # type: ignore
+        # self.figman.labels.force_integer_ticks(axis='x', method='maxn', ax=ax)  # type: ignore
+        self.figman.labels.force_integer_ticks(  # type: ignore
             axis='x', method='ticker', ax=ax, hack_labels=0
         )
         # ax.set_xticks(ax.get_xticks().astype(int))
 
         # ax.set_yscale('symlog', linthresh=10)
-        self.figman.finalize('anns_per_image_histogram_ge1.png')
+        self.figman.finalize('anns_per_image_histogram_ge1.png')  # type: ignore
 
     def images_over_time(self):
         """
@@ -1305,16 +1305,16 @@ class BuiltinPlots:
         import pandas as pd
         import numpy as np
 
-        img_df = self.perimage_data.sort_values('datetime')
+        img_df = self.perimage_data.sort_values('datetime')  # type: ignore
         img_df['pd_datetime'] = pd.to_datetime(img_df.datetime)
         img_df['collection_size'] = np.arange(1, len(img_df) + 1)
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        self.sns.histplot(data=img_df, x='pd_datetime', ax=ax, cumulative=True)
-        # self.sns.lineplot(data=img_df, x='pd_datetime', y='collection_size')
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        self.sns.histplot(data=img_df, x='pd_datetime', ax=ax, cumulative=True)  # type: ignore
+        # self.sns.lineplot(data=img_df, x='pd_datetime', y='collection_size')  # type: ignore
         ax.set_title('Images collected over time')
         ax.set_xlabel('Datetime')
         ax.set_ylabel('Number of Images Collected')
-        self.figman.finalize('images_over_time.png')
+        self.figman.finalize('images_over_time.png')  # type: ignore
 
     def images_timeofday_distribution(self):
         """
@@ -1330,7 +1330,7 @@ class BuiltinPlots:
         import kwimage
         import kwplot
 
-        img_df = self.perimage_data.sort_values('datetime')
+        img_df = self.perimage_data.sort_values('datetime')  # type: ignore
         img_df['pd_datetime'] = pd.to_datetime(img_df.datetime)
         img_df['collection_size'] = np.arange(1, len(img_df) + 1)
         datetimes = [kwutil.datetime.coerce(x) for x in img_df['datetime']]
@@ -1347,24 +1347,28 @@ class BuiltinPlots:
             for z in img_df['time']
         ]
 
-        self.snskw = {}
+        self.snskw = {}  # type: ignore
         has_sunlight = 'sunlight' in img_df.columns
         if has_sunlight and not img_df['sunlight'].isna().all():
-            palette = self.sns.color_palette(
+            palette = self.sns.color_palette(  # type: ignore
                 'flare', n_colors=4, as_cmap=True
             ).reversed()
-            self.snskw['hue'] = 'sunlight'
-            self.snskw['palette'] = palette
+            self.snskw['hue'] = 'sunlight'  # type: ignore
+            self.snskw['palette'] = palette  # type: ignore
 
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
-        # self.sns.histplot(data=img_df, x='month', ax=ax)
-        # self.sns.kdeplot(data=img_df, x='day_of_year', y='hour_of_day')
-        # self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight_values')
-        self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day')
-        self.sns.scatterplot(
-            data=img_df, x='day_of_year', y='hour_of_day', **self.snskw, legend=False
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
+        # self.sns.histplot(data=img_df, x='month', ax=ax)  # type: ignore
+        # self.sns.kdeplot(data=img_df, x='day_of_year', y='hour_of_day')  # type: ignore
+        # self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight_values')  # type: ignore
+        self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day')  # type: ignore
+        self.sns.scatterplot(  # type: ignore
+            data=img_df,  # type: ignore
+             x='day_of_year',
+             y='hour_of_day', 
+             **self.snskw,   # type: ignore
+             legend=False
         )
-        # self.sns.kdeplot(data=img_df, x='hour_of_day', y='day_of_year')
+        # self.sns.kdeplot(data=img_df, x='hour_of_day', y='day_of_year')  # type: ignore
         if has_sunlight:
             kwplot.phantom_legend(
                 {
@@ -1377,7 +1381,7 @@ class BuiltinPlots:
         ax.set_title('Time Captured')
         ax.set_xlabel('Day of Year')
         ax.set_ylabel('Hour of Day')
-        self.figman.finalize('images_timeofday_distribution.png')
+        self.figman.finalize('images_timeofday_distribution.png')  # type: ignore
 
     def all_polygons(self):
         """
@@ -1404,8 +1408,8 @@ class BuiltinPlots:
                 'facecolor': '#b1dfaa',
             }
         )
-        options = self.resolve_options(default_options, 'all_polygons')
-        ax = self.figman.figure(fnum=1, doclf=True).gca()
+        options = self.resolve_options(default_options, 'all_polygons')  # type: ignore
+        ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
         # edgecolor = kwimage.Color.coerce('kitware_darkblue').as01()
         # facecolor = kwimage.Color.coerce('kitware_green').as01()
         # edgecolor = kwimage.Color.coerce('white').as01()
@@ -1416,19 +1420,19 @@ class BuiltinPlots:
         # facecolor = kwimage.Color.coerce('kitware_green').as01()
         # ad900d
         facecolor = kwimage.Color.coerce(options['facecolor']).as01()
-        self.polys.draw(alpha=0.5, edgecolor=edgecolor, facecolor=facecolor)
+        self.polys.draw(alpha=0.5, edgecolor=edgecolor, facecolor=facecolor)  # type: ignore
         ax.set_xlabel('Image X Coordinate')
         ax.set_ylabel('Image Y Coordinate')
-        ax.set_title(f'All {len(self.polys)} Polygons')
+        ax.set_title(f'All {len(self.polys)} Polygons')  # type: ignore
         ax.set_aspect('equal')
-        ax.set_xlim(0, self.annot_max_x)
-        ax.set_ylim(0, self.annot_max_y)
-        self.figman.labels.relabel(ax)
+        ax.set_xlim(0, self.annot_max_x)  # type: ignore
+        ax.set_ylim(0, self.annot_max_y)  # type: ignore
+        self.figman.labels.relabel(ax)  # type: ignore
         ax.set_ylim(
-            0, self.annot_max_y
+            0, self.annot_max_y  # type: ignore
         )  # not sure why this needs to be after the relabel, should ideally fix that.
         ax.invert_yaxis()
-        self.figman.finalize(
+        self.figman.finalize(  # type: ignore
             'all_polygons.png', tight_layout=0
         )  # tight layout seems to cause issues here
 

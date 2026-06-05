@@ -477,7 +477,7 @@ def random_single_video_dset(
 
     if isinstance(coercable_width, distributions.Distribution):
         video_width = int(coercable_width.sample())
-        video_height = int(coercable_height.sample())
+        video_height = int(coercable_height.sample())  # type: ignore
         image_width_distri = coercable_width
         image_height_distri = coercable_height
     else:
@@ -549,7 +549,7 @@ def random_single_video_dset(
             senorchan.streams(), key=lambda x: x.sensor.spec
         )
         for sensor, subchans in sensor_to_subchans.items():
-            subspec = ','.join([c._chans.spec for c in subchans])
+            subspec = ','.join([c._chans.spec for c in subchans])  # type: ignore
             chans = ChannelSpec.coerce(subspec)
             sensor_to_channels[sensor] = chans
 
@@ -558,7 +558,7 @@ def random_single_video_dset(
     for frame_idx, gid in enumerate(image_ids):
         if verbose > 3:
             print('generate gid = {!r}'.format(gid))
-        image_height = int(image_height_distri.sample())
+        image_height = int(image_height_distri.sample())  # type: ignore
         image_width = int(image_width_distri.sample())
 
         warp_vid_from_img = kwimage.Affine.coerce(
@@ -697,8 +697,8 @@ def random_single_video_dset(
         )
 
         # Smooth out varying box sizes
-        alpha = rng.rand() * 0.1
-        wh = pd.DataFrame(video_boxes.data[:, 2:4], columns=['w', 'h'])
+        alpha = rng.rand() * 0.1  # type: ignore
+        wh = pd.DataFrame(video_boxes.data[:, 2:4], columns=['w', 'h'])  # type: ignore
 
         ar = wh['w'] / wh['h']
         min_ar = 0.25
@@ -821,8 +821,8 @@ def populate_random_timestamps(coco_dset, timestamps=True, rng=None):
         tskw.update(timestamps)
 
     rng = kwarray.ensure_rng(rng)
-    min_time = util_time.datetime.coerce(tskw['start_time'])
-    max_time = util_time.datetime.coerce(tskw['end_time'])
+    min_time = util_time.datetime.coerce(tskw['start_time'])  # type: ignore
+    max_time = util_time.datetime.coerce(tskw['end_time'])  # type: ignore
     time_distri = Uniform(min_time.timestamp(), max_time.timestamp(), rng=rng)
 
     # Hack in other metadata
@@ -834,7 +834,7 @@ def populate_random_timestamps(coco_dset, timestamps=True, rng=None):
         imgs = sorted(imgs, key=lambda g: g.get('frame_index', None))
         new_times = sorted(time_distri.sample(len(imgs)))
         for img, timestamp in zip(imgs, new_times):
-            ts = util_time.datetime.fromtimestamp(timestamp)
+            ts = util_time.datetime.fromtimestamp(timestamp)  # type: ignore
             img['timestamp'] = ts.isoformat()
 
 
@@ -1203,7 +1203,7 @@ def render_toy_image(dset, gid, rng=None, renderkw=None):
                     auxdata[..., chan_idx] = auxdata[..., chan_idx]
             elif chan_name.startswith('B') or 1:
                 maskshape = auxdata[..., chan_idx].shape[0:2]
-                mask = rng.randint(0, 2, size=maskshape, dtype=bool)
+                mask = rng.randint(0, 2, size=maskshape, dtype=bool)  # type: ignore
                 # mask = rng.rand(*maskshape) > 0.5
                 # NOTE: fourier mask takes a long time! Up to 80% of it!
                 auxdata[..., chan_idx] = kwimage.fourier_mask(
@@ -1266,14 +1266,14 @@ def render_foreground(
             # slice would be good
             chip = kwarray.padded_slice(imdata, chip_index)
             inverse_slice = (
-                slice(padding[0][0], chip.shape[0] - padding[0][1]),
-                slice(padding[1][0], chip.shape[1] - padding[1][1]),
+                slice(padding[0][0], chip.shape[0] - padding[0][1]),  # type: ignore
+                slice(padding[1][0], chip.shape[1] - padding[1][1]),  # type: ignore
             )
 
         size = (br_x - tl_x, br_y - tl_y)
         xy_offset = (tl_x, tl_y)
 
-        if chip is None or chip.size:
+        if chip is None or chip.size:  # type: ignore
             # todo: no need to make kpts / sseg if not requested
             info = catpats.render_category(
                 catname, chip, xy_offset, dims, newstyle=newstyle, size=size
@@ -1629,7 +1629,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
         class Position(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.pos = torch.nn.Parameter(torch.from_numpy(rng.rand(2)))
+                self.pos = torch.nn.Parameter(torch.from_numpy(rng.rand(2)))  # type: ignore
 
             def forward(self, noise):
                 return (self.pos * noise).sum()
@@ -1641,7 +1641,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
         positions = []
         for i in range(num):
             optim.zero_grad()
-            noise = torch.from_numpy(rng.rand(2))
+            noise = torch.from_numpy(rng.rand(2))  # type: ignore
             loss = pos.forward(noise)
             loss.backward()
             optim.step()
@@ -1652,7 +1652,7 @@ def random_path(num, degree=1, dimension=2, rng=None, mode='boid'):
         import bezier
 
         # Create random bezier control points
-        nodes_f = rng.rand(degree + 1, dimension).T  # F-contiguous
+        nodes_f = rng.rand(degree + 1, dimension).T  # type: ignore  # F-contiguous
         curve = bezier.Curve(nodes_f, degree=degree)
         if 0:
             # TODO: https://stackoverflow.com/questions/18244305/how-to-redistribute-points-evenly-over-a-curve

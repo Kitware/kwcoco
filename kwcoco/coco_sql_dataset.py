@@ -1612,7 +1612,7 @@ class CocoSqlDatabase(
                     print('deleting postgresql database, doesnt exist')
 
     def table_names(self):
-        table_names = sqlalchemy.inspect(self.engine).get_table_names()
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()  # type: ignore
         return table_names
 
     def populate_from(self, dset, verbose=1):
@@ -1700,7 +1700,7 @@ class CocoSqlDatabase(
             colinfo = inspector.get_columns(key)
             colnames = {c['name'] for c in colinfo}
             # TODO: is there a better way to grab this information?
-            cls = CocoBase.TBLNAME_TO_CLASS[key]
+            cls = CocoBase.TBLNAME_TO_CLASS[key]  # type: ignore
             for item in ub.ProgIter(
                 dset.dataset.get(key, []),
                 desc='Populate {}'.format(key),
@@ -1718,30 +1718,30 @@ class CocoSqlDatabase(
                     item_['_bbox_h'] = h
                 row = cls(**item_)
                 # print(f'row={row}')
-                session.add(row)
+                session.add(row)  # type: ignore
 
                 if next(counter) % batch_size == 0:
                     # Commit data in batches
                     session.commit()
         if verbose:
             print('finish populate')
-        session.commit()
+        session.commit()  # type: ignore
 
     @property
     def dataset(self):
-        return self.index.dataset
+        return self.index.dataset  # type: ignore
 
     @property
     def anns(self):
-        return self.index.anns
+        return self.index.anns  # type: ignore
 
     @property
     def cats(self):
-        return self.index.cats
+        return self.index.cats  # type: ignore
 
     @property
     def imgs(self):
-        return self.index.imgs
+        return self.index.imgs  # type: ignore
 
     @property
     def name_to_cat(self):
@@ -1779,7 +1779,7 @@ class CocoSqlDatabase(
             if IS_GE_SQLALCH_2x:
                 # When pandas is < 1.5 and sqlalchemy is > 2.x this will fail
                 # with a type error
-                con = self.session.connection()
+                con = self.session.connection()  # type: ignore
                 table_df = pd.read_sql_table(table_name=table_name, con=con)
             else:
                 table_df = pd.read_sql_table(table_name, self.engine)
@@ -2051,7 +2051,7 @@ class CocoSqlDatabase(
             values = [
                 # self.anns[aid][key]
                 # if aid in self.anns._cache else
-                self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]
+                self.session.execute(stmt, {'rowid': rowid}).fetchone()[0]  # type: ignore
                 for rowid in rowids
             ]
 
@@ -2147,7 +2147,7 @@ class CocoSqlDatabase(
             """
             ).format(colnames=colnames, tablename=tablename)
         )
-        result = self.session.execute(stmt)
+        result = self.session.execute(stmt)  # type: ignore
         rows = result.fetchall()
         return rows
 
@@ -2203,7 +2203,7 @@ class CocoSqlDatabase(
         return targets
 
     def _table_names(self):
-        inspector = sqlalchemy.inspect(self.engine)
+        inspector = sqlalchemy.inspect(self.engine)  # type: ignore
         table_names = inspector.get_table_names()
         return table_names
 
@@ -2222,7 +2222,7 @@ class CocoSqlDatabase(
 
     @data_fpath.setter
     def data_fpath(self, value):
-        self.fpath = value
+        self.fpath = value  # type: ignore
 
     def _orig_coco_fpath(self):
         """
@@ -2439,7 +2439,7 @@ def cached_sql_coco_view(
         depends=[dct_db_fpath],
         product=cache_product,
         enabled=enable_cache,
-        hasher=None,
+        hasher=None,  # type: ignore
         ext='.json',
         verbose=4,
     )
@@ -2820,7 +2820,7 @@ def devcheck():
 
     # Read the sql tables into pandas
     # table_names = self.engine.table_names()  # deprecated
-    table_names = sqlalchemy.inspect(self.engine).get_table_names()
+    table_names = sqlalchemy.inspect(self.engine).get_table_names()  # type: ignore
     for key in table_names:
         print('\n----')
         print('key = {!r}'.format(key))
@@ -2833,10 +2833,10 @@ def devcheck():
     sampler = ndsampler.CocoSampler(self, backend=None)
 
     regions = sampler.regions
-    regions.isect_index
-    regions.get_segmentations([1, 3])
-    regions.get_positive(1)
-    regions.get_negative()
+    regions.isect_index  # type: ignore
+    regions.get_segmentations([1, 3])  # type: ignore
+    regions.get_positive(1)  # type: ignore
+    regions.get_negative()  # type: ignore
 
     import timerit
 

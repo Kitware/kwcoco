@@ -73,7 +73,7 @@ def perterb_coco(coco_dset, **kwargs):
     # Build random variables
     from kwarray import distributions
 
-    DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)
+    DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)  # type: ignore
 
     def _parse_arg(key, default):
         value = kwargs.get(key, default)
@@ -259,15 +259,15 @@ def perterb_coco(coco_dset, **kwargs):
             dims = (h, w)
             for cidx in range(len(classes)):
                 chan_data = heatmaps[cidx]
-                chan_data += rng.randn(*dims) * 0.1
+                chan_data += rng.randn(*dims) * 0.1  # type: ignore
                 chan_data + chan_data.clip(0, 1)
                 chan_data = kwimage.gaussian_blur(chan_data, sigma=1.2)
                 chan_data = chan_data.clip(0, 1)
-                mask = rng.randn(*dims)
+                mask = rng.randn(*dims)  # type: ignore
                 chan_data = chan_data * (
                     (kwimage.fourier_mask(chan_data, mask)[..., 0]) + 0.5
                 )
-                chan_data += rng.randn(*dims) * 0.1
+                chan_data += rng.randn(*dims) * 0.1  # type: ignore
                 chan_data = chan_data.clip(0, 1)
                 chan_datas.append(chan_data)
             hwc_probs = np.stack(chan_datas, axis=2)

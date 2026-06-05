@@ -199,7 +199,7 @@ def demodata_toy_dset(
 
     if bundle_dpath is None:
         bundle_dname = f'shapes_{n_imgs}_{depends}'
-        bundle_dpath = ub.ensuredir((dpath, bundle_dname))
+        bundle_dpath = ub.ensuredir((dpath, bundle_dname))  # type: ignore
 
     bundle_dpath = abspath(bundle_dpath)
 
@@ -219,7 +219,7 @@ def demodata_toy_dset(
         dpath=cache_dpath,
         depends=depends,
         verbose=verbose,
-        enabled=0,
+        enabled=0,  # type: ignore
     )
 
     n_have = len(list(glob.glob(join(img_dpath, '*.png'))))
@@ -559,14 +559,14 @@ def demodata_toy_img(
     if gray:
         gshape = (gh, gw, 1)
         imdata = kwarray.standard_normal(
-            gshape, mean=bg_intensity, std=bg_scale, rng=rng, dtype=np.float32
+            gshape, mean=bg_intensity, std=bg_scale, rng=rng, dtype=np.float32  # type: ignore
         )
     else:
         gshape = (gh, gw, 3)
         # imdata = kwarray.standard_normal(gshape, mean=bg_intensity, std=bg_scale,
         #                                    rng=rng, dtype=np.float32)
         # hack because 3 channels is slower
-        imdata = kwarray.uniform(0, 1, gshape, rng=rng, dtype=np.float32)
+        imdata = kwarray.uniform(0, 1, gshape, rng=rng, dtype=np.float32)  # type: ignore
 
     np.clip(imdata, 0, 1, out=imdata)
 
@@ -629,7 +629,7 @@ def demodata_toy_img(
     }
 
     if auxdata is not None:
-        mask = rng.rand(*auxdata.shape[0:2]) > 0.5
+        mask = rng.rand(*auxdata.shape[0:2]) > 0.5  # type: ignore
         auxdata = kwimage.fourier_mask(auxdata, mask)
         auxdata = auxdata - auxdata.min()
         auxdata = auxdata / max(1e-8, auxdata.max())
