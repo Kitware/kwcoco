@@ -92,7 +92,7 @@ def demo_format_options():
         fmt = '{alternate}{width}{group}{precision}{type}'.format(**kw)
         fmtstr = '{:' + fmt + '}'
         out = fmtstr.format(val)
-        print('kw = {}'.format(ub.urepr(kw, nl=0, sort=0)))
+        print('kw = {}'.format(ub.urepr(kw, nl=0, sort=0)))  # type: ignore
         print(out)
 
 

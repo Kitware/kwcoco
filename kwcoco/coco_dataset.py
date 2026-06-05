@@ -6801,7 +6801,7 @@ class CocoDataset(
             assumed_root = bundle_dpath
 
         if isinstance(data, (str, os.PathLike)):
-            if not exists(fpath):
+            if not exists(fpath):  # type: ignore
                 raise Exception(
                     ub.paragraph(
                         """
@@ -6820,8 +6820,8 @@ class CocoDataset(
             # Test to see if the kwcoco file is compressed
             import zipfile
 
-            if zipfile.is_zipfile(fpath):
-                with open(fpath, 'rb') as file:
+            if zipfile.is_zipfile(fpath):  # type: ignore
+                with open(fpath, 'rb') as file:  # type: ignore
                     with zipfile.ZipFile(file, 'r') as zfile:
                         members = zfile.namelist()
                         if len(members) != 1:
@@ -6832,7 +6832,7 @@ class CocoDataset(
                         text = zfile.read(members[0]).decode('utf8')
                         data = json_r.loads(text)
             else:
-                with open(fpath, 'r') as file:
+                with open(fpath, 'r') as file:  # type: ignore
                     data = json_r.load(file)
 
             # If data is a path it gives us the absolute location of the root
@@ -7207,7 +7207,7 @@ class CocoDataset(
             file = self.fpath
 
         try:
-            fpath = os.fspath(file)
+            fpath = os.fspath(file)  # type: ignore
         except TypeError:
             input_was_pathlike = False
         else:
@@ -7236,7 +7236,7 @@ class CocoDataset(
                 temp_file = not ub.WIN32
 
             with safer.open(fpath, mode, temp_file=temp_file) as fp:
-                self._dump(fp, indent=indent, newlines=newlines, compress=compress)
+                self._dump(fp, indent=indent, newlines=newlines, compress=compress)  # type: ignore
         else:
             # We are likely dumping to a real file.
             self._dump(file, indent=indent, newlines=newlines, compress=compress)
@@ -7333,7 +7333,7 @@ class CocoDataset(
         checks['name_to_track'] = self.index.name_to_track == new.index.name_to_track
 
         one_to_many1: dict = self.index.trackid_to_aids
-        one_to_many2: dict = new.index.trackid_to_aids
+        one_to_many2: dict = new.index.trackid_to_aids  # type: ignore
 
         missing2 = ub.dict_diff(one_to_many1, one_to_many2)
         missing1 = ub.dict_diff(one_to_many2, one_to_many1)
@@ -7374,7 +7374,7 @@ class CocoDataset(
                 if cid is not None:
                     errors.append('aid={} references bad cid={}'.format(aid, cid))
             else:
-                if self.index.cats[cid]['id'] != cid:
+                if self.index.cats[cid]['id'] != cid:  # type: ignore
                     errors.append('cid={} has a bad index'.format(cid))
 
             if gid not in self.index.imgs:
@@ -7396,7 +7396,7 @@ class CocoDataset(
             gid = img['id']
             vidid = img.get('video_id', None)
             if vidid is not None:
-                if vidid not in self.index.videos:
+                if vidid not in self.index.videos:  # type: ignore
                     # Dont make this an error because a video dictionary is not
                     # strictly necessary for images to be linked via videos.
                     warnings.append(
@@ -7411,7 +7411,7 @@ class CocoDataset(
             )
             for category in iter_:
                 category_id = category['id']
-                if self.index.cats[category_id]['id'] != category_id:
+                if self.index.cats[category_id]['id'] != category_id:  # type: ignore
                     errors.append(f'category_id={category_id} has a bad index')
 
         if 'tracks' in self.dataset:
@@ -7429,7 +7429,7 @@ class CocoDataset(
             )
             for video in iter_:
                 video_id = video['id']
-                if self.index.videos[video_id]['id'] != video_id:
+                if self.index.videos[video_id]['id'] != video_id:  # type: ignore
                     errors.append(f'video_id={video_id} has a bad index')
 
         if errors:
@@ -7711,7 +7711,7 @@ class CocoDataset(
                         new_relect_cat = global_keypoint_catid_remaper._name_to_cat.get(
                             reflect_name
                         )
-                        kpcat['reflection_id'] = new_relect_cat['id']
+                        kpcat['reflection_id'] = new_relect_cat['id']  # type: ignore
 
                 # Add the tracks into the merged dataset
                 for old_track in old_dset.get('tracks', []):
@@ -7878,7 +7878,7 @@ class CocoDataset(
                         if 'keypoints' in new_annot:
                             old_keypoints = new_annot['keypoints']
                             new_keypoints = copy.deepcopy(old_keypoints)
-                            for kp in new_keypoints:
+                            for kp in new_keypoints:  # type: ignore
                                 kp['keypoint_category_id'] = kpcat_id_map.get(
                                     kp['keypoint_category_id'], None
                                 )
@@ -8047,13 +8047,13 @@ class CocoDataset(
             vidids = sorted(
                 set(img.get('video_id', None) for img in chosen_imgs) - {None}
             )
-            chosen_vids = list(ub.take(self.index.videos, vidids))
+            chosen_vids = list(ub.take(self.index.videos, vidids))  # type: ignore
             new_dataset['videos'] = chosen_vids
 
         sub_aids = sorted(
             [aid for gid in chosen_gids for aid in self.index.gid_to_aids.get(gid, [])]
         )
-        new_dataset['annotations'] = list(ub.take(self.index.anns, sub_aids))
+        new_dataset['annotations'] = list(ub.take(self.index.anns, sub_aids))  # type: ignore
 
         if 'tracks' in self.dataset:
             sub_track_ids = sorted(

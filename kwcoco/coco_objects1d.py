@@ -55,7 +55,7 @@ class ObjectList1D(ub.NiceRepr):
         >>> self.lookup(['id'])
     """
 
-    def __init__(self, ids, dset, key):
+    def __init__(self, ids, dset, key):  # type: ignore
         """
         Args:
             ids (List[int]): list of ids
@@ -210,7 +210,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> assert len(self.compress([True, False, True])) == 2
         """
         subids = list(ub.compress(self._ids, flags))
-        newself = self.__class__(subids, self._dset)
+        newself = self.__class__(subids, self._dset)  # type: ignore
         return newself
 
     def peek(self):
@@ -546,8 +546,8 @@ class ObjectGroups(ub.NiceRepr):
         Returns:
             ObjectList1D
         """
-        flat_ids = list(ub.flatten(self))
-        return self._cls1d(flat_ids, self._dset)
+        flat_ids = list(ub.flatten(self))  # type: ignore
+        return self._cls1d(flat_ids, self._dset)  # type: ignore
 
     def __nice__(self) -> str:
         # import timerit

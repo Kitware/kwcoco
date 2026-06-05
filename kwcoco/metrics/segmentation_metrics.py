@@ -1942,7 +1942,7 @@ def evaluate_segmentations(
         summary['salient_max_f1'] = salient_combo_measures['max_f1']
 
     rich.print(
-        'summary = {}'.format(ub.urepr(summary, nl=1, precision=4, align=':', sort=0))
+        'summary = {}'.format(ub.urepr(summary, nl=1, precision=4, align=':', sort=0))  # type: ignore
     )
 
     rich.print(f'Eval Dpath: [link={eval_dpath}]{eval_dpath}[/link]')

@@ -182,7 +182,7 @@ class CocoImage(_CocoObject):
         Returns:
             Annots: a 1d annotations object referencing annotations in this image
         """
-        return self.dset.annots(image_id=self.img['id'])
+        return self.dset.annots(image_id=self.img['id'])  # type: ignore
 
     def __nice__(self):
         """
@@ -203,8 +203,8 @@ class CocoImage(_CocoObject):
 
         stats = ub.udict(self.stats())
         stats = stats.map_values(str)
-        stats = stats.map_values(partial(smart_truncate, max_length=32, trunc_loc=0.5))
-        return ub.urepr(stats, compact=1, nl=0)
+        stats = stats.map_values(partial(smart_truncate, max_length=32, trunc_loc=0.5))  # type: ignore
+        return ub.urepr(stats, compact=1, nl=0)  # type: ignore
 
     def stats(self):
         """ """
@@ -889,7 +889,7 @@ class CocoImage(_CocoObject):
                 #             absolute path.
                 #             '''))
                 # else:
-                fpath = join(self.bundle_dpath, file_name)
+                fpath = join(self.bundle_dpath, file_name)  # type: ignore
                 kwimage.imwrite(fpath, imdata)
             else:
                 obj['imdata'] = imdata
@@ -1170,14 +1170,14 @@ class CocoImage(_CocoObject):
                 delayed = delayed.take_channels(requested)
 
             if hasattr(delayed, 'components'):
-                if len(delayed.components) == 1:
-                    delayed = delayed.components[0]
+                if len(delayed.components) == 1:  # type: ignore
+                    delayed = delayed.components[0]  # type: ignore
 
             if space in {'image', 'auxiliary', 'asset'}:
                 pass
             elif space == 'video':
                 warp_vid_from_img = self.img.get('warp_img_to_vid', None)
-                delayed = delayed.warp(
+                delayed = delayed.warp(  # type: ignore
                     warp_vid_from_img,
                     dsize=dsize,
                     interpolation=interpolation,
@@ -1192,7 +1192,7 @@ class CocoImage(_CocoObject):
             factor = self._scalefactor_for_resolution(
                 space=space, resolution=resolution, RESOLUTION_KEY=RESOLUTION_KEY
             )
-            delayed = delayed.scale(
+            delayed = delayed.scale(  # type: ignore
                 factor, antialias=antialias, interpolation=interpolation
             )
 
@@ -1516,11 +1516,11 @@ class CocoImage(_CocoObject):
 
         # Get annotations in "Image Space"
         if aids is None:
-            annots = coco_img.dset.annots(image_id=coco_img.img['id'])
+            annots = coco_img.dset.annots(image_id=coco_img.img['id'])  # type: ignore
         else:
             # We already know the annots we want (assume the user
             # specified them correctly and they belong to this image).
-            annots = coco_img.dset.annots(aids)
+            annots = coco_img.dset.annots(aids)  # type: ignore
         imgspace_dets = annots.detections
 
         # Warp them into the requested space

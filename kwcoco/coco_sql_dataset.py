@@ -127,8 +127,8 @@ try:
     import sqlalchemy
     import sqlite3
 
-    sqlite3.register_adapter(np.int64, int)
-    sqlite3.register_adapter(np.int32, int)
+    sqlite3.register_adapter(np.int64, int)  # type: ignore
+    sqlite3.register_adapter(np.int32, int)  # type: ignore
     CocoBase = declarative_base()
     sqlalchemy_version = Version(sqlalchemy_version_str)
     IS_GE_SQLALCH_2x = sqlalchemy_version >= Version('2.0.0')
@@ -310,14 +310,14 @@ class Annotation(CocoBase):
 ALCHEMY_MODE_DEFAULT = 1
 
 # Global book keeping (It would be nice to find a way to avoid this)
-CocoBase.TBLNAME_TO_CLASS = {}
+CocoBase.TBLNAME_TO_CLASS = {}  # type: ignore
 # sqlalchemy v 1.3.23 is the last to have _decl_class_registry
 # v1.4 does not have it
 if hasattr(CocoBase, '_decl_class_registry'):
     for classname, cls in CocoBase._decl_class_registry.items():
         if not classname.startswith('_'):
             tblname = cls.__tablename__
-            CocoBase.TBLNAME_TO_CLASS[tblname] = cls
+            CocoBase.TBLNAME_TO_CLASS[tblname] = cls  # type: ignore
 else:
     for mapper in CocoBase.registry.mappers:
         cls = mapper.class_
@@ -701,7 +701,7 @@ class SqlDictProxy(DictLike):
             if proxy.ignore_null:
                 # I think this is only needed in the autoreload session
                 # otherwise it might be possible to just use proxy.keyattr
-                cls_keyattr = getattr(proxy.cls, proxy.keyattr.key)
+                cls_keyattr = getattr(proxy.cls, proxy.keyattr.key)  # type: ignore
                 query = query.filter(cls_keyattr != None)  # NOQA
             query = query.order_by(proxy.cls.id)
             for obj in _orm_yielder(query):
@@ -747,7 +747,7 @@ class SqlDictProxy(DictLike):
             result = proxy.session.execute(expr)
 
             for row in _raw_yielder(result):
-                cast_row = [f(x) for f, x in zip(proxy._casters, row)]
+                cast_row = [f(x) for f, x in zip(proxy._casters, row)]  # type: ignore
                 # Note: assert colnames == list(result.keys())
                 item = dict(zip(colnames, cast_row))
                 item = dict_restructure(item)
@@ -910,7 +910,7 @@ class SqlIdGroupDictProxy(DictLike):
         if proxy.ALCHEMY_MODE:
             if proxy._is_jsonb:
                 # Hack for columns with JSONB indexes (e.g. track_id)
-                key = sqlalchemy.func.to_jsonb(key)
+                key = sqlalchemy.func.to_jsonb(key)  # type: ignore
             query = session.query(valattr).filter(keyattr == key)
             if proxy.order_attr is not None:
                 if proxy.order_id is not None:
@@ -1054,12 +1054,12 @@ class SqlIdGroupDictProxy(DictLike):
                 parent_table = parent_keyattr.class_.__table__
                 table = keyattr.class_.__table__
 
-                grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)
+                grouped_vals = sqlalchemy.func.json_group_array(valattr, type_=JSON)  # type: ignore
                 # Hack: have to cast to str because I don't know how to make
                 # the json type work.
                 # Update: New version of sqlalchemy needs an explicit cast to
                 # "text" to represent a text query.
-                grouped_vals = sqlalchemy.sql.text(str(grouped_vals))
+                grouped_vals = sqlalchemy.sql.text(str(grouped_vals))  # type: ignore
                 query = (
                     session.query(parent_keyattr, grouped_vals)
                     .outerjoin(table, parent_keyattr == keyattr)
@@ -1226,7 +1226,7 @@ class CocoSqlIndex:
         for v in index.__dict__.values():
             if hasattr(v, 'ALCHEMY_MODE'):
                 v.ALCHEMY_MODE = mode
-        for v in index.dataset.values():
+        for v in index.dataset.values():  # type: ignore
             if hasattr(v, 'ALCHEMY_MODE'):
                 v.ALCHEMY_MODE = mode
 
@@ -1366,7 +1366,7 @@ class CocoSqlDatabase(
         parts = []
         parts.append('tag={}'.format(self.tag))
         if self.dataset is not None:
-            info = ub.urepr(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)
+            info = ub.urepr(self.basic_stats(), kvsep='=', si=1, nobr=1, nl=0)  # type: ignore
             parts.append(info)
         return ', '.join(parts)
 
@@ -1533,7 +1533,7 @@ class CocoSqlDatabase(
         self._dialect_name = self.engine.dialect.name
 
         # table_names = self.engine.table_names()
-        table_names = sqlalchemy.inspect(self.engine).get_table_names()
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()  # type: ignore
         if len(table_names) == 0:
             # Opened an empty database, need to create the tables
             # Create all tables in the engine.
@@ -1542,7 +1542,7 @@ class CocoSqlDatabase(
             #     raise AssertionError('must open existing table in readonly mode')
             if verbose:
                 print('check for tables, none exist, making them')
-            CocoBase.metadata.create_all(self.engine)
+            CocoBase.metadata.create_all(self.engine)  # type: ignore
         else:
             if verbose:
                 print('check for tables, they exist')
@@ -1612,7 +1612,7 @@ class CocoSqlDatabase(
                     print('deleting postgresql database, doesnt exist')
 
     def table_names(self):
-        table_names = sqlalchemy.inspect(self.engine).get_table_names()  # type: ignore
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()  # type: ignore  # type: ignore
         return table_names
 
     def populate_from(self, dset, verbose=1):
@@ -1692,7 +1692,7 @@ class CocoSqlDatabase(
         session = self.session
         inspector = inspect(self.engine)
         # table_names = self.engine.table_names()
-        table_names = sqlalchemy.inspect(self.engine).get_table_names()
+        table_names = sqlalchemy.inspect(self.engine).get_table_names()  # type: ignore
 
         batch_size = 100000
 
@@ -1722,7 +1722,7 @@ class CocoSqlDatabase(
 
                 if next(counter) % batch_size == 0:
                     # Commit data in batches
-                    session.commit()
+                    session.commit()  # type: ignore
         if verbose:
             print('finish populate')
         session.commit()  # type: ignore
@@ -1745,7 +1745,7 @@ class CocoSqlDatabase(
 
     @property
     def name_to_cat(self):
-        return self.index.name_to_cat
+        return self.index.name_to_cat  # type: ignore
 
     def pandas_table(self, table_name, strict=False):
         """
@@ -1791,7 +1791,7 @@ class CocoSqlDatabase(
         return table_df
 
     def raw_table(self, table_name):
-        inspector = sqlalchemy.inspect(self.engine)
+        inspector = sqlalchemy.inspect(self.engine)  # type: ignore
         column_infos = inspector.get_columns(table_name)
         column_names = [d['name'] for d in column_infos]
         stmt = ub.paragraph(
@@ -1799,7 +1799,7 @@ class CocoSqlDatabase(
             SELECT * FROM {table_name}
             """
         )
-        results = self.session.execute(text(stmt))
+        results = self.session.execute(text(stmt))  # type: ignore
         rows = []
         for row_vals in results:
             assert len(column_names) == len(row_vals)
@@ -1819,7 +1819,7 @@ class CocoSqlDatabase(
             ...     print(f'tblname={tblname}')
             ...     print(pd.DataFrame(table))
         """
-        inspector = sqlalchemy.inspect(self.engine)
+        inspector = sqlalchemy.inspect(self.engine)  # type: ignore
         table_names = inspector.get_table_names()
         raw_tables = {}
         for table_name in table_names:
@@ -1980,7 +1980,7 @@ class CocoSqlDatabase(
             >>> assert sql_vidid_values2 == dct_vidid_values
         """
         # TODO: memoize this check
-        table = CocoBase.TBLNAME_TO_CLASS[tablename]
+        table = CocoBase.TBLNAME_TO_CLASS[tablename]  # type: ignore
         column = table.__table__.columns[key]
         column_type = column.type
 
@@ -2018,7 +2018,7 @@ class CocoSqlDatabase(
                 )
             )
             # print(stmt)
-            resp = self.session.execute(stmt)
+            resp = self.session.execute(stmt)  # type: ignore
             values = [r[0] for r in resp.fetchall()]
             # resp.fetchone()[0]
             # attr_list = None
@@ -2175,7 +2175,7 @@ class CocoSqlDatabase(
             JOIN images on images.id = annotations.image_id
             """
         )
-        result = self.session.execute(text(stmt))
+        result = self.session.execute(text(stmt))  # type: ignore
         rows = result.fetchall()
         aids, gids, cids, cxs, cys, ws, hs, img_ws, img_hs = list(zip(*rows))
 
@@ -2203,7 +2203,7 @@ class CocoSqlDatabase(
         return targets
 
     def _table_names(self):
-        inspector = sqlalchemy.inspect(self.engine)  # type: ignore
+        inspector = sqlalchemy.inspect(self.engine)  # type: ignore  # type: ignore
         table_names = inspector.get_table_names()
         return table_names
 
