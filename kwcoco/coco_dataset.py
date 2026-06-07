@@ -141,7 +141,7 @@ SPEC_KEYS = [
 ]
 
 
-class MixinCocoDepricate:
+class MixinCocoDeprecate:
     """
     These functions are marked for deprecation and will be removed
     """
@@ -6542,7 +6542,7 @@ class CocoDataset(
     MixinCocoExtras,
     MixinCocoHashing,
     MixinCocoIndex,
-    MixinCocoDepricate,
+    MixinCocoDeprecate,
     ub.NiceRepr,
 ):
     """

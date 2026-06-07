@@ -227,12 +227,12 @@ CocoDataset methods (via MixinCocoStats)
  * :func:`kwcoco.CocoDataset.stats<kwcoco.coco_dataset.MixinCocoStats.stats>` - Compute summary statistics to describe the dataset at a high level
  * :func:`kwcoco.CocoDataset.validate<kwcoco.coco_dataset.MixinCocoStats.validate>` - Performs checks on this coco dataset.
 
-CocoDataset methods (via MixinCocoDepricate)
+CocoDataset methods (via MixinCocoDeprecate)
 ********************************************
 
- * :func:`kwcoco.CocoDataset.category_annotation_type_frequency<kwcoco.coco_dataset.MixinCocoDepricate.category_annotation_type_frequency>` - DEPRECATED
- * :func:`kwcoco.CocoDataset.imread<kwcoco.coco_dataset.MixinCocoDepricate.imread>` - DEPRECATED: use load_image or delayed_image
- * :func:`kwcoco.CocoDataset.keypoint_annotation_frequency<kwcoco.coco_dataset.MixinCocoDepricate.keypoint_annotation_frequency>` - DEPRECATED
+ * :func:`kwcoco.CocoDataset.category_annotation_type_frequency<kwcoco.coco_dataset.MixinCocoDeprecate.category_annotation_type_frequency>` - DEPRECATED
+ * :func:`kwcoco.CocoDataset.imread<kwcoco.coco_dataset.MixinCocoDeprecate.imread>` - DEPRECATED: use load_image or delayed_image
+ * :func:`kwcoco.CocoDataset.keypoint_annotation_frequency<kwcoco.coco_dataset.MixinCocoDeprecate.keypoint_annotation_frequency>` - DEPRECATED
 
 CocoDataset methods (via MixinCocoAccessors)
 ********************************************
