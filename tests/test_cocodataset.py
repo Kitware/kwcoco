@@ -179,6 +179,27 @@ def test_dump_causes_saved_status():
     assert dset._state['was_saved']
 
 
+def test_img_root_none_does_not_warn():
+    import warnings
+    import kwcoco
+
+    # Some historical code paths wrote this into dataset bodies, e.g. via
+    # CocoDataset.subset().  It is equivalent to leaving img_root unspecified,
+    # so it should not emit the img_root deprecation warning.
+    raw = {
+        'img_root': None,
+        'images': [],
+        'annotations': [],
+        'categories': [],
+    }
+    with warnings.catch_warnings(record=True) as records:
+        warnings.simplefilter('always')
+        dset = kwcoco.CocoDataset(raw)
+    messages = [str(record.message) for record in records]
+    assert not any('img_root' in message for message in messages)
+    assert dset.bundle_dpath is not None
+
+
 def test_ensure_video_does_not_duplicate():
     import kwcoco
 

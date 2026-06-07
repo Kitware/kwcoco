@@ -6843,21 +6843,24 @@ class CocoDataset(
         # bundle_dpath
         # TODO: deprecate img_root
         if isinstance(data, dict) and 'img_root' in data:
-            ub.schedule_deprecation(
-                'kwcoco',
-                name='img_root',
-                type='dataset member',
-                deprecate='0.6.3',
-                error='1.0.0',
-                remove='1.1.0',
-                migration=ub.paragraph(
-                    """
-                    Ensure the location of the saved kwcoco file encodes the
-                    bundle dpath or ensure bundle_dpath is correctly set in the
-                    in-memory CocoDataset object.
-                    """
-                ),
-            )
+            # Historical code paths may have serialized ``img_root`` with a
+            # null value. Treat that as unspecified and avoid warning for it.
+            if data.get('img_root', None) is not None:
+                ub.schedule_deprecation(
+                    'kwcoco',
+                    name='img_root',
+                    type='dataset member',
+                    deprecate='0.6.3',
+                    error='1.0.0',
+                    remove='1.1.0',
+                    migration=ub.paragraph(
+                        """
+                        Ensure the location of the saved kwcoco file encodes the
+                        bundle dpath or ensure bundle_dpath is correctly set in the
+                        in-memory CocoDataset object.
+                        """
+                    ),
+                )
             # allow image root to be specified in the dataset
             # we refer to this as a json data "body root".
             body_root = data.get('img_root', '')
