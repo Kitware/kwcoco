@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Reworked image association in detection metrics to reuse segmentation metrics code. The "name" is now used as the primary key, but fallbacks to older image id and filename methods are still supported.
 * Rework how special-cased labelme __metadata__ data is stored, use the COCO caption convention.
 * Started to breakup the `coco_dataset.py` monolith into a `_dataset_components` submodule.
+* Update finish-install to use UV and detect pipconf issues.
 
 ### Added
 * Add experimental `kwcoco.metrics.assignment_v2` candidate-index assignment prototype for reusable multi-IoU confusion-vector construction.

@@ -1,7 +1,8 @@
-from __future__ import annotations
-
 #!/usr/bin/env python3
 # PYTHON_ARGCOMPLETE_OK
+from __future__ import annotations
+import os
+import sys
 import scriptconfig as scfg
 import ubelt as ub
 
@@ -31,6 +32,13 @@ class FinishInstallCLI(scfg.DataConfig):
     )
 
     strict = scfg.Value(False, isflag=True, help='if True, use strict versions')
+    prefer_uv = scfg.Value(
+        True, isflag=True, help='if True, use uv if it is available'
+    )
+    isolated_installer = scfg.Value(
+        False, isflag=True,
+        help='if True, ignore ambient installer environment/config'
+    )
 
     @classmethod
     def main(FinishInstallCLI, cmdline=1, **kwargs):
@@ -43,7 +51,6 @@ class FinishInstallCLI(scfg.DataConfig):
             >>> main(cmdline=cmdline, **kwargs)
         """
         import rich
-        import sys
 
         config = FinishInstallCLI.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
         rich.print('config = ' + ub.urepr(config, nl=1))  # type: ignore
@@ -55,9 +62,9 @@ class FinishInstallCLI(scfg.DataConfig):
                 '--find-links',
                 'https://girder.github.io/large_image_wheels',
             ]
-            ub.cmd(
-                [sys.executable, '-m', 'pip', 'install'] + options + requirements,
-                verbose=3,
+            _python_package_install(
+                requirements, options, prefer_uv=config.prefer_uv,
+                isolated=config.isolated_installer,
             )
 
         if config.with_cv2_headless:
@@ -68,9 +75,9 @@ class FinishInstallCLI(scfg.DataConfig):
             options = [
                 '--prefer-binary',
             ]
-            ub.cmd(
-                [sys.executable, '-m', 'pip', 'install'] + options + requirements,
-                verbose=3,
+            _python_package_install(
+                requirements, options, prefer_uv=config.prefer_uv,
+                isolated=config.isolated_installer,
             )
 
         want_system_exes = [
@@ -83,6 +90,71 @@ class FinishInstallCLI(scfg.DataConfig):
         request_system_executables(want_system_exes)
 
 
+def _python_package_install(requirements, options=(), prefer_uv=True, isolated=False):
+    """
+    Install Python packages into the current interpreter environment.
+
+    Uses ``uv pip install`` if requested and available, otherwise falls back to
+    ``python -m pip install``. Uses ``ub.cmd(..., verbose=3)`` so failures show
+    the exact command and subprocess output.
+    """
+    if not requirements:
+        return
+
+    uv_exe = ub.find_exe('uv') if prefer_uv else None
+    use_uv = uv_exe is not None
+
+    if use_uv:
+        # uv's pip interface is mostly compatible with pip, but it does not
+        # need pip's --prefer-binary flag. Target sys.executable explicitly so
+        # we install into the environment that invoked this script.
+        options = [opt for opt in options if opt != '--prefer-binary']
+        command = [uv_exe]
+        if isolated:
+            command.append('--no-config')
+        command += ['pip', 'install', '--python', sys.executable]
+    else:
+        command = [sys.executable, '-m', 'pip', 'install']
+
+    command += list(options) + list(requirements)
+
+    env = None
+    if isolated:
+        env = os.environ.copy()
+        for key in list(env):
+            if key.startswith('PIP_') or (use_uv and key.startswith('UV_')):
+                env.pop(key)
+        if use_uv:
+            env['UV_NO_PYTHON_DOWNLOADS'] = '1'
+        else:
+            env['PIP_CONFIG_FILE'] = os.devnull
+
+    info = ub.cmd(command, verbose=3, env=env, check=False)
+    if info['ret'] != 0:
+        _handle_installer_failure(info, isolated=isolated)
+
+
+def _handle_installer_failure(info, isolated=False):
+    text = '\n'.join([
+        str(info.get('out', '')),
+        str(info.get('err', '')),
+    ])
+    if (not isolated and
+            'does not provide upload-time metadata' in text):
+        raise RuntimeError(
+            'Installer failed because an ambient pip option appears to require '
+            'upload-time metadata, but the configured index / --find-links page '
+            'does not provide it. This can happen when PIP_UPLOADED_PRIOR_TO '
+            'or a matching pip config option is set. Re-run this command with '
+            '--isolated_installer=True to ignore ambient installer configuration.'
+        )
+    raise RuntimeError(
+        'Installer failed with exit code {}. See command output above.'.format(
+            info['ret']
+        )
+    )
+
+
 def request_system_executables(want_system_exes):
     missing = []
     for exe in want_system_exes:
@@ -90,15 +162,17 @@ def request_system_executables(want_system_exes):
         if found is None:
             missing.append(exe)
     if missing:
-        print('Warning: missing system packages: {missing}')
+        print(f'Warning: missing system packages: {missing}')
 
 
 def get_optional_requirements(name, strict=False):
     try:
         from kwcoco.rc.registry import requirement_path
-    except Exception:
-        raise
-        requirement_path = None
+    except Exception as ex:
+        raise RuntimeError(
+            f'Cannot locate optional requirement file {name!r}. '
+            'Is kwcoco importable from this environment?'
+        ) from ex
     req_path = requirement_path(name)
     requirements = parse_requirements(
         req_path, versions='strict' if strict else 'loose'
