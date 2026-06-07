@@ -129,7 +129,7 @@ def _python_package_install(requirements, options=(), prefer_uv=True, isolated=F
         else:
             env['PIP_CONFIG_FILE'] = os.devnull
 
-    info = ub.cmd(command, verbose=3, env=env, check=False)
+    info = ub.cmd(command, verbose=3, env=env, check=False)  # type: ignore
     if info['ret'] != 0:
         _handle_installer_failure(info, isolated=isolated)
 
