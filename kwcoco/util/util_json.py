@@ -16,7 +16,7 @@ from typing import NamedTuple, Tuple, Any, Union
 import typing
 
 if typing.TYPE_CHECKING:
-    from typing import Dict, List, Union
+    from typing import Dict, List
     from collections.abc import Generator
 
 # backwards compat

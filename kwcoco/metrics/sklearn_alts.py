@@ -1,13 +1,12 @@
 """
-from __future__ import annotations
-
 Faster pure-python versions of sklearn functions that avoid expensive checks
 and label rectifications. It is assumed that all labels are consecutive
 non-negative integers.
 """
-
+from __future__ import annotations
 from scipy.sparse import coo_matrix
 import numpy as np
+from typing import Any
 
 
 def confusion_matrix(y_true, y_pred, n_labels=None, labels=None, sample_weight=None):
@@ -121,7 +120,6 @@ def _binary_clf_curve2(y_true, y_score, pos_label=None, sample_weight=None):
     from sklearn.utils import column_or_1d
     from sklearn.utils import check_consistent_length
     from sklearn.utils.multiclass import type_of_target
-    from sklearn.utils.extmath import stable_cumsum
 
     # Check to make sure y_true is valid
     y_type = type_of_target(y_true)
@@ -193,11 +191,56 @@ def _binary_clf_curve2(y_true, y_score, pos_label=None, sample_weight=None):
     threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
 
     # accumulate the true positives with decreasing threshold
-    tps = stable_cumsum(y_true * weight)[threshold_idxs]
+    tps = _stable_cumsum(y_true * weight)[threshold_idxs]
     if sample_weight is not None:
         # express fps as a cumsum to ensure fps is increasing even in
         # the presence of floating point errors
-        fps = stable_cumsum((1 - y_true) * weight)[threshold_idxs]
+        fps = _stable_cumsum((1 - y_true) * weight)[threshold_idxs]
     else:
         fps = 1 + threshold_idxs - tps
     return fps, tps, y_score[threshold_idxs]
+
+
+def _stable_cumsum(arr: Any) -> np.ndarray:
+    """
+    Compatibility shim for sklearn.utils.extmath.stable_cumsum.
+
+    Prefer NumPy's Array-API-compatible cumulative_sum when available. This
+    requires NumPy >= 2.1. On older NumPy versions, fall back to sklearn's
+    stable_cumsum. If that fallback warns or fails, the environment is outside
+    the supported compatibility matrix and should be fixed by adjusting
+    dependency versions.
+
+    Example:
+        >>> from kwcoco.metrics.sklearn_alts import *  # NOQA
+        >>> from kwcoco.metrics.sklearn_alts import _binary_clf_curve2, _stable_cumsum
+        >>> import numpy as np
+        >>> arr = [1, 2, 3, 4]
+        >>> result = _stable_cumsum(arr)
+        >>> assert isinstance(result, np.ndarray)
+        >>> assert np.allclose(result, [1, 3, 6, 10])
+
+    Example:
+        >>> # Regression: callers use NumPy fancy indexing on the result.
+        >>> arr = [1, 2, 3, 4]
+        >>> threshold_idxs = np.array([0, 2, 3])
+        >>> result = _stable_cumsum(arr)[threshold_idxs]
+        >>> assert np.allclose(result, [1, 6, 10])
+
+    Example:
+        >>> # Match the ROC code path where boolean labels are multiplied
+        >>> # by a scalar sample weight.
+        >>> y_true = np.array([True, True, False, True])
+        >>> weight = 1.0
+        >>> threshold_idxs = np.array([0, 2, 3])
+        >>> result = _stable_cumsum(y_true * weight)[threshold_idxs]
+        >>> assert np.allclose(result, [1, 2, 3])
+    """
+    arr = np.asarray(arr)
+    numpy_cumulative_sum = getattr(np, 'cumulative_sum', None)
+    if numpy_cumulative_sum is not None:
+        result = numpy_cumulative_sum(arr, dtype=np.float64)
+    else:
+        from sklearn.utils.extmath import stable_cumsum
+        result = stable_cumsum(arr)
+    return result
