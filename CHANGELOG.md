@@ -12,6 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * The `classes_of_interest` parameter to evaluate_detections now uses coercable YAML as input. Previous input formats were not reliable. This could result in minor breaking changes.
 * Reworked image association in detection metrics to reuse segmentation metrics code. The "name" is now used as the primary key, but fallbacks to older image id and filename methods are still supported.
 * Rework how special-cased labelme __metadata__ data is stored, use the COCO caption convention.
+* Started to breakup the `coco_dataset.py` monolith into a `_dataset_components` submodule.
 
 ### Added
 * Add experimental `kwcoco.metrics.assignment_v2` candidate-index assignment prototype for reusable multi-IoU confusion-vector construction.
