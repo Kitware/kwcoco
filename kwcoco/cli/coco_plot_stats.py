@@ -127,8 +127,6 @@ def prep_plots(src, plots_dpath=None, options=None, dpi=300):
     with ub.Timer(label='Loading kwcoco file') as load_timer:
         dset = kwcoco.CocoDataset.coerce(src)
 
-    scalar_stats, tables_data, nonsaved_data, dataframes = build_stats_data(dset)
-
     cache_dpath = ub.Path(dset.fpath).absolute().parent / '_cache'
     cacher = ub.Cacher('stats', depends=dset._cached_hashid(), dpath=cache_dpath)
     loaded = cacher.tryload()
@@ -170,7 +168,6 @@ def run(config):
     dst_dpath = dst_dpath.absolute()
     dst_dpath.ensuredir()
     plots_dpath = dst_dpath / 'annot_stat_plots'
-    tables_fpath = dst_dpath / 'stats_tables.json'
     tables_fpath = dst_dpath / 'stats_tables.json'
 
     from kwcoco.util.util_rich import rich_print
@@ -239,7 +236,6 @@ def run(config):
     # Write manifest of all data written to disk
     summary_data = {}
     if proc_context is not None:
-        proc_context.stop()
         obj = proc_context.stop()
         obj = kwutil.Json.ensure_serializable(obj)
         summary_data['info'] = [obj]
@@ -472,7 +468,7 @@ def build_stats_data(dset):
                 'annot_id': annots.ids,
                 'image_id': annots.image_id,
                 'box_rt_area': np.sqrt(boxes.area.ravel()),
-                'box_width': box_height,
+                'box_width': box_width,
                 'box_height': box_height,
                 'rel_box_width': box_width / box_canvas_width,
                 'rel_box_height': box_height / box_canvas_height,

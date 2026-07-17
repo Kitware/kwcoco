@@ -270,3 +270,39 @@ def test_assignment_v2_exact_iou_threshold_matches_v1():
     assert _row_signature(y2) == _row_signature(y1)
     assert y2['txs'] == [-1, 0]
     assert y2['pxs'] == [0, -1]
+
+
+def test_assignment_v2_default_compat_matches_v1():
+    import kwimage
+    import numpy as np
+
+    from kwcoco.metrics.assignment import _assign_confusion_vectors
+    from kwcoco.metrics.assignment_v2 import assign_confusion_vectors_v2
+
+    true_dets = kwimage.Detections(
+        boxes=kwimage.Boxes(np.array([[0, 0, 10, 10]]), 'xywh'),
+        class_idxs=np.array([0]),
+    )
+    pred_dets = kwimage.Detections(
+        boxes=kwimage.Boxes(np.array([[0, 0, 10, 10]]), 'xywh'),
+        class_idxs=np.array([1]),
+        scores=np.array([0.9]),
+    )
+
+    y1 = _assign_confusion_vectors(
+        true_dets,
+        pred_dets,
+        iou_thresh=0.5,
+        ignore_classes=None,
+    )
+    y2 = assign_confusion_vectors_v2(
+        true_dets,
+        pred_dets,
+        iou_thresh=0.5,
+        ignore_classes=None,
+        spatial_threshold=None,
+    )
+
+    assert _row_signature(y2) == _row_signature(y1)
+    assert y2['txs'] == [0]
+    assert y2['pxs'] == [0]

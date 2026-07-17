@@ -68,7 +68,7 @@ class MixinCocoStats:
         )
         return catname_to_nannots
 
-    def conform(self, **config: Any) -> None:
+    def conform(self, **config: Any):
         """
         Make the COCO file conform a stricter spec, infers attributes where
         possible.
@@ -169,7 +169,7 @@ class MixinCocoStats:
                     for frame_index, img in enumerate(images.objs):
                         img['frame_id'] = frame_index
                 # mmdet wants the instance_id property
-                for ann in enumerate(self.dataset['annotations']):  # type: ignore
+                for ann in self.dataset['annotations']:  # type: ignore
                     if 'track_id' in ann:
                         ann['instance_id'] = ann['track_id']  # type: ignore
 

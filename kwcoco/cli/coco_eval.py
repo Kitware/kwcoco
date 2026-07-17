@@ -131,7 +131,7 @@ def main(cmdline=True, **kw):
 
     out_dpath = ub.Path(cli_config['out_dpath'])
 
-    if cli_config['out_dpath'] == 'auto':
+    if cli_config['out_fpath'] == 'auto':
         metrics_fpath = out_dpath / 'metrics.json'
     else:
         metrics_fpath = ub.Path(cli_config['out_fpath'])
@@ -381,4 +381,4 @@ if __name__ == '__main__':
         --pred_dataset=$HOME/.cache/kwcoco/tests/eval/pred.mscoco.json \
         --out_dpath=$HOME/.cache/kwcoco/tests/eval/out
     """
-    __cli__._main()  # type: ignore
+    __cli__.main()  # type: ignore

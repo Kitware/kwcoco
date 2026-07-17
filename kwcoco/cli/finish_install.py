@@ -158,7 +158,7 @@ def _handle_installer_failure(info, isolated=False):
 def request_system_executables(want_system_exes):
     missing = []
     for exe in want_system_exes:
-        found = ub.find_path(exe)
+        found = ub.find_exe(exe)
         if found is None:
             missing.append(exe)
     if missing:

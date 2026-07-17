@@ -58,6 +58,9 @@ class MixinCocoDraw:
 
         canvas = delayed.finalize()
         canvas = _normalize_intensity_if_needed(canvas)
+        # OpenCV's drawing primitives require an 8-bit image. In particular,
+        # OpenCV 5 rejects float canvases when rendering annotation labels.
+        canvas = kwimage.ensure_uint255(canvas)
 
         # Get annotation IDs from this image
         aids = self.index.gid_to_aids[gid]  # type: ignore
@@ -435,8 +438,10 @@ def _normalize_intensity_if_needed(canvas: Any) -> Any:
 
     max_value = canvas.max()
     min_value = canvas.min()
-    if canvas.dtype.kind in ['u', 'i'] and max_value > 255 or min_value < 0:
-        canvas = kwimage.normalize_intensity(canvas)
-    elif max_value > 0 or min_value < 0:
+    if canvas.dtype.kind in ['u', 'i']:
+        needs_normalization = min_value < 0 or max_value > 255
+    else:
+        needs_normalization = min_value < 0 or max_value > 1
+    if needs_normalization:
         canvas = kwimage.normalize_intensity(canvas)
     return canvas

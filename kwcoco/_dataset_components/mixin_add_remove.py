@@ -771,16 +771,12 @@ class MixinCocoAddRemove:
         Example:
             >>> import kwcoco
             >>> self = kwcoco.CocoDataset.demo()
-            >>> aids_or_anns = [self.anns[2], 3, 4, self.anns[1]]
-            >>> self.remove_annotations(aids_or_anns)
-            >>> assert len(self.dataset['annotations']) == 7
+            >>> aid = 2
+            >>> self.remove_annotation(aid)
+            >>> assert len(self.dataset['annotations']) == 10
             >>> self._check_integrity()
         """
-        # Do the simple thing, its O(n) anyway,
-        remove_ann = self._resolve_to_ann(aid_or_ann)  # type: ignore
-        self.dataset['annotations'].remove(remove_ann)  # type: ignore
-        self.index.clear()  # type: ignore
-        self._invalidate_hashid(['annotations'])  # type: ignore
+        self.remove_annotations([aid_or_ann])
 
     def remove_annotations(
         self, aids_or_anns: Any, verbose: int = 0, safe: bool = True

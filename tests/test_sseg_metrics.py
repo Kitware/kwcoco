@@ -65,7 +65,6 @@ def test_single_image_sseg_with_weights():
     if 1:
         pred_coco = base_pred_coco.copy()
         pred_coco.remove_annotation(pred_coco_img.annots().objs[0]['id'])
-        pred_coco.rebuild_index()
 
         pred_coco_img = pred_coco.images()[0:1].coco_images[0]
 
@@ -116,7 +115,6 @@ def test_single_image_sseg_with_weights():
         pred_coco = base_pred_coco.copy()
         pred_coco_img = pred_coco.images()[0:1].coco_images[0]
         pred_coco.remove_annotation(pred_coco_img.annots().objs[1]['id'])
-        pred_coco.rebuild_index()
 
         # Create a dummy heatmap based on annotations
         height, width = pred_coco_img.img['height'], pred_coco_img.img['width']

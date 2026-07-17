@@ -7,7 +7,7 @@
 ## Build / Packaging
 
 * `setup.py` = authoritative build/install behavior.
-* `pyproject.toml` = metadata + pytest/coverage/mypy hints. Keep in sync when changing deps/options.
+* `pyproject.toml` = metadata + coverage/mypy hints. Keep in sync when changing deps/options.
 * **Python**: min 3.8; CI targets latest CPython too. Avoid upper bounds on Python/deps unless a real break forces it.
 
 ## Layout (high-signal)
@@ -47,7 +47,7 @@
 * Imports: don’t hide missing deps with try/except.
 * **Index integrity**: `CocoDataset` has raw `dataset` + cached `index` (`imgs`, `anns`, mappings, etc.). If you mutate internals, use existing helpers to invalidate/rebuild; avoid manual patching of caches.
 * Bundles/paths: prefer bundle/reroot utilities over manual path edits.
-* Typing: repo ships `.pyi` + `py.typed`; keep stubs/signatures aligned with code.
+* Typing: repo ships inline annotations + `py.typed`; keep signatures aligned with code.
 
 ## Testing / Quality
 

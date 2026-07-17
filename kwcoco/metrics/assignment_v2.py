@@ -518,7 +518,7 @@ def assign_confusion_vectors_v2(
     bg_cidx: int = -1,
     bias: float = 0.0,
     classes=None,
-    compat: str = 'mutex',
+    compat: str = 'all',
     prioritize: str = 'iou',
     ignore_classes='ignore',
     max_dets: int | None = None,

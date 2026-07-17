@@ -144,4 +144,4 @@ if __name__ == '__main__':
     CommandLine:
         python -m kwcoco.cli.coco_union
     """
-    __cli__._main()  # type: ignore
+    __cli__.main()  # type: ignore

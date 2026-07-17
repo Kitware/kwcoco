@@ -73,7 +73,7 @@ class MixinCocoConstructors:
         import kwcoco
 
         if isinstance(key, cls):
-            self = key
+            return key
         if isinstance(key, os.PathLike):
             key = str(key)
         if isinstance(key, str):

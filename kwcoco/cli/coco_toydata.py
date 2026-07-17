@@ -144,4 +144,4 @@ class CocoToyDataCLI(scfg.DataConfig):
 __cli__ = CocoToyDataCLI
 
 if __name__ == '__main__':
-    __cli__._main()  # type: ignore
+    __cli__.main()  # type: ignore

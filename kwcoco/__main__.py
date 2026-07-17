@@ -9,6 +9,7 @@ if __name__ == '__main__':
         python -m kwcoco.coco_stats
         python ~/code/kwcoco/coco_cli/__main__.py
     """
+    import sys
     from kwcoco.cli.__main__ import main
 
-    main()
+    sys.exit(main())

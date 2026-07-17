@@ -21,6 +21,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add channels option to coco stats.
 
 ### Fixed
+* Restore assignment-v2 defaults and hierarchical matching parity with the original assignment implementation.
+* Preserve dataset index integrity when removing a single annotation, and accept `CocoDataset` subclass instances in `coerce`.
+* Populate OpenMMLab `instance_id` values during conform and correct fluent dataset return annotations.
+* Fix direct CLI module entry points, default evaluation output paths, finish-install executable checks, and plot-stat width/cache handling.
 * Fix detection evaluation so ignored truth annotations are not emitted as false negatives after being removed from assignment consideration. This may change classless detection scores for datasets that contain ignored truth regions/classes.
 * Fix detection evaluation crash when inputs are empty
 * Fix degenerate case of AUC to fallback on Youden's J statistic

@@ -263,3 +263,30 @@ def test_boxsize_stats_handles_no_boxes():
 
     with pytest.raises(ValueError, match='without bounding boxes'):
         dset.boxsize_stats(anchors=1)
+
+
+def test_remove_annotation_preserves_index():
+    import kwcoco
+
+    dset = kwcoco.CocoDataset.demo('shapes8')
+    remove_aid = next(iter(dset.anns))
+    remaining_aids = set(dset.anns) - {remove_aid}
+    remaining_gids = set(dset.imgs)
+
+    dset.remove_annotation(remove_aid)
+
+    assert remove_aid not in dset.anns
+    assert set(dset.anns) == remaining_aids
+    assert set(dset.imgs) == remaining_gids
+    dset._check_integrity()
+
+
+def test_coerce_accepts_cocodataset_subclass():
+    import kwcoco
+
+    class DemoCocoDataset(kwcoco.CocoDataset):
+        pass
+
+    dset = DemoCocoDataset()
+    assert DemoCocoDataset.coerce(dset) is dset
+    assert kwcoco.CocoDataset.coerce(dset) is dset
