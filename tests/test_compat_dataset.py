@@ -32,6 +32,7 @@ def test_ensure_image_data_accepts_image_ids_and_coco_url(monkeypatch, tmp_path)
     dset = COCO()
     gid: int = dset.add_image(
         file_name='image.png',
+        url=None,
         coco_url='https://example.com/image.png',
     )
     dset.bundle_dpath = tmp_path

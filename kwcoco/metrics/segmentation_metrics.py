@@ -962,9 +962,11 @@ def draw_chunked_confusion(
     """
     Draw a a sequence of true/pred image predictions
     """
+    if config is None:
+        config = {}
+
     color_labels = ['TN', 'TP', 'FN', 'FP']
 
-    assert config is not None
     score_space = config.get('score_space', 'video')
 
     colors = list(ub.take(CONFUSION_COLOR_SCHEME, color_labels))
@@ -972,9 +974,6 @@ def draw_chunked_confusion(
     # colors = ['black', 'white', 'yellow', 'red']
     color_lut = np.array([kwimage.Color(c).as255() for c in colors])
     # full_classes: kwcoco.CategoryTree = true_coco.object_categories()
-
-    if config is None:
-        config = {}
 
     resolution = config.get('resolution', None)
     draw_legend = config.get('draw_legend', True)

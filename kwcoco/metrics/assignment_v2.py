@@ -92,9 +92,12 @@ class BoxSpatialIndex:
             max_cells_per_box=max_cells_per_box,
         )
 
-    def query(self, box_ltrb: np.ndarray) -> np.ndarray:
+    def query(self, box_ltrb: np.ndarray, bias: float = 0.0) -> np.ndarray:
         """Return candidate true-box indexes whose grid cells overlap a box."""
-        cells = _box_cells(box_ltrb, self.cell_size)
+        query_box = np.asarray(box_ltrb, dtype=float)
+        if bias > 0:
+            query_box = query_box + np.array([-bias, -bias, bias, bias])
+        cells = _box_cells(query_box, self.cell_size)
         if cells is None or len(cells) > self.max_cells_per_box:
             return np.arange(len(self.boxes_ltrb), dtype=int)
         cand = set()
@@ -104,7 +107,7 @@ class BoxSpatialIndex:
             return np.empty(0, dtype=int)
         cand_idxs = np.array(sorted(cand), dtype=int)
         cand_boxes = self.boxes_ltrb[cand_idxs]
-        overlap = _ltrb_intersects(box_ltrb[None, :], cand_boxes)[0]
+        overlap = _ltrb_intersects(box_ltrb[None, :], cand_boxes, bias=bias)[0]
         return cand_idxs[overlap]
 
 
@@ -126,17 +129,19 @@ def _boxes_to_ltrb(boxes) -> np.ndarray:
     return np.asarray(boxes.to_ltrb().data, dtype=float)
 
 
-def _ltrb_intersects(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+def _ltrb_intersects(
+    left: np.ndarray, right: np.ndarray, bias: float = 0.0
+) -> np.ndarray:
     """Return a dense boolean matrix indicating box intersection."""
     left = np.asarray(left, dtype=float)
     right = np.asarray(right, dtype=float)
     if len(left) == 0 or len(right) == 0:
         return np.empty((len(left), len(right)), dtype=bool)
     return (
-        (left[:, None, 0] < right[None, :, 2])
-        & (left[:, None, 2] > right[None, :, 0])
-        & (left[:, None, 1] < right[None, :, 3])
-        & (left[:, None, 3] > right[None, :, 1])
+        (left[:, None, 0] < right[None, :, 2] + bias)
+        & (left[:, None, 2] + bias > right[None, :, 0])
+        & (left[:, None, 1] < right[None, :, 3] + bias)
+        & (left[:, None, 3] + bias > right[None, :, 1])
     )
 
 
@@ -151,7 +156,7 @@ class AssignmentCandidateIndex:
     pairwise overlaps or compatible-class groups.
 
     The candidate graph is deliberately sparse: only candidate pairs with
-    ``iou >= min_iou`` are retained.  For COCO-style AP50:95, ``min_iou=0.5``
+    ``iou > min_iou`` are retained.  For COCO-style AP50:95, ``min_iou=0.5``
     is sufficient for all threshold queries.
     """
 
@@ -304,7 +309,7 @@ class AssignmentCandidateIndex:
             build_stats['dense_pairs_considered'] += dense_pair_count
             ious = pred_dets.boxes[pred_idxs].ious(true_dets.boxes[true_idxs], bias=bias)
             for px, row in zip(pred_idxs, ious):
-                keep = row >= min_iou
+                keep = row > min_iou
                 if np.any(keep):
                     txs = true_idxs[keep]
                     iou_vals = np.asarray(row[keep], dtype=float)
@@ -388,7 +393,7 @@ class AssignmentCandidateIndex:
             chosen_tx = -1
             chosen_iou = -1.0
             if len(txs):
-                valid = (ious >= iou_thresh) & true_available[txs]
+                valid = (ious > iou_thresh) & true_available[txs]
                 if np.any(valid):
                     # Candidate arrays are already sorted by descending IoU.
                     chosen_pos = int(np.where(valid)[0][0])
@@ -403,7 +408,12 @@ class AssignmentCandidateIndex:
                     weight = float(self.true_dets.weights[chosen_tx])  # type: ignore
                 else:
                     weight = 1.0
-                y_pred.append(pred_cx)
+                assigned_pred_cx = pred_cx
+                if self.compat == 'ancestors':
+                    # Preserve v1 hierarchical scoring: a finer prediction
+                    # matched to an ancestor truth is scored as that ancestor.
+                    assigned_pred_cx = true_cx
+                y_pred.append(assigned_pred_cx)
                 y_true.append(true_cx)
                 y_score.append(score)
                 y_weight.append(weight)
@@ -479,7 +489,7 @@ def _populate_sparse_candidates(
     used_any = False
     build_stats['spatial_blocks'] += 1
     for px in pred_idxs:
-        local_txs = index.query(pred_ltrb[int(px)])
+        local_txs = index.query(pred_ltrb[int(px)], bias=bias)
         if len(local_txs) == 0:
             continue
         global_txs = true_idxs[local_txs]
@@ -487,7 +497,7 @@ def _populate_sparse_candidates(
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='invalid .* true_divide')
             row = pred_dets.boxes[[int(px)]].ious(true_dets.boxes[global_txs], bias=bias)[0]
-        keep = row >= min_iou
+        keep = row > min_iou
         if np.any(keep):
             txs = global_txs[keep]
             iou_vals = np.asarray(row[keep], dtype=float)

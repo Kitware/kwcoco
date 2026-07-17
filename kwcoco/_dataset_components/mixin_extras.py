@@ -213,7 +213,9 @@ class MixinCocoExtras:
         imgs: Iterable[dict] = _coerce_img_iter(gids)
 
         for img in ub.ProgIter(imgs, desc='ensure image data', verbose=verbose):
-            url: str | None = img.get('url', img.get('coco_url', None))
+            url: str | None = img.get('url')
+            if url is None:
+                url = img.get('coco_url')
             if url is not None:
                 if _has_download_permission():
                     gpath = join(self.bundle_dpath, img['file_name'])
