@@ -87,7 +87,18 @@ class MixinCocoDraw:
             anns, classes=classes, cats=cats, kp_classes=kp_classes
         )
 
-        canvas = dets.draw_on(canvas)
+        # Segmentation drawing uses alpha compositing, which may promote an
+        # otherwise uint8 canvas to float. OpenCV 5 requires uint8 input for
+        # label text, so finish the segmentation pass first, restore the
+        # display dtype, and then draw boxes, labels, and keypoints.
+        if dets.data.get('segmentations', None) is not None:
+            canvas = dets.draw_on(
+                canvas, boxes=False, kpts=False, labels=False
+            )
+            canvas = kwimage.ensure_uint255(canvas)
+            canvas = dets.draw_on(canvas, sseg=False)
+        else:
+            canvas = dets.draw_on(canvas)
         return canvas
 
     def show_image(

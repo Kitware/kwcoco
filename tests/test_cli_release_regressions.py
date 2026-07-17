@@ -49,6 +49,7 @@ def test_coco_eval_auto_output_path(monkeypatch, tmp_path):
     class FakeEvaluator:
         def __init__(self, config):
             self.config = config
+            self.true_extra = {}
 
         def _init(self):
             pass
