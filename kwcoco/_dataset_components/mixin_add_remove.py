@@ -119,6 +119,7 @@ class MixinCocoAddRemove:
         """
         index = self.index  # type: ignore
 
+        norm_file_name: Any
         try:
             norm_file_name = os.fspath(file_name)  # type: ignore
         except TypeError:
@@ -134,7 +135,7 @@ class MixinCocoAddRemove:
         if id is None:
             id = self._next_ids.get('images')  # type: ignore
 
-        img = dict()
+        img: dict[str, Any] = {}
         img['id'] = int(id)
         img['file_name'] = norm_file_name
         img.update(**kw)
@@ -314,7 +315,7 @@ class MixinCocoAddRemove:
         elif self.anns and id in self.anns:  # type: ignore
             raise IndexError('Annot id={} already exists'.format(id))
 
-        ann = dict()
+        ann: dict[str, Any] = {}
         ann['id'] = int(id)
         ann['image_id'] = int(image_id)
         ann['category_id'] = None if category_id is None else int(category_id)
@@ -401,7 +402,7 @@ class MixinCocoAddRemove:
                 'Category id={} already exists'.format(id)
             )
 
-        cat = dict()
+        cat: dict[str, Any] = {}
         cat['id'] = int(id)
         cat['name'] = str(name)
         if supercategory:
@@ -464,7 +465,7 @@ class MixinCocoAddRemove:
         elif index.tracks and id in index.tracks:
             raise exceptions.DuplicateAddError('Track id={} already exists'.format(id))
 
-        track = dict()
+        track: dict[str, Any] = {}
         track['id'] = int(id)
         track['name'] = str(name)
         track.update(**kw)
@@ -803,7 +804,7 @@ class MixinCocoAddRemove:
             >>> assert len(self.dataset['annotations']) == prev_n_annots - 4
             >>> self._check_integrity()
         """
-        remove_info = {'annotations': None}
+        remove_info: dict[str, Any] = {'annotations': None}
         # Do nothing if given no input
         if aids_or_anns:
             # build mapping from aid to index O(n)
@@ -863,20 +864,22 @@ class MixinCocoAddRemove:
             >>> assert len(self.dataset['categories']) == 5
             >>> self._check_integrity()
         """
-        remove_info = {'annotations': None, 'categories': None}
+        remove_info: dict[str, Any] = {
+            'annotations': None, 'categories': None
+        }
         if cat_identifiers:
             if verbose > 1:
                 print('Removing annots of removed categories')
 
             if safe:
-                remove_cids = set()
+                remove_cid_set: set[int] = set()
                 for identifier in cat_identifiers:
                     try:
                         cid = self._resolve_to_cid(identifier)  # type: ignore
-                        remove_cids.add(cid)
+                        remove_cid_set.add(cid)
                     except Exception:
                         pass
-                remove_cids = sorted(remove_cids)
+                remove_cids = sorted(remove_cid_set)
             else:
                 remove_cids = list(map(self._resolve_to_cid, cat_identifiers))  # type: ignore
             # First remove any annotation that belongs to those categories
@@ -952,20 +955,20 @@ class MixinCocoAddRemove:
             >>> assert len(self.dataset['tracks']) == 1
             >>> self._check_integrity()
         """
-        remove_info = {'annotations': None, 'tracks': None}
+        remove_info: dict[str, Any] = {'annotations': None, 'tracks': None}
         if track_identifiers:
             if verbose > 1:
                 print('Removing annots of removed tracks')
 
             if safe:
-                remove_trackids = set()
+                remove_trackid_set: set[int] = set()
                 for identifier in track_identifiers:
                     try:
                         trackid = self._resolve_to_trackid(identifier)  # type: ignore
-                        remove_trackids.add(trackid)
+                        remove_trackid_set.add(trackid)
                     except Exception:
                         pass
-                remove_trackids = sorted(remove_trackids)
+                remove_trackids = sorted(remove_trackid_set)
             else:
                 remove_trackids = list(map(self._resolve_to_trackid, track_identifiers))  # type: ignore
 
@@ -1039,7 +1042,7 @@ class MixinCocoAddRemove:
             >>> assert len(self.dataset['images']) == 0
             >>> self._check_integrity()
         """
-        remove_info = {'annotations': None, 'images': None}
+        remove_info: dict[str, Any] = {'annotations': None, 'images': None}
         if gids_or_imgs:
             if verbose > 1:
                 print('Removing images')
@@ -1103,7 +1106,9 @@ class MixinCocoAddRemove:
             >>> assert len(self.dataset['videos']) == 7
             >>> self._check_integrity()
         """
-        remove_info = {'annotations': None, 'images': None, 'videos': None}
+        remove_info: dict[str, Any] = {
+            'annotations': None, 'images': None, 'videos': None
+        }
         if vidids_or_videos:
             if verbose > 1:
                 print('Removing videos')
@@ -1195,7 +1200,9 @@ class MixinCocoAddRemove:
             >>> # assert remove_info == {'keypoint_categories': 2, 'annotation_keypoints': 16, 'reflection_ids': 1}
             >>> assert self._resolve_to_kpcat('right_eye')['reflection_id'] is None
         """
-        remove_info = {'keypoint_categories': None, 'annotation_keypoints': None}
+        remove_info: dict[str, Any] = {
+            'keypoint_categories': None, 'annotation_keypoints': None
+        }
         remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))  # type: ignore
 
         # This is expensive, should make it optional.

@@ -56,7 +56,7 @@ References:
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, IO
+from typing import TYPE_CHECKING, Any, IO, cast
 
 import copy
 import sys
@@ -224,6 +224,16 @@ class CocoDataset(
         >>> plt.show()
     """
 
+    dataset: dict[str, Any]
+    index: CocoIndex
+    _fpath: str | PathLike | None
+    bundle_dpath: str
+    assets_dpath: str | None
+    cache_dpath: str | None
+    hashid: str | None
+    hashid_parts: Any
+    tag: str | None
+
     def __init__(
         self,
         data: str | PathLike | dict | None = None,
@@ -290,7 +300,7 @@ class CocoDataset(
                 'info': [],
             }
 
-        fpath = None
+        fpath: str | PathLike | None = None
         inferred_date_type = None
         if isinstance(data, dict):
             # Assumption: If data is a dict and are not explicitly given
@@ -471,7 +481,7 @@ class CocoDataset(
         self.hashid_parts = None
 
         self.tag = tag
-        self.dataset = data
+        self.dataset = cast(dict[str, Any], data)
 
         self.data_fpath = fpath
         self.bundle_dpath = bundle_dpath
@@ -681,7 +691,7 @@ class CocoDataset(
                     arcname = arcname[:-4]
                     if not arcname.endswith('.json'):
                         arcname = arcname + '.json'
-        with zipfile.ZipFile(file, 'w', **zipkw) as zfile:
+        with zipfile.ZipFile(file, 'w', **zipkw) as zfile:  # type: ignore
             # It would be nice if we could dump directly to a binary
             # encoded format here. Then we could use self.dump(zfile.open())
             text = self.dumps(indent=indent, newlines=newlines)
@@ -829,7 +839,7 @@ class CocoDataset(
         from kwcoco.util.util_json import find_json_unserializable
 
         bad_parts_gen = find_json_unserializable(self.dataset)
-        bad_parts = []
+        bad_parts: list[Any] = []
         for part in bad_parts_gen:
             if verbose == 3:
                 print('part = {!r}'.format(part))
@@ -913,10 +923,10 @@ class CocoDataset(
         one_to_many1: dict = self.index.trackid_to_aids  # type: ignore
         one_to_many2: dict = new.index.trackid_to_aids  # type: ignore
 
-        missing2 = ub.dict_diff(one_to_many1, one_to_many2)
-        missing1 = ub.dict_diff(one_to_many2, one_to_many1)
-        common1 = ub.dict_isect(one_to_many1, one_to_many2)
-        common2 = ub.dict_isect(one_to_many2, one_to_many1)
+        missing2: dict[Any, Any] = ub.dict_diff(one_to_many1, one_to_many2)
+        missing1: dict[Any, Any] = ub.dict_diff(one_to_many2, one_to_many1)
+        common1: dict[Any, Any] = ub.dict_isect(one_to_many1, one_to_many2)
+        common2: dict[Any, Any] = ub.dict_isect(one_to_many2, one_to_many1)
         checks['trackid_to_aids'] = all(
             [
                 all(len(v) == 0 for v in missing1.values()),
@@ -1587,7 +1597,7 @@ class CocoDataset(
             >>> assert len(sub3.anns) == 0
             >>> assert rejoined.basic_stats() == self.basic_stats()
         """
-        new_dataset = dict([(k, []) for k in self.dataset])
+        new_dataset: dict[str, Any] = dict([(k, []) for k in self.dataset])
         new_dataset['categories'] = self.dataset['categories']
         new_dataset['info'] = self.dataset.get('info', [])
         new_dataset['licenses'] = self.dataset.get('licenses', [])
@@ -1623,7 +1633,11 @@ class CocoDataset(
         if 'videos' in self.dataset:
             # TODO: Take only videos with image support?
             vidids = sorted(
-                set(img.get('video_id', None) for img in chosen_imgs) - {None}
+                {
+                    video_id
+                    for img in chosen_imgs
+                    if (video_id := img.get('video_id', None)) is not None
+                }
             )
             chosen_vids = list(ub.take(self.index.videos, vidids))  # type: ignore
             new_dataset['videos'] = chosen_vids

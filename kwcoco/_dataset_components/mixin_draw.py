@@ -315,7 +315,7 @@ class MixinCocoDraw:
                             poly = mpl.patches.Polygon(poly_xys, **polykw)  # type: ignore
                             try:
                                 # hack
-                                poly.area = sseg.to_shapely().area
+                                poly.area = sseg.to_shapely().area  # type: ignore[attr-defined]
                             except Exception:
                                 pass
                             sseg_polys.append(poly)

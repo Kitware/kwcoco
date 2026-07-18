@@ -9,7 +9,7 @@ import os
 import tarfile
 import zipfile
 from os.path import relpath
-from typing import Dict, Tuple, Literal, Iterator
+from typing import cast, Dict, Tuple, Literal, Iterator
 from types import ModuleType
 
 class Archive:
@@ -146,7 +146,7 @@ class Archive:
             file = tarfile.open(fpath, tar_mode)
         else:
             raise NotImplementedError
-        return file, backend
+        return file, cast(ModuleType, backend)
 
     def __iter__(self) -> Iterator[str]:
         return self.names()
@@ -180,7 +180,7 @@ class Archive:
             self.file._check('r')  # type: ignore
             tarinfo = self.file.getmember(name)  # type: ignore
             source = self.file.fileobj  # type: ignore
-            source.seek(tarinfo.offset_data)
+            source.seek(tarinfo.offset_data)  # type: ignore[possibly-missing-attribute]
             bufsize = self.file.copybufsize  # type: ignore
             target = io.BytesIO()
             if tarinfo.sparse is not None:

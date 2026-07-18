@@ -1091,6 +1091,7 @@ class CocoImage(_CocoObject):
             if info.get('chan_construct', None) is not None:
                 include_flag = requested is None
                 if not include_flag:
+                    assert requested is not None
                     if requested.intersection(info['channels']):
                         include_flag = True
                 if include_flag:

@@ -3,7 +3,7 @@ from functools import partial
 from collections import defaultdict
 from kwcoco import exceptions
 from typing import Any
-from typing import MutableMapping, Protocol
+from typing import Mapping, Protocol
 import numbers
 import ubelt as ub
 import warnings
@@ -17,7 +17,8 @@ from kwcoco._helpers import (
 
 # TODO: better generic reusable protocol
 class _CocoIndexParent(Protocol):
-    dataset: MutableMapping[str, Any]
+    @property
+    def dataset(self) -> Mapping[str, Any]: ...
 
 
 class CocoIndex:
@@ -72,6 +73,25 @@ class CocoIndex:
         file_name_to_img (Dict[str, dict]):
             mapping between a image file_name and the image dictionary.
     """
+
+    anns: dict[Any, dict[str, Any]] | None
+    imgs: dict[Any, dict[str, Any]] | None
+    videos: dict[Any, dict[str, Any]] | None
+    cats: dict[Any, dict[str, Any]] | None
+    tracks: dict[Any, dict[str, Any]] | None
+    kpcats: dict[Any, dict[str, Any]] | None
+    _id_lookup: dict[str, dict[Any, dict[str, Any]]] | None
+
+    gid_to_aids: Any
+    cid_to_aids: Any
+    vidid_to_gids: Any
+    trackid_to_aids: Any
+
+    name_to_video: dict[str, dict[str, Any]] | None
+    name_to_cat: dict[str, dict[str, Any]] | None
+    name_to_img: dict[str, dict[str, Any]] | None
+    name_to_track: dict[str, dict[str, Any]] | None
+    file_name_to_img: dict[str, dict[str, Any]] | None
 
     # _set = ub.oset  # many operations are much slower for oset
     _set = set
@@ -470,10 +490,12 @@ class CocoIndex:
             >>> index.build(parent)
         """
         # create index
-        anns, cats, imgs = {}, {}, {}
-        videos = {}
-        tracks = {}
-        kpcats = {}
+        anns: dict[Any, dict[str, Any]] = {}
+        cats: dict[Any, dict[str, Any]] = {}
+        imgs: dict[Any, dict[str, Any]] = {}
+        videos: dict[Any, dict[str, Any]] = {}
+        tracks: dict[Any, dict[str, Any]] = {}
+        kpcats: dict[Any, dict[str, Any]] = {}
 
         # Build one-to-one index-lookup maps
         for cat in parent.dataset.get('categories', []):
@@ -659,16 +681,16 @@ class CocoIndex:
 
         # Be careful to not apply sorting to trackless annotations
         _notrack_aids = trackid_to_aids.pop(None, None)
-        trackid_to_aids = ub.map_vals(
+        sorted_trackid_to_aids = ub.map_vals(
             index._annots_set_sorted_by_frame_index, trackid_to_aids
         )
         if _notrack_aids is not None:
-            trackid_to_aids[None] = set(_notrack_aids)
+            sorted_trackid_to_aids[None] = set(_notrack_aids)
 
         index.gid_to_aids = gid_to_aids
         index.cid_to_aids = cid_to_aids
         index.vidid_to_gids = vidid_to_gids
-        index.trackid_to_aids = trackid_to_aids
+        index.trackid_to_aids = sorted_trackid_to_aids
 
         index.name_to_cat = {cat['name']: cat for cat in index.cats.values()}
         index.file_name_to_img = {

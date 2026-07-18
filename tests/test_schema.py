@@ -25,7 +25,7 @@ def test_polygon_schema():
     }
     polygon_cases = {}
     for kw in ub.named_product(basis):
-        key = ub.urepr(kw, compact=1)
+        key = ub.urepr(kw, compact=True)
         polykw = ub.compatible(kw, kwimage.Polygon.random)
         poly01 = kwimage.Polygon.random(**polykw, rng=rng)
         if kw['scale'] == 1 and kw['type'].startswith('int'):

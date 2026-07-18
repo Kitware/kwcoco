@@ -208,22 +208,21 @@ def test_assignment_v2_sparse_bias_matches_dense():
         scores=np.array([0.9, 0.8]),
     )
 
-    build_kwargs = {
-        'compat': 'mutex',
-        'bias': 1,
-        'min_iou': 0.3,
-    }
     dense = AssignmentCandidateIndex.build(
         true_dets,
         pred_dets,
         spatial_threshold=None,
-        **build_kwargs,
+        compat='mutex',
+        bias=1,
+        min_iou=0.3,
     )
     sparse = AssignmentCandidateIndex.build(
         true_dets,
         pred_dets,
         spatial_threshold=1,
-        **build_kwargs,
+        compat='mutex',
+        bias=1,
+        min_iou=0.3,
     )
 
     dense_y = dense.assign(0.3, ignore_classes=None)

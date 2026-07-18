@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, IO, TYPE_CHECKING
+from typing import Any, Callable, IO, TYPE_CHECKING, cast
 from functools import partial
 from os.path import exists, join
 import os
@@ -73,7 +73,9 @@ class MixinCocoConstructors:
         import kwcoco
 
         if isinstance(key, cls):
-            return key
+            return cast(
+                'AbstractCocoDataset | CocoDataset | CocoSqlDatabase', key
+            )
         if isinstance(key, os.PathLike):
             key = str(key)
         if isinstance(key, str):
@@ -271,7 +273,7 @@ class MixinCocoConstructors:
                 print('suff_parts = {!r}'.format(suff_parts))
 
             # The allowed suffix patterns and aliases are defined here
-            vidkw = {
+            vidkw: dict[str, Any] = {
                 'render': True,
                 'num_videos': 1,
                 'num_frames': 2,
@@ -297,6 +299,7 @@ class MixinCocoConstructors:
             alias_to_key = {k: v for v, ks in vidkw_aliases.items() for k in ks}
             # These are the variables the vidshapes generator accepts
             for part in suff_parts:
+                value: Any
                 match = re.search(r'[\d]', part)
                 if match is None:
                     value = True
@@ -546,9 +549,9 @@ class MixinCocoConstructors:
         """
         import kwimage
 
-        root = ub.Path(root)
-        subdirs = [child for child in root.glob('*') if child.is_dir()]
-        coco_dset = cls(bundle_dpath=root)  # type: ignore
+        root_path = ub.Path(root)
+        subdirs = [child for child in root_path.glob('*') if child.is_dir()]
+        coco_dset = cls(bundle_dpath=root_path)  # type: ignore
         for subdir in subdirs:
             catname = subdir.name
             cat_id = coco_dset.ensure_category(catname)  # type: ignore

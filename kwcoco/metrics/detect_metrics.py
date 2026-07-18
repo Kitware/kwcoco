@@ -82,6 +82,7 @@ class DetectionMetrics(ub.NiceRepr):
 
     gid_to_true_dets: Dict[int, kwimage.Detections]
     gid_to_pred_dets: Dict[int, kwimage.Detections]
+    _imgname_to_gid: dict[str, int]
 
     def __init__(dmet, classes: kwcoco.CategoryTree | None = None) -> None:
         dmet.classes = classes
@@ -120,8 +121,12 @@ class DetectionMetrics(ub.NiceRepr):
         all_pxs = cfsn_data['pxs']
 
         # Initialize new annotation-id columns to add to confusion vectors
-        cfsn_pred_aids = np.full(len(all_gids), fill_value=-1, dtype=int)
-        cfsn_true_aids = np.full(len(all_gids), fill_value=-1, dtype=int)
+        cfsn_pred_aids: np.ndarray = np.full(
+            len(all_gids), fill_value=-1, dtype=int
+        )
+        cfsn_true_aids: np.ndarray = np.full(
+            len(all_gids), fill_value=-1, dtype=int
+        )
 
         # For each image
         unique_gids, grouped_indexes = kwarray.group_indices(all_gids)
@@ -495,13 +500,13 @@ class DetectionMetrics(ub.NiceRepr):
                 list(y_accum.items()), desc='ndarray convert', verbose=verbose
             ):
                 # Try to use 32 bit types for large evaluation problems
-                kw = dict()
+                dtype = None
                 if k in {'iou', 'score', 'weight'}:
-                    kw['dtype'] = np.float32
+                    dtype = np.float32
                 if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
-                    kw['dtype'] = np.int32
+                    dtype = np.int32
                 try:
-                    _data[k] = np.asarray(v, **kw)
+                    _data[k] = np.asarray(v, dtype=dtype)
                 except TypeError:
                     _data[k] = np.asarray(v)
 
@@ -1503,13 +1508,13 @@ def pycocotools_confusion_vectors(dmet, evaler, iou_thresh=0.5, verbose=0):
             list(y_accum.items()), desc='ndarray convert', verbose=verbose
         ):
             # Try to use 32 bit types for large evaluation problems
-            kw = dict()
+            dtype = None
             if k in {'iou', 'score', 'weight'}:
-                kw['dtype'] = np.float32
+                dtype = np.float32
             if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
-                kw['dtype'] = np.int32
+                dtype = np.int32
             try:
-                _data[k] = np.asarray(v, **kw)
+                _data[k] = np.asarray(v, dtype=dtype)
             except TypeError:
                 _data[k] = np.asarray(v)
 

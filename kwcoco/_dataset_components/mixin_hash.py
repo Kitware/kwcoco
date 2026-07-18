@@ -11,6 +11,9 @@ class MixinCocoHashing:
     Mixin for creating and maintaining hashids (i.e. content identifiers)
     """
 
+    hashid: str | None
+    hashid_parts: Any
+
     def _build_hashid(self, hash_pixels: bool = False, verbose: int = 0) -> str:
         """
         Construct a hash that uniquely identifies the state of this dataset.
@@ -78,7 +81,7 @@ class MixinCocoHashing:
         # info corresponding to each type of data that we track.
         from collections import OrderedDict
 
-        hashid_parts = self.hashid_parts
+        hashid_parts: Any = self.hashid_parts  # type: ignore[has-type]
         if hashid_parts is None:
             hashid_parts = OrderedDict()
 
@@ -202,7 +205,7 @@ class MixinCocoHashing:
             - [ ] Rename to _notify_modification --- or something like that
         """
         self._state['was_modified'] = True  # type: ignore
-        self.hashid = None
+        self.hashid = None  # type: ignore[assignment]
         if parts is not None and self.hashid_parts is not None:
             for part in parts:
                 self.hashid_parts.pop(part, None)

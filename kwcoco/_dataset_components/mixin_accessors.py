@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, cast
 import numbers
 import ubelt as ub
 
@@ -241,7 +241,7 @@ class MixinCocoAccessors:
             resolved_id = id_or_dict
         else:
             resolved_id = id_or_dict['id']
-        return resolved_id
+        return cast(int, resolved_id)
 
     def _resolve_to_cid(self, id_or_name_or_dict: Any) -> int:
         """
@@ -259,7 +259,7 @@ class MixinCocoAccessors:
             resolved_id = self.index.name_to_cat[id_or_name_or_dict]['id']  # type: ignore
         else:
             resolved_id = id_or_name_or_dict['id']
-        return resolved_id
+        return cast(int, resolved_id)
 
     def _resolve_to_gid(self, id_or_name_or_dict: Any) -> int:
         """
@@ -271,7 +271,7 @@ class MixinCocoAccessors:
             resolved_id = self.index.file_name_to_img[id_or_name_or_dict]['id']  # type: ignore
         else:
             resolved_id = id_or_name_or_dict['id']
-        return resolved_id
+        return cast(int, resolved_id)
 
     def _resolve_to_vidid(self, id_or_name_or_dict: Any) -> int:
         """
@@ -283,7 +283,7 @@ class MixinCocoAccessors:
             resolved_id = self.index.name_to_video[id_or_name_or_dict]['id']  # type: ignore
         else:
             resolved_id = id_or_name_or_dict['id']
-        return resolved_id
+        return cast(int, resolved_id)
 
     def _resolve_to_trackid(self, id_or_name_or_dict: Any) -> int:
         if isinstance(id_or_name_or_dict, numbers.Integral):
@@ -292,7 +292,7 @@ class MixinCocoAccessors:
             resolved_id = self.index.name_to_track[id_or_name_or_dict]['id']  # type: ignore
         else:
             resolved_id = id_or_name_or_dict['id']
-        return resolved_id
+        return cast(int, resolved_id)
 
     def _resolve_to_ann(self, aid_or_ann: Any) -> dict:
         """
@@ -427,13 +427,14 @@ class MixinCocoAccessors:
                     )
         elif isinstance(cat_identifier, str):
             cat = self._alias_to_cat(cat_identifier)
+            assert cat is not None
         elif isinstance(cat_identifier, dict):
             cat = cat_identifier
         else:
             raise TypeError(type(cat_identifier))
         return cat
 
-    def _alias_to_cat(self, alias_catname: str) -> dict:
+    def _alias_to_cat(self, alias_catname: str | None) -> dict | None:
         """
         Lookup a coco-category via its name or an "alias" name.
         In production code, use :func:`_resolve_to_cat` instead.

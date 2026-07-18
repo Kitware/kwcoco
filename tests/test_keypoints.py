@@ -83,9 +83,9 @@ def test_keypoint_formats():
     keypoints_variants['new-v2'] = points.to_coco('new-v2')
 
     basis = {
-        'object_class_variant': object_class_variants,
-        'keypoint_class_variant': keypoint_class_variants,
-        'keypoints_variant': keypoints_variants,
+        'object_class_variant': list(object_class_variants),
+        'keypoint_class_variant': list(keypoint_class_variants),
+        'keypoints_variant': list(keypoints_variants),
     }
     grid_items = list(ub.named_product(basis))
     DEBUG = 1
@@ -160,7 +160,7 @@ def test_keypoint_formats():
 
     # Peek at the status for each variant, we likely need to add more checks to
     # ensure everything is working properly
-    print(f'errors = {ub.urepr(errors, nl=1, sv=1)}')
+    print(f'errors = {ub.urepr(errors, nl=1, sv=True)}')
     failed_varaints = {tuple((ub.udict(e) & basis).values()) for e in errors}
     unexpected_failures = failed_varaints - allowfail_variants
     if 1:

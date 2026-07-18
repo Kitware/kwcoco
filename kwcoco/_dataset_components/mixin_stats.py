@@ -286,7 +286,7 @@ class MixinCocoStats:
         """
         dset = self
 
-        result = {
+        result: dict[str, list[Any]] = {
             'errors': [],
             'warnings': [],
         }
@@ -757,7 +757,7 @@ class MixinCocoStats:
             if 'bbox' in ann:
                 cname = self.cats[ann['category_id']]['name']  # type: ignore
                 cname_to_box_sizes[cname].append(ann['bbox'][2:4])
-        cname_to_box_sizes = ub.map_vals(np.array, cname_to_box_sizes)
+        cname_to_box_sizes_arr = ub.map_vals(np.array, cname_to_box_sizes)
 
         def _boxes_info(box_sizes):
             box_info = {'stats': kwarray.stats_dict(box_sizes, axis=0, **statskw)}
@@ -783,7 +783,7 @@ class MixinCocoStats:
 
         if perclass:
             cid_to_info = {}
-            for cname, box_sizes in cname_to_box_sizes.items():
+            for cname, box_sizes in cname_to_box_sizes_arr.items():
                 if verbose:
                     print('compute {} bbox stats'.format(cname))
                 cid_to_info[cname] = _boxes_info(box_sizes)
@@ -791,8 +791,8 @@ class MixinCocoStats:
 
         if verbose:
             print('compute all bbox stats')
-        if cname_to_box_sizes:
-            all_sizes = np.vstack(list(cname_to_box_sizes.values()))
+        if cname_to_box_sizes_arr:
+            all_sizes = np.vstack(list(cname_to_box_sizes_arr.values()))
             all_info = _boxes_info(all_sizes)
         else:
             if anchors:
@@ -859,8 +859,6 @@ class MixinCocoStats:
                 # Add a dummy category to note images without any annotations
                 gid_to_cids[gid].append(-1)
                 all_cids.add(-1)
-
-        all_cids = list(all_cids)
 
         # Solve setcover with different weight schemes to get a better
         # representative sample.

@@ -73,6 +73,8 @@ TODO:
 
 import json
 import numpy as np
+from typing import Any, Dict, Optional, Tuple, Type
+
 import ubelt as ub
 import os
 from os.path import exists, dirname
@@ -86,7 +88,7 @@ from kwcoco.coco_dataset import (  # NOQA
     MixinCocoDraw,
 )
 
-from packaging.version import parse as Version
+from packaging.version import Version
 
 # __docstubs__ = """
 # from typing import TypeVar
@@ -108,10 +110,13 @@ SCHEMA_VERSION = 'v016'
 
 class FallbackCocoBase:
     # Used when sqlalchemy doesn't exist to allow for import without error
-    _decl_class_registry = {}
+    _decl_class_registry: Dict[str, Any] = {}
 
 
-CocoBase: type
+CocoBase: Any
+sqlalchemy_version: Optional[Version]
+JSONVariant: Any
+SQL_ERROR_TYPES: Tuple[Type[Exception], ...]
 
 try:
     from sqlalchemy import __version__ as sqlalchemy_version_str

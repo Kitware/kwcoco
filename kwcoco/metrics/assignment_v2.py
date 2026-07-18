@@ -227,7 +227,9 @@ class AssignmentCandidateIndex:
         else:
             pred_scores = np.ones(len(pred_dets), dtype=float)
         pred_order = np.argsort(-pred_scores, kind='mergesort')
-        pred_rank = np.full(len(pred_dets), fill_value=-1, dtype=int)
+        pred_rank: np.ndarray = np.full(
+            len(pred_dets), fill_value=-1, dtype=int
+        )
         pred_rank[pred_order] = np.arange(len(pred_order))
 
         unique_tcxs = sorted(set(map(int, true_cxs.tolist())))
@@ -264,8 +266,12 @@ class AssignmentCandidateIndex:
                 txs = np.empty(0, dtype=int)
             cx_to_matchable_txs[int(cx)] = txs
 
-        cand_txs = [np.empty(0, dtype=int) for _ in range(len(pred_dets))]
-        cand_ious = [np.empty(0, dtype=float) for _ in range(len(pred_dets))]
+        cand_txs: list[np.ndarray] = [
+            np.empty(0, dtype=int) for _ in range(len(pred_dets))
+        ]
+        cand_ious: list[np.ndarray] = [
+            np.empty(0, dtype=float) for _ in range(len(pred_dets))
+        ]
         build_stats = {
             'dense_blocks': 0,
             'spatial_blocks': 0,
@@ -433,7 +439,7 @@ class AssignmentCandidateIndex:
 
         unused_flags = true_nmatches == 0
         if ignore_classes is not None:
-            unused_flags = unused_flags & ~true_ignore_flags
+            unused_flags = unused_flags & np.logical_not(true_ignore_flags)
         unused_txs = np.where(unused_flags)[0]
         if 'weights' in self.true_dets.data:  # type: ignore
             unused_y_weight = self.true_dets.weights[unused_txs].tolist()  # type: ignore

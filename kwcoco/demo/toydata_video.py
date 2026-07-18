@@ -460,7 +460,7 @@ def random_single_video_dset(
             remove='1.1.0',
         )
         image_size = kwargs.pop('gsize')
-    assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
+    assert len(kwargs) == 0, f'unknown kwargs={kwargs}'
 
     image_ids = list(range(gid_start, num_frames + gid_start))
     track_ids = list(range(tid_start, num_tracks + tid_start))

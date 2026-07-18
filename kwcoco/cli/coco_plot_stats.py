@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 
 #!/usr/bin/env python3
 """
@@ -295,7 +296,7 @@ def geospatial_stats(dset, images, perimage_data):
                 # import suntime  # NOQA
                 import astral  # NOQA
                 import timezonefinder  # NOQA
-                import pytz  # NOQA
+                import pytz  # type: ignore[import-untyped]  # NOQA
 
                 raise ImportError
             except ImportError as ex:
@@ -559,7 +560,7 @@ class Plots:
     makes it easier to enable / disable plots.
     """
 
-    _plot_function_registery = {}
+    _plot_function_registery: dict[str, Any] = {}
 
     @classmethod
     def demo(cls, options=None, **kwargs):

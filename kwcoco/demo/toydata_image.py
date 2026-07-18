@@ -482,7 +482,7 @@ def demodata_toy_img(
             remove='1.1.0',
         )
         image_size = kwargs.pop('gsize')
-    assert len(kwargs) == 0, 'unknown kwargs={}'.format(**kwargs)
+    assert len(kwargs) == 0, f'unknown kwargs={kwargs}'
 
     rng = kwarray.ensure_rng(rng)
     catpats = CategoryPatterns.coerce(

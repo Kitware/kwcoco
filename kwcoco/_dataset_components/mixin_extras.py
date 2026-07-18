@@ -15,6 +15,12 @@ class MixinCocoExtras:
     """
     Misc functions for coco
     """
+    bundle_dpath: str
+    fpath: str | PathLike | None
+    tag: str | None
+    dataset: dict[str, Any]
+    imgs: dict[int, dict[str, Any]]
+
 
     def _tree(self) -> None:
         """
@@ -113,7 +119,7 @@ class MixinCocoExtras:
             >>> with pytest.raises(Exception):
             >>>     self._ensure_imgsize(fail=True)
         """
-        summary = {}
+        summary: dict[str, Any] = {}
         bad_images = []
         if any(
             'width' not in img or 'height' not in img for img in self.dataset['images']  # type: ignore
@@ -125,7 +131,7 @@ class MixinCocoExtras:
             else:
                 desc = 'populate imgsize for untagged coco dataset'
 
-            pool = ub.JobPool('thread', max_workers=workers)
+            pool: Any = ub.JobPool('thread', max_workers=workers)
             bundle_dpath = self.bundle_dpath
             for img in ub.ProgIter(
                 self.dataset['images'], verbose=verbose, desc='submit image size jobs'  # type: ignore
@@ -205,8 +211,8 @@ class MixinCocoExtras:
                     if ans:
                         _HAS_PERMISSION[0] = True
                 except ImportError:
-                    ans = input('is it ok to download? (enter y for yes)')
-                    if ans in ['yes', 'y']:
+                    answer_text = input('is it ok to download? (enter y for yes)')
+                    if answer_text in ['yes', 'y']:
                         _HAS_PERMISSION[0] = True
             return _HAS_PERMISSION[0]
 
@@ -280,7 +286,7 @@ class MixinCocoExtras:
         """
         bad_paths = []
 
-        jobs = ub.JobPool(mode='process', max_workers=workers)
+        jobs: Any = ub.JobPool(mode='process', max_workers=workers)
 
         img_enum = enumerate(self.dataset['images'])  # type: ignore
         for index, img in ub.ProgIter(
@@ -539,7 +545,7 @@ class MixinCocoExtras:
                     orig_cat = orig_cats[cname]
                     # Only update name and non-existing information
                     # TODO: check for conflicts?
-                    new_info = ub.dict_diff(new_cat, orig_cat)
+                    new_info: dict[str, Any] = ub.dict_diff(new_cat, orig_cat)
                     orig_cat.update(new_info)
                 else:
                     raise KeyError('Unknown merge_policy={}'.format(merge_policy))
@@ -836,13 +842,13 @@ class MixinCocoExtras:
                     )
 
             # Overwrite old values
-            prog = ub.ProgIter(
+            finalize_prog = ub.ProgIter(
                 gid_to_new.items(),
                 total=num_images,
                 enabled=enable_prog,
                 desc='finalize reroot',
             )
-            for gid, new in prog:
+            for gid, new in finalize_prog:
                 img = self.imgs[gid]  # type: ignore
                 img['file_name'] = new.get('file_name', None)
                 if 'auxiliary' in new:
@@ -852,13 +858,13 @@ class MixinCocoExtras:
                     for aux_fname, aux in zip(new['assets'], img['assets']):
                         aux['file_name'] = aux_fname
         else:
-            prog = ub.ProgIter(
+            reroot_prog = ub.ProgIter(
                 self.imgs.values(),  # type: ignore
                 total=num_images,
                 enabled=enable_prog,
                 desc='rerooting',
             )
-            for img in prog:
+            for img in reroot_prog:
                 try:
                     gname = img.get('file_name', None)
                     if gname is not None:
@@ -900,7 +906,7 @@ class MixinCocoExtras:
 
     @data_root.setter
     def data_root(self, value: Any) -> None:
-        self.bundle_dpath = value if value is None else os.fspath(value)
+        self.bundle_dpath = value if value is None else os.fspath(value)  # type: ignore[assignment]
 
     @property
     def img_root(self) -> PathLike | None:
@@ -912,7 +918,7 @@ class MixinCocoExtras:
         self.bundle_dpath = value
 
     @property
-    def data_fpath(self) -> PathLike | None:
+    def data_fpath(self) -> str | PathLike | None:
         """data_fpath is an alias of fpath"""
         return self.fpath
 

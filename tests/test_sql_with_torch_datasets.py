@@ -1,16 +1,17 @@
 import ubelt as ub
 import kwcoco
 import numpy as np
+import typing
 
+torch: typing.Any
 try:
-    import torch
+    import torch as _torch
 except ImportError:
     torch = None
-
-if torch is None:
-    DatasetBase = object
 else:
-    DatasetBase = torch.utils.data.Dataset
+    torch = _torch
+
+DatasetBase: typing.Any = object if torch is None else torch.utils.data.Dataset
 
 
 class DemoTorchDataset(DatasetBase):
@@ -28,6 +29,7 @@ class DemoTorchDataset(DatasetBase):
         return len(self.gids)
 
     def __getitem__(self, index):
+        assert torch is not None
         coco_dset = self.coco_dset
 
         image_id = self.gids[index]
@@ -46,6 +48,7 @@ class DemoTorchDataset(DatasetBase):
         return item
 
     def make_loader(self, batch_size=1, num_workers=0, shuffle=False, pin_memory=False):
+        assert torch is not None
         loader = torch.utils.data.DataLoader(
             self,
             batch_size=batch_size,
@@ -62,9 +65,10 @@ def worker_init_fn(worker_id):
     import torch.utils
 
     worker_info = torch.utils.data.get_worker_info()
+    assert worker_info is not None
     worker_id = worker_info.id
     print(f'[Worker {worker_id}] Initialize')
-    self = worker_info.dataset
+    self = typing.cast(DemoTorchDataset, worker_info.dataset)
     if hasattr(self.coco_dset, 'connect'):
         # Reconnect to the backend if we are using SQL
         print(f'[Worker {worker_id}] Reconnecting to the backend SQL Dataset')

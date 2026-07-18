@@ -304,8 +304,11 @@ def test_union_keeps_keypoint_category_ids_consistent():
 def random_unique_integers(low, high, size, rng=None):
     import kwarray
     import numpy as np
+    import typing
 
-    rng = kwarray.ensure_rng(rng, 'numpy')
+    rng = typing.cast(
+        np.random.RandomState, kwarray.ensure_rng(rng, api='numpy')
+    )
 
     result = set()
     range_size = high - low
@@ -315,7 +318,7 @@ def random_unique_integers(low, high, size, rng=None):
         remaining = size - len(result)
         # Generate a chunk of random numbers (at most remaining or range_size)
         chunk = rng.randint(low, high, size=min(remaining * 2, range_size))
-        result.update(chunk)
+        result.update(chunk.tolist())
 
     # Convert the result to a numpy array
     result = np.array(list(result))
@@ -330,7 +333,12 @@ def test_union_with_inconsistent_category_ids():
     import kwcoco
     import kwarray
 
-    rng = kwarray.ensure_rng(0)
+    import numpy as np
+    import typing
+
+    rng = typing.cast(
+        np.random.RandomState, kwarray.ensure_rng(0, api='numpy')
+    )
     for max_id in [5, 25, 100000]:
         # Create datasets with the same keypoint category names, but different ids
         dsets = []
@@ -359,7 +367,12 @@ def test_union_with_inconsistent_keypoint_category_ids():
     import kwcoco
     import kwarray
 
-    rng = kwarray.ensure_rng(0)
+    import numpy as np
+    import typing
+
+    rng = typing.cast(
+        np.random.RandomState, kwarray.ensure_rng(0, api='numpy')
+    )
     for max_id in [5, 25, 100000]:
         # Create datasets with the same keypoint category names, but different ids
         dsets = []
@@ -389,7 +402,12 @@ def test_union_with_disjoint_inconsistent_kp_category_ids():
     import kwcoco
     import kwarray
 
-    rng = kwarray.ensure_rng(132)
+    import numpy as np
+    import typing
+
+    rng = typing.cast(
+        np.random.RandomState, kwarray.ensure_rng(132, api='numpy')
+    )
     for _ in range(100):
         for max_id in [5, 6, 25, 100000]:
             dsets = []
@@ -423,7 +441,12 @@ def test_union_with_disjoint_inconsistent_category_ids():
     import kwcoco
     import kwarray
 
-    rng = kwarray.ensure_rng(13212)
+    import numpy as np
+    import typing
+
+    rng = typing.cast(
+        np.random.RandomState, kwarray.ensure_rng(13212, api='numpy')
+    )
     for _ in range(100):
         for max_id in [5, 6, 25, 100000]:
             dsets = []

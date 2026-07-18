@@ -205,7 +205,7 @@ class COCO(CocoDataset):
 
         for catId in catIds:
             aids = self.index.cid_to_aids.get(catId, [])  # type: ignore
-            hascat_gids = set(self.annots(aids).lookup('image_id'))
+            hascat_gids = set(self.annots(list(aids)).lookup('image_id'))
             valid_gids &= hascat_gids
         return sorted(valid_gids)
 

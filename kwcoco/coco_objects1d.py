@@ -559,7 +559,9 @@ class ObjectGroups(ub.NiceRepr):
         num = len(self._groups)
         mean = np.mean(len_list)
         std = np.std(len_list)
-        nice = 'n={!r}, {}={:.1f}, {}={:.1f}'.format(num, mu, mean, sigma, std)
+        nice = 'n={!r}, {}={:.1f}, {}={:.1f}'.format(
+            num, mu, float(mean), sigma, float(std)
+        )
         return nice
 
 

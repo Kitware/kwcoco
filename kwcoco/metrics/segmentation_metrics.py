@@ -72,7 +72,7 @@ IGNORE_CLASSNAMES = {'ignore', 'Unknown'}
 BACKGROUND_CLASSES = {'background'}
 NEGATIVE_CLASSES = {'negative'}
 UNDISTINGUISHED_CLASSES = {'positive'}
-CONTEXT_CLASSES = {}
+CONTEXT_CLASSES: set[str] = set()
 
 
 class SegmentationEvalConfig(scfg.DataConfig):
@@ -335,8 +335,8 @@ class SingleImageSegmentationMetrics:
         # HACK! FIXME: There needs to be a clear definition of what classes are
         # scored and which are not.
         self._behavor_to_classes['background_'] = (
-            self._behavor_to_classes['background']
-            | self._behavor_to_classes['negative']
+            set(self._behavor_to_classes['background'])
+            | set(self._behavor_to_classes['negative'])
         )
         """
         The above heuristics should roughly be:

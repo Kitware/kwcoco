@@ -387,7 +387,7 @@ def clamp_mag(vec, mag, axis=None):
     new_vec = clamp_mag(vec, mag, axis)
     np.linalg.norm(new_vec, axis=axis)
     """
-    norm = np.linalg.norm(vec, axis=axis, keepdims=True)
+    norm = np.asarray(np.linalg.norm(vec, axis=axis, keepdims=True))
     flags = norm > mag
     flags = np.squeeze(flags, axis)
     vec[flags] = (vec[flags] / norm[flags]) * mag
