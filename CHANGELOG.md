@@ -16,12 +16,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Update finish-install to use UV and detect pipconf issues.
 
 ### Added
-* Add experimental `kwcoco.metrics.assignment_v2` candidate-index assignment prototype for reusable multi-IoU confusion-vector construction.
+* Add experimental `kwcoco.metrics.assignment_v2` candidate-index assignment prototype for reusable multi-IoU confusion-vector construction. It is not wired into the public evaluator and is not a drop-in semantic replacement for the original assignment implementation.
 * Add `disk_usage` argument to kwcoco stats.
 * Add channels option to coco stats.
 
 ### Fixed
-* Restore assignment-v2 defaults and hierarchical matching parity with the original assignment implementation.
+* Align assignment-v2 with the original implementation on defaults, strict IoU thresholding, ancestor-mode relabeling, and sparse bias handling while retaining documented intentional semantic differences.
 * Preserve dataset index integrity when removing a single annotation, and accept `CocoDataset` subclass instances in `coerce`.
 * Populate OpenMMLab `instance_id` values during conform and correct fluent dataset return annotations.
 * Fix direct CLI module entry points, default evaluation output paths, finish-install executable checks, and plot-stat width/cache handling.

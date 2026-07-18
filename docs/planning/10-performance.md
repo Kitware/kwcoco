@@ -13,8 +13,9 @@ below were already fixed as bugs (noted) — verify rather than redo.
 - SQL `_column_lookup` N+1 + ordering → doc 05 task 5.4.
 - `coco_plot_stats` double-compute → doc 06 task 6.6.
 - `pycocotools_confusion_vectors` O(n²) loop → doc 04 task 4.4.
-- v1 assignment per-prediction Python loop → doc 04 part C wires
-  `assignment_v2` as the replacement path once parity holds.
+- v1 assignment per-prediction Python loop → doc 04 part C evaluates
+  `assignment_v2` as an alternative path once its semantic choices are
+  explicit and characterization tests cover both shared and differing cases.
 
 ## Task 10.1 — Lazy CLI registration
 

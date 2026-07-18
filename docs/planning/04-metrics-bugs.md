@@ -164,45 +164,64 @@ Three related bugs in `coco_evaluator.py`:
       `np.where(finite_flags)[0][max_idx]`. Currently benign (offset always
       0) but fix while touching the file.
 
-## C. assignment_v2 (new module) parity
+## C. assignment_v2 (new module) semantic contract
 
-Context: `assignment_v2.py` is unwired — nothing outside its own test imports
-it. Before it can replace `assignment.py` (the v1 per-prediction Python loop,
-the metrics stack's main bottleneck), three divergences must be fixed and a
-fuzz-parity test added.
+Context: `assignment_v2.py` is unwired — nothing outside its own tests imports
+it. It is an alternative candidate-index design, not necessarily a drop-in
+semantic clone of `assignment.py`. Differences should be evaluated as API and
+metric choices rather than automatically classified as correctness bugs.
 
-### Task 4.14 — Fix v2 divergences from v1
+The follow-up implementation aligned several important baseline behaviors:
 
-1. **Hierarchical relabel dropped**: v1 relabels `pred_cx = true_cx` when the
-   true class is an ancestor of the predicted class
-   (`assignment.py:533-538` — "the key to hierarchical scoring"); v2's
-   `AssignmentCandidateIndex.assign` (`assignment_v2.py:398-413`) always
-   emits raw `pred_cx` yet accepts `compat='ancestors'`. Either replicate the
-   relabel or raise `NotImplementedError` for `'ancestors'`.
-   **⚠️ DECISION** — recommended: implement the relabel (it is the point of
-   the mode).
-2. **`>=` vs `>` at the IoU threshold**: v1 uses strict `>` 
-   (`assignment.py:304,:488`); v2 uses `>=` (`assignment_v2.py:308,:391,:490`).
-   **⚠️ DECISION** — recommended: match v1 (`>`) for drop-in parity now, and
-   note that pycocotools uses `>=` as a possible future flag.
-3. **Default `compat` mismatch**: v2 wrapper defaults `'mutex'`
-   (`assignment_v2.py:511`) vs v1 `'all'` (`assignment.py:48`) while claiming
-   to mirror v1. Change v2's default to `'all'`.
-4. **Sparse/dense divergence at `bias=1`**: `_ltrb_intersects`
-   (`assignment_v2.py:129-140`) uses strict inequalities, so touching boxes
-   are never candidates while `Boxes.ious(..., bias=1)` (the coco_evaluator
-   default) gives them nonzero IoU. Dilate the query box by `bias` (or use
-   `<=`/`>=`) when `bias > 0`.
+- [x] The wrapper default is `compat='all'` in both implementations.
+- [x] Both use strict `iou > threshold` matching.
+- [x] `compat='ancestors'` relabels a finer prediction to its matched ancestor
+      truth in both implementations.
+- [x] Sparse candidate generation accounts for positive IoU bias.
 
-### Task 4.15 — Randomized parity test
+### Task 4.14 — Preserve and document the known differences
 
-Add to `tests/test_metrics_assignment_v2.py`: fuzz over
-`DetectionMetrics.demo`-style data comparing `_assign_confusion_vectors` (v1)
-vs `assign_confusion_vectors_v2` row signatures across
+The remaining differences are part of the current v2 contract:
+
+1. **Hierarchy source when `classes=None`**: v2 consults
+   `true_dets.classes` and then `pred_dets.classes`. V1 does not infer classes
+   from the detections and downgrades `compat='ancestors'` to flat mutex
+   matching unless `classes=` is passed explicitly. V2's inference is useful
+   and should not be removed solely for parity.
+2. **Relabeling under `compat='all'`**: with an explicit hierarchy, v1 may
+   relabel a finer predicted class to an ancestor truth even though all classes
+   are match-compatible. V2 preserves the original predicted class in
+   `compat='all'` and performs hierarchy coercion only in
+   `compat='ancestors'`. This is a semantic choice; the v2 behavior more
+   literally separates unconstrained matching from hierarchy-aware scoring.
+3. **Equal-score prediction order**: v2 uses a stable descending sort and
+   preserves input order for tied scores. V1 reverses `argsort` output and does
+   not provide the same tie-order contract. Greedy assignment can therefore
+   choose a different truth when tied predictions compete for it.
+4. **Supported feature subset**: v2 currently supports only
+   `prioritize='iou'` and `truth_reuse_policy='never'`. V1 additionally
+   supports class/correct prioritization and least-used truth reuse.
+5. **Output and reuse model**: v2 adds a `rank` column and exposes a reusable
+   candidate index for querying multiple IoU thresholds. V1 recomputes through
+   its monolithic function and emits only `ASSIGN_COLUMNS`.
+
+Keep these differences visible in the module documentation and changelog. If
+v2 is wired into the evaluator, make the selected semantics explicit instead
+of silently treating either implementation as the universal reference.
+
+### Task 4.15 — Characterization and integration tests
+
+Add seeded randomized tests over `DetectionMetrics.demo`-style data comparing
+`_assign_confusion_vectors` and `assign_confusion_vectors_v2` across
 `compat ∈ {mutex, all, ancestors}`, `bias ∈ {0, 1}`, weights on/off,
 `max_dets`, iterable `iou_thresh`, `ignore_classes='ignore'`, and forced
-sparse vs dense candidate builds. Seeded RNG, ~50 random cases. This is the
-gate for ever wiring v2 into `detect_metrics.py`.
+sparse versus dense candidate builds.
+
+Exact equality is required only where the two implementations have the same
+semantic contract. Add explicit expected-difference tests for hierarchy
+inference, `compat='all'` relabeling, and tied-score ordering. The integration
+gate is that every observed difference is either documented and intentional or
+fixed — not that v2 must reproduce every v1 edge behavior.
 
 ## D. Addendum — deep-dive verification round (2026-07-09)
 
@@ -212,11 +231,14 @@ Verified-at-runtime: 4.1, 4.2, 4.3 (both trigger cases), 4.7, 4.8, 4.9
 (tn tail clobbered AND combined AP shifts 0.816→0.845 with -inf rows present,
 vs 2e-3 binning error without), 4.10, 4.11 (mAP=1.0 where truth says 0.5),
 4.12 items 1+3 (spy shows `use_area_attr` never passed; all area-range
-results share ONE cfsn_vecs object id), 4.13 dict-of-Detections KeyError,
-4.14 items 1-3. Item 4.14.4 (sparse/dense bias divergence) did NOT reproduce
-in a touching-box test — treat as plausible, verify while fixing.
-All 24 existing metrics tests and 68 metrics doctests PASS despite these bugs
-— none are covered by the current suite.
+results share ONE cfsn_vecs object id), and 4.13's dict-of-Detections KeyError.
+
+The original audit described all assignment-v2 differences as parity defects.
+Subsequent work aligned the shared defaults, strict threshold behavior,
+ancestor-mode relabeling, and sparse bias handling. The remaining differences
+are now recorded in part C as explicit semantic or feature choices. The test
+counts below describe the repository at the time of the historical audit, not
+the coverage after the follow-up commits.
 
 New findings from this pass (add as tasks):
 
@@ -252,17 +274,21 @@ Fix together with 4.3: populate `mAP` from the summarize stats in both
 branches. Note `evaler.stats[1]` (standard branch) is AP@0.5, not AP@.5:.95
 — decide which is meant by 'mAP' and document it.
 
-### Task 4.18 [verified, MEDIUM] — v1 ignores `dets.classes` unless `classes=` is passed
+### Task 4.18 [verified, MEDIUM] — v1 and v2 source hierarchy differently
 
-`_assign_confusion_vectors` builds a mutex tree when `classes=None` even if
-`true_dets.classes`/`pred_dets.classes` carry a real hierarchy;
-`assignment_v2` DOES read `dets.classes` (`assignment_v2.py:211-214`).
-Verified: same hierarchical inputs give v1 no cross-hierarchy match without
-explicit classes, v1 relabeled-match with them, v2 match either way. Fix as
-part of the v1/v2 parity work (4.14): make both source classes identically.
-Also verified: v1's hierarchical relabel (`assignment.py:533-538`) fires for
-`compat='all'` too (`cx_to_ancestors` is unconditional, `assignment.py:245`)
-— the fuzz test in 4.15 must cover hierarchy + compat='all'.
+`_assign_confusion_vectors` builds a flat compatibility model when
+`classes=None` even if `true_dets.classes` or `pred_dets.classes` carries a
+real hierarchy; `assignment_v2` reads those detection-level classes.
+Verified: the same hierarchical inputs give v1 no cross-hierarchy match
+without explicit `classes=`, while v2 can use the attached hierarchy. This is
+now a documented semantic difference rather than an automatic parity bug.
+Preserve v2's inference unless an evaluator integration decision explicitly
+chooses v1 behavior.
+
+Also verified: v1's hierarchical relabel fires for `compat='all'` when a
+hierarchy is explicitly supplied, while v2 reserves relabeling for
+`compat='ancestors'`. The characterization tests in 4.15 must cover and name
+this difference.
 
 ### Task 4.19 [verified, LOW] — misc from this pass
 
@@ -282,6 +308,8 @@ Also verified: v1's hierarchical relabel (`assignment.py:533-538`) fires for
 ```
 python -m pytest tests/test_metrics_assignment_v2.py tests/test_metrics_assignment.py \
     tests/test_detect_metrics.py tests/test_confusion_vectors.py tests/test_sseg_metrics.py -q
+# Compare shared-contract cases exactly and assert documented differences
+# separately; do not use unconditional row-for-row parity as the oracle.
 python -m pytest --xdoctest kwcoco/metrics kwcoco/coco_evaluator.py -q
 ```
 

@@ -14,6 +14,39 @@ assignment into testable, composable pieces:
 The current public evaluator does not use this module yet.  The main design
 constraint preserved from the existing evaluator is that assignment emits
 confusion-vector rows with traceable true / predicted detection indexes.
+
+Relationship to :mod:`kwcoco.metrics.assignment`
+-------------------------------------------------
+
+This module is an alternative assignment design, not a promise of row-for-row
+compatibility with the original implementation.  The two implementations now
+share important baseline behavior, including the ``compat='all'`` wrapper
+default, strict ``iou > threshold`` matching, ancestor relabeling in
+``compat='ancestors'`` mode, and bias-aware sparse candidate generation.
+
+Known semantic and feature differences are intentional unless an integration
+decision says otherwise:
+
+* When ``classes`` is omitted, v2 uses ``true_dets.classes`` or
+  ``pred_dets.classes`` when available.  V1 does not infer the hierarchy this
+  way and may fall back to flat matching.
+* In ``compat='all'`` mode, v2 preserves the predicted class of a matched row.
+  V1 can relabel a finer prediction to an ancestor truth when an explicit
+  hierarchy is supplied.  V2 reserves that coercion for
+  ``compat='ancestors'``.
+* V2 uses a stable descending score sort, so equal-score predictions retain
+  their input order.  V1 reverses ``argsort`` output, and its tie order is not
+  the same contract.
+* V2 currently implements only ``prioritize='iou'`` and
+  ``truth_reuse_policy='never'``.  V1 also supports class-prioritized matching
+  and least-used truth reuse.
+* V2 emits an additional ``rank`` column and can reuse one candidate index for
+  multiple IoU thresholds.
+
+Consequently, v2 can produce different confusion rows for accepted inputs even
+when neither implementation is incorrect.  Tests that compare them should
+assert exact equality only over their shared semantic contract and should
+separately characterize the documented differences.
 """
 
 from __future__ import annotations
@@ -535,8 +568,9 @@ def assign_confusion_vectors_v2(
     """
     Convenience wrapper around :class:`AssignmentCandidateIndex`.
 
-    This mirrors the old assignment function at a high level, but exposes the
-    candidate-index implementation through a standalone module.
+    This accepts a similar high-level input shape to the original assignment
+    function, but it does not promise row-for-row equivalence.  See the module
+    documentation for the known semantic and feature differences.
     """
     iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else list(iou_thresh)  # type: ignore
     if min_iou is None:

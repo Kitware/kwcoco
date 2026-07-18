@@ -7,16 +7,17 @@ Prereqs: none
 Goal: remove clutter, resolve untracked-file limbo, and land one mechanical
 repo-wide fix. Everything here is cheap and unblocks cleaner diffs later.
 
-## Task 1.1 — Commit the assignment_v2 work-in-progress
+## Task 1.1 — Commit the assignment_v2 work-in-progress [completed]
 
-`CHANGELOG.md:19` documents `kwcoco.metrics.assignment_v2` under the 0.9.0
-"Added" section, but `kwcoco/metrics/assignment_v2.py` and
-`tests/test_metrics_assignment_v2.py` are **untracked**. Any sdist/`git archive`
-built from this state ships a changelog entry for code that does not exist.
+The historical audit found that `CHANGELOG.md` documented
+`kwcoco.metrics.assignment_v2` while the module and its tests were untracked.
+They are tracked in the current branch, so source archives now contain the
+prototype described by the changelog.
 
-- [ ] `git add kwcoco/metrics/assignment_v2.py tests/test_metrics_assignment_v2.py`
-      and commit. (Doc 04 fixes its correctness divergences; committing the
-      current state first gives those fixes a reviewable diff.)
+- [x] Commit `kwcoco/metrics/assignment_v2.py` and
+      `tests/test_metrics_assignment_v2.py`. Doc 04 now describes v2 as an
+      alternative design with an explicit semantic contract rather than
+      assuming every difference from v1 is a correctness defect.
 
 ## Task 1.2 — Delete stray root files and gitignore the archive pattern
 
