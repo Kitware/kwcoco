@@ -481,7 +481,7 @@ class CocoDataset(
         self.hashid_parts = None
 
         self.tag = tag
-        self.dataset = cast(dict[str, Any], data)
+        self.dataset = cast('dict[str, Any]', data)
 
         self.data_fpath = fpath
         self.bundle_dpath = bundle_dpath
