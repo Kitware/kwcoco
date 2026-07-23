@@ -132,6 +132,23 @@ class MixinCocoAddRemove:
                 'Image with file_name={} already exists'.format(norm_file_name)
             )
 
+        # Perform all checks that do not depend on the chosen id before
+        # advancing the automatic id generator.
+        name = kw.get('name', None)
+        if index.imgs is not None and index._CHECKS:
+            if norm_file_name is None and name is None:
+                raise exceptions.InvalidAddError(
+                    'at least one of file_name or name must be specified'
+                )
+            if name in index.name_to_img:  # type: ignore
+                raise exceptions.DuplicateAddError(
+                    'Image with name={} already exists'.format(name)
+                )
+        if 'video_id' in kw and kw.get('frame_index', None) is None:
+            raise exceptions.InvalidAddError(
+                'Images with video-ids must have a frame_index'
+            )
+
         if id is not None and self.imgs and id in self.imgs:  # type: ignore
             raise exceptions.DuplicateAddError('Image id={} already exists'.format(id))
         if id is None:
@@ -141,6 +158,9 @@ class MixinCocoAddRemove:
         img['id'] = int(id)
         img['file_name'] = norm_file_name
         img.update(**kw)
+
+        # Validation above completes before automatic id selection. Insert
+        # into the index before the raw append so both views change together.
         self.index._add_image(id, img)  # type: ignore
         self.dataset['images'].append(img)  # type: ignore
         self._invalidate_hashid()  # type: ignore
@@ -312,6 +332,12 @@ class MixinCocoAddRemove:
         except ImportError:
             kwimage = None  # type: ignore
 
+        # Preserve the historical KeyError for an unknown image, but raise it
+        # before advancing the automatic id generator or mutating either view.
+        if self.index.gid_to_aids is not None:  # type: ignore
+            if image_id not in self.index.gid_to_aids:  # type: ignore
+                raise KeyError(image_id)
+
         if id is None:
             id = self._next_ids.get('annotations')  # type: ignore
         elif self.anns and id in self.anns:  # type: ignore
@@ -352,8 +378,8 @@ class MixinCocoAddRemove:
 
         ann.update(**kw)
 
-        self.dataset['annotations'].append(ann)  # type: ignore
         self.index._add_annotation(id, image_id, category_id, track_id, ann)  # type: ignore
+        self.dataset['annotations'].append(ann)  # type: ignore
         self._invalidate_hashid(['annotations'])  # type: ignore
         return id
 
@@ -975,7 +1001,7 @@ class MixinCocoAddRemove:
                 remove_trackids = list(map(self._resolve_to_trackid, track_identifiers))  # type: ignore
 
             # First remove any annotation that belongs to those tracks
-            if self.index.trackid_to_aids:  # type: ignore
+            if self.index.trackid_to_aids is not None:  # type: ignore
                 remove_aids = list(
                     it.chain(
                         *[
@@ -988,14 +1014,22 @@ class MixinCocoAddRemove:
                 remove_aids = [
                     ann['id']
                     for ann in self.dataset['annotations']  # type: ignore
-                    if ann['track_id'] in remove_trackids
+                    if ann.get('track_id', None) in remove_trackids
                 ]
 
             if keep_annots:
                 # Simply remove track information instead of removing the
                 # entire annotation.
-                for aid in remove_aids:
-                    self.anns[aid].pop('track_id')  # type: ignore
+                if remove_aids:
+                    trackless_aids = self.index.trackid_to_aids.get(  # type: ignore
+                        None
+                    )
+                    if trackless_aids is None:
+                        trackless_aids = set()
+                        self.index.trackid_to_aids[None] = trackless_aids  # type: ignore
+                    for aid in remove_aids:
+                        self.anns[aid].pop('track_id', None)  # type: ignore
+                        trackless_aids.add(aid)
             else:
                 rminfo = self.remove_annotations(remove_aids, verbose=verbose)
                 remove_info.update(rminfo)

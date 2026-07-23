@@ -22,6 +22,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add channels option to coco stats.
 
 ### Fixed
+* Keep dynamically maintained image, annotation, video, category, and track
+  indexes consistent across bulk image insertion, clearing images,
+  retained-annotation track removal, and rejected single-item additions,
+  while preserving the non-video bulk insertion fast path. Registered tracks
+  now keep explicit empty annotation buckets, so missing buckets remain a
+  detectable index inconsistency rather than being silently ignored. Duplicate
+  category, keypoint-category, and track IDs now emit the intended rebuild
+  warnings.
 * Align assignment-v2 with the original implementation on defaults, strict IoU thresholding, ancestor-mode relabeling, and sparse bias handling while retaining documented intentional semantic differences.
 * Preserve dataset index integrity when removing a single annotation, and accept `CocoDataset` subclass instances in `coerce`.
 * Populate OpenMMLab `instance_id` values during conform and correct fluent dataset return annotations.

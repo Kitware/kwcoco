@@ -200,19 +200,12 @@ class CocoIndex:
         if index.imgs is not None:
             file_name = img.get('file_name', None)
             name = img.get('name', None)
-            if index._CHECKS:
-                if file_name is None and name is None:
-                    raise exceptions.InvalidAddError(
-                        'at least one of file_name or name must be specified'
-                    )
-                if file_name in index.file_name_to_img:  # type: ignore
-                    raise exceptions.DuplicateAddError(
-                        'image with file_name={} already exists'.format(file_name)
-                    )
-                if name in index.name_to_img:  # type: ignore
-                    raise exceptions.DuplicateAddError(
-                        'image with name={} already exists'.format(name)
-                    )
+            has_video = 'video_id' in img
+            vidid = img.get('video_id', None)
+
+            # The public add_image method validates the complete object before
+            # choosing an automatic id. Keep this helper mutation-only so the
+            # common single-image path does not repeat every lookup.
             index.imgs[gid] = img
             index.gid_to_aids[gid] = index._set()  # type: ignore
 
@@ -222,12 +215,7 @@ class CocoIndex:
             if name is not None:
                 index.name_to_img[name] = img  # type: ignore
 
-            if 'video_id' in img:
-                if img.get('frame_index', None) is None:
-                    raise exceptions.InvalidAddError(
-                        'Images with video-ids must have a frame_index'
-                    )
-                vidid = img['video_id']
+            if has_video:
                 try:
                     index.vidid_to_gids[vidid].add(gid)  # type: ignore
                 except KeyError:
@@ -268,18 +256,29 @@ class CocoIndex:
             for gid in gids:
                 index.gid_to_aids[gid] = index._set()  # type: ignore
 
-            if index.vidid_to_gids:
-                vidid_to_gids = ub.group_items(
-                    [g['id'] for g in imgs], [g.get('video_id', None) for g in imgs]
-                )
+            # Preserve the original fast path for a fresh, non-video
+            # dataset. Only allocate grouping lists when a video lookup already
+            # exists or this batch introduces at least one real video id.
+            if index.vidid_to_gids or any(
+                img.get('video_id', None) is not None for img in imgs
+            ):
+                vidids = [img.get('video_id', None) for img in imgs]
+                vidid_to_gids = ub.group_items(gids, vidids)
                 vidid_to_gids.pop(None, None)
-                for vidid, gids in vidid_to_gids.items():
-                    index.vidid_to_gids[vidid].update(gids)
+                for vidid, video_gids_to_add in vidid_to_gids.items():
+                    try:
+                        video_gids = index.vidid_to_gids[vidid]
+                    except KeyError:
+                        video_gids = index._images_set_sorted_by_frame_index()
+                        index.vidid_to_gids[vidid] = video_gids
+                    video_gids.update(video_gids_to_add)
 
     def _add_annotation(
         index, aid: int, gid: int, cid: int, tid: int, ann: dict
     ) -> None:
         if index.anns is not None:
+            # The public add_annotation method validates the image reference
+            # before choosing an automatic id. Keep this helper mutation-only.
             index.anns[aid] = ann
             # Note: it should be ok to have None's here
             index.gid_to_aids[gid].add(aid)  # type: ignore
@@ -372,10 +371,28 @@ class CocoIndex:
             index.anns.clear()  # type: ignore
             index.gid_to_aids.clear()  # type: ignore
             index.file_name_to_img.clear()  # type: ignore
-            for _ in index.cid_to_aids.values():  # type: ignore
-                _.clear()
-            for _ in index.vidid_to_gids.values():  # type: ignore
-                _.clear()
+            index.name_to_img.clear()  # type: ignore
+
+            # Preserve zero-member buckets for registered tables, but discard
+            # transient buckets created by None or unknown foreign keys. This
+            # keeps the dynamic index equivalent to a fresh rebuild.
+            for cid in list(index.cid_to_aids):  # type: ignore
+                if cid in index.cats:  # type: ignore
+                    index.cid_to_aids[cid].clear()  # type: ignore
+                else:
+                    index.cid_to_aids.pop(cid)  # type: ignore
+
+            for vidid in list(index.vidid_to_gids):  # type: ignore
+                if vidid in index.videos:  # type: ignore
+                    index.vidid_to_gids[vidid].clear()  # type: ignore
+                else:
+                    index.vidid_to_gids.pop(vidid)  # type: ignore
+
+            for trackid in list(index.trackid_to_aids):  # type: ignore
+                if trackid in index.tracks:  # type: ignore
+                    index.trackid_to_aids[trackid].clear()  # type: ignore
+                else:
+                    index.trackid_to_aids.pop(trackid)  # type: ignore
 
     def _remove_keypoint_categories(index, remove_kpcid: Any, verbose: Any = 0) -> None:
         if index.kpcats is not None:
@@ -500,7 +517,7 @@ class CocoIndex:
         # Build one-to-one index-lookup maps
         for cat in parent.dataset.get('categories', []):
             cid = cat['id']
-            if cid in cat:
+            if cid in cats:
                 warnings.warn(
                     'Categories have the same id in {}:\n{} and\n{}'.format(
                         parent, cats[cid], cat
@@ -510,9 +527,9 @@ class CocoIndex:
 
         for obj in parent.dataset.get('keypoint_categories', []):
             cid = obj['id']
-            if cid in obj:
+            if cid in kpcats:
                 warnings.warn(
-                    'Keypoint objegories have the same id in {}:\n{} and\n{}'.format(
+                    'Keypoint categories have the same id in {}:\n{} and\n{}'.format(
                         parent, kpcats[cid], obj
                     )
                 )
@@ -555,7 +572,7 @@ class CocoIndex:
 
         for track in parent.dataset.get('tracks', []):
             tid = track['id']
-            if tid in track:
+            if tid in tracks:
                 warnings.warn(
                     'Tracks have the same id in {}:\n{} and\n{}'.format(
                         parent, tracks[tid], track
@@ -648,6 +665,10 @@ class CocoIndex:
         for vidid in videos.keys():
             if vidid not in vidid_to_gids:
                 vidid_to_gids[vidid] = index._set()  # type: ignore
+
+        for trackid in tracks.keys():
+            if trackid not in trackid_to_aids:
+                trackid_to_aids[trackid] = index._set()
 
         # create class members
         index._id_lookup = {
