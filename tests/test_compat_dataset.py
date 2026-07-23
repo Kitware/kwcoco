@@ -163,7 +163,7 @@ def test_compat_download_uses_target_without_reroot(monkeypatch, tmp_path):
 
     target = tmp_path / 'compat-download'
     result = dset.download(tarDir=target, imgIds=[gid])
-    assert result is None
+    assert list(map(Path, result)) == [target / 'image.png']
     assert calls == [
         ('https://example.com/image.png', target / 'image.png')
     ]

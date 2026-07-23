@@ -17,6 +17,8 @@ API including dynamic addition / removal of categories / annotations / images.
 """
 
 from kwcoco.coco_dataset import CocoDataset
+from typing import Iterable
+from os import PathLike
 import itertools as it
 import ubelt as ub
 import numpy as np
@@ -369,19 +371,50 @@ class COCO(CocoDataset):
         res.createIndex()
         return res
 
-    def download(self, tarDir=None, imgIds=[]):
+    def download(
+        self,
+        dpath: str | PathLike | None = None,
+        image_ids: int | Iterable[int] | None = None,
+        overwrite: bool = False,
+        verbose: int = 1,
+        *,
+        tarDir: str | PathLike | None = None,
+        imgIds: int | Iterable[int] | None = None,
+    ) -> list[str]:
         """
         Download images from their standard ``coco_url`` fields.
 
+        This accepts the native kwcoco argument names while retaining the
+        legacy pycocotools keyword aliases ``tarDir`` and ``imgIds``.
+
         Args:
-            tarDir (str | PathLike | None): COCO results directory name
-            imgIds (list): images to be downloaded
+            dpath: native kwcoco target directory.
+            image_ids: native kwcoco image identifiers.
+            overwrite: if true, redownload existing files.
+            verbose: verbosity level.
+            tarDir: legacy pycocotools alias for ``dpath``.
+            imgIds: legacy pycocotools alias for ``image_ids``. An empty
+                legacy selection retains pycocotools' "all images" behavior.
+
+        Returns:
+            Local paths corresponding to the requested images.
         """
-        if tarDir is None:
-            print('Please specify target directory')
-            return -1
-        image_ids = imgIds if imgIds else None
-        super().download(dpath=tarDir, image_ids=image_ids)
+        if tarDir is not None:
+            if dpath is not None:
+                raise TypeError('Specify only one of dpath or tarDir')
+            dpath = tarDir
+        if imgIds is not None:
+            if image_ids is not None:
+                raise TypeError('Specify only one of image_ids or imgIds')
+            image_ids = imgIds
+            if not image_ids:
+                image_ids = None
+        return super().download(
+            dpath=dpath,
+            image_ids=image_ids,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
 
     def loadNumpyAnnotations(self, data):
         """
