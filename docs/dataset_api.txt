@@ -59,6 +59,16 @@
    +_invalidate_hashid : function
    +_ensure_imgsize : function
    +download : function
+
+     The public download contract currently supports HTTPS ``coco_url``
+     values. Other URI schemes may be valid dataset metadata but are not
+     guaranteed to be downloadable by this method.
+
+     ``file_name`` is used as a trusted destination path. It is joined with
+     the requested download directory without confinement or sanitization, so
+     absolute paths and ``..`` components may write outside that directory.
+     Validate untrusted datasets before downloading them.
+
    +_ensure_image_data : function
    +missing_images : function
    +corrupted_images : function

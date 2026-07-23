@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 TODO:
     - [ ] UCF101 - Action Recognition Data Set - https://www.crcv.ucf.edu/data/UCF101.php
     - [ ] HMDB: a large human motion database - https://serre-lab.clps.brown.edu/resource/hmdb-a-large-human-motion-database/
@@ -14,3 +12,4 @@ TODO:
     - [ ] https://paperswithcode.com/dataset/activitynet
     - [ ] https://paperswithcode.com/dataset/clevr
 """
+from __future__ import annotations

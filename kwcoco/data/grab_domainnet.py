@@ -1,10 +1,8 @@
 """
-from __future__ import annotations
-
 References:
     http://ai.bu.edu/M3SDA/#dataset
 """
-
+from __future__ import annotations
 
 def grab_domain_net():
     """

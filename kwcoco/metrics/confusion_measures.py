@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 Classes that store accumulated confusion measures (usually derived from
 confusion vectors).
 
@@ -17,6 +15,7 @@ The primary data we manipulate are arrays of "confusion" counts, i.e.
     * tn_count[i] - true negatives at the i-th threshold
 
 """
+from __future__ import annotations
 
 import kwarray
 import numpy as np

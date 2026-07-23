@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 TODO:
     - [ ] _fast_pdist_priority: Look at absolute difference in sibling entropy
         when deciding whether to go up or down in the tree.
@@ -22,6 +20,7 @@ TODO:
         ducks in a row are annotated as separate object, and we only care about
         getting the group)
 """
+from __future__ import annotations
 
 import warnings
 import networkx as nx

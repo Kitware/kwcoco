@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 WIP:
 
 Conversions to and from KPF format.
@@ -42,7 +40,7 @@ Conversions to and from KPF format.
 References:
     https://github.com/Kitware/DIVA/blob/master/doc/manuals/kpf.rst
 """
-
+from __future__ import annotations
 
 def coco_to_kpf(coco_dset):
     """

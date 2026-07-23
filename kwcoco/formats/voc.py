@@ -1,9 +1,7 @@
 """
-from __future__ import annotations
-
 Helpers for the Pascal VOC format. (used by ImageNet)
 """
-
+from __future__ import annotations
 
 def read_voc_image(xml_fpath, data_dpath='.'):
     # print(xml_fpath.read_text())

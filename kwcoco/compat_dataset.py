@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 A wrapper around the basic kwcoco dataset with a pycocotools API.
 
 We do not recommend using this API because it has some idiosyncrasies, where
@@ -15,6 +13,7 @@ The cool thing is that this extends the kwcoco API so you can drop this for
 compatibility with the old API, but you still get access to all of the kwcoco
 API including dynamic addition / removal of categories / annotations / images.
 """
+from __future__ import annotations
 
 from kwcoco.coco_dataset import CocoDataset
 from typing import Iterable, List, Optional, Union
@@ -398,6 +397,11 @@ class COCO(CocoDataset):
 
         Returns:
             Local paths corresponding to the requested images.
+
+        Note:
+            The native downloader officially supports HTTPS URLs. Image
+            ``file_name`` values are trusted destination paths and may escape
+            the target directory when absolute or when they contain ``..``.
         """
         if tarDir is not None:
             if dpath is not None:

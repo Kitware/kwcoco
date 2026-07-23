@@ -1,8 +1,7 @@
 """
-from __future__ import annotations
-
 Functionality has been ported to delayed_image
 """
+from __future__ import annotations
 
 from delayed_image import delayed_base
 from delayed_image import delayed_leafs

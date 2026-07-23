@@ -179,8 +179,8 @@ class MixinCocoExtras:
         Download image data referenced by standard ``coco_url`` fields.
 
         This is the kwcoco-native counterpart to
-        :meth:`pycocotools.coco.COCO.download`. Each remote resource is saved
-        beneath ``dpath`` using its image ``file_name``. Existing files are
+        :meth:`pycocotools.coco.COCO.download`. Each destination is formed
+        by joining ``dpath`` with the image ``file_name``. Existing files are
         skipped unless ``overwrite`` is true.
 
         Args:
@@ -200,8 +200,19 @@ class MixinCocoExtras:
             List[str]: local paths corresponding to the requested images.
 
         Note:
+            HTTPS URLs are the only officially supported download transport.
+            Other URI schemes may satisfy the dataset schema, but are not
+            guaranteed to work with this method.
+
             This currently downloads only top-level image resources. Video
             references and auxiliary image assets are not downloaded.
+
+        Warning:
+            Image ``file_name`` values are treated as trusted destination
+            paths. They are joined with ``dpath`` without confinement or
+            sanitization. In particular, an absolute ``file_name`` or one
+            containing ``..`` components may write outside ``dpath``. Validate
+            untrusted datasets before downloading them.
 
         Example:
             >>> # xdoctest: +SKIP("requires network")

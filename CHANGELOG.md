@@ -16,7 +16,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Update finish-install to use UV and detect pipconf issues.
 
 ### Added
-* Officially support validated `coco_url` fields on images and videos, and add `CocoDataset.download` for fetching image resources.
+* Officially support validated `coco_url` fields on images and videos, and add `CocoDataset.download` for fetching image resources over HTTPS. The downloader treats image `file_name` values as trusted destination paths and does not confine them to the requested directory.
 * Add experimental `kwcoco.metrics.assignment_v2` candidate-index assignment prototype for reusable multi-IoU confusion-vector construction. It is not wired into the public evaluator and is not a drop-in semantic replacement for the original assignment implementation.
 * Add `disk_usage` argument to kwcoco stats.
 * Add channels option to coco stats.

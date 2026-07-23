@@ -1,8 +1,8 @@
 """
-from __future__ import annotations
-
 mkinit kwcoco.metrics -w --relative
 """
+from __future__ import annotations
+
 # flake8: noqa
 
 __submodules__ = [

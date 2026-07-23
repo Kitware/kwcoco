@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 Finally got a baseline implementation of an SQLite backend for COCO
 datasets. This mostly plugs into my existing tools (as long as only read
 operations are used; haven't implemented writing yet) by duck-typing the
@@ -70,6 +68,7 @@ TODO:
     - [ ] We get better speeds with raw SQL over alchemy. Can we mitigate the
         speed difference so we can take advantage of alchemy's expressiveness?
 """
+from __future__ import annotations
 
 import json
 import numpy as np

@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 Generates "toydata" for demo and testing purposes.
 
 Loose image version of the toydata generators.
@@ -13,6 +11,7 @@ Note:
     redone using the tools built for `random_video_dset`, which have more
     extensible implementations.
 """
+from __future__ import annotations
 
 import glob
 from os.path import basename

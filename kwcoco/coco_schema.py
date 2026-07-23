@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 The place where the formal KWCOCO schema is defined.
 
 CommandLine:
@@ -45,6 +43,7 @@ Example:
     >>> img['name'] = 'asset-only images must have a name'
     >>> COCO_SCHEMA.validate(dataset)
 """
+from __future__ import annotations
 
 from kwcoco.util.jsonschema_elements import SchemaElements
 from collections import OrderedDict

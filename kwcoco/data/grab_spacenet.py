@@ -1,11 +1,10 @@
 """
-from __future__ import annotations
-
 References:
     https://medium.com/the-downlinq/the-spacenet-7-multi-temporal-urban-development-challenge-algorithmic-baseline-4515ec9bd9fe
     https://arxiv.org/pdf/2102.11958.pdf
     https://spacenet.ai/sn7-challenge/
 """
+from __future__ import annotations
 
 import ubelt as ub
 import os

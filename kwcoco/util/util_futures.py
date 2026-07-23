@@ -1,8 +1,7 @@
 """
-from __future__ import annotations
-
 Deprecated and functionality moved to ubelt
 """
+from __future__ import annotations
 
 from ubelt import Executor, JobPool
 
