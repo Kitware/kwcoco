@@ -371,17 +371,17 @@ class COCO(CocoDataset):
 
     def download(self, tarDir=None, imgIds=[]):
         """
-        Download COCO images from mscoco.org server.
+        Download images from their standard ``coco_url`` fields.
 
         Args:
             tarDir (str | PathLike | None): COCO results directory name
             imgIds (list): images to be downloaded
         """
-        if tarDir is not None:
-            self.reroot(tarDir)
-        if not imgIds:
-            imgIds = None
-        self._ensure_image_data(gids=imgIds)
+        if tarDir is None:
+            print('Please specify target directory')
+            return -1
+        image_ids = imgIds if imgIds else None
+        super().download(dpath=tarDir, image_ids=image_ids)
 
     def loadNumpyAnnotations(self, data):
         """

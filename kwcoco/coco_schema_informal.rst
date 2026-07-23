@@ -23,6 +23,7 @@ An informal spec is as follows:
     video = {
         'id': int,
         'name': str,  # a unique name for this video.
+        'coco_url': str,  # COCO-style remote URI for the video resource
 
         'width': int  # the base width of this video (all associated images must have this width)
         'height': int  # the base height of this video (all associated images must have this height)
@@ -46,6 +47,7 @@ An informal spec is as follows:
 
         'name': str,  # an encouraged but optional unique name (ideally not larger than 256 characters)
         'file_name': str,  # relative path to the "base" image data (optional if auxiliary items are specified)
+        'coco_url': str,  # standard MS-COCO remote URI for the image
 
         'width': int,   # pixel width of "base" image
         'height': int,  # pixel height of "base" image

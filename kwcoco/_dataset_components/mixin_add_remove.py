@@ -26,6 +26,7 @@ class MixinCocoAddRemove:
         Args:
             name (str): Unique name for this video.
             id (None | int): ADVANCED. Force using this image id.
+            coco_url (str): COCO-style remote URI for the video resource
             **kw : stores arbitrary key/value pairs in this new video
 
         Returns:
@@ -88,6 +89,7 @@ class MixinCocoAddRemove:
                  expect that "auxiliary" assets are eventually added.
             id (None | int): ADVANCED. Force using this image id.
             name (str): a unique key to identify this image
+            coco_url (str): standard MS-COCO remote URI for the main image data
             width (int): base width of the image
             height (int): base height of the image
             channels (ChannelSpec): specification of base channels.

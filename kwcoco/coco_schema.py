@@ -80,6 +80,14 @@ STRING = elem.STRING
 UUID = STRING
 PATH = STRING
 
+# JSON Schema's ``format`` keyword is not checked by the default validator.
+# Use a deliberately lightweight absolute-URI pattern so ordinary validation
+# rejects local paths and scheme-less strings.
+REMOTE_URI = STRING(
+    pattern=r'^[A-Za-z][A-Za-z0-9+.-]*:[^\s]+$',
+    description='An absolute remote URI with an explicit scheme',
+)
+
 KWCOCO_KEYPOINT = OBJECT(
     PROPERTIES={
         'xy': TUPLE(NUMBER, NUMBER, description='<x1, y1> in pixels'),
@@ -193,6 +201,9 @@ VIDEO = OBJECT(
         'id': INTEGER(description='An internal video identifier'),
         'name': NAME(description='A unique name for this video'),
         'caption': STRING(description='A video level text caption'),
+        'coco_url': REMOTE_URI(
+            description='A COCO-style remote URI for the video resource'
+        ),
         'resolution': (NUMBER | STRING | NULL)(
             description='a unit representing the size of a pixel in video space'
         ),
@@ -259,6 +270,18 @@ IMAGE = OBJECT(
                     )
                 )
                 | NULL,
+            ),
+            (
+                'coco_url',
+                REMOTE_URI(
+                    description=ub.paragraph(
+                        """
+            The standard MS-COCO remote URI for the main image data. The
+            :func:`CocoDataset.download` method downloads this resource to
+            ``file_name``.
+            """
+                    )
+                ),
             ),
             (
                 'width',

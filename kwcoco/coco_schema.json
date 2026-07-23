@@ -70,6 +70,11 @@
                     "id": {"type": "integer", "description": "An internal video identifier"},
                     "name": {"type": "string", "pattern": "[^/]+", "description": "A unique name for this video"},
                     "caption": {"type": "string", "description": "A video level text caption"},
+                    "coco_url": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^\\s]+$",
+                        "description": "A COCO-style remote URI for the video resource"
+                    },
                     "resolution": {
                         "anyOf": [
                             {"type": "number"},
@@ -111,6 +116,11 @@
                             {"type": "string", "pattern": "[^/]+", "description": "A unique name for the image. If unspecified the file_name should be used as the default value for the name property. Required if assets / auxiliary are specified."},
                             {"type": "null"}
                         ]
+                    },
+                    "coco_url": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^\\s]+$",
+                        "description": "The standard MS-COCO remote URI for the main image data. The :func:`CocoDataset.download` method downloads this resource to ``file_name``."
                     },
                     "width": {"type": "integer", "description": "The width of the image in image space pixels"},
                     "height": {"type": "integer", "description": "The height of the image in image space pixels"},

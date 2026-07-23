@@ -58,6 +58,7 @@
    +_build_hashid : function
    +_invalidate_hashid : function
    +_ensure_imgsize : function
+   +download : function
    +_ensure_image_data : function
    +missing_images : function
    +corrupted_images : function
