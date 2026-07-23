@@ -61,7 +61,7 @@ def main(cmdline=True, **kw):
 
         return kwcoco.__version__
 
-    modal.__class__.version = property(get_version)
+    modal.__class__.version = property(get_version) # type: ignore
 
     for cli_module in cli_modules:
         cli_config = None

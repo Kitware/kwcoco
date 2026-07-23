@@ -346,11 +346,11 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
         'annotations': [],
     }
 
-    lines = ub.readfrom(label_path).split('\n')
+    lines = ub.readfrom(label_path).split('\n')  # type: ignore
     lines = [line for line in lines if line]
     for line in lines:
-        color_text, name = re.split('\t+', line)
-        r, g, b = map(int, color_text.split(' '))
+        color_text, name = re.split('\t+', line)  # type: ignore
+        r, g, b = map(int, color_text.split(' '))  # type: ignore
         color = (r, g, b)
 
         # Parse the special camvid format

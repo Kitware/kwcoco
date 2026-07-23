@@ -21,7 +21,7 @@ from packaging.version import parse as Version
 try:
     import ujson # type: ignore
 except ImportError:
-    ujson = None
+    ujson = None  # type: ignore
 
 KWCOCO_USE_UJSON = bool(os.environ.get('KWCOCO_USE_UJSON'))
 

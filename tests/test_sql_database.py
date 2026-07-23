@@ -58,8 +58,12 @@ def test_api_compatability_msi_ooo_tracks():
     video_id = dct_dset.add_video(name='ooo_video')
 
     import kwarray
+    import numpy as np
+    import typing
 
-    rng = kwarray.ensure_rng(0)
+    rng = typing.cast(
+        np.random.RandomState, kwarray.ensure_rng(0, api='numpy')
+    )
     frame_order = list(range(9))
     rng.shuffle(frame_order)
 

@@ -194,5 +194,5 @@ def _average_precision(tpr, ppv):
         ydata = ydata[::-1]
     # Note: we could simply use sklearn.metrics.auc, which has more robust
     # checks.
-    ap = np.trapz(y=ydata, x=xdata)
+    ap = np.trapz(y=ydata, x=xdata)  # type: ignore
     return ap

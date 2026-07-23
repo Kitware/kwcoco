@@ -300,7 +300,7 @@ def _assign_confusion_vectors(
     iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh
 
     iou_thresh_to_y = {}
-    for iou_thresh_ in iou_thresh_list:
+    for iou_thresh_ in iou_thresh_list:  # type: ignore
         isvalid_lookup = {px: ious > iou_thresh_ for px, ious in iou_lookup.items()}
 
         y = _critical_loop(
@@ -476,13 +476,12 @@ def _critical_loop(
                     # valid match with the highest iou
                     cand_nmatches = true_nmatches.compress(available)
                     cand_validmatch = cand_ious > iou_thresh_
-                    ovidx = kwarray.arglexmax(
-                        [
+                    _items = [
                             cand_ious,
                             -cand_nmatches,
                             cand_validmatch,
-                        ]
-                    )
+                    ]
+                    ovidx = kwarray.arglexmax(_items)  # type: ignore
                 else:
                     raise KeyError(truth_reuse_policy)
                 ovmax = cand_ious[ovidx]
@@ -512,7 +511,7 @@ def _critical_loop(
                     cand_class_priority = pdist_priority[pred_cx][cand_true_cxs]
 
                     # ovidx = ub.argmax(zip(cand_class_priority, cand_ious))
-                    ovidx = kwarray.arglexmax([cand_ious, cand_class_priority])
+                    ovidx = kwarray.arglexmax([cand_ious, cand_class_priority])  # type: ignore
 
                     ovmax = cand_ious[ovidx]
                     tx = cand_true_idxs[ovidx]
@@ -557,9 +556,14 @@ def _critical_loop(
             y_txs.append(tx)
 
     # All pred boxes have been assigned to a truth box or the background.
-    # Mark available true boxes we failed to predict as false negatives
+    # Mark available true boxes we failed to predict as false negatives.
+    # Ignored truths were intentionally removed from assignment consideration
+    # above, so do not reintroduce them here as missed detections.
     bg_px = -1
-    unused_txs = np.where(true_nmatches == 0)[0]
+    unused_flags = true_nmatches == 0
+    if ignore_classes is not None:
+        unused_flags = unused_flags & ~true_ignore_flags
+    unused_txs = np.where(unused_flags)[0]
     n = len(unused_txs)
 
     unused_y_true = true_dets.class_idxs[unused_txs].tolist()

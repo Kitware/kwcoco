@@ -16,7 +16,7 @@ from typing import NamedTuple, Tuple, Any, Union
 import typing
 
 if typing.TYPE_CHECKING:
-    from typing import Dict, List, Union
+    from typing import Dict, List
     from collections.abc import Generator
 
 # backwards compat
@@ -68,7 +68,7 @@ def ensure_json_serializable(
         return c
 
     walker = ub.IndexableWalker(dict_)
-    for prefix, value in walker:
+    for prefix, value in walker:  # type: ignore
         new_value: Union[list, int, float, complex, str]
         if isinstance(value, tuple):
             new_value = list(value)

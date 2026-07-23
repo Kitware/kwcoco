@@ -141,7 +141,7 @@ def parse_version(fpath):
 
 
 project = 'kwcoco'
-copyright = '2025, Jon Crall'
+copyright = '2026, Jon Crall'
 author = 'Jon Crall'
 modname = 'kwcoco'
 
@@ -426,7 +426,9 @@ class PatchedPythonDomain(PythonDomain):
         https://github.com/sphinx-doc/sphinx/issues/3866
     """
 
-    def resolve_xref(self, env, fromdocname, builder, typ, target, node, contnode):
+    def resolve_xref(
+        self, env, fromdocname, builder, type, target, node, contnode
+    ):
         """
         Helps to resolves cross-references
         """
@@ -435,7 +437,7 @@ class PatchedPythonDomain(PythonDomain):
         if target.startswith('xdoc.'):
             target = 'xdoctest.' + target[3]
         return_value = super(PatchedPythonDomain, self).resolve_xref(
-            env, fromdocname, builder, typ, target, node, contnode
+            env, fromdocname, builder, type, target, node, contnode
         )
         return return_value
 
@@ -613,7 +615,13 @@ class GoogleStyleDocstringProcessor:
         return lines
 
     def process_docstring_callback(
-        self, app, what_: str, name: str, obj: Any, options: Any, lines: List[str]
+        self,
+        app,
+        what_: str,
+        name: str,
+        obj: Any,
+        options: Any,
+        lines: List[str],
     ) -> None:
         """
         Callback to be registered to autodoc-process-docstring
@@ -822,9 +830,11 @@ def create_doctest_figure(app, obj, name, lines):
     The idea is that each doctest that produces a figure should generate that
     and then that figure should be part of the docs.
     """
-    import xdoctest
     import sys
     import types
+
+    import xdoctest
+    import xdoctest.core
 
     if isinstance(obj, types.ModuleType):
         module = obj
@@ -946,7 +956,9 @@ def create_doctest_figure(app, obj, name, lines):
                     fig_num += 1
                     # path_name = path_sanatize(name)
                     path_name = (name).replace('.', '_')
-                    fig_fpath = src_fig_dpath / f'fig_{path_name}_{fig_num:03d}.jpeg'
+                    fig_fpath = (
+                        src_fig_dpath / f'fig_{path_name}_{fig_num:03d}.jpeg'
+                    )
                     fig.savefig(fig_fpath)
                     print(f'Wrote figure: {fig_fpath}')
                     to_insert_fpaths.append(
@@ -1002,7 +1014,9 @@ def create_doctest_figure(app, obj, name, lines):
             insert_index = end_index
         else:
             raise KeyError(INSERT_AT)
-        lines.insert(insert_index, '.. image:: {}'.format('..' / rel_to_root_fpath))
+        lines.insert(
+            insert_index, '.. image:: {}'.format('..' / rel_to_root_fpath)
+        )
         # lines.insert(insert_index, '.. image:: {}'.format(rel_to_root_fpath))
         # lines.insert(insert_index, '.. image:: {}'.format(rel_to_static_fpath))
         lines.insert(insert_index, '')
@@ -1015,8 +1029,9 @@ def postprocess_hyperlinks(app, doctree, docname):
     "autodoc-process-docstring" event.
     """
     # Your hyperlink postprocessing logic here
-    from docutils import nodes
     import pathlib
+
+    from docutils import nodes
 
     for node in doctree.traverse(nodes.reference):
         if 'refuri' in node.attributes:
@@ -1026,13 +1041,15 @@ def postprocess_hyperlinks(app, doctree, docname):
                     fpath = pathlib.Path(node.document['source'])
                     parent_dpath = fpath.parent
                     if (parent_dpath / refuri).exists():
-                        node.attributes['refuri'] = refuri.replace('.rst', '.html')
+                        node.attributes['refuri'] = refuri.replace(
+                            '.rst', '.html'
+                        )
                 else:
                     raise AssertionError
 
 
 def fix_rst_todo_section(lines):
-    new_lines = []
+    # new_lines = []
     for line in lines:
         ...
     ...
@@ -1040,6 +1057,7 @@ def fix_rst_todo_section(lines):
 
 def setup(app):
     import sphinx
+    import sphinx.application
 
     app: sphinx.application.Sphinx = app
     app.add_domain(PatchedPythonDomain, override=True)
@@ -1049,7 +1067,8 @@ def setup(app):
     docstring_processor = GoogleStyleDocstringProcessor()
     # https://stackoverflow.com/questions/26534184/can-sphinx-ignore-certain-tags-in-python-docstrings
     app.connect(
-        'autodoc-process-docstring', docstring_processor.process_docstring_callback
+        'autodoc-process-docstring',
+        docstring_processor.process_docstring_callback,
     )
 
     def copy(src, dst):

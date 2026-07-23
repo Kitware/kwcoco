@@ -5,19 +5,27 @@ We are currently working on porting this changelog to the specifications in
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.8.10 - Unreleased
+## Version 0.9.0 - Unreleased
 
 
 ### Changed
 * The `classes_of_interest` parameter to evaluate_detections now uses coercable YAML as input. Previous input formats were not reliable. This could result in minor breaking changes.
 * Reworked image association in detection metrics to reuse segmentation metrics code. The "name" is now used as the primary key, but fallbacks to older image id and filename methods are still supported.
 * Rework how special-cased labelme __metadata__ data is stored, use the COCO caption convention.
+* Started to breakup the `coco_dataset.py` monolith into a `_dataset_components` submodule.
+* Update finish-install to use UV and detect pipconf issues.
 
 ### Added
+* Add experimental `kwcoco.metrics.assignment_v2` candidate-index assignment prototype for reusable multi-IoU confusion-vector construction. It is not wired into the public evaluator and is not a drop-in semantic replacement for the original assignment implementation.
 * Add `disk_usage` argument to kwcoco stats.
 * Add channels option to coco stats.
 
 ### Fixed
+* Align assignment-v2 with the original implementation on defaults, strict IoU thresholding, ancestor-mode relabeling, and sparse bias handling while retaining documented intentional semantic differences.
+* Preserve dataset index integrity when removing a single annotation, and accept `CocoDataset` subclass instances in `coerce`.
+* Populate OpenMMLab `instance_id` values during conform and correct fluent dataset return annotations.
+* Fix direct CLI module entry points, default evaluation output paths, finish-install executable checks, and plot-stat width/cache handling.
+* Fix detection evaluation so ignored truth annotations are not emitted as false negatives after being removed from assignment consideration. This may change classless detection scores for datasets that contain ignored truth regions/classes.
 * Fix detection evaluation crash when inputs are empty
 * Fix degenerate case of AUC to fallback on Youden's J statistic
 

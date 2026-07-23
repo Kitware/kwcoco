@@ -58,7 +58,7 @@ class CocoToyDataCLI(scfg.DataConfig):
     )
     use_cache = scfg.Value(
         True,
-        isflag=1,
+        isflag=True,
         help=ub.paragraph(
             """
             if False, this will force the dataset to be regenerated.
@@ -144,4 +144,4 @@ class CocoToyDataCLI(scfg.DataConfig):
 __cli__ = CocoToyDataCLI
 
 if __name__ == '__main__':
-    __cli__._main()
+    __cli__.main()  # type: ignore

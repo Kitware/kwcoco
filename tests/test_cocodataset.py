@@ -179,6 +179,27 @@ def test_dump_causes_saved_status():
     assert dset._state['was_saved']
 
 
+def test_img_root_none_does_not_warn():
+    import warnings
+    import kwcoco
+
+    # Some historical code paths wrote this into dataset bodies, e.g. via
+    # CocoDataset.subset().  It is equivalent to leaving img_root unspecified,
+    # so it should not emit the img_root deprecation warning.
+    raw = {
+        'img_root': None,
+        'images': [],
+        'annotations': [],
+        'categories': [],
+    }
+    with warnings.catch_warnings(record=True) as records:
+        warnings.simplefilter('always')
+        dset = kwcoco.CocoDataset(raw)
+    messages = [str(record.message) for record in records]
+    assert not any('img_root' in message for message in messages)
+    assert dset.bundle_dpath is not None
+
+
 def test_ensure_video_does_not_duplicate():
     import kwcoco
 
@@ -227,3 +248,45 @@ def test_normalize_category_ids():
     start_id = -1
     self.normalize_category_ids(start_id=start_id, order=order)
     self.categories().lookup('name')[0:2] == order
+
+
+def test_boxsize_stats_handles_no_boxes():
+    import pytest
+    import kwcoco
+
+    dset = kwcoco.CocoDataset()
+    dset.add_image(file_name='empty.png')
+
+    infos = dset.boxsize_stats()
+    assert infos['perclass'] == {}
+    assert infos['all']['stats'] == {}
+
+    with pytest.raises(ValueError, match='without bounding boxes'):
+        dset.boxsize_stats(anchors=1)
+
+
+def test_remove_annotation_preserves_index():
+    import kwcoco
+
+    dset = kwcoco.CocoDataset.demo('shapes8')
+    remove_aid = next(iter(dset.anns))
+    remaining_aids = set(dset.anns) - {remove_aid}
+    remaining_gids = set(dset.imgs)
+
+    dset.remove_annotation(remove_aid)
+
+    assert remove_aid not in dset.anns
+    assert set(dset.anns) == remaining_aids
+    assert set(dset.imgs) == remaining_gids
+    dset._check_integrity()
+
+
+def test_coerce_accepts_cocodataset_subclass():
+    import kwcoco
+
+    class DemoCocoDataset(kwcoco.CocoDataset):
+        pass
+
+    dset = DemoCocoDataset()
+    assert DemoCocoDataset.coerce(dset) is dset
+    assert kwcoco.CocoDataset.coerce(dset) is dset

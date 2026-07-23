@@ -25,7 +25,7 @@ import warnings
 from kwcoco.util.dict_like import DictProxy
 
 
-class Measures(ub.NiceRepr, DictProxy):
+class Measures(ub.NiceRepr, DictProxy):  # type: ignore
     """
     Dict-like container for accumulated confusion counts and derived metrics.
 
@@ -540,7 +540,7 @@ class Measures(ub.NiceRepr, DictProxy):
                 combo_thresh_asc = np.hstack([combo_thresh_asc, nonfinite_vals])
                 combo_thresh_asc.sort()
 
-        new_thresh = combo_thresh_asc[::-1]
+        new_thresh = combo_thresh_asc[::-1]  # type: ignore
 
         # From this point on, the rest of the logic should (if the
         # implementation is correct) work with respect to an arbitrary choice
@@ -578,9 +578,9 @@ class Measures(ub.NiceRepr, DictProxy):
 
             # Find the locations where the thresholds from "these" measures
             # should be inserted into the combined measures.
-            right_idxs = np.searchsorted(combo_thresh_asc, thresholds, 'right')
-            left_idxs = len(combo_thresh_asc) - right_idxs
-            left_idxs = left_idxs.clip(0, len(combo_thresh_asc) - 1)
+            right_idxs = np.searchsorted(combo_thresh_asc, thresholds, 'right')  # type: ignore
+            left_idxs = len(combo_thresh_asc) - right_idxs  # type: ignore
+            left_idxs = left_idxs.clip(0, len(combo_thresh_asc) - 1)  # type: ignore
 
             # Accumulate these values from these measures into the appropriate
             # new threshold position. note: np.add.at is unbuffered
@@ -833,7 +833,7 @@ def reversable_diff(arr, assume_sorted=1, reverse=False):
     return diff_arr, prefix, suffix
 
 
-class PerClass_Measures(ub.NiceRepr, DictProxy):
+class PerClass_Measures(ub.NiceRepr, DictProxy):  # type: ignore
     """
     A container class mapping categories to :class:`Measures`.
     """
@@ -1518,7 +1518,7 @@ def populate_info(info):
                 try:
                     info['sklearn_ap'] = integrate.trapezoid(y=prec, x=rec)
                 except AttributeError:
-                    info['sklearn_ap'] = integrate.trapz(y=prec, x=rec)
+                    info['sklearn_ap'] = integrate.trapz(y=prec, x=rec)  # type: ignore
 
         info['ap_method'] = info.get('ap_method', 'pycocotools')
         if info['ap_method'] == 'pycocotools':

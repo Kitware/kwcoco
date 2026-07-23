@@ -334,7 +334,7 @@ def classification_report(
         perclass_df = perclass_df[perclass_df['support'] > 0]
 
     # combined_df = pd.DataFrame(combined_data, index=['ave/sum'])
-    combined_df = pd.DataFrame(combined_data, index=['combined'])
+    combined_df = pd.DataFrame(combined_data, index=['combined'])  # type: ignore
 
     metric_df = pd.concat([perclass_df, combined_df])
     metric_df.index.name = 'class'
@@ -342,7 +342,7 @@ def classification_report(
 
     pred_id = ['%s' % m for m in target_names]
     real_id = ['%s' % m for m in target_names]
-    confusion_df = pd.DataFrame(confusion, columns=pred_id, index=real_id)
+    confusion_df = pd.DataFrame(confusion, columns=pred_id, index=real_id)  # type: ignore
 
     if ascii_only:
         sum_glyph = 'sum-'
@@ -353,7 +353,7 @@ def classification_report(
     sum_pred_key = sum_glyph + 'p'
 
     to_append = pd.DataFrame(
-        [confusion.sum(axis=0)], columns=pred_id, index=[sum_pred_key]
+        [confusion.sum(axis=0)], columns=pred_id, index=[sum_pred_key]  # type: ignore
     )
     confusion_df = pd.concat([confusion_df, to_append], axis=0)
 
@@ -377,7 +377,7 @@ def classification_report(
             times_glyph = '×'
 
         cfsm_str = confusion_df.to_string(float_format=lambda x: '%.1f' % (x,))
-        log(
+        log(  # type: ignore
             'Confusion Matrix (real ' + times_glyph + ' pred) :\n' + ub.indent(cfsm_str)
         )
 
@@ -385,7 +385,7 @@ def classification_report(
         float_precision = 2
         float_format = '%.' + str(float_precision) + 'f'
         ext_report = metric_df.to_string(float_format=float_format)
-        log('\nEvaluation Metric Report:' + '\n' + ub.indent(ext_report))
+        log('\nEvaluation Metric Report:' + '\n' + ub.indent(ext_report))  # type: ignore
 
     report = {
         'metrics': metric_df,
@@ -423,11 +423,11 @@ def classification_report(
             for k, v in mcc_significance_scales.items():
                 if np.abs(mcc) >= k:
                     if verbose:
-                        log('classifier correlation is %s' % (v,))
+                        log('classifier correlation is %s' % (v,))  # type: ignore
                     break
             if verbose:
                 float_precision = 2
-                log(("MCC' = %." + str(float_precision) + 'f') % (mcc,))
+                log(("MCC' = %." + str(float_precision) + 'f') % (mcc,))  # type: ignore
             report['mcc'] = mcc
     except ValueError:
         report['mcc'] = None

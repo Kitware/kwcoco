@@ -62,7 +62,7 @@ class COCO(CocoDataset):
             def __init__(self, parent):
                 self.parent = parent
 
-            def getitem(self, gid):
+            def getitem(self, gid):  # type: ignore
                 aids = self.parent.index.gid_to_aids[gid]
                 anns = list(ub.take(self.parent.index.anns, aids))
                 return anns
@@ -203,11 +203,9 @@ class COCO(CocoDataset):
         else:
             valid_gids = set(imgIds)
 
-        if catIds:
-            hascat_gids = set()
-            for aids in ub.take(self.index.cid_to_aids, catIds):
-                hascat_gids |= set(self.annots(aids).lookup('image_id'))
-
+        for catId in catIds:
+            aids = self.index.cid_to_aids.get(catId, [])  # type: ignore
+            hascat_gids = set(self.annots(list(aids)).lookup('image_id'))
             valid_gids &= hascat_gids
         return sorted(valid_gids)
 
@@ -327,44 +325,44 @@ class COCO(CocoDataset):
                     img for img in res.dataset['images'] if img['id'] in imgIds
                 ]
                 for id, ann in enumerate(anns):
-                    ann['id'] = id + 1
+                    ann['id'] = id + 1  # type: ignore
             elif 'bbox' in anns[0] and not anns[0]['bbox'] == []:
                 res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
                 for id, ann in enumerate(anns):
-                    bb = ann['bbox']
+                    bb = ann['bbox']  # type: ignore
                     x1, x2, y1, y2 = [bb[0], bb[0] + bb[2], bb[1], bb[1] + bb[3]]
-                    if 'segmentation' not in ann:
-                        ann['segmentation'] = [[x1, y1, x1, y2, x2, y2, x2, y1]]
-                    ann['area'] = bb[2] * bb[3]
-                    ann['id'] = id + 1
-                    ann['iscrowd'] = 0
+                    if 'segmentation' not in ann:  # type: ignore
+                        ann['segmentation'] = [[x1, y1, x1, y2, x2, y2, x2, y1]]  # type: ignore
+                    ann['area'] = bb[2] * bb[3]  # type: ignore
+                    ann['id'] = id + 1  # type: ignore
+                    ann['iscrowd'] = 0  # type: ignore
             elif 'segmentation' in anns[0]:
                 res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
                 for id, ann in enumerate(anns):
                     # Unlike the original, using kwimage will support multiple
                     # segmentation formats, even in legacy mode.
-                    sseg = kwimage.Segmentation.coerce(ann['segmentation'])
+                    sseg = kwimage.Segmentation.coerce(ann['segmentation'])  # type: ignore
                     # ann['area'] = maskUtils.area(ann['segmentation'])
-                    if 'bbox' not in ann:
-                        ann['bbox'] = sseg.to_multi_polygon().box().to_coco()
+                    if 'bbox' not in ann:  # type: ignore
+                        ann['bbox'] = sseg.to_multi_polygon().box().to_coco()  # type: ignore
                         # ann['bbox'] = maskUtils.toBbox(ann['segmentation'])
-                    ann['id'] = id + 1
-                    ann['iscrowd'] = 0
+                    ann['id'] = id + 1  # type: ignore
+                    ann['iscrowd'] = 0  # type: ignore
             elif 'keypoints' in anns[0]:
                 res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
                 for id, ann in enumerate(anns):
-                    s = kwimage.Points.coerce(ann['keypoints']).to_coco()
+                    s = kwimage.Points.coerce(ann['keypoints']).to_coco()  # type: ignore
                     if len(s):
                         x = s[0::3]
                         y = s[1::3]
                         x0, x1, y0, y1 = np.min(x), np.max(x), np.min(y), np.max(y)
-                        ann['area'] = (x1 - x0) * (y1 - y0)
-                        ann['bbox'] = [x0, y0, x1 - x0, y1 - y0]
+                        ann['area'] = (x1 - x0) * (y1 - y0)  # type: ignore
+                        ann['bbox'] = [x0, y0, x1 - x0, y1 - y0]  # type: ignore
                     else:
-                        ann['area'] = 0
-                        ann['bbox'] = [0, 0, 0, 0]
+                        ann['area'] = 0  # type: ignore
+                        ann['bbox'] = [0, 0, 0, 0]  # type: ignore
                         print('Warning: annotation missing keypoints')
-                    ann['id'] = id + 1
+                    ann['id'] = id + 1  # type: ignore
         print('DONE (t={:0.2f}s)'.format(time.time() - tic))
 
         res.dataset['annotations'] = anns

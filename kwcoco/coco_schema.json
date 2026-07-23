@@ -124,7 +124,7 @@
                     "frame_index": {"type": "integer", "description": "Used to temporally order the images in a video"},
                     "channels": {
                         "anyOf": [
-                            {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
+                            {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with delayed_image.channel_spec.ChannelSpec", "title": "CHANNEL_SPEC"},
                             {"type": "null"}
                         ]
                     },
@@ -142,7 +142,7 @@
                             "type": "object",
                             "properties": {
                                 "file_name": {"type": "string"},
-                                "channels": {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
+                                "channels": {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with delayed_image.channel_spec.ChannelSpec", "title": "CHANNEL_SPEC"},
                                 "id": {"type": "integer", "description": "The id of the asset (option for now, but will be required in the future when assets are moved to their own table)"},
                                 "image_id": {"type": "integer", "description": "The image id this asset is associated with (option for now, but will be required in the future)"},
                                 "width": {"type": "integer", "description": "The width in asset-space pixels"},
@@ -160,7 +160,7 @@
                             "type": "object",
                             "properties": {
                                 "file_name": {"type": "string"},
-                                "channels": {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with kwcoco.ChannelSpec", "title": "CHANNEL_SPEC"},
+                                "channels": {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with delayed_image.channel_spec.ChannelSpec", "title": "CHANNEL_SPEC"},
                                 "id": {"type": "integer", "description": "The id of the asset (option for now, but will be required in the future when assets are moved to their own table)"},
                                 "image_id": {"type": "integer", "description": "The image id this asset is associated with (option for now, but will be required in the future)"},
                                 "width": {"type": "integer", "description": "The width in asset-space pixels"},

@@ -937,7 +937,7 @@ class CocoEvaluator:
 
                     ovr_measures2 = ovr_binvecs2.measures(**measurekw)['perclass']
                     # print('ovr_measures2 = {!r}'.format(ovr_measures2))
-                    result.ovr_measures2 = ovr_measures2
+                    result.ovr_measures2 = ovr_measures2  # type: ignore
 
                 reskey = ub.urepr(
                     dict(area_range=minmax_key, iou_thresh=iou_thresh),
@@ -945,7 +945,7 @@ class CocoEvaluator:
                     explicit=1,
                     itemsep='',
                     nobr=1,
-                    sv=1,
+                    sv=1,  # type: ignore
                 )
                 resdata[reskey] = result
                 if coco_eval.config['force_pycocoutils']:
@@ -1042,7 +1042,7 @@ def dmet_area_weights(
         yield minmax_key, minmax, new_weights
 
 
-class CocoResults(ub.NiceRepr, DictProxy):
+class CocoResults(ub.NiceRepr, DictProxy):  # type: ignore
     """
     CommandLine:
         xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_evaluator.py CocoResults
@@ -1083,7 +1083,7 @@ class CocoResults(ub.NiceRepr, DictProxy):
     """
 
     def __init__(results, resdata=None):
-        results.proxy = resdata
+        results.proxy = resdata  # type: ignore
 
     def dump_figures(results, out_dpath, expt_title=None, figsize='auto', tight=True):
         for key, result in results.items():
@@ -1180,7 +1180,7 @@ class CocoSingleResult(ub.NiceRepr):
                 'nocls_measures': result.nocls_measures,
                 'ovr_measures': result.ovr_measures,
             },
-            sv=1,
+            sv=1,  # type: ignore
         )
         return text
 
@@ -1233,7 +1233,7 @@ class CocoSingleResult(ub.NiceRepr):
         result, out_dpath, expt_title=None, figsize='auto', tight=True, verbose=1
     ):
         if expt_title is None:
-            expt_title = result.meta.get('expt_title', '')
+            expt_title = result.meta.get('expt_title', '')  # type: ignore
         metrics_dpath = ub.ensuredir(os.fspath(out_dpath))
 
         nocls_measures = result.nocls_measures
@@ -1285,13 +1285,13 @@ class CocoSingleResult(ub.NiceRepr):
         if hasattr(result, 'ovr_measures2'):
             ovr_measures2 = result.ovr_measures2
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
-            ovr_measures2.draw(key='pr', fnum=2, prefix='coi-vs-bg-only')
+            ovr_measures2.draw(key='pr', fnum=2, prefix='coi-vs-bg-only')  # type: ignore
             _writefig(
                 fig, metrics_dpath, 'ovr_pr_coi_vs_bg.png', figsize, verbose, tight
             )
 
             fig = kwplot.figure(fnum=2, pnum=(1, 1, 1), doclf=True, **figkw)
-            ovr_measures2.draw(key='roc', fnum=2, prefix='coi-vs-bg-only')
+            ovr_measures2.draw(key='roc', fnum=2, prefix='coi-vs-bg-only')  # type: ignore
             _writefig(
                 fig, metrics_dpath, 'ovr_roc_coi_vs_bg.png', figsize, verbose, tight
             )

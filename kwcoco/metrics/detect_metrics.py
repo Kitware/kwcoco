@@ -82,6 +82,7 @@ class DetectionMetrics(ub.NiceRepr):
 
     gid_to_true_dets: Dict[int, kwimage.Detections]
     gid_to_pred_dets: Dict[int, kwimage.Detections]
+    _imgname_to_gid: dict[str, int]
 
     def __init__(dmet, classes: kwcoco.CategoryTree | None = None) -> None:
         dmet.classes = classes
@@ -120,8 +121,12 @@ class DetectionMetrics(ub.NiceRepr):
         all_pxs = cfsn_data['pxs']
 
         # Initialize new annotation-id columns to add to confusion vectors
-        cfsn_pred_aids = np.full(len(all_gids), fill_value=-1, dtype=int)
-        cfsn_true_aids = np.full(len(all_gids), fill_value=-1, dtype=int)
+        cfsn_pred_aids: np.ndarray = np.full(
+            len(all_gids), fill_value=-1, dtype=int
+        )
+        cfsn_true_aids: np.ndarray = np.full(
+            len(all_gids), fill_value=-1, dtype=int
+        )
 
         # For each image
         unique_gids, grouped_indexes = kwarray.group_indices(all_gids)
@@ -397,10 +402,10 @@ class DetectionMetrics(ub.NiceRepr):
         _tracking_probs = bool(track_probs)
         iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else iou_thresh
 
-        iou_to_yaccum = {t: ub.ddict(list) for t in iou_thresh_list}
+        iou_to_yaccum = {t: ub.ddict(list) for t in iou_thresh_list}  # type: ignore
 
         if _tracking_probs:
-            iou_to_probaccum = {t: [] for t in iou_thresh_list}
+            iou_to_probaccum = {t: [] for t in iou_thresh_list}  # type: ignore
 
         if gids is None:
             gids = sorted(dmet._imgname_to_gid.values())
@@ -443,11 +448,11 @@ class DetectionMetrics(ub.NiceRepr):
                 max_dets=max_dets,
                 truth_reuse_policy=truth_reuse_policy,
             )
-            job.gid = gid
+            job.gid = gid  # type: ignore
 
         for job in ub.ProgIter(jobs.jobs, desc='assign detections', verbose=verbose):
             iou_thresh_to_y = job.result()
-            gid = job.gid
+            gid = job.gid  # type: ignore
 
             for t, y in iou_thresh_to_y.items():
                 y_accum = iou_to_yaccum[t]
@@ -495,13 +500,13 @@ class DetectionMetrics(ub.NiceRepr):
                 list(y_accum.items()), desc='ndarray convert', verbose=verbose
             ):
                 # Try to use 32 bit types for large evaluation problems
-                kw = dict()
+                dtype = None
                 if k in {'iou', 'score', 'weight'}:
-                    kw['dtype'] = np.float32
+                    dtype = np.float32
                 if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
-                    kw['dtype'] = np.int32
+                    dtype = np.int32
                 try:
-                    _data[k] = np.asarray(v, **kw)
+                    _data[k] = np.asarray(v, dtype=dtype)
                 except TypeError:
                     _data[k] = np.asarray(v)
 
@@ -1117,7 +1122,7 @@ class DetectionMetrics(ub.NiceRepr):
             # Build random variables
             from kwarray import distributions
 
-            DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)
+            DiscreteUniform = distributions.DiscreteUniform.seeded(rng=rng)  # type: ignore
 
             def _parse_arg(key, default):
                 value = kwargs.get(key, default)
@@ -1503,13 +1508,13 @@ def pycocotools_confusion_vectors(dmet, evaler, iou_thresh=0.5, verbose=0):
             list(y_accum.items()), desc='ndarray convert', verbose=verbose
         ):
             # Try to use 32 bit types for large evaluation problems
-            kw = dict()
+            dtype = None
             if k in {'iou', 'score', 'weight'}:
-                kw['dtype'] = np.float32
+                dtype = np.float32
             if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
-                kw['dtype'] = np.int32
+                dtype = np.int32
             try:
-                _data[k] = np.asarray(v, **kw)
+                _data[k] = np.asarray(v, dtype=dtype)
             except TypeError:
                 _data[k] = np.asarray(v)
 

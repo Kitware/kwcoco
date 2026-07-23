@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = ubelt
+source = kwcoco
 
 [report]
 exclude_lines =
@@ -20,7 +20,5 @@ exclude_lines =
     .*if six.PY2:
 
 omit =
-    ubelt/tests/*
-    ubelt/_win32_links.py
-    ubelt/__main__.py
+    kwcoco/__main__.py
     */setup.py

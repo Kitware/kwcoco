@@ -55,7 +55,7 @@ class ObjectList1D(ub.NiceRepr):
         >>> self.lookup(['id'])
     """
 
-    def __init__(self, ids, dset, key):
+    def __init__(self, ids, dset, key):  # type: ignore
         """
         Args:
             ids (List[int]): list of ids
@@ -93,7 +93,7 @@ class ObjectList1D(ub.NiceRepr):
         """
         if isinstance(index, slice):
             subids = self._ids[index]
-            newself = self.__class__(subids, self._dset)
+            newself = self.__class__(subids, self._dset)  # type: ignore
             return newself
         else:
             return self._ids[index]
@@ -125,7 +125,7 @@ class ObjectList1D(ub.NiceRepr):
             ObjectList1D
         """
         subids = list(ub.unique(self._ids))
-        newself = self.__class__(subids, self._dset)
+        newself = self.__class__(subids, self._dset)  # type: ignore
         return newself
 
     @property
@@ -194,7 +194,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> assert len(self.take([0, 2, 3])) == 3
         """
         subids = list(ub.take(self._ids, idxs))
-        newself = self.__class__(subids, self._dset)
+        newself = self.__class__(subids, self._dset)  # type: ignore
         return newself
 
     def compress(self, flags):
@@ -210,7 +210,7 @@ class ObjectList1D(ub.NiceRepr):
             >>> assert len(self.compress([True, False, True])) == 2
         """
         subids = list(ub.compress(self._ids, flags))
-        newself = self.__class__(subids, self._dset)
+        newself = self.__class__(subids, self._dset)  # type: ignore
         return newself
 
     def peek(self):
@@ -517,8 +517,16 @@ class ObjectGroups(ub.NiceRepr):
         self._groups = groups
         self._dset = dset
 
-    def _lookup(self, key):
-        return self._lookup(key)  # broken?
+    def _lookup(self, key: str) -> None:
+        """Deprecated private alias for :meth:`lookup`.
+
+        Historically this method was accidentally recursive. Keep the private
+        method as an explicit unsupported path instead of failing with an
+        unhelpful RecursionError.
+        """
+        raise NotImplementedError(
+            'ObjectGroups._lookup is not implemented; use ObjectGroups.lookup instead'
+        )
 
     def __getitem__(self, index):
         if isinstance(index, slice):
@@ -538,8 +546,8 @@ class ObjectGroups(ub.NiceRepr):
         Returns:
             ObjectList1D
         """
-        flat_ids = list(ub.flatten(self))
-        return self._cls1d(flat_ids, self._dset)
+        flat_ids = list(ub.flatten(self))  # type: ignore
+        return self._cls1d(flat_ids, self._dset)  # type: ignore
 
     def __nice__(self) -> str:
         # import timerit
@@ -551,7 +559,9 @@ class ObjectGroups(ub.NiceRepr):
         num = len(self._groups)
         mean = np.mean(len_list)
         std = np.std(len_list)
-        nice = 'n={!r}, {}={:.1f}, {}={:.1f}'.format(num, mu, mean, sigma, std)
+        nice = 'n={!r}, {}={:.1f}, {}={:.1f}'.format(
+            num, mu, float(mean), sigma, float(std)
+        )
         return nice
 
 

@@ -182,7 +182,7 @@ class CocoImage(_CocoObject):
         Returns:
             Annots: a 1d annotations object referencing annotations in this image
         """
-        return self.dset.annots(image_id=self.img['id'])
+        return self.dset.annots(image_id=self.img['id'])  # type: ignore
 
     def __nice__(self):
         """
@@ -203,8 +203,8 @@ class CocoImage(_CocoObject):
 
         stats = ub.udict(self.stats())
         stats = stats.map_values(str)
-        stats = stats.map_values(partial(smart_truncate, max_length=32, trunc_loc=0.5))
-        return ub.urepr(stats, compact=1, nl=0)
+        stats = stats.map_values(partial(smart_truncate, max_length=32, trunc_loc=0.5))  # type: ignore
+        return ub.urepr(stats, compact=1, nl=0)  # type: ignore
 
     def stats(self):
         """ """
@@ -745,7 +745,7 @@ class CocoImage(_CocoObject):
                 The name of the file relative to the bundle directory. If
                 unspecified, imdata must be given.
 
-            channels (str | kwcoco.FusedChannelSpec | None):
+            channels (str | delayed_image.channel_spec.FusedChannelSpec | None):
                 The channel code indicating what each of the bands represents.
                 These channels should be disjoint wrt to the existing data in
                 this image (this is not checked).
@@ -788,10 +788,11 @@ class CocoImage(_CocoObject):
         Example:
             >>> from kwcoco.coco_image import *  # NOQA
             >>> import kwcoco
+            >>> from delayed_image.channel_spec import FusedChannelSpec
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> coco_img = dset.coco_image(1)
             >>> imdata = np.random.rand(32, 32, 5)
-            >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
+            >>> channels = FusedChannelSpec.coerce('Aux:5')
             >>> coco_img.add_asset(imdata=imdata, channels=channels)
 
         Example:
@@ -888,7 +889,7 @@ class CocoImage(_CocoObject):
                 #             absolute path.
                 #             '''))
                 # else:
-                fpath = join(self.bundle_dpath, file_name)
+                fpath = join(self.bundle_dpath, file_name)  # type: ignore
                 kwimage.imwrite(fpath, imdata)
             else:
                 obj['imdata'] = imdata
@@ -929,7 +930,7 @@ class CocoImage(_CocoObject):
         Args:
             gid (int): image id to load
 
-            channels (kwcoco.FusedChannelSpec): specific channels to load.
+            channels (delayed_image.channel_spec.FusedChannelSpec): specific channels to load.
                 if unspecified, all channels are loaded.
 
             space (str):
@@ -1009,11 +1010,12 @@ class CocoImage(_CocoObject):
             >>> # dictionary itself.
             >>> from kwcoco.coco_image import *  # NOQA
             >>> import kwcoco
+            >>> from delayed_image.channel_spec import FusedChannelSpec
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8-multispectral')
             >>> coco_img = dset.coco_image(1)
             >>> imdata = np.random.rand(6, 6, 5)
             >>> imdata[:] = np.arange(5)[None, None, :]
-            >>> channels = kwcoco.FusedChannelSpec.coerce('Aux:5')
+            >>> channels = FusedChannelSpec.coerce('Aux:5')
             >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
             >>> delayed = coco_img.imdelay(channels='B1|Aux:2:4')
             >>> final = delayed.finalize()
@@ -1089,6 +1091,7 @@ class CocoImage(_CocoObject):
             if info.get('chan_construct', None) is not None:
                 include_flag = requested is None
                 if not include_flag:
+                    assert requested is not None
                     if requested.intersection(info['channels']):
                         include_flag = True
                 if include_flag:
@@ -1168,14 +1171,14 @@ class CocoImage(_CocoObject):
                 delayed = delayed.take_channels(requested)
 
             if hasattr(delayed, 'components'):
-                if len(delayed.components) == 1:
-                    delayed = delayed.components[0]
+                if len(delayed.components) == 1:  # type: ignore
+                    delayed = delayed.components[0]  # type: ignore
 
             if space in {'image', 'auxiliary', 'asset'}:
                 pass
             elif space == 'video':
                 warp_vid_from_img = self.img.get('warp_img_to_vid', None)
-                delayed = delayed.warp(
+                delayed = delayed.warp(  # type: ignore
                     warp_vid_from_img,
                     dsize=dsize,
                     interpolation=interpolation,
@@ -1190,7 +1193,7 @@ class CocoImage(_CocoObject):
             factor = self._scalefactor_for_resolution(
                 space=space, resolution=resolution, RESOLUTION_KEY=RESOLUTION_KEY
             )
-            delayed = delayed.scale(
+            delayed = delayed.scale(  # type: ignore
                 factor, antialias=antialias, interpolation=interpolation
             )
 
@@ -1345,7 +1348,7 @@ class CocoImage(_CocoObject):
             space (str): the space to the resolution of.
                 Can be either "image", "video", or "asset".
 
-            channel (str | kwcoco.FusedChannelSpec | None):
+            channel (str | delayed_image.channel_spec.FusedChannelSpec | None):
                 a channel that identifies a single asset, only relevant if
                 asking for asset space
 
@@ -1461,7 +1464,7 @@ class CocoImage(_CocoObject):
             resolution (str | float | int):
                 the resolution (ideally with units) you want.
 
-            channel (str | kwcoco.FusedChannelSpec | None):
+            channel (str | delayed_image.channel_spec.FusedChannelSpec | None):
                 a channel that identifies a single asset, only relevant if
                 asking for asset space
 
@@ -1514,11 +1517,11 @@ class CocoImage(_CocoObject):
 
         # Get annotations in "Image Space"
         if aids is None:
-            annots = coco_img.dset.annots(image_id=coco_img.img['id'])
+            annots = coco_img.dset.annots(image_id=coco_img.img['id'])  # type: ignore
         else:
             # We already know the annots we want (assume the user
             # specified them correctly and they belong to this image).
-            annots = coco_img.dset.annots(aids)
+            annots = coco_img.dset.annots(aids)  # type: ignore
         imgspace_dets = annots.detections
 
         # Warp them into the requested space

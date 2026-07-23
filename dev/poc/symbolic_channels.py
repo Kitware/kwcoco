@@ -4,6 +4,7 @@ pip install lark
 
 import ubelt as ub
 import lark
+from delayed_image.channel_spec import ChannelSpec, FusedChannelSpec
 
 
 SENSOR_CHAN_GRAMMAR = ub.codeblock(
@@ -275,20 +276,20 @@ def sensor_channel_lark():
 
         ti = timerit.Timerit(100, bestof=10, verbose=1, unit='us')
 
-        for timer in ti.reset('kwcoco.ChannelSpec'):
+        for timer in ti.reset('ChannelSpec'):
             with timer:
-                chan_spec = kwcoco.ChannelSpec.coerce(code).normalize()
+                chan_spec = ChannelSpec.coerce(code).normalize()
 
         try:
             # Is this fused
-            fchan_spec = kwcoco.FusedChannelSpec.coerce(code).normalize()
+            fchan_spec = FusedChannelSpec.coerce(code).normalize()
         except Exception:
             print('* not fused')
             fchan_spec = None
         else:
-            for timer in ti.reset('kwcoco.FusedChannelSpec'):
+            for timer in ti.reset('FusedChannelSpec'):
                 with timer:
-                    kwcoco.FusedChannelSpec.coerce(code).normalize()
+                    FusedChannelSpec.coerce(code).normalize()
 
         for timer in ti.reset('lark sensor_channel_parser_python'):
             with timer:

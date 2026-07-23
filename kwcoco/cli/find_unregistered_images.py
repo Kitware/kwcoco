@@ -95,11 +95,11 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
             >>> cls = FindUnregisteredImagesCLI
             >>> cls.main(cmdline=cmdline, **kwargs)
         """
-        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
+        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
         from kwcoco.util.util_rich import rich_print
 
         if config.verbose:
-            rich_print('config = ' + ub.urepr(config, nl=1))
+            rich_print('config = ' + ub.urepr(config, nl=1))  # type: ignore
         import os
         import kwcoco
         from kwutil import util_path
@@ -137,7 +137,7 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
         fpath_sets = ub.udict(fpath_sets)
         fpath_set_sizes = fpath_sets.map_values(len)
         if config.verbose:
-            rich_print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))
+            rich_print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))  # type: ignore
 
         unregistered_fpaths = fpath_sets['unregistered']
 
@@ -150,7 +150,7 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
                         ub.urepr([os.fspath(f) for f in unregistered_fpaths], nl=1)
                     )
                 )
-                rich_print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))
+                rich_print('fpath_set_sizes = ' + ub.urepr(fpath_set_sizes, align=':'))  # type: ignore
             else:
                 for f in unregistered_fpaths:
                     print(os.fspath(f))

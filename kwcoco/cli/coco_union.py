@@ -18,7 +18,7 @@ class CocoUnionCLI(scfg.DataConfig):
 
     absolute = scfg.Value(
         False,
-        isflag=1,
+        isflag=True,
         help=ub.paragraph(
             """
             if True, converts paths to absolute paths before doing union
@@ -144,4 +144,4 @@ if __name__ == '__main__':
     CommandLine:
         python -m kwcoco.cli.coco_union
     """
-    __cli__._main()
+    __cli__.main()  # type: ignore

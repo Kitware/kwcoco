@@ -78,7 +78,7 @@ class Element(dict):
         'examples': NotImplemented,
     }
 
-    def __init__(self, base, options={}, _magic=None):
+    def __init__(self, base, options=None, _magic=None):
         """
         Args:
             base (dict): the keys / values this schema must contain
@@ -90,6 +90,8 @@ class Element(dict):
         """
         self._base = base
 
+        if options is None:
+            options = {}
         if isinstance(options, (set, list, tuple)):
             options = {k: None for k in options}
 
@@ -255,7 +257,7 @@ class ContainerElements:
         {'type': 'object', 'properties': {}}
     """
 
-    def ARRAY(self, TYPE={}, **kw):
+    def ARRAY(self, TYPE=None, **kw):
         """
         https://json-schema.org/understanding-json-schema/reference/array.html
 
@@ -266,6 +268,9 @@ class ContainerElements:
             >>> schema.validate()
             {'type': 'array', 'items': {}, 'minItems': 3}
         """
+
+        if TYPE is None:
+            TYPE = {}
 
         def _magic(kw):
             numItems = kw.pop('numItems', None)
@@ -291,7 +296,7 @@ class ContainerElements:
         )
         return self(**_magic(kw))
 
-    def OBJECT(self, PROPERTIES={}, **kw):
+    def OBJECT(self, PROPERTIES=None, **kw):
         """
         https://json-schema.org/understanding-json-schema/reference/object.html
 
@@ -332,6 +337,9 @@ class ContainerElements:
             }
 
         """
+        if PROPERTIES is None:
+            PROPERTIES = {}
+
         self = Element(
             base={'type': 'object', 'properties': PROPERTIES},
             options={

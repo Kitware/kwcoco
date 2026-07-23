@@ -3,6 +3,44 @@ import kwcoco
 from kwcoco.metrics.helpers import associate_images
 
 
+
+
+def test_ignored_truth_without_predictions_is_not_false_negative():
+    """
+    Ignored truth annotations should not be reintroduced as unmatched truth
+    rows after they are removed from assignment consideration.
+    """
+    from kwcoco.metrics.assignment import _assign_confusion_vectors
+    import kwimage
+    import kwcoco
+    import numpy as np
+
+    classes = kwcoco.CategoryTree.from_mutex(['cat', 'ignore'])
+    true_dets = kwimage.Detections(
+        boxes=kwimage.Boxes(np.array([[0, 0, 10, 10]]), 'xywh'),
+        class_idxs=np.array([classes.index('ignore')]),
+        classes=classes,
+    )
+    pred_dets = kwimage.Detections(
+        boxes=kwimage.Boxes(np.empty((0, 4)), 'xywh'),
+        scores=np.empty(0),
+        class_idxs=np.empty(0, dtype=int),
+        classes=classes,
+    )
+
+    y = _assign_confusion_vectors(
+        true_dets,
+        pred_dets,
+        classes=classes,
+        ignore_classes='ignore',
+        compat='mutex',
+    )
+
+    assert y['true'] == []
+    assert y['pred'] == []
+    assert y['txs'] == []
+    assert y['pxs'] == []
+
 def test_truth_reuse_policy():
     """
     Create multiple predicted bounding boxes that overlap the same truth

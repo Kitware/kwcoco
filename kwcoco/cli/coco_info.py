@@ -38,7 +38,7 @@ class CocoFileHelper:
                 raise Exception(
                     'Currently only zipfiles with exactly 1 kwcoco member are supported'
                 )
-            self.file = zfile.open(members[0], mode=self.mode)
+            self.file = zfile.open(members[0], mode=self.mode)  # type: ignore
         else:
             self.file = open(fpath, mode=self.mode)
         return self.file
@@ -198,7 +198,7 @@ class CocoInfoCLI(scfg.DataConfig):
             def rich_print(msg):
                 _raw_rich_print(_rich_escape(msg))
         except ImportError:
-            rich_print = print
+            rich_print = print  # type: ignore
 
         if config.verbose:
             rich_print('config = ' + ub.urepr(config, nl=1))
@@ -248,7 +248,7 @@ class CocoInfoCLI(scfg.DataConfig):
         _cocofile = CocoFileHelper(fpath)
         try:
             file = _cocofile._open()
-            ijson_parser = ijson_ext.parse(file, use_float=True)
+            ijson_parser = ijson_ext.parse(file, use_float=True)  # type: ignore
 
             config_table_keys = {
                 'show_info': 'info',
@@ -308,7 +308,7 @@ class CocoInfoCLI(scfg.DataConfig):
             parent = 'info'
             if parent_to_num[parent] > 0:
                 # Hack for info, which might not exist and is enabled by default
-                info_iter = ijson_ext.items(ijson_parser, prefix=parent)
+                info_iter = ijson_ext.items(ijson_parser, prefix=parent)  # type: ignore
                 print(f'"{parent}": ')
                 try:
                     info_section = next(info_iter)
@@ -346,7 +346,7 @@ class CocoInfoCLI(scfg.DataConfig):
                     if prev_parent is not sentinel:
                         print(',')
 
-                    obj_iter = ijson_ext.items(ijson_parser, prefix=f'{parent}.item')
+                    obj_iter = ijson_ext.items(ijson_parser, prefix=f'{parent}.item')  # type: ignore
 
                     print(f'"{parent}": [')
 

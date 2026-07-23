@@ -154,8 +154,12 @@ def test_with_multiple_images_and_some_have_no_truth():
     import kwimage
     import kwarray
     import kwarray.distributions
+    import numpy as np
+    import typing
 
-    rng = kwarray.ensure_rng(4329012312)
+    rng = typing.cast(
+        np.random.RandomState, kwarray.ensure_rng(4329012312, api='numpy')
+    )
 
     dmet = DetectionMetrics()
 

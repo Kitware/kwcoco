@@ -102,7 +102,7 @@ def grab_domain_net():
                 zip_fpath = ub.grabdata(
                     info['url'], dpath=dpath, hash_prefix=info.get('sha512', 'x' * 64)
                 )
-                info['fpath'] = zip_fpath
+                info['fpath'] = zip_fpath  # type: ignore
             except Exception as ex:
                 print('ex = {!r}'.format(ex))
                 errors.append(repr(ex))

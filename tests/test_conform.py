@@ -17,3 +17,7 @@ def test_conform_mmlab():
 
         assert sorted(frame_ids) == frame_ids
         assert sorted(frame_idxs) == frame_idxs
+
+    tracked_annots = [ann for ann in dset.anns.values() if 'track_id' in ann]
+    assert tracked_annots
+    assert all(ann['instance_id'] == ann['track_id'] for ann in tracked_annots)

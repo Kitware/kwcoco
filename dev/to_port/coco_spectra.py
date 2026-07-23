@@ -240,6 +240,7 @@ def main(cmdline=True, **kwargs):
     Example:
         >>> from geowatch.cli.coco_spectra import *  # NOQA
         >>> import kwcoco
+        >>> from delayed_image.channel_spec import FusedChannelSpec
         >>> test_dpath = ub.Path.appdir('geowatch/tests/cli/spectra').ensuredir()
         >>> image_fpath = test_dpath + '/intensityhist_demo.jpg'
         >>> coco_dset = kwcoco.CocoDataset.demo('vidshapes-msi-multisensor-videos1-frames2-gsize8')
@@ -304,12 +305,12 @@ def main(cmdline=True, **kwargs):
     include_channels = (
         None
         if include_channels is None
-        else kwcoco.FusedChannelSpec.coerce(include_channels)
+        else FusedChannelSpec.coerce(include_channels)
     )
     exclude_channels = (
         None
         if exclude_channels is None
-        else kwcoco.FusedChannelSpec.coerce(exclude_channels)
+        else FusedChannelSpec.coerce(exclude_channels)
     )
 
     if config['valid_range'] is not None:
@@ -802,9 +803,9 @@ def ensure_intensity_stats(
             elif num_channels == 1:
                 channels = 'r|g|b'
             else:
-                channels = kwcoco.FusedChannelSpec.coerce(num_channels)
+                channels = FusedChannelSpec.coerce(num_channels)
 
-        channels = kwcoco.FusedChannelSpec.coerce(channels)
+        channels = FusedChannelSpec.coerce(channels)
         declared_channel_list = channels.as_list()
 
         quantization = obj.get('quantization', None)

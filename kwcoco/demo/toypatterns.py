@@ -137,9 +137,9 @@ class CategoryPatterns:
 
         # keep track of which keypoints belong to which categories
         self.categories = categories
-        self.cname_to_kp = {c['name']: c.get('keypoints', []) for c in self.categories}
+        self.cname_to_kp = {c['name']: c.get('keypoints', []) for c in self.categories}  # type: ignore
 
-        self.obj_catnames = sorted([c['name'] for c in self.categories])
+        self.obj_catnames = sorted([c['name'] for c in self.categories])  # type: ignore
         self.kp_catnames = sorted(ub.flatten(self.cname_to_kp.values()))
 
         kpname_to_cat = {
@@ -152,17 +152,17 @@ class CategoryPatterns:
         #     ub.flatten([self.cname_to_kp.get(cname, [])
         #                 for cname in self.obj_catnames])
         # )
-        self.cname_to_cid = {cat['name']: cat['id'] for cat in self.categories}
-        self.cname_to_cx = {cat['name']: cx for cx, cat in enumerate(self.categories)}
+        self.cname_to_cid = {cat['name']: cat['id'] for cat in self.categories}  # type: ignore
+        self.cname_to_cx = {cat['name']: cx for cx, cat in enumerate(self.categories)}  # type: ignore
 
     def __len__(self):
         return len(self.obj_catnames)
 
     def __getitem__(self, index):
-        return self.categories[index]
+        return self.categories[index]  # type: ignore
 
     def __iter__(self):
-        for cat in self.categories:
+        for cat in self.categories:  # type: ignore
             yield cat
 
     def index(self, name):
@@ -170,10 +170,10 @@ class CategoryPatterns:
 
     def get(self, index, default=ub.NoParam):
         if default is ub.NoParam:
-            return self.categories[index]
+            return self.categories[index]  # type: ignore
         else:
             try:
-                return self.categories[index]
+                return self.categories[index]  # type: ignore
             except KeyError:
                 return default
 
@@ -385,11 +385,11 @@ class CategoryPatterns:
         fg_scale = np.float32(self.fg_scale)
 
         if chip is not None:
-            fgdata = kwarray.standard_normal(
+            fgdata = kwarray.standard_normal(  # type: ignore
                 chip.shape,
-                std=fg_scale,
-                mean=fg_intensity,
-                rng=self.rng,
+                std=fg_scale,  # type: ignore
+                mean=fg_intensity,  # type: ignore
+                rng=self.rng,  # type: ignore
                 dtype=np.float32,
             )
             fgdata = np.clip(fgdata, 0, 1, out=fgdata)

@@ -7,6 +7,7 @@ Visualize annotations on kwcoco video frames.
 import math
 import ubelt as ub
 import scriptconfig as scfg
+from delayed_image.channel_spec import ChannelSpec, FusedChannelSpec
 
 
 class CocoVisualizeVideosCLI(scfg.DataConfig):
@@ -308,7 +309,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         if config['skip_missing'] and config['channels'] is not None:
             # Remove images that do not contain any of the requested channels.
             requested_channels = (
-                kwcoco.ChannelSpec.coerce(config['channels']).fuse().as_set()
+                ChannelSpec.coerce(config['channels']).fuse().as_set()
             )
             coco_images = coco_dset.images(selected_gids).coco_images
             keep = []
@@ -580,13 +581,10 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands, 
     """
     Resolve which channel groups to request and how to visualize them.
     """
-    from delayed_image import channel_spec
-    import kwcoco
-
     if channels is not None:
         if isinstance(channels, list):
             channels = ','.join(channels)
-        channels = channel_spec.ChannelSpec.coerce(channels)
+        channels = ChannelSpec.coerce(channels)
         chan_groups = [{'chan': chan_obj} for chan_obj in channels.streams()]
     else:
         # Default: use the image's channel metadata if present.
@@ -601,7 +599,7 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands, 
             request_grouped_bands = ['red|green|blue', 'r|g|b', 'ir']
 
         for cand in request_grouped_bands:
-            cand = kwcoco.FusedChannelSpec.coerce(cand)
+            cand = FusedChannelSpec.coerce(cand)
             has_cand = (channels & cand).numel() == cand.numel()
             if has_cand:
                 # Move the grouped band to the end so it is visualized together.
@@ -620,7 +618,7 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands, 
                     # For small-but-large groups, split into single-channel views.
                     for part in group:
                         chan_groups.append(
-                            {'chan': kwcoco.FusedChannelSpec.coerce(part)}
+                            {'chan': FusedChannelSpec.coerce(part)}
                         )
             else:
                 chan_groups.append({'chan': group})
@@ -638,7 +636,7 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands, 
         if avail_channels is not None:
             common_visualizers = list(
                 map(
-                    kwcoco.FusedChannelSpec.coerce,
+                    FusedChannelSpec.coerce,
                     ['red|green|blue', 'r|g|b', 'pan', 'panchromatic'],
                 )
             )
@@ -651,7 +649,7 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands, 
             if found is None:
                 # Fall back to the first available channels.
                 first3 = avail_channels.as_list()[0:3]
-                found = kwcoco.FusedChannelSpec.coerce('|'.join(first3))
+                found = FusedChannelSpec.coerce('|'.join(first3))
             chan_groups.append({'pname': 'any3', 'chan': found})
 
     return chan_groups
@@ -868,7 +866,7 @@ def _draw_channel_group(
     if chan_group_obj is not None:
         chan_list = chan_group_obj.parsed
         chan_group = chan_group_obj.spec
-        chan_pname2 = kwcoco.FusedChannelSpec.coerce(chan_group).path_sanitize(
+        chan_pname2 = FusedChannelSpec.coerce(chan_group).path_sanitize(
             maxlen=10
         )
         prefix = '_'.join([frame_id, chan_pname2])
@@ -950,7 +948,7 @@ def _draw_channel_group(
                 )
 
             default_cmap_name = chan_to_cmap.get('__default__', 'viridis')
-            cmap_name = chan_to_cmap.get(chan_group, default_cmap_name)
+            cmap_name = chan_to_cmap.get(chan_group, default_cmap_name)  # type: ignore
 
             try:
                 import matplotlib.cm  # NOQA
@@ -1057,7 +1055,7 @@ def perchannel_colorize(data, channel_colors=None):
         data = data[None, :, :]
 
     existing_colors = [
-        kwimage.Color.coerce(c).as01() for c in channel_colors if c is not None
+        kwimage.Color.coerce(c).as01() for c in channel_colors if c is not None  # type: ignore
     ]
 
     fill_colors = kwimage.Color.distinct(
@@ -1066,7 +1064,7 @@ def perchannel_colorize(data, channel_colors=None):
     fill_color_iter = iter(fill_colors)
 
     resolved_channel_colors = []
-    for c in channel_colors:
+    for c in channel_colors:  # type: ignore
         if c is None:
             c = next(fill_color_iter)
         else:
@@ -1108,7 +1106,7 @@ def ensure_false_color(canvas, method='ortho'):
     else:
         if method == 'ortho':
             rng = kwarray.ensure_rng(canvas.shape[2])
-            seedmat = rng.rand(canvas.shape[2], 3).T
+            seedmat = rng.rand(canvas.shape[2], 3).T  # type: ignore
             h, tau = np.linalg.qr(seedmat, mode='raw')
             false_colored = canvas @ h
             rgb_canvas = kwarray.normalize(false_colored)
