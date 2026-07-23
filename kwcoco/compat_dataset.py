@@ -17,7 +17,7 @@ API including dynamic addition / removal of categories / annotations / images.
 """
 
 from kwcoco.coco_dataset import CocoDataset
-from typing import Iterable
+from typing import Iterable, List, Optional, Union
 from os import PathLike
 import itertools as it
 import ubelt as ub
@@ -373,14 +373,14 @@ class COCO(CocoDataset):
 
     def download(
         self,
-        dpath: str | PathLike | None = None,
-        image_ids: int | Iterable[int] | None = None,
+        dpath: Optional[Union[str, PathLike]] = None,
+        image_ids: Optional[Union[int, Iterable[int]]] = None,
         overwrite: bool = False,
         verbose: int = 1,
         *,
-        tarDir: str | PathLike | None = None,
-        imgIds: int | Iterable[int] | None = None,
-    ) -> list[str]:
+        tarDir: Optional[Union[str, PathLike]] = None,
+        imgIds: Optional[Union[int, Iterable[int]]] = None,
+    ) -> List[str]:
         """
         Download images from their standard ``coco_url`` fields.
 
