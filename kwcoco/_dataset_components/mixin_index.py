@@ -1,9 +1,10 @@
 from __future__ import annotations
 from functools import partial
 from collections import defaultdict
+from collections.abc import Iterable, MutableSet
 from kwcoco import exceptions
 from typing import Any
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol, cast
 import numbers
 import ubelt as ub
 import warnings
@@ -19,6 +20,12 @@ from kwcoco._helpers import (
 class _CocoIndexParent(Protocol):
     @property
     def dataset(self) -> Mapping[str, Any]: ...
+
+
+class _SupportsUpdate(Protocol):
+    """Structural contract shared by ``set`` and ``SortedSet``."""
+
+    def update(self, values: Iterable[Any]) -> None: ...
 
 
 class CocoIndex:
@@ -82,10 +89,10 @@ class CocoIndex:
     kpcats: dict[Any, dict[str, Any]] | None
     _id_lookup: dict[str, dict[Any, dict[str, Any]]] | None
 
-    gid_to_aids: Any
-    cid_to_aids: Any
-    vidid_to_gids: Any
-    trackid_to_aids: Any
+    gid_to_aids: dict[Any, MutableSet[Any]] | None
+    cid_to_aids: dict[Any, MutableSet[Any]] | None
+    vidid_to_gids: dict[Any, MutableSet[Any]] | None
+    trackid_to_aids: dict[Any, MutableSet[Any]] | None
 
     name_to_video: dict[str, dict[str, Any]] | None
     name_to_cat: dict[str, dict[str, Any]] | None
@@ -94,9 +101,11 @@ class CocoIndex:
     file_name_to_img: dict[str, dict[str, Any]] | None
 
     # _set = ub.oset  # many operations are much slower for oset
-    _set = set
+    _set: Callable[..., MutableSet[Any]] = set
 
-    def _images_set_sorted_by_frame_index(index, gids: Any = None) -> Any:
+    def _images_set_sorted_by_frame_index(
+        index, gids: Any = None
+    ) -> MutableSet[Any]:
         """
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
@@ -106,7 +115,9 @@ class CocoIndex:
     # Backwards compat
     _set_sorted_by_frame_index = _images_set_sorted_by_frame_index
 
-    def _annots_set_sorted_by_frame_index(index, aids: Any = None) -> Any:
+    def _annots_set_sorted_by_frame_index(
+        index, aids: Any = None
+    ) -> MutableSet[Any]:
         """
         Helper for ensuring that vidid_to_gids returns image ids ordered by
         frame index.
@@ -171,16 +182,20 @@ class CocoIndex:
 
     def _add_video(index, vidid: int, video: dict) -> None:
         if index.videos is not None:
+            name_to_video = index.name_to_video
+            vidid_to_gids = index.vidid_to_gids
+            assert name_to_video is not None
+            assert vidid_to_gids is not None
+
             name = video['name']
-            if index._CHECKS:
-                if name in index.name_to_video:  # type: ignore
-                    raise exceptions.DuplicateAddError(
-                        'video with name={} already exists'.format(name)
-                    )
+            if index._CHECKS and name in name_to_video:
+                raise exceptions.DuplicateAddError(
+                    'video with name={} already exists'.format(name)
+                )
             index.videos[vidid] = video
-            if vidid not in index.vidid_to_gids:  # type: ignore
-                index.vidid_to_gids[vidid] = index._images_set_sorted_by_frame_index()  # type: ignore
-            index.name_to_video[name] = video  # type: ignore
+            if vidid not in vidid_to_gids:
+                vidid_to_gids[vidid] = index._images_set_sorted_by_frame_index()
+            name_to_video[name] = video
 
     def _add_image(index, gid: int, img: dict) -> None:
         """
@@ -198,6 +213,15 @@ class CocoIndex:
             >>> dset._check_integrity()
         """
         if index.imgs is not None:
+            gid_to_aids = index.gid_to_aids
+            file_name_to_img = index.file_name_to_img
+            name_to_img = index.name_to_img
+            vidid_to_gids = index.vidid_to_gids
+            assert gid_to_aids is not None
+            assert file_name_to_img is not None
+            assert name_to_img is not None
+            assert vidid_to_gids is not None
+
             file_name = img.get('file_name', None)
             name = img.get('name', None)
             has_video = 'video_id' in img
@@ -207,27 +231,26 @@ class CocoIndex:
             # choosing an automatic id. Keep this helper mutation-only so the
             # common single-image path does not repeat every lookup.
             index.imgs[gid] = img
-            index.gid_to_aids[gid] = index._set()  # type: ignore
+            gid_to_aids[gid] = index._set()
 
             if file_name is not None:
-                index.file_name_to_img[file_name] = img  # type: ignore
+                file_name_to_img[file_name] = img
 
             if name is not None:
-                index.name_to_img[name] = img  # type: ignore
+                name_to_img[name] = img
 
             if has_video:
                 try:
-                    index.vidid_to_gids[vidid].add(gid)  # type: ignore
+                    vidid_to_gids[vidid].add(gid)
                 except KeyError:
                     # Should warning messages contain data-specific info?
                     # msg = ('Adding image-id={} to '
                     #        'non-existing video-id={}').format(gid, vidid)
                     msg = 'Adding image to non-existing video'
                     warnings.warn(msg)
-                    index.vidid_to_gids[vidid] = (  # type: ignore
-                        index._images_set_sorted_by_frame_index()
-                    )
-                    index.vidid_to_gids[vidid].add(gid)  # type: ignore
+                    video_gids = index._images_set_sorted_by_frame_index()
+                    vidid_to_gids[vidid] = video_gids
+                    video_gids.add(gid)
 
     def _add_images(index, imgs: list[dict]) -> None:
         """
@@ -240,64 +263,83 @@ class CocoIndex:
             SAFER.
         """
         if index.imgs is not None:
+            gid_to_aids = index.gid_to_aids
+            file_name_to_img = index.file_name_to_img
+            name_to_img = index.name_to_img
+            index_vidid_to_gids = index.vidid_to_gids
+            assert gid_to_aids is not None
+            assert file_name_to_img is not None
+            assert name_to_img is not None
+            assert index_vidid_to_gids is not None
+
             gids = [img['id'] for img in imgs]
             new_imgs = dict(zip(gids, imgs))
             index.imgs.update(new_imgs)
-            index.file_name_to_img.update(  # type: ignore
+            file_name_to_img.update(
                 {
                     img['file_name']: img
                     for img in imgs
                     if img.get('file_name', None) is not None
                 }
             )
-            index.name_to_img.update(  # type: ignore
+            name_to_img.update(
                 {img['name']: img for img in imgs if img.get('name', None) is not None}
             )
             for gid in gids:
-                index.gid_to_aids[gid] = index._set()  # type: ignore
+                gid_to_aids[gid] = index._set()
 
             # Preserve the original fast path for a fresh, non-video
             # dataset. Only allocate grouping lists when a video lookup already
             # exists or this batch introduces at least one real video id.
-            if index.vidid_to_gids or any(
+            if index_vidid_to_gids or any(
                 img.get('video_id', None) is not None for img in imgs
             ):
                 vidids = [img.get('video_id', None) for img in imgs]
-                vidid_to_gids = ub.group_items(gids, vidids)
-                vidid_to_gids.pop(None, None)
-                for vidid, video_gids_to_add in vidid_to_gids.items():
+                grouped_gids = ub.group_items(gids, vidids)
+                grouped_gids.pop(None, None)
+                for vidid, video_gids_to_add in grouped_gids.items():
                     try:
-                        video_gids = index.vidid_to_gids[vidid]
+                        video_gids = index_vidid_to_gids[vidid]
                     except KeyError:
                         video_gids = index._images_set_sorted_by_frame_index()
-                        index.vidid_to_gids[vidid] = video_gids
-                    video_gids.update(video_gids_to_add)
+                        index_vidid_to_gids[vidid] = video_gids
+                    cast(_SupportsUpdate, video_gids).update(video_gids_to_add)
 
     def _add_annotation(
-        index, aid: int, gid: int, cid: int, tid: int, ann: dict
+        index,
+        aid: int,
+        gid: int,
+        cid: int | None,
+        tid: int | str | None,
+        ann: dict,
     ) -> None:
         if index.anns is not None:
+            gid_to_aids = index.gid_to_aids
+            cid_to_aids = index.cid_to_aids
+            trackid_to_aids = index.trackid_to_aids
+            assert gid_to_aids is not None
+            assert cid_to_aids is not None
+            assert trackid_to_aids is not None
+
             # The public add_annotation method validates the image reference
             # before choosing an automatic id. Keep this helper mutation-only.
             index.anns[aid] = ann
             # Note: it should be ok to have None's here
-            index.gid_to_aids[gid].add(aid)  # type: ignore
-            index.cid_to_aids[cid].add(aid)  # type: ignore
-            # index.trackid_to_aids[tid].add(aid)
+            gid_to_aids[gid].add(aid)
+            cid_to_aids[cid].add(aid)
             try:
-                index.trackid_to_aids[tid].add(aid)  # type: ignore
+                trackid_to_aids[tid].add(aid)
             except KeyError:
                 if tid is not None:
                     msg = 'Adding annotation to non-existing track'
                     warnings.warn(msg)
                 # Be careful to not apply sorting to trackless annotations
                 if tid is None:
-                    index.trackid_to_aids[tid] = set()
+                    track_aids: MutableSet[Any] = set()
                 else:
-                    index.trackid_to_aids[tid] = (  # type: ignore
-                        index._annots_set_sorted_by_frame_index()
-                    )
-                index.trackid_to_aids[tid].add(aid)  # type: ignore
+                    track_aids = index._annots_set_sorted_by_frame_index()
+                trackid_to_aids[tid] = track_aids
+                track_aids.add(aid)
 
     def _add_keypoint_categories(index, keypoint_cats: list[dict]) -> None:
         if index.kpcats is None:
@@ -308,16 +350,26 @@ class CocoIndex:
 
     def _add_categories(index, cats: list[dict]) -> None:
         if index.cats is not None:
+            cid_to_aids = index.cid_to_aids
+            name_to_cat = index.name_to_cat
+            assert cid_to_aids is not None
+            assert name_to_cat is not None
             ids = [obj['id'] for obj in cats]
             names = [obj['name'] for obj in cats]
             new_objs = dict(zip(ids, cats))
             index.cats.update(new_objs)
             for cid, cat, name in zip(ids, cats, names):
-                index.cid_to_aids[cid] = index._set()  # type: ignore
-                index.name_to_cat[name] = cat  # type: ignore
+                cid_to_aids[cid] = index._set()
+                name_to_cat[name] = cat
 
     def _add_annotations(index, anns: list[dict]) -> None:
         if index.anns is not None:
+            gid_to_aids = index.gid_to_aids
+            cid_to_aids = index.cid_to_aids
+            trackid_to_aids = index.trackid_to_aids
+            assert gid_to_aids is not None
+            assert cid_to_aids is not None
+            assert trackid_to_aids is not None
             aids = [ann['id'] for ann in anns]
             gids = [ann['image_id'] for ann in anns]
             cids = [ann['category_id'] for ann in anns]
@@ -325,74 +377,110 @@ class CocoIndex:
             new_anns = dict(zip(aids, anns))
             index.anns.update(new_anns)
             for gid, cid, tid, aid in zip(gids, cids, tids, aids):
-                index.gid_to_aids[gid].add(aid)  # type: ignore
-                index.cid_to_aids[cid].add(aid)  # type: ignore
+                gid_to_aids[gid].add(aid)
+                cid_to_aids[cid].add(aid)
                 try:
-                    index.trackid_to_aids[tid].add(aid)  # type: ignore
+                    trackid_to_aids[tid].add(aid)
                 except KeyError:
                     if tid is None:
-                        index.trackid_to_aids[tid] = set()  # type: ignore
+                        track_aids: MutableSet[Any] = set()
                     else:
-                        index.trackid_to_aids[tid] = (  # type: ignore
-                            index._annots_set_sorted_by_frame_index()
-                        )
-                    index.trackid_to_aids[tid].add(aid)  # type: ignore
+                        track_aids = index._annots_set_sorted_by_frame_index()
+                    trackid_to_aids[tid] = track_aids
+                    track_aids.add(aid)
 
     def _add_category(index, cid: int, name: str, cat: dict) -> None:
         if index.cats is not None:
+            cid_to_aids = index.cid_to_aids
+            name_to_cat = index.name_to_cat
+            assert cid_to_aids is not None
+            assert name_to_cat is not None
             index.cats[cid] = cat
-            index.cid_to_aids[cid] = index._set()  # type: ignore
-            index.name_to_cat[name] = cat  # type: ignore
+            cid_to_aids[cid] = index._set()
+            name_to_cat[name] = cat
 
     def _add_track(index, trackid: int, name: str, track: dict) -> None:
         if index.tracks is not None:
+            trackid_to_aids = index.trackid_to_aids
+            name_to_track = index.name_to_track
+            assert trackid_to_aids is not None
+            assert name_to_track is not None
             index.tracks[trackid] = track
-            index.trackid_to_aids[trackid] = index._annots_set_sorted_by_frame_index()  # type: ignore
-            index.name_to_track[name] = track  # type: ignore
+            trackid_to_aids[trackid] = index._annots_set_sorted_by_frame_index()
+            name_to_track[name] = track
 
     def _remove_all_annotations(index) -> None:
         # Keep the category and image indexes alive
         if index.anns is not None:
-            for _ in index.gid_to_aids.values():  # type: ignore
-                _.clear()
-            for _ in index.cid_to_aids.values():  # type: ignore
-                _.clear()
-            # for _ in index.trackid_to_aids.values():
-            #     _.clear()
+            tracks = index.tracks
+            gid_to_aids = index.gid_to_aids
+            cid_to_aids = index.cid_to_aids
+            trackid_to_aids = index.trackid_to_aids
+            name_to_track = index.name_to_track
+            assert tracks is not None
+            assert gid_to_aids is not None
+            assert cid_to_aids is not None
+            assert trackid_to_aids is not None
+            assert name_to_track is not None
+            for aids in gid_to_aids.values():
+                aids.clear()
+            for aids in cid_to_aids.values():
+                aids.clear()
             index.anns.clear()
-            index.tracks.clear()  # type: ignore
-            index.trackid_to_aids.clear()  # type: ignore
-            index.name_to_track.clear()  # type: ignore
+            tracks.clear()
+            trackid_to_aids.clear()
+            name_to_track.clear()
 
     def _remove_all_images(index) -> None:
         # Keep the category indexes alive
         if index.imgs is not None:
+            anns = index.anns
+            cats = index.cats
+            videos = index.videos
+            tracks = index.tracks
+            gid_to_aids = index.gid_to_aids
+            cid_to_aids = index.cid_to_aids
+            vidid_to_gids = index.vidid_to_gids
+            trackid_to_aids = index.trackid_to_aids
+            file_name_to_img = index.file_name_to_img
+            name_to_img = index.name_to_img
+            assert anns is not None
+            assert cats is not None
+            assert videos is not None
+            assert tracks is not None
+            assert gid_to_aids is not None
+            assert cid_to_aids is not None
+            assert vidid_to_gids is not None
+            assert trackid_to_aids is not None
+            assert file_name_to_img is not None
+            assert name_to_img is not None
+
             index.imgs.clear()
-            index.anns.clear()  # type: ignore
-            index.gid_to_aids.clear()  # type: ignore
-            index.file_name_to_img.clear()  # type: ignore
-            index.name_to_img.clear()  # type: ignore
+            anns.clear()
+            gid_to_aids.clear()
+            file_name_to_img.clear()
+            name_to_img.clear()
 
             # Preserve zero-member buckets for registered tables, but discard
             # transient buckets created by None or unknown foreign keys. This
             # keeps the dynamic index equivalent to a fresh rebuild.
-            for cid in list(index.cid_to_aids):  # type: ignore
-                if cid in index.cats:  # type: ignore
-                    index.cid_to_aids[cid].clear()  # type: ignore
+            for cid in list(cid_to_aids):
+                if cid in cats:
+                    cid_to_aids[cid].clear()
                 else:
-                    index.cid_to_aids.pop(cid)  # type: ignore
+                    cid_to_aids.pop(cid)
 
-            for vidid in list(index.vidid_to_gids):  # type: ignore
-                if vidid in index.videos:  # type: ignore
-                    index.vidid_to_gids[vidid].clear()  # type: ignore
+            for vidid in list(vidid_to_gids):
+                if vidid in videos:
+                    vidid_to_gids[vidid].clear()
                 else:
-                    index.vidid_to_gids.pop(vidid)  # type: ignore
+                    vidid_to_gids.pop(vidid)
 
-            for trackid in list(index.trackid_to_aids):  # type: ignore
-                if trackid in index.tracks:  # type: ignore
-                    index.trackid_to_aids[trackid].clear()  # type: ignore
+            for trackid in list(trackid_to_aids):
+                if trackid in tracks:
+                    trackid_to_aids[trackid].clear()
                 else:
-                    index.trackid_to_aids.pop(trackid)  # type: ignore
+                    trackid_to_aids.pop(trackid)
 
     def _remove_keypoint_categories(index, remove_kpcid: Any, verbose: Any = 0) -> None:
         if index.kpcats is not None:
@@ -404,6 +492,12 @@ class CocoIndex:
 
     def _remove_annotations(index, remove_aids: Any, verbose: Any = 0) -> None:
         if index.anns is not None:
+            gid_to_aids = index.gid_to_aids
+            cid_to_aids = index.cid_to_aids
+            trackid_to_aids = index.trackid_to_aids
+            assert gid_to_aids is not None
+            assert cid_to_aids is not None
+            assert trackid_to_aids is not None
             if verbose > 1:
                 print('Updating annotation index')
             # This is faster for simple set cid_to_aids
@@ -412,46 +506,62 @@ class CocoIndex:
                 gid = ann['image_id']
                 cid = ann.get('category_id', None)
                 track_id = ann.get('track_id', None)
-                index.trackid_to_aids[track_id].remove(aid)  # type: ignore
-                index.cid_to_aids[cid].remove(aid)  # type: ignore
-                index.gid_to_aids[gid].remove(aid)  # type: ignore
+                trackid_to_aids[track_id].remove(aid)
+                cid_to_aids[cid].remove(aid)
+                gid_to_aids[gid].remove(aid)
                 index.anns.pop(aid)
 
     def _remove_tracks(index, remove_trackids: Any, verbose: Any = 0) -> None:
         # dynamically update the track index
         if index.tracks is not None:
+            trackid_to_aids = index.trackid_to_aids
+            name_to_track = index.name_to_track
+            assert trackid_to_aids is not None
+            assert name_to_track is not None
             for tid in remove_trackids:
                 track = index.tracks.pop(tid)
-                del index.trackid_to_aids[tid]  # type: ignore
-                del index.name_to_track[track['name']]  # type: ignore
+                del trackid_to_aids[tid]
+                del name_to_track[track['name']]
             if verbose > 2:
                 print('Updated track index')
 
     def _remove_categories(index, remove_cids: Any, verbose: Any = 0) -> None:
         # dynamically update the category index
         if index.cats is not None:
+            cid_to_aids = index.cid_to_aids
+            name_to_cat = index.name_to_cat
+            assert cid_to_aids is not None
+            assert name_to_cat is not None
             for cid in remove_cids:
                 cat = index.cats.pop(cid)
-                del index.cid_to_aids[cid]  # type: ignore
-                del index.name_to_cat[cat['name']]  # type: ignore
+                del cid_to_aids[cid]
+                del name_to_cat[cat['name']]
             if verbose > 2:
                 print('Updated category index')
 
     def _remove_images(index, remove_gids: Any, verbose: Any = 0) -> None:
         # dynamically update the image index
         if index.imgs is not None:
+            gid_to_aids = index.gid_to_aids
+            vidid_to_gids = index.vidid_to_gids
+            file_name_to_img = index.file_name_to_img
+            name_to_img = index.name_to_img
+            assert gid_to_aids is not None
+            assert vidid_to_gids is not None
+            assert file_name_to_img is not None
+            assert name_to_img is not None
             for gid in remove_gids:
                 img = index.imgs[gid]
                 vidid = img.get('video_id', None)
-                if vidid in index.vidid_to_gids:  # type: ignore
-                    index.vidid_to_gids[vidid].remove(gid)  # type: ignore
-                del index.gid_to_aids[gid]  # type: ignore
+                if vidid in vidid_to_gids:
+                    vidid_to_gids[vidid].remove(gid)
+                del gid_to_aids[gid]
                 gname = img.get('file_name', None)
                 if gname is not None:
-                    del index.file_name_to_img[gname]  # type: ignore
+                    del file_name_to_img[gname]
                 name = img.get('name', None)
                 if name is not None:
-                    del index.name_to_img[name]  # type: ignore
+                    del name_to_img[name]
                 del index.imgs[gid]
             if verbose > 2:
                 print('Updated image index')
@@ -460,11 +570,14 @@ class CocoIndex:
         # dynamically update the video index
         lut = index.videos
         if lut is not None:
+            vidid_to_gids = index.vidid_to_gids
+            name_to_video = index.name_to_video
+            assert vidid_to_gids is not None
+            assert name_to_video is not None
             for item_id in remove_vidids:
                 item = lut.pop(item_id)
-                del index.vidid_to_gids[item_id]  # type: ignore
-                if index.name_to_video is not None:
-                    del index.name_to_video[item['name']]
+                del vidid_to_gids[item_id]
+                del name_to_video[item['name']]
             if verbose > 2:
                 print('Updated video index')
 
@@ -581,77 +694,64 @@ class CocoIndex:
             tracks[tid] = track
 
         # Build one-to-many lookup maps
-        vidid_to_gids = ub.group_items(
+        raw_vidid_to_gids: dict[Any, list[Any]] = ub.group_items(
             [g['id'] for g in imgs.values()],
             [g.get('video_id', None) for g in imgs.values()],
         )
-        vidid_to_gids.pop(None, None)
+        raw_vidid_to_gids.pop(None, None)
 
-        if 0:
-            # The following is slightly slower, but it is also many fewer lines
-            # Not sure if its correct to replace the else block or not
-            aids = [d['id'] for d in anns.values()]
-            gid_to_aids = ub.group_items(aids, (d['image_id'] for d in anns.values()))
-            cid_to_aids = ub.group_items(
-                aids, (d.get('category_id', None) for d in anns.values())
-            )
-            trackid_to_aids = ub.group_items(
-                aids, (d.get('track_id', None) for d in anns.values())
-            )
-            cid_to_aids.pop(None, None)
-            gid_to_aids = ub.map_vals(index._set, gid_to_aids)
-            cid_to_aids = ub.map_vals(index._set, cid_to_aids)
-            trackid_to_aids = ub.map_vals(index._set, trackid_to_aids)
-            vidid_to_gids = ub.map_vals(
-                index._images_set_sorted_by_frame_index, vidid_to_gids
-            )
-        else:
-            gid_to_aids = defaultdict(index._set)
-            cid_to_aids = defaultdict(index._set)
-            trackid_to_aids = defaultdict(index._set)
-            for ann in anns.values():
-                try:
-                    aid = ann['id']
-                    gid = ann['image_id']
-                except KeyError:
-                    raise KeyError('Annotation does not have ids {}'.format(ann))
+        gid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
+            index._set
+        )
+        cid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
+            index._set
+        )
+        trackid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
+            index._set
+        )
+        for ann in anns.values():
+            try:
+                aid = ann['id']
+                gid = ann['image_id']
+            except KeyError:
+                raise KeyError('Annotation does not have ids {}'.format(ann))
 
-                if not isinstance(aid, numbers.Integral):
-                    raise TypeError('bad aid={} type={}'.format(aid, type(aid)))
-                if not isinstance(gid, numbers.Integral):
-                    raise TypeError('bad gid={} type={}'.format(gid, type(gid)))
+            if not isinstance(aid, numbers.Integral):
+                raise TypeError('bad aid={} type={}'.format(aid, type(aid)))
+            if not isinstance(gid, numbers.Integral):
+                raise TypeError('bad gid={} type={}'.format(gid, type(gid)))
 
-                gid_to_aids[gid].add(aid)
-                if gid not in imgs:
+            gid_to_aids[gid].add(aid)
+            if gid not in imgs:
+                warnings.warn(
+                    'Annotation {} in {} references unknown image_id'.format(
+                        ann, parent
+                    )
+                )
+
+            try:
+                cid = ann['category_id']
+            except KeyError:
+                warnings.warn(
+                    'Annotation {} in {} is missing a category_id'.format(
+                        ann, parent
+                    )
+                )
+            else:
+                cid_to_aids[cid].add(aid)
+
+                if not isinstance(cid, numbers.Integral) and cid is not None:
+                    raise TypeError('bad cid={} type={}'.format(cid, type(cid)))
+
+                if cid not in cats and cid is not None:
                     warnings.warn(
-                        'Annotation {} in {} references unknown image_id'.format(
+                        'Annotation {} in {} references unknown category_id'.format(
                             ann, parent
                         )
                     )
 
-                try:
-                    cid = ann['category_id']
-                except KeyError:
-                    warnings.warn(
-                        'Annotation {} in {} is missing a category_id'.format(
-                            ann, parent
-                        )
-                    )
-                else:
-                    cid_to_aids[cid].add(aid)
-
-                    if not isinstance(cid, numbers.Integral) and cid is not None:
-                        raise TypeError('bad cid={} type={}'.format(cid, type(cid)))
-
-                    if cid not in cats and cid is not None:
-                        warnings.warn(
-                            'Annotation {} in {} references unknown category_id'.format(
-                                ann, parent
-                            )
-                        )
-
-                trackid = ann.get('track_id', None)
-                trackid_to_aids[trackid].add(aid)
+            trackid = ann.get('track_id', None)
+            trackid_to_aids[trackid].add(aid)
 
         # Fix one-to-zero cases
         for cid in cats.keys():
@@ -663,8 +763,8 @@ class CocoIndex:
                 gid_to_aids[gid] = index._set()
 
         for vidid in videos.keys():
-            if vidid not in vidid_to_gids:
-                vidid_to_gids[vidid] = index._set()  # type: ignore
+            if vidid not in raw_vidid_to_gids:
+                raw_vidid_to_gids[vidid] = []
 
         for trackid in tracks.keys():
             if trackid not in trackid_to_aids:
@@ -696,8 +796,8 @@ class CocoIndex:
 
         # Ensure that the values are cast to the appropriate set type
         # This needs to happen after index.imgs is populated
-        vidid_to_gids = ub.map_vals(
-            index._images_set_sorted_by_frame_index, vidid_to_gids
+        vidid_to_gids: dict[Any, MutableSet[Any]] = ub.map_vals(
+            index._images_set_sorted_by_frame_index, raw_vidid_to_gids
         )
 
         # Be careful to not apply sorting to trackless annotations
