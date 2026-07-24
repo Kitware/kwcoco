@@ -700,74 +700,58 @@ class CocoIndex:
         )
         raw_vidid_to_gids.pop(None, None)
 
-        if 0:
-            # The following is slightly slower, but it is also many fewer lines
-            # Not sure if its correct to replace the else block or not
-            aids = [d['id'] for d in anns.values()]
-            gid_to_aids = ub.group_items(aids, (d['image_id'] for d in anns.values()))
-            cid_to_aids = ub.group_items(
-                aids, (d.get('category_id', None) for d in anns.values())
-            )
-            trackid_to_aids = ub.group_items(
-                aids, (d.get('track_id', None) for d in anns.values())
-            )
-            cid_to_aids.pop(None, None)
-            gid_to_aids = ub.map_vals(index._set, gid_to_aids)
-            cid_to_aids = ub.map_vals(index._set, cid_to_aids)
-            trackid_to_aids = ub.map_vals(index._set, trackid_to_aids)
-        else:
-            gid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
-                index._set
-            )
-            cid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
-                index._set
-            )
-            trackid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
-                index._set
-            )
-            for ann in anns.values():
-                try:
-                    aid = ann['id']
-                    gid = ann['image_id']
-                except KeyError:
-                    raise KeyError('Annotation does not have ids {}'.format(ann))
+        gid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
+            index._set
+        )
+        cid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
+            index._set
+        )
+        trackid_to_aids: defaultdict[Any, MutableSet[Any]] = defaultdict(
+            index._set
+        )
+        for ann in anns.values():
+            try:
+                aid = ann['id']
+                gid = ann['image_id']
+            except KeyError:
+                raise KeyError('Annotation does not have ids {}'.format(ann))
 
-                if not isinstance(aid, numbers.Integral):
-                    raise TypeError('bad aid={} type={}'.format(aid, type(aid)))
-                if not isinstance(gid, numbers.Integral):
-                    raise TypeError('bad gid={} type={}'.format(gid, type(gid)))
+            if not isinstance(aid, numbers.Integral):
+                raise TypeError('bad aid={} type={}'.format(aid, type(aid)))
+            if not isinstance(gid, numbers.Integral):
+                raise TypeError('bad gid={} type={}'.format(gid, type(gid)))
 
-                gid_to_aids[gid].add(aid)
-                if gid not in imgs:
+            gid_to_aids[gid].add(aid)
+            if gid not in imgs:
+                warnings.warn(
+                    'Annotation {} in {} references unknown image_id'.format(
+                        ann, parent
+                    )
+                )
+
+            try:
+                cid = ann['category_id']
+            except KeyError:
+                warnings.warn(
+                    'Annotation {} in {} is missing a category_id'.format(
+                        ann, parent
+                    )
+                )
+            else:
+                cid_to_aids[cid].add(aid)
+
+                if not isinstance(cid, numbers.Integral) and cid is not None:
+                    raise TypeError('bad cid={} type={}'.format(cid, type(cid)))
+
+                if cid not in cats and cid is not None:
                     warnings.warn(
-                        'Annotation {} in {} references unknown image_id'.format(
+                        'Annotation {} in {} references unknown category_id'.format(
                             ann, parent
                         )
                     )
 
-                try:
-                    cid = ann['category_id']
-                except KeyError:
-                    warnings.warn(
-                        'Annotation {} in {} is missing a category_id'.format(
-                            ann, parent
-                        )
-                    )
-                else:
-                    cid_to_aids[cid].add(aid)
-
-                    if not isinstance(cid, numbers.Integral) and cid is not None:
-                        raise TypeError('bad cid={} type={}'.format(cid, type(cid)))
-
-                    if cid not in cats and cid is not None:
-                        warnings.warn(
-                            'Annotation {} in {} references unknown category_id'.format(
-                                ann, parent
-                            )
-                        )
-
-                trackid = ann.get('track_id', None)
-                trackid_to_aids[trackid].add(aid)
+            trackid = ann.get('track_id', None)
+            trackid_to_aids[trackid].add(aid)
 
         # Fix one-to-zero cases
         for cid in cats.keys():
