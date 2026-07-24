@@ -354,5 +354,8 @@ def test_remove_categories_keep_annots_without_index():
 
     dset.rebuild_index()
     _assert_index_matches_rebuild(dset)
-    assert 1 in dset.index.cid_to_aids[None]
+    # Removing a category label deletes the category_id key. Rebuilding
+    # warns about the missing field and does not index that annotation under
+    # the explicit category_id=None bucket.
+    assert 1 not in dset.index.cid_to_aids.get(None, set())
     assert dset.index.cid_to_aids[2] == {2}
