@@ -1,8 +1,7 @@
 """
-from __future__ import annotations
-
 A registry of resource files bundled with the kwcoco package
 """
+from __future__ import annotations
 
 from importlib import resources as importlib_resources
 import ubelt as ub

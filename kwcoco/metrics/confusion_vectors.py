@@ -1,9 +1,8 @@
 """
-from __future__ import annotations
-
 Classes that store raw confusion vectors, which can be accumulated into
 confusion measures.
 """
+from __future__ import annotations
 
 import numpy as np
 import ubelt as ub

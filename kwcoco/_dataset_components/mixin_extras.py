@@ -168,6 +168,100 @@ class MixinCocoExtras:
         summary['bad_images'] = bad_images
         return summary
 
+    def download(
+        self,
+        dpath: str | PathLike | None = None,
+        image_ids: int | Iterable[int] | None = None,
+        overwrite: bool = False,
+        verbose: int = 1,
+    ) -> list[str]:
+        """
+        Download image data referenced by standard ``coco_url`` fields.
+
+        This is the kwcoco-native counterpart to
+        :meth:`pycocotools.coco.COCO.download`. Each destination is formed
+        by joining ``dpath`` with the image ``file_name``. Existing files are
+        skipped unless ``overwrite`` is true.
+
+        Args:
+            dpath (str | PathLike | None):
+                Target directory. Defaults to ``self.bundle_dpath``.
+
+            image_ids (int | Iterable[int] | None):
+                Image ids to download. Defaults to every image.
+
+            overwrite (bool):
+                If true, redownload files that already exist.
+
+            verbose (int):
+                Verbosity level.
+
+        Returns:
+            List[str]: local paths corresponding to the requested images.
+
+        Note:
+            HTTPS URLs are the only officially supported download transport.
+            Other URI schemes may satisfy the dataset schema, but are not
+            guaranteed to work with this method.
+
+            This currently downloads only top-level image resources. Video
+            references and auxiliary image assets are not downloaded.
+
+        Warning:
+            Image ``file_name`` values are treated as trusted destination
+            paths. They are joined with ``dpath`` without confinement or
+            sanitization. In particular, an absolute ``file_name`` or one
+            containing ``..`` components may write outside ``dpath``. Validate
+            untrusted datasets before downloading them.
+
+        Example:
+            >>> # xdoctest: +SKIP("requires network")
+            >>> import kwcoco
+            >>> dset = kwcoco.CocoDataset()
+            >>> dset.add_image(
+            >>>     file_name='images/example.jpg',
+            >>>     coco_url='https://example.com/example.jpg',
+            >>> )
+            >>> local_paths = dset.download(dpath='downloaded-images')
+        """
+        if dpath is None:
+            dpath = self.bundle_dpath
+        dpath = os.fspath(dpath)
+
+        if image_ids is None:
+            imgs = list(self.dataset.get('images', []))
+        else:
+            if isinstance(image_ids, int):
+                image_ids = [image_ids]
+            imgs = list(ub.take(self.imgs, image_ids))
+
+        download_tasks = []
+        for img in imgs:
+            gid = img.get('id', None)
+            file_name = img.get('file_name', None)
+            coco_url = img.get('coco_url', None)
+            if file_name is None:
+                raise ValueError(
+                    f'Cannot download image id={gid!r}: missing file_name'
+                )
+            if coco_url is None:
+                raise ValueError(
+                    f'Cannot download image id={gid!r}: missing coco_url'
+                )
+            fpath = join(dpath, file_name)
+            download_tasks.append((coco_url, fpath))
+
+        local_paths = []
+        task_iter = ub.ProgIter(
+            download_tasks, desc='download images', verbose=verbose
+        )
+        for coco_url, fpath in task_iter:
+            local_paths.append(fpath)
+            if overwrite or not exists(fpath):
+                ub.ensuredir(dirname(fpath))
+                ub.download(coco_url, fpath=fpath, verbose=verbose)
+        return local_paths
+
     def _ensure_image_data(self, gids: list | dict | int | None = None, verbose: int = 1) -> None:
         """
         Download data from image ``url`` / ``coco_url`` fields if specified.

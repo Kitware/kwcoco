@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 The Kitware COCO module defines a variant of the Microsoft COCO format,
 originally developed for the "collected images in context" object detection
 challenge. We are backwards compatible with the original module, but we also
@@ -275,6 +273,7 @@ CocoDataset methods (via MixinCocoDraw)
  * :func:`kwcoco.CocoDataset.show_image<kwcoco.coco_dataset.MixinCocoDraw.show_image>` - Use matplotlib to show an image with annotations overlaid
 
 """
+from __future__ import annotations
 
 __dev__ = """
 

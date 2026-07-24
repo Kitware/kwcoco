@@ -1,9 +1,8 @@
 """
-from __future__ import annotations
-
 mkinit ~/code/kwcoco/kwcoco/util/__init__.py -w
 mkinit ~/code/kwcoco/kwcoco/util/__init__.py --lazy
 """
+from __future__ import annotations
 
 import sys
 

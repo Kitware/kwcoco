@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 Evaluates a predicted coco dataset against a truth coco dataset.
 
 This currently computes detection-level metrics.
@@ -66,6 +64,7 @@ Example:
     >>>     import xdev
     >>>     xdev.view_directory(dpath)
 """
+from __future__ import annotations
 
 import os
 import scriptconfig as scfg

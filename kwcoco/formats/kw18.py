@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 A helper for converting COCO to / from KW18 format.
 
 KW18 File Format
@@ -38,6 +36,7 @@ frame of one track and all rows have the same number of columns. The fields are:
     (vehicle), or 3 (other).
     20) Activity ID -- refer to activities.txt for index and list of activities.
 """
+from __future__ import annotations
 
 import kwarray
 import numpy as np

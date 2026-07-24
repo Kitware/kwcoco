@@ -1,12 +1,11 @@
 """
-from __future__ import annotations
-
 Generates "toydata" for demo and testing purposes.
 
 This is the video version of the toydata generator and should be preferred to
 the loose image version in toydata_image.
 
 """
+from __future__ import annotations
 
 from os.path import join
 import os

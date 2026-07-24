@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 A wrapper around the basic kwcoco dataset with a pycocotools API.
 
 We do not recommend using this API because it has some idiosyncrasies, where
@@ -15,8 +13,11 @@ The cool thing is that this extends the kwcoco API so you can drop this for
 compatibility with the old API, but you still get access to all of the kwcoco
 API including dynamic addition / removal of categories / annotations / images.
 """
+from __future__ import annotations
 
 from kwcoco.coco_dataset import CocoDataset
+from typing import Iterable, List, Optional, Union
+from os import PathLike
 import itertools as it
 import ubelt as ub
 import numpy as np
@@ -369,19 +370,55 @@ class COCO(CocoDataset):
         res.createIndex()
         return res
 
-    def download(self, tarDir=None, imgIds=[]):
+    def download(
+        self,
+        dpath: Optional[Union[str, PathLike]] = None,
+        image_ids: Optional[Union[int, Iterable[int]]] = None,
+        overwrite: bool = False,
+        verbose: int = 1,
+        *,
+        tarDir: Optional[Union[str, PathLike]] = None,
+        imgIds: Optional[Union[int, Iterable[int]]] = None,
+    ) -> List[str]:
         """
-        Download COCO images from mscoco.org server.
+        Download images from their standard ``coco_url`` fields.
+
+        This accepts the native kwcoco argument names while retaining the
+        legacy pycocotools keyword aliases ``tarDir`` and ``imgIds``.
 
         Args:
-            tarDir (str | PathLike | None): COCO results directory name
-            imgIds (list): images to be downloaded
+            dpath: native kwcoco target directory.
+            image_ids: native kwcoco image identifiers.
+            overwrite: if true, redownload existing files.
+            verbose: verbosity level.
+            tarDir: legacy pycocotools alias for ``dpath``.
+            imgIds: legacy pycocotools alias for ``image_ids``. An empty
+                legacy selection retains pycocotools' "all images" behavior.
+
+        Returns:
+            Local paths corresponding to the requested images.
+
+        Note:
+            The native downloader officially supports HTTPS URLs. Image
+            ``file_name`` values are trusted destination paths and may escape
+            the target directory when absolute or when they contain ``..``.
         """
         if tarDir is not None:
-            self.reroot(tarDir)
-        if not imgIds:
-            imgIds = None
-        self._ensure_image_data(gids=imgIds)
+            if dpath is not None:
+                raise TypeError('Specify only one of dpath or tarDir')
+            dpath = tarDir
+        if imgIds is not None:
+            if image_ids is not None:
+                raise TypeError('Specify only one of image_ids or imgIds')
+            image_ids = imgIds
+            if not image_ids:
+                image_ids = None
+        return super().download(
+            dpath=dpath,
+            image_ids=image_ids,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
 
     def loadNumpyAnnotations(self, data):
         """

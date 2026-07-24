@@ -1,8 +1,7 @@
 """
-from __future__ import annotations
-
 Downloads the CamVid data if necessary, and converts it to COCO.
 """
+from __future__ import annotations
 
 from os.path import relpath
 from os.path import exists

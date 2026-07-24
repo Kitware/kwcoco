@@ -1,8 +1,7 @@
 """
-from __future__ import annotations
-
 This functionality has been moved to "delayed_image"
 """
+from __future__ import annotations
 
 from delayed_image.sensorchan_spec import SensorChanSpec, FusedSensorChanSpec
 from delayed_image.sensorchan_spec import sensorchan_concise_parts

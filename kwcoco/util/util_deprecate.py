@@ -1,8 +1,7 @@
 """
-from __future__ import annotations
-
 Deprecation helpers
 """
+from __future__ import annotations
 
 import ubelt as ub
 

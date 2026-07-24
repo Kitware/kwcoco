@@ -1,8 +1,7 @@
 """
-from __future__ import annotations
-
 Extensions to sklearn constructs
 """
+from __future__ import annotations
 
 import warnings
 import numpy as np

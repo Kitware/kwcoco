@@ -58,3 +58,41 @@ def test_jsonschema_element_default_containers_are_not_shared():
     obj2 = OBJECT()
     obj1['properties']['sentinel'] = True
     assert obj2['properties'] == {}
+
+
+def test_coco_url_schema_fields():
+    """Image/video coco_url values must be absolute URI-like strings."""
+    import jsonschema
+    import pytest
+
+    from kwcoco import coco_schema
+
+    valid_coco_urls = [
+        'https://example.com/image.png',
+        's3://bucket/path/to/image.tif',
+        'ipfs://bafybeigdyrzt/example.png',
+    ]
+    invalid_coco_urls = [
+        '',
+        'example.com/image.png',
+        'relative/path/image.png',
+        'https://example.com/has whitespace.png',
+    ]
+
+    for value in valid_coco_urls:
+        coco_schema.IMAGE.validate(
+            {'id': 1, 'file_name': 'image.png', 'coco_url': value}
+        )
+        coco_schema.VIDEO.validate(
+            {'id': 1, 'name': 'video', 'coco_url': value}
+        )
+
+    for value in invalid_coco_urls + [None]:
+        with pytest.raises(jsonschema.ValidationError):
+            coco_schema.IMAGE.validate(
+                {'id': 1, 'file_name': 'image.png', 'coco_url': value}
+            )
+        with pytest.raises(jsonschema.ValidationError):
+            coco_schema.VIDEO.validate(
+                {'id': 1, 'name': 'video', 'coco_url': value}
+            )

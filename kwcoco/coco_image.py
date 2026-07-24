@@ -1,6 +1,4 @@
 """
-from __future__ import annotations
-
 Defines the CocoImage class which is an object oriented way of manipulating
 data pointed to by a COCO image dictionary.
 
@@ -13,6 +11,7 @@ TODO:
     This file no longer is only images, it has logic for generic single-class
     objects. It should be refactored into coco_objects0d.py or something.
 """
+from __future__ import annotations
 
 import ubelt as ub
 import os

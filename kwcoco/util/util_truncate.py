@@ -1,11 +1,9 @@
 """
-from __future__ import annotations
-
 Truncate utility based on python-slugify.
 
 https://pypi.org/project/python-slugify/1.2.2/
 """
-
+from __future__ import annotations
 
 def _trunc_op(string, max_length, trunc_loc, trunc_char='~'):
     """
