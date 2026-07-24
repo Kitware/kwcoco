@@ -6,7 +6,14 @@ recycle ids, do renaming, extend sortedcontainers etc...
 """
 from __future__ import annotations
 
+from typing import Any, Mapping, Protocol
+
 import sortedcontainers
+
+
+class _NextIdParent(Protocol):
+    @property
+    def dataset(self) -> Mapping[str, Any]: ...
 
 
 class _NextId:
@@ -14,12 +21,12 @@ class _NextId:
     Helper class to tracks unused ids for new items
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent: _NextIdParent) -> None:
         self.parent = parent
 
         # TODO: use a single source of truth for what the top-level tables with
         # ids are.
-        self.unused = {
+        self.unused: dict[str, int | None] = {
             'categories': None,
             'images': None,
             'annotations': None,
@@ -27,7 +34,7 @@ class _NextId:
             'tracks': None,
         }
 
-    def _update_unused(self, key):
+    def _update_unused(self, key: str) -> None:
         """Scans for what the next safe id can be for ``key``"""
         try:
             item_list = self.parent.dataset[key]
@@ -38,12 +45,13 @@ class _NextId:
             next_id = 1
         self.unused[key] = next_id
 
-    def get(self, key):
+    def get(self, key: str) -> int:
         """Get the next safe item id for ``key``"""
         if self.unused[key] is None:
             self._update_unused(key)
         new_id = self.unused[key]
-        self.unused[key] += 1  # type: ignore
+        assert new_id is not None
+        self.unused[key] = new_id + 1
         return new_id
 
 

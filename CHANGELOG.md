@@ -30,6 +30,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   detectable index inconsistency rather than being silently ignored. Duplicate
   category, keypoint-category, and track IDs now emit the intended rebuild
   warnings.
+* Model dataset mutation mixins and optional index tables explicitly instead of
+  suppressing their types. Correct category, track, and video removal when
+  indexes are disabled, and narrow the automatic ID allocator before
+  incrementing it.
 * Align assignment-v2 with the original implementation on defaults, strict IoU thresholding, ancestor-mode relabeling, and sparse bias handling while retaining documented intentional semantic differences.
 * Preserve dataset index integrity when removing a single annotation, and accept `CocoDataset` subclass instances in `coerce`.
 * Populate OpenMMLab `instance_id` values during conform and correct fluent dataset return annotations.

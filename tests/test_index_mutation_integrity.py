@@ -263,3 +263,96 @@ def test_duplicate_ids_warn_when_rebuilding_index():
     assert dset.cats[1]['name'] == 'category-b'
     assert dset.index.kpcats[2]['name'] == 'keypoint-b'
     assert dset.index.tracks[3]['name'] == 'track-b'
+
+
+def test_remove_tracks_keep_annots_without_index():
+    raw = {
+        'categories': [{'id': 1, 'name': 'category'}],
+        'images': [{'id': 1, 'file_name': 'image.png'}],
+        'annotations': [
+            {'id': 1, 'image_id': 1, 'category_id': 1, 'track_id': 1},
+            {'id': 2, 'image_id': 1, 'category_id': 1, 'track_id': 2},
+        ],
+        'videos': [],
+        'tracks': [
+            {'id': 1, 'name': 'remove-me'},
+            {'id': 2, 'name': 'keep-me'},
+        ],
+    }
+    dset = kwcoco.CocoDataset(raw)
+    dset.index.clear()
+
+    remove_info = dset.remove_tracks([1], keep_annots=True)
+
+    assert remove_info == {'annotations': None, 'tracks': 1}
+    assert dset.dataset['tracks'] == [{'id': 2, 'name': 'keep-me'}]
+    assert 'track_id' not in dset.dataset['annotations'][0]
+    assert dset.dataset['annotations'][1]['track_id'] == 2
+
+    dset.rebuild_index()
+    _assert_index_matches_rebuild(dset)
+    assert 1 in dset.index.trackid_to_aids[None]
+    assert dset.index.trackid_to_aids[2] == {2}
+
+
+def test_remove_videos_without_index_uses_raw_images():
+    raw = {
+        'categories': [{'id': 1, 'name': 'category'}],
+        'videos': [
+            {'id': 1, 'name': 'remove-me'},
+            {'id': 2, 'name': 'keep-me'},
+        ],
+        'images': [
+            {'id': 1, 'file_name': 'remove.png', 'video_id': 1, 'frame_index': 0},
+            {'id': 2, 'file_name': 'keep.png', 'video_id': 2, 'frame_index': 0},
+            {'id': 3, 'file_name': 'loose.png'},
+        ],
+        'annotations': [
+            {'id': 1, 'image_id': 1, 'category_id': 1},
+            {'id': 2, 'image_id': 2, 'category_id': 1},
+            {'id': 3, 'image_id': 3, 'category_id': 1},
+        ],
+        'tracks': [],
+    }
+    dset = kwcoco.CocoDataset(raw)
+    dset.index.clear()
+
+    remove_info = dset.remove_videos([1])
+
+    assert remove_info == {'annotations': 1, 'images': 1, 'videos': 1}
+    assert [video['id'] for video in dset.dataset['videos']] == [2]
+    assert [img['id'] for img in dset.dataset['images']] == [2, 3]
+    assert [ann['id'] for ann in dset.dataset['annotations']] == [2, 3]
+
+    dset.rebuild_index()
+    _assert_index_matches_rebuild(dset)
+
+
+def test_remove_categories_keep_annots_without_index():
+    raw = {
+        'categories': [
+            {'id': 1, 'name': 'remove-me'},
+            {'id': 2, 'name': 'keep-me'},
+        ],
+        'images': [{'id': 1, 'file_name': 'image.png'}],
+        'annotations': [
+            {'id': 1, 'image_id': 1, 'category_id': 1},
+            {'id': 2, 'image_id': 1, 'category_id': 2},
+        ],
+        'videos': [],
+        'tracks': [],
+    }
+    dset = kwcoco.CocoDataset(raw)
+    dset.index.clear()
+
+    remove_info = dset.remove_categories([1], keep_annots=True)
+
+    assert remove_info == {'annotations': None, 'categories': 1}
+    assert dset.dataset['categories'] == [{'id': 2, 'name': 'keep-me'}]
+    assert 'category_id' not in dset.dataset['annotations'][0]
+    assert dset.dataset['annotations'][1]['category_id'] == 2
+
+    dset.rebuild_index()
+    _assert_index_matches_rebuild(dset)
+    assert 1 in dset.index.cid_to_aids[None]
+    assert dset.index.cid_to_aids[2] == {2}

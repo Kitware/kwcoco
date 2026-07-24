@@ -10,6 +10,9 @@ from kwcoco._helpers import _delitems
 
 if TYPE_CHECKING:
     from delayed_image.channel_spec import FusedChannelSpec
+    from kwcoco._dataset_components.mixin_index import CocoIndex
+    from kwcoco._helpers import _NextId
+    from kwcoco.coco_image import CocoImage
     import kwimage
 
 
@@ -18,6 +21,22 @@ class MixinCocoAddRemove:
     Mixin functions to dynamically add / remove annotations images and
     categories while maintaining lookup indexes.
     """
+
+    if TYPE_CHECKING:
+        # These attributes are supplied by CocoDataset and sibling mixins.
+        # Declaring them here gives the mixin a real structural type contract.
+        index: CocoIndex
+        dataset: dict[str, Any]
+        _next_ids: _NextId
+        def _invalidate_hashid(self, parts: Any = None) -> Any: ...
+        def coco_image(self, gid: int) -> CocoImage: ...
+        def _resolve_to_id(self, value: Any) -> int: ...
+        def _resolve_to_cid(self, value: Any) -> int: ...
+        def _resolve_to_gid(self, value: Any) -> int: ...
+        def _resolve_to_vidid(self, value: Any) -> int: ...
+        def _resolve_to_trackid(self, value: Any) -> int: ...
+        def _resolve_to_kpcat(self, value: Any) -> dict[str, Any]: ...
+        def _resolve_to_ann(self, value: Any) -> dict[str, Any]: ...
 
     def add_video(self, name: str, id: None | int = None, **kw: Any) -> int:
         """
@@ -57,23 +76,30 @@ class MixinCocoAddRemove:
             >>> self.remove_images([gid2])
             >>> print('self.index.vidid_to_gids = {!r}'.format(self.index.vidid_to_gids))
         """
-        index = self.index  # type: ignore
-        if index.videos is not None and name in index.name_to_video:
-            raise exceptions.DuplicateAddError(f'Video name={name} already exists')
-        if id is not None and index.videos is not None and id in index.videos:
-            raise exceptions.DuplicateAddError(f'Video id={id} already exists')
+        index = self.index
+        if index.videos is not None:
+            name_to_video = index.name_to_video
+            assert name_to_video is not None
+            if name in name_to_video:
+                raise exceptions.DuplicateAddError(
+                    f'Video name={name} already exists'
+                )
+            if id is not None and id in index.videos:
+                raise exceptions.DuplicateAddError(
+                    f'Video id={id} already exists'
+                )
         if id is None:
-            id = self._next_ids.get('videos')  # type: ignore
+            id = self._next_ids.get('videos')
         video = ub.odict()
         video['id'] = id
         video['name'] = name
         video.update(**kw)
         try:
-            self.dataset['videos'].append(video)  # type: ignore
+            self.dataset['videos'].append(video)
         except KeyError:
-            self.dataset['videos'] = []  # type: ignore
-            self.dataset['videos'].append(video)  # type: ignore
-        self.index._add_video(id, video)  # type: ignore
+            self.dataset['videos'] = []
+            self.dataset['videos'].append(video)
+        self.index._add_video(id, video)
         # self._invalidate_hashid(['videos'])
         return id
 
@@ -119,40 +145,49 @@ class MixinCocoAddRemove:
             >>> gid = self.add_image(gname)
             >>> assert self.imgs[gid]['file_name'] == gname
         """
-        index = self.index  # type: ignore
+        index = self.index
 
         norm_file_name: Any
-        try:
-            norm_file_name = os.fspath(file_name)  # type: ignore
-        except TypeError:
-            norm_file_name = file_name
+        if file_name is None:
+            norm_file_name = None
+        else:
+            norm_file_name = os.fspath(file_name)
 
-        if index.imgs is not None and norm_file_name in index.file_name_to_img:
-            raise exceptions.DuplicateAddError(
-                'Image with file_name={} already exists'.format(norm_file_name)
-            )
-
-        # Perform all checks that do not depend on the chosen id before
-        # advancing the automatic id generator.
         name = kw.get('name', None)
-        if index.imgs is not None and index._CHECKS:
-            if norm_file_name is None and name is None:
-                raise exceptions.InvalidAddError(
-                    'at least one of file_name or name must be specified'
-                )
-            if name in index.name_to_img:  # type: ignore
+        if index.imgs is not None:
+            file_name_to_img = index.file_name_to_img
+            name_to_img = index.name_to_img
+            assert file_name_to_img is not None
+            assert name_to_img is not None
+            if norm_file_name in file_name_to_img:
                 raise exceptions.DuplicateAddError(
-                    'Image with name={} already exists'.format(name)
+                    'Image with file_name={} already exists'.format(
+                        norm_file_name
+                    )
                 )
+
+            # Perform all checks that do not depend on the chosen id before
+            # advancing the automatic id generator.
+            if index._CHECKS:
+                if norm_file_name is None and name is None:
+                    raise exceptions.InvalidAddError(
+                        'at least one of file_name or name must be specified'
+                    )
+                if name in name_to_img:
+                    raise exceptions.DuplicateAddError(
+                        'Image with name={} already exists'.format(name)
+                    )
         if 'video_id' in kw and kw.get('frame_index', None) is None:
             raise exceptions.InvalidAddError(
                 'Images with video-ids must have a frame_index'
             )
 
-        if id is not None and self.imgs and id in self.imgs:  # type: ignore
-            raise exceptions.DuplicateAddError('Image id={} already exists'.format(id))
+        if id is not None and index.imgs is not None and id in index.imgs:
+            raise exceptions.DuplicateAddError(
+                'Image id={} already exists'.format(id)
+            )
         if id is None:
-            id = self._next_ids.get('images')  # type: ignore
+            id = self._next_ids.get('images')
 
         img: dict[str, Any] = {}
         img['id'] = int(id)
@@ -161,9 +196,9 @@ class MixinCocoAddRemove:
 
         # Validation above completes before automatic id selection. Insert
         # into the index before the raw append so both views change together.
-        self.index._add_image(id, img)  # type: ignore
-        self.dataset['images'].append(img)  # type: ignore
-        self._invalidate_hashid()  # type: ignore
+        self.index._add_image(id, img)
+        self.dataset['images'].append(img)
+        self._invalidate_hashid()
         return id
 
     def add_asset(
@@ -199,7 +234,7 @@ class MixinCocoAddRemove:
             >>> dset.add_asset(gid, 'path/fake_B0.tif', channels='B0', width=200,
             >>>                height=200, warp_aux_to_img={'scale': 1.0})
         """
-        coco_img = self.coco_image(gid)  # type: ignore
+        coco_img = self.coco_image(gid)
         coco_img.add_asset(file_name=file_name, channels=channels, **kwargs)
 
     # TODO: deprecated add_auxiliary_item for add_asset
@@ -334,13 +369,13 @@ class MixinCocoAddRemove:
 
         # Preserve the historical KeyError for an unknown image, but raise it
         # before advancing the automatic id generator or mutating either view.
-        if self.index.gid_to_aids is not None:  # type: ignore
-            if image_id not in self.index.gid_to_aids:  # type: ignore
-                raise KeyError(image_id)
+        gid_to_aids = self.index.gid_to_aids
+        if gid_to_aids is not None and image_id not in gid_to_aids:
+            raise KeyError(image_id)
 
         if id is None:
-            id = self._next_ids.get('annotations')  # type: ignore
-        elif self.anns and id in self.anns:  # type: ignore
+            id = self._next_ids.get('annotations')
+        elif self.index.anns is not None and id in self.index.anns:
             raise IndexError('Annot id={} already exists'.format(id))
 
         ann: dict[str, Any] = {}
@@ -378,9 +413,9 @@ class MixinCocoAddRemove:
 
         ann.update(**kw)
 
-        self.index._add_annotation(id, image_id, category_id, track_id, ann)  # type: ignore
-        self.dataset['annotations'].append(ann)  # type: ignore
-        self._invalidate_hashid(['annotations'])  # type: ignore
+        self.index._add_annotation(id, image_id, category_id, track_id, ann)
+        self.dataset['annotations'].append(ann)
+        self._invalidate_hashid(['annotations'])
         return id
 
     def add_category(
@@ -417,18 +452,21 @@ class MixinCocoAddRemove:
             >>> with pytest.raises(ValueError):
             >>>     self.add_category('dog', supercategory='object')
         """
-        index = self.index  # type: ignore
-        if index.cats and name in index.name_to_cat:
-            raise exceptions.DuplicateAddError(
-                'Category name={!r} already exists'.format(name)
-            )
+        index = self.index
+        if index.cats is not None:
+            name_to_cat = index.name_to_cat
+            assert name_to_cat is not None
+            if name in name_to_cat:
+                raise exceptions.DuplicateAddError(
+                    'Category name={!r} already exists'.format(name)
+                )
+            if id is not None and id in index.cats:
+                raise exceptions.DuplicateAddError(
+                    'Category id={} already exists'.format(id)
+                )
 
         if id is None:
-            id = self._next_ids.get('categories')  # type: ignore
-        elif index.cats and id in index.cats:
-            raise exceptions.DuplicateAddError(
-                'Category id={} already exists'.format(id)
-            )
+            id = self._next_ids.get('categories')
 
         cat: dict[str, Any] = {}
         cat['id'] = int(id)
@@ -438,14 +476,16 @@ class MixinCocoAddRemove:
         cat.update(**kw)
 
         # Add to raw data structure
-        self.dataset['categories'].append(cat)  # type: ignore
+        self.dataset['categories'].append(cat)
 
         # And add to the indexes
         index._add_category(id, name, cat)
-        self._invalidate_hashid(['categories'])  # type: ignore
+        self._invalidate_hashid(['categories'])
         return id
 
-    def add_track(self, name: str = None, id: int | None = None, **kw: Any) -> int:  # type: ignore
+    def add_track(
+        self, name: str | None = None, id: int | None = None, **kw: Any
+    ) -> int:
         """
         Register a new track with the dataset
 
@@ -471,27 +511,33 @@ class MixinCocoAddRemove:
             >>> with pytest.raises(ValueError):
             >>>     self.add_track('dog')
         """
-        index = self.index  # type: ignore
+        index = self.index
+
+        name_to_track = index.name_to_track
+        if index.tracks is not None:
+            assert name_to_track is not None
 
         if name is None:
             # auto choose name
             import uuid
 
             name = str(uuid.uuid4())
-            while index.tracks and name in index.name_to_track:
+            while name_to_track is not None and name in name_to_track:
                 # This will never happen, but my brain is irrationally
                 # insisting on writing the check anyway.
                 name = str(uuid.uuid4())
 
-        if index.tracks and name in index.name_to_track:
+        if name_to_track is not None and name in name_to_track:
             raise exceptions.DuplicateAddError(
                 'Track name={!r} already exists'.format(name)
             )
 
         if id is None:
-            id = self._next_ids.get('tracks')  # type: ignore
-        elif index.tracks and id in index.tracks:
-            raise exceptions.DuplicateAddError('Track id={} already exists'.format(id))
+            id = self._next_ids.get('tracks')
+        elif index.tracks is not None and id in index.tracks:
+            raise exceptions.DuplicateAddError(
+                'Track id={} already exists'.format(id)
+            )
 
         track: dict[str, Any] = {}
         track['id'] = int(id)
@@ -500,13 +546,13 @@ class MixinCocoAddRemove:
 
         # Add to raw data structure
         try:
-            self.dataset['tracks'].append(track)  # type: ignore
+            self.dataset['tracks'].append(track)
         except KeyError:
-            self.dataset['tracks'] = [track]  # type: ignore
+            self.dataset['tracks'] = [track]
 
         # And add to the indexes
         index._add_track(id, name, track)
-        self._invalidate_hashid(['tracks'])  # type: ignore
+        self._invalidate_hashid(['tracks'])
         return id
 
     def ensure_video(self, name: Any, id: None | int = None, **kw: Any) -> int:
@@ -539,8 +585,9 @@ class MixinCocoAddRemove:
         try:
             id = self.add_video(name=name, id=id, **kw)
         except exceptions.DuplicateAddError:
-            obj = self.index.name_to_video[name]  # type: ignore
-            id = obj['id']
+            name_to_video = self.index.name_to_video
+            assert name_to_video is not None
+            id = name_to_video[name]['id']
         return id
 
     def ensure_track(self, name: Any, id: None | int = None, **kw: Any) -> int:
@@ -573,8 +620,9 @@ class MixinCocoAddRemove:
         try:
             id = self.add_track(name=name, id=id, **kw)
         except exceptions.DuplicateAddError:
-            obj = self.index.name_to_track[name]  # type: ignore
-            id = obj['id']
+            name_to_track = self.index.name_to_track
+            assert name_to_track is not None
+            id = name_to_track[name]['id']
         return id
 
     def ensure_image(self, file_name: str, id: None | int = None, **kw: Any) -> int:
@@ -601,8 +649,9 @@ class MixinCocoAddRemove:
         try:
             id = self.add_image(file_name=file_name, id=id, **kw)
         except exceptions.DuplicateAddError:
-            img = self.index.file_name_to_img[file_name]  # type: ignore
-            id = img['id']
+            file_name_to_img = self.index.file_name_to_img
+            assert file_name_to_img is not None
+            id = file_name_to_img[file_name]['id']
         return id
 
     def ensure_category(
@@ -629,8 +678,9 @@ class MixinCocoAddRemove:
         try:
             id = self.add_category(name=name, supercategory=supercategory, id=id, **kw)
         except exceptions.DuplicateAddError:
-            cat = self.index.name_to_cat[name]  # type: ignore
-            id = cat['id']
+            name_to_cat = self.index.name_to_cat
+            assert name_to_cat is not None
+            id = name_to_cat[name]['id']
         return id
 
     def add_categories(self, cats: list[dict]) -> Any:
@@ -658,9 +708,9 @@ class MixinCocoAddRemove:
             >>> self.add_categories(cats)
             >>> assert self.n_cats == 8 and self._check_integrity()
         """
-        self.dataset['categories'].extend(cats)  # type: ignore
-        self.index._add_categories(cats)  # type: ignore
-        self._invalidate_hashid(['categories'])  # type: ignore
+        self.dataset['categories'].extend(cats)
+        self.index._add_categories(cats)
+        self._invalidate_hashid(['categories'])
 
     def add_keypoint_categories(self, keypoint_cats: Any) -> Any:
         """
@@ -686,11 +736,11 @@ class MixinCocoAddRemove:
             >>> kp_identifiers = keypoint_cats
             >>> self.remove_keypoint_categories(kp_identifiers, clean_anns=False)
         """
-        if 'keypoint_categories' not in self.dataset:  # type: ignore
-            self.dataset['keypoint_categories'] = []  # type: ignore
-        self.dataset['keypoint_categories'].extend(keypoint_cats)  # type: ignore
-        self.index._add_keypoint_categories(keypoint_cats)  # type: ignore
-        self._invalidate_hashid(['keypoint_categories'])  # type: ignore
+        if 'keypoint_categories' not in self.dataset:
+            self.dataset['keypoint_categories'] = []
+        self.dataset['keypoint_categories'].extend(keypoint_cats)
+        self.index._add_keypoint_categories(keypoint_cats)
+        self._invalidate_hashid(['keypoint_categories'])
 
     def add_annotations(self, anns: list[dict]) -> None:
         """
@@ -716,9 +766,9 @@ class MixinCocoAddRemove:
             >>> self.add_annotations(anns)
             >>> assert self.n_annots == 11 and self._check_integrity()
         """
-        self.dataset['annotations'].extend(anns)  # type: ignore
-        self.index._add_annotations(anns)  # type: ignore
-        self._invalidate_hashid(['annotations'])  # type: ignore
+        self.dataset['annotations'].extend(anns)
+        self.index._add_annotations(anns)
+        self._invalidate_hashid(['annotations'])
 
     def add_images(self, imgs: list[dict]) -> None:
         """
@@ -749,9 +799,9 @@ class MixinCocoAddRemove:
             >>> self.add_images(imgs)
             >>> assert self.n_images == 3 and self._check_integrity()
         """
-        self.dataset['images'].extend(imgs)  # type: ignore
-        self.index._add_images(imgs)  # type: ignore
-        self._invalidate_hashid(['images'])  # type: ignore
+        self.dataset['images'].extend(imgs)
+        self.index._add_images(imgs)
+        self._invalidate_hashid(['images'])
 
     def clear_images(self) -> None:
         """
@@ -766,10 +816,10 @@ class MixinCocoAddRemove:
         """
         # self.dataset['images'].clear()
         # self.dataset['annotations'].clear()
-        del self.dataset['images'][:]  # type: ignore
-        del self.dataset['annotations'][:]  # type: ignore
-        self.index._remove_all_images()  # type: ignore
-        self._invalidate_hashid(['images', 'annotations'])  # type: ignore
+        del self.dataset['images'][:]
+        del self.dataset['annotations'][:]
+        self.index._remove_all_images()
+        self._invalidate_hashid(['images', 'annotations'])
 
     def clear_annotations(self) -> None:
         """
@@ -783,11 +833,11 @@ class MixinCocoAddRemove:
             n_anns: 0, n_imgs: 3, n_videos: 0, n_cats: 8, n_tracks: 0
         """
         # self.dataset['annotations'].clear()
-        self.dataset['annotations'].clear()  # type: ignore
-        if 'tracks' in self.dataset:  # type: ignore
-            self.dataset['tracks'].clear()  # type: ignore
-        self.index._remove_all_annotations()  # type: ignore
-        self._invalidate_hashid(['annotations', 'tracks'])  # type: ignore
+        self.dataset['annotations'].clear()
+        if 'tracks' in self.dataset:
+            self.dataset['tracks'].clear()
+        self.index._remove_all_annotations()
+        self._invalidate_hashid(['annotations', 'tracks'])
 
     def remove_annotation(self, aid_or_ann: Any) -> None:
         """
@@ -839,9 +889,9 @@ class MixinCocoAddRemove:
             # TODO: it would be nice if this mapping was as part of the index.
             aid_to_index = {
                 ann['id']: index
-                for index, ann in enumerate(self.dataset['annotations'])  # type: ignore
+                for index, ann in enumerate(self.dataset['annotations'])
             }
-            remove_aids = list(map(self._resolve_to_id, aids_or_anns))  # type: ignore
+            remove_aids = list(map(self._resolve_to_id, aids_or_anns))
             if safe:
                 remove_aids = sorted(set(remove_aids))
             remove_info['annotations'] = len(remove_aids)
@@ -852,11 +902,11 @@ class MixinCocoAddRemove:
 
             remove_idxs = list(ub.take(aid_to_index, remove_aids))
 
-            self.index._remove_annotations(remove_aids, verbose=verbose)  # type: ignore
+            self.index._remove_annotations(remove_aids, verbose=verbose)
 
-            _delitems(self.dataset['annotations'], remove_idxs)  # type: ignore
+            _delitems(self.dataset['annotations'], remove_idxs)
 
-            self._invalidate_hashid(['annotations'])  # type: ignore
+            self._invalidate_hashid(['annotations'])
         return remove_info
 
     def remove_categories(
@@ -903,30 +953,39 @@ class MixinCocoAddRemove:
                 remove_cid_set: set[int] = set()
                 for identifier in cat_identifiers:
                     try:
-                        cid = self._resolve_to_cid(identifier)  # type: ignore
+                        cid = self._resolve_to_cid(identifier)
                         remove_cid_set.add(cid)
                     except Exception:
                         pass
                 remove_cids = sorted(remove_cid_set)
             else:
-                remove_cids = list(map(self._resolve_to_cid, cat_identifiers))  # type: ignore
+                remove_cids = list(map(self._resolve_to_cid, cat_identifiers))
             # First remove any annotation that belongs to those categories
-            if self.index.cid_to_aids:  # type: ignore
+            cid_to_aids = self.index.cid_to_aids
+            if cid_to_aids:
                 remove_aids = list(
-                    it.chain(*[self.index.cid_to_aids[cid] for cid in remove_cids])  # type: ignore
+                    it.chain.from_iterable(cid_to_aids[cid] for cid in remove_cids)
                 )
             else:
                 remove_aids = [
                     ann['id']
-                    for ann in self.dataset['annotations']  # type: ignore
+                    for ann in self.dataset['annotations']
                     if ann['category_id'] in remove_cids
                 ]
 
             if keep_annots:
                 # Simply remove category information instead of removing the
                 # entire annotation.
-                for aid in remove_aids:
-                    self.anns[aid].pop('category_id')  # type: ignore
+                if cid_to_aids is None:
+                    remove_aid_set = set(remove_aids)
+                    for ann in self.dataset['annotations']:
+                        if ann['id'] in remove_aid_set:
+                            ann.pop('category_id', None)
+                else:
+                    anns = self.index.anns
+                    assert anns is not None
+                    for aid in remove_aids:
+                        anns[aid].pop('category_id', None)
             else:
                 rminfo = self.remove_annotations(remove_aids, verbose=verbose)
                 remove_info.update(rminfo)
@@ -935,14 +994,14 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing {} category entries'.format(len(remove_cids)))
             id_to_index = {
-                cat['id']: index for index, cat in enumerate(self.dataset['categories'])  # type: ignore
+                cat['id']: index for index, cat in enumerate(self.dataset['categories'])
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(id_to_index, remove_cids))
-            _delitems(self.dataset['categories'], remove_idxs)  # type: ignore
+            _delitems(self.dataset['categories'], remove_idxs)
 
-            self.index._remove_categories(remove_cids, verbose=verbose)  # type: ignore
-            self._invalidate_hashid(['categories', 'annotations'])  # type: ignore
+            self.index._remove_categories(remove_cids, verbose=verbose)
+            self._invalidate_hashid(['categories', 'annotations'])
 
         return remove_info
 
@@ -992,28 +1051,26 @@ class MixinCocoAddRemove:
                 remove_trackid_set: set[int] = set()
                 for identifier in track_identifiers:
                     try:
-                        trackid = self._resolve_to_trackid(identifier)  # type: ignore
+                        trackid = self._resolve_to_trackid(identifier)
                         remove_trackid_set.add(trackid)
                     except Exception:
                         pass
                 remove_trackids = sorted(remove_trackid_set)
             else:
-                remove_trackids = list(map(self._resolve_to_trackid, track_identifiers))  # type: ignore
+                remove_trackids = list(map(self._resolve_to_trackid, track_identifiers))
 
-            # First remove any annotation that belongs to those tracks
-            if self.index.trackid_to_aids is not None:  # type: ignore
+            # First remove any annotation that belongs to those tracks.
+            trackid_to_aids = self.index.trackid_to_aids
+            if trackid_to_aids is not None:
                 remove_aids = list(
-                    it.chain(
-                        *[
-                            self.index.trackid_to_aids[trackid]  # type: ignore
-                            for trackid in remove_trackids
-                        ]
+                    it.chain.from_iterable(
+                        trackid_to_aids[trackid] for trackid in remove_trackids
                     )
                 )
             else:
                 remove_aids = [
                     ann['id']
-                    for ann in self.dataset['annotations']  # type: ignore
+                    for ann in self.dataset['annotations']
                     if ann.get('track_id', None) in remove_trackids
                 ]
 
@@ -1021,15 +1078,23 @@ class MixinCocoAddRemove:
                 # Simply remove track information instead of removing the
                 # entire annotation.
                 if remove_aids:
-                    trackless_aids = self.index.trackid_to_aids.get(  # type: ignore
-                        None
-                    )
-                    if trackless_aids is None:
-                        trackless_aids = set()
-                        self.index.trackid_to_aids[None] = trackless_aids  # type: ignore
-                    for aid in remove_aids:
-                        self.anns[aid].pop('track_id', None)  # type: ignore
-                        trackless_aids.add(aid)
+                    if trackid_to_aids is None:
+                        # The index is disabled, so mutate only the authoritative
+                        # raw annotation dictionaries.
+                        remove_aid_set = set(remove_aids)
+                        for ann in self.dataset['annotations']:
+                            if ann['id'] in remove_aid_set:
+                                ann.pop('track_id', None)
+                    else:
+                        anns = self.index.anns
+                        assert anns is not None
+                        trackless_aids = trackid_to_aids.get(None)
+                        if trackless_aids is None:
+                            trackless_aids = set()
+                            trackid_to_aids[None] = trackless_aids
+                        for aid in remove_aids:
+                            anns[aid].pop('track_id', None)
+                            trackless_aids.add(aid)
             else:
                 rminfo = self.remove_annotations(remove_aids, verbose=verbose)
                 remove_info.update(rminfo)
@@ -1038,14 +1103,14 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing {} track entries'.format(len(remove_trackids)))
             id_to_index = {
-                track['id']: index for index, track in enumerate(self.dataset['tracks'])  # type: ignore
+                track['id']: index for index, track in enumerate(self.dataset['tracks'])
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(id_to_index, remove_trackids))
-            _delitems(self.dataset['tracks'], remove_idxs)  # type: ignore
+            _delitems(self.dataset['tracks'], remove_idxs)
 
-            self.index._remove_tracks(remove_trackids, verbose=verbose)  # type: ignore
-            self._invalidate_hashid(['tracks', 'annotations'])  # type: ignore
+            self.index._remove_tracks(remove_trackids, verbose=verbose)
+            self._invalidate_hashid(['tracks', 'annotations'])
 
         return remove_info
 
@@ -1083,18 +1148,19 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing images')
 
-            remove_gids = list(map(self._resolve_to_gid, gids_or_imgs))  # type: ignore
+            remove_gids = list(map(self._resolve_to_gid, gids_or_imgs))
             if safe:
                 remove_gids = sorted(set(remove_gids))
             # First remove any annotation that belongs to those images
-            if self.index.gid_to_aids:  # type: ignore
+            gid_to_aids = self.index.gid_to_aids
+            if gid_to_aids:
                 remove_aids = list(
-                    it.chain(*[self.index.gid_to_aids[gid] for gid in remove_gids])  # type: ignore
+                    it.chain.from_iterable(gid_to_aids[gid] for gid in remove_gids)
                 )
             else:
                 remove_aids = [
                     ann['id']
-                    for ann in self.dataset['annotations']  # type: ignore
+                    for ann in self.dataset['annotations']
                     if ann['image_id'] in remove_gids
                 ]
 
@@ -1105,14 +1171,14 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing {} image entries'.format(len(remove_gids)))
             id_to_index = {
-                img['id']: index for index, img in enumerate(self.dataset['images'])  # type: ignore
+                img['id']: index for index, img in enumerate(self.dataset['images'])
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(id_to_index, remove_gids))
-            _delitems(self.dataset['images'], remove_idxs)  # type: ignore
+            _delitems(self.dataset['images'], remove_idxs)
 
-            self.index._remove_images(remove_gids, verbose=verbose)  # type: ignore
-            self._invalidate_hashid(['images', 'annotations'])  # type: ignore
+            self.index._remove_images(remove_gids, verbose=verbose)
+            self._invalidate_hashid(['images', 'annotations'])
 
         return remove_info
 
@@ -1149,21 +1215,22 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing videos')
 
-            remove_vidids = list(map(self._resolve_to_vidid, vidids_or_videos))  # type: ignore
+            remove_vidids = list(map(self._resolve_to_vidid, vidids_or_videos))
             if safe:
                 remove_vidids = sorted(set(remove_vidids))
-            # First remove any annotation that belongs to those images
-            if self.index.vidid_to_gids:  # type: ignore
+            # First remove images that belong to those videos.
+            vidid_to_gids = self.index.vidid_to_gids
+            if vidid_to_gids:
                 remove_gids = list(
-                    it.chain(
-                        *[self.index.vidid_to_gids[vidid] for vidid in remove_vidids]  # type: ignore
+                    it.chain.from_iterable(
+                        vidid_to_gids[vidid] for vidid in remove_vidids
                     )
                 )
             else:
                 remove_gids = [
-                    ann['id']
-                    for ann in self.dataset['videos']  # type: ignore
-                    if ann['image_id'] in remove_gids  # type: ignore
+                    img['id']
+                    for img in self.dataset['images']
+                    if img.get('video_id', None) in remove_vidids
                 ]
 
             rminfo = self.remove_images(remove_gids, verbose=verbose, safe=safe)
@@ -1173,14 +1240,14 @@ class MixinCocoAddRemove:
             if verbose > 1:
                 print('Removing {} video entries'.format(len(remove_vidids)))
             id_to_index = {
-                video['id']: index for index, video in enumerate(self.dataset['videos'])  # type: ignore
+                video['id']: index for index, video in enumerate(self.dataset['videos'])
             }
             # Lookup the indices to remove, sort in descending order
             remove_idxs = list(ub.take(id_to_index, remove_vidids))
-            _delitems(self.dataset['videos'], remove_idxs)  # type: ignore
+            _delitems(self.dataset['videos'], remove_idxs)
 
-            self.index._remove_videos(remove_vidids, verbose=verbose)  # type: ignore
-            self._invalidate_hashid(['videos', 'images', 'annotations'])  # type: ignore
+            self.index._remove_videos(remove_vidids, verbose=verbose)
+            self._invalidate_hashid(['videos', 'images', 'annotations'])
         return remove_info
 
     def remove_annotation_keypoints(self, kp_identifiers: list) -> dict:
@@ -1195,10 +1262,10 @@ class MixinCocoAddRemove:
         """
         # kpnames = {k['name'] for k in remove_kpcats}
         # TODO: needs optimization
-        remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))  # type: ignore
+        remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))
         kpcids = {k['id'] for k in remove_kpcats}
         num_kps_removed = 0
-        for ann in self.dataset['annotations']:  # type: ignore
+        for ann in self.dataset['annotations']:
             remove_idxs = [
                 kp_idx
                 for kp_idx, kp in enumerate(ann['keypoints'])
@@ -1239,7 +1306,7 @@ class MixinCocoAddRemove:
         remove_info: dict[str, Any] = {
             'keypoint_categories': None, 'annotation_keypoints': None
         }
-        remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))  # type: ignore
+        remove_kpcats = list(map(self._resolve_to_kpcat, kp_identifiers))
 
         # This is expensive, should make it optional.
         if clean_anns:
@@ -1249,18 +1316,18 @@ class MixinCocoAddRemove:
         remove_kpcids = {k['id'] for k in remove_kpcats}
 
         for kpcat in remove_kpcats:
-            self.dataset['keypoint_categories'].remove(kpcat)  # type: ignore
+            self.dataset['keypoint_categories'].remove(kpcat)
 
         # handle reflection ids
         remove_reflect_ids = 0
-        for kpcat in self.dataset['keypoint_categories']:  # type: ignore
+        for kpcat in self.dataset['keypoint_categories']:
             if kpcat.get('reflection_id', None) in remove_kpcids:
                 kpcat['reflection_id'] = None
                 remove_reflect_ids += 1
 
         remove_info['reflection_ids'] = remove_reflect_ids
         remove_info['keypoint_categories'] = len(remove_kpcats)
-        self.index._remove_keypoint_categories(remove_kpcids)  # type: ignore
+        self.index._remove_keypoint_categories(remove_kpcids)
         return remove_info
 
     def set_annotation_category(
@@ -1287,14 +1354,15 @@ class MixinCocoAddRemove:
             >>> assert sum(new_freq.values()) == sum(old_freq.values())
             >>> assert new_freq['kitten'] == 1
         """
-        new_cid = self._resolve_to_cid(cid_or_cat)  # type: ignore
-        ann = self._resolve_to_ann(aid_or_ann)  # type: ignore
+        new_cid = self._resolve_to_cid(cid_or_cat)
+        ann = self._resolve_to_ann(aid_or_ann)
         aid = ann['id']
-        if self.index:  # type: ignore
+        cid_to_aids = self.index.cid_to_aids
+        if cid_to_aids is not None:
             if 'category_id' in ann:
                 old_cid = ann['category_id']
-                self.index.cid_to_aids[old_cid].remove(aid)  # type: ignore
+                cid_to_aids[old_cid].remove(aid)
         ann['category_id'] = new_cid
-        if self.index:  # type: ignore
-            self.index.cid_to_aids[new_cid].add(aid)  # type: ignore
-        self._invalidate_hashid(['annotations'])  # type: ignore
+        if cid_to_aids is not None:
+            cid_to_aids[new_cid].add(aid)
+        self._invalidate_hashid(['annotations'])
