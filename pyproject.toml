@@ -31,6 +31,7 @@ classifiers = [
 dynamic = [
   "dependencies",
   "optional-dependencies",
+  "readme",
   "version",
 ]
 urls.Homepage = "https://gitlab.kitware.com/computer-vision/kwcoco"
@@ -49,7 +50,11 @@ dynamic.optional-dependencies.all.file = [
   "requirements/gdal.txt",
 ]
 dynamic.optional-dependencies.docs.file = [
-  "requirements/docs.txt",
+  "requirements/docs-core.txt",
+  "requirements/tests.txt",
+  "requirements/headless.txt",
+  "requirements/optional.txt",
+  "requirements/runtime.txt",
 ]
 dynamic.optional-dependencies.gdal.file = [
   "requirements/gdal.txt",

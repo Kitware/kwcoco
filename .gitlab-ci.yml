@@ -122,7 +122,7 @@ stages:
             fpath = sdists[-1]
         print(str(fpath).replace(chr(92), chr(47)))
     ")
-  - python -m pip install --prefer-binary -r requirements/gdal.txt
+  - python -m pip install --prefer-binary --find-links https://girder.github.io/large_image_wheels -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "USE_UV_LOCK=$USE_UV_LOCK"
@@ -222,7 +222,7 @@ stages:
             fpath = sdists[-1]
         print(str(fpath).replace(chr(92), chr(47)))
     ")
-  - python -m pip install --prefer-binary -r requirements/gdal.txt
+  - python -m pip install --prefer-binary --find-links https://girder.github.io/large_image_wheels -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "USE_UV_LOCK=$USE_UV_LOCK"
@@ -323,7 +323,7 @@ stages:
         print(str(fpath).replace(chr(92), chr(47)))
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt
+  - python -m pip install --prefer-binary --find-links https://girder.github.io/large_image_wheels -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "USE_UV_LOCK=$USE_UV_LOCK"
@@ -424,7 +424,7 @@ stages:
         print(str(fpath).replace(chr(92), chr(47)))
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt
+  - python -m pip install --prefer-binary --find-links https://girder.github.io/large_image_wheels -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
   - echo "USE_UV_LOCK=$USE_UV_LOCK"
