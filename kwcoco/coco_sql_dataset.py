@@ -1010,8 +1010,7 @@ class SqlIdGroupDictProxy(DictLike):
                 query = session.query(keyattr, valattr).order_by(
                     keyattr, proxy.order_attr
                 )
-                result = session.execute(query)
-                yielder = _raw_yielder(result)
+                yielder = _orm_yielder(query)
             else:
                 table = proxy.keyattr.class_.__tablename__
                 keycol = table + '.' + proxy.keyattr.name

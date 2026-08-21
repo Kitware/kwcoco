@@ -44,7 +44,7 @@ stages:
   stage: build
   script:
   - python -m pip install pip uv -U
-  - python -m uv pip install setuptools>=0.8 wheel build twine
+  - python -m uv pip install setuptools>=77 wheel build twine
   - python -m build --sdist --outdir dist
   - python -m twine check ./dist/kwcoco*.tar.gz
   artifacts:
@@ -58,7 +58,7 @@ stages:
   - df -h
   script:
   - python -m pip install pip uv -U
-  - python -m uv pip install setuptools>=0.8 wheel build twine
+  - python -m uv pip install setuptools>=77 wheel build twine
   - python -m build --wheel --outdir dist
   - python -m twine check ./dist/kwcoco*.whl
   artifacts:
@@ -94,7 +94,7 @@ stages:
   - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
   - 'echo "Installing helpers: setuptools"'
-  - python -m uv pip install --resolution=highest setuptools>=0.8 setuptools_scm wheel build -U
+  - python -m uv pip install --resolution=highest setuptools>=77 setuptools_scm wheel build -U
   - 'echo "Installing helpers: tomli and pkginfo"'
   - python -m uv pip install --resolution=highest tomli pkginfo packaging
   - |-
@@ -194,7 +194,7 @@ stages:
   - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
   - 'echo "Installing helpers: setuptools"'
-  - python -m uv pip install --resolution=highest setuptools>=0.8 setuptools_scm wheel build -U
+  - python -m uv pip install --resolution=highest setuptools>=77 setuptools_scm wheel build -U
   - 'echo "Installing helpers: tomli and pkginfo"'
   - python -m uv pip install --resolution=highest tomli pkginfo packaging
   - |-
@@ -294,7 +294,7 @@ stages:
   - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
   - 'echo "Installing helpers: setuptools"'
-  - python -m uv pip install --resolution=highest setuptools>=0.8 setuptools_scm wheel build -U
+  - python -m uv pip install --resolution=highest setuptools>=77 setuptools_scm wheel build -U
   - 'echo "Installing helpers: tomli and pkginfo"'
   - python -m uv pip install --resolution=highest tomli pkginfo packaging
   - |-
@@ -395,7 +395,7 @@ stages:
   - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
   - 'echo "Installing helpers: setuptools"'
-  - python -m uv pip install --resolution=highest setuptools>=0.8 setuptools_scm wheel build -U
+  - python -m uv pip install --resolution=highest setuptools>=77 setuptools_scm wheel build -U
   - 'echo "Installing helpers: tomli and pkginfo"'
   - python -m uv pip install --resolution=highest tomli pkginfo packaging
   - |-

@@ -89,6 +89,10 @@ package-data.kwcoco = [
   "py.typed",
   "coco_schema.json",
 ]
+package-data."kwcoco.rc.requirements" = [
+  "*.txt",
+  "locks/*.txt",
+]
 packages.find.where = [
   ".",
 ]
@@ -221,6 +225,7 @@ render_doc_images = 1
 use_setup_py = false
 use_pyproject_requirements = false
 enable_gpg = true
+requirements_package = "kwcoco.rc.requirements"
 entry_points.console_scripts = [
   "kwcoco = kwcoco.cli.__main__:main",
 ]

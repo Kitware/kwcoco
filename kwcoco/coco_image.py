@@ -380,7 +380,7 @@ class CocoImage(_CocoObject):
         if self.bundle_dpath is None:
             raise Exception('Bundle dpath must be populated to use this method')
         dpath = ub.Path(self.bundle_dpath)
-        primary = cast(dict[str, Any], self.primary_asset(requires=requires))
+        primary = cast('dict[str, Any]', self.primary_asset(requires=requires))
         fname = primary['file_name']
         fpath = dpath / fname
         return fpath
@@ -1479,7 +1479,7 @@ class CocoImage(_CocoObject):
                 'image', RESOLUTION_KEY=RESOLUTION_KEY
             ).copy()
             # Adjust the image resolution based on the asset scale factor
-            asset_obj = cast(dict[str, Any], self.find_asset_obj(channel))
+            asset_obj = cast('dict[str, Any]', self.find_asset_obj(channel))
             warp_img_from_aux = kwimage.Affine.coerce(
                 asset_obj.get('warp_aux_to_img', None)
             )
