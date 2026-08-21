@@ -3,7 +3,7 @@ from __future__ import annotations
 import kwarray
 import numpy as np
 import ubelt as ub
-from scipy.spatial.distance import pdist
+from scipy.spatial import cKDTree
 
 
 class Boids(ub.NiceRepr):
@@ -29,7 +29,7 @@ class Boids(ub.NiceRepr):
         >>> import kwplot
         >>> plt = kwplot.autoplt()
         >>> from mpl_toolkits.mplot3d import Axes3D  # NOQA
-        >>> ax = plt.gca(projection='3d')
+        >>> ax = plt.axes(projection='3d')
         >>> ax.cla()
         >>> #
         >>> for path in paths:
@@ -95,7 +95,7 @@ class Boids(ub.NiceRepr):
                 avsteer = self.avoid_steering[rx]
 
                 # plt.arrow(tip[0], tip[1], s * vel[0], s * vel[1], color='green')
-                plt.arrow(tip[0], tip[1], s * acc[1], s * acc[1], color='purple')
+                plt.arrow(tip[0], tip[1], s * acc[0], s * acc[1], color='purple')
 
                 plt.arrow(tip[0], tip[1], s * spsteer[0], s * spsteer[1], color='dodgerblue')
                 plt.arrow(tip[0], tip[1], s * cmsteer[0], s * cmsteer[1], color='orange')
@@ -128,6 +128,8 @@ class Boids(ub.NiceRepr):
     """
 
     def __init__(self, num, dims=2, rng=None, **kwargs):
+        if dims != 2:
+            raise NotImplementedError('Boids currently supports only dims=2')
         self.rng = kwarray.ensure_rng(rng)
         self.num = num
         self.dims = dims
@@ -138,16 +140,26 @@ class Boids(ub.NiceRepr):
         #     'max_force': 0.0003,
         # }
         self.config = {
-            'perception_thresh': 0.2,
-            'max_speed': 0.01,
-            'max_force': 0.001,
+            'perception_thresh': 0.05,
+            'separation_thresh': 0.030,
+            'max_speed': 0.003,
+            'max_force': 0.00012,
             'damping': 0.99,
+            'alignment_strength': 0.20,
+            'cohesion_strength': 0.20,
+            'separation_strength': 0.55,
+            'random_strength': 0.12,
+            'avoidance_strength': 0.75,
+            'edge_thresh': 0.12,
         }
         self.config.update(ub.dict_isect(kwargs, self.config))
 
         self.pos = None
         self.vel = None
         self.acc = None
+        self.neighbor_pairs = np.empty((0, 2), dtype=np.int64)
+        self.neighbor_vec = np.empty((0, 2), dtype=float)
+        self.neighbor_dist2 = np.empty(0, dtype=float)
 
     def __nice__(self):
         return '{}'.format(self.num)
@@ -160,132 +172,175 @@ class Boids(ub.NiceRepr):
         return self
 
     def update_neighbors(self):
-        # TODO: this should be done with a fast spatial index, but
-        # unfortunately I don't see any existing implementations that make it
-        # easy to support moving points.
-        utriu_dists = pdist(self.pos)  # type: ignore
-        utriu_flags = utriu_dists < self.config['perception_thresh']
-        utriu_rx, utriu_cx = np.triu_indices(len(self.pos), k=1)  # type: ignore
+        # Rebuild a spatial index each frame and return the sparse undirected
+        # neighbor graph. cKDTree performs both index construction and radius
+        # queries in compiled code, avoiding Python work per occupied grid cell.
+        perception_thresh = self.config['perception_thresh']
+        num = len(self.pos)  # type: ignore
 
-        utriu_neighb_rxs = utriu_rx[utriu_flags]
-        utriu_neighb_cxs = utriu_cx[utriu_flags]
+        if num > 1 and perception_thresh > 0:
+            tree = cKDTree(
+                self.pos, compact_nodes=False, balanced_tree=False  # type: ignore
+            )
+            pairs = tree.query_pairs(
+                perception_thresh, output_type='ndarray'
+            )
+            if len(pairs):
+                # query_pairs includes pairs exactly on the radius. Preserve
+                # the historical strict ``distance < perception_thresh`` rule
+                # and retain the pair geometry for separation below.
+                neigh_vec = self.pos[pairs[:, 0]] - self.pos[pairs[:, 1]]  # type: ignore
+                neigh_dist2 = np.sum(neigh_vec * neigh_vec, axis=1)
+                flags = neigh_dist2 < perception_thresh ** 2
+                if not np.all(flags):
+                    pairs = pairs[flags]
+                    neigh_vec = neigh_vec[flags]
+                    neigh_dist2 = neigh_dist2[flags]
+            else:
+                neigh_vec = np.empty((0, 2), dtype=float)
+                neigh_dist2 = np.empty(0, dtype=float)
+        else:
+            pairs = np.empty((0, 2), dtype=np.int64)
+            neigh_vec = np.empty((0, 2), dtype=float)
+            neigh_dist2 = np.empty(0, dtype=float)
 
-        neighb_rxs = np.r_[utriu_neighb_rxs, utriu_neighb_cxs]
-        neighb_cxs = np.r_[utriu_neighb_cxs, utriu_neighb_rxs]
-
-        group_rxs, groupxs = kwarray.group_indices(neighb_rxs)
-        group_cxs = kwarray.apply_grouping(neighb_cxs, groupxs)
-
-        rx_to_neighb_cxs = ub.dzip(group_rxs, group_cxs)
-
-        # n = len(self.pos)
-        # rx_to_neighb_utriu_idxs = {}
-        # for rx, cxs in rx_to_neighb_cxs.items():
-        #     rxs = np.full_like(cxs, fill_value=rx)
-        #     multi_index = (rxs, cxs)
-        #     utriu_idxs = triu_condense_multi_index(
-        #         multi_index, dims=(n, n), symmetric=True)
-        #     rx_to_neighb_utriu_idxs[rx] = utriu_idxs
-
-        # self.utriu_dists = utriu_dists
-        self.rx_to_neighb_cxs = rx_to_neighb_cxs
-        # self.rx_to_neighb_utriu_idxs = rx_to_neighb_utriu_idxs
-
-        # Compute speed and direction of every boid
-        self.speeds = np.linalg.norm(self.vel, axis=1)  # type: ignore
-        self.dirs = self.vel / np.maximum(self.speeds[:, None], 1e-9)
+        self.neighbor_pairs = pairs
+        self.neighbor_vec = neigh_vec
+        self.neighbor_dist2 = neigh_dist2
+        return pairs
 
     def compute_forces(self):
-        self.update_neighbors()
+        pairs = self.update_neighbors()
         max_speed = self.config['max_speed']
-
-        # Randomly drop perception of neighbors
-        # neighbors[self.rng.rand(*neighbors.shape) > 0.3] = 0
         num = len(self.pos)  # type: ignore
 
         align_steering = np.zeros((num, 2))
         com_steering = np.zeros((num, 2))
         sep_steering = np.zeros((num, 2))
 
-        for rx in self.rx_to_neighb_cxs.keys():
-            cxs = self.rx_to_neighb_cxs[rx]
+        if len(pairs):
+            rxs1 = pairs[:, 0]
+            rxs2 = pairs[:, 1]
 
-            # Alignment
-            # Each boid wants its direction to agree with the
-            # the average direction of its neighbors
-            if 1:
-                neigh_vel = self.vel[cxs]  # type: ignore
-                ave_vel = neigh_vel.mean(axis=0)
-                ave_speed = np.linalg.norm(ave_vel)
-                if ave_speed > 0:
-                    ave_dir = (ave_vel / ave_speed) * max_speed
-                else:
-                    ave_dir = ave_vel
-                align_steering_ = ave_dir - self.vel[rx]  # type: ignore
-                align_steering[rx] = align_steering_
+            # Each pair contributes one neighbor to each endpoint. Aggregate
+            # over the sparse edge list instead of issuing many small numpy
+            # reductions inside a Python loop over boids.
+            neighbor_count = np.bincount(pairs.ravel(), minlength=num)
+            has_neighbors = neighbor_count > 0
 
-            # Cohesion
-            # Each boid wants to be in the center of its neighbors
-            if 1:
-                center_of_mass = self.pos[cxs].mean(axis=0)  # type: ignore
-                com_vec = center_of_mass - self.pos[rx]  # type: ignore
-                com_dist = np.linalg.norm(com_vec)
-                if com_dist > 0:
-                    com_dir = (com_vec / com_dist) * max_speed
-                else:
-                    com_dir = com_vec
-                com_steering_ = com_dir - self.vel[rx]  # type: ignore
-                com_steering[rx] = com_steering_
+            # Alignment: average neighbor velocity.
+            neigh_vel_sum = np.empty((num, 2), dtype=float)
+            for dim in range(2):
+                neigh_vel_sum[:, dim] = (
+                    np.bincount(
+                        rxs1, weights=self.vel[rxs2, dim], minlength=num
+                    )
+                    + np.bincount(
+                        rxs2, weights=self.vel[rxs1, dim], minlength=num
+                    )
+                )
+            ave_vel = np.zeros((num, 2), dtype=float)
+            ave_vel[has_neighbors] = (
+                neigh_vel_sum[has_neighbors]
+                / neighbor_count[has_neighbors, None]
+            )
+            ave_speed = np.linalg.norm(ave_vel, axis=1)
+            moving = ave_speed > 0
+            ave_vel[moving] *= (max_speed / ave_speed[moving])[:, None]
+            align_steering[has_neighbors] = (
+                ave_vel[has_neighbors] - self.vel[has_neighbors]
+            )
 
-            # Separation
-            # Each boid does not want to be too close to its neighbors
-            if 1:
-                neigh_vec = self.pos[rx] - self.pos[cxs]  # type: ignore
+            # Cohesion: average neighbor position.
+            neigh_pos_sum = np.empty((num, 2), dtype=float)
+            for dim in range(2):
+                neigh_pos_sum[:, dim] = (
+                    np.bincount(
+                        rxs1, weights=self.pos[rxs2, dim], minlength=num
+                    )
+                    + np.bincount(
+                        rxs2, weights=self.pos[rxs1, dim], minlength=num
+                    )
+                )
+            center_of_mass = np.zeros((num, 2), dtype=float)
+            center_of_mass[has_neighbors] = (
+                neigh_pos_sum[has_neighbors]
+                / neighbor_count[has_neighbors, None]
+            )
+            com_vec = center_of_mass - self.pos
+            com_dist = np.linalg.norm(com_vec, axis=1)
+            com_dir = com_vec.copy()
+            moving = has_neighbors & (com_dist > 0)
+            com_dir[moving] *= (max_speed / com_dist[moving])[:, None]
+            com_steering[has_neighbors] = (
+                com_dir[has_neighbors] - self.vel[has_neighbors]
+            )
 
-                # utriu_idxs = self.rx_to_neighb_utriu_idxs[rx]
-                # neigh_dist1 = self.utriu_dists[utriu_idxs][:, None]
-                # neigh_dist = neigh_dist1
-                neigh_dist2 = np.linalg.norm(neigh_vec, axis=1, keepdims=1)  # type: ignore
-                neigh_dist = neigh_dist2
-                assert neigh_dist.max() <= self.config['perception_thresh']
-
-                flags = neigh_dist.ravel() > 0
-                # neigh_dir = neigh_vec[flags]
-                # neigh_dir = neigh_vec[flags] / neigh_dist[flags]
-                neigh_dir = neigh_vec[flags] / (neigh_dist[flags] ** 2)
-
-                ave_neigh_dir = neigh_dir.mean(axis=0)
-                sep_steering_ = ave_neigh_dir - self.vel[rx]  # type: ignore
-                sep_steering[rx] = sep_steering_
-
-        def dist_point_to_line(line_pts, pt):
-            pt1, pt2 = line_pts
-            x1, y1 = pt1
-            x2, y2 = pt2
-            x0, y0 = pt
-            numer = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1)
-            denom = np.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
-            dist = numer / denom
-            return dist
-
-        # align_steering[
-        # com_steering = clamp_mag(com_steering, self.config['max_force'], axis=None)
+            # Separation: only repel boids that are within the smaller
+            # separation radius. A pair contributes equal and opposite
+            # repulsion to its endpoints. Coincident boids are excluded.
+            neigh_vec = self.neighbor_vec
+            neigh_dist2 = self.neighbor_dist2
+            separation_thresh = min(
+                self.config['separation_thresh'],
+                self.config['perception_thresh'],
+            )
+            valid = (
+                (neigh_dist2 > 0)
+                & (neigh_dist2 < separation_thresh ** 2)
+            )
+            if np.any(valid):
+                valid_rxs1 = rxs1[valid]
+                valid_rxs2 = rxs2[valid]
+                repel = neigh_vec[valid] / neigh_dist2[valid, None]
+                sep_count = (
+                    np.bincount(valid_rxs1, minlength=num)
+                    + np.bincount(valid_rxs2, minlength=num)
+                )
+                sep_sum = np.empty((num, 2), dtype=float)
+                for dim in range(2):
+                    sep_sum[:, dim] = (
+                        np.bincount(
+                            valid_rxs1, weights=repel[:, dim], minlength=num
+                        )
+                        - np.bincount(
+                            valid_rxs2, weights=repel[:, dim], minlength=num
+                        )
+                    )
+                has_sep_neighbors = sep_count > 0
+                ave_neigh_dir = np.zeros((num, 2), dtype=float)
+                ave_neigh_dir[has_sep_neighbors] = (
+                    sep_sum[has_sep_neighbors]
+                    / sep_count[has_sep_neighbors, None]
+                )
+                sep_steering[has_sep_neighbors] = (
+                    ave_neigh_dir[has_sep_neighbors]
+                    - self.vel[has_sep_neighbors]
+                )
 
         align_steering = clamp_mag(
-            align_steering, 0.33 * self.config['max_force'], axis=None
+            align_steering,
+            self.config['alignment_strength'] * self.config['max_force'],
+            axis=1,
         )
         com_steering = clamp_mag(
-            com_steering, 0.33 * self.config['max_force'], axis=None
+            com_steering,
+            self.config['cohesion_strength'] * self.config['max_force'],
+            axis=1,
         )
 
         # Separation and obstical avoidance should override alignment and COM
         sep_steering = clamp_mag(
-            sep_steering, 1.0 * self.config['max_force'], axis=None
+            sep_steering,
+            self.config['separation_strength'] * self.config['max_force'],
+            axis=1,
         )
 
         # Add some small random movement
         rand_steering = clamp_mag(
-            self.rng.randn(*self.pos.shape), 0.08 * self.config['max_force'], axis=None  # type: ignore
+            self.rng.randn(*self.pos.shape),
+            self.config['random_strength'] * self.config['max_force'],
+            axis=1,  # type: ignore
         )
 
         self.sep_steering = sep_steering
@@ -306,7 +361,7 @@ class Boids(ub.NiceRepr):
             # # Edge avoidance
             # # Each boid does not want to hit an edge
             avoid_steering = np.zeros_like(self.pos)
-            edge_thresh = self.config['perception_thresh'] * 1
+            edge_thresh = self.config['edge_thresh']
             edges = {
                 'bot': np.array([(0, 0), (1, 0)]),
                 'left': np.array([(0, 0), (0, 1)]),
@@ -329,7 +384,9 @@ class Boids(ub.NiceRepr):
                     avoid_steering[rxs] += avoid_steering_
 
             avoid_steering = clamp_mag(
-                avoid_steering, 1.0 * self.config['max_force'], axis=None
+                avoid_steering,
+                self.config['avoidance_strength'] * self.config['max_force'],
+                axis=1,
             )
             steering += avoid_steering
             self.avoid_steering = avoid_steering
@@ -367,7 +424,7 @@ class Boids(ub.NiceRepr):
         self.vel = clamp_mag(self.vel, self.config['max_speed'], axis=1)
 
         # Dampen acceleration
-        self.acc[:] *= max(1, min(0, (1 - self.config['damping'])))
+        self.acc[:] *= min(1, max(0, (1 - self.config['damping'])))
         # self.acc[:] = 0
 
         self.boundary_conditions()
@@ -391,9 +448,8 @@ def clamp_mag(vec, mag, axis=None):
     np.linalg.norm(new_vec, axis=axis)
     """
     norm = np.asarray(np.linalg.norm(vec, axis=axis, keepdims=True))
-    flags = norm > mag
-    flags = np.squeeze(flags, axis)
-    vec[flags] = (vec[flags] / norm[flags]) * mag
+    scale = np.minimum(1.0, mag / np.maximum(norm, 1e-12))
+    vec[...] = vec * scale
     return vec
 
 
@@ -641,34 +697,146 @@ def _pygame_render_boids():
     screen = pygame.display.set_mode([w, h], flags=pygame.RESIZABLE)
     pygame.display.set_caption('YEAH BOID!')
     strokeweight = 2
+    clock = pygame.time.Clock()
+    font = pygame.font.Font(None, 22)
 
-    kw = {
-        'perception_thresh': 0.20,
-        'max_speed': 0.005,
-        'max_force': 0.0003,
-        'damping': 0.99,
-    }
+    param_specs = [
+        ('perception_thresh', 0.01, 0.01, 1.0, '{:.2f}'),
+        ('separation_thresh', 0.005, 0.0, 1.0, '{:.3f}'),
+        ('max_speed', 0.001, 0.001, 0.05, '{:.3f}'),
+        ('max_force', 0.00005, 0.00005, 0.01, '{:.5f}'),
+        ('damping', 0.01, 0.0, 1.0, '{:.2f}'),
+        ('alignment_strength', 0.05, 0.0, 3.0, '{:.2f}'),
+        ('cohesion_strength', 0.05, 0.0, 3.0, '{:.2f}'),
+        ('separation_strength', 0.05, 0.0, 3.0, '{:.2f}'),
+        ('random_strength', 0.01, 0.0, 1.0, '{:.2f}'),
+        ('avoidance_strength', 0.05, 0.0, 3.0, '{:.2f}'),
+        ('edge_thresh', 0.01, 0.0, 1.0, '{:.2f}'),
+    ]
 
-    flock = Boids(256, **kw).initialize()
+    # Boids.__init__ is the single source of truth for demo defaults.
+    flock = Boids(256)
+    initial_rng_state = flock.rng.get_state()
+    flock.initialize()
 
-    try:
-        while True:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
+    def reset_flock():
+        # Keep the parameters currently selected in the UI, but replay the
+        # initial random draws so their effect can be compared from the same
+        # starting conditions.
+        flock.rng.set_state(initial_rng_state)
+        flock.initialize()
+        flock.neighbor_pairs = np.empty((0, 2), dtype=np.int64)
+        flock.neighbor_vec = np.empty((0, 2), dtype=float)
+        flock.neighbor_dist2 = np.empty(0, dtype=float)
 
-            screen.fill((255, 255, 255))
+    control_buttons = []
+    controls_expanded = True
+    toggle_rect = None
+    reset_rect = None
+    running = True
 
-            positions = flock.step()
-            for pos in positions:
-                x, y = pos * (w, h)
-                r = 8
-                pygame.draw.ellipse(screen, (255, 0, 0), (x, y, r, r))
-                pygame.draw.ellipse(screen, (0, 0, 0), (x, y, r, r), strokeweight)
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if reset_rect is not None and reset_rect.collidepoint(event.pos):
+                    reset_flock()
+                elif toggle_rect is not None and toggle_rect.collidepoint(event.pos):
+                    controls_expanded = not controls_expanded
+                elif controls_expanded:
+                    for key, delta, lower, upper, rect in control_buttons:
+                        if rect.collidepoint(event.pos):
+                            value = flock.config[key] + delta
+                            flock.config[key] = min(upper, max(lower, value))
+                            if key == 'separation_thresh':
+                                flock.config[key] = min(
+                                    flock.config[key],
+                                    flock.config['perception_thresh'],
+                                )
+                            elif key == 'perception_thresh':
+                                flock.config['separation_thresh'] = min(
+                                    flock.config['separation_thresh'],
+                                    flock.config[key],
+                                )
+                            break
 
-            pygame.display.flip()
-    except pygame.error:
-        print('exiting')
+        screen.fill((255, 255, 255))
+        w, h = screen.get_size()
+
+        positions = flock.step()
+        for pos in positions:
+            x, y = pos * (w, h)
+            r = 8
+            pygame.draw.ellipse(screen, (255, 0, 0), (x, y, r, r))
+            pygame.draw.ellipse(screen, (0, 0, 0), (x, y, r, r), strokeweight)
+
+        # Draw a small live-control HUD in the top-left corner.
+        margin = 8
+        row_h = 24
+        panel_w = 300
+        num_panel_rows = (len(param_specs) + 2) if controls_expanded else 2
+        panel_h = row_h * num_panel_rows + margin * 2
+        panel_rect = pygame.Rect(margin, margin, panel_w, panel_h)
+        pygame.draw.rect(screen, (255, 255, 255), panel_rect)
+        pygame.draw.rect(screen, (0, 0, 0), panel_rect, 1)
+
+        reset_rect = pygame.Rect(
+            margin + panel_w - 100, margin + 4, 64, 20
+        )
+        pygame.draw.rect(screen, (235, 235, 235), reset_rect)
+        pygame.draw.rect(screen, (0, 0, 0), reset_rect, 1)
+        reset_surface = font.render('reset', True, (0, 0, 0))
+        reset_surface_rect = reset_surface.get_rect(center=reset_rect.center)
+        screen.blit(reset_surface, reset_surface_rect)
+
+        toggle_rect = pygame.Rect(
+            margin + panel_w - 30, margin + 4, 22, 20
+        )
+        pygame.draw.rect(screen, (235, 235, 235), toggle_rect)
+        pygame.draw.rect(screen, (0, 0, 0), toggle_rect, 1)
+        toggle_symbol = '-' if controls_expanded else '+'
+        toggle_surface = font.render(toggle_symbol, True, (0, 0, 0))
+        toggle_surface_rect = toggle_surface.get_rect(center=toggle_rect.center)
+        screen.blit(toggle_surface, toggle_surface_rect)
+
+        fps_text = font.render('FPS: {:5.1f}'.format(clock.get_fps()), True, (0, 0, 0))
+        screen.blit(fps_text, (margin * 2, margin * 2))
+        num_pairs = len(flock.neighbor_pairs)
+        mean_neighbors = (2 * num_pairs / flock.num) if flock.num else 0
+        neighbor_text = font.render(
+            'pairs: {}  mean neighbors: {:.1f}'.format(num_pairs, mean_neighbors),
+            True,
+            (0, 0, 0),
+        )
+        screen.blit(neighbor_text, (margin * 2, margin * 2 + row_h))
+
+        control_buttons = []
+        if controls_expanded:
+            label_x = margin * 2
+            minus_x = margin + panel_w - 58
+            plus_x = margin + panel_w - 30
+            button_w = 24
+            button_h = 20
+            for row, (key, step, lower, upper, fmt) in enumerate(param_specs, start=2):
+                y = margin * 2 + row * row_h
+                value_text = '{}: {}'.format(key, fmt.format(flock.config[key]))
+                text_surface = font.render(value_text, True, (0, 0, 0))
+                screen.blit(text_surface, (label_x, y + 2))
+
+                for symbol, delta, x in [('-', -step, minus_x), ('+', step, plus_x)]:
+                    rect = pygame.Rect(x, y, button_w, button_h)
+                    pygame.draw.rect(screen, (235, 235, 235), rect)
+                    pygame.draw.rect(screen, (0, 0, 0), rect, 1)
+                    symbol_surface = font.render(symbol, True, (0, 0, 0))
+                    symbol_rect = symbol_surface.get_rect(center=rect.center)
+                    screen.blit(symbol_surface, symbol_rect)
+                    control_buttons.append((key, delta, lower, upper, rect))
+
+        pygame.display.flip()
+        clock.tick()
+
+    pygame.quit()
 
 
 def _yeah_boid():
