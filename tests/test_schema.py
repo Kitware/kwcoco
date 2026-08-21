@@ -112,17 +112,17 @@ def test_coco_url_schema_fields():
 
 
 def test_schema_json_in_sync():
-    from pathlib import Path
+    from importlib import resources
 
     from kwcoco import coco_schema
 
     import ubelt as ub
 
-    schema_fpath = Path(coco_schema.__file__).with_name('coco_schema.json')
     expected = ub.urepr(
         coco_schema.COCO_SCHEMA, nl=-1, trailsep=False, sort=False
     ).replace("'", '"') + '\n'
-    assert schema_fpath.read_text() == expected
+    with resources.path('kwcoco', 'coco_schema.json') as schema_fpath:
+        assert schema_fpath.read_text() == expected
 
 
 def test_optional_coco_and_kwcoco_schema_fields():
