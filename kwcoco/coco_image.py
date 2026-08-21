@@ -13,9 +13,13 @@ TODO:
 """
 from __future__ import annotations
 
-import ubelt as ub
+import collections.abc
+import datetime as datetime_mod
 import os
+from typing import Any, cast, Iterator, Sequence, TYPE_CHECKING, TypeVar
+
 import numpy as np
+import ubelt as ub
 from os.path import join
 from kwcoco.util.util_deprecate import deprecated_function_alias
 from kwcoco.util.dict_proxy2 import AliasedDictProxy
@@ -26,6 +30,17 @@ from delayed_image.channel_spec import ChannelSpec
 from delayed_image import DelayedNans
 from delayed_image import DelayedChannelConcat
 from delayed_image import DelayedLoad, DelayedIdentity
+
+if TYPE_CHECKING:
+    from os import PathLike
+
+    import kwimage
+
+    from kwcoco.coco_objects1d import Annots
+
+
+CocoObjectT = TypeVar('CocoObjectT', bound='_CocoObject')
+CocoImageT = TypeVar('CocoImageT', bound='CocoImage')
 
 
 __docstubs__ = """
@@ -47,23 +62,28 @@ class _CocoObject(AliasedDictProxy, ub.NiceRepr):
 
     __alias_to_primary__ = {}
 
-    def __init__(self, obj, dset=None, bundle_dpath=None):
+    def __init__(
+        self,
+        obj: dict[str, Any],
+        dset: Any = None,
+        bundle_dpath: 'str | PathLike | None' = None,
+    ) -> None:
         self._proxy = obj
         self.dset = dset
         self._bundle_dpath = bundle_dpath
 
     @property
-    def bundle_dpath(self):
+    def bundle_dpath(self) -> 'str | PathLike | None':
         if self.dset is not None:
             return self.dset.bundle_dpath
         else:
             return self._bundle_dpath
 
     @bundle_dpath.setter
-    def bundle_dpath(self, value):
+    def bundle_dpath(self, value: 'str | PathLike | None') -> None:
         self._bundle_dpath = value
 
-    def detach(self):
+    def detach(self: CocoObjectT) -> CocoObjectT:
         """
         Removes references to the underlying coco dataset, but keeps special
         information such that it wont be needed.
@@ -106,19 +126,19 @@ class CocoImage(_CocoObject):
         'assets': 'auxiliary',
     }
 
-    def __init__(self, img, dset=None):
+    def __init__(self, img: dict[str, Any], dset: Any = None) -> None:
         super().__init__(img, dset=dset)
-        self.img = img
-        self._video = None
+        self.img: dict[str, Any] = img
+        self._video: dict[str, Any] | None = None
 
     @classmethod
-    def from_gid(cls, dset, gid):
+    def from_gid(cls: type[CocoImageT], dset: Any, gid: int) -> CocoImageT:
         img = dset.index.imgs[gid]
         self = cls(img, dset=dset)
         return self
 
     @property
-    def video(self):
+    def video(self) -> dict[str, Any] | None:
         """
         Helper to grab the video for this image if it exists
         """
@@ -133,15 +153,15 @@ class CocoImage(_CocoObject):
         return video
 
     @video.setter
-    def video(self, value):
+    def video(self, value: dict[str, Any] | None) -> None:
         # TODO: ducktype with an object
         self._video = value
 
     @property
-    def name(self):
+    def name(self) -> str | None:
         return self['name']
 
-    def detach(self):
+    def detach(self: CocoImageT) -> CocoImageT:
         """
         Removes references to the underlying coco dataset, but keeps special
         information such that it wont be needed.
@@ -150,14 +170,14 @@ class CocoImage(_CocoObject):
         return super().detach()
 
     @property
-    def assets(self):
+    def assets(self) -> list['CocoImage | CocoAsset']:
         """
         Convenience wrapper around :func: `CocoImage.iter_assets`.
         """
         return list(self.iter_assets())
 
     @ub.memoize_property
-    def datetime(self):
+    def datetime(self) -> datetime_mod.datetime:
         """
         Try to get datetime information for this image. Not always possible.
 
@@ -170,20 +190,20 @@ class CocoImage(_CocoObject):
         for k in candidate_keys:
             v = self.img.get(k)
             if v is not None:
-                return util_time.coerce_datetime(v)
+                return cast(datetime_mod.datetime, util_time.coerce_datetime(v))
         raise KeyError(
             f'No keys {candidate_keys} to coerce datetime '
             'found in {list(self.img.keys())}'
         )
 
-    def annots(self):
+    def annots(self) -> 'Annots':
         """
         Returns:
             Annots: a 1d annotations object referencing annotations in this image
         """
         return self.dset.annots(image_id=self.img['id'])  # type: ignore
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         """
         Example:
             >>> from kwcoco.coco_image import *  # NOQA
@@ -205,7 +225,7 @@ class CocoImage(_CocoObject):
         stats = stats.map_values(partial(smart_truncate, max_length=32, trunc_loc=0.5))  # type: ignore
         return ub.urepr(stats, compact=1, nl=0)  # type: ignore
 
-    def stats(self):
+    def stats(self) -> dict[str, Any]:
         """ """
         key_attrname = [
             ('wh', 'dsize'),
@@ -224,7 +244,7 @@ class CocoImage(_CocoObject):
                 stats['channels'] = stats['channels'].spec
         return stats
 
-    def __contains__(self, key):
+    def __contains__(self, key: str) -> bool:
         if '_unstructured' in self._proxy:
             if AliasedDictProxy.__contains__(self, key):
                 return True
@@ -232,7 +252,7 @@ class CocoImage(_CocoObject):
         else:
             return AliasedDictProxy.__contains__(self, key)
 
-    def get(self, key, default=ub.NoParam):
+    def get(self, key: str, default: Any = ub.NoParam) -> Any:
         try:
             return self[key]
         except KeyError:
@@ -241,7 +261,7 @@ class CocoImage(_CocoObject):
             else:
                 return default
 
-    def keys(self):
+    def keys(self) -> collections.abc.Iterable[str]:
         """
         Proxy getter attribute for underlying `self.img` dictionary
         """
@@ -254,7 +274,7 @@ class CocoImage(_CocoObject):
         else:
             return self._proxy.keys()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         """
         Proxy getter attribute for underlying `self.img` dictionary
 
@@ -300,7 +320,7 @@ class CocoImage(_CocoObject):
                 raise KeyError(key)
 
     @property
-    def channels(self):
+    def channels(self) -> ChannelSpec | None:
         # from delayed_image.channel_spec import FusedChannelSpec
         # from delayed_image.channel_spec import ChannelSpec
         img_parts = []
@@ -317,7 +337,7 @@ class CocoImage(_CocoObject):
         return spec
 
     @property
-    def n_assets(self):
+    def n_assets(self) -> int:
         """
         The number of on-disk files associated with this coco image
         """
@@ -330,17 +350,18 @@ class CocoImage(_CocoObject):
         return total
 
     @property
-    def num_channels(self):
-        return self.channels.numel()
+    def num_channels(self) -> int:
+        channels = cast(ChannelSpec, self.channels)
+        return channels.numel()
         # return sum(map(len, self.channels.streams()))
 
     @property
-    def dsize(self):
+    def dsize(self) -> tuple[int | None, int | None]:
         width = self.img.get('width', None)
         height = self.img.get('height', None)
         return width, height
 
-    def image_filepath(self):
+    def image_filepath(self) -> ub.Path:
         """
         Note: this only returns a file path if it is directly associated with
         this image, it does not respect assets. This is intended to duck-type
@@ -353,13 +374,20 @@ class CocoImage(_CocoObject):
         else:
             return ub.Path(self.bundle_dpath) / self['file_name']
 
-    def primary_image_filepath(self, requires=None):
+    def primary_image_filepath(
+        self, requires: Sequence[str] | None = None
+    ) -> ub.Path:
+        if self.bundle_dpath is None:
+            raise Exception('Bundle dpath must be populated to use this method')
         dpath = ub.Path(self.bundle_dpath)
-        fname = self.primary_asset()['file_name']
+        primary = cast(dict[str, Any], self.primary_asset(requires=requires))
+        fname = primary['file_name']
         fpath = dpath / fname
         return fpath
 
-    def primary_asset(self, requires=None, as_dict=True):
+    def primary_asset(
+        self, requires: Sequence[str] | None = None, as_dict: bool = True
+    ) -> dict[str, Any] | CocoImage | CocoAsset | None:
         """
         Compute a "main" image asset.
 
@@ -442,7 +470,7 @@ class CocoImage(_CocoObject):
             requires = []
         img = self.img
         has_base_image = img.get('file_name', None) is not None
-        candidates = []
+        candidates: list[dict[str, Any]] = []
 
         if has_base_image:
             obj = img
@@ -488,7 +516,7 @@ class CocoImage(_CocoObject):
         else:
             return CocoAsset(obj, bundle_dpath=self.bundle_dpath)
 
-    def iter_image_filepaths(self, with_bundle=True):
+    def iter_image_filepaths(self, with_bundle: bool = True) -> Iterator[ub.Path]:
         """
         Could rename to iter_asset_filepaths
 
@@ -501,13 +529,15 @@ class CocoImage(_CocoObject):
         Yields:
             ub.Path
         """
+        if self.bundle_dpath is None:
+            raise Exception('Bundle dpath must be populated to use this method')
         dpath = ub.Path(self.bundle_dpath)
         for obj in self.iter_asset_objs():
-            fname = obj.get('file_name')
+            fname = cast(str, obj.get('file_name'))
             fpath = dpath / fname
             yield fpath
 
-    def iter_assets(self):
+    def iter_assets(self) -> Iterator['CocoImage | CocoAsset']:
         """
         Iterate through assets (which could include the image itself it points to a file path).
 
@@ -537,7 +567,7 @@ class CocoImage(_CocoObject):
         for obj in img.get('assets', None) or []:
             yield CocoAsset(obj, self.bundle_dpath)
 
-    def iter_asset_objs(self):
+    def iter_asset_objs(self) -> Iterator[dict[str, Any]]:
         """
         Iterate through base + auxiliary dicts that have file paths
 
@@ -556,7 +586,9 @@ class CocoImage(_CocoObject):
         for obj in img.get('assets', None) or []:
             yield obj
 
-    def find_asset(self, channels):
+    def find_asset(
+        self, channels: str | FusedChannelSpec
+    ) -> 'CocoImage | CocoAsset | None':
         """
         Find the asset dictionary with the specified channels
 
@@ -631,7 +663,9 @@ class CocoImage(_CocoObject):
                 return self
             return CocoAsset(obj, bundle_dpath=self.bundle_dpath)
 
-    def find_asset_obj(self, channels):
+    def find_asset_obj(
+        self, channels: str | FusedChannelSpec
+    ) -> dict[str, Any] | None:
         """
         Find the asset dictionary with the specified channels
 
@@ -686,7 +720,7 @@ class CocoImage(_CocoObject):
             if (obj_channels & channels).numel():
                 return obj
 
-    def _assets_key(self):
+    def _assets_key(self) -> str:
         """
         Internal helper for transition from auxiliary -> assets in the image
         spec
@@ -698,7 +732,7 @@ class CocoImage(_CocoObject):
         else:
             return 'auxiliary'
 
-    def add_annotation(self, **ann):
+    def add_annotation(self, **ann: Any) -> int:
         """
         Adds an annotation to this image.
 
@@ -723,16 +757,16 @@ class CocoImage(_CocoObject):
 
     def add_asset(
         self,
-        file_name=None,
-        channels=None,
-        imdata=None,
-        warp_aux_to_img=None,
-        width=None,
-        height=None,
-        imwrite=False,
-        image_id=None,
-        **kw,
-    ):
+        file_name: str | PathLike | None = None,
+        channels: str | FusedChannelSpec | None = None,
+        imdata: np.ndarray | None = None,
+        warp_aux_to_img: Any = None,
+        width: int | None = None,
+        height: int | None = None,
+        imwrite: bool = False,
+        image_id: int | None = None,
+        **kw: Any,
+    ) -> None:
         """
         Adds an auxiliary / asset item to the image dictionary.
 
@@ -1199,7 +1233,7 @@ class CocoImage(_CocoObject):
         return delayed
 
     @ub.memoize_method
-    def valid_region(self, space='image'):
+    def valid_region(self, space: str = 'image') -> 'kwimage.MultiPolygon | None':
         """
         If this image has a valid polygon, return it in image, or video space
 
@@ -1227,7 +1261,7 @@ class CocoImage(_CocoObject):
         return valid_poly
 
     @ub.memoize_property
-    def warp_vid_from_img(self):
+    def warp_vid_from_img(self) -> 'kwimage.Affine':
         """
         Affine transformation that warps image space -> video space.
 
@@ -1243,7 +1277,7 @@ class CocoImage(_CocoObject):
         return warp_img_to_vid
 
     @ub.memoize_property
-    def warp_img_from_vid(self):
+    def warp_img_from_vid(self) -> 'kwimage.Affine':
         """
         Affine transformation that warps video space -> image space.
 
@@ -1338,7 +1372,12 @@ class CocoImage(_CocoObject):
             warped_ssegs.append(warped_sseg)
         return warped_ssegs
 
-    def resolution(self, space='image', channel=None, RESOLUTION_KEY=None):
+    def resolution(
+        self,
+        space: str = 'image',
+        channel: str | FusedChannelSpec | None = None,
+        RESOLUTION_KEY: str | collections.abc.Iterable[str] | None = None,
+    ) -> dict[str, Any]:
         """
         Returns the resolution of this CocoImage in the requested space if
         known. Errors if this information is not registered.
@@ -1435,8 +1474,9 @@ class CocoImage(_CocoObject):
                 'image', RESOLUTION_KEY=RESOLUTION_KEY
             ).copy()
             # Adjust the image resolution based on the asset scale factor
+            asset_obj = cast(dict[str, Any], self.find_asset_obj(channel))
             warp_img_from_aux = kwimage.Affine.coerce(
-                self.find_asset_obj(channel).get('warp_aux_to_img', None)
+                asset_obj.get('warp_aux_to_img', None)
             )
             img_res_mat = kwimage.Affine.scale(space_resolution_info['mag'])
             aux_res_mat = img_res_mat @ warp_img_from_aux
@@ -1562,7 +1602,7 @@ class CocoImage(_CocoObject):
             )
         return self.dset.show_image(self['id'], **kwargs)
 
-    def draw(self, **kwargs):
+    def draw(self, **kwargs: Any) -> np.ndarray:
         """
         Draw the image on an ndarray using opencv
 
@@ -1618,13 +1658,15 @@ class CocoAsset(_CocoObject):
         'warp_wld_from_asset': 'warp_to_wld',
     }
 
-    def __init__(self, asset, bundle_dpath=None):
+    def __init__(
+        self, asset: dict[str, Any], bundle_dpath: 'str | PathLike | None' = None
+    ) -> None:
         super().__init__(asset, bundle_dpath=bundle_dpath)
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return repr(self.__json__())
 
-    def image_filepath(self):
+    def image_filepath(self) -> ub.Path:
         if self.bundle_dpath is None:
             raise Exception('Bundle dpath must be populated to use this method')
             # return self['file_name']
@@ -1647,7 +1689,7 @@ class CocoVideo(_CocoObject):
 
     __alias_to_primary__ = {}
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return repr(self.__json__())
 
 
@@ -1666,7 +1708,7 @@ class CocoAnnotation(_CocoObject):
 
     __alias_to_primary__ = {}
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return repr(self.__json__())
 
 
@@ -1685,7 +1727,7 @@ class CocoCategory(_CocoObject):
 
     __alias_to_primary__ = {}
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return repr(self.__json__())
 
 
@@ -1704,10 +1746,10 @@ class CocoTrack(_CocoObject):
 
     __alias_to_primary__ = {}
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return repr(self.__json__())
 
-    def annots(self):
+    def annots(self) -> 'Annots':
         assert self.dset is not None
         return self.dset.annots(track_id=self['id'])
 

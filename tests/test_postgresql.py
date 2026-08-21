@@ -22,6 +22,7 @@ def test_postgresql_cases():
     from kwcoco.coco_sql_dataset import text, IS_GE_SQLALCH_2x
 
     dct_dset = kwcoco.CocoDataset.coerce('special:vidshapes8')
+    assert dct_dset.fpath is not None
     # Add annots so there is an out of order track
     ooo_track_id = 9001
     dct_dset.add_track(name='ooo_track', id=ooo_track_id)
@@ -58,6 +59,7 @@ def test_postgresql_cases():
         }
     )
 
+    assert dct_dset.fpath is not None
     new_fpath = ub.Path(dct_dset.fpath).augment(
         stemsuffix='_with_ooo_track', multidot=True
     )
@@ -66,6 +68,11 @@ def test_postgresql_cases():
 
     # psql_dset = dct_dset.view_sql(backend='postgresql')
     psql_dset = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='postgresql')
+    assert psql_dset.engine is not None
+    assert psql_dset.session is not None
+    assert psql_dset.index is not None
+    assert psql_dset.index.anns is not None
+    assert psql_dset.index.trackid_to_aids is not None
     psql_dset.engine
     print(f'psql_dset.engine={psql_dset.engine}')
     assert str(psql_dset.engine.url).startswith('postgresql')

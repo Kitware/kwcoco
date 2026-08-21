@@ -300,7 +300,7 @@ class MixinCocoObjects:
 
     def tracks(
         self,
-        track_ids: list[int] | None = None,
+        track_ids: list[int | str] | None = None,
         names: list[str] | None = None,
         video_id: int | None = None,
         video_name: str | None = None,
@@ -309,7 +309,7 @@ class MixinCocoObjects:
         Return vectorized track objects
 
         Args:
-            track_ids (List[int] | None):
+            track_ids (List[int | str] | None):
                 track ids to reference, if unspecified all tracks are returned.
 
             names (List[str] | None):

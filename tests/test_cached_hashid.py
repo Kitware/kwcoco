@@ -16,6 +16,7 @@ def test_cached_hashid_with_permissions():
     dset.fpath = os.fspath(dpath / 'test.kwcoco.json')
     dset.dump()
 
+    assert dset.fpath is not None
     fpath = ub.Path(dset.fpath)
     dset = kwcoco.CocoDataset(fpath)
 

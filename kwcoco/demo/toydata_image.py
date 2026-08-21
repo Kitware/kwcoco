@@ -327,10 +327,10 @@ def demodata_toy_dset(
 
         fname = basename(dset_fpath)
         dset = kwcoco.CocoDataset(dataset, bundle_dpath=bundle_dpath, fname=fname)
-        dset.dset_fpath = dset_fpath
+        dset.fpath = dset_fpath
         if verbose:
-            print('dump dset.dset_fpath = {!r}'.format(dset.dset_fpath))
-        dset.dump(dset.dset_fpath, newlines=True)
+            print('dump dset.fpath = {!r}'.format(dset.fpath))
+        dset.dump(dset.fpath, newlines=True)
         stamp.renew()
     else:
         # otherwise load the data

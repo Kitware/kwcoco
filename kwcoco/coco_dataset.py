@@ -88,6 +88,7 @@ from kwcoco._dataset_components.json_backend import json_r, json_w
 
 if TYPE_CHECKING:
     from os import PathLike
+    from kwcoco.coco_sql_dataset import CocoSqlDatabase
 
 # The ujson library is faster than Python's json, but the API has some
 # limitations and requires a minimum version. Currently we only use it to read,
@@ -725,7 +726,7 @@ class CocoDataset(
 
     def dump(
         self,
-        file: PathLike | IO | None = None,
+        file: str | PathLike | IO | None = None,
         indent: int | str | None = None,
         newlines: bool = False,
         temp_file: bool | str = 'auto',
@@ -736,7 +737,7 @@ class CocoDataset(
         Writes the dataset out to the json format
 
         Args:
-            file (PathLike | IO | None):
+            file (str | PathLike | IO | None):
                 Where to write the data. Can either be a path to a file or an
                 open file pointer / stream. If unspecified, it will be written
                 to the current ``fpath`` property.
@@ -1044,7 +1045,7 @@ class CocoDataset(
         self.index.build(self)
 
     def union(
-        *others: Any,
+        *others: CocoDataset,
         disjoint_tracks: bool = True,
         remember_parent: bool = False,
         **kwargs: Any,
@@ -1532,12 +1533,12 @@ class CocoDataset(
 
     def subset(
         self,
-        gids: list[int] = None,  # type: ignore
+        gids: list[int] | None = None,
         video_ids: list[int] | None = None,
         copy: bool = False,
         autobuild: bool = True,
         **kwargs: Any,
-    ) -> Any:
+    ) -> CocoDataset:
         """
         Return a subset of the larger coco dataset by specifying which images
         to port. All annotations in those images will be taken.
@@ -1652,10 +1653,14 @@ class CocoDataset(
         new_dataset['annotations'] = list(ub.take(self.index.anns, sub_aids))  # type: ignore
 
         if 'tracks' in self.dataset:
-            sub_track_ids = sorted(
+            track_ids = (
                 set(ann.get('track_id', None) for ann in new_dataset['annotations'])
                 - {None}
             )
+            # Track ids are historically allowed to be either ints or strings.
+            # Preserve the existing runtime ordering behavior here; the raw
+            # dataset dictionaries are intentionally open-ended.
+            sub_track_ids = sorted(cast(Any, track_ids))
             new_dataset['tracks'] = list(self.tracks(sub_track_ids).objs_iter())
 
         new_dataset['img_root'] = self.dataset.get('img_root', None)  # type: ignore
@@ -1674,9 +1679,9 @@ class CocoDataset(
         self,
         force_rewrite: bool = False,
         memory: bool = False,
-        backend: str = 'sqlite',
+        backend: str | None = 'sqlite',
         sql_db_fpath: str | PathLike | None = None,
-    ) -> Any:
+    ) -> CocoSqlDatabase:
         """
         Create a cached SQL interface to this dataset suitable for large scale
         multiprocessing use cases.

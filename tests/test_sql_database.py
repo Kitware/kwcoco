@@ -1,3 +1,4 @@
+from typing import Any
 import ubelt as ub
 import kwcoco
 
@@ -24,7 +25,9 @@ def test_coerce_as_postgresql():
     if not have_postgresql() or not have_sqlalchemy():
         pytest.skip()
     dct_dset = kwcoco.CocoDataset.coerce('special:shapes8')
+    assert dct_dset.fpath is not None
     psql_dset = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='postgresql')
+    assert psql_dset.engine is not None
     psql_dset.engine
     print(f'psql_dset.engine={psql_dset.engine}')
     assert str(psql_dset.engine.url).startswith('postgresql')
@@ -36,7 +39,9 @@ def test_coerce_as_sqlite():
     if not have_sqlalchemy():
         pytest.skip()
     dct_dset = kwcoco.CocoDataset.coerce('special:shapes8')
+    assert dct_dset.fpath is not None
     sql_dset = kwcoco.CocoDataset.coerce(dct_dset.fpath, sqlview='sqlite')
+    assert sql_dset.engine is not None
     assert str(sql_dset.engine.url).startswith('sqlite')
 
 
@@ -84,6 +89,7 @@ def test_api_compatability_msi_ooo_tracks():
         )
 
     dct_dset = kwcoco.CocoDataset.demo('vidshapes8-multisensor-msi')
+    assert dct_dset.fpath is not None
     dct_dset.fpath = ub.Path(dct_dset.fpath).augment(
         stemsuffix='_with_ooo_tracks', multidot=True
     )
@@ -189,6 +195,7 @@ def test_coerce_sql_from_zipfile():
     dct_dset.dump()
     import zipfile
 
+    assert dct_dset.fpath is not None
     assert zipfile.is_zipfile(dct_dset.fpath)
 
     # Initial coerce should do conversion
@@ -241,8 +248,9 @@ def test_python_index_maps():
         assert isinstance(dct_index, dict)
         assert sql_index is not None
 
-        dct_keys = list(dct_index.keys())
-        sql_keys = list(sql_index.keys())
+        # These keys come from dynamically discovered index objects.
+        dct_keys: Any = list(dct_index.keys())
+        sql_keys: Any = list(sql_index.keys())
 
         fudgable = None
         exact_same = sorted(dct_keys) == sorted(sql_keys)

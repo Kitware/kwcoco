@@ -8,6 +8,8 @@ operations.
 from __future__ import annotations
 
 import itertools as it
+from typing import Any
+
 import networkx as nx
 import ubelt as ub
 import numpy as np
@@ -105,6 +107,13 @@ class CategoryTree(ub.NiceRepr):
         >>> kwcoco.CategoryTree.coerce(4)
     """
 
+    graph: nx.DiGraph
+    id_to_node: dict[int, Any]
+    node_to_id: dict[Any, int]
+    node_to_idx: dict[Any, int]
+    idx_to_node: list[Any]
+    idx_groups: list[list[int]]
+
     def __init__(self, graph=None, checks=True):
         """
         Args:
@@ -129,14 +138,9 @@ class CategoryTree(ub.NiceRepr):
                         type(graph)
                     )
                 )
-        self.graph = graph  # :type: nx.Graph
-        # Note: nodes are class names
-        self.id_to_node = None
-        self.node_to_id = None
-        self.node_to_idx = None
-        self.idx_to_node = None
-        self.idx_groups = None
-
+        self.graph = graph
+        # _build_index initializes all lookup tables before construction
+        # returns, so these attributes are non-optional to callers.
         self._build_index()
 
     def copy(self):
@@ -681,18 +685,18 @@ class CategoryTree(ub.NiceRepr):
         for node, attrs in node_attrs:
             node_to_id[node] = attrs.get('id', max_id + 1)
             max_id = max(max_id, node_to_id[node])
-        id_to_node = ub.invert_dict(node_to_id)
+        id_to_node = {cid: node for node, cid in node_to_id.items()}
 
         if RESPECT_INPUT_ORDER:
             # list(self.graph.nodes.items())
             if isinstance(self.graph, OrderedDiGraph):
                 idx_to_node = list(self.graph.nodes)
             else:
-                idx_to_node = ub.argsort(node_to_id)
+                idx_to_node = list(ub.argsort(node_to_id))
         else:
             # TODO: respect user-given ordering over sorting by ids
             # Compress ids into a flat index space (sorted by node ids)
-            idx_to_node = ub.argsort(node_to_id)
+            idx_to_node = list(ub.argsort(node_to_id))
 
         node_to_idx = {node: idx for idx, node in enumerate(idx_to_node)}
 

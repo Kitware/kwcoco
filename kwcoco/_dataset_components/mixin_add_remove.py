@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, overload
 import itertools as it
 import os
 import ubelt as ub
@@ -10,6 +10,7 @@ from kwcoco._helpers import _delitems
 
 if TYPE_CHECKING:
     from delayed_image.channel_spec import FusedChannelSpec
+    from os import PathLike
     from kwcoco._dataset_components.mixin_index import CocoIndex
     from kwcoco._helpers import _NextId
     from kwcoco.coco_image import CocoImage
@@ -105,14 +106,30 @@ class MixinCocoAddRemove:
         # self._invalidate_hashid(['videos'])
         return id
 
+    @overload
     def add_image(
-        self, file_name: str | None = None, id: None | int = None, **kw: Any
+        self,
+        file_name: str | PathLike | None = None,
+        id: None | int = None,
+        **kw: Any,
+    ) -> int: ...
+
+    @overload
+    def add_image(
+        self, file_name: Any = None, id: Any = None, **kw: Any
+    ) -> int: ...
+
+    def add_image(
+        self,
+        file_name: str | PathLike | None = None,
+        id: None | int = None,
+        **kw: Any,
     ) -> int:
         """
         Register a new image with the dataset
 
         Args:
-            file_name (str | None): relative or absolute path to image.
+            file_name (str | PathLike | None): relative or absolute path to image.
                  if not given, then "name" must be specified and we will
                  expect that "auxiliary" assets are eventually added.
             id (None | int): ADVANCED. Force using this image id.
@@ -241,6 +258,32 @@ class MixinCocoAddRemove:
 
     # TODO: deprecated add_auxiliary_item for add_asset
     add_auxiliary_item = add_asset
+
+    @overload
+    def add_annotation(
+        self,
+        image_id: int,
+        category_id: int | None = None,
+        bbox: list | kwimage.Boxes = ub.NoParam,
+        segmentation: dict | list | Any = ub.NoParam,
+        keypoints: Any = ub.NoParam,
+        id: None | int = None,
+        track_id: int | str | None = None,
+        **kw: Any,
+    ) -> int: ...
+
+    @overload
+    def add_annotation(
+        self,
+        image_id: Any,
+        category_id: Any = None,
+        bbox: Any = ub.NoParam,
+        segmentation: Any = ub.NoParam,
+        keypoints: Any = ub.NoParam,
+        id: Any = None,
+        track_id: Any = None,
+        **kw: Any,
+    ) -> int: ...
 
     def add_annotation(
         self,

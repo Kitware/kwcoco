@@ -13,7 +13,9 @@ def test_resolution_with_channels():
     coco_img = dset.coco_image(1)
     coco_img.img['resolution'] = '1 meter'
     # Test with a channel that does / does not exist
-    chan = coco_img.channels.fuse().to_list()[0]
+    channels = coco_img.channels
+    assert channels is not None
+    chan = channels.fuse().to_list()[0]
     shapes1 = []
     shapes2 = []
     shapes3 = []

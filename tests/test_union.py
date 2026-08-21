@@ -77,6 +77,9 @@ def test_union_subdirs_to_root():
     dset1 = kwcoco.CocoDataset.demo('vidshapes1')
     dset2 = kwcoco.CocoDataset.demo('vidshapes2')
     dset3 = kwcoco.CocoDataset.demo('vidshapes3')
+    assert dset1.fpath is not None
+    assert dset2.fpath is not None
+    assert dset3.fpath is not None
 
     import ubelt as ub
 
@@ -123,6 +126,9 @@ def test_union_subdirs_to_new_subdir():
     dset1 = kwcoco.CocoDataset.demo('vidshapes1')
     dset2 = kwcoco.CocoDataset.demo('vidshapes2')
     dset3 = kwcoco.CocoDataset.demo('vidshapes3')
+    assert dset1.fpath is not None
+    assert dset2.fpath is not None
+    assert dset3.fpath is not None
 
     import ubelt as ub
 
@@ -169,6 +175,9 @@ def test_union_subdirs_to_existing_subdir():
     dset1 = kwcoco.CocoDataset.demo('vidshapes1')
     dset2 = kwcoco.CocoDataset.demo('vidshapes2')
     dset3 = kwcoco.CocoDataset.demo('vidshapes3')
+    assert dset1.fpath is not None
+    assert dset2.fpath is not None
+    assert dset3.fpath is not None
 
     import ubelt as ub
 

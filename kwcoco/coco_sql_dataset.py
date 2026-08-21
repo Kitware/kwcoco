@@ -1151,21 +1151,50 @@ class CocoSqlIndex:
     Simulates the dictionary provided by :class:`kwcoco.coco_dataset.CocoIndex`
     """
 
+    # As with CocoIndex, these annotations describe the normal built state.
+    # CocoSqlIndex.__init__ creates a temporary unbuilt state before build()
+    # installs the SQL-backed proxies.
+    anns: SqlDictProxy
+    imgs: SqlDictProxy
+    videos: SqlDictProxy
+    cats: SqlDictProxy
+    kpcats: SqlDictProxy
+    tracks: SqlDictProxy
+    file_name_to_img: SqlDictProxy
+    name_to_cat: SqlDictProxy
+    name_to_img: SqlDictProxy
+    name_to_track: SqlDictProxy
+    name_to_video: SqlDictProxy
+    gid_to_aids: SqlIdGroupDictProxy
+    cid_to_aids: SqlIdGroupDictProxy
+    cid_to_gids: SqlIdGroupDictProxy
+    trackid_to_aids: SqlIdGroupDictProxy
+    vidid_to_gids: SqlIdGroupDictProxy
+    dataset: dict[str, SqlListProxy]
+    _id_lookup: dict[str, SqlDictProxy]
+
     def __init__(index):
-        index.anns = None
-        index.imgs = None
-        index.videos = None
-        index.cats = None
-        index.tracks = None
-        index.file_name_to_img = None
+        unbuilt: Any = None
+        index.anns = unbuilt
+        index.imgs = unbuilt
+        index.videos = unbuilt
+        index.cats = unbuilt
+        index.kpcats = unbuilt
+        index.tracks = unbuilt
+        index.file_name_to_img = unbuilt
 
-        index.name_to_cat = None
-        index.name_to_img = None
-        index.name_to_track = None
+        index.name_to_cat = unbuilt
+        index.name_to_img = unbuilt
+        index.name_to_track = unbuilt
+        index.name_to_video = unbuilt
 
-        index.dataset = None
-        index._id_lookup = None
-        index.trackid_to_aids = None
+        index.gid_to_aids = unbuilt
+        index.cid_to_aids = unbuilt
+        index.cid_to_gids = unbuilt
+        index.trackid_to_aids = unbuilt
+        index.vidid_to_gids = unbuilt
+        index.dataset = unbuilt
+        index._id_lookup = unbuilt
 
     def build(index, parent):
         session = parent.session
@@ -2509,9 +2538,11 @@ def demo(num=10, backend=None):
         # print('aids1 = {!r}'.format(aids1))
         # print('aids2 = {!r}'.format(aids2))
         dset.remove_annotations(aids1 | aids2)
-        dset.fpath = ub.augpath(dset.fpath, suffix='_hack', multidot=True)
-        if not exists(dset.fpath):
-            dset.dump(dset.fpath, newlines=True)
+        assert dset.fpath is not None
+        new_fpath = ub.augpath(dset.fpath, suffix='_hack', multidot=True)
+        dset.fpath = new_fpath
+        if not exists(new_fpath):
+            dset.dump(new_fpath, newlines=True)
     self = dset.view_sql(backend=backend)
     return self, dset
 

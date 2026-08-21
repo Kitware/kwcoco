@@ -84,7 +84,17 @@ class DetectionMetrics(ub.NiceRepr):
     gid_to_pred_dets: Dict[int, kwimage.Detections]
     _imgname_to_gid: dict[str, int]
 
-    def __init__(dmet, classes: kwcoco.CategoryTree | None = None) -> None:
+    def __init__(
+        dmet,
+        classes: (
+            kwcoco.CategoryTree
+            | list[str]
+            | list[dict[str, typing.Any]]
+            | int
+            | nx.DiGraph
+            | None
+        ) = None,
+    ) -> None:
         dmet.classes = classes
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}

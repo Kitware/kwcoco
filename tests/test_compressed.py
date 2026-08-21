@@ -7,6 +7,7 @@ def test_read_zipped_kwcoco():
     dset = kwcoco.CocoDataset.demo('vidshapes8')
 
     # Make a zipfile with a kwcoco file in it
+    assert dset.fpath is not None
     src_fpath = ub.Path(dset.fpath)
     zip_fpath = src_fpath.augment(ext='.zip')
 
@@ -55,6 +56,7 @@ def test_internal_archive_name():
 
     import zipfile
 
+    assert dset.fpath is not None
     zfile = zipfile.ZipFile(dset.fpath)
     assert zfile.namelist() == ['mydataset.kwcoco.json']
 
