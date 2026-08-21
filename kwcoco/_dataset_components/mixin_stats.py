@@ -174,6 +174,18 @@ class MixinCocoStats:
                         ann['instance_id'] = ann['track_id']  # type: ignore
 
         if config.get('legacy', False):
+            # Original MS-COCO represents ``info`` as a single dictionary.
+            # KWCOCO also permits a list of metadata / provenance records.
+            # Keep that list intact under an extension key rather than
+            # flattening records with potentially overlapping keys.
+            info = self.dataset.get('info', None)  # type: ignore
+            if isinstance(info, list):
+                self.dataset['info'] = (  # type: ignore
+                    {'kwcoco_info': info} if info else {}
+                )
+            elif info is None:
+                self.dataset['info'] = {}  # type: ignore
+
             try:
                 kpcats = self.keypoint_categories()  # type: ignore
             except Exception:

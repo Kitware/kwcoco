@@ -48,6 +48,25 @@ def test_union_with_aux():
     )
 
 
+def test_union_accepts_mscoco_info_dict():
+    import kwcoco
+
+    dset1 = kwcoco.CocoDataset()
+    dset1.dataset['info'] = {'description': 'dataset one', 'year': 2026}
+
+    dset2 = kwcoco.CocoDataset()
+    dset2.dataset['info'] = [
+        {'type': 'process', 'properties': {'name': 'dataset two process'}}
+    ]
+
+    combo = kwcoco.CocoDataset.union(dset1, dset2)
+
+    assert combo.dataset['info'] == [
+        {'description': 'dataset one', 'year': 2026},
+        {'type': 'process', 'properties': {'name': 'dataset two process'}},
+    ]
+
+
 def test_union_subdirs_to_root():
     """
     Test case where unions kwcoco files in the subdirs and then outputs the new

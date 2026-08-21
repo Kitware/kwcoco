@@ -71,6 +71,7 @@ from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco._helpers import UniqueNameRemapper, _NextId
 from kwcoco._helpers import _ID_Remapper
 from kwcoco._helpers import _CategoryID_Remapper
+from kwcoco._helpers import _coerce_info_list
 from kwcoco._dataset_components.mixin_deprecate import MixinCocoDeprecate
 from kwcoco._dataset_components.mixin_hash import MixinCocoHashing
 from kwcoco._dataset_components.mixin_draw import MixinCocoDraw
@@ -1261,11 +1262,12 @@ class CocoDataset(
                 track_id_map = {}
                 kpcat_id_map = {}
 
-                # Add the licenses / info into the merged dataset
-                # Licenses / info are unused in our datas, so this might not be
-                # correct
+                # Add the licenses / info into the merged dataset. MS-COCO
+                # represents info as one dict, while KWCOCO also permits a
+                # list of metadata records. A union necessarily promotes the
+                # single-dict form to the list form.
                 merged['licenses'].extend(old_dset.get('licenses', []))
-                merged['info'].extend(old_dset.get('info', []))
+                merged['info'].extend(_coerce_info_list(old_dset.get('info', [])))
 
                 # Add the categories into the merged dataset
                 for old_cat in old_dset['categories']:

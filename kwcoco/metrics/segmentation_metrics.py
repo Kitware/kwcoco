@@ -1498,7 +1498,9 @@ def evaluate_segmentations(
             (list(pred_fpath.parts[-2:-1]) + [pred_fpath.stem])
         )
 
-    predicted_info = pred_coco.dataset.get('info', [])
+    from kwcoco._helpers import _coerce_info_list
+
+    predicted_info = _coerce_info_list(pred_coco.dataset.get('info', []))
     for item in predicted_info:
         if item.get('type', None) == 'measure':
             info.append(item)

@@ -141,7 +141,9 @@ An informal spec is as follows:
         'images': [image, ...]
         'annotations': [annotation, ...]
         'licenses': [],
-        'info': [],
+        # MS-COCO uses one metadata dictionary. KWCOCO also supports a list
+        # of metadata / provenance dictionaries.
+        'info': dict | list[dict],
     }
 
     Polygon:

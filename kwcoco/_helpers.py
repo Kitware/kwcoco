@@ -11,6 +11,25 @@ from typing import Any, Mapping, Protocol
 import sortedcontainers
 
 
+def _coerce_info_list(info):
+    """Return either supported ``info`` representation as a list of records.
+
+    MS-COCO uses a single dictionary for dataset metadata, while KWCOCO also
+    supports a list of metadata / provenance dictionaries.  Code paths that
+    need to iterate over records should use this view rather than assuming one
+    representation.
+    """
+    if info is None:
+        return []
+    if isinstance(info, dict):
+        return [info]
+    if isinstance(info, list):
+        return info
+    raise TypeError(
+        'info must be a dict or list of dicts, got {!r}'.format(type(info))
+    )
+
+
 class _NextIdParent(Protocol):
     @property
     def dataset(self) -> Mapping[str, Any]: ...

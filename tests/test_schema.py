@@ -3,6 +3,19 @@ Tests for small components of the schema
 """
 
 
+def test_info_schema_accepts_mscoco_dict_and_kwcoco_list():
+    import kwcoco
+
+    base = kwcoco.CocoDataset().dataset
+    for info in [
+        {'description': 'mscoco metadata', 'custom_field': 1},
+        [{'type': 'process', 'properties': {'name': 'demo'}}],
+    ]:
+        data = dict(base)
+        data['info'] = info
+        kwcoco.coco_schema.COCO_SCHEMA.validate(data)
+
+
 def test_polygon_schema():
     from kwcoco import coco_schema
     import jsonschema

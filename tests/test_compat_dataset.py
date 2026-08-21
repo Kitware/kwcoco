@@ -1,6 +1,28 @@
 from __future__ import annotations
 
 
+def test_info_accepts_mscoco_dict_and_kwcoco_list(capsys):
+    from kwcoco.compat_dataset import COCO
+
+    dset = COCO()
+    dset.dataset['info'] = {'description': 'mscoco metadata', 'year': 2026}
+    dset.info()
+    dict_output = capsys.readouterr().out
+    assert 'description: mscoco metadata' in dict_output
+    assert 'year: 2026' in dict_output
+
+    dset.dataset['info'] = [
+        {'type': 'process', 'name': 'first'},
+        {'type': 'measure', 'name': 'second'},
+    ]
+    dset.info()
+    list_output = capsys.readouterr().out
+    assert 'type: process' in list_output
+    assert 'name: first' in list_output
+    assert 'type: measure' in list_output
+    assert 'name: second' in list_output
+
+
 def test_get_img_ids_matches_pycocotools_intersection_semantics():
     from kwcoco.compat_dataset import COCO
 
