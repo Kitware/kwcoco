@@ -1586,7 +1586,7 @@ class CocoSqlDatabase(
         self.session = DBSession()
 
         if _uri_info['scheme'] == 'sqlite':
-            self.session.execute(text('PRAGMA cache_size=-{}'.format(128 * 1000)))
+            self.session.execute(text('PRAGMA cache_size=-{}'.format(128 * 1000)))  # type: ignore
 
         if _uri_info['scheme'].startswith('postgresql'):
             if 0:

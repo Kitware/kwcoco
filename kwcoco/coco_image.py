@@ -1211,9 +1211,14 @@ class CocoImage(_CocoObject):
                 pass
             elif space == 'video':
                 warp_vid_from_img = self.img.get('warp_img_to_vid', None)
+                video_dsize: tuple[int, int] | str
+                if width is None or height is None:
+                    video_dsize = 'auto'
+                else:
+                    video_dsize = (width, height)
                 delayed = delayed.warp(  # type: ignore
                     warp_vid_from_img,
-                    dsize=dsize,
+                    dsize=video_dsize,
                     interpolation=interpolation,
                     antialias=antialias,
                     lazy=True,

@@ -102,7 +102,7 @@ def test_postgresql_cases():
     #     raw_annot_table = pd.DataFrame(raw_tables['annotations'])
 
     # Check that raw lookups work where we explicitly cast the key (v1)
-    result = psql_dset.session.execute(
+    result = psql_dset.session.execute(  # type: ignore
         text(
             ub.codeblock(
                 f"""
@@ -116,7 +116,7 @@ def test_postgresql_cases():
     assert list(aids2) == list(aids1)
 
     # Check that raw lookups work where we explicitly cast the key (v2)
-    result = psql_dset.session.execute(
+    result = psql_dset.session.execute(  # type: ignore
         text(
             ub.codeblock(
                 f"""
@@ -130,7 +130,7 @@ def test_postgresql_cases():
     assert list(aids2) == list(aids1)
 
     # Check that raw lookups work where we explicitly cast the query
-    result = psql_dset.session.execute(
+    result = psql_dset.session.execute(  # type: ignore
         text(
             ub.codeblock(
                 f"""
