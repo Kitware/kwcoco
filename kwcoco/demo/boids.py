@@ -338,6 +338,9 @@ class Boids(ub.NiceRepr):
 
     def boundary_conditions(self):
         # Clamp positions
+        assert self.vel is not None
+        assert self.pos is not None
+        assert self.acc is not None
         lower_boundry_violators = self.pos < 0  # type: ignore
         upper_boundry_violators = self.pos > 1  # type: ignore
         if np.any(lower_boundry_violators):
