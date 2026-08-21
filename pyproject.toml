@@ -1,21 +1,210 @@
 [build-system]
-requires = [ "setuptools>=41.0.1",]
 build-backend = "setuptools.build_meta"
+requires = [
+  "setuptools>=41.0.1",
+  "setuptools>=77",
+]
+
+[project]
+name = "kwcoco"
+description = "The kwcoco module and cli for image datasets"
+license = "Apache-2.0"
+license-files = [
+  "LICENSE",
+]
+authors = [ { name = "Jon Crall", email = "jon.crall@kitware.com" } ]
+requires-python = ">=3.8"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Utilities",
+]
+dynamic = [
+  "dependencies",
+  "optional-dependencies",
+  "version",
+]
+urls.Homepage = "https://gitlab.kitware.com/computer-vision/kwcoco"
+scripts.kwcoco = "kwcoco.cli.__main__:main"
+
+[tool.setuptools]
+include-package-data = true
+dynamic.dependencies.file = [
+  "requirements/runtime.txt",
+]
+dynamic.optional-dependencies.all.file = [
+  "requirements/optional.txt",
+  "requirements/headless.txt",
+  "requirements/graphics.txt",
+  "requirements/postgresql.txt",
+  "requirements/gdal.txt",
+]
+dynamic.optional-dependencies.docs.file = [
+  "requirements/docs.txt",
+]
+dynamic.optional-dependencies.gdal.file = [
+  "requirements/gdal.txt",
+]
+dynamic.optional-dependencies.graphics.file = [
+  "requirements/graphics.txt",
+]
+dynamic.optional-dependencies.headless.file = [
+  "requirements/headless.txt",
+]
+dynamic.optional-dependencies.linting.file = [
+  "requirements/linting.txt",
+]
+dynamic.optional-dependencies.optional.file = [
+  "requirements/optional.txt",
+]
+dynamic.optional-dependencies.postgresql.file = [
+  "requirements/postgresql.txt",
+]
+dynamic.optional-dependencies.tests.file = [
+  "requirements/tests.txt",
+]
+dynamic.readme.file = [
+  "README.rst",
+]
+dynamic.readme.content-type = "text/x-rst"
+dynamic.version.attr = "kwcoco.__version__"
+package-data."*" = [
+  "requirements/*.txt",
+]
+package-data.kwcoco = [
+  "py.typed",
+  "coco_schema.json"
+]
+packages.find.where = [
+  ".",
+]
+packages.find.include = [
+  "kwcoco*",
+]
+
+[tool.uv]
+# Supply-chain guard: ignore packages published too recently.
+# Accepts a relative window (e.g. "P7D" / "30 days") or a fixed date.
+exclude-newer = "P7D"
+
+[tool.ruff]
+format.indent-style = "space"
+format.quote-style = "single"
+format.line-ending = "auto"
+format.skip-magic-trailing-comma = false
+format.docstring-code-format = false
+lint.ignore = [
+  "E402",
+]
+
+[tool.codespell]
+skip = [
+  "./docs/build",
+  "./*.egg-info",
+  "./build",
+  "./htmlcov",
+]
+count = true
+quiet-level = 3
+ignore-words-list = [
+  "fpr",
+  "ANS",
+  "ans",
+  "numer",
+  "wont",
+  "cant",
+  "ANS",
+  "doesnt",
+  "arent",
+  "ans",
+  "thats",
+  "datas",
+  "isnt",
+  "nd",
+  "bu",
+  "hasnt",
+  "didnt",
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.ty]
+rules.unused-ignore-comment = "ignore"
+rules.unused-type-ignore-comment = "ignore"
+rules.unresolved-import = "ignore"
+src.exclude = []
+
+[tool.pytest]
+ini_options.addopts = "-p no:doctest --xdoctest --xdoctest-style=google --ignore-glob=setup.py --ignore-glob=dev --ignore-glob=docs"
+ini_options.norecursedirs = ".git ignore build __pycache__ dev _skbuild docs"
+ini_options.filterwarnings = [
+  "default",
+  "ignore:.*No cfgstr given in Cacher constructor or call.*:Warning",
+  "ignore:.*Define the __nice__ method for.*:Warning",
+  "ignore:.*private pytest class or function.*:Warning",
+]
+
+[tool.coverage]
+run.branch = true
+report.exclude_lines = [
+  ".*  # nocover",
+  ".*  # pragma: no cover",
+  ".*if six.PY2:",
+  "^ *pass *$",
+  "^ *raise",
+  "def __repr__",
+  "if __name__ == .__main__.:",
+  "if _debug:",
+  "if 0:",
+  "if trace is not None",
+  "pragma: no cover",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "verbose = .*",
+]
+report.omit = [
+  "*/setup.py",
+  "kwcoco/__main__.py",
+]
 
 [tool.xcookie]
-tags = [ "gitlab", "kitware", "purepy", "cv2", "gdal", "postgresql"]
+tags = [
+  "gitlab",
+  "kitware",
+  "purepy",
+  "cv2",
+  "gdal",
+  "postgresql",
+]
 mod_name = "kwcoco"
 repo_name = "kwcoco"
 rel_mod_parent_dpath = "."
-min_python = '3.8'
-main_python = '3.13'
+min_python = "3.8"
+main_python = "3.14"
 url = "https://gitlab.kitware.com/computer-vision/kwcoco"
-ci_cpython_versions = ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+ci_cpython_versions = [
+  "3.8",
+  "3.9",
+  "3.10",
+  "3.11",
+  "3.12",
+  "3.13",
+]
 extra_full_strict_lines = [
-    "pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
+  "pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
 ]
 extra_full_loose_lines = [
-    "pip install GDAL>=3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
+  "pip install GDAL>=3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
 ]
 author = "Jon Crall"
 author_email = "jon.crall@kitware.com"
@@ -24,63 +213,9 @@ description = "The kwcoco module and cli for image datasets"
 dev_status = "beta"
 typed = true
 render_doc_images = 1
-
-[tool.xcookie.entry_points]
-# the console_scripts entry point creates the xdoctest executable
-console_scripts = [
-    "kwcoco = kwcoco.cli.__main__:main",
+use_setup_py = false
+use_pyproject_requirements = false
+enable_gpg = true
+entry_points.console_scripts = [
+  "kwcoco = kwcoco.cli.__main__:main",
 ]
-
-[tool.coverage.run]
-branch = true
-
-[tool.coverage.report]
-exclude_lines = [
- "pragma: no cover",
- ".*  # pragma: no cover",
- ".*  # nocover",
- "def __repr__",
- "raise AssertionError",
- "raise NotImplementedError",
- "if 0:",
- "if trace is not None",
- "verbose = .*",
- "^ *raise",
- "^ *pass *$",
- "if _debug:",
- "if __name__ == .__main__.:",
- ".*if six.PY2:",
-]
-omit = [ "kwcoco/__main__.py", "*/setup.py",]
-
-[tool.mypy]
-ignore_missing_imports = true
-
-[tool.codespell]
-skip = ['./docs/build', './*.egg-info', './build', './htmlcov']
-count = true
-quiet-level = 3
-ignore-words-list = ["fpr", 'ANS', 'ans', 'numer', 'wont', 'cant', 'ANS', 'doesnt', 'arent', 'ans', 'thats', 'datas', 'isnt', 'nd', 'bu', 'hasnt', 'didnt']
-
-[tool.ty.src]
-exclude = []
-
-[tool.ty.rules]
-unused-ignore-comment = "ignore"
-unused-type-ignore-comment = "ignore"
-unresolved-import = "ignore"
-
-[tool.ruff.lint]
-# Select all rules (optional, if you want to explicitly select all)
-# select = ["ALL"]
-# Ignore specific rules project-wide
-ignore = [
-    "E402",  # Module level import not at top of file
-]
-
-[tool.ruff.format]
-quote-style = "single"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
-docstring-code-format = false
