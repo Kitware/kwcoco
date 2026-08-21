@@ -109,3 +109,57 @@ def test_coco_url_schema_fields():
             coco_schema.VIDEO.validate(
                 {'id': 1, 'name': 'video', 'coco_url': value}
             )
+
+
+def test_schema_json_in_sync():
+    from pathlib import Path
+
+    from kwcoco import coco_schema
+
+    import ubelt as ub
+
+    schema_fpath = Path(coco_schema.__file__).with_name('coco_schema.json')
+    expected = ub.urepr(
+        coco_schema.COCO_SCHEMA, nl=-1, trailsep=False, sort=False
+    ).replace("'", '"') + '\n'
+    assert schema_fpath.read_text() == expected
+
+
+def test_optional_coco_and_kwcoco_schema_fields():
+    from kwcoco import coco_schema
+
+    # These fields describe metadata that KWCOCO can preserve and use, but
+    # none are required merely to represent an image, video, asset, or
+    # annotation.
+    coco_schema.IMAGE.validate({'id': 1, 'file_name': 'frame.jpg'})
+    coco_schema.IMAGE.validate({
+        'id': 1,
+        'file_name': 'frame.jpg',
+        'license': 1,
+        'flickr_url': 'https://example.com/frame',
+        'date_captured': '2026-08-21 12:00:00',
+        'datetime': '2026-08-21T12:00:00Z',
+        'warp_img_to_vid': {'type': 'affine', 'scale': 1},
+        'valid_region': {'exterior': [[0, 0], [1, 0], [1, 1]]},
+    })
+    coco_schema.VIDEO.validate({'id': 1, 'name': 'video'})
+    coco_schema.VIDEO.validate({
+        'id': 1,
+        'name': 'video',
+        'width': 1920,
+        'height': 1080,
+    })
+    coco_schema.ASSET.validate({'file_name': 'aux.tif'})
+    coco_schema.ASSET.validate({
+        'file_name': 'aux.tif',
+        'warp_aux_to_img': {'type': 'affine', 'scale': 2},
+        'warp_to_wld': {'type': 'affine', 'scale': 3},
+        'quantization': {'orig_min': 0, 'orig_max': 1},
+    })
+    coco_schema.ANNOTATION.validate({'id': 1, 'image_id': 1})
+    coco_schema.ANNOTATION.validate({
+        'id': 1,
+        'image_id': 1,
+        'area': 100.0,
+        'ignore': False,
+    })

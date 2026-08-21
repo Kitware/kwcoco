@@ -203,6 +203,8 @@ VIDEO = OBJECT(
         'coco_url': REMOTE_URI(
             description='A COCO-style remote URI for the video resource'
         ),
+        'width': INTEGER(description='The width of frames in video-space pixels'),
+        'height': INTEGER(description='The height of frames in video-space pixels'),
         'resolution': (NUMBER | STRING | NULL)(
             description='a unit representing the size of a pixel in video space'
         ),
@@ -233,6 +235,15 @@ ASSET = OBJECT(
         ),
         'width': INTEGER(description='The width in asset-space pixels'),
         'height': INTEGER(description='The height in asset-space pixels'),
+        'warp_aux_to_img': ANY(
+            description='A transform from asset space to image space'
+        ),
+        'warp_to_wld': ANY(
+            description='A transform from asset space to a world coordinate space'
+        ),
+        'quantization': ANY(
+            description='Metadata describing quantization of the underlying asset data'
+        ),
     },
     required=['file_name'],
     description='Information about a single file belonging to an image',
@@ -283,6 +294,18 @@ IMAGE = OBJECT(
                 ),
             ),
             (
+                'license',
+                INTEGER(description='The optional MS-COCO license identifier'),
+            ),
+            (
+                'flickr_url',
+                STRING(description='The optional MS-COCO Flickr URL'),
+            ),
+            (
+                'date_captured',
+                STRING(description='The optional MS-COCO capture date'),
+            ),
+            (
                 'width',
                 INTEGER(description='The width of the image in image space pixels'),
             ),
@@ -300,6 +323,18 @@ IMAGE = OBJECT(
             (
                 'frame_index',
                 INTEGER(description='Used to temporally order the images in a video'),
+            ),
+            (
+                'warp_img_to_vid',
+                ANY(description='A transform from image space to video space'),
+            ),
+            (
+                'valid_region',
+                ANY(description='A polygonal region containing valid image data'),
+            ),
+            (
+                'datetime',
+                ANY(description='A datetime associated with this image'),
             ),
             ('channels', CHANNELS | NULL),
             (
@@ -356,6 +391,10 @@ ANNOTATION = OBJECT(
                 INTEGER(description='The image id this annotation belongs to'),
             ),
             ('bbox', BBOX),
+            (
+                'area',
+                NUMBER(description='The optional MS-COCO annotation area'),
+            ),
             ('category_id', INTEGER(description='The category id of this annotation')),
             (
                 'track_id',
@@ -406,6 +445,12 @@ ANNOTATION = OBJECT(
                     description=(
                         'A legacy mscoco field used to indicate if an annotation contains multiple objects'
                     )
+                ),
+            ),
+            (
+                'ignore',
+                ANYOF(INTEGER, BOOLEAN)(
+                    description='An optional pycocotools-compatible ignore flag'
                 ),
             ),
             ('caption', STRING(description='An annotation-level text caption')),
