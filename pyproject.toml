@@ -44,10 +44,10 @@ dynamic.dependencies.file = [
 ]
 dynamic.optional-dependencies.all.file = [
   "requirements/optional.txt",
-  "requirements/headless.txt",
-  "requirements/graphics.txt",
-  "requirements/postgresql.txt",
   "requirements/gdal.txt",
+  "requirements/graphics.txt",
+  "requirements/headless.txt",
+  "requirements/postgresql.txt",
 ]
 dynamic.optional-dependencies.docs.file = [
   "requirements/docs-core.txt",
@@ -87,7 +87,7 @@ package-data."*" = [
 ]
 package-data.kwcoco = [
   "py.typed",
-  "coco_schema.json"
+  "coco_schema.json",
 ]
 packages.find.where = [
   ".",
