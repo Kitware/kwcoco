@@ -16,6 +16,7 @@ API including dynamic addition / removal of categories / annotations / images.
 from __future__ import annotations
 
 from kwcoco.coco_dataset import CocoDataset
+from kwcoco._helpers import _coerce_info_list
 from typing import Iterable, List, Optional, Union
 from os import PathLike
 import itertools as it
@@ -52,8 +53,9 @@ class COCO(CocoDataset):
         """
         Print information about the annotation file.
         """
-        for key, value in self.dataset.get('info', {}).items():
-            print('{}: {}'.format(key, value))
+        for item in _coerce_info_list(self.dataset.get('info', {})):
+            for key, value in item.items():
+                print('{}: {}'.format(key, value))
 
     @property
     def imgToAnns(self):

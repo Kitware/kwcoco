@@ -272,7 +272,7 @@ if __name__ == '__main__':
     setupkw['package_data'] = {
         '': ['requirements/*.txt'],
         'kwcoco.rc.requirements': ['*.txt'],
-        'kwcoco': ['py.typed'],
+        'kwcoco': ['py.typed', 'coco_schema.json'],
     }
     setupkw['entry_points'] = {
         'console_scripts': [

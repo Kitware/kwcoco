@@ -18,6 +18,13 @@ An informal spec is as follows:
         'supercategory': str,   # parent category name
     }
 
+    keypoint_category = {
+        'id': int,
+        'name': str,
+        'supercategory': str,
+        'reflection_id': int,
+    }
+
     # Videos are used to manage collections or sequences of images.
     # Frames do not necesarilly have to be aligned or uniform time steps
     video = {
@@ -37,22 +44,23 @@ An informal spec is as follows:
     # time. This is usually paths to rgb images, but auxiliary information
     # can be used to specify multiple bands / etc...
 
-    # NOTE: in the future we will transition from calling these auxiliary items
-    # to calling these asset items. As such the key will change from
-    # "auxiliary" to "asset". The API will be updated to maintain backwards
-    # compatibility while this transition occurs.
+    # NOTE: ``assets`` is the preferred name for image asset items.
+    # The older ``auxiliary`` key remains supported for backwards compatibility.
 
     image = {
         'id': int,
 
         'name': str,  # an encouraged but optional unique name (ideally not larger than 256 characters)
-        'file_name': str,  # relative path to the "base" image data (optional if auxiliary items are specified)
+        'file_name': str,  # relative path to the "base" image data (optional if assets are specified)
         'coco_url': str,  # standard MS-COCO remote URI for the image
+        'license': int,  # optional MS-COCO license identifier
+        'flickr_url': str,  # optional MS-COCO Flickr URL
+        'date_captured': str,  # optional MS-COCO capture date
 
         'width': int,   # pixel width of "base" image
         'height': int,  # pixel height of "base" image
 
-        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image (optional if auxiliary items are specified)
+        'channels': <ChannelSpec>,   # a string encoding of the channels in the main image (optional if assets are specified)
         'resolution': int | str,  # indicates the size of a pixel in image space
 
         'assets': [  # information about any auxiliary channels / bands
@@ -61,21 +69,24 @@ An informal spec is as follows:
                 'channels': <ChannelSpec>,   # a string encoding
                 'width':     <int>    # pixel width of image asset
                 'height':    <int>    # pixel height of image asset
-                'warp_aux_to_img': <TransformSpec>,  # transform from "base" image space to auxiliary/asset space. (identity if unspecified)
+                'warp_aux_to_img': <TransformSpec>,  # transform from auxiliary/asset space to image space (identity if unspecified)
+                'warp_to_wld': <TransformSpec>,  # transform from auxiliary/asset space to a world coordinate space
                 'quantization': <QuantizationSpec>,  # indicates that the underlying data was quantized
             }, ...
         ]
 
-        'video_id': str  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
-        'timestamp': str | int  # a iso-8601 or unix timestamp.
+        'video_id': int  # if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
+        'timestamp': str | int  # an ISO-8601 or unix timestamp.
         'frame_index': int  # ordinal frame index which can be used if timestamp is unknown.
-        'warp_img_to_vid': <TransformSpec>  # a transform image space to video space (identity if unspecified), can be used for sensor alignment or video stabilization
+        'warp_img_to_vid': <TransformSpec>  # a transform from image space to video space (identity if unspecified), can be used for sensor alignment or video stabilization
+        'valid_region': <Polygon>,  # region containing valid image data
+        'datetime': str,  # datetime associated with this image
     }
 
     TransformSpec:
         The spec can be anything coercible to a kwimage.Affine object.
         This can be an explicit affine transform matrix like:
-            {'type': 'affine': 'matrix': <a-3x3 matrix>},
+            {'type': 'affine', 'matrix': <a-3x3 matrix>},
 
         But it can also be a concise dict containing one or more of these keys
             {
@@ -118,9 +129,11 @@ An informal spec is as follows:
         'track_id': <int | str | uuid>  # indicates association between annotations across images
 
         'bbox': [tl_x, tl_y, w, h],  # xywh format)
+        'area': float,  # optional MS-COCO annotation area
         'score' : float,
         'prob' : List[float],
         'weight' : float,
+        'ignore': int | bool,  # optional pycocotools-compatible ignore flag
 
         'caption': str,  # a text caption for this annotation
         'keypoints' : <Points | List[number] > # an accepted keypoint format
@@ -129,19 +142,23 @@ An informal spec is as follows:
 
     # In development: tracks - an object to store properties associated with
     # all annotations with a track-id.
-    tracks = {
+    track = {
         'id': int,
-        'name': int,
+        'name': str,
     }
 
     # A dataset bundles a manifest of all aforementioned data into one structure.
     dataset = {
         'categories': [category, ...],
+        'keypoint_categories': [keypoint_category, ...],
         'videos': [video, ...]
+        'tracks': [track, ...]
         'images': [image, ...]
         'annotations': [annotation, ...]
         'licenses': [],
-        'info': [],
+        # MS-COCO uses one metadata dictionary. KWCOCO also supports a list
+        # of metadata / provenance dictionaries.
+        'info': dict | list[dict],
     }
 
     Polygon:
@@ -157,7 +174,7 @@ An informal spec is as follows:
             {'exterior': [(x1, y1)...],
              'interiors': [[(x1, y1), ...], ...]}
 
-        TODO: Support WTK
+        TODO: Support WKT
 
     RunLengthEncoding:
         The RLE can be in a special bytes encoding or in a binary array
@@ -222,7 +239,7 @@ An informal spec is as follows:
         We also have a new top-level dictionary to specify all the possible
         keypoint categories.
 
-        TODO: Support WTK
+        TODO: Support WKT
 
         NEW IN VERSION 0.8.5: Column based keypoints:
         These are still experimental
@@ -248,11 +265,11 @@ An informal spec is as follows:
             'file_name': str,    # path to the "base" image (may be None)
             'name': str,         # a unique name for the image (must be given if file_name is None)
             'channels': <ChannelSpec>,  # a spec code that indicates the layout of the "base" image channels.
-            'auxiliary': [  # information about auxiliary channels
+            'assets': [  # preferred key for image assets
                 {
                     'file_name': str,
                     'channels': <ChannelSpec>
-                }, ... # can have many auxiliary channels with unique specs
+                }, ... # can have many assets with unique channel specs
             ]
         }
 
@@ -260,13 +277,14 @@ An informal spec is as follows:
         necessary, and mainly useful for augmenting an existing single-image
         dataset with multimodal information. Typically if an image consists of
         more than one file, all file information should be stored in the
-        "auxiliary" or "assets" list.
+        "assets" list. The older "auxiliary" key remains supported for
+        backwards compatibility.
 
         NEW DOCS:
-            In an MSI use case you should think of the "auxiliary" list as a
+            In an MSI use case you should think of the "assets" list as a
             list of single file assets that are composed to make the entire
             image. Your assets might include sensed bands, computed features,
-            or quality information. For instance a list of auxiliary items may
+            or quality information. For instance a list of assets may
             look like this:
 
             image = {
@@ -277,16 +295,16 @@ An informal spec is as follows:
                 "video_id": 2,
                 "timestamp": "2020-01-1",
                 "frame_index": 5,
-                "warp_img_to_vid": {"type": "affine", "scale", 1.4},
+                "warp_img_to_vid": {"type": "affine", "scale": 1.4},
 
-                "auxiliary": [
-                   {"channels": "red|green|blue": "file_name": "rgb.tif", "warp_aux_to_img": {"scale": 1.0}, "height": 400, "width": 400, ...},
+                "assets": [
+                   {"channels": "red|green|blue", "file_name": "rgb.tif", "warp_aux_to_img": {"scale": 1.0}, "height": 400, "width": 400, ...},
                    ...
-                   {"channels": "cloudmask": "file_name": "cloudmask.tif", "warp_aux_to_img": {"scale": 4.0}, "height": 100, "width": 100, ...},
-                   {"channels": "nir": "file_name": "nir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
-                   {"channels": "swir": "file_name": "swir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
-                   {"channels": "model1_predictions.0:6": "file_name": "model1_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
-                   {"channels": "model2_predictions.0:3": "file_name": "model2_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                   {"channels": "cloudmask", "file_name": "cloudmask.tif", "warp_aux_to_img": {"scale": 4.0}, "height": 100, "width": 100, ...},
+                   {"channels": "nir", "file_name": "nir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
+                   {"channels": "swir", "file_name": "swir.tif", "warp_aux_to_img": {"scale": 2.0}, "height": 200, "width": 200, ...},
+                   {"channels": "model1_predictions.0:6", "file_name": "model1_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
+                   {"channels": "model2_predictions.0:3", "file_name": "model2_preds.tif", "warp_aux_to_img": {"scale": 8.0}, "height": 50, "width": 50, ...},
                 ]
             }
 
@@ -295,7 +313,7 @@ An informal spec is as follows:
             multiple assets. One could indicate that an asset is primary by
             giving its information to the parent image, but for better STAC
             compatibility, all assets for MSI images should simply be listed
-            as "auxiliary" items.
+            under the "assets" key.
 
         NOTE: in the future assets may be moved to a top-level table to better
         support common relational database patterns.
@@ -316,7 +334,7 @@ An informal spec is as follows:
         Then image dictionaries are augmented as follows:
 
         {
-            'video_id': str  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
+            'video_id': int  # optional, if this image is a frame in a video sequence, this id is shared by all frames in that sequence.
             'timestamp': str | int  # optional, an iso8601 or unix timestamp
             'frame_index': int  # optional, ordinal frame index which can be used if timestamp is unknown.
         }
@@ -335,7 +353,7 @@ An informal spec is as follows:
         **image space**, track geometry should be specified in **video space**.
 
         {
-            'track_id': <int | str >  # internal integer id for the track
+            'id': <int>  # internal integer id for the track
             'name': <str>  # external name id for the track.
         }
 

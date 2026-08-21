@@ -70,11 +70,9 @@
                     "id": {"type": "integer", "description": "An internal video identifier"},
                     "name": {"type": "string", "pattern": "[^/]+", "description": "A unique name for this video"},
                     "caption": {"type": "string", "description": "A video level text caption"},
-                    "coco_url": {
-                        "type": "string",
-                        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^\\s]+$",
-                        "description": "A COCO-style remote URI for the video resource"
-                    },
+                    "coco_url": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^\\s]+$", "description": "A COCO-style remote URI for the video resource"},
+                    "width": {"type": "integer", "description": "The width of frames in video-space pixels"},
+                    "height": {"type": "integer", "description": "The height of frames in video-space pixels"},
                     "resolution": {
                         "anyOf": [
                             {"type": "number"},
@@ -117,11 +115,10 @@
                             {"type": "null"}
                         ]
                     },
-                    "coco_url": {
-                        "type": "string",
-                        "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^\\s]+$",
-                        "description": "The standard MS-COCO remote URI for the main image data. The :func:`CocoDataset.download` method downloads this resource to ``file_name``."
-                    },
+                    "coco_url": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^\\s]+$", "description": "The standard MS-COCO remote URI for the main image data. The :func:`CocoDataset.download` method downloads this resource to ``file_name``."},
+                    "license": {"type": "integer", "description": "The optional MS-COCO license identifier"},
+                    "flickr_url": {"type": "string", "description": "The optional MS-COCO Flickr URL"},
+                    "date_captured": {"type": "string", "description": "The optional MS-COCO capture date"},
                     "width": {"type": "integer", "description": "The width of the image in image space pixels"},
                     "height": {"type": "integer", "description": "The height of the image in image space pixels"},
                     "video_id": {"type": "integer", "description": "The video this image belongs to"},
@@ -132,6 +129,9 @@
                         ]
                     },
                     "frame_index": {"type": "integer", "description": "Used to temporally order the images in a video"},
+                    "warp_img_to_vid": {"description": "A transform from image space to video space"},
+                    "valid_region": {"description": "A polygonal region containing valid image data"},
+                    "datetime": {"description": "A datetime associated with this image"},
                     "channels": {
                         "anyOf": [
                             {"type": "string", "pattern": "[^/]*", "description": "A human readable channel name. Must be compatible with delayed_image.channel_spec.ChannelSpec", "title": "CHANNEL_SPEC"},
@@ -156,7 +156,10 @@
                                 "id": {"type": "integer", "description": "The id of the asset (option for now, but will be required in the future when assets are moved to their own table)"},
                                 "image_id": {"type": "integer", "description": "The image id this asset is associated with (option for now, but will be required in the future)"},
                                 "width": {"type": "integer", "description": "The width in asset-space pixels"},
-                                "height": {"type": "integer", "description": "The height in asset-space pixels"}
+                                "height": {"type": "integer", "description": "The height in asset-space pixels"},
+                                "warp_aux_to_img": {"description": "A transform from asset space to image space"},
+                                "warp_to_wld": {"description": "A transform from asset space to a world coordinate space"},
+                                "quantization": {"description": "Metadata describing quantization of the underlying asset data"}
                             },
                             "required": ["file_name"],
                             "description": "Information about a single file belonging to an image",
@@ -174,7 +177,10 @@
                                 "id": {"type": "integer", "description": "The id of the asset (option for now, but will be required in the future when assets are moved to their own table)"},
                                 "image_id": {"type": "integer", "description": "The image id this asset is associated with (option for now, but will be required in the future)"},
                                 "width": {"type": "integer", "description": "The width in asset-space pixels"},
-                                "height": {"type": "integer", "description": "The height in asset-space pixels"}
+                                "height": {"type": "integer", "description": "The height in asset-space pixels"},
+                                "warp_aux_to_img": {"description": "A transform from asset space to image space"},
+                                "warp_to_wld": {"description": "A transform from asset space to a world coordinate space"},
+                                "quantization": {"description": "Metadata describing quantization of the underlying asset data"}
                             },
                             "required": ["file_name"],
                             "description": "Information about a single file belonging to an image",
@@ -213,6 +219,7 @@
                         "minItems": 4,
                         "maxItems": 4
                     },
+                    "area": {"type": "number", "description": "The optional MS-COCO annotation area"},
                     "category_id": {"type": "integer", "description": "The category id of this annotation"},
                     "track_id": {
                         "anyOf": [
@@ -334,7 +341,8 @@
                                         "keypoint_category_id": {"type": "integer"},
                                         "keypoint_category": {"type": "string", "description": "only to be used as a hint"}
                                     },
-                                    "title": "KWCOCO_KEYPOINT"
+                                    "title": "KWCOCO_KEYPOINT",
+                                    "description": "A new-style point"
                                 }
                             }
                         ],
@@ -353,6 +361,13 @@
                             {"type": "boolean"}
                         ],
                         "description": "A legacy mscoco field used to indicate if an annotation contains multiple objects"
+                    },
+                    "ignore": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "boolean"}
+                        ],
+                        "description": "An optional pycocotools-compatible ignore flag"
                     },
                     "caption": {"type": "string", "description": "An annotation-level text caption"},
                     "role": {
