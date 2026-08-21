@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Optional, Sequence, Tuple, cast
+
 import kwarray
 import numpy as np
 import ubelt as ub
 from scipy.spatial import cKDTree
+
+if TYPE_CHECKING:
+    from kwarray.util_random import RNGInput
 
 
 class Boids(ub.NiceRepr):
@@ -127,10 +132,14 @@ class Boids(ub.NiceRepr):
         >>> assert ub.allsame(list(map(ub.hash_data, tocheck)))
     """
 
-    def __init__(self, num, dims=2, rng=None, **kwargs):
+    def __init__(
+        self, num: int, dims: int = 2, rng: RNGInput = None, **kwargs
+    ) -> None:
         if dims != 2:
             raise NotImplementedError('Boids currently supports only dims=2')
-        self.rng = kwarray.ensure_rng(rng)
+        self.rng = cast(
+            np.random.RandomState, kwarray.ensure_rng(rng, api='numpy')
+        )
         self.num = num
         self.dims = dims
 
@@ -154,33 +163,34 @@ class Boids(ub.NiceRepr):
         }
         self.config.update(ub.dict_isect(kwargs, self.config))
 
-        self.pos = None
-        self.vel = None
-        self.acc = None
-        self.neighbor_pairs = np.empty((0, 2), dtype=np.int64)
-        self.neighbor_vec = np.empty((0, 2), dtype=float)
-        self.neighbor_dist2 = np.empty(0, dtype=float)
+        # Populated by initialize().
+        self.pos: np.ndarray
+        self.vel: np.ndarray
+        self.acc: np.ndarray
+        self.neighbor_pairs: np.ndarray = np.empty((0, 2), dtype=np.int64)
+        self.neighbor_vec: np.ndarray = np.empty((0, 2), dtype=float)
+        self.neighbor_dist2: np.ndarray = np.empty(0, dtype=float)
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return '{}'.format(self.num)
 
-    def initialize(self):
+    def initialize(self) -> Boids:
         # Generate random starting positions, velocities, and accelerations
-        self.pos = self.rng.rand(self.num, self.dims)  # type: ignore
-        self.vel = self.rng.randn(self.num, self.dims) * self.config['max_speed']  # type: ignore
-        self.acc = self.rng.randn(self.num, self.dims) * self.config['max_force']  # type: ignore
+        self.pos = self.rng.rand(self.num, self.dims)
+        self.vel = self.rng.randn(self.num, self.dims) * self.config['max_speed']
+        self.acc = self.rng.randn(self.num, self.dims) * self.config['max_force']
         return self
 
-    def update_neighbors(self):
+    def update_neighbors(self) -> np.ndarray:
         # Rebuild a spatial index each frame and return the sparse undirected
         # neighbor graph. cKDTree performs both index construction and radius
         # queries in compiled code, avoiding Python work per occupied grid cell.
         perception_thresh = self.config['perception_thresh']
-        num = len(self.pos)  # type: ignore
+        num = len(self.pos)
 
         if num > 1 and perception_thresh > 0:
             tree = cKDTree(
-                self.pos, compact_nodes=False, balanced_tree=False  # type: ignore
+                self.pos, compact_nodes=False, balanced_tree=False
             )
             pairs = tree.query_pairs(
                 perception_thresh, output_type='ndarray'
@@ -189,7 +199,7 @@ class Boids(ub.NiceRepr):
                 # query_pairs includes pairs exactly on the radius. Preserve
                 # the historical strict ``distance < perception_thresh`` rule
                 # and retain the pair geometry for separation below.
-                neigh_vec = self.pos[pairs[:, 0]] - self.pos[pairs[:, 1]]  # type: ignore
+                neigh_vec = self.pos[pairs[:, 0]] - self.pos[pairs[:, 1]]
                 neigh_dist2 = np.sum(neigh_vec * neigh_vec, axis=1)
                 flags = neigh_dist2 < perception_thresh ** 2
                 if not np.all(flags):
@@ -209,10 +219,10 @@ class Boids(ub.NiceRepr):
         self.neighbor_dist2 = neigh_dist2
         return pairs
 
-    def compute_forces(self):
+    def compute_forces(self) -> np.ndarray:
         pairs = self.update_neighbors()
         max_speed = self.config['max_speed']
-        num = len(self.pos)  # type: ignore
+        num = len(self.pos)
 
         align_steering = np.zeros((num, 2))
         com_steering = np.zeros((num, 2))
@@ -340,7 +350,7 @@ class Boids(ub.NiceRepr):
         rand_steering = clamp_mag(
             self.rng.randn(*self.pos.shape),
             self.config['random_strength'] * self.config['max_force'],
-            axis=1,  # type: ignore
+            axis=1,
         )
 
         self.sep_steering = sep_steering
@@ -372,7 +382,7 @@ class Boids(ub.NiceRepr):
                 e1, e2 = edge
                 edge_pt = closest_point_on_line_segment(self.pos, e1, e2)
                 edge_vec = self.pos - edge_pt
-                edge_dist = np.linalg.norm(edge_vec, axis=1, keepdims=1)  # type: ignore
+                edge_dist = np.linalg.norm(edge_vec, axis=1, keepdims=True)
                 flags = ((edge_dist < edge_thresh) & (edge_dist > 0)).ravel()
                 rxs = np.where(flags)[0]
 
@@ -380,7 +390,7 @@ class Boids(ub.NiceRepr):
                     avoid_vec = edge_vec[rxs]
                     avoid_dist = edge_dist[rxs]
                     avoid_vec = avoid_vec / (avoid_dist**3)
-                    avoid_steering_ = avoid_vec - self.vel[rxs]  # type: ignore
+                    avoid_steering_ = avoid_vec - self.vel[rxs]
                     avoid_steering[rxs] += avoid_steering_
 
             avoid_steering = clamp_mag(
@@ -393,32 +403,29 @@ class Boids(ub.NiceRepr):
 
         return steering
 
-    def boundary_conditions(self):
+    def boundary_conditions(self) -> None:
         # Clamp positions
-        assert self.vel is not None
-        assert self.pos is not None
-        assert self.acc is not None
-        lower_boundry_violators = self.pos < 0  # type: ignore
-        upper_boundry_violators = self.pos > 1  # type: ignore
+        lower_boundry_violators = self.pos < 0
+        upper_boundry_violators = self.pos > 1
         if np.any(lower_boundry_violators):
-            self.pos[lower_boundry_violators] = 0  # type: ignore
+            self.pos[lower_boundry_violators] = 0
             self.vel[lower_boundry_violators] *= -1.0  # bounce
             self.acc[lower_boundry_violators] *= -1.0
 
         if np.any(upper_boundry_violators):
-            self.pos[upper_boundry_violators] = 1  # type: ignore
+            self.pos[upper_boundry_violators] = 1
             self.vel[upper_boundry_violators] *= -1.0
             self.acc[upper_boundry_violators] *= -1.0
 
-    def step(self):
+    def step(self) -> np.ndarray:
         """
         Update positions, velocities, and accelerations
         """
         self.boundary_conditions()
         force = self.compute_forces()
         self.acc += force
-        self.pos += self.vel  # type: ignore
-        self.vel += self.acc  # type: ignore
+        self.pos += self.vel
+        self.vel += self.acc
 
         self.acc = clamp_mag(self.acc, self.config['max_force'], axis=1)
         self.vel = clamp_mag(self.vel, self.config['max_speed'], axis=1)
@@ -430,7 +437,7 @@ class Boids(ub.NiceRepr):
         self.boundary_conditions()
         return self.pos
 
-    def paths(self, num_steps):
+    def paths(self, num_steps: int) -> np.ndarray:
         positions = []
         for _ in range(num_steps):
             pos = self.step().copy()
@@ -439,7 +446,9 @@ class Boids(ub.NiceRepr):
         return paths
 
 
-def clamp_mag(vec, mag, axis=None):
+def clamp_mag(
+    vec: np.ndarray, mag: float, axis: Optional[int] = None
+) -> np.ndarray:
     """
     vec = np.random.rand(10, 2)
     mag = 1.0
@@ -453,7 +462,11 @@ def clamp_mag(vec, mag, axis=None):
     return vec
 
 
-def triu_condense_multi_index(multi_index, dims, symmetric=False):
+def triu_condense_multi_index(
+    multi_index: Tuple[np.ndarray, np.ndarray],
+    dims: Sequence[int],
+    symmetric: bool = False,
+) -> np.ndarray:
     r"""
     Like np.ravel_multi_index but returns positions in an upper triangular
     condensed square matrix
@@ -569,7 +582,7 @@ def triu_condense_multi_index(multi_index, dims, symmetric=False):
     return condensed_indices
 
 
-def _spatial_index_scratch():
+def _spatial_index_scratch() -> None:
     """
     Ignore:
         !pip install git+git://github.com/carsonfarmer/fastpair.git
@@ -596,7 +609,9 @@ def _spatial_index_scratch():
     """
 
 
-def closest_point_on_line_segment(pts, e1, e2):
+def closest_point_on_line_segment(
+    pts: np.ndarray, e1: np.ndarray, e2: np.ndarray
+) -> np.ndarray:
     """
     Finds the closet point from p on line segment (e1, e2)
 
@@ -659,7 +674,7 @@ def closest_point_on_line_segment(pts, e1, e2):
     return pt_on_seg
 
 
-def _pygame_render_boids():
+def _pygame_render_boids() -> None:
     """
     Fast and responsive BOID rendering. This is an easter egg.
 
@@ -719,7 +734,7 @@ def _pygame_render_boids():
     initial_rng_state = flock.rng.get_state()
     flock.initialize()
 
-    def reset_flock():
+    def reset_flock() -> None:
         # Keep the parameters currently selected in the UI, but replay the
         # initial random draws so their effect can be compared from the same
         # starting conditions.
@@ -839,7 +854,7 @@ def _pygame_render_boids():
     pygame.quit()
 
 
-def _yeah_boid():
+def _yeah_boid() -> None:
     _pygame_render_boids()
 
 
