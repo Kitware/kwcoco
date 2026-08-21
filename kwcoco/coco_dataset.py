@@ -81,6 +81,7 @@ from kwcoco._dataset_components.mixin_constructors import MixinCocoConstructors
 from kwcoco._dataset_components.mixin_extras import MixinCocoExtras
 from kwcoco._dataset_components.mixin_objects import MixinCocoObjects
 from kwcoco._dataset_components.mixin_stats import MixinCocoStats
+from kwcoco._dataset_components.mixin_schema import MixinCocoSchema
 from kwcoco._dataset_components.mixin_add_remove import MixinCocoAddRemove
 from kwcoco._dataset_components.json_backend import json_r, json_w
 
@@ -111,6 +112,7 @@ class CocoDataset(
     AbstractCocoDataset,
     MixinCocoAddRemove,
     MixinCocoStats,
+    MixinCocoSchema,
     MixinCocoObjects,
     MixinCocoDraw,
     MixinCocoAccessors,

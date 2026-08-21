@@ -84,6 +84,7 @@ from kwcoco.coco_dataset import (  # NOQA
     MixinCocoAccessors,
     MixinCocoObjects,
     MixinCocoStats,
+    MixinCocoSchema,
     MixinCocoDraw,
 )
 
@@ -1320,6 +1321,7 @@ class CocoSqlDatabase(
     MixinCocoAccessors,
     MixinCocoObjects,
     MixinCocoStats,
+    MixinCocoSchema,
     MixinCocoDraw,
     ub.NiceRepr,
 ):
