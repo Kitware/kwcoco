@@ -689,11 +689,13 @@ class SingleImageSegmentationMetrics:
             resolution=self.resolution,
             nodata_method='float',
         )
-        _got_salient_prob = salient_delay.finalize(nodata_method='float')
+        _got_salient_prob = np.asarray(
+            salient_delay.finalize(nodata_method='float')
+        )
         # FIXME: Delayed image bug? Not sure why it returns 2 channels
         # sometimes instead of 3. That should not happen. Probably something to
         # do with saving / reading the asset as a png?
-        if len(_got_salient_prob.shape) == 2:
+        if _got_salient_prob.ndim == 2:
             salient_prob = _got_salient_prob
         else:
             salient_prob = _got_salient_prob[..., 0]
@@ -784,10 +786,8 @@ class SingleImageSegmentationMetrics:
             space=self.score_space,
             resolution=self.resolution,
             nodata_method='float',
-        ).as_xarray()
-        # Do we need xarray anymore?
-
-        class_probs = delayed_probs.finalize()
+        )
+        class_probs = np.asarray(delayed_probs.finalize())
         invalid_mask = np.isnan(class_probs).all(axis=2)
 
         self.class_weights[invalid_mask] = 0
@@ -796,7 +796,7 @@ class SingleImageSegmentationMetrics:
         cx_to_binvecs: dict[int | str, BinaryConfusionVectors] = {}
         for cx, cname in enumerate(self.classes_of_interest):
             is_true = self.catname_to_true[cname]
-            score = class_probs.loc[:, :, cname].data.copy()
+            score = class_probs[..., cx].copy()
             invalid_mask = np.isnan(score)
             weights = self.class_weights.copy()
             weights[invalid_mask] = 0
