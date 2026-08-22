@@ -100,11 +100,6 @@ packages.find.include = [
   "kwcoco*",
 ]
 
-[tool.uv]
-# Supply-chain guard: ignore packages published too recently.
-# Accepts a relative window (e.g. "P7D" / "30 days") or a fixed date.
-exclude-newer = "P7D"
-
 [tool.ruff]
 format.indent-style = "space"
 format.quote-style = "single"
