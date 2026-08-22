@@ -713,7 +713,7 @@ class SingleImageSegmentationMetrics:
         pred_score = salient_prob.ravel()
         if self.left_bin_edges is not None:
             rounded_idx = np.searchsorted(self.left_bin_edges, pred_score)
-            pred_score = self.left_bin_edges[rounded_idx]
+            pred_score = self.left_bin_edges[rounded_idx]  # type: ignore
 
         data = kwarray.DataFrameArray(
             {
