@@ -986,7 +986,7 @@ class CocoImage(_CocoObject):
         antialias: bool = True,
         nodata_method: str | None = None,
         RESOLUTION_KEY: str | collections.abc.Iterable[str] | None = None,
-    ) -> 'DelayedImage':
+    ) -> 'DelayedImage | DelayedChannelConcat':
         """
         Perform a delayed load on the data in this image.
 
@@ -1240,11 +1240,13 @@ class CocoImage(_CocoObject):
 
             # Reorder channels in the requested order
             if requested is not None:
-                delayed = delayed.take_channels(requested)
+                delayed = cast(
+                    DelayedChannelConcat, delayed.take_channels(requested)
+                )
 
             if hasattr(delayed, 'components'):
                 if len(delayed.components) == 1:  # type: ignore
-                    delayed = delayed.components[0]  # type: ignore
+                    delayed = cast('DelayedImage', delayed.components[0])  # type: ignore
 
             if space in {'image', 'auxiliary', 'asset'}:
                 pass
@@ -1270,8 +1272,11 @@ class CocoImage(_CocoObject):
             factor = self._scalefactor_for_resolution(
                 space=space, resolution=resolution, RESOLUTION_KEY=RESOLUTION_KEY
             )
-            delayed = delayed.scale(  # type: ignore
-                factor, antialias=antialias, interpolation=interpolation
+            delayed = cast(
+                'DelayedImage',
+                delayed.scale(
+                    factor, antialias=antialias, interpolation=interpolation
+                ),
             )
 
         return delayed
