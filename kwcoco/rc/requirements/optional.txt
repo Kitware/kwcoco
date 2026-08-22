@@ -17,6 +17,8 @@ matplotlib>=3.8.2  ; python_version < '3.12' and python_version >= '3.11'    # P
 matplotlib>=3.8.2  ; python_version < '3.11' and python_version >= '3.10'    # Python 3.10
 matplotlib>=3.6.2  ; python_version <  '3.10'    # Python 3.8-3.9
 
+pint>=0.23      ; python_version < '4.0'  and python_version >= '3.12'    # Python 3.12+
+pint>=0.18      ; python_version < '3.12'                                 # Python 3.11-
 
 ujson>=5.2.0 ; python_version >= '3.7'
 
