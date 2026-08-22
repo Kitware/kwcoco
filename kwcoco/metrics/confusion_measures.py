@@ -17,6 +17,9 @@ The primary data we manipulate are arrays of "confusion" counts, i.e.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping, Sequence
+from typing import Any, Literal
+
 import kwarray
 import numpy as np
 import ubelt as ub
@@ -24,7 +27,7 @@ import warnings
 from kwcoco.util.dict_like import DictProxy
 
 
-class Measures(ub.NiceRepr, DictProxy):  # type: ignore
+class Measures(ub.NiceRepr, DictProxy[str, Any]):
     """
     Dict-like container for accumulated confusion counts and derived metrics.
 
@@ -53,21 +56,21 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
         >>> kwplot.show_if_requested()
     """
 
-    def __init__(self, info):
+    def __init__(self, info: dict[str, Any]) -> None:
         self.proxy = info
 
     @property
-    def catname(self):
+    def catname(self) -> str | None:
         """
         Category name associated with these measures, if any (``node`` key).
         """
         return self.get('node', None)
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         info = self.summary()
         return ub.urepr(info, nl=0, precision=3, strvals=True, align=':')
 
-    def reconstruct(self):
+    def reconstruct(self) -> 'Measures':
         """
         Recomputes derivable measures (e.g. AP, F1) from raw confusion counts.
 
@@ -78,14 +81,14 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
         return self
 
     @classmethod
-    def from_json(cls, state):
+    def from_json(cls, state: dict[str, Any]) -> 'Measures':
         """
         Construct from a minimally serialized state.
         """
         populate_info(state)
         return cls(state)
 
-    def __json__(self):
+    def __json__(self) -> dict[str, Any]:
         """
         Return a minimal, JSON-serializable snapshot of the measures.
 
@@ -141,7 +144,7 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
         state = ensure_json_serializable(state)
         return state
 
-    def summary(self):
+    def summary(self) -> dict[str, Any]:
         """
         A concise dictionary with summary level information about the measures
 
@@ -160,7 +163,7 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
             'catname': self.get('node', None),
         }
 
-    def maximized_thresholds(self):
+    def maximized_thresholds(self) -> dict[str, dict[str, Any]]:
         """
         Returns thresholds that maximize metrics.
 
@@ -189,7 +192,7 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
                 }
         return maximized_info
 
-    def scalars(self):
+    def scalars(self) -> dict[str, Any]:
         """
         Return the computed metrics without the full curve content
 
@@ -205,7 +208,7 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
             >>> print(f'scalars = {ub.urepr(scalars, nl=1)}')
         """
         scalar_data = ub.dict_diff(
-            self,
+            self.proxy,
             [
                 'fp_count',
                 'tp_count',
@@ -234,7 +237,7 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
         )
         return scalar_data
 
-    def counts(self):
+    def counts(self) -> 'kwarray.DataFrameArray':
         """
         Just return the curves, from which most other data is computed
         (subject to metadata, see __json__ for actual minimal metadata)
@@ -243,12 +246,12 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
             kwarray.DataFrameArray
         """
         counts_df = ub.dict_isect(
-            self, ['fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds']
+            self.proxy, ['fp_count', 'tp_count', 'tn_count', 'fn_count', 'thresholds']
         )
         counts_df = kwarray.DataFrameArray(counts_df)
         return counts_df
 
-    def draw(self, key=None, prefix='', **kw):
+    def draw(self, key: str | None = None, prefix: str = '', **kw: Any) -> Any:
         """
         Draw a specified metric curve using matplotlib.
 
@@ -288,7 +291,12 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
         elif key == 'roc':
             return drawing.draw_roc(self, prefix=prefix, **kw)
 
-    def summary_plot(self, fnum=1, title='', subplots='auto'):
+    def summary_plot(
+        self,
+        fnum: int = 1,
+        title: str = '',
+        subplots: str | int | Sequence[str] = 'auto',
+    ) -> None:
         """
         Draws a figure with multiple metric curves using :func:`Measures.draw`.
 
@@ -304,14 +312,20 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
             >>> self.summary_plot()
             >>> kwplot.show_if_requested()
         """
-        if subplots == 'auto' or (isinstance(subplots, int) and subplots):
-            subplots = ['pr', 'roc', 'thresh']
+        if subplots == 'auto':
+            subplot_keys = ['pr', 'roc', 'thresh']
+        elif isinstance(subplots, int):
+            subplot_keys = ['pr', 'roc', 'thresh'] if subplots else []
+        elif isinstance(subplots, str):
+            subplot_keys = [subplots]
+        else:
+            subplot_keys = list(subplots)
         import kwplot
 
         kwplot.figure(fnum=fnum, figtitle=title)
 
-        pnum_ = kwplot.PlotNums(nSubplots=len(subplots))
-        for key in subplots:
+        pnum_ = kwplot.PlotNums(nSubplots=len(subplot_keys))
+        for key in subplot_keys:
             kwplot.figure(fnum=fnum, pnum=pnum_())
             self.draw(key, fnum=fnum)
 
@@ -321,7 +335,7 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
             # self.draw('thresh', keys=['mcc', 'f1', 'acc'])
 
     @classmethod
-    def demo(cls, **kwargs):
+    def demo(cls, **kwargs: Any) -> 'Measures':
         """
         Create a demo Measures object for testing / demos
 
@@ -336,7 +350,13 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
         return measures
 
     @classmethod
-    def combine(cls, tocombine, precision=None, growth=None, thresh_bins=None):
+    def combine(
+        cls,
+        tocombine: Sequence[Measures | Mapping[str, Any]],
+        precision: int | None = None,
+        growth: str | None = None,
+        thresh_bins: int | Sequence[float] | np.ndarray | None = None,
+    ) -> 'Measures':
         """
         Combine binary confusion metrics
 
@@ -572,8 +592,8 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
             fp_pos, _, _ = reversable_diff(measures['fp_count'])
             tp_pos, _, _ = reversable_diff(measures['tp_count'])
 
-            tn_pos, tn_p, tn_s = reversable_diff(measures['tn_count'], reverse=1)
-            fn_pos, _, _ = reversable_diff(measures['fn_count'], reverse=1)
+            tn_pos, tn_p, tn_s = reversable_diff(measures['tn_count'], reverse=True)
+            fn_pos, _, _ = reversable_diff(measures['fn_count'], reverse=True)
 
             # Find the locations where the thresholds from "these" measures
             # should be inserted into the combined measures.
@@ -620,7 +640,7 @@ class Measures(ub.NiceRepr, DictProxy):  # type: ignore
             'stabalize_thresh',
             'trunc_idx',
         }
-        rest = ub.dict_isect(tocombine[0], other)
+        rest = ub.dict_isect(dict(tocombine[0]), other)
         new_info.update(rest)
 
         new_measures = Measures(new_info)
@@ -730,7 +750,9 @@ def _combine_threshold(tocombine_thresh, thresh_bins, growth, precision):
     return combo_thresh_asc, nonfinite_vals
 
 
-def reversable_diff(arr, assume_sorted=1, reverse=False):
+def reversable_diff(
+    arr: np.ndarray, assume_sorted: int | bool = 1, reverse: bool = False
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Does a reversible array difference operation.
 
@@ -820,7 +842,7 @@ def reversable_diff(arr, assume_sorted=1, reverse=False):
     diff_arr = np.r_[[0] * prefix_len, [offset], np.diff(finite_body), [0] * suffix_len]
 
     # The goal is to be able to recon perfectly
-    def invert(diff_arr):
+    def invert(diff_arr: np.ndarray) -> np.ndarray:
         recon_arr = np.cumsum(diff_arr)
         recon_arr[0 : len(prefix)] += prefix
         recon_arr[len(recon_arr) - len(suffix) :] += suffix
@@ -832,30 +854,30 @@ def reversable_diff(arr, assume_sorted=1, reverse=False):
     return diff_arr, prefix, suffix
 
 
-class PerClass_Measures(ub.NiceRepr, DictProxy):  # type: ignore
+class PerClass_Measures(ub.NiceRepr, DictProxy[Any, Measures]):
     """
     A container class mapping categories to :class:`Measures`.
     """
 
-    def __init__(self, cx_to_info):
+    def __init__(self, cx_to_info: MutableMapping[Any, Measures]) -> None:
         self.proxy = cx_to_info
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return ub.urepr(self.proxy, nl=2, strvals=True, align=':')
 
-    def summary(self):
+    def summary(self) -> dict[Any, dict[str, Any]]:
         return {k: v.summary() for k, v in self.items()}
 
     @classmethod
-    def from_json(cls, state):
-        state = ub.map_vals(Measures.from_json, state)
-        self = cls(state)
+    def from_json(cls, state: dict[Any, dict[str, Any]]) -> 'PerClass_Measures':
+        measure_state = ub.map_vals(Measures.from_json, state)
+        self = cls(measure_state)
         return self
 
-    def __json__(self):
+    def __json__(self) -> dict[Any, dict[str, Any]]:
         return {k: v.__json__() for k, v in self.items()}
 
-    def draw(self, key='mcc', prefix='', **kw):
+    def draw(self, key: str = 'mcc', prefix: str = '', **kw: Any) -> Any:
         """
         Example:
             >>> # xdoctest: +REQUIRES(module:kwplot)
@@ -876,17 +898,22 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):  # type: ignore
         else:
             return drawing.draw_perclass_thresholds(self, key=key, prefix=prefix, **kw)
 
-    def draw_roc(self, prefix='', **kw):
+    def draw_roc(self, prefix: str = '', **kw: Any) -> Any:
         from kwcoco.metrics import drawing
 
         return drawing.draw_perclass_roc(self, prefix=prefix, **kw)
 
-    def draw_pr(self, prefix='', **kw):
+    def draw_pr(self, prefix: str = '', **kw: Any) -> Any:
         from kwcoco.metrics import drawing
 
         return drawing.draw_perclass_prcurve(self, prefix=prefix, **kw)
 
-    def summary_plot(self, fnum=1, title='', subplots='auto'):
+    def summary_plot(
+        self,
+        fnum: int = 1,
+        title: str = '',
+        subplots: str | int | Sequence[str] = 'auto',
+    ) -> None:
         """
 
         CommandLine:
@@ -910,13 +937,19 @@ class PerClass_Measures(ub.NiceRepr, DictProxy):  # type: ignore
             >>> kwplot.show_if_requested()
             >>> self.summary_plot(title='demo summary_plot ovr', subplots=['mcc', 'acc'], fnum=2)
         """
-        if subplots == 'auto' or (isinstance(subplots, int) and subplots):
-            subplots = ['pr', 'roc', 'mcc', 'f1', 'acc']
+        if subplots == 'auto':
+            subplot_keys = ['pr', 'roc', 'mcc', 'f1', 'acc']
+        elif isinstance(subplots, int):
+            subplot_keys = ['pr', 'roc', 'mcc', 'f1', 'acc'] if subplots else []
+        elif isinstance(subplots, str):
+            subplot_keys = [subplots]
+        else:
+            subplot_keys = list(subplots)
         import kwplot
 
-        pnum_ = kwplot.PlotNums(nSubplots=len(subplots))
+        pnum_ = kwplot.PlotNums(nSubplots=len(subplot_keys))
         kwplot.figure(fnum=fnum, doclf=True, figtitle=title)
-        for key in subplots:
+        for key in subplot_keys:
             self.draw(key, fnum=fnum, pnum=pnum_())
 
 
@@ -938,7 +971,12 @@ class MeasureCombiner:
 
     """
 
-    def __init__(self, precision=None, growth=None, thresh_bins=None):
+    def __init__(
+        self,
+        precision: int | None = None,
+        growth: str | None = None,
+        thresh_bins: int | Sequence[float] | np.ndarray | None = None,
+    ) -> None:
         """
         Args:
             precision (None | int):
@@ -961,10 +999,10 @@ class MeasureCombiner:
         self.queue = []
 
     @property
-    def queue_size(self):
+    def queue_size(self) -> int:
         return len(self.queue)
 
-    def submit(self, other):
+    def submit(self, other: Measures) -> None:
         """
         Queue another set of measures for combination.
 
@@ -973,7 +1011,7 @@ class MeasureCombiner:
         """
         self.queue.append(other)
 
-    def combine(self):
+    def combine(self) -> None:
         """
         Reduce the current queue into a consolidated ``self.measures``.
         """
@@ -996,7 +1034,7 @@ class MeasureCombiner:
             )
         self.queue = []
 
-    def finalize(self):
+    def finalize(self) -> Measures | Literal[False]:
         """
         Combine any remaining items, reconstruct metrics, and return the result.
 
@@ -1030,14 +1068,19 @@ class OneVersusRestMeasureCombiner:
         >>> print('combined = {!r}'.format(combined))
     """
 
-    def __init__(self, precision=None, growth=None, thresh_bins=None):
+    def __init__(
+        self,
+        precision: int | None = None,
+        growth: str | None = None,
+        thresh_bins: int | Sequence[float] | np.ndarray | None = None,
+    ) -> None:
         self.catname_to_combiner = {}
         self.precision = precision
-        self.growth = precision
+        self.growth = growth
         self.thresh_bins = thresh_bins
         self.queue_size = 0
 
-    def submit(self, other):
+    def submit(self, other: Mapping[str, Any]) -> None:
         self.queue_size += 1
         for catname, other_m in other['perclass'].items():
             if catname not in self.catname_to_combiner:
@@ -1049,7 +1092,7 @@ class OneVersusRestMeasureCombiner:
                 self.catname_to_combiner[catname] = combiner
             self.catname_to_combiner[catname].submit(other_m)
 
-    def _summary(self):
+    def _summary(self) -> None:
         for catname, combiner in self.catname_to_combiner.items():
             # combiner summary
             # combiner.measures
@@ -1059,12 +1102,12 @@ class OneVersusRestMeasureCombiner:
                 measure.reconstruct()
                 print('  * queue[{}] = {}'.format(qx, ub.urepr(measure, nl=1)))
 
-    def combine(self):
+    def combine(self) -> None:
         for combiner in self.catname_to_combiner.values():
             combiner.combine()
         self.queue_size = 0
 
-    def finalize(self):
+    def finalize(self) -> dict[str, Any]:
         catname_to_measures = {}
         for catname, combiner in self.catname_to_combiner.items():
             catname_to_measures[catname] = combiner.finalize()
@@ -1082,7 +1125,7 @@ class OneVersusRestMeasureCombiner:
         return compatible_format
 
 
-def populate_info(info):
+def populate_info(info: dict[str, Any] | Measures) -> None:
     """
     Given raw accumulated confusion counts, populated secondary measures like
     AP, AUC, F1, MCC, etc..

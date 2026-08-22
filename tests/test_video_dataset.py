@@ -60,6 +60,8 @@ def test_frames_are_in_order():
     else:
         # Test that the sql view works too
         sql_dset = dset.view_sql(memory=True)
+        assert sql_dset.index is not None
+        assert sql_dset.index.vidid_to_gids is not None
 
         vidid_to_gids = dict(sql_dset.index.vidid_to_gids)
         gids_were_in_order = []

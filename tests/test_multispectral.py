@@ -100,6 +100,8 @@ def test_multispectral_sql():
 
     dset1 = kwcoco.CocoDataset.demo('vidshapes1-multispectral')
     dset2 = dset1.view_sql(force_rewrite=True)
+    assert dset2.index is not None
+    assert dset2.index.name_to_img is not None
 
     dset2.basic_stats()
 

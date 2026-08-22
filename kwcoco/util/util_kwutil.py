@@ -4,10 +4,18 @@ This is a staging ground for utilities that may make there way into
 """
 from __future__ import annotations
 
+from collections import deque
+from collections.abc import Callable
+from typing import Any, Generic, ParamSpec, TypeVar
+
 import ubelt as ub
 
 
-class _DelayedFuture:
+P = ParamSpec('P')
+T = TypeVar('T')
+
+
+class _DelayedFuture(Generic[T]):
     """
     todo: move to kwutil
 
@@ -15,7 +23,13 @@ class _DelayedFuture:
     accessed.
     """
 
-    def __init__(self, func, args, kwargs, parent):
+    def __init__(
+        self,
+        func: Callable[..., T],
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        parent: _DelayedBlockingJobQueue,
+    ) -> None:
         self.func = func
         self.args = args
         self.kwargs = kwargs
@@ -23,7 +37,7 @@ class _DelayedFuture:
         self.parent = parent
         self.future = None
 
-    def result(self, timeout=None):
+    def result(self, timeout: float | None = None) -> T:
         if self.future is None:
             raise Exception('The task has not been submitted yet')
         result = self.future.result(timeout)
@@ -68,17 +82,25 @@ class _DelayedBlockingJobQueue:
         >>>     f.result()
     """
 
-    def __init__(self, max_unhandled_jobs, mode='thread', max_workers=None):
-        from collections import deque
-
-        self._unsubmitted = deque()
+    def __init__(
+        self,
+        max_unhandled_jobs: int,
+        mode: str = 'thread',
+        max_workers: int | None = None,
+    ) -> None:
+        self._unsubmitted: deque[_DelayedFuture[Any]] = deque()
         self.pool = ub.Executor(mode=mode, max_workers=max_workers)  # type: ignore
         self.max_unhandled_jobs = max_unhandled_jobs
         self._num_handled_results = 0
         self._num_submitted_jobs = 0
         self._num_unhandled = 0
 
-    def submit(self, func, *args, **kwargs):
+    def submit(
+        self,
+        func: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> _DelayedFuture[T]:
         """
         Queues a new job, but wont execute until
         some conditions are met
@@ -88,7 +110,7 @@ class _DelayedBlockingJobQueue:
         self._submit_if_room()
         return delayed
 
-    def _submit_if_room(self):
+    def _submit_if_room(self) -> None:
         while self._num_unhandled < self.max_unhandled_jobs and self._unsubmitted:
             delayed = self._unsubmitted.popleft()
             self._num_submitted_jobs += 1
@@ -97,13 +119,13 @@ class _DelayedBlockingJobQueue:
                 delayed.func, *delayed.args, **delayed.kwargs
             )
 
-    def _job_result_accessed_callback(self, _):
+    def _job_result_accessed_callback(self, _: _DelayedFuture[Any]) -> None:
         """Called when the user handles a result"""
         self._num_handled_results += 1
         self._num_unhandled -= 1
         self._submit_if_room()
 
-    def shutdown(self):
+    def shutdown(self) -> Any:
         """
         Calls the shutdown function of the underlying backend.
         """
@@ -151,7 +173,12 @@ class _MaxQueuePool:
 
     """
 
-    def __init__(self, max_queue_size=None, mode='thread', max_workers=0):
+    def __init__(
+        self,
+        max_queue_size: int | None = None,
+        mode: str = 'thread',
+        max_workers: int = 0,
+    ) -> None:
         if max_queue_size is None:
             max_queue_size = max_workers
         self.pool = ub.Executor(mode=mode, max_workers=max_workers)  # type: ignore
@@ -162,7 +189,12 @@ class _MaxQueuePool:
 
             self.pool_queue = BoundedSemaphore(max_queue_size)
 
-    def submit(self, function, *args, **kwargs):
+    def submit(
+        self,
+        function: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Any:
         """Submits a new task to the pool, blocks if Pool queue is full."""
         if self.pool_queue is not None:
             self.pool_queue.acquire()
@@ -172,12 +204,12 @@ class _MaxQueuePool:
 
         return future
 
-    def pool_queue_callback(self, _):
+    def pool_queue_callback(self, _: Any) -> None:
         """Called once task is done, releases one queue slot."""
         if self.pool_queue is not None:
             self.pool_queue.release()
 
-    def shutdown(self):
+    def shutdown(self) -> Any:
         """
         Calls the shutdown function of the underlying backend.
         """

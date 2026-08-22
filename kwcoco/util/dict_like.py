@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Iterable, Iterator, Mapping, MutableMapping
+from typing import Any, Generic, TypeVar, overload
 
 import ubelt as ub
-from scriptconfig.dict_like import DictLike as DictLike_  # FIXME: do we vendor or not?
 
 # from sqlalchemy.dialects.postgresql import Any
 
 
-class DictLike(ub.NiceRepr):
+K = TypeVar('K')
+V = TypeVar('V')
+T = TypeVar('T')
+
+
+class DictLike(ub.NiceRepr, Generic[K, V]):
     """
     An inherited class must specify the ``getitem``, ``setitem``, and
       ``keys`` methods.
@@ -33,7 +38,7 @@ class DictLike(ub.NiceRepr):
     And perhaps: ``copy``,
     """
 
-    def getitem(self, key):
+    def getitem(self, key: K) -> V:
         """
         Args:
             key (Any): a key
@@ -43,7 +48,7 @@ class DictLike(ub.NiceRepr):
         """
         raise NotImplementedError('abstract getitem function')
 
-    def setitem(self, key, value):
+    def setitem(self, key: K, value: V) -> None:
         """
         Args:
             key (Any):
@@ -51,14 +56,14 @@ class DictLike(ub.NiceRepr):
         """
         raise NotImplementedError('abstract setitem function')
 
-    def delitem(self, key):
+    def delitem(self, key: K) -> None:
         """
         Args:
             key (Any):
         """
         raise NotImplementedError('abstract delitem function')
 
-    def keys(self):
+    def keys(self) -> Iterable[K]:
         """
         Yields:
             Any: a key
@@ -71,17 +76,17 @@ class DictLike(ub.NiceRepr):
     # def __str__(self):
     #     return str(self.asdict())
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Returns:
             int:
         """
         return len(list(self.keys()))
 
-    def __iter__(self):
-        return self.keys()
+    def __iter__(self) -> Iterator[K]:
+        return iter(self.keys())
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         """
         Args:
             key (Any):
@@ -91,14 +96,14 @@ class DictLike(ub.NiceRepr):
         """
         return key in self.keys()
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: K) -> None:
         """
         Args:
             key (Any):
         """
         return self.delitem(key)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: K) -> V:
         """
         Args:
             key (Any):
@@ -108,7 +113,7 @@ class DictLike(ub.NiceRepr):
         """
         return self.getitem(key)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: K, value: V) -> None:
         """
         Args:
             key (Any):
@@ -116,14 +121,14 @@ class DictLike(ub.NiceRepr):
         """
         return self.setitem(key, value)
 
-    def items(self):
+    def items(self) -> Iterator[tuple[K, V]]:
         """
         Yields:
             Tuple[Any, Any]: a key value pair
         """
         yield from ((key, self[key]) for key in self.keys())
 
-    def values(self):
+    def values(self) -> Iterator[V]:
         """
         Yields:
             Any: a value
@@ -132,14 +137,14 @@ class DictLike(ub.NiceRepr):
             yield self[key]
         # yield from (self[key] for key in self.keys())
 
-    def copy(self):
+    def copy(self) -> dict[K, V]:
         """
         Returns:
             Dict:
         """
         return dict(self.items())
 
-    def to_dict(self):
+    def to_dict(self) -> dict[K, V]:
         """
         Returns:
             Dict:
@@ -150,11 +155,17 @@ class DictLike(ub.NiceRepr):
     # TODO: deprecate and remove
     asdict = to_dict
 
-    def update(self, other):
+    def update(self, other: Mapping[K, V]) -> None:
         for k, v in other.items():
             self[k] = v
 
-    def get(self, key, default=None):
+    @overload
+    def get(self, key: K) -> V | None: ...
+
+    @overload
+    def get(self, key: K, default: T) -> V | T: ...
+
+    def get(self, key: K, default: Any = None) -> Any:
         """
         Args:
             key (Any):
@@ -169,21 +180,51 @@ class DictLike(ub.NiceRepr):
             return default
 
 
-class DictProxy(DictLike_):
+class DictProxy(Mapping[K, V]):
     """
-    Allows an object to proxy the behavior of a dict attribute
+    Allows an object to proxy the behavior of a mutable mapping attribute.
+
+    Subclasses only need to assign ``self.proxy``.  The proxy itself is
+    mutable, while the inherited :class:`Mapping` interface gives callers a
+    precise read contract.
     """
 
-    proxy: dict[str, Any]
+    proxy: MutableMapping[K, V]
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: K) -> V:
         return self.proxy[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: K, value: V) -> None:
         self.proxy[key] = value
 
-    def keys(self):
-        return self.proxy.keys()
+    def __delitem__(self, key: K) -> None:
+        del self.proxy[key]
 
-    def __json__(self):
+    def __iter__(self) -> Iterator[K]:
+        return iter(self.proxy)
+
+    def __len__(self) -> int:
+        return len(self.proxy)
+
+    def copy(self) -> dict[K, V]:
+        return dict(self.proxy)
+
+    def to_dict(self) -> dict[K, V]:
+        return dict(self.proxy)
+
+    asdict = to_dict
+
+    def update(self, other: Mapping[K, V]) -> None:
+        self.proxy.update(other)
+
+    def iteritems(self) -> Iterator[tuple[K, V]]:
+        return iter(self.proxy.items())
+
+    def itervalues(self) -> Iterator[V]:
+        return iter(self.proxy.values())
+
+    def iterkeys(self) -> Iterator[K]:
+        return iter(self.proxy.keys())
+
+    def __json__(self) -> dict[Any, Any]:
         return ub.odict(self.proxy)

@@ -106,6 +106,7 @@ def test_torch_dataset_with_sql():
     # in its memory, even if it reinitializes, and if the fork closes the
     # session then we run the risk of multiple actors attempting to clean up
     # the same resource.
+    assert sql_dset.session is not None
     sql_dset.session.close()
     sql_dset.disconnect()
 

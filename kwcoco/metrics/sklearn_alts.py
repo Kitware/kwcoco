@@ -9,7 +9,13 @@ import numpy as np
 from typing import Any
 
 
-def confusion_matrix(y_true, y_pred, n_labels=None, labels=None, sample_weight=None):
+def confusion_matrix(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    n_labels: int | None = None,
+    labels: list[Any] | np.ndarray | None = None,
+    sample_weight: np.ndarray | list[float] | None = None,
+) -> np.ndarray:
     """
     faster version of sklearn confusion matrix that avoids the
     expensive checks and label rectification
@@ -51,7 +57,7 @@ def confusion_matrix(y_true, y_pred, n_labels=None, labels=None, sample_weight=N
     return CM
 
 
-def global_accuracy_from_confusion(cfsn):
+def global_accuracy_from_confusion(cfsn: np.ndarray) -> float:
     # real is rows, pred is columns
     n_ii = np.diag(cfsn)
     # sum over pred = columns = axis1
@@ -60,7 +66,7 @@ def global_accuracy_from_confusion(cfsn):
     return global_acc
 
 
-def class_accuracy_from_confusion(cfsn):
+def class_accuracy_from_confusion(cfsn: np.ndarray) -> float:
     # real is rows, pred is columns
     n_ii = np.diag(cfsn)
     # sum over pred = columns = axis1

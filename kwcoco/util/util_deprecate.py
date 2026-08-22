@@ -3,18 +3,30 @@ Deprecation helpers
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
+from typing import Any, ParamSpec, TypeVar
+
 import ubelt as ub
 
 
+P = ParamSpec('P')
+R = TypeVar('R')
+
+
 def deprecated_function_alias(
-    modname, old_name, new_func, deprecate=None, error=None, remove=None
-):
+    modname: str,
+    old_name: str,
+    new_func: Callable[P, R],
+    deprecate: str | None = None,
+    error: str | None = None,
+    remove: str | None = None,
+) -> Callable[P, R]:
     """
     Exposes an old deprecated alias of a new preferred function
     """
-    new_name = new_func.__name__
+    new_name = getattr(new_func, '__name__', type(new_func).__name__)
 
-    def _deprecated_func_wrapper(*args, **kwargs):
+    def _deprecated_func_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         ub.schedule_deprecation(
             modname=modname,
             name=old_name,
@@ -31,7 +43,12 @@ def deprecated_function_alias(
     return _deprecated_func_wrapper
 
 
-def migrate_argnames(aliases, explicit_args, kwargs, warn_non_cannon=False):
+def migrate_argnames(
+    aliases: Mapping[str, str | Iterable[str]],
+    explicit_args: Mapping[str, Any],
+    kwargs: MutableMapping[str, Any],
+    warn_non_cannon: bool = False,
+) -> dict[str, Any]:
     """
     Initial pass at a function to help migrate a function to a keyword argument
     signature while maintaining backwards compatibility.

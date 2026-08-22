@@ -12,12 +12,14 @@ from collections import OrderedDict
 import decimal
 import fractions
 import pathlib
-from typing import NamedTuple, Tuple, Any, Union
-import typing
+from collections.abc import Iterator
+from typing import Any, NamedTuple, TypedDict, Union
 
-if typing.TYPE_CHECKING:
-    from typing import Dict, List
-    from collections.abc import Generator
+
+class UnserializablePart(TypedDict):
+    loc: list[Any]
+    data: Any
+
 
 # backwards compat
 IndexableWalker = ub.IndexableWalker
@@ -25,7 +27,7 @@ IndexableWalker = ub.IndexableWalker
 
 def ensure_json_serializable(
     dict_: Any, normalize_containers: bool = False, verbose: int = 0
-):
+) -> Any:
     """
     Attempt to convert common types (e.g. numpy) into something json compliant
 
@@ -56,7 +58,7 @@ def ensure_json_serializable(
     """
     dict_ = copy.deepcopy(dict_)
 
-    def _norm_container(c):
+    def _norm_container(c: Any) -> Any:
         if isinstance(c, dict):
             # Cast to a normal dictionary
             if isinstance(c, OrderedDict):
@@ -110,7 +112,7 @@ def ensure_json_serializable(
 
 def find_json_unserializable(
     data: object, quickcheck: bool = False
-) -> Generator[List[Dict], None, None]:
+) -> Iterator[UnserializablePart]:
     """
     Recurse through json datastructure and find any component that
     causes a serialization error. Record the location of these errors
@@ -249,7 +251,9 @@ def find_json_unserializable(
         yield from _walk(data, [], set())
 
 
-def indexable_allclose(dct1, dct2, return_info: bool = False):
+def indexable_allclose(
+    dct1: Any, dct2: Any, return_info: bool = False
+) -> Any:
     """
     Walks through two nested data structures and ensures that everything is
     roughly the same.
@@ -297,12 +301,18 @@ class Difference(NamedTuple):
     the indexables is.
     """
 
-    path: Tuple
+    path: tuple[Any, ...]
     value1: Any
     value2: Any
 
 
-def indexable_diff(dct1, dct2, rtol=1e-05, atol=1e-08, equal_nan=False):
+def indexable_diff(
+    dct1: Any,
+    dct2: Any,
+    rtol: float = 1e-05,
+    atol: float = 1e-08,
+    equal_nan: bool = False,
+) -> dict[str, Any]:
     """
     Walks through two nested data structures finds differences in the
     structures.
@@ -360,7 +370,7 @@ def indexable_diff(dct1, dct2, rtol=1e-05, atol=1e-08, equal_nan=False):
     return walker1.diff(dct2, rel_tol=rtol, abs_tol=atol, equal_nan=equal_nan)
 
 
-def coerce_indent(indent: Union[int, str, None]):
+def coerce_indent(indent: Union[int, str, None]) -> int | None:
     """
     Example:
         .. code:: python

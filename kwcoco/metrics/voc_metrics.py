@@ -3,6 +3,12 @@ from __future__ import annotations
 import warnings
 import numpy as np
 import ubelt as ub
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import kwimage
+    from kwcoco.category_tree import CategoryTree
 
 
 class VOC_Metrics(ub.NiceRepr):
@@ -27,12 +33,12 @@ class VOC_Metrics(ub.NiceRepr):
             class names
     """
 
-    def __init__(self, classes=None):
+    def __init__(self, classes: 'Sequence[str] | CategoryTree | None' = None) -> None:
         self.recs = {}
         self.cx_to_lines = ub.ddict(list)
         self.classes = classes
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         info = {
             'n_true_imgs': len(self.recs),
             'n_true_anns': sum(map(len, self.recs.values())),
@@ -41,7 +47,7 @@ class VOC_Metrics(ub.NiceRepr):
         }
         return ub.urepr(info)
 
-    def add_truth(self, true_dets, gid):
+    def add_truth(self, true_dets: 'kwimage.Detections', gid: int) -> None:
         self.recs[gid] = []
         true_weights = true_dets.data.get('weights', None)
         if true_weights is None:
@@ -51,7 +57,7 @@ class VOC_Metrics(ub.NiceRepr):
         ):
             self.recs[gid].append({'bbox': bbox, 'difficult': weight < 0.5, 'name': cx})
 
-    def add_predictions(self, pred_dets, gid):
+    def add_predictions(self, pred_dets: 'kwimage.Detections', gid: int) -> None:
         pred_scores = pred_dets.data.get('scores', None)
         if pred_scores is None:
             pred_scores = [1.0] * len(pred_dets)
@@ -61,7 +67,9 @@ class VOC_Metrics(ub.NiceRepr):
             voc_line = [gid, score] + list(bbox)
             self.cx_to_lines[cx].append(voc_line)
 
-    def score(self, iou_thresh=0.5, bias=1, method='voc2012'):
+    def score(
+        self, iou_thresh: float = 0.5, bias: float = 1, method: str = 'voc2012'
+    ) -> dict[str, Any]:
         """
         Compute VOC scores for every category
 

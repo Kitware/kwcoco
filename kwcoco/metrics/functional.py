@@ -5,7 +5,12 @@ import warnings
 from scipy.sparse import coo_matrix
 
 
-def fast_confusion_matrix(y_true, y_pred, n_labels, sample_weight=None):
+def fast_confusion_matrix(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    n_labels: int,
+    sample_weight: np.ndarray | None = None,
+) -> np.ndarray:
     """
     faster version of sklearn confusion matrix that avoids the
     expensive checks and label rectification

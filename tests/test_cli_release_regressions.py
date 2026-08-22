@@ -132,8 +132,6 @@ def test_plot_stats_preserves_asymmetric_box_dimensions(monkeypatch):
     gid = dset.add_image(file_name='unused.png', width=100, height=100)
     dset.add_annotation(image_id=gid, bbox=[0, 0, 10, 20])
 
-    monkeypatch.setattr(coco_plot_stats, 'geospatial_stats', lambda *args: None)
-
     def fake_polygon_shape_stats(data):
         data = data.copy()
         data['sseg_rt_area'] = data['box_rt_area']

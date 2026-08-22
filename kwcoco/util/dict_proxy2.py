@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Iterable, Iterator, Mapping
+from typing import Any, Generic, TypeVar, overload
 
 from ubelt import NoParam
 
 
+K = TypeVar('K')
+V = TypeVar('V')
+T = TypeVar('T')
+
+
 # Another variant of DictLike Circa 2023
-class DictInterface:
+class DictInterface(Generic[K, V]):
     """
     An inherited class must specify the ``getitem``, ``setitem``, and
       ``keys`` methods.
@@ -53,7 +59,7 @@ class DictInterface:
 
     """
 
-    def keys(self):
+    def keys(self) -> Iterable[K]:
         """
         Yields:
             str:
@@ -66,17 +72,17 @@ class DictInterface:
     # def __str__(self):
     #     return str(self.asdict())
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Returns:
             int:
         """
         return len(list(self.keys()))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[K]:
         return iter(self.keys())
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         """
         Args:
             key (Any):
@@ -86,14 +92,14 @@ class DictInterface:
         """
         return key in self.keys()
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: K) -> None:
         """
         Args:
             key (Any):
         """
         raise NotImplementedError('abstract delitem function')
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: K) -> V:
         """
         Args:
             key (Any):
@@ -103,7 +109,7 @@ class DictInterface:
         """
         raise NotImplementedError('abstract getitem function')
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: K, value: V) -> None:
         """
         Args:
             key (Any):
@@ -111,25 +117,31 @@ class DictInterface:
         """
         raise NotImplementedError('abstract setitem function')
 
-    def items(self):
+    def items(self) -> Iterator[tuple[K, V]]:
         """
         Yields:
             Tuple[Any, Any]: a key value pair
         """
         return ((key, self[key]) for key in self.keys())
 
-    def values(self):
+    def values(self) -> Iterator[V]:
         """
         Yields:
             Any: a value
         """
         return (self[key] for key in self.keys())
 
-    def update(self, other):
+    def update(self, other: Mapping[K, V]) -> None:
         for k, v in other.items():
             self[k] = v
 
-    def get(self, key, default=None):
+    @overload
+    def get(self, key: K) -> V | None: ...
+
+    @overload
+    def get(self, key: K, default: T) -> V | T: ...
+
+    def get(self, key: K, default: Any = None) -> Any:
         """
         Args:
             key (Any):
@@ -143,7 +155,13 @@ class DictInterface:
         except KeyError:
             return default
 
-    def pop(self, key, default=NoParam):
+    @overload
+    def pop(self, key: K) -> V: ...
+
+    @overload
+    def pop(self, key: K, default: T) -> V | T: ...
+
+    def pop(self, key: K, default: Any = NoParam) -> Any:
         """
         Remove specified key and return the corresponding value.
 
@@ -168,7 +186,7 @@ class DictInterface:
             return value
 
 
-class DictProxy2(DictInterface):
+class DictProxy2(DictInterface[str, Any]):
     """
     Allows an object to proxy the behavior of a _proxy dict attribute.
 
@@ -223,19 +241,19 @@ class DictProxy2(DictInterface):
 
     _proxy: dict[str, Any]
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         return self._proxy[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         self._proxy[key] = value
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         del self._proxy[key]
 
-    def keys(self):
+    def keys(self) -> Iterable[str]:
         return self._proxy.keys()
 
-    def __json__(self):
+    def __json__(self) -> dict[str, Any]:
         return self._proxy
 
 
@@ -246,8 +264,15 @@ class _AliasMetaclass(type):
     """
 
     @staticmethod
-    def __new__(mcls, name, bases, namespace, *args, **kwargs):
-        secondary_to_primary = namespace.get('__alias_to_primary__')
+    def __new__(
+        mcls,
+        name: str,
+        bases: tuple[type, ...],
+        namespace: dict[str, Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> type:
+        secondary_to_primary = namespace.get('__alias_to_primary__', {})
         primary_to_aliases = {}
         for secondary, primary in secondary_to_primary.items():
             if primary not in primary_to_aliases:
@@ -367,7 +392,7 @@ class AliasedDictProxy(DictProxy2, metaclass=_AliasMetaclass):
     __alias_to_primary__: dict[str, str] = {}
     _proxy: dict[str, Any]
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         try:
             # Try to do the quick thing first
             return self._proxy[key]
@@ -378,7 +403,7 @@ class AliasedDictProxy(DictProxy2, metaclass=_AliasMetaclass):
                     return self._proxy[alias]
             raise
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         # Setting will update all aliases in the level-set of equivalent keys
         _needs_set = True
         for alias in self.__alias_to_aliases__.get(key, []):
@@ -391,15 +416,17 @@ class AliasedDictProxy(DictProxy2, metaclass=_AliasMetaclass):
             key = self.__alias_to_primary__.get(key, key)
             self._proxy[key] = value
 
-    def keys(self):
+    def keys(self) -> Iterable[str]:
         return self._proxy.keys()
 
-    def __json__(self):
+    def __json__(self) -> dict[str, Any]:
         return self._proxy
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         if key in self._proxy:
             return True
+        if not isinstance(key, str):
+            return False
         return any(
             alias in self._proxy for alias in self.__alias_to_aliases__.get(key, [])
         )

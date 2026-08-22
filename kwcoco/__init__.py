@@ -275,6 +275,8 @@ CocoDataset methods (via MixinCocoDraw)
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 __dev__ = """
 
 Some of the above docs were generated via:
@@ -293,6 +295,21 @@ Testing:
 """
 
 __version__ = '0.9.0'
+
+
+if TYPE_CHECKING:
+    # Runtime imports are intentionally lazy, but public exports should still
+    # be concrete to static type checkers and IDEs.
+    from kwcoco.abstract_coco_dataset import (
+        AbstractCocoDataset as AbstractCocoDataset,
+    )
+    from kwcoco.category_tree import CategoryTree as CategoryTree
+    from kwcoco.channel_spec import ChannelSpec as ChannelSpec
+    from kwcoco.channel_spec import FusedChannelSpec as FusedChannelSpec
+    from kwcoco.coco_dataset import CocoDataset as CocoDataset
+    from kwcoco.coco_image import CocoImage as CocoImage
+    from kwcoco.coco_sql_dataset import CocoSqlDatabase as CocoSqlDatabase
+    from kwcoco.sensorchan_spec import SensorChanSpec as SensorChanSpec
 
 
 __submodules__ = {

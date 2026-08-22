@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 import ubelt as ub
 from os.path import exists
 from os.path import join
@@ -144,7 +145,7 @@ def _convert_voc_split(devkit_dpath, classes, split, year, root):
         unknown = {e.tag for e in top_level} - KNOWN
         assert not unknown
 
-        img = {
+        img: dict[str, Any] = {
             'file_name': relpath(gpath, root),  # type: ignore
             'width': int(tree.find('size').find('width').text),  # type: ignore
             'height': int(tree.find('size').find('height').text),  # type: ignore
@@ -175,15 +176,15 @@ def _convert_voc_split(devkit_dpath, classes, split, year, root):
             catname = obj.find('name').text.lower().strip()  # type: ignore
             w = x2 - x1
             h = y2 - y1
-            ann = {
+            ann: dict[str, Any] = {
                 'bbox': [x1, y1, w, h],
-                'category_name': catname,
                 'difficult': difficult,
                 'weight': 1.0 - difficult,
             }
-            cid = dset._alias_to_cat(ann.pop('category_name'))['id']
+            cid = dset._resolve_to_cid(catname)
             dset.add_annotation(image_id=gid, category_id=cid, **ann)
 
+    assert dset.tag is not None
     dset.dump(join(root, dset.tag + '.mscoco.json'), newlines=True)
     return dset
 

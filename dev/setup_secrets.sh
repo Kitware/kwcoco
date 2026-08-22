@@ -347,13 +347,40 @@ _secret_fingerprint(){
 }
 
 
+_gitlab_pick_remote(){
+    # Echo the name of the remote that points at a GitLab instance.
+    # A project may have multiple backends (e.g. `origin` -> github.com and
+    # `gitlab` -> gitlab.kitware.com), so we cannot assume `origin` is the
+    # GitLab remote. Preference order:
+    #   1. a remote literally named `gitlab`
+    #   2. any remote whose URL host contains `gitlab`
+    #   3. `origin` (legacy fallback for single-backend repos)
+    local name url
+    if git remote get-url gitlab >/dev/null 2>&1; then
+        printf '%s\n' gitlab
+        return 0
+    fi
+    while read -r name; do
+        [[ -z "$name" ]] && continue
+        url=$(git remote get-url "$name" 2>/dev/null) || continue
+        if [[ "$url" == *gitlab* ]]; then
+            printf '%s\n' "$name"
+            return 0
+        fi
+    done < <(git remote 2>/dev/null)
+    printf '%s\n' origin
+}
+
+
 _gitlab_remote_info(){
-    # Parse the `origin` remote URL and emit three lines: HOST PROJECT_PATH GROUP_PATH.
+    # Parse the GitLab remote URL and emit three lines: HOST PROJECT_PATH GROUP_PATH.
     # Supports SSH (user@host:ns/repo.git) and HTTPS (https://host/ns/repo.git)
-    # and arbitrarily nested namespaces.
-    local remote_url host path
-    remote_url=$(git remote get-url origin 2>/dev/null) || {
-        echo "ERROR: cannot read origin remote URL" >&2
+    # and arbitrarily nested namespaces. The GitLab remote is auto-detected
+    # (see _gitlab_pick_remote) rather than assumed to be `origin`.
+    local remote_name remote_url host path
+    remote_name=$(_gitlab_pick_remote)
+    remote_url=$(git remote get-url "$remote_name" 2>/dev/null) || {
+        echo "ERROR: cannot read '$remote_name' remote URL" >&2
         return 1
     }
     if [[ "$remote_url" =~ ^[^@/:]+@([^:]+):(.+)$ ]]; then
@@ -369,7 +396,7 @@ _gitlab_remote_info(){
         host="${BASH_REMATCH[2]}"
         path="${BASH_REMATCH[3]}"
     else
-        echo "ERROR: unrecognized origin URL: $remote_url" >&2
+        echo "ERROR: unrecognized GitLab remote URL: $remote_url" >&2
         return 1
     fi
     path="${path%.git}"

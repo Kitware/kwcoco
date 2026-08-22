@@ -44,7 +44,7 @@ stages:
   stage: build
   script:
   - python -m pip install pip uv -U
-  - python -m uv pip install setuptools>=0.8 wheel build twine
+  - python -m uv pip install setuptools>=77 wheel build twine
   - python -m build --sdist --outdir dist
   - python -m twine check ./dist/kwcoco*.tar.gz
   artifacts:
@@ -58,7 +58,7 @@ stages:
   - df -h
   script:
   - python -m pip install pip uv -U
-  - python -m uv pip install setuptools>=0.8 wheel build twine
+  - python -m uv pip install setuptools>=77 wheel build twine
   - python -m build --wheel --outdir dist
   - python -m twine check ./dist/kwcoco*.whl
   artifacts:
@@ -87,14 +87,16 @@ stages:
     python --version  # Print out python version for debugging
   script:
   - export INSTALL_EXTRAS="tests,headless"
+  - export USE_UV_LOCK="false"
+  - export LOCK_REQUIREMENTS=""
   - echo "Finding the path to the wheel"
   - ls dist || echo "dist does not exist"
   - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
   - 'echo "Installing helpers: setuptools"'
-  - python -m uv pip install setuptools>=0.8 setuptools_scm wheel build -U
+  - python -m uv pip install --resolution=highest setuptools>=77 setuptools_scm wheel build -U
   - 'echo "Installing helpers: tomli and pkginfo"'
-  - python -m uv pip install tomli pkginfo packaging
+  - python -m uv pip install --resolution=highest tomli pkginfo packaging
   - |-
     export WHEEL_FPATH=$(python -c "if 1:
         import pathlib
@@ -120,11 +122,32 @@ stages:
             fpath = sdists[-1]
         print(str(fpath).replace(chr(92), chr(47)))
     ")
-  - python -m pip install --prefer-binary -r requirements/gdal.txt
+  - python -m pip install --prefer-binary --find-links https://girder.github.io/large_image_wheels -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
-  - echo "UV_RESOLUTION=$UV_RESOLUTION"
-  - python -m pip install --prefer-binary "${WHEEL_FPATH}[${INSTALL_EXTRAS}]"
+  - echo "USE_UV_LOCK=$USE_UV_LOCK"
+  - echo "LOCK_REQUIREMENTS=$LOCK_REQUIREMENTS"
+  - if [[ -n "${INSTALL_EXTRAS:-}" ]]; then
+  - '    INSTALL_TARGET="${WHEEL_FPATH}[${INSTALL_EXTRAS}]"'
+  - else
+  - '    INSTALL_TARGET="${WHEEL_FPATH}"'
+  - fi
+  - echo "INSTALL_TARGET=$INSTALL_TARGET"
+  - LOCK_ARGS=()
+  - if [[ "${USE_UV_LOCK:-false}" == "true" ]]; then
+  - '    if [[ -z "${LOCK_REQUIREMENTS:-}" ]]; then'
+  - '        echo "USE_UV_LOCK=true but LOCK_REQUIREMENTS is empty"'
+  - '        exit 1'
+  - '    fi'
+  - '    if [[ ! -f "$LOCK_REQUIREMENTS" ]]; then'
+  - '        echo "Missing checked-in lock requirements: $LOCK_REQUIREMENTS"'
+  - '        exit 1'
+  - '    fi'
+  - '    echo "Using checked-in lock requirements: $LOCK_REQUIREMENTS"'
+  - '    cat "$LOCK_REQUIREMENTS"'
+  - '    LOCK_ARGS=(--constraint "$LOCK_REQUIREMENTS")'
+  - fi
+  - python -m uv pip install --prerelease=allow "${LOCK_ARGS[@]}" "${INSTALL_TARGET}"
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -164,14 +187,16 @@ stages:
     python --version  # Print out python version for debugging
   script:
   - export INSTALL_EXTRAS="tests,optional,headless"
+  - export USE_UV_LOCK="false"
+  - export LOCK_REQUIREMENTS=""
   - echo "Finding the path to the wheel"
   - ls dist || echo "dist does not exist"
   - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
   - 'echo "Installing helpers: setuptools"'
-  - python -m uv pip install setuptools>=0.8 setuptools_scm wheel build -U
+  - python -m uv pip install --resolution=highest setuptools>=77 setuptools_scm wheel build -U
   - 'echo "Installing helpers: tomli and pkginfo"'
-  - python -m uv pip install tomli pkginfo packaging
+  - python -m uv pip install --resolution=highest tomli pkginfo packaging
   - |-
     export WHEEL_FPATH=$(python -c "if 1:
         import pathlib
@@ -197,11 +222,32 @@ stages:
             fpath = sdists[-1]
         print(str(fpath).replace(chr(92), chr(47)))
     ")
-  - python -m pip install --prefer-binary -r requirements/gdal.txt
+  - python -m pip install --prefer-binary --find-links https://girder.github.io/large_image_wheels -r requirements/gdal.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
-  - echo "UV_RESOLUTION=$UV_RESOLUTION"
-  - python -m pip install --prefer-binary "${WHEEL_FPATH}[${INSTALL_EXTRAS}]"
+  - echo "USE_UV_LOCK=$USE_UV_LOCK"
+  - echo "LOCK_REQUIREMENTS=$LOCK_REQUIREMENTS"
+  - if [[ -n "${INSTALL_EXTRAS:-}" ]]; then
+  - '    INSTALL_TARGET="${WHEEL_FPATH}[${INSTALL_EXTRAS}]"'
+  - else
+  - '    INSTALL_TARGET="${WHEEL_FPATH}"'
+  - fi
+  - echo "INSTALL_TARGET=$INSTALL_TARGET"
+  - LOCK_ARGS=()
+  - if [[ "${USE_UV_LOCK:-false}" == "true" ]]; then
+  - '    if [[ -z "${LOCK_REQUIREMENTS:-}" ]]; then'
+  - '        echo "USE_UV_LOCK=true but LOCK_REQUIREMENTS is empty"'
+  - '        exit 1'
+  - '    fi'
+  - '    if [[ ! -f "$LOCK_REQUIREMENTS" ]]; then'
+  - '        echo "Missing checked-in lock requirements: $LOCK_REQUIREMENTS"'
+  - '        exit 1'
+  - '    fi'
+  - '    echo "Using checked-in lock requirements: $LOCK_REQUIREMENTS"'
+  - '    cat "$LOCK_REQUIREMENTS"'
+  - '    LOCK_ARGS=(--constraint "$LOCK_REQUIREMENTS")'
+  - fi
+  - python -m uv pip install --prerelease=allow "${LOCK_ARGS[@]}" "${INSTALL_TARGET}"
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -240,15 +286,17 @@ stages:
     python -m uv pip install pygments
     python --version  # Print out python version for debugging
   script:
-  - export INSTALL_EXTRAS="tests-strict,runtime-strict,headless-strict"
+  - export INSTALL_EXTRAS="tests,headless"
+  - export USE_UV_LOCK="true"
+  - export LOCK_REQUIREMENTS="requirements/locks/tests-headless.txt"
   - echo "Finding the path to the wheel"
   - ls dist || echo "dist does not exist"
   - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
   - 'echo "Installing helpers: setuptools"'
-  - python -m uv pip install setuptools>=0.8 setuptools_scm wheel build -U
+  - python -m uv pip install --resolution=highest setuptools>=77 setuptools_scm wheel build -U
   - 'echo "Installing helpers: tomli and pkginfo"'
-  - python -m uv pip install tomli pkginfo packaging
+  - python -m uv pip install --resolution=highest tomli pkginfo packaging
   - |-
     export WHEEL_FPATH=$(python -c "if 1:
         import pathlib
@@ -275,11 +323,32 @@ stages:
         print(str(fpath).replace(chr(92), chr(47)))
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt
+  - python -m pip install --prefer-binary --find-links https://girder.github.io/large_image_wheels -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
-  - echo "UV_RESOLUTION=$UV_RESOLUTION"
-  - python -m pip install --prefer-binary "${WHEEL_FPATH}[${INSTALL_EXTRAS}]"
+  - echo "USE_UV_LOCK=$USE_UV_LOCK"
+  - echo "LOCK_REQUIREMENTS=$LOCK_REQUIREMENTS"
+  - if [[ -n "${INSTALL_EXTRAS:-}" ]]; then
+  - '    INSTALL_TARGET="${WHEEL_FPATH}[${INSTALL_EXTRAS}]"'
+  - else
+  - '    INSTALL_TARGET="${WHEEL_FPATH}"'
+  - fi
+  - echo "INSTALL_TARGET=$INSTALL_TARGET"
+  - LOCK_ARGS=()
+  - if [[ "${USE_UV_LOCK:-false}" == "true" ]]; then
+  - '    if [[ -z "${LOCK_REQUIREMENTS:-}" ]]; then'
+  - '        echo "USE_UV_LOCK=true but LOCK_REQUIREMENTS is empty"'
+  - '        exit 1'
+  - '    fi'
+  - '    if [[ ! -f "$LOCK_REQUIREMENTS" ]]; then'
+  - '        echo "Missing checked-in lock requirements: $LOCK_REQUIREMENTS"'
+  - '        exit 1'
+  - '    fi'
+  - '    echo "Using checked-in lock requirements: $LOCK_REQUIREMENTS"'
+  - '    cat "$LOCK_REQUIREMENTS"'
+  - '    LOCK_ARGS=(--constraint "$LOCK_REQUIREMENTS")'
+  - fi
+  - python -m uv pip install --prerelease=allow "${LOCK_ARGS[@]}" "${INSTALL_TARGET}"
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -318,15 +387,17 @@ stages:
     python -m uv pip install pygments
     python --version  # Print out python version for debugging
   script:
-  - export INSTALL_EXTRAS="tests-strict,runtime-strict,optional-strict,headless-strict"
+  - export INSTALL_EXTRAS="tests,optional,headless"
+  - export USE_UV_LOCK="true"
+  - export LOCK_REQUIREMENTS="requirements/locks/tests-optional-headless.txt"
   - echo "Finding the path to the wheel"
   - ls dist || echo "dist does not exist"
   - 'echo "Installing helpers: update pip"'
   - python -m pip install pip uv -U
   - 'echo "Installing helpers: setuptools"'
-  - python -m uv pip install setuptools>=0.8 setuptools_scm wheel build -U
+  - python -m uv pip install --resolution=highest setuptools>=77 setuptools_scm wheel build -U
   - 'echo "Installing helpers: tomli and pkginfo"'
-  - python -m uv pip install tomli pkginfo packaging
+  - python -m uv pip install --resolution=highest tomli pkginfo packaging
   - |-
     export WHEEL_FPATH=$(python -c "if 1:
         import pathlib
@@ -353,11 +424,32 @@ stages:
         print(str(fpath).replace(chr(92), chr(47)))
     ")
   - sed 's/>=/==/' "requirements/gdal.txt" > "requirements/gdal-strict.txt"
-  - python -m pip install --prefer-binary -r requirements/gdal-strict.txt
+  - python -m pip install --prefer-binary --find-links https://girder.github.io/large_image_wheels -r requirements/gdal-strict.txt
   - echo "WHEEL_FPATH=$WHEEL_FPATH"
   - echo "INSTALL_EXTRAS=$INSTALL_EXTRAS"
-  - echo "UV_RESOLUTION=$UV_RESOLUTION"
-  - python -m pip install --prefer-binary "${WHEEL_FPATH}[${INSTALL_EXTRAS}]"
+  - echo "USE_UV_LOCK=$USE_UV_LOCK"
+  - echo "LOCK_REQUIREMENTS=$LOCK_REQUIREMENTS"
+  - if [[ -n "${INSTALL_EXTRAS:-}" ]]; then
+  - '    INSTALL_TARGET="${WHEEL_FPATH}[${INSTALL_EXTRAS}]"'
+  - else
+  - '    INSTALL_TARGET="${WHEEL_FPATH}"'
+  - fi
+  - echo "INSTALL_TARGET=$INSTALL_TARGET"
+  - LOCK_ARGS=()
+  - if [[ "${USE_UV_LOCK:-false}" == "true" ]]; then
+  - '    if [[ -z "${LOCK_REQUIREMENTS:-}" ]]; then'
+  - '        echo "USE_UV_LOCK=true but LOCK_REQUIREMENTS is empty"'
+  - '        exit 1'
+  - '    fi'
+  - '    if [[ ! -f "$LOCK_REQUIREMENTS" ]]; then'
+  - '        echo "Missing checked-in lock requirements: $LOCK_REQUIREMENTS"'
+  - '        exit 1'
+  - '    fi'
+  - '    echo "Using checked-in lock requirements: $LOCK_REQUIREMENTS"'
+  - '    cat "$LOCK_REQUIREMENTS"'
+  - '    LOCK_ARGS=(--constraint "$LOCK_REQUIREMENTS")'
+  - fi
+  - python -m uv pip install --prerelease=allow "${LOCK_ARGS[@]}" "${INSTALL_TARGET}"
   - echo "Install finished."
   - echo "Creating test sandbox directory"
   - export WORKSPACE_DNAME="sandbox"
@@ -383,153 +475,118 @@ stages:
   - echo "pytest command finished, moving the coverage file to the repo root"
 build/sdist:
   <<: *build_sdist_template
-  image: python:3.13
-test/sdist/minimal-loose/cp313-linux-x86_64:
+  image: python:3.14
+test/sdist/minimal-loose/cp314-linux-x86_64:
   <<: *test_minimal-loose_template
-  image: python:3.13
+  image: python:3.14
   needs:
   - build/sdist
-build/cp38-linux-x86_64:
+build/wheel:
   <<: *build_wheel_template
-  image: python:3.8
-test/minimal-loose/cp38-linux-x86_64:
-  <<: *test_minimal-loose_template
-  image: python:3.8
-  needs:
-  - build/cp38-linux-x86_64
-test/full-loose/cp38-linux-x86_64:
-  <<: *test_full-loose_template
-  image: python:3.8
-  needs:
-  - build/cp38-linux-x86_64
-test/minimal-strict/cp38-linux-x86_64:
-  <<: *test_minimal-strict_template
-  image: python:3.8
-  needs:
-  - build/cp38-linux-x86_64
-test/full-strict/cp38-linux-x86_64:
-  <<: *test_full-strict_template
-  image: python:3.8
-  needs:
-  - build/cp38-linux-x86_64
-build/cp39-linux-x86_64:
-  <<: *build_wheel_template
-  image: python:3.9
-test/minimal-loose/cp39-linux-x86_64:
-  <<: *test_minimal-loose_template
-  image: python:3.9
-  needs:
-  - build/cp39-linux-x86_64
-test/full-loose/cp39-linux-x86_64:
-  <<: *test_full-loose_template
-  image: python:3.9
-  needs:
-  - build/cp39-linux-x86_64
-test/minimal-strict/cp39-linux-x86_64:
-  <<: *test_minimal-strict_template
-  image: python:3.9
-  needs:
-  - build/cp39-linux-x86_64
-test/full-strict/cp39-linux-x86_64:
-  <<: *test_full-strict_template
-  image: python:3.9
-  needs:
-  - build/cp39-linux-x86_64
-build/cp310-linux-x86_64:
-  <<: *build_wheel_template
-  image: python:3.10
+  image: python:3.14
 test/minimal-loose/cp310-linux-x86_64:
   <<: *test_minimal-loose_template
   image: python:3.10
   needs:
-  - build/cp310-linux-x86_64
-test/full-loose/cp310-linux-x86_64:
-  <<: *test_full-loose_template
-  image: python:3.10
-  needs:
-  - build/cp310-linux-x86_64
-test/minimal-strict/cp310-linux-x86_64:
-  <<: *test_minimal-strict_template
-  image: python:3.10
-  needs:
-  - build/cp310-linux-x86_64
-test/full-strict/cp310-linux-x86_64:
-  <<: *test_full-strict_template
-  image: python:3.10
-  needs:
-  - build/cp310-linux-x86_64
-build/cp311-linux-x86_64:
-  <<: *build_wheel_template
-  image: python:3.11
+  - build/wheel
 test/minimal-loose/cp311-linux-x86_64:
   <<: *test_minimal-loose_template
   image: python:3.11
   needs:
-  - build/cp311-linux-x86_64
-test/full-loose/cp311-linux-x86_64:
-  <<: *test_full-loose_template
-  image: python:3.11
-  needs:
-  - build/cp311-linux-x86_64
-test/minimal-strict/cp311-linux-x86_64:
-  <<: *test_minimal-strict_template
-  image: python:3.11
-  needs:
-  - build/cp311-linux-x86_64
-test/full-strict/cp311-linux-x86_64:
-  <<: *test_full-strict_template
-  image: python:3.11
-  needs:
-  - build/cp311-linux-x86_64
-build/cp312-linux-x86_64:
-  <<: *build_wheel_template
-  image: python:3.12
+  - build/wheel
 test/minimal-loose/cp312-linux-x86_64:
   <<: *test_minimal-loose_template
   image: python:3.12
   needs:
-  - build/cp312-linux-x86_64
-test/full-loose/cp312-linux-x86_64:
-  <<: *test_full-loose_template
-  image: python:3.12
-  needs:
-  - build/cp312-linux-x86_64
-test/minimal-strict/cp312-linux-x86_64:
-  <<: *test_minimal-strict_template
-  image: python:3.12
-  needs:
-  - build/cp312-linux-x86_64
-test/full-strict/cp312-linux-x86_64:
-  <<: *test_full-strict_template
-  image: python:3.12
-  needs:
-  - build/cp312-linux-x86_64
-build/cp313-linux-x86_64:
-  <<: *build_wheel_template
-  image: python:3.13
+  - build/wheel
 test/minimal-loose/cp313-linux-x86_64:
   <<: *test_minimal-loose_template
   image: python:3.13
   needs:
-  - build/cp313-linux-x86_64
+  - build/wheel
+test/minimal-loose/cp314-linux-x86_64:
+  <<: *test_minimal-loose_template
+  image: python:3.14
+  needs:
+  - build/wheel
+test/full-loose/cp310-linux-x86_64:
+  <<: *test_full-loose_template
+  image: python:3.10
+  needs:
+  - build/wheel
+test/full-loose/cp311-linux-x86_64:
+  <<: *test_full-loose_template
+  image: python:3.11
+  needs:
+  - build/wheel
+test/full-loose/cp312-linux-x86_64:
+  <<: *test_full-loose_template
+  image: python:3.12
+  needs:
+  - build/wheel
 test/full-loose/cp313-linux-x86_64:
   <<: *test_full-loose_template
   image: python:3.13
   needs:
-  - build/cp313-linux-x86_64
+  - build/wheel
+test/full-loose/cp314-linux-x86_64:
+  <<: *test_full-loose_template
+  image: python:3.14
+  needs:
+  - build/wheel
+test/minimal-strict/cp310-linux-x86_64:
+  <<: *test_minimal-strict_template
+  image: python:3.10
+  needs:
+  - build/wheel
+test/minimal-strict/cp311-linux-x86_64:
+  <<: *test_minimal-strict_template
+  image: python:3.11
+  needs:
+  - build/wheel
+test/minimal-strict/cp312-linux-x86_64:
+  <<: *test_minimal-strict_template
+  image: python:3.12
+  needs:
+  - build/wheel
 test/minimal-strict/cp313-linux-x86_64:
   <<: *test_minimal-strict_template
   image: python:3.13
   needs:
-  - build/cp313-linux-x86_64
+  - build/wheel
+test/minimal-strict/cp314-linux-x86_64:
+  <<: *test_minimal-strict_template
+  image: python:3.14
+  needs:
+  - build/wheel
+test/full-strict/cp310-linux-x86_64:
+  <<: *test_full-strict_template
+  image: python:3.10
+  needs:
+  - build/wheel
+test/full-strict/cp311-linux-x86_64:
+  <<: *test_full-strict_template
+  image: python:3.11
+  needs:
+  - build/wheel
+test/full-strict/cp312-linux-x86_64:
+  <<: *test_full-strict_template
+  image: python:3.12
+  needs:
+  - build/wheel
 test/full-strict/cp313-linux-x86_64:
   <<: *test_full-strict_template
   image: python:3.13
   needs:
-  - build/cp313-linux-x86_64
+  - build/wheel
+test/full-strict/cp314-linux-x86_64:
+  <<: *test_full-strict_template
+  image: python:3.14
+  needs:
+  - build/wheel
 lint:
   <<: *common_template
-  image: python:3.13
+  image: python:3.14
   stage: lint
   before_script:
   - df -h
@@ -543,7 +600,7 @@ lint:
   allow_failure: true
 gpgsign/wheels:
   <<: *common_template
-  image: python:3.13
+  image: python:3.14
   stage: gpgsign
   artifacts:
     paths:
@@ -594,21 +651,11 @@ gpgsign/wheels:
   needs:
   - job: build/sdist
     artifacts: true
-  - job: build/cp38-linux-x86_64
-    artifacts: true
-  - job: build/cp39-linux-x86_64
-    artifacts: true
-  - job: build/cp310-linux-x86_64
-    artifacts: true
-  - job: build/cp311-linux-x86_64
-    artifacts: true
-  - job: build/cp312-linux-x86_64
-    artifacts: true
-  - job: build/cp313-linux-x86_64
+  - job: build/wheel
     artifacts: true
 deploy/wheels:
   <<: *common_template
-  image: python:3.13
+  image: python:3.14
   stage: deploy
   only:
     refs:
@@ -632,29 +679,30 @@ deploy/wheels:
     done
   - |-
     set -e
-    # Have the server git-tag the release and push the tags
-    export PROJECT_VERSION=$(python -c "import setup; print(setup.VERSION)")
-    # do sed twice to handle the case of https clone with and without a read token
-    URL_HOST=$(git remote get-url origin | sed -e 's|https\?://.*@||g' | sed -e 's|https\?://||g' | sed -e 's|git@||g' | sed -e 's|:|/|g')
-    source dev/secrets_configuration.sh
-    PUSH_TOKEN=${!VARNAME_PUSH_TOKEN}
-    echo "URL_HOST = $URL_HOST"
-    # A git config user name and email is required. Set if needed.
-    if [[ "$(git config user.email)" == "" ]]; then
-        git config user.email "ci@gitlab.org.com"
-        git config user.name "Gitlab-CI"
-    fi
-    TAG_NAME="v${PROJECT_VERSION}"
-    echo "TAG_NAME = $TAG_NAME"
-    if [ $(git tag -l "$TAG_NAME") ]; then
-        echo "Tag already exists"
-    else
-        # if we messed up we can delete the tag
-        # git push origin :refs/tags/$TAG_NAME
-        # and then tag with -f
-        git tag $TAG_NAME -m "tarball tag $PROJECT_VERSION"
-        git push --tags "https://git-push-token:${PUSH_TOKEN}@${URL_HOST}"
-    fi
+    export PROJECT_VERSION=$(python -c 'import ast, pathlib; tree = ast.parse(pathlib.Path('"'"'kwcoco/__init__.py'"'"').read_text()); print(next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "__version__" for t in n.targets)))')
+
+                    # Have the server git-tag the release and push the tags
+                    # do sed twice to handle the case of https clone with and without a read token
+                    URL_HOST=$(git remote get-url origin | sed -e 's|https\?://.*@||g' | sed -e 's|https\?://||g' | sed -e 's|git@||g' | sed -e 's|:|/|g')
+                    source dev/secrets_configuration.sh
+                    PUSH_TOKEN=${!VARNAME_PUSH_TOKEN}
+                    echo "URL_HOST = $URL_HOST"
+                    # A git config user name and email is required. Set if needed.
+                    if [[ "$(git config user.email)" == "" ]]; then
+                        git config user.email "ci@gitlab.org.com"
+                        git config user.name "Gitlab-CI"
+                    fi
+                    TAG_NAME="v${PROJECT_VERSION}"
+                    echo "TAG_NAME = $TAG_NAME"
+                    if [ $(git tag -l "$TAG_NAME") ]; then
+                        echo "Tag already exists"
+                    else
+                        # if we messed up we can delete the tag
+                        # git push origin :refs/tags/$TAG_NAME
+                        # and then tag with -f
+                        git tag $TAG_NAME -m "tarball tag $PROJECT_VERSION"
+                        git push --tags "https://git-push-token:${PUSH_TOKEN}@${URL_HOST}"
+                    fi
   - |-
     set -e
     # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
@@ -662,7 +710,7 @@ deploy/wheels:
     echo "CI_PROJECT_NAME=$CI_PROJECT_NAME"
     echo "CI_API_V4_URL=$CI_API_V4_URL"
 
-    export PROJECT_VERSION=$(python -c "import setup; print(setup.VERSION)")
+    export PROJECT_VERSION=$(python -c 'import ast, pathlib; tree = ast.parse(pathlib.Path('"'"'kwcoco/__init__.py'"'"').read_text()); print(next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "__version__" for t in n.targets)))')
     echo "PROJECT_VERSION=$PROJECT_VERSION"
 
     # If running on CI use CI authentication, otherwise
@@ -689,44 +737,45 @@ deploy/wheels:
         PACKAGE_ARTIFACT_ARRAY+=("$PACKAGE_URL")
     done
   - |-
-    export PROJECT_VERSION=$(python -c "import setup; print(setup.VERSION)")
-    echo "PROJECT_VERSION=$PROJECT_VERSION"
-    TAG_NAME="v$PROJECT_VERSION"
+    export PROJECT_VERSION=$(python -c 'import ast, pathlib; tree = ast.parse(pathlib.Path('"'"'kwcoco/__init__.py'"'"').read_text()); print(next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "__version__" for t in n.targets)))')
 
-    # Construct the JSON for assets to attach to the release
-    RELEASE_ASSET_JSON_LINKS=()
-    for ASSET_URL in "${PACKAGE_ARTIFACT_ARRAY[@]}"; do
-        ASSET_FNAME=$(basename $ASSET_URL)
-        RELEASE_ASSET_JSON_LINKS+=("{\"name\": \"$ASSET_FNAME\", \"url\": \"$ASSET_URL\"},")
-    done
-    _ASSET_LINK_JSON="${RELEASE_ASSET_JSON_LINKS[@]}"
-    # remove the trailing comma
-    ASSET_LINK_JSON=${_ASSET_LINK_JSON::-1}
-    echo "ASSET_LINK_JSON=$ASSET_LINK_JSON"
+                        echo "PROJECT_VERSION=$PROJECT_VERSION"
+                        TAG_NAME="v$PROJECT_VERSION"
 
-    # Build json describing the release
-    RELEASE_DATA_JSON="{
-        \"name\": \"Version $PROJECT_VERSION\",
-        \"description\": \"Automated release of $CI_PROJECT_NAME version $PROJECT_VERSION\",
-        \"tag_name\": \"$TAG_NAME\",
-        \"assets\": {\"links\": [$ASSET_LINK_JSON]}
-    }"
-    echo "$RELEASE_DATA_JSON"
+                        # Construct the JSON for assets to attach to the release
+                        RELEASE_ASSET_JSON_LINKS=()
+                        for ASSET_URL in "${PACKAGE_ARTIFACT_ARRAY[@]}"; do
+                            ASSET_FNAME=$(basename $ASSET_URL)
+                            RELEASE_ASSET_JSON_LINKS+=("{\"name\": \"$ASSET_FNAME\", \"url\": \"$ASSET_URL\"},")
+                        done
+                        _ASSET_LINK_JSON="${RELEASE_ASSET_JSON_LINKS[@]}"
+                        # remove the trailing comma
+                        ASSET_LINK_JSON=${_ASSET_LINK_JSON::-1}
+                        echo "ASSET_LINK_JSON=$ASSET_LINK_JSON"
 
-    # If running on CI use CI authentication, otherwise
-    # assume we developer authentication available.
-    if [[ -z "${CI_JOB_TOKEN}" ]]; then
-        AUTH_HEADER="PRIVATE-TOKEN: $PRIVATE_GITLAB_TOKEN"
-    else
-        AUTH_HEADER="JOB-TOKEN: $CI_JOB_TOKEN"
-    fi
+                        # Build json describing the release
+                        RELEASE_DATA_JSON="{
+                            \"name\": \"Version $PROJECT_VERSION\",
+                            \"description\": \"Automated release of $CI_PROJECT_NAME version $PROJECT_VERSION\",
+                            \"tag_name\": \"$TAG_NAME\",
+                            \"assets\": {\"links\": [$ASSET_LINK_JSON]}
+                        }"
+                        echo "$RELEASE_DATA_JSON"
 
-    curl \
-        --header 'Content-Type: application/json' \
-        --header "$AUTH_HEADER" \
-        --data "$RELEASE_DATA_JSON" \
-        --request POST \
-        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
+                        # If running on CI use CI authentication, otherwise
+                        # assume we developer authentication available.
+                        if [[ -z "${CI_JOB_TOKEN}" ]]; then
+                            AUTH_HEADER="PRIVATE-TOKEN: $PRIVATE_GITLAB_TOKEN"
+                        else
+                            AUTH_HEADER="JOB-TOKEN: $CI_JOB_TOKEN"
+                        fi
+
+                        curl \
+                            --header 'Content-Type: application/json' \
+                            --header "$AUTH_HEADER" \
+                            --data "$RELEASE_DATA_JSON" \
+                            --request POST \
+                            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
 
 
 # end

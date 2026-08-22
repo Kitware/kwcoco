@@ -142,7 +142,7 @@ def grab_domain_net():
                             image_id=gid, category_id=cid, bbox=[0, 0, w, h]
                         )
                         # Mark the domain in an non-standard field
-                        coco_dset.index.imgs['domain'] = domain
+                        coco_dset.index.imgs[gid]['domain'] = domain
 
                 coco_dset.validate()
                 coco_dset.dump(coco_dset.fpath, newlines=True)

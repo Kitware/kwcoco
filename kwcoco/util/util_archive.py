@@ -9,7 +9,7 @@ import os
 import tarfile
 import zipfile
 from os.path import relpath
-from typing import cast, Dict, Tuple, Literal, Iterator
+from typing import Any, cast, Dict, Tuple, Literal, Iterator, overload
 from types import ModuleType
 
 class Archive:
@@ -73,9 +73,9 @@ class Archive:
 
     def __init__(
         self, 
-        fpath: str | None = None, 
+        fpath: str | os.PathLike[str] | None = None,
         mode: Literal['r', 'w'] = 'r', 
-        backend: str | ModuleType | None = None, 
+        backend: str | ModuleType | None = None,
         file: tarfile.TarFile | zipfile.ZipFile| None = None
     ) -> None:
         """
@@ -110,7 +110,7 @@ class Archive:
     @classmethod
     def _open(
         cls, 
-        fpath: str, 
+        fpath: str | os.PathLike[str],
         mode: Literal['r', 'w'] = 'r',
         backend: str | ModuleType | None = None,
     ) -> Tuple[tarfile.TarFile | zipfile.ZipFile , ModuleType]:
@@ -159,7 +159,13 @@ class Archive:
             # does zip have an iterable structure?
             return iter(cast(zipfile.ZipFile, self.file).namelist())
 
-    def read(self, name, mode='rb'):
+    @overload
+    def read(self, name: str, mode: Literal['rb'] = 'rb') -> bytes: ...
+
+    @overload
+    def read(self, name: str, mode: Literal['r']) -> str: ...
+
+    def read(self, name: str, mode: Literal['r', 'rb'] = 'rb') -> str | bytes:
         """
         Read data directly out of the archive.
 
@@ -207,12 +213,14 @@ class Archive:
             raise KeyError(mode)
 
     @classmethod
-    def coerce(cls, data):
+    def coerce(
+        cls, data: str | os.PathLike[str] | zipfile.ZipFile
+    ) -> Archive:
         """
         Either open an archive file path or coerce an existing
         ZipFile or tarfile structure into this wrapper class
         """
-        if isinstance(data, str):
+        if isinstance(data, (str, os.PathLike)):
             return cls(data)
         if isinstance(data, zipfile.ZipFile):
             assert data.fp is not None, 'ZipFile has no associated file object'
@@ -221,7 +229,11 @@ class Archive:
         else:
             raise NotImplementedError
 
-    def add(self, fpath, arcname=None):
+    def add(
+        self,
+        fpath: str | os.PathLike[str],
+        arcname: str | os.PathLike[str] | None = None,
+    ) -> None:
         if arcname is None:
             assert self.fpath is not None, 'fpath must be set to compute arcname'
             arcname = relpath(fpath, dirname(self.fpath))
@@ -230,17 +242,22 @@ class Archive:
         if self.backend is zipfile:
             self.file.write(fpath, arcname)  # type: ignore
 
-    def close(self):
+    def close(self) -> None:
         return self.file.close()
 
-    def __enter__(self):
+    def __enter__(self) -> Archive:
         self.file.__enter__()
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: Any) -> None:
         self.file.__exit__(*args)
 
-    def extractall(self, output_dpath='.', verbose=1, overwrite=True):
+    def extractall(
+        self,
+        output_dpath: str | os.PathLike[str] = '.',
+        verbose: int = 1,
+        overwrite: bool = True,
+    ) -> list[str]:
         if verbose:
             print('Enumerate members')
         archive_namelist = list(ub.ProgIter(iter(self), desc='enumerate members'))
@@ -265,7 +282,12 @@ class Archive:
     #         raise NotImplementedError
 
 
-def unarchive_file(archive_fpath, output_dpath='.', verbose=1, overwrite=True):
+def unarchive_file(
+    archive_fpath: str | os.PathLike[str],
+    output_dpath: str | os.PathLike[str] = '.',
+    verbose: int = 1,
+    overwrite: bool = True,
+) -> list[str]:
     import tarfile
     import zipfile
 
@@ -305,7 +327,7 @@ def unarchive_file(archive_fpath, output_dpath='.', verbose=1, overwrite=True):
 
 
 @ub.memoize
-def _available_zipfile_compressions():
+def _available_zipfile_compressions() -> set[str]:
     available = set(['ZIP_STORED'])
     try:
         import zlib  # NOQA
@@ -328,18 +350,20 @@ def _available_zipfile_compressions():
     return available
 
 
-def _coerce_zipfile_compression(compression):
-    if isinstance(compression, str):
-        if compression == 'auto':
-            priority = ['ZIP_LZMA', 'ZIP_DEFLATED', 'ZIP_BZIP2', 'ZIP_STORED']
-            available = _available_zipfile_compressions()
-            found = None
-            for cand in priority:
-                if cand in available:
-                    found = cand
-                    break
-            compression = found
-        if compression is None:
+def _coerce_zipfile_compression(compression: str | int) -> int:
+    if isinstance(compression, int):
+        return compression
+
+    compression_name = compression
+    if compression_name == 'auto':
+        priority = ['ZIP_LZMA', 'ZIP_DEFLATED', 'ZIP_BZIP2', 'ZIP_STORED']
+        available = _available_zipfile_compressions()
+        found = None
+        for cand in priority:
+            if cand in available:
+                found = cand
+                break
+        if found is None:
             raise ValueError('No supported zipfile compression found')
-        compression = getattr(zipfile, compression)
-    return compression
+        compression_name = found
+    return getattr(zipfile, compression_name)

@@ -5,7 +5,9 @@ https://pypi.org/project/python-slugify/1.2.2/
 """
 from __future__ import annotations
 
-def _trunc_op(string, max_length, trunc_loc, trunc_char='~'):
+def _trunc_op(
+    string: str, max_length: int, trunc_loc: float, trunc_char: str = '~'
+) -> str:
     """
     Example:
         >>> from kwcoco.util.util_truncate import _trunc_op
@@ -59,7 +61,13 @@ def _trunc_op(string, max_length, trunc_loc, trunc_char='~'):
     return trunc_text
 
 
-def smart_truncate(string, max_length=0, separator=' ', trunc_loc=0.5, trunc_char='~'):
+def smart_truncate(
+    string: str,
+    max_length: int = 0,
+    separator: str = ' ',
+    trunc_loc: float = 0.5,
+    trunc_char: str = '~',
+) -> str:
     """
     Truncate a string.
     :param string (str): string for modification

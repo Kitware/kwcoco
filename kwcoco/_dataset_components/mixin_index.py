@@ -81,24 +81,29 @@ class CocoIndex:
             mapping between a image file_name and the image dictionary.
     """
 
-    anns: dict[Any, dict[str, Any]] | None
-    imgs: dict[Any, dict[str, Any]] | None
-    videos: dict[Any, dict[str, Any]] | None
-    cats: dict[Any, dict[str, Any]] | None
-    tracks: dict[Any, dict[str, Any]] | None
-    kpcats: dict[Any, dict[str, Any]] | None
-    _id_lookup: dict[str, dict[Any, dict[str, Any]]] | None
+    # These annotations describe the normal built state exposed by
+    # CocoDataset.index. ``clear()`` and ``autobuild=False`` intentionally
+    # create a temporary unbuilt state where these runtime values are None.
+    # Python's type system cannot express that state transition without making
+    # every normal index lookup optional.
+    anns: dict[Any, dict[str, Any]]
+    imgs: dict[Any, dict[str, Any]]
+    videos: dict[Any, dict[str, Any]]
+    cats: dict[Any, dict[str, Any]]
+    tracks: dict[Any, dict[str, Any]]
+    kpcats: dict[Any, dict[str, Any]]
+    _id_lookup: dict[str, dict[Any, dict[str, Any]]]
 
-    gid_to_aids: dict[Any, MutableSet[Any]] | None
-    cid_to_aids: dict[Any, MutableSet[Any]] | None
-    vidid_to_gids: dict[Any, MutableSet[Any]] | None
-    trackid_to_aids: dict[Any, MutableSet[Any]] | None
+    gid_to_aids: dict[Any, MutableSet[Any]]
+    cid_to_aids: dict[Any, MutableSet[Any]]
+    vidid_to_gids: dict[Any, MutableSet[Any]]
+    trackid_to_aids: dict[Any, MutableSet[Any]]
 
-    name_to_video: dict[str, dict[str, Any]] | None
-    name_to_cat: dict[str, dict[str, Any]] | None
-    name_to_img: dict[str, dict[str, Any]] | None
-    name_to_track: dict[str, dict[str, Any]] | None
-    file_name_to_img: dict[str, dict[str, Any]] | None
+    name_to_video: dict[str, dict[str, Any]]
+    name_to_cat: dict[str, dict[str, Any]]
+    name_to_img: dict[str, dict[str, Any]]
+    name_to_track: dict[str, dict[str, Any]]
+    file_name_to_img: dict[str, dict[str, Any]]
 
     # _set = ub.oset  # many operations are much slower for oset
     _set: Callable[..., MutableSet[Any]] = set
@@ -130,24 +135,28 @@ class CocoIndex:
         )
 
     def __init__(index) -> None:
-        index.anns = None
-        index.imgs = None
-        index.videos = None
-        index.cats = None
-        index.tracks = None
-        index.kpcats = None
-        index._id_lookup = None
+        # Runtime sentinel for the explicit unbuilt state.  Keep it typed as
+        # Any so the public attribute types can describe the overwhelmingly
+        # common built state without changing runtime behavior.
+        unbuilt: Any = None
+        index.anns = unbuilt
+        index.imgs = unbuilt
+        index.videos = unbuilt
+        index.cats = unbuilt
+        index.tracks = unbuilt
+        index.kpcats = unbuilt
+        index._id_lookup = unbuilt
 
-        index.gid_to_aids = None
-        index.cid_to_aids = None
-        index.vidid_to_gids = None
-        index.trackid_to_aids = None
+        index.gid_to_aids = unbuilt
+        index.cid_to_aids = unbuilt
+        index.vidid_to_gids = unbuilt
+        index.trackid_to_aids = unbuilt
 
-        index.name_to_video = None
-        index.name_to_cat = None
-        index.name_to_img = None
-        index.name_to_track = None
-        index.file_name_to_img = None
+        index.name_to_video = unbuilt
+        index.name_to_cat = unbuilt
+        index.name_to_img = unbuilt
+        index.name_to_track = unbuilt
+        index.file_name_to_img = unbuilt
         index._CHECKS = True
         # index.kpcid_to_aids = None  # TODO
 
@@ -582,21 +591,22 @@ class CocoIndex:
                 print('Updated video index')
 
     def clear(index) -> None:
-        index.anns = None
-        index.imgs = None
-        index.videos = None
-        index.cats = None
-        index.tracks = None
-        index.kpcats = None
-        index._id_lookup = None
-        index.gid_to_aids = None
-        index.vidid_to_gids = None
-        index.cid_to_aids = None
-        index.name_to_cat = None
-        index.file_name_to_img = None
-        index.name_to_video = None
-        index.trackid_to_aids = None
-        index.name_to_track = None
+        unbuilt: Any = None
+        index.anns = unbuilt
+        index.imgs = unbuilt
+        index.videos = unbuilt
+        index.cats = unbuilt
+        index.tracks = unbuilt
+        index.kpcats = unbuilt
+        index._id_lookup = unbuilt
+        index.gid_to_aids = unbuilt
+        index.vidid_to_gids = unbuilt
+        index.cid_to_aids = unbuilt
+        index.name_to_cat = unbuilt
+        index.file_name_to_img = unbuilt
+        index.name_to_video = unbuilt
+        index.trackid_to_aids = unbuilt
+        index.name_to_track = unbuilt
         # index.kpcid_to_aids = None  # TODO?
 
     def build(index, parent: _CocoIndexParent) -> None:
@@ -859,11 +869,11 @@ class MixinCocoIndex:
     #     return self.index.videos
 
     @property
-    def gid_to_aids(self) -> dict[int, list[int]]:
+    def gid_to_aids(self) -> dict[int, MutableSet[int]]:
         return self.index.gid_to_aids  # type: ignore
 
     @property
-    def cid_to_aids(self) -> dict[int, list[int]]:
+    def cid_to_aids(self) -> dict[int, MutableSet[int]]:
         return self.index.cid_to_aids  # type: ignore
 
     @property

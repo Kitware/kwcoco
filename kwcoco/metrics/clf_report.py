@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
+
 import warnings
 import numpy as np
 import ubelt as ub
@@ -14,15 +17,15 @@ ASCII_ONLY = os.environ.get('ASCII_ONLY', '')
 
 
 def classification_report(
-    y_true,
-    y_pred,
-    target_names=None,
-    sample_weight=None,
-    verbose=False,
-    remove_unsupported=False,
-    log=None,
-    ascii_only=False,
-):
+    y_true: Sequence[Any] | np.ndarray,
+    y_pred: Sequence[Any] | np.ndarray,
+    target_names: Sequence[Any] | np.ndarray | None = None,
+    sample_weight: Sequence[float] | np.ndarray | None = None,
+    verbose: bool | int = False,
+    remove_unsupported: bool = False,
+    log: Callable[[str], Any] | None = None,
+    ascii_only: bool = False,
+) -> dict[str, Any]:
     r"""
     Computes a classification report which is a collection of various metrics
     commonly used to evaluate classification quality. This can handle binary
@@ -435,15 +438,15 @@ def classification_report(
 
 
 def ovr_classification_report(
-    mc_y_true,
-    mc_probs,
-    target_names=None,
-    sample_weight=None,
-    metrics=None,
-    verbose=0,
-    remove_unsupported=False,
-    log=None,
-):
+    mc_y_true: Sequence[int] | np.ndarray,
+    mc_probs: np.ndarray,
+    target_names: Mapping[int, str] | Sequence[str] | None = None,
+    sample_weight: np.ndarray | None = None,
+    metrics: Sequence[str] | None = None,
+    verbose: bool | int = 0,
+    remove_unsupported: bool = False,
+    log: Callable[[str], Any] | None = None,
+) -> dict[str, Any]:
     """
     One-vs-rest classification report
 

@@ -3,10 +3,20 @@ Helpers for the Pascal VOC format. (used by ImageNet)
 """
 from __future__ import annotations
 
-def read_voc_image(xml_fpath, data_dpath='.'):
+import os
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import kwcoco
+
+
+def read_voc_image(
+    xml_fpath: str | os.PathLike[str],
+    data_dpath: str | os.PathLike[str] = '.',
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     # print(xml_fpath.read_text())
     import ubelt as ub
-    import os
     import xml.etree.ElementTree as ET
 
     tree = ET.parse(xml_fpath)
@@ -95,7 +105,12 @@ def read_voc_image(xml_fpath, data_dpath='.'):
     return img, anns
 
 
-def add_vocdata_to_coco(image_xml_fpaths, data_dpath, workers=0, dset=None):
+def add_vocdata_to_coco(
+    image_xml_fpaths: Iterable[str | os.PathLike[str]],
+    data_dpath: str | os.PathLike[str],
+    workers: int = 0,
+    dset: kwcoco.CocoDataset | None = None,
+) -> kwcoco.CocoDataset:
     """
     Args,:
         dset (CocoDataset | None):

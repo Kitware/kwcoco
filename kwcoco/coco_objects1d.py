@@ -19,8 +19,27 @@ from __future__ import annotations
 
 import collections.abc
 from os.path import join
+from typing import (
+    Any,
+    Callable,
+    cast,
+    Iterator,
+    Literal,
+    Sequence,
+    TYPE_CHECKING,
+    TypeVar,
+    overload,
+)
 import numpy as np
 import ubelt as ub
+
+if TYPE_CHECKING:
+    import kwimage
+    from kwcoco.coco_image import CocoImage
+
+
+ObjectListT = TypeVar('ObjectListT', bound='ObjectList1D')
+ObjectGroupsT = TypeVar('ObjectGroupsT', bound='ObjectGroups')
 
 
 __docstubs__ = """
@@ -54,7 +73,7 @@ class ObjectList1D(ub.NiceRepr):
         >>> self.lookup(['id'])
     """
 
-    def __init__(self, ids, dset, key):  # type: ignore
+    def __init__(self, ids: Sequence[Any], dset: Any, key: str) -> None:
         """
         Args:
             ids (List[int]): list of ids
@@ -68,21 +87,27 @@ class ObjectList1D(ub.NiceRepr):
     def __nice__(self) -> str:
         return 'num={!r}'.format(len(self))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return iter(self._ids)
 
     def __len__(self) -> int:
         return len(self._ids)
 
     @property
-    def _id_to_obj(self):
+    def _id_to_obj(self) -> Any:
         """
         Maps the table id to a dictionary (or dict-like) containing the row
         data for that id.
         """
         return self._dset.index._id_lookup[self._key]
 
-    def __getitem__(self, index):
+    @overload
+    def __getitem__(self: ObjectListT, index: slice) -> ObjectListT: ...
+
+    @overload
+    def __getitem__(self, index: int) -> Any: ...
+
+    def __getitem__(self: ObjectListT, index: int | slice) -> Any | ObjectListT:
         """
         Args:
             index (int | slice): positional index or slice
@@ -116,7 +141,7 @@ class ObjectList1D(ub.NiceRepr):
     #         """
     #         return self
 
-    def unique(self):
+    def unique(self: ObjectListT) -> ObjectListT:
         """
         Removes any duplicates entries in this object
 
@@ -128,7 +153,7 @@ class ObjectList1D(ub.NiceRepr):
         return newself
 
     @property
-    def ids(self):
+    def ids(self) -> Sequence[Any]:
         """
         The row ids corresponding to this object
 
@@ -137,7 +162,7 @@ class ObjectList1D(ub.NiceRepr):
         """
         return self._ids
 
-    def objs_iter(self):
+    def objs_iter(self) -> Iterator[dict[str, Any]]:
         """
         Iterate over the underlying object dictionary for each object.
 
@@ -164,7 +189,7 @@ class ObjectList1D(ub.NiceRepr):
         return ub.take(self._id_to_obj, self._ids)
 
     @property
-    def objs(self):
+    def objs(self) -> ObjView:
         """
         Get the underlying object dictionary for each object.
 
@@ -180,7 +205,7 @@ class ObjectList1D(ub.NiceRepr):
         """
         return ObjView(self._id_to_obj, self._ids)
 
-    def take(self, idxs):
+    def take(self: ObjectListT, idxs: collections.abc.Iterable[int]) -> ObjectListT:
         """
         Take a subset by index
 
@@ -196,7 +221,9 @@ class ObjectList1D(ub.NiceRepr):
         newself = self.__class__(subids, self._dset)  # type: ignore
         return newself
 
-    def compress(self, flags):
+    def compress(
+        self: ObjectListT, flags: collections.abc.Iterable[bool]
+    ) -> ObjectListT:
         """
         Take a subset by flags
 
@@ -212,7 +239,7 @@ class ObjectList1D(ub.NiceRepr):
         newself = self.__class__(subids, self._dset)  # type: ignore
         return newself
 
-    def peek(self):
+    def peek(self) -> dict[str, Any]:
         """
         Return the first object dictionary
 
@@ -234,7 +261,28 @@ class ObjectList1D(ub.NiceRepr):
         obj = self._id_to_obj[id_]
         return obj
 
-    def lookup(self, key, default=ub.NoParam, keepid=False):
+    @overload
+    def lookup(
+        self,
+        key: str,
+        default: Any = ub.NoParam,
+        keepid: Literal[False] = False,
+    ) -> list[Any]: ...
+
+    @overload
+    def lookup(
+        self,
+        key: str | collections.abc.Iterable[str],
+        default: Any = ub.NoParam,
+        keepid: bool = False,
+    ) -> list[Any] | dict[Any, Any]: ...
+
+    def lookup(
+        self,
+        key: str | collections.abc.Iterable[str],
+        default: Any = ub.NoParam,
+        keepid: bool = False,
+    ) -> list[Any] | dict[Any, Any]:
         """
         Lookup a list of object attributes
 
@@ -269,9 +317,14 @@ class ObjectList1D(ub.NiceRepr):
         if ub.iterable(key):
             return {k: self.lookup(k, default, keepid) for k in key}
         else:
-            return self.get(key, default=default, keepid=keepid)
+            return self.get(cast(str, key), default=default, keepid=keepid)
 
-    def sort_values(self, by, reverse=False, key=None):
+    def sort_values(
+        self: ObjectListT,
+        by: str,
+        reverse: bool = False,
+        key: Callable[[Any], Any] | None = None,
+    ) -> ObjectListT:
         """
         Reorders the items by an attribute.
 
@@ -298,7 +351,19 @@ class ObjectList1D(ub.NiceRepr):
         new = self.take(sortx)
         return new
 
-    def get(self, key, default=ub.NoParam, keepid=False):
+    @overload
+    def get(
+        self, key: str, default: Any = ub.NoParam, keepid: Literal[False] = False
+    ) -> list[Any]: ...
+
+    @overload
+    def get(
+        self, key: str, default: Any = ub.NoParam, keepid: bool = False
+    ) -> list[Any] | dict[Any, Any]: ...
+
+    def get(
+        self, key: str, default: Any = ub.NoParam, keepid: bool = False
+    ) -> list[Any] | dict[Any, Any]:
         """
         Lookup a list of object attributes
 
@@ -375,7 +440,7 @@ class ObjectList1D(ub.NiceRepr):
                 attr_list = [_lut[_id].get(key, default) for _id in self._ids]
         return attr_list
 
-    def get_iter(self, key, default=ub.NoParam):
+    def get_iter(self, key: str, default: Any = ub.NoParam) -> Iterator[Any]:
         """
         Iterator version of get, not in stable API yet.
 
@@ -402,7 +467,7 @@ class ObjectList1D(ub.NiceRepr):
 
     _iter_get = get_iter  # backwards compat
 
-    def set(self, key, values):
+    def set(self, key: str, values: Any) -> None:
         """
         Assign a value to each annotation
 
@@ -428,13 +493,13 @@ class ObjectList1D(ub.NiceRepr):
         assert len(self) == len(values)
         self._set(key, values)
 
-    def _set(self, key, values):
+    def _set(self, key: str, values: collections.abc.Iterable[Any]) -> None:
         """faster less safe version of set"""
         objs = ub.take(self._id_to_obj, self._ids)
         for obj, value in zip(objs, values):
             obj[key] = value
 
-    def _lookup(self, key, default=ub.NoParam):
+    def _lookup(self, key: str, default: Any = ub.NoParam) -> list[Any] | dict[Any, Any]:
         """
         Example:
             >>> # xdoctest: +REQUIRES(--benchmark)
@@ -481,7 +546,7 @@ class ObjectList1D(ub.NiceRepr):
         """
         return self.lookup(key, default=default)
 
-    def attribute_frequency(self):
+    def attribute_frequency(self) -> dict[str, int]:
         """
         Compute the number of times each key is used in a dictionary
 
@@ -507,7 +572,7 @@ class ObjectGroups(ub.NiceRepr):
     An object for holding a groups of :class:`ObjectList1D` objects
     """
 
-    def __init__(self, groups, dset):
+    def __init__(self, groups: Sequence[ObjectList1D], dset: Any) -> None:
         """
         Args:
             groups (List[ObjectList1D]): list of object lists
@@ -527,7 +592,15 @@ class ObjectGroups(ub.NiceRepr):
             'ObjectGroups._lookup is not implemented; use ObjectGroups.lookup instead'
         )
 
-    def __getitem__(self, index):
+    @overload
+    def __getitem__(self: ObjectGroupsT, index: slice) -> ObjectGroupsT: ...
+
+    @overload
+    def __getitem__(self, index: int) -> ObjectList1D: ...
+
+    def __getitem__(
+        self: ObjectGroupsT, index: int | slice
+    ) -> ObjectList1D | ObjectGroupsT:
         if isinstance(index, slice):
             subgroups = self._groups[index]
             newself = self.__class__(subgroups, self._dset)
@@ -535,10 +608,10 @@ class ObjectGroups(ub.NiceRepr):
         else:
             return self._groups[index]
 
-    def lookup(self, key, default=ub.NoParam):
+    def lookup(self, key: str, default: Any = ub.NoParam) -> list[list[Any]]:
         return [group.lookup(key, default) for group in self._groups]
 
-    def flatten(self):
+    def flatten(self) -> ObjectList1D:
         """
         Flattens the group into a single object list.
 
@@ -581,7 +654,7 @@ class Categories(ObjectList1D):
         >>> print('self.supercategory = {!r}'.format(self.supercategory))
     """
 
-    def __init__(self, ids, dset):
+    def __init__(self, ids: Sequence[int], dset: Any) -> None:
         """
         Args:
             ids (List[int]): list of category ids
@@ -590,15 +663,15 @@ class Categories(ObjectList1D):
         super().__init__(ids, dset, 'categories')
 
     @property
-    def cids(self):
+    def cids(self) -> list[int]:
         return self.lookup('id')
 
     @property
-    def name(self):
+    def name(self) -> list[str]:
         return self.lookup('name')
 
     @property
-    def supercategory(self):
+    def supercategory(self) -> list[str | None]:
         return self.lookup('supercategory', None)
 
 
@@ -619,7 +692,7 @@ class Videos(ObjectList1D):
         self = <Videos(num=5) at ...>
     """
 
-    def __init__(self, ids, dset):
+    def __init__(self, ids: Sequence[int], dset: Any) -> None:
         """
         Args:
             ids (List[int]): list of video ids
@@ -628,7 +701,7 @@ class Videos(ObjectList1D):
         super().__init__(ids, dset, 'videos')
 
     @property
-    def images(self):
+    def images(self) -> ImageGroups:
         """
         Returns:
             ImageGroups
@@ -661,7 +734,7 @@ class Images(ObjectList1D):
         :func:`kwcoco.coco_dataset.MixinCocoObjects.images`
     """
 
-    def __init__(self, ids, dset):
+    def __init__(self, ids: Sequence[int], dset: Any) -> None:
         """
         Args:
             ids (List[int]): list of image ids
@@ -669,7 +742,7 @@ class Images(ObjectList1D):
         """
         super().__init__(ids, dset, 'images')
 
-    def coco_images_iter(self):
+    def coco_images_iter(self) -> Iterator['CocoImage']:
         """
         Access the enriched coco image objects.
 
@@ -688,7 +761,7 @@ class Images(ObjectList1D):
         yield from (self._dset.coco_image(gid) for gid in self)
 
     @property
-    def coco_images(self):
+    def coco_images(self) -> CocoImageView:
         """
         Access the enriched coco image objects.
 
@@ -704,40 +777,40 @@ class Images(ObjectList1D):
         return CocoImageView(self._dset.coco_image, self._ids)
 
     @property
-    def gids(self):
+    def gids(self) -> Sequence[int]:
         return self._ids
 
     @property
-    def gname(self):
+    def gname(self) -> list[str | None]:
         return self.lookup('file_name')
 
     @property
-    def gpath(self):
-        root = self._dset.bundle_dpath
-        return [join(root, gname) for gname in self.gname]
+    def gpath(self) -> list[str]:
+        root = cast(str, self._dset.bundle_dpath)
+        return [join(root, cast(str, gname)) for gname in self.gname]
 
     @property
-    def image_id(self):
+    def image_id(self) -> Sequence[int]:
         return self._ids
 
     @property
-    def image_name(self):
+    def image_name(self) -> list[str | None]:
         return self.gname
 
     @property
-    def image_path(self):
+    def image_path(self) -> list[str]:
         return self.gpath
 
     @property
-    def width(self):
+    def width(self) -> list[int | None]:
         return self.lookup('width')
 
     @property
-    def height(self):
+    def height(self) -> list[int | None]:
         return self.lookup('height')
 
     @property
-    def size(self):
+    def size(self) -> list[tuple[int | None, int | None]]:
         """
         Example:
             >>> import kwcoco
@@ -750,7 +823,7 @@ class Images(ObjectList1D):
         return list(zip(self.lookup('width'), self.lookup('height')))
 
     @property
-    def area(self):
+    def area(self) -> list[float]:
         """
         Returns:
             List[float]
@@ -766,7 +839,7 @@ class Images(ObjectList1D):
         return [w * h for w, h in zip(self.lookup('width'), self.lookup('height'))]
 
     @property
-    def n_annots(self):
+    def n_annots(self) -> list[int]:
         """
         Returns:
             List[int]
@@ -780,7 +853,7 @@ class Images(ObjectList1D):
         return list(map(len, ub.take(self._dset.index.gid_to_aids, self._ids)))
 
     @property
-    def aids(self):
+    def aids(self) -> list[collections.abc.MutableSet[int]]:
         """
         Returns:
             List[set]
@@ -794,7 +867,7 @@ class Images(ObjectList1D):
         return list(ub.take(self._dset.index.gid_to_aids, self._ids))
 
     @property
-    def annots(self):
+    def annots(self) -> AnnotGroups:
         """
         Returns:
             AnnotGroups
@@ -828,7 +901,7 @@ class Annots(ObjectList1D):
         image_ids = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2]
     """
 
-    def __init__(self, ids, dset):
+    def __init__(self, ids: Sequence[int], dset: Any) -> None:
         """
         Args:
             ids (List[int]): list of annotation ids
@@ -837,12 +910,12 @@ class Annots(ObjectList1D):
         super().__init__(ids, dset, 'annotations')
 
     @property
-    def aids(self):
+    def aids(self) -> Sequence[int]:
         """The annotation ids of this column of annotations"""
         return self._ids
 
     @property
-    def images(self):
+    def images(self) -> Images:
         """
         Get the column of images
 
@@ -852,15 +925,15 @@ class Annots(ObjectList1D):
         return self._dset.images(self.gids)
 
     @property
-    def image_id(self):
+    def image_id(self) -> list[int]:
         return self.lookup('image_id')
 
     @property
-    def category_id(self):
+    def category_id(self) -> list[int | None]:
         return self.lookup('category_id')
 
     @property
-    def gids(self):
+    def gids(self) -> list[int]:
         """
         Get the column of image-ids
 
@@ -870,7 +943,7 @@ class Annots(ObjectList1D):
         return self.lookup('image_id')
 
     @property
-    def cids(self):
+    def cids(self) -> list[int | None]:
         """
         Get the column of category-ids
 
@@ -880,7 +953,7 @@ class Annots(ObjectList1D):
         return self.lookup('category_id')
 
     @property
-    def cnames(self):
+    def cnames(self) -> list[str]:
         """
         DEPRECATED
 
@@ -893,7 +966,7 @@ class Annots(ObjectList1D):
         return self.category_names
 
     @cnames.setter
-    def cnames(self, cnames):
+    def cnames(self, cnames: Sequence[str]) -> None:
         """
         DEPRECATED
 
@@ -904,7 +977,7 @@ class Annots(ObjectList1D):
         self.category_names = cnames
 
     @property
-    def category_names(self):
+    def category_names(self) -> list[str]:
         """
         Get the column of category names
 
@@ -914,7 +987,7 @@ class Annots(ObjectList1D):
         return [cat['name'] for cat in ub.take(self._dset.cats, self.cids)]
 
     @category_names.setter
-    def category_names(self, names):
+    def category_names(self, names: Sequence[str]) -> None:
         """
         Set the category name of each annotation.
 
@@ -937,7 +1010,7 @@ class Annots(ObjectList1D):
         self.set('category_id', cids)
 
     @property
-    def detections(self):
+    def detections(self) -> 'kwimage.Detections':
         """
         Get the kwimage-style detection objects
 
@@ -960,7 +1033,7 @@ class Annots(ObjectList1D):
         return dets
 
     @property
-    def boxes(self):
+    def boxes(self) -> 'kwimage.Boxes':
         """
         Get the column of kwimage-style bounding boxes
 
@@ -983,7 +1056,7 @@ class Annots(ObjectList1D):
         return boxes
 
     @boxes.setter
-    def boxes(self, boxes):
+    def boxes(self, boxes: 'kwimage.Boxes') -> None:
         """
         Args:
             boxes (kwimage.Boxes):
@@ -1003,7 +1076,7 @@ class Annots(ObjectList1D):
             ann['bbox'] = xywh
 
     @property
-    def xywh(self):
+    def xywh(self) -> list[list[float]]:
         """
         Returns raw boxes
 
@@ -1048,7 +1121,7 @@ class Tracks(ObjectList1D):
         ['track_001', 'track_002', 'track_003', 'track_004']
     """
 
-    def __init__(self, ids, dset):
+    def __init__(self, ids: Sequence[int | str], dset: Any) -> None:
         """
         Args:
             ids (List[int]): list of track ids
@@ -1057,16 +1130,16 @@ class Tracks(ObjectList1D):
         super().__init__(ids, dset, 'tracks')
 
     @property
-    def track_ids(self):
+    def track_ids(self) -> Sequence[int | str]:
         """The annotation ids of this column of annotations"""
         return self._ids
 
     @property
-    def name(self):
+    def name(self) -> list[str | None]:
         return self.lookup('name')
 
     @property
-    def annots(self):
+    def annots(self) -> AnnotGroups:
         """
         Example:
             >>> import kwcoco
@@ -1112,7 +1185,7 @@ class AnnotGroups(ObjectGroups):
     _cls1d = Annots
 
     @property
-    def cids(self):
+    def cids(self) -> list[list[int | None]]:
         """
         Get the grouped category ids for annotations in this group
 
@@ -1128,7 +1201,7 @@ class AnnotGroups(ObjectGroups):
         return self.lookup('category_id')
 
     @property
-    def cnames(self):
+    def cnames(self) -> list[list[str]]:
         """
         Get the grouped category names for annotations in this group
 
@@ -1144,7 +1217,7 @@ class AnnotGroups(ObjectGroups):
         return [getattr(group, 'cnames') for group in self._groups]
 
     @property
-    def category_names(self):
+    def category_names(self) -> list[list[str]]:
         """
         Get the grouped category names for annotations in this group
 
@@ -1205,11 +1278,11 @@ class _BaseView(collections.abc.Sequence):
     #     """
     #     return self
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         clsname = self.__class__.__name__
         return f'{clsname}({list(self)!r})'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{list(self)!r}'
 
 
@@ -1218,20 +1291,28 @@ class ObjView(_BaseView):
     A proxy for an iterator over object dictionaries
     """
 
-    def __init__(self, id_to_obj, ids):
+    def __init__(self, id_to_obj: Any, ids: Sequence[Any]) -> None:
         self._id_to_obj = id_to_obj
         self._ids = ids
 
-    def __getitem__(self, index):
+    @overload
+    def __getitem__(self, index: int) -> dict[str, Any]: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list[dict[str, Any]]: ...
+
+    def __getitem__(
+        self, index: int | slice
+    ) -> dict[str, Any] | list[dict[str, Any]]:
         if isinstance(index, slice):
             return [self._id_to_obj[_id] for _id in self._ids[index]]
         else:
             return self._id_to_obj[self._ids[index]]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._ids)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[dict[str, Any]]:
         for _id in self._ids:
             yield self._id_to_obj[_id]
 
@@ -1241,20 +1322,27 @@ class CocoImageView(_BaseView):
     A proxy for an iterator over CocoImage objects
     """
 
-    def __init__(self, getter, ids):
+    def __init__(self, getter: Callable[[Any], 'CocoImage'], ids: Sequence[Any]) -> None:
         self._getter = getter
         self._ids = ids
 
-    def __getitem__(self, index):
-        return self._getter(self._ids[index])
+    @overload
+    def __getitem__(self, index: int) -> 'CocoImage': ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list['CocoImage']: ...
+
+    def __getitem__(
+        self, index: int | slice
+    ) -> 'CocoImage | list[CocoImage]':
         if isinstance(index, slice):
             return [self._getter(_id) for _id in self._ids[index]]
         else:
             return self._getter(self._ids[index])
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._ids)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator['CocoImage']:
         for _id in self._ids:
             yield self._getter(_id)

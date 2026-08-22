@@ -3,6 +3,8 @@ Deprecated: use the one in kwutil instead
 """
 from __future__ import annotations
 
+from typing import Any
+
 try:
     from functools import cache
 except ImportError:
@@ -20,7 +22,7 @@ def _get_rich_print():
         return rich.print
 
 
-def rich_print(*args, **kwargs):
+def rich_print(*args: Any, **kwargs: Any) -> None:
     """
     Does a rich print if available, otherwise fallback to regular print
     """

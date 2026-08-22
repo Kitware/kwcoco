@@ -53,6 +53,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from collections import defaultdict
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, overload
 import math
 import warnings
 
@@ -62,6 +64,10 @@ import ubelt as ub
 from kwcoco.metrics.assignment import ASSIGN_COLUMNS
 from kwcoco.metrics.assignment import USE_NEG_INF
 from kwcoco.metrics.assignment import _filter_ignore_regions
+
+if TYPE_CHECKING:
+    import kwimage
+    from kwcoco.category_tree import CategoryTree
 
 
 V2_ASSIGN_COLUMNS = ASSIGN_COLUMNS + ['rank']
@@ -193,9 +199,9 @@ class AssignmentCandidateIndex:
     is sufficient for all threshold queries.
     """
 
-    true_dets: object
-    pred_dets: object
-    classes: object | None
+    true_dets: 'kwimage.Detections'
+    pred_dets: 'kwimage.Detections'
+    classes: 'CategoryTree | None'
     compat: str
     prioritize: str
     bias: float
@@ -213,10 +219,10 @@ class AssignmentCandidateIndex:
     @classmethod
     def build(
         cls,
-        true_dets,
-        pred_dets,
+        true_dets: 'kwimage.Detections',
+        pred_dets: 'kwimage.Detections',
         *,
-        classes=None,
+        classes: 'CategoryTree | None' = None,
         compat: str = 'mutex',
         prioritize: str = 'iou',
         bias: float = 0.0,
@@ -382,10 +388,10 @@ class AssignmentCandidateIndex:
         *,
         bg_weight: float = 1.0,
         bg_cidx: int = -1,
-        ignore_classes='ignore',
+        ignore_classes: str | Iterable[str] | None = 'ignore',
         max_dets: int | None = None,
         truth_reuse_policy: str = 'never',
-    ) -> dict[str, list]:
+    ) -> dict[str, list[int | float]]:
         """Run greedy assignment for one IoU threshold."""
         if truth_reuse_policy != 'never':
             raise NotImplementedError(
@@ -500,9 +506,9 @@ class AssignmentCandidateIndex:
 
     def assign_many(
         self,
-        iou_thresh: list[float] | np.ndarray,
-        **kwargs,
-    ) -> dict[float, dict[str, list]]:
+        iou_thresh: Iterable[float],
+        **kwargs: Any,
+    ) -> dict[float, dict[str, list[int | float]]]:
         """Run repeated threshold queries from the same candidate index."""
         return {float(t): self.assign(float(t), **kwargs) for t in iou_thresh}
 
@@ -548,23 +554,63 @@ def _populate_sparse_candidates(
     return used_any
 
 
+@overload
 def assign_confusion_vectors_v2(
-    true_dets,
-    pred_dets,
+    true_dets: 'kwimage.Detections',
+    pred_dets: 'kwimage.Detections',
     *,
-    iou_thresh=0.5,
+    iou_thresh: float = 0.5,
     bg_weight: float = 1.0,
     bg_cidx: int = -1,
     bias: float = 0.0,
-    classes=None,
+    classes: 'CategoryTree | None' = None,
     compat: str = 'all',
     prioritize: str = 'iou',
-    ignore_classes='ignore',
+    ignore_classes: str | Iterable[str] | None = 'ignore',
     max_dets: int | None = None,
     truth_reuse_policy: str = 'never',
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
-):
+) -> dict[str, list[int | float]]: ...
+
+
+@overload
+def assign_confusion_vectors_v2(
+    true_dets: 'kwimage.Detections',
+    pred_dets: 'kwimage.Detections',
+    *,
+    iou_thresh: Iterable[float],
+    bg_weight: float = 1.0,
+    bg_cidx: int = -1,
+    bias: float = 0.0,
+    classes: 'CategoryTree | None' = None,
+    compat: str = 'all',
+    prioritize: str = 'iou',
+    ignore_classes: str | Iterable[str] | None = 'ignore',
+    max_dets: int | None = None,
+    truth_reuse_policy: str = 'never',
+    min_iou: float | None = None,
+    spatial_threshold: int | None = 50_000,
+) -> dict[float, dict[str, list[int | float]]]: ...
+
+
+def assign_confusion_vectors_v2(
+    true_dets: 'kwimage.Detections',
+    pred_dets: 'kwimage.Detections',
+    *,
+    iou_thresh: float | Iterable[float] = 0.5,
+    bg_weight: float = 1.0,
+    bg_cidx: int = -1,
+    bias: float = 0.0,
+    classes: 'CategoryTree | None' = None,
+    compat: str = 'all',
+    prioritize: str = 'iou',
+    ignore_classes: str | Iterable[str] | None = 'ignore',
+    max_dets: int | None = None,
+    truth_reuse_policy: str = 'never',
+    min_iou: float | None = None,
+    spatial_threshold: int | None = 50_000,
+) -> dict[str, list[int | float]] | dict[float, dict[str, list[int | float]]]:
     """
     Convenience wrapper around :class:`AssignmentCandidateIndex`.
 
@@ -572,9 +618,14 @@ def assign_confusion_vectors_v2(
     function, but it does not promise row-for-row equivalence.  See the module
     documentation for the known semantic and feature differences.
     """
-    iou_thresh_list = [iou_thresh] if not ub.iterable(iou_thresh) else list(iou_thresh)  # type: ignore
+    if isinstance(iou_thresh, Iterable):
+        iou_thresh_list = [float(t) for t in iou_thresh]
+        multi_iou = True
+    else:
+        iou_thresh_list = [float(iou_thresh)]
+        multi_iou = False
     if min_iou is None:
-        min_iou = min(map(float, iou_thresh_list)) if iou_thresh_list else 0.0  # type: ignore
+        min_iou = min(iou_thresh_list) if iou_thresh_list else 0.0
     index = AssignmentCandidateIndex.build(
         true_dets,
         pred_dets,
@@ -582,18 +633,18 @@ def assign_confusion_vectors_v2(
         compat=compat,
         prioritize=prioritize,
         bias=bias,
-        min_iou=float(min_iou),  # type: ignore
+        min_iou=float(min_iou),
         spatial_threshold=spatial_threshold,
     )
     results = index.assign_many(
-        iou_thresh_list,  # type: ignore
+        iou_thresh_list,
         bg_weight=bg_weight,
         bg_cidx=bg_cidx,
         ignore_classes=ignore_classes,
         max_dets=max_dets,
         truth_reuse_policy=truth_reuse_policy,
     )
-    if ub.iterable(iou_thresh):
+    if multi_iou:
         return results
     else:
-        return results[float(iou_thresh_list[0])]  # type: ignore
+        return results[iou_thresh_list[0]]

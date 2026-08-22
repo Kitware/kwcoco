@@ -93,7 +93,7 @@ def grab_spacenet7(data_dpath):
             for item in ub.ProgIter(items, desc='extract spacenet', verbose=3):
                 archive_fpath = item['fpath']
                 util_archive.unarchive_file(
-                    archive_fpath, extract_dpath, overwrite=0, verbose=2
+                    archive_fpath, extract_dpath, overwrite=False, verbose=2
                 )
 
         coco_dset = convert_spacenet_to_kwcoco(extract_dpath, coco_fpath)

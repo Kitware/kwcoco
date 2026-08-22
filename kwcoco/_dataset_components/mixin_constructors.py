@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Callable, IO, TYPE_CHECKING, cast
+from typing import Any, Callable, IO, Literal, overload, TYPE_CHECKING, cast
 from functools import partial
 from os.path import exists, join
 import os
 import warnings
 import ubelt as ub
 
-from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco._helpers import _load_and_postprocess
 from kwcoco._dataset_components.json_backend import json_r
 
@@ -27,10 +26,60 @@ class MixinCocoConstructors:
     Classmethods for constructing CocoDataset objects
     """
 
+    @overload
+    @classmethod
+    def coerce(
+        cls,
+        key: CocoDataset,
+        sqlview: bool | str = False,
+        verbose: int = 0,
+        **kw: Any,
+    ) -> CocoDataset: ...
+
+    @overload
+    @classmethod
+    def coerce(
+        cls,
+        key: CocoSqlDatabase,
+        sqlview: bool | str = False,
+        verbose: int = 0,
+        **kw: Any,
+    ) -> CocoSqlDatabase: ...
+
+    @overload
+    @classmethod
+    def coerce(
+        cls,
+        key: Any,
+        sqlview: Literal[False] = False,
+        verbose: int = 0,
+        **kw: Any,
+    ) -> CocoDataset: ...
+
+    @overload
+    @classmethod
+    def coerce(
+        cls,
+        key: Any,
+        sqlview: Literal[True] | str,
+        verbose: int = 0,
+        **kw: Any,
+    ) -> CocoSqlDatabase: ...
+
+    @overload
+    @classmethod
+    def coerce(
+        cls,
+        key: Any,
+        sqlview: bool | str = False,
+        verbose: int = 0,
+        **kw: Any,
+    ) -> CocoDataset | CocoSqlDatabase: ...
+
     @classmethod
     def coerce(
         cls, key: Any, sqlview: bool | str = False, verbose: int = 0, **kw: Any
-    ) -> AbstractCocoDataset | CocoDataset | CocoSqlDatabase:
+    ) -> CocoDataset | CocoSqlDatabase:
         """
         Attempt to transform the input into the intended CocoDataset.
 
@@ -51,7 +100,7 @@ class MixinCocoConstructors:
             **kw: passed to whatever constructor is chosen (if any)
 
         Returns:
-            AbstractCocoDataset | kwcoco.CocoDataset | kwcoco.CocoSqlDatabase
+            kwcoco.CocoDataset | kwcoco.CocoSqlDatabase
 
         Example:
             >>> # test coerce for various input methods
@@ -73,9 +122,7 @@ class MixinCocoConstructors:
         import kwcoco
 
         if isinstance(key, cls):
-            return cast(
-                'AbstractCocoDataset | CocoDataset | CocoSqlDatabase', key
-            )
+            return cast('CocoDataset', key)
         if isinstance(key, os.PathLike):
             key = str(key)
         if isinstance(key, str):
@@ -633,13 +680,15 @@ class MixinCocoConstructors:
         from kwcoco.util.util_parallel import coerce_num_workers
 
         _loader = partial(kwcoco.CocoDataset.coerce, verbose=verbose)
-        workers = coerce_num_workers(workers)
-        workers = min(workers, len(datas))
+        resolved_workers = coerce_num_workers(workers)
+        if resolved_workers is None:
+            resolved_workers = 0
+        resolved_workers = min(resolved_workers, len(datas))
         # Reuse coerce_multiple logic but overload the loader function.
         yield from cls._load_multiple(
             _loader,
             datas,
-            workers=workers,
+            workers=resolved_workers,
             mode=mode,
             verbose=verbose,
             postprocess=postprocess,

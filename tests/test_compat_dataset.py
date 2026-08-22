@@ -43,6 +43,22 @@ def test_get_img_ids_matches_pycocotools_intersection_semantics():
     assert dset.getImgIds(imgIds=[gid1, gid2], catIds=[cid1, cid2]) == [gid2]
 
 
+def test_scalar_compat_filters():
+    from kwcoco.compat_dataset import COCO
+
+    dset = COCO()
+    gid = dset.add_image(file_name='img.png')
+    cid = dset.add_category('cat1', supercategory='parent')
+    aid = dset.add_annotation(
+        image_id=gid, category_id=cid, bbox=[0, 0, 1, 1], area=1
+    )
+
+    assert dset.getAnnIds(imgIds=gid, catIds=cid) == [aid]
+    assert dset.getCatIds(catNms='cat1') == [cid]
+    assert dset.getCatIds(supNms='parent') == [cid]
+    assert dset.getImgIds(imgIds=gid, catIds=cid) == [gid]
+
+
 def test_ensure_image_data_accepts_image_ids_and_coco_url(monkeypatch, tmp_path):
     import builtins
     from pathlib import Path

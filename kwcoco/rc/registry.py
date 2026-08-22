@@ -7,7 +7,7 @@ from importlib import resources as importlib_resources
 import ubelt as ub
 
 
-def requirement_path(fname):
+def requirement_path(fname: str) -> ub.Path:
     """
 
     CommandLine:

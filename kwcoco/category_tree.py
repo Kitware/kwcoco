@@ -8,11 +8,17 @@ operations.
 from __future__ import annotations
 
 import itertools as it
+from collections.abc import Hashable, Iterable, Iterator
+from typing import Any, TypeVar, overload
+
 import networkx as nx
 import ubelt as ub
 import numpy as np
 
 __all__ = ['CategoryTree']
+
+
+CategoryTreeT = TypeVar('CategoryTreeT', bound='CategoryTree')
 
 if hasattr(nx, 'OrderedDiGraph'):
     # For 3.6 compat
@@ -105,7 +111,14 @@ class CategoryTree(ub.NiceRepr):
         >>> kwcoco.CategoryTree.coerce(4)
     """
 
-    def __init__(self, graph=None, checks=True):
+    graph: nx.DiGraph
+    id_to_node: dict[int, Hashable]
+    node_to_id: dict[Hashable, int]
+    node_to_idx: dict[Hashable, int]
+    idx_to_node: list[Hashable]
+    idx_groups: list[list[int]]
+
+    def __init__(self, graph: nx.DiGraph | None = None, checks: bool = True) -> None:
         """
         Args:
             graph (nx.DiGraph):
@@ -129,22 +142,19 @@ class CategoryTree(ub.NiceRepr):
                         type(graph)
                     )
                 )
-        self.graph = graph  # :type: nx.Graph
-        # Note: nodes are class names
-        self.id_to_node = None
-        self.node_to_id = None
-        self.node_to_idx = None
-        self.idx_to_node = None
-        self.idx_groups = None
-
+        self.graph = graph
+        # _build_index initializes all lookup tables before construction
+        # returns, so these attributes are non-optional to callers.
         self._build_index()
 
-    def copy(self):
+    def copy(self: CategoryTreeT) -> CategoryTreeT:
         new = self.__class__(self.graph.copy())
         return new
 
     @classmethod
-    def from_mutex(cls, nodes, bg_hack=True):
+    def from_mutex(
+        cls: type[CategoryTreeT], nodes: Iterable[Hashable], bg_hack: bool = True
+    ) -> CategoryTreeT:
         """
         Args:
             nodes (List[str]): or a list of class names (in which case they
@@ -172,7 +182,9 @@ class CategoryTree(ub.NiceRepr):
         return cls(graph)
 
     @classmethod
-    def from_json(cls, state):
+    def from_json(
+        cls: type[CategoryTreeT], state: dict[str, Any]
+    ) -> CategoryTreeT:
         """
         Args:
             state (Dict): see __getstate__ / __json__ for details
@@ -182,7 +194,9 @@ class CategoryTree(ub.NiceRepr):
         return self
 
     @classmethod
-    def from_coco(cls, categories):
+    def from_coco(
+        cls: type[CategoryTreeT], categories: Iterable[dict[str, Any]]
+    ) -> CategoryTreeT:
         """
         Create a CategoryTree object from coco categories
 
@@ -205,7 +219,9 @@ class CategoryTree(ub.NiceRepr):
         return self
 
     @classmethod
-    def coerce(cls, data, **kw):
+    def coerce(
+        cls: type[CategoryTreeT], data: Any, **kw: Any
+    ) -> CategoryTreeT:
         """
         Attempt to coerce data as a CategoryTree object.
 
@@ -281,7 +297,9 @@ class CategoryTree(ub.NiceRepr):
         return self
 
     @classmethod
-    def demo(cls, key='coco', **kwargs):
+    def demo(
+        cls: type[CategoryTreeT], key: str = 'coco', **kwargs: Any
+    ) -> CategoryTreeT:
         """
         Args:
             key (str): specify which demo dataset to use.
@@ -340,7 +358,7 @@ class CategoryTree(ub.NiceRepr):
         self = cls(graph)
         return self
 
-    def to_coco(self):
+    def to_coco(self) -> Iterator[dict[str, Any]]:
         """
         Converts to a coco-style data structure
 
@@ -359,7 +377,7 @@ class CategoryTree(ub.NiceRepr):
             yield cat
 
     @ub.memoize_property
-    def id_to_idx(self):
+    def id_to_idx(self) -> _calldict:
         """
         Example:
             >>> import kwcoco
@@ -371,7 +389,7 @@ class CategoryTree(ub.NiceRepr):
         )
 
     @ub.memoize_property
-    def idx_to_id(self):
+    def idx_to_id(self) -> list[int]:
         """
         Example:
             >>> import kwcoco
@@ -381,7 +399,9 @@ class CategoryTree(ub.NiceRepr):
         return [self.node_to_id[node] for node in self.idx_to_node]  # type: ignore
 
     @ub.memoize_method
-    def idx_to_ancestor_idxs(self, include_self=True):
+    def idx_to_ancestor_idxs(
+        self, include_self: bool = True
+    ) -> dict[int, set[int]]:
         """
         Mapping from a class index to its ancestors
 
@@ -399,7 +419,9 @@ class CategoryTree(ub.NiceRepr):
         return lut
 
     @ub.memoize_method
-    def idx_to_descendants_idxs(self, include_self=False):
+    def idx_to_descendants_idxs(
+        self, include_self: bool = False
+    ) -> dict[int, set[int]]:
         """
         Mapping from a class index to its descendants (including itself)
 
@@ -417,7 +439,7 @@ class CategoryTree(ub.NiceRepr):
         return lut
 
     @ub.memoize_method
-    def idx_pairwise_distance(self):
+    def idx_pairwise_distance(self) -> np.ndarray:
         """
         Get a matrix encoding the distance from one class to another.
 
@@ -435,27 +457,35 @@ class CategoryTree(ub.NiceRepr):
                 pdist[idx2, idx1] = -dist
         return pdist
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Returns:
             int
         """
         return len(self.graph)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Hashable]:
         return iter(self.idx_to_node)  # type: ignore
 
-    def __getitem__(self, index):
+    @overload
+    def __getitem__(self, index: int) -> Hashable: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list[Hashable]: ...
+
+    def __getitem__(
+        self, index: int | slice
+    ) -> Hashable | list[Hashable]:
         """
         Returns:
             str
         """
-        return self.idx_to_node[index]  # type: ignore
+        return self.idx_to_node[index]
 
-    def __contains__(self, node):
+    def __contains__(self, node: object) -> bool:
         return node in self.idx_to_node  # type: ignore
 
-    def __json__(self):
+    def __json__(self) -> dict[str, Any]:
         """
         Example:
             >>> import pickle
@@ -464,7 +494,7 @@ class CategoryTree(ub.NiceRepr):
         """
         return self.__getstate__()
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         """
         Serializes information in this class
 
@@ -489,7 +519,7 @@ class CategoryTree(ub.NiceRepr):
             state.pop('idx_groups')
         return state
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict[str, Any]) -> None:
         graph = from_directed_nested_tuples(state['graph'])
         need_reindex = False
 
@@ -520,7 +550,7 @@ class CategoryTree(ub.NiceRepr):
         if need_reindex:
             self._build_index()
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         max_depth = tree_depth(self.graph)
         if max_depth > 1:
             max_breadth = max(it.chain([0], map(len, self.idx_groups)))  # type: ignore
@@ -537,7 +567,7 @@ class CategoryTree(ub.NiceRepr):
             )
         return text
 
-    def is_mutex(self):
+    def is_mutex(self) -> bool:
         """
         Returns True if all categories are mutually exclusive (i.e. flat)
 
@@ -551,19 +581,19 @@ class CategoryTree(ub.NiceRepr):
         return len(self.graph.edges) == 0
 
     @property
-    def num_classes(self):
+    def num_classes(self) -> int:
         return self.graph.number_of_nodes()
 
     @property
-    def class_names(self):
+    def class_names(self) -> list[Hashable]:
         return self.idx_to_node
 
     @property
-    def category_names(self):
+    def category_names(self) -> list[Hashable]:
         return self.idx_to_node
 
     @property
-    def cats(self):
+    def cats(self) -> dict[Hashable, dict[str, Any]]:
         """
         Returns a mapping from category names to category attributes.
 
@@ -580,7 +610,7 @@ class CategoryTree(ub.NiceRepr):
         """
         return dict(self.graph.nodes)
 
-    def index(self, node):
+    def index(self, node: Hashable) -> int:
         """
         Return the index that corresponds to the category name
 
@@ -592,7 +622,9 @@ class CategoryTree(ub.NiceRepr):
         """
         return self.node_to_idx[node]  # type: ignore
 
-    def take(self, indexes):
+    def take(
+        self: CategoryTreeT, indexes: Iterable[int]
+    ) -> CategoryTreeT:
         """
         Create a subgraph based on the selected class indexes
 
@@ -605,7 +637,11 @@ class CategoryTree(ub.NiceRepr):
         subnodes = list(ub.take(self.idx_to_node, indexes))  # type: ignore
         return self.subgraph(subnodes)
 
-    def subgraph(self, subnodes, closure=True):
+    def subgraph(
+        self: CategoryTreeT,
+        subnodes: Iterable[Hashable],
+        closure: bool = True,
+    ) -> CategoryTreeT:
         """
         Create a subgraph based on the selected class nodes (i.e. names)
 
@@ -660,7 +696,7 @@ class CategoryTree(ub.NiceRepr):
         new = self.__class__(new_graph)
         return new
 
-    def _build_index(self):
+    def _build_index(self) -> None:
         """
         construct lookup tables
         """
@@ -677,22 +713,22 @@ class CategoryTree(ub.NiceRepr):
             node_attrs = sorted(self.graph.nodes.items())
 
         # Fill in id-values for any node that doesn't have one
-        node_to_id = {}
+        node_to_id: dict[Hashable, int] = {}
         for node, attrs in node_attrs:
             node_to_id[node] = attrs.get('id', max_id + 1)
             max_id = max(max_id, node_to_id[node])
-        id_to_node = ub.invert_dict(node_to_id)
+        id_to_node = {cid: node for node, cid in node_to_id.items()}
 
         if RESPECT_INPUT_ORDER:
-            # list(self.graph.nodes.items())
+            # node_to_id preserves the graph traversal order established above.
             if isinstance(self.graph, OrderedDiGraph):
-                idx_to_node = list(self.graph.nodes)
+                idx_to_node = list(node_to_id)
             else:
-                idx_to_node = ub.argsort(node_to_id)
+                idx_to_node = sorted(node_to_id, key=node_to_id.__getitem__)
         else:
             # TODO: respect user-given ordering over sorting by ids
             # Compress ids into a flat index space (sorted by node ids)
-            idx_to_node = ub.argsort(node_to_id)
+            idx_to_node = sorted(node_to_id, key=node_to_id.__getitem__)
 
         node_to_idx = {node: idx for idx, node in enumerate(idx_to_node)}
 
@@ -707,7 +743,7 @@ class CategoryTree(ub.NiceRepr):
         self.node_to_idx = node_to_idx
         self.idx_groups = idx_groups
 
-    def show(self):
+    def show(self) -> None:
         """
 
         Ignore:
@@ -730,14 +766,14 @@ class CategoryTree(ub.NiceRepr):
         # import graphid
         # graphid.util.show_nx(self.graph)
 
-    def forest_str(self):
+    def forest_str(self) -> str:
         import networkx as nx
 
         text = nx.forest_str(self.graph)
         # print(text)
         return text
 
-    def print_graph(self):
+    def print_graph(self) -> None:
         import networkx as nx
 
         try:
@@ -747,7 +783,7 @@ class CategoryTree(ub.NiceRepr):
 
             util_networkx.write_network_text(self.graph)
 
-    def normalize(self):
+    def normalize(self: CategoryTreeT) -> CategoryTreeT:
         """
         Applies a normalization scheme to the categories.
 
@@ -765,7 +801,7 @@ class CategoryTree(ub.NiceRepr):
         """
 
         # nx.adjacency_data(self.graph)
-        def normalize_name(name):
+        def normalize_name(name: Any) -> str:
             return name.lower().replace(' ', '')
 
         new_graph = self.graph.__class__()
@@ -805,29 +841,33 @@ class CategoryTree(ub.NiceRepr):
         # self.idx_to_node
 
 
-def source_nodes(graph):
+def source_nodes(graph: nx.DiGraph) -> Iterator[Hashable]:
     """generates source nodes --- nodes without incoming edges"""
     return (n for n in graph.nodes() if graph.in_degree(n) == 0)
 
 
-def sink_nodes(graph):
+def sink_nodes(graph: nx.DiGraph) -> Iterator[Hashable]:
     """generates source nodes --- nodes without incoming edges"""
     return (n for n in graph.nodes() if graph.out_degree(n) == 0)
 
 
-def traverse_siblings(graph, sources=None):
+def traverse_siblings(
+    graph: nx.DiGraph, sources: Iterable[Hashable] | None = None
+) -> Iterator[list[Hashable]]:
     """generates groups of nodes that have the same parent"""
     if sources is None:
-        sources = list(source_nodes(graph))
-    yield sources
-    for node in sources:
+        source_list = list(source_nodes(graph))
+    else:
+        source_list = list(sources)
+    yield source_list
+    for node in source_list:
         children = list(graph.successors(node))
         if children:
             for _ in traverse_siblings(graph, children):
                 yield _
 
 
-def tree_depth(graph, root=None):
+def tree_depth(graph: nx.DiGraph, root: Hashable | None = None) -> int:
     """
     Maximum depth of the forest / tree
 
@@ -855,13 +895,21 @@ def tree_depth(graph, root=None):
     return depth
 
 
-def to_directed_nested_tuples(graph, with_data=True):
+def to_directed_nested_tuples(
+    graph: nx.DiGraph, with_data: bool = True
+) -> list[tuple]:
     """
     Serialize a networkx graph.
 
     Encodes each node and its children in a tuple as:
         (node, children)
     """
+
+    def _node_sort_key(node: Hashable) -> Any:
+        # Category nodes are historically required to be mutually sortable at
+        # runtime. Returning Any here records that dynamic ordering contract
+        # without pretending Hashable itself guarantees rich comparison.
+        return node
 
     def _represent_node(node):
         if with_data:
@@ -871,16 +919,16 @@ def to_directed_nested_tuples(graph, with_data=True):
             return (node, _traverse_encode(node))
 
     def _traverse_encode(parent):
-        children = sorted(graph.successors(parent))
+        children = sorted(graph.successors(parent), key=_node_sort_key)
         # graph.get_edge_data(node, child)
         return [_represent_node(node) for node in children]
 
-    sources = sorted(source_nodes(graph))
+    sources = sorted(source_nodes(graph), key=_node_sort_key)
     encoding = [_represent_node(node) for node in sources]
     return encoding
 
 
-def from_directed_nested_tuples(encoding):
+def from_directed_nested_tuples(encoding: Iterable[tuple]) -> nx.DiGraph:
     """
     Unserialize a networkx graph.
 
@@ -934,7 +982,7 @@ class _calldict(dict):
         >>> assert self[1] == 2
     """
 
-    def __call__(self):
+    def __call__(self) -> _calldict:
         import warnings
 
         warnings.warn(

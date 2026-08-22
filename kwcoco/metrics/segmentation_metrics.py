@@ -26,7 +26,8 @@ from kwcoco.metrics.confusion_measures import OneVersusRestMeasureCombiner
 from kwcoco.metrics.confusion_vectors import OneVsRestConfusionVectors
 from kwcoco.metrics.confusion_measures import MeasureCombiner
 from kwcoco.metrics.confusion_measures import Measures
-from typing import Dict
+from collections.abc import Mapping, Sequence
+from typing import Any, Dict, Protocol
 import scriptconfig as scfg
 from shapely.ops import unary_union
 from kwcoco.util.util_kwutil import _DelayedBlockingJobQueue, _MaxQueuePool
@@ -216,13 +217,20 @@ class SegmentationEvalConfig(scfg.DataConfig):
     )
 
 
-def main(cmdline=True, **kwargs):
+def main(cmdline: bool | Sequence[str] = True, **kwargs: Any) -> None:
     """
     Entry point: todo: doctest and CLI structure
 
     todo: ProcessContext to track resource usage
     """
-    full_config = SegmentationEvalConfig.cli(cmdline=cmdline, data=kwargs, strict=True)
+    if isinstance(cmdline, bool):
+        full_config = SegmentationEvalConfig.cli(
+            cmdline=cmdline, data=kwargs, strict=True
+        )
+    else:
+        full_config = SegmentationEvalConfig.cli(
+            argv=list(cmdline), data=kwargs, strict=True
+        )
     import rich
 
     rich.print('full_config = {}'.format(ub.urepr(full_config, nl=1)))
@@ -299,16 +307,18 @@ class SingleImageSegmentationMetrics:
 
     def __init__(
         self,
-        pred_coco_img,
-        true_coco_img,
-        true_classes,
-        true_dets,
-        video1=None,
-        thresh_bins=None,
-        config=None,
-    ):
+        pred_coco_img: kwcoco.CocoImage,
+        true_coco_img: kwcoco.CocoImage,
+        true_classes: kwcoco.CategoryTree | Sequence[str],
+        true_dets: kwimage.Detections,
+        video1: Mapping[str, Any] | None = None,
+        thresh_bins: int | Sequence[float] | np.ndarray | None = None,
+        config: Mapping[str, Any] | None = None,
+    ) -> None:
         if config is None:
             config = {}
+        else:
+            config = dict(config)
 
         self.pred_coco_img = pred_coco_img
         self.true_coco_img = true_coco_img
@@ -347,7 +357,7 @@ class SingleImageSegmentationMetrics:
             * context - unused
         """
 
-    def run(self):
+    def run(self) -> dict[str, Any]:
         """
         Run like a function
         """
@@ -380,7 +390,7 @@ class SingleImageSegmentationMetrics:
         #         pred_saliency = pred_sseg.fill(pred_saliency, value=1)
         return self.info
 
-    def resolve_config_variables(self):
+    def resolve_config_variables(self) -> None:
         """
         Messy helper to help transition from function to a class
         """
@@ -443,21 +453,28 @@ class SingleImageSegmentationMetrics:
         }
 
         # Determine what true/predicted categories are in common
-        predicted_classes = []
-        for stream in self.pred_coco_img.channels.streams():
-            have = stream.intersection(self.true_classes)
-            predicted_classes.extend(have.parsed)
-        self.classes_of_interest = ub.oset(predicted_classes) - (  # type: ignore
-            self._behavor_to_classes['negative']  # type: ignore
-            | self._behavor_to_classes['background']  # type: ignore 
-            | self._behavor_to_classes['ignore']  # type: ignore
-            | self._behavor_to_classes['undistinguished']  # type: ignore
+        predicted_classes: list[str] = []
+        pred_channels = self.pred_coco_img.channels
+        if pred_channels is not None:
+            for stream in pred_channels.streams():
+                have = stream.intersection(self.true_classes)
+                predicted_classes.extend(map(str, have.parsed))
+        excluded_classes = (
+            self._behavor_to_classes['negative']
+            | self._behavor_to_classes['background']
+            | self._behavor_to_classes['ignore']
+            | self._behavor_to_classes['undistinguished']
+        )
+        self.classes_of_interest = list(
+            ub.oset(predicted_classes) - excluded_classes
         )
 
         # Determine if saliency has been predicted
-        salient_class = self.config.get('salient_channel', 'salient')
+        salient_class = str(self.config.get('salient_channel', 'salient'))
         # TODO: allow the use of polygons as saliency predictions.
-        self.has_saliency = salient_class in self.pred_coco_img.channels
+        self.has_saliency = (
+            pred_channels is not None and salient_class in pred_channels
+        )
 
         self.score_space = score_space
         self.resolution = resolution
@@ -467,7 +484,7 @@ class SingleImageSegmentationMetrics:
         self.info = info
         self.row = row
 
-    def prepare_common_truth(self):
+    def prepare_common_truth(self) -> None:
         # Load ground truth annotations
         scaled_true_dets = self.true_dets
         if self.score_space == 'video':
@@ -497,7 +514,7 @@ class SingleImageSegmentationMetrics:
             ub.take(scaled_true_dets.classes.idx_to_node, self.true_cidxs)
         )
 
-    def build_saliency_masks(self):
+    def build_saliency_masks(self) -> None:
         """
         Create a truth "panoptic segmentation" style mask and weights
         """
@@ -584,7 +601,7 @@ class SingleImageSegmentationMetrics:
         self.true_saliency = true_saliency
         self.saliency_weights = saliency_weights
 
-    def build_class_masks(self):
+    def build_class_masks(self) -> None:
         """
         Creates the truth masks and weights for each class
         """
@@ -659,7 +676,7 @@ class SingleImageSegmentationMetrics:
         self.class_weights = class_weights
         self.catname_to_true = catname_to_true
 
-    def score_saliency_masks(self):
+    def score_saliency_masks(self) -> None:
         """
         Compute scores for the pred / truth
         """
@@ -672,11 +689,13 @@ class SingleImageSegmentationMetrics:
             resolution=self.resolution,
             nodata_method='float',
         )
-        _got_salient_prob = salient_delay.finalize(nodata_method='float')
+        _got_salient_prob = np.asarray(
+            salient_delay.finalize(nodata_method='float')
+        )
         # FIXME: Delayed image bug? Not sure why it returns 2 channels
         # sometimes instead of 3. That should not happen. Probably something to
         # do with saving / reading the asset as a png?
-        if len(_got_salient_prob.shape) == 2:
+        if _got_salient_prob.ndim == 2:
             salient_prob = _got_salient_prob
         else:
             salient_prob = _got_salient_prob[..., 0]
@@ -694,7 +713,7 @@ class SingleImageSegmentationMetrics:
         pred_score = salient_prob.ravel()
         if self.left_bin_edges is not None:
             rounded_idx = np.searchsorted(self.left_bin_edges, pred_score)
-            pred_score = self.left_bin_edges[rounded_idx]
+            pred_score = self.left_bin_edges[rounded_idx]  # type: ignore
 
         data = kwarray.DataFrameArray(
             {
@@ -759,7 +778,7 @@ class SingleImageSegmentationMetrics:
                 }
             )
 
-    def score_class_masks(self):
+    def score_class_masks(self) -> None:
         # handle multiclass case
         pred_chan_of_interest = '|'.join(self.classes_of_interest)
         delayed_probs = self.pred_coco_img.imdelay(
@@ -767,19 +786,17 @@ class SingleImageSegmentationMetrics:
             space=self.score_space,
             resolution=self.resolution,
             nodata_method='float',
-        ).as_xarray()
-        # Do we need xarray anymore?
-
-        class_probs = delayed_probs.finalize()
+        )
+        class_probs = np.asarray(delayed_probs.finalize())
         invalid_mask = np.isnan(class_probs).all(axis=2)
 
         self.class_weights[invalid_mask] = 0
 
         catname_to_prob = {}
-        cx_to_binvecs = {}
+        cx_to_binvecs: dict[int | str, BinaryConfusionVectors] = {}
         for cx, cname in enumerate(self.classes_of_interest):
             is_true = self.catname_to_true[cname]
-            score = class_probs.loc[:, :, cname].data.copy()
+            score = class_probs[..., cx].copy()
             invalid_mask = np.isnan(score)
             weights = self.class_weights.copy()
             weights[invalid_mask] = 0
@@ -820,14 +837,14 @@ class SingleImageSegmentationMetrics:
 
 
 def single_image_segmentation_metrics(
-    pred_coco_img,
-    true_coco_img,
-    true_classes,
-    true_dets,
-    video1=None,
-    thresh_bins=None,
-    config=None,
-):
+    pred_coco_img: kwcoco.CocoImage,
+    true_coco_img: kwcoco.CocoImage,
+    true_classes: kwcoco.CategoryTree | Sequence[str],
+    true_dets: kwimage.Detections,
+    video1: Mapping[str, Any] | None = None,
+    thresh_bins: int | Sequence[float] | np.ndarray | None = None,
+    config: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     DEPRECATED, Use SingleImageSegmentationMetrics instead
 
@@ -862,7 +879,7 @@ def _memo_legend(label_to_color):
     return legend_img
 
 
-def draw_confusion_image(pred, target):
+def draw_confusion_image(pred: np.ndarray, target: np.ndarray) -> np.ndarray:
     canvas = np.zeros_like(pred)
     np.putmask(canvas, (target == 0) & (pred == 0), 0)  # true-neg
     np.putmask(canvas, (target == 1) & (pred == 1), 1)  # true-pos
@@ -871,7 +888,9 @@ def draw_confusion_image(pred, target):
     return canvas
 
 
-def colorize_class_probs(probs, classes):
+def colorize_class_probs(
+    probs: np.ndarray, classes: kwcoco.CategoryTree
+) -> np.ndarray:
     """
     probs = pred_cat_ohe
     classes = pred_classes
@@ -929,7 +948,12 @@ def colorize_class_probs(probs, classes):
     return colormask
 
 
-def draw_truth_borders(true_dets, canvas, alpha=1.0, color=None):
+def draw_truth_borders(
+    true_dets: kwimage.Detections,
+    canvas: np.ndarray,
+    alpha: float = 1.0,
+    color: Any = None,
+) -> np.ndarray:
     true_sseg = true_dets.data['segmentations']
     true_cidxs = true_dets.data['class_idxs']
     _classes = true_dets.data['classes']
@@ -956,14 +980,32 @@ def draw_truth_borders(true_dets, canvas, alpha=1.0, color=None):
     return canvas
 
 
+class _CocoImageLike(Protocol):
+    @property
+    def img(self) -> Mapping[str, Any]: ...
+
+    @property
+    def channels(self) -> Any: ...
+
+    def primary_asset(self) -> Mapping[str, Any] | None: ...
+
+    def imdelay(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
 def draw_chunked_confusion(
-    full_classes, true_coco_imgs, chunk_info, title=None, config=None
-):
+    full_classes: kwcoco.CategoryTree | None,
+    true_coco_imgs: Sequence[_CocoImageLike],
+    chunk_info: Sequence[Mapping[str, Any]],
+    title: str | None = None,
+    config: Mapping[str, Any] | None = None,
+) -> tuple[np.ndarray, dict[str, Any]]:
     """
     Draw a a sequence of true/pred image predictions
     """
     if config is None:
         config = {}
+    else:
+        config = dict(config)
 
     color_labels = ['TN', 'TP', 'FN', 'FP']
 
@@ -985,6 +1027,8 @@ def draw_chunked_confusion(
     legend_images = []
 
     if 'catname_to_prob' in chunk_info[0]:
+        if full_classes is None:
+            raise ValueError('full_classes is required to draw class predictions')
         # Class Legend
         label_to_color = {
             node: kwimage.Color(data['color']).as01()
@@ -1068,6 +1112,10 @@ def draw_chunked_confusion(
         DRAW_WEIGHTS = config.get('draw_weights', False)
 
         if 'catname_to_prob' in info:
+            if full_classes is None:
+                raise ValueError(
+                    'full_classes is required to draw class predictions'
+                )
             true_dets = info['true_dets']
             true_dets.data['classes'] = full_classes
 
@@ -1223,20 +1271,27 @@ def draw_chunked_confusion(
 
         TRY_IMREAD = 1
         if TRY_IMREAD:
-            avali_chans = {
-                p2
-                for p1 in true_coco_img.channels.spec.split(',')
-                for p2 in p1.split('|')
-            }
+            true_channels = true_coco_img.channels
+            if true_channels is None:
+                avali_chans = set()
+            else:
+                avali_chans = {
+                    p2
+                    for p1 in true_channels.spec.split(',')
+                    for p2 in p1.split('|')
+                }
             chosen_viz_channs = None
             if len(avali_chans & {'red', 'green', 'blue'}) == 3:
                 chosen_viz_channs = 'red|green|blue'
             elif len(avali_chans & {'r', 'g', 'b'}) == 3:
                 chosen_viz_channs = 'r|g|b'
-            elif len(avali_chans & {'pan'}) == 3:
+            elif len(avali_chans & {'pan'}) == 1:
                 chosen_viz_channs = 'pan'
             else:
-                chosen_viz_channs = true_coco_img.primary_asset()['channels']
+                primary_asset = true_coco_img.primary_asset()
+                chosen_viz_channs = (
+                    None if primary_asset is None else primary_asset.get('channels')
+                )
             try:
                 real_image = true_coco_img.imdelay(
                     chosen_viz_channs,
@@ -1342,8 +1397,13 @@ def draw_chunked_confusion(
 
 
 def dump_chunked_confusion(
-    full_classes, true_coco_imgs, chunk_info, heatmap_dpath, title=None, config=None
-):
+    full_classes: kwcoco.CategoryTree,
+    true_coco_imgs: Sequence[kwcoco.CocoImage],
+    chunk_info: Sequence[Mapping[str, Any]],
+    heatmap_dpath: str | os.PathLike[str],
+    title: str | None = None,
+    config: Mapping[str, Any] | None = None,
+) -> None:
     """
     Draw and write a sequence of true/pred image predictions
     """
@@ -1374,8 +1434,12 @@ def dump_chunked_confusion(
 
 
 def evaluate_segmentations(
-    true_coco, pred_coco, eval_dpath=None, eval_fpath=None, config=None
-):
+    true_coco: kwcoco.CocoDataset,
+    pred_coco: kwcoco.CocoDataset,
+    eval_dpath: str | os.PathLike[str] | None = None,
+    eval_fpath: str | os.PathLike[str] | None = None,
+    config: Mapping[str, Any] | None = None,
+) -> pd.DataFrame:
     """
     TODO:
         - [ ] Fold non-critical options into the config
@@ -1461,6 +1525,8 @@ def evaluate_segmentations(
 
     if config is None:
         config = {}
+    else:
+        config = dict(config)
 
     draw_curves = config.get('draw_curves', 'auto')
     draw_heatmaps = config.get('draw_heatmaps', 'auto')
@@ -1476,17 +1542,21 @@ def evaluate_segmentations(
 
     # Ensure each class has colors.
     ensure_heuristic_coco_colors(true_coco)
-    true_classes = list(true_coco.object_categories())
+    true_classes = [str(node) for node in true_coco.object_categories()]
     full_classes: kwcoco.CategoryTree = true_coco.object_categories()
 
     # Sometimes supercategories dont get colors, this fixes that.
     ensure_heuristic_category_tree_colors(full_classes)
 
     workers = util_parallel.coerce_num_workers(config.get('workers', 0))
+    if workers is None:
+        workers = 0
     if draw_workers == 'auto':
         draw_workers = min(2, workers)
     else:
         draw_workers = util_parallel.coerce_num_workers(draw_workers)
+        if draw_workers is None:
+            draw_workers = 0
 
     # Extract metadata about the predictions to persist
     meta = {}
@@ -1776,7 +1846,7 @@ def evaluate_segmentations(
 
             if draw_heatmaps:
                 assert eval_dpath is not None
-                heatmap_dpath = (ub.Path(eval_dpath) / 'heatmaps').ensuredir() 
+                heatmap_dpath = (ub.Path(eval_dpath) / 'heatmaps').ensuredir()
                 # Let the draw executor release any memory it can
                 remaining_draw_jobs = []
                 if VERBOSE_DEBUG:
@@ -1997,7 +2067,7 @@ def _max_digits(max_num):
     return num_digits
 
 
-def build_image_header_text(**kwargs):
+def build_image_header_text(**kwargs: Any) -> list[str]:
     """
     A heuristic for what sort of info is useful to plot on the header of an
     image.
@@ -2086,7 +2156,9 @@ def build_image_header_text(**kwargs):
     return header_lines
 
 
-def ensure_heuristic_coco_colors(coco_dset, force=False):
+def ensure_heuristic_coco_colors(
+    coco_dset: kwcoco.CocoDataset, force: bool = False
+) -> None:
     """
     Args:
         coco_dset (kwcoco.CocoDataset): object to modify
@@ -2112,7 +2184,9 @@ def ensure_heuristic_coco_colors(coco_dset, force=False):
     _ensure_distinct_dict_colors(data_dicts)
 
 
-def ensure_heuristic_category_tree_colors(classes, force=False):
+def ensure_heuristic_category_tree_colors(
+    classes: kwcoco.CategoryTree, force: bool = False
+) -> None:
     """
     Args:
         classes (kwcoco.CategoryTree): object to modify
@@ -2160,7 +2234,7 @@ def _ensure_distinct_dict_colors(data_dicts, force=False):
             d['color'] = c
 
 
-def colorize_weights(weights):
+def colorize_weights(weights: np.ndarray) -> np.ndarray:
     """
     Normally weights will range between 0 and 1, but in some cases they may
     range higher.  We handle this by coloring the 0-1 range in grayscale and

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypeVar
 import warnings
 
 import ubelt as ub
+
+
+MixinCocoSchemaT = TypeVar('MixinCocoSchemaT', bound='MixinCocoSchema')
 
 
 class MixinCocoSchema:
@@ -11,7 +14,7 @@ class MixinCocoSchema:
     Methods for validating and conforming dataset structure.
     """
 
-    def conform(self, **config: Any):
+    def conform(self: MixinCocoSchemaT, **config: Any) -> MixinCocoSchemaT:
         """
         Make the COCO file conform a stricter spec, infers attributes where
         possible.

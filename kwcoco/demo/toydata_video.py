@@ -1481,13 +1481,14 @@ def random_multi_object_path(num_objects, num_frames, rng=None, max_speed=0.01):
     if USE_BOIDS:
         from kwcoco.demo.boids import Boids
 
-        config = {
-            'perception_thresh': 0.2,
-            'max_speed': max_speed,
-            'max_force': 0.001,
-            'damping': 0.99,
-        }
-        boids = Boids(num_objects, rng=rng, **config).initialize()
+        boids = Boids(
+            num_objects,
+            rng=rng,
+            perception_thresh=0.2,
+            max_speed=max_speed,
+            max_force=0.001,
+            damping=0.99,
+        ).initialize()
         paths = boids.paths(num_frames)
         return paths
     else:
