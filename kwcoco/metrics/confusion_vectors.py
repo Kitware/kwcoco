@@ -326,14 +326,13 @@ class ConfusionVectors(ub.NiceRepr):
         import pandas as pd
 
         class_names = [str(c) for c in classes]
-        class_index = pd.Index(class_names)
-        cm = pd.DataFrame(matrix, index=class_index, columns=class_index)
+        real_index = pd.Index(class_names, name='real')
+        pred_index = pd.Index(class_names, name='pred')
+        cm = pd.DataFrame(matrix, index=real_index, columns=pred_index)
         if compress:
             iszero = matrix == 0
             unused = np.all(iszero, axis=0) & np.all(iszero, axis=1)
             cm = cm[~unused].T[~unused].T
-        cm.index.name = 'real'
-        cm.columns.name = 'pred'
         return cm
 
     def coarsen(cfsn_vecs, cxs: Iterable[int]) -> 'ConfusionVectors':

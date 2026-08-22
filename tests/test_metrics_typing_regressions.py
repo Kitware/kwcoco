@@ -63,3 +63,16 @@ def test_suppress_print_restores_each_module_print():
     getattr(mod2, 'print')('visible-2')
     assert calls1 == ['visible-1']
     assert calls2 == ['visible-2']
+
+
+def test_confusion_matrix_axis_names_are_independent():
+    from kwcoco.metrics.confusion_vectors import ConfusionVectors
+
+    cfsn_vecs = ConfusionVectors.from_arrays(
+        true=np.array([0, 1]),
+        pred=np.array([1, 0]),
+        classes=['cat', 'dog'],
+    )
+    cm = cfsn_vecs.confusion_matrix()
+    assert cm.index.name == 'real'
+    assert cm.columns.name == 'pred'
