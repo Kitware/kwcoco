@@ -158,10 +158,8 @@ object" help (`:139`). Initialize the sentinel before the info section. Test:
 - [ ] `cli/coco_visualize_videos.py:1048-1056` (`perchannel_colorize`) —
       `data.shape[2]` read before the 2D guard, and the guard adds the axis
       at the front; fix both (currently latent).
-- [ ] `cli/coco_plot_stats.py:296-304` — unconditional `raise ImportError`
-      permanently disables the sunlight feature even when deps exist.
-      **⚠️ DECISION** — recommended: remove the dead feature branch entirely
-      (kwgis is an exotic dep); alternatively remove the bare raise.
+- [x] `cli/coco_plot_stats.py` — remove sunlight estimation from the core CLI
+      and preserve the workflow in `examples/plot_sunlight.py`.
 
 ## Verification (whole doc)
 

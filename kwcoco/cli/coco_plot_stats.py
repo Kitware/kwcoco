@@ -279,76 +279,6 @@ def rerun_plots(tables_fpath):
     # plots.plot_functions['polygon_area_vs_num_verts'](self)
 
 
-def geospatial_stats(dset, images, perimage_data):
-    import math
-    import warnings
-    import numpy as np
-
-    ESTIMATE_SUNLIGHT = 1
-    if ESTIMATE_SUNLIGHT:
-        # This might be more of a domain-specific plugin feature, than
-        # something that kwcoco should be concerned with.
-
-        def coco_estimate_sunlight(dset, image_ids=None):
-            try:
-                from kwgis.utils.util_sunlight import estimate_sunlight
-
-                # import suntime  # NOQA
-                import astral  # NOQA
-                import timezonefinder  # NOQA
-                import pytz  # type: ignore[import-untyped]  # NOQA
-
-                raise ImportError
-            except ImportError as ex:
-                from kwutil.util_exception import add_exception_note
-
-                msg = f"""
-                    Missing requirements, please:
-                    pip install astral suntime timezonefinder pytz kwgis
-                    {ex}
-                    """
-                if 0:
-                    raise add_exception_note(ex, ub.codeblock(msg))
-                else:
-                    warnings.warn(msg)
-            else:
-                from kwutil.util_math import Rational
-
-                sunlight_values = []
-                images = dset.images(image_ids)
-                for img in images.objs_iter():
-                    if 'geos_point' not in img:
-                        sunlight = math.nan
-                    else:
-                        geos_point = img['geos_point']
-                        if isinstance(geos_point, float) and math.isnan(geos_point):
-                            sunlight = math.nan
-                        elif not isinstance(geos_point, dict):
-                            warnings.warn(
-                                f'Warning: unknown geos_point format {geos_point!r} in {img!r}'
-                            )
-                            sunlight = np.nan
-                        else:
-                            coords = geos_point['coordinates']
-                            point = [Rational.coerce(x) for x in coords]
-                            lon, lat = point
-                            datetime = img['datetime']
-                            sunlight = estimate_sunlight(lat, lon, datetime)
-                    sunlight_values.append(sunlight)
-                sunlight_values = np.array(sunlight_values)
-                return sunlight_values
-
-        try:
-            sunlight_values = coco_estimate_sunlight(dset, image_ids=images)
-            if sunlight_values is not None and not np.isnan(sunlight_values).all():
-                perimage_data['sunlight'] = sunlight_values
-        except ImportError as ex:
-            print(f'Unable to estimate sunlight: {ex}')
-            raise
-        except Exception as ex:
-            print(f'Unable to estimate sunlight: {ex}')
-            raise
-
 
 def build_stats_data(dset):
     """
@@ -404,15 +334,6 @@ def build_stats_data(dset):
         scalar_stats['most_frequent_image_size'] = most_frequent_image_size
         print(f'scalar_stats = {ub.urepr(scalar_stats, nl=1)}')
         # scalar_stats['table_buildtime_seconds'] = stats_timer.elapsed
-
-        try:
-            geospatial_stats(dset, images, perimage_data)
-        except Exception as ex:
-            print(f'Failed to build domain (geospatial) stats: ex={ex}')
-            raise
-        else:
-            # TODO: medical stats / other domain stats
-            print('Built domain (geospatial) stats')
 
         # try:
         #     # We dont want to require geopandas
@@ -1324,8 +1245,6 @@ class BuiltinPlots:
         import pandas as pd
         import numpy as np
         import kwutil
-        import kwimage
-        import kwplot
 
         img_df = self.perimage_data.sort_values('datetime')  # type: ignore
         img_df['pd_datetime'] = pd.to_datetime(img_df.datetime)
@@ -1344,37 +1263,10 @@ class BuiltinPlots:
             for z in img_df['time']
         ]
 
-        self.snskw = {}  # type: ignore
-        has_sunlight = 'sunlight' in img_df.columns
-        if has_sunlight and not img_df['sunlight'].isna().all():
-            palette = self.sns.color_palette(  # type: ignore
-                'flare', n_colors=4, as_cmap=True
-            ).reversed()
-            self.snskw['hue'] = 'sunlight'  # type: ignore
-            self.snskw['palette'] = palette  # type: ignore
-
         ax = self.figman.figure(fnum=1, doclf=True).gca()  # type: ignore
-        # self.sns.histplot(data=img_df, x='month', ax=ax)  # type: ignore
-        # self.sns.kdeplot(data=img_df, x='day_of_year', y='hour_of_day')  # type: ignore
-        # self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day', hue='sunlight_values')  # type: ignore
-        self.sns.scatterplot(data=img_df, x='day_of_year', y='hour_of_day')  # type: ignore
         self.sns.scatterplot(  # type: ignore
-            data=img_df,  # type: ignore
-             x='day_of_year',
-             y='hour_of_day', 
-             **self.snskw,   # type: ignore
-             legend=False
+            data=img_df, x='day_of_year', y='hour_of_day', ax=ax
         )
-        # self.sns.kdeplot(data=img_df, x='hour_of_day', y='day_of_year')  # type: ignore
-        if has_sunlight:
-            kwplot.phantom_legend(
-                {
-                    'Night': kwimage.Color.coerce(palette.colors[0]).as255(),
-                    'Day': kwimage.Color.coerce(palette.colors[-1]).as255(),
-                    'nan': 'blue',
-                },
-                mode='circle',
-            )
         ax.set_title('Time Captured')
         ax.set_xlabel('Day of Year')
         ax.set_ylabel('Hour of Day')
