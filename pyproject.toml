@@ -13,7 +13,7 @@ license-files = [
   "LICENSE",
 ]
 authors = [ { name = "Jon Crall", email = "jon.crall@kitware.com" } ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
@@ -198,7 +198,7 @@ tags = [
 mod_name = "kwcoco"
 repo_name = "kwcoco"
 rel_mod_parent_dpath = "."
-min_python = "3.8"
+min_python = "3.10"
 main_python = "3.14"
 url = "https://gitlab.kitware.com/computer-vision/kwcoco"
 ci_cpython_versions = [
