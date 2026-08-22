@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Collection, Mapping
 from typing import Any, TYPE_CHECKING
 import ubelt as ub
 
@@ -102,7 +103,9 @@ class MixinCocoStats:
         if config.get('catfreq', True):
             info['catfreq'] = dset.category_annotation_frequency()
 
-        def varied(obj_lut):
+        def varied(
+            obj_lut: Mapping[Any, Mapping[str, Any]]
+        ) -> dict[str, dict[str, int]]:
             attrs = ub.ddict(lambda: 0)
             unique = ub.ddict(set)
             for obj in obj_lut.values():
@@ -203,8 +206,10 @@ class MixinCocoStats:
         """
         import kwarray
 
-        def mapping_stats(xid_to_yids):
-            n_yids = list(ub.map_vals(len, xid_to_yids).values())
+        def mapping_stats(
+            xid_to_yids: Mapping[Any, Collection[Any]]
+        ) -> dict[str, Any]:
+            n_yids = [len(yids) for yids in xid_to_yids.values()]
             return kwarray.stats_dict(n_yids, n_extreme=True)
 
         if hasattr(self, '_all_rows_column_lookup'):

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from types import ModuleType
+from typing import Any, Callable
+
 
 class SupressPrint:
     """
@@ -11,23 +14,23 @@ class SupressPrint:
             enabled (bool, default=True): enables or disables this context
     """
 
-    def __init__(self, *mods, **kw):
+    def __init__(self, *mods: ModuleType, **kw: bool) -> None:
         enabled = kw.get('enabled', True)
         self.mods = mods
         self.enabled = enabled
-        self.oldprints = {}
+        self.oldprints: dict[ModuleType, Callable[..., Any]] = {}
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         if self.enabled:
             for mod in self.mods:
-                oldprint = getattr(self.mods, 'print', print)
+                oldprint = getattr(mod, 'print', print)
                 self.oldprints[mod] = oldprint
-                mod.print = lambda *args, **kw: None
+                setattr(mod, 'print', lambda *args, **kw: None)
 
-    def __exit__(self, a, b, c):
+    def __exit__(self, a: Any, b: Any, c: Any) -> None:
         if self.enabled:
             for mod in self.mods:
-                mod.print = self.oldprints[mod]
+                setattr(mod, 'print', self.oldprints[mod])
 
 
 class Reloadable(type):
@@ -71,7 +74,7 @@ class Reloadable(type):
         >>> assert isinstance(inst2, Derived2)
     """
 
-    def __subclasscheck__(cls, sub):
+    def __subclasscheck__(cls, sub: type) -> bool:
         """
         Is ``sub`` a subclass of ``cls``
         """
@@ -80,15 +83,16 @@ class Reloadable(type):
             b_mod_name = (b.__module__, b.__name__)
             if cls_mod_name == b_mod_name:
                 return True
+        return False
 
-    def __instancecheck__(cls, inst):
+    def __instancecheck__(cls, inst: object) -> bool:
         """
         Is ``inst`` an instance of ``cls``
         """
         return cls.__subclasscheck__(inst.__class__)
 
     @classmethod
-    def add_metaclass(metaclass, cls):
+    def add_metaclass(metaclass, cls: type) -> type:
         """
         Class decorator for creating a class with this as a metaclass
         """
@@ -106,7 +110,7 @@ class Reloadable(type):
         return metaclass(cls.__name__, cls.__bases__, orig_vars)
 
     @classmethod
-    def developing(metaclass, cls):
+    def developing(metaclass, cls: type) -> type:
         """
         Like add_metaclass, but warns the user that they are developing.
         This helps remind them to remove this in production

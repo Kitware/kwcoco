@@ -42,7 +42,13 @@ References:
 """
 from __future__ import annotations
 
-def coco_to_kpf(coco_dset):
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import kwcoco
+
+
+def coco_to_kpf(coco_dset: kwcoco.CocoDataset) -> None:
     """
     Example:
         >>> from kwcoco.formats.kpf import *  # NOQA
@@ -84,7 +90,7 @@ class KPFStream:
     ...
 
     @classmethod
-    def demo_packets(cls):
+    def demo_packets(cls) -> list[dict[str, Any]]:
         ...
         import kwutil
         import ubelt as ub
@@ -117,7 +123,7 @@ class KPFStream:
 #     ...
 
 
-def demo():
+def demo() -> None:
     dataset = {
         'categories': [
             {'id': 0, 'name': 'background'},

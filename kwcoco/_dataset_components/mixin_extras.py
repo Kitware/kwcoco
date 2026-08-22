@@ -695,7 +695,7 @@ class MixinCocoExtras:
         check: bool = True,
         safe: bool = True,
         verbose: int = 0,
-    ):
+    ) -> None:
         """
         Modify the prefix of the image/data paths onto a new image/data root.
 

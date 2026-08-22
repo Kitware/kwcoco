@@ -223,15 +223,20 @@ def main(cmdline=True, **kw):
     else:
         truth_dset = None
 
-    if truth_dset is not None and getattr(results, 'cfsn_vecs', None):
-        # FIXME: results is a MultiResult, need to patch this to loop over the
-        # single results.
+    result_cfsn_vecs = None
+    if truth_dset is not None:
+        result_cfsn_vecs = next(
+            (result.cfsn_vecs for result in results.values() if result.cfsn_vecs is not None),
+            None,
+        )
+    if truth_dset is not None and result_cfsn_vecs is not None:
+        # Use the first result with confusion vectors for the example ranking.
         print('Attempting to draw examples')
         gid_to_stats = {}
-        gids, groupxs = kwarray.group_indices(results.cfsn_vecs.data['gid'])
+        gids, groupxs = kwarray.group_indices(result_cfsn_vecs.data['gid'])
         for gid, groupx in zip(gids, groupxs):
-            true_vec = results.cfsn_vecs.data['true'][groupx]
-            pred_vec = results.cfsn_vecs.data['pred'][groupx]
+            true_vec = result_cfsn_vecs.data['true'][groupx]
+            pred_vec = result_cfsn_vecs.data['pred'][groupx]
             is_true = true_vec > 0
             is_pred = pred_vec > 0
             has_pred = is_true & is_pred

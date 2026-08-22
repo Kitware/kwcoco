@@ -5,9 +5,16 @@ from __future__ import annotations
 
 import ubelt as ub
 import os
+from collections.abc import Iterator, Mapping, Sequence
+from typing import IO, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import kwcoco
 
 
-def labelme_to_coco_structure(labelme_data, special_options=True):
+def labelme_to_coco_structure(
+    labelme_data: Mapping[str, Any], special_options: bool = True
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """
     Helper to convert labelme data into dictionaries suitable for adding to a
     CocoDataset.
@@ -160,7 +167,11 @@ class LabelMeFile(ub.NiceRepr):
         'mask',
     ]
 
-    def __init__(self, data, fpath=None):
+    def __init__(
+        self,
+        data: dict[str, Any],
+        fpath: str | os.PathLike[str] | None = None,
+    ) -> None:
         """
         Initialize the LabelMe file structure.
 
@@ -178,7 +189,7 @@ class LabelMeFile(ub.NiceRepr):
         self.data = data
         self.fpath = fpath
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         parts = []
         parts.append(str(self.fpath))
         # parts.append(str(self.data.get('imagePath')))
@@ -187,7 +198,7 @@ class LabelMeFile(ub.NiceRepr):
         return ', '.join(parts)
 
     @classmethod
-    def demo(cls):
+    def demo(cls) -> 'LabelMeFile':
         """
         Create an instance of this class for demos and tests
 
@@ -248,7 +259,13 @@ class LabelMeFile(ub.NiceRepr):
         return self
 
     @classmethod
-    def empty(cls, image_path=None, image_height=None, image_width=None, fpath=None):
+    def empty(
+        cls,
+        image_path: str | os.PathLike[str] | None = None,
+        image_height: int | None = None,
+        image_width: int | None = None,
+        fpath: str | os.PathLike[str] | None = None,
+    ) -> 'LabelMeFile':
         """
         Create a new empty file for a specific image.
 
@@ -279,7 +296,7 @@ class LabelMeFile(ub.NiceRepr):
         return self
 
     @classmethod
-    def load(cls, file):
+    def load(cls, file: str | os.PathLike[str] | IO[str]) -> 'LabelMeFile':
         """
         Load a file from a path.
 
@@ -288,13 +305,8 @@ class LabelMeFile(ub.NiceRepr):
         """
         import kwutil
 
-        try:
+        if isinstance(file, (str, os.PathLike)):
             fpath = os.fspath(file)
-        except TypeError:
-            input_was_pathlike = False
-        else:
-            input_was_pathlike = True
-        if input_was_pathlike:
             data = kwutil.Json.load(file)
             self = cls(data, fpath)
         else:
@@ -303,12 +315,14 @@ class LabelMeFile(ub.NiceRepr):
         return self
 
     @classmethod
-    def multiple_from_coco(cls, coco_dset):
+    def multiple_from_coco(
+        cls, coco_dset: 'kwcoco.CocoDataset'
+    ) -> Iterator['LabelMeFile']:
         for image_id in coco_dset.images():
             self = cls.from_coco(coco_dset, image_id)
             yield self
 
-    def reroot(self, absolute=True):
+    def reroot(self, absolute: bool = True) -> None:
         assert not absolute
         old_fpath = self.data['imagePath']
         parent_dpath = ub.Path(self.fpath).parent  # type: ignore
@@ -317,7 +331,9 @@ class LabelMeFile(ub.NiceRepr):
         self.data['imagePath'] = os.fspath(rel_fpath)
 
     @classmethod
-    def from_coco(cls, coco_dset, image_id=None):
+    def from_coco(
+        cls, coco_dset: 'kwcoco.CocoDataset', image_id: int | None = None
+    ) -> 'LabelMeFile':
         """
         Convert an image in a CocoDataset into a LabeMeFile.
 
@@ -419,7 +435,7 @@ class LabelMeFile(ub.NiceRepr):
 
         return self
 
-    def add_to_coco(self, coco_dset):
+    def add_to_coco(self, coco_dset: 'kwcoco.CocoDataset') -> None:
         """
         Add the information in this labelme file to an existing coco file.
 
@@ -440,7 +456,7 @@ class LabelMeFile(ub.NiceRepr):
             ann['image_id'] = image_id
             coco_dset.add_annotation(**ann)
 
-    def to_coco(self):
+    def to_coco(self) -> 'kwcoco.CocoDataset':
         """
         Convert this labelme file into a standalone coco dataset.
 
@@ -469,7 +485,13 @@ class LabelMeFile(ub.NiceRepr):
         self.add_to_coco(coco_dset)
         return coco_dset
 
-    def add_point(self, label, points, flags=None, **kwargs):
+    def add_point(
+        self,
+        label: str,
+        points: Sequence[Sequence[float]],
+        flags: Mapping[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         """
         Add a polygon shape.
 
@@ -488,7 +510,14 @@ class LabelMeFile(ub.NiceRepr):
         }
         self.data['shapes'].append(shape)
 
-    def add_polygon(self, label, points, group_id=None, flags=None, **kwargs):
+    def add_polygon(
+        self,
+        label: str,
+        points: Sequence[Sequence[float]],
+        group_id: int | None = None,
+        flags: Mapping[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         """
         Add a polygon shape.
 
@@ -508,7 +537,14 @@ class LabelMeFile(ub.NiceRepr):
         }
         self.data['shapes'].append(shape)
 
-    def add_rectangle(self, label, bbox, group_id=None, flags=None, **kwargs):
+    def add_rectangle(
+        self,
+        label: str,
+        bbox: Sequence[float],
+        group_id: int | None = None,
+        flags: Mapping[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         """
         Add a rectangle shape.
 
@@ -529,7 +565,9 @@ class LabelMeFile(ub.NiceRepr):
         }
         self.data['shapes'].append(shape)
 
-    def dump(self, file=None):
+    def dump(
+        self, file: str | os.PathLike[str] | IO[str] | None = None
+    ) -> None:
         """
         Save the LabelMe JSON data to a file.
 
@@ -540,19 +578,16 @@ class LabelMeFile(ub.NiceRepr):
 
         if file is None:
             file = self.fpath
-        try:
-            fpath = os.fspath(file)  # type: ignore
-        except TypeError:
-            input_was_pathlike = False
-        else:
-            input_was_pathlike = True
-        if input_was_pathlike:
-            with open(fpath, 'w') as file:
-                self.dump(file)
+        if file is None:
+            raise ValueError('no output path was specified')
+        if isinstance(file, (str, os.PathLike)):
+            fpath = os.fspath(file)
+            with open(fpath, 'w') as stream:
+                self.dump(stream)
         else:
             kwutil.Json.dump(self.data, file)
 
-    def dumps(self):
+    def dumps(self) -> str:
         """
         Save the LabelMe JSON data to a file.
 

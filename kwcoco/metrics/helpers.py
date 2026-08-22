@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import ubelt as ub
+from collections.abc import Collection, Iterator
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import kwcoco
 
 
 def associate_images(
-    dset1, dset2, key_fallback=None, valid_image_ids=None, flatten_video_structure=False
-):
+    dset1: 'kwcoco.CocoDataset',
+    dset2: 'kwcoco.CocoDataset',
+    key_fallback: str | None = None,
+    valid_image_ids: Collection[int] | None = None,
+    flatten_video_structure: bool = False,
+) -> dict[str, Any]:
     """
     Builds an association between image-ids in two datasets.
 
@@ -108,7 +117,9 @@ def associate_images(
     """
     common_vidnames = set(dset1.index.name_to_video) & set(dset2.index.name_to_video)
 
-    def image_keys(dset, gids):
+    def image_keys(
+        dset: 'kwcoco.CocoDataset', gids: Collection[int]
+    ) -> Iterator[str | int]:
         # Generate image "keys" that should be compatible between datasets
         for gid in gids:
             img = dset.imgs[gid]
@@ -133,7 +144,7 @@ def associate_images(
     gid_to_key1 = ub.invert_dict(key_to_gid1)
     gid_to_key2 = ub.invert_dict(key_to_gid2)
 
-    video_matches = []
+    video_matches: list[dict[str, Any]] = []
 
     all_match_gids1 = set()
     all_match_gids2 = set()
@@ -170,12 +181,12 @@ def associate_images(
     remain_gids1 = [key_to_gid1[key] for key in remain_keys]
     remain_gids2 = [key_to_gid2[key] for key in remain_keys]
 
-    image_matches = {
+    image_matches: dict[str, Any] = {
         'match_gids1': remain_gids1,
         'match_gids2': remain_gids2,
     }
 
-    matches = {
+    matches: dict[str, Any] = {
         'image': image_matches,
         'video': video_matches,
     }

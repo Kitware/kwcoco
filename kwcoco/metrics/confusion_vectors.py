@@ -4,6 +4,9 @@ confusion measures.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, KeysView, Mapping, Sequence
+from typing import Any
+
 import numpy as np
 import ubelt as ub
 import warnings
@@ -77,15 +80,20 @@ class ConfusionVectors(ub.NiceRepr):
         ...
     """
 
-    def __init__(cfsn_vecs, data, classes, probs=None):
+    def __init__(
+        cfsn_vecs,
+        data: Any,
+        classes: Sequence[str] | CategoryTree | None,
+        probs: np.ndarray | None = None,
+    ) -> None:
         cfsn_vecs.data = data
         cfsn_vecs.classes = classes
         cfsn_vecs.probs = probs
 
-    def __nice__(cfsn_vecs):
+    def __nice__(cfsn_vecs) -> str:
         return cfsn_vecs.data.__nice__()
 
-    def __json__(self):
+    def __json__(self) -> dict[str, Any]:
         """
         Serialize to json
 
@@ -97,14 +105,18 @@ class ConfusionVectors(ub.NiceRepr):
             >>> print('state = {}'.format(ub.urepr(state, nl=2, precision=2, align=1)))
             >>> recon = ConfusionVectors.from_json(state)
         """
+        if self.classes is None:
+            classes_state = None
+        else:
+            classes_state = CategoryTree.coerce(self.classes).__json__()
         state = {
             'probs': None if self.probs is None else self.probs.tolist(),
-            'classes': self.classes.__json__(),
+            'classes': classes_state,
             'data': self.data.pandas().to_dict(orient='list'),
         }
         return state
 
-    def pandas(self, concat_prob_columns=False):
+    def pandas(self, concat_prob_columns: bool = False) -> Any:
         """
         Return a pandas representation.
 
@@ -130,28 +142,36 @@ class ConfusionVectors(ub.NiceRepr):
             # Maybe add probabilities as columns?
             import pandas as pd
 
-            probs_df = pd.DataFrame(self.probs, columns=self.classes)
+            if self.classes is None:
+                raise ValueError('classes are required to label probability columns')
+            class_names = [str(c) for c in self.classes]
+            probs_df = pd.DataFrame(self.probs, columns=pd.Index(class_names))
             df = pd.concat([df, probs_df], axis=1)
         else:
             df.attrs['probs'] = self.probs
         return df
 
     @classmethod
-    def from_json(cls, state):
+    def from_json(cls, state: Mapping[str, Any]) -> 'ConfusionVectors':
         import kwarray
         import kwcoco
 
         probs = state['probs']
         if probs is not None:
             probs = np.array(probs)
-        classes = kwcoco.CategoryTree.from_json(state['classes'])
+        classes_state = state['classes']
+        classes = (
+            None
+            if classes_state is None
+            else kwcoco.CategoryTree.from_json(classes_state)
+        )
         data = ub.map_vals(np.array, state['data'])
         data = kwarray.DataFrameArray(data)
         self = cls(data=data, probs=probs, classes=classes)
         return self
 
     @classmethod
-    def demo(cfsn_vecs, **kw):
+    def demo(cfsn_vecs, **kw: Any) -> 'ConfusionVectors':
         """
         Args:
             **kwargs: See :func:`kwcoco.metrics.DetectionMetrics.demo`
@@ -193,14 +213,14 @@ class ConfusionVectors(ub.NiceRepr):
 
     @classmethod
     def from_arrays(
-        ConfusionVectors,
-        true,
-        pred=None,
-        score=None,
-        weight=None,
-        probs=None,
-        classes=None,
-    ):
+        cls,
+        true: Any,
+        pred: Any = None,
+        score: Any = None,
+        weight: Any = None,
+        probs: np.ndarray | None = None,
+        classes: Sequence[str] | CategoryTree | None = None,
+    ) -> 'ConfusionVectors':
         """
         Construct confusion vector data structure from component arrays
 
@@ -241,10 +261,10 @@ class ConfusionVectors(ub.NiceRepr):
 
         data = {k: v for k, v in data.items() if v is not None}
         cfsn_data = kwarray.DataFrameArray(data)
-        cfsn_vecs = ConfusionVectors(cfsn_data, probs=probs, classes=classes)
+        cfsn_vecs = cls(cfsn_data, probs=probs, classes=classes)
         return cfsn_vecs
 
-    def confusion_matrix(cfsn_vecs, compress=False):
+    def confusion_matrix(cfsn_vecs, compress: bool = False) -> Any:
         """
         Builds a confusion matrix from the confusion vectors.
 
@@ -278,13 +298,16 @@ class ConfusionVectors(ub.NiceRepr):
             cat_3             2.00   0.00   0.00  17.00
         """
         data = cfsn_vecs.data
+        classes = cfsn_vecs.classes
+        if classes is None:
+            raise ValueError('classes are required to build a confusion matrix')
 
         y_true = data['true'].copy()
         y_pred = data['pred'].copy()
 
         # FIXME: hard-coded background class
-        if 'background' in cfsn_vecs.classes:
-            bg_idx = cfsn_vecs.classes.index('background')
+        if 'background' in classes:
+            bg_idx = classes.index('background')
             y_true[y_true < 0] = bg_idx
             y_pred[y_pred < 0] = bg_idx
         else:
@@ -296,15 +319,15 @@ class ConfusionVectors(ub.NiceRepr):
         matrix = fast_confusion_matrix(
             y_true,
             y_pred,
-            n_labels=len(cfsn_vecs.classes),
+            n_labels=len(classes),
             sample_weight=data.get('weight', None),
         )
 
         import pandas as pd
 
-        cm = pd.DataFrame(
-            matrix, index=list(cfsn_vecs.classes), columns=list(cfsn_vecs.classes)  # type: ignore
-        )
+        class_names = [str(c) for c in classes]
+        class_index = pd.Index(class_names)
+        cm = pd.DataFrame(matrix, index=class_index, columns=class_index)
         if compress:
             iszero = matrix == 0
             unused = np.all(iszero, axis=0) & np.all(iszero, axis=1)
@@ -313,7 +336,7 @@ class ConfusionVectors(ub.NiceRepr):
         cm.columns.name = 'pred'
         return cm
 
-    def coarsen(cfsn_vecs, cxs):
+    def coarsen(cfsn_vecs, cxs: Iterable[int]) -> 'ConfusionVectors':
         """
         Creates a coarsened set of vectors
 
@@ -355,7 +378,9 @@ class ConfusionVectors(ub.NiceRepr):
         )
         return coarse_cfsn_vecs
 
-    def binarize_classless(cfsn_vecs, negative_classes=None):
+    def binarize_classless(
+        cfsn_vecs, negative_classes: Iterable[str | int] | None = None
+    ) -> 'BinaryConfusionVectors':
         """
         Creates a binary representation useful for measuring the performance of
         detectors. It is assumed that scores of "positive" classes should be
@@ -398,7 +423,7 @@ class ConfusionVectors(ub.NiceRepr):
                     raise Exception(
                         'classes must be known if negative_classes are strings'
                     )
-                return [c.lower() for c in cfsn_vecs.classes]
+                return [str(c).lower() for c in cfsn_vecs.classes]
 
             for c in negative_classes:
                 if isinstance(c, str):
@@ -424,8 +449,12 @@ class ConfusionVectors(ub.NiceRepr):
         return nocls_binvecs
 
     def binarize_ovr(
-        cfsn_vecs, mode=1, keyby='name', ignore_classes={'ignore'}, approx=False
-    ):
+        cfsn_vecs,
+        mode: int = 1,
+        keyby: str = 'name',
+        ignore_classes: Iterable[str] = {'ignore'},
+        approx: bool = False,
+    ) -> 'OneVsRestConfusionVectors':
         """
         Transforms cfsn_vecs into one-vs-rest BinaryConfusionVectors for each
         category.
@@ -493,14 +522,18 @@ class ConfusionVectors(ub.NiceRepr):
         import kwarray
 
         classes = cfsn_vecs.classes
+        if classes is None:
+            raise ValueError('classes are required for one-vs-rest binarization')
         data = cfsn_vecs.data
 
         if mode == 0:
             if cfsn_vecs.probs is None:
                 raise ValueError('cannot binarize in mode=0 without probs')
+            if not isinstance(classes, CategoryTree):
+                raise TypeError('mode=0 requires classes to be a CategoryTree')
             pdist = classes.idx_pairwise_distance()
 
-        cx_to_binvecs = {}
+        cx_to_binvecs: dict[int, BinaryConfusionVectors] = {}
         for cx in range(len(classes)):
             if classes[cx] == 'background' or classes[cx] in ignore_classes:
                 continue
@@ -618,17 +651,20 @@ class ConfusionVectors(ub.NiceRepr):
                 bin_cfsn = BinaryConfusionVectors(bin_data, cx, classes)
             cx_to_binvecs[cx] = bin_cfsn
 
+        keyed_binvecs: dict[int | str, BinaryConfusionVectors]
         if keyby == 'cx':
-            cx_to_binvecs = cx_to_binvecs
+            keyed_binvecs = {cx: binvec for cx, binvec in cx_to_binvecs.items()}
         elif keyby == 'name':
-            cx_to_binvecs = ub.map_keys(cfsn_vecs.classes, cx_to_binvecs)
+            keyed_binvecs = {
+                str(classes[cx]): binvec for cx, binvec in cx_to_binvecs.items()
+            }
         else:
             raise KeyError(keyby)
 
-        ovr_cfns = OneVsRestConfusionVectors(cx_to_binvecs, cfsn_vecs.classes)
+        ovr_cfns = OneVsRestConfusionVectors(keyed_binvecs, classes)
         return ovr_cfns
 
-    def classification_report(cfsn_vecs, verbose=0):
+    def classification_report(cfsn_vecs, verbose: int = 0) -> dict[str, Any]:
         """
         Build a classification report with various metrics.
 
@@ -640,10 +676,13 @@ class ConfusionVectors(ub.NiceRepr):
         """
         from kwcoco.metrics import clf_report
 
+        classes = cfsn_vecs.classes
+        if classes is None:
+            raise ValueError('classes are required for a classification report')
         y_true = cfsn_vecs.data['true']
         y_pred = cfsn_vecs.data['pred']
         sample_weight = cfsn_vecs.data.get('weight', None)
-        target_names = list(cfsn_vecs.classes)
+        target_names = [str(c) for c in classes]
         report = clf_report.classification_report(
             y_true=y_true,
             y_pred=y_pred,
@@ -671,15 +710,19 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         >>> print('self = {!r}'.format(self))
     """
 
-    def __init__(self, cx_to_binvecs, classes):
+    def __init__(
+        self,
+        cx_to_binvecs: Mapping[int | str, 'BinaryConfusionVectors'],
+        classes: Sequence[str] | CategoryTree,
+    ) -> None:
         self.cx_to_binvecs = cx_to_binvecs
         self.classes = classes
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return ub.urepr(self.cx_to_binvecs, strvals=True, align=':')
 
     @classmethod
-    def demo(cls):
+    def demo(cls) -> 'OneVsRestConfusionVectors':
         """
         Args:
             **kwargs: See :func:`kwcoco.metrics.DetectionMetrics.demo`
@@ -691,19 +734,19 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
         self = cfsn_vecs.binarize_ovr(keyby='name')
         return self
 
-    def keys(self):
+    def keys(self) -> KeysView[int | str]:
         return self.cx_to_binvecs.keys()
 
-    def __getitem__(self, cx):
+    def __getitem__(self, cx: int | str) -> 'BinaryConfusionVectors':
         return self.cx_to_binvecs[cx]
 
     def measures(
         self,
-        stabalize_thresh=7,
-        fp_cutoff=None,
-        monotonic_ppv=True,
-        ap_method='pycocotools',
-    ):
+        stabalize_thresh: int = 7,
+        fp_cutoff: int | None = None,
+        monotonic_ppv: bool = True,
+        ap_method: str = 'pycocotools',
+    ) -> dict[str, Any]:
         """
         Creates binary confusion measures for every one-versus-rest category.
 
@@ -749,7 +792,7 @@ class OneVsRestConfusionVectors(ub.NiceRepr):
             'perclass': perclass,
         }
 
-    def ovr_classification_report(self):
+    def ovr_classification_report(self) -> Any:
         raise NotImplementedError
 
 
@@ -780,7 +823,12 @@ class BinaryConfusionVectors(ub.NiceRepr):
         >>> print('measures = {}'.format(ub.urepr(self.measures())))
     """
 
-    def __init__(self, data, cx=None, classes=None):
+    def __init__(
+        self,
+        data: Any,
+        cx: int | None = None,
+        classes: Sequence[str] | CategoryTree | None = None,
+    ) -> None:
         import kwarray
 
         if data is None:
@@ -800,7 +848,14 @@ class BinaryConfusionVectors(ub.NiceRepr):
         self.classes = classes
 
     @classmethod
-    def demo(cls, n=10, p_true=0.5, p_error=0.2, p_miss=0.0, rng=None):
+    def demo(
+        cls,
+        n: int = 10,
+        p_true: float = 0.5,
+        p_error: float = 0.2,
+        p_miss: float = 0.0,
+        rng: Any = None,
+    ) -> 'BinaryConfusionVectors':
         """
         Create random data for tests
 
@@ -850,12 +905,12 @@ class BinaryConfusionVectors(ub.NiceRepr):
         return self
 
     @property
-    def catname(self):
+    def catname(self) -> str | None:
         if self.cx is None:
             return None
         return self.classes[self.cx]  # type: ignore
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         return ub.urepr(
             {
                 'catname': self.catname,
@@ -866,17 +921,17 @@ class BinaryConfusionVectors(ub.NiceRepr):
             align=':',
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
     # @ub.memoize_method
     def measures(
         self,
-        stabalize_thresh=7,
-        fp_cutoff=None,
-        monotonic_ppv=True,
-        ap_method='pycocotools',
-    ):
+        stabalize_thresh: int = 7,
+        fp_cutoff: int | None = None,
+        monotonic_ppv: bool = True,
+        ap_method: str = 'pycocotools',
+    ) -> Measures:
         """
         Get statistics (F1, G1, MCC) versus thresholds
 
@@ -1045,7 +1100,7 @@ class BinaryConfusionVectors(ub.NiceRepr):
             )
         return info
 
-    def draw_distribution(self):
+    def draw_distribution(self) -> Any:
         data = self.data
         y_true = data['is_true'].astype(np.uint8)
         y_score = data['pred_score']

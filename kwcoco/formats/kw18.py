@@ -40,6 +40,12 @@ from __future__ import annotations
 
 import kwarray
 import numpy as np
+import os
+from collections.abc import Mapping
+from typing import IO, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import kwcoco
 
 
 class KW18(kwarray.DataFrameArray):
@@ -80,7 +86,7 @@ class KW18(kwarray.DataFrameArray):
         'activity_type_id',  # 21
     ]
 
-    def __init__(self, data):
+    def __init__(self, data: Any) -> None:
         """
         Args:
             data : the kw18 data frame.
@@ -88,18 +94,18 @@ class KW18(kwarray.DataFrameArray):
         super().__init__(data)
 
     @classmethod
-    def demo(KW18):
+    def demo(cls) -> 'KW18':
         import kwcoco
 
         coco_dset = kwcoco.CocoDataset.demo('shapes8')
-        self = KW18.from_coco(coco_dset)
+        self = cls.from_coco(coco_dset)
         return self
 
     @classmethod
-    def from_coco(KW18, coco_dset):
+    def from_coco(cls, coco_dset: 'kwcoco.CocoDataset') -> 'KW18':
         import kwimage
 
-        raw = {col: None for col in KW18.DEFAULT_COLUMNS}
+        raw = {col: None for col in cls.DEFAULT_COLUMNS}
         anns = coco_dset.dataset['annotations']
         boxes = kwimage.Boxes(np.array([ann['bbox'] for ann in anns]), 'xywh')
         tlbr = boxes.to_ltrb()
@@ -163,10 +169,14 @@ class KW18(kwarray.DataFrameArray):
         for groupx in groupxs:
             raw['track_length'][groupx] = len(groupx)
 
-        self = KW18(raw)
+        self = cls(raw)
         return self
 
-    def to_coco(self, image_paths=None, video_name=None):
+    def to_coco(
+        self,
+        image_paths: Mapping[int, str] | None = None,
+        video_name: str | None = None,
+    ) -> 'kwcoco.CocoDataset':
         """
         Translates a kw18 files to a CocoDataset.
 
@@ -229,7 +239,7 @@ class KW18(kwarray.DataFrameArray):
 
         # kw18 files correspond to one video
         vidid = 1
-        dset.add_video(id=vidid, name='unknown_kw18_video')
+        dset.add_video(id=vidid, name=video_name or 'unknown_kw18_video')
 
         # Index frames of the video
         for idx in unique_frame_idxs:
@@ -277,7 +287,7 @@ class KW18(kwarray.DataFrameArray):
         return dset
 
     @classmethod
-    def load(KW18, file):
+    def load(cls, file: str | os.PathLike[str] | IO[str]) -> 'KW18':
         """
         Example:
             >>> import kwcoco
@@ -297,14 +307,14 @@ class KW18(kwarray.DataFrameArray):
             df = pd.read_csv(file, sep=' +', comment='#', header=None, engine='python')
         except EmptyDataError:
             df = pd.DataFrame()
-        renamer = dict(zip(df.columns, KW18.DEFAULT_COLUMNS))
+        renamer = dict(zip(df.columns, cls.DEFAULT_COLUMNS))
         raw = df.rename(columns=renamer)
         raw = _ensure_kw18_column_order(raw)
-        self = KW18(raw)
+        self = cls(raw)
         return self
 
     @classmethod
-    def loads(KW18, text):
+    def loads(cls, text: str) -> 'KW18':
         """
         Example:
             >>> self = KW18.demo()
@@ -317,12 +327,10 @@ class KW18(kwarray.DataFrameArray):
         file = io.StringIO()
         file.write(text)
         file.seek(0)
-        self = KW18.load(file)
+        self = cls.load(file)
         return self
 
-    def dump(self, file):
-        import os
-
+    def dump(self, file: str | os.PathLike[str] | IO[str]) -> None:
         if isinstance(file, (str, os.PathLike)):
             with open(file, 'w') as fp:
                 self.dump(fp)
@@ -332,7 +340,7 @@ class KW18(kwarray.DataFrameArray):
             file.write('#' + ' '.join(df.columns) + '\n')
             df.to_csv(file, sep=' ', mode='a', index=False, header=False)
 
-    def dumps(self):
+    def dumps(self) -> str:
         """
         Example:
             >>> self = KW18.demo()

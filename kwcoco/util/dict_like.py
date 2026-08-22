@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping, MutableMapping
 from typing import Any, Generic, TypeVar, overload
 
 import ubelt as ub
-from scriptconfig.dict_like import DictLike as DictLike_  # FIXME: do we vendor or not?
 
 # from sqlalchemy.dialects.postgresql import Any
 
@@ -181,21 +180,51 @@ class DictLike(ub.NiceRepr, Generic[K, V]):
             return default
 
 
-class DictProxy(DictLike_):
+class DictProxy(Mapping[K, V]):
     """
-    Allows an object to proxy the behavior of a dict attribute
+    Allows an object to proxy the behavior of a mutable mapping attribute.
+
+    Subclasses only need to assign ``self.proxy``.  The proxy itself is
+    mutable, while the inherited :class:`Mapping` interface gives callers a
+    precise read contract.
     """
 
-    proxy: dict[str, Any]
+    proxy: MutableMapping[K, V]
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, key: K) -> V:
         return self.proxy[key]
 
-    def __setitem__(self, key: str, value: Any) -> None:
+    def __setitem__(self, key: K, value: V) -> None:
         self.proxy[key] = value
 
-    def keys(self) -> Iterable[str]:
-        return self.proxy.keys()
+    def __delitem__(self, key: K) -> None:
+        del self.proxy[key]
 
-    def __json__(self) -> dict[str, Any]:
+    def __iter__(self) -> Iterator[K]:
+        return iter(self.proxy)
+
+    def __len__(self) -> int:
+        return len(self.proxy)
+
+    def copy(self) -> dict[K, V]:
+        return dict(self.proxy)
+
+    def to_dict(self) -> dict[K, V]:
+        return dict(self.proxy)
+
+    asdict = to_dict
+
+    def update(self, other: Mapping[K, V]) -> None:
+        self.proxy.update(other)
+
+    def iteritems(self) -> Iterator[tuple[K, V]]:
+        return iter(self.proxy.items())
+
+    def itervalues(self) -> Iterator[V]:
+        return iter(self.proxy.values())
+
+    def iterkeys(self) -> Iterator[K]:
+        return iter(self.proxy.keys())
+
+    def __json__(self) -> dict[Any, Any]:
         return ub.odict(self.proxy)

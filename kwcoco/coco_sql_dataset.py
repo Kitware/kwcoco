@@ -71,8 +71,10 @@ TODO:
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator, Mapping
+from typing import Any, Dict, Optional, Tuple, Type, overload
+
 import numpy as np
-from typing import Any, Dict, Optional, Tuple, Type
 
 import ubelt as ub
 import os
@@ -81,6 +83,7 @@ from os.path import exists, dirname
 from kwcoco.util.dict_like import DictLike  # NOQA
 from kwcoco.abstract_coco_dataset import AbstractCocoDataset
 from kwcoco.coco_dataset import (  # NOQA
+    CocoDataset,
     MixinCocoAccessors,
     MixinCocoObjects,
     MixinCocoStats,
@@ -176,10 +179,10 @@ except ImportError:
 try:
     from psycopg2.extensions import register_adapter, AsIs
 
-    def addapt_numpy_float64(numpy_float64):
+    def addapt_numpy_float64(numpy_float64: np.float64) -> Any:
         return AsIs(numpy_float64)
 
-    def addapt_numpy_int64(numpy_int64):
+    def addapt_numpy_int64(numpy_int64: np.int64) -> Any:
         return AsIs(numpy_int64)
 
     register_adapter(np.float64, addapt_numpy_float64)
@@ -332,14 +335,14 @@ else:
             CocoBase.TBLNAME_TO_CLASS[tblname] = cls
 
 
-def orm_to_dict(obj):
+def orm_to_dict(obj: Any) -> dict[str, Any]:
     item = obj.__dict__.copy()
     item.pop('_sa_instance_state', None)
     item = dict_restructure(item)
     return item
 
 
-def dict_restructure(item):
+def dict_restructure(item: dict[str, Any]) -> dict[str, Any]:
     """
     Removes the unstructured field so the API is transparent to the user.
     """
@@ -391,20 +394,20 @@ class SqlListProxy(ub.NiceRepr):
     A view of an SQL table that behaves like a Python list
     """
 
-    def __init__(proxy, session, cls):
+    def __init__(proxy, session: Any, cls: Any) -> None:
         proxy.cls = cls
         proxy.session = session
         proxy._colnames = None
         proxy.ALCHEMY_MODE = ALCHEMY_MODE_DEFAULT
 
-    def __len__(proxy):
+    def __len__(proxy) -> int:
         query = proxy.session.query(proxy.cls)
         return query.count()
 
-    def __nice__(proxy):
+    def __nice__(proxy) -> str:
         return '{}: {}'.format(proxy.cls.__tablename__, len(proxy))
 
-    def __iter__(proxy):
+    def __iter__(proxy) -> Iterator[dict[str, Any]]:
         if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.cls).order_by(proxy.cls.id)
             for obj in _orm_yielder(query):
@@ -451,7 +454,15 @@ class SqlListProxy(ub.NiceRepr):
                 item = dict(zip(colnames, cast_row))
                 yield item
 
-    def __getitem__(proxy, index):
+    @overload
+    def __getitem__(proxy, index: int) -> dict[str, Any]: ...
+
+    @overload
+    def __getitem__(proxy, index: slice) -> list[dict[str, Any]]: ...
+
+    def __getitem__(
+        proxy, index: int | slice
+    ) -> dict[str, Any] | list[dict[str, Any]]:
         query = proxy.session.query(proxy.cls)
         if isinstance(index, slice):
             assert index.step in {None, 1}, 'slice queries must be contiguous'
@@ -463,17 +474,17 @@ class SqlListProxy(ub.NiceRepr):
             item = orm_to_dict(obj)
             return item
 
-    def __contains__(proxy, item):
+    def __contains__(proxy, item: object) -> bool:
         raise Exception('cannot perform contains operations on SqlListProxy')
 
-    def __setitem__(proxy, index, value):
+    def __setitem__(proxy, index: int, value: dict[str, Any]) -> None:
         raise Exception('SqlListProxy is immutable')
 
-    def __delitem__(proxy, index):
+    def __delitem__(proxy, index: int) -> None:
         raise Exception('SqlListProxy is immutable')
 
 
-class SqlDictProxy(DictLike):
+class SqlDictProxy(DictLike[Any, dict[str, Any]]):
     """
     Duck-types an SQL table as a dictionary of dictionaries.
 
@@ -560,7 +571,13 @@ class SqlDictProxy(DictLike):
         >>> assert len(list(proxy.values())) == 4
     """
 
-    def __init__(proxy, session, cls, keyattr=None, ignore_null=False):
+    def __init__(
+        proxy,
+        session: Any,
+        cls: Any,
+        keyattr: Any = None,
+        ignore_null: bool = False,
+    ) -> None:
         proxy.cls = cls
         proxy.session = session
         proxy.keyattr = keyattr
@@ -592,7 +609,7 @@ class SqlDictProxy(DictLike):
                 proxy.keyattr.name, proxy.cls.__tablename__, len(proxy)
             )
 
-    def __contains__(proxy, key) -> bool:
+    def __contains__(proxy, key: object) -> bool:
         if proxy._cache is not None:
             if key in proxy._cache:
                 return True
@@ -650,7 +667,7 @@ class SqlDictProxy(DictLike):
                 raise
         return obj
 
-    def __getitem__(proxy, key):
+    def __getitem__(proxy, key: Any) -> dict[str, Any]:
         """
         Example:
             >>> # xdoctest: +REQUIRES(module:sqlalchemy)
@@ -672,7 +689,7 @@ class SqlDictProxy(DictLike):
             proxy._cache[key] = item
         return item
 
-    def keys(proxy):
+    def keys(proxy) -> Iterator[Any]:
         if proxy.ALCHEMY_MODE:
             if proxy.keyattr is None:
                 query = proxy.session.query(proxy.cls.id).order_by(proxy.cls.id)
@@ -700,7 +717,7 @@ class SqlDictProxy(DictLike):
             for item in _raw_yielder(result):
                 yield item[0]
 
-    def values(proxy):
+    def values(proxy) -> Iterator[dict[str, Any]]:
         if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.cls)
             if proxy.ignore_null:
@@ -758,7 +775,7 @@ class SqlDictProxy(DictLike):
                 item = dict_restructure(item)
                 yield item
 
-    def items(proxy):
+    def items(proxy) -> Iterator[tuple[Any, dict[str, Any]]]:
         if proxy.keyattr is None:
             keyattr_name = 'id'
         else:
@@ -767,7 +784,7 @@ class SqlDictProxy(DictLike):
             yield (value[keyattr_name], value)
 
 
-class SqlIdGroupDictProxy(DictLike):
+class SqlIdGroupDictProxy(DictLike[Any, Any]):
     """
     Similar to :class:`SqlDictProxy`, but maps ids to groups of other ids.
 
@@ -832,13 +849,13 @@ class SqlIdGroupDictProxy(DictLike):
 
     def __init__(
         proxy,
-        session,
-        valattr,
-        keyattr,
-        parent_keyattr=None,
-        order_attr=None,
-        order_id=None,
-    ):
+        session: Any,
+        valattr: Any,
+        keyattr: Any,
+        parent_keyattr: Any = None,
+        order_attr: Any = None,
+        order_id: Any = None,
+    ) -> None:
         """
         Args:
             session (sqlalchemy.orm.session.Session): the sqlalchemy session
@@ -945,7 +962,7 @@ class SqlIdGroupDictProxy(DictLike):
         item = _set(item)
         return item
 
-    def __getitem__(proxy, key):
+    def __getitem__(proxy, key: Any) -> Any:
         if proxy._cache is not None:
             if key in proxy._cache:
                 return proxy._cache[key]
@@ -954,7 +971,7 @@ class SqlIdGroupDictProxy(DictLike):
             proxy._cache[key] = item
         return item
 
-    def __contains__(proxy, key) -> bool:
+    def __contains__(proxy, key: object) -> bool:
         if proxy._cache is not None:
             if key in proxy._cache:
                 return True
@@ -970,7 +987,7 @@ class SqlIdGroupDictProxy(DictLike):
                 raise
         return flag
 
-    def keys(proxy):
+    def keys(proxy) -> Iterator[Any]:
         if proxy.ALCHEMY_MODE:
             query = proxy.session.query(proxy.parent_keyattr)
             query = query.order_by(proxy.parent_keyattr)
@@ -988,7 +1005,7 @@ class SqlIdGroupDictProxy(DictLike):
             for item in _raw_yielder(result):
                 yield item[0]
 
-    def items(proxy):
+    def items(proxy) -> Iterator[tuple[Any, Any]]:
         _set = set if proxy.order_attr is None else ub.oset
         if proxy.order_attr is not None:
             # print('proxy.order_attr = {!r}'.format(proxy.order_attr))
@@ -1110,7 +1127,7 @@ class SqlIdGroupDictProxy(DictLike):
                     tup = (key, group)
                     yield tup
 
-    def values(proxy):
+    def values(proxy) -> Iterator[Any]:
         # Not sure if there if iterating over just the values can be more
         # efficient than iterating over the items and discarding the values.
         for key, val in proxy.items():
@@ -1172,7 +1189,7 @@ class CocoSqlIndex:
     dataset: dict[str, SqlListProxy]
     _id_lookup: dict[str, SqlDictProxy]
 
-    def __init__(index):
+    def __init__(index) -> None:
         unbuilt: Any = None
         index.anns = unbuilt
         index.imgs = unbuilt
@@ -1195,7 +1212,7 @@ class CocoSqlIndex:
         index.dataset = unbuilt
         index._id_lookup = unbuilt
 
-    def build(index, parent):
+    def build(index, parent: 'CocoSqlDatabase') -> None:
         session = parent.session
         index.anns = SqlDictProxy(session, Annotation)
         index.imgs = SqlDictProxy(session, Image)
@@ -1377,7 +1394,12 @@ class CocoSqlDatabase(
 
     MEMORY_URI = 'sqlite:///:memory:'
 
-    def __init__(self, uri=None, tag=None, img_root=None):
+    def __init__(
+        self,
+        uri: str | None = None,
+        tag: str | None = None,
+        img_root: str | os.PathLike[str] | None = None,
+    ) -> None:
         if uri is None:
             uri = self.MEMORY_URI
 
@@ -1393,7 +1415,7 @@ class CocoSqlDatabase(
         self.tag = tag
         self._dialect_name = None
 
-    def __nice__(self):
+    def __nice__(self) -> str:
         if self.dataset is None:
             return 'not connected'
 
@@ -1405,7 +1427,11 @@ class CocoSqlDatabase(
         return ', '.join(parts)
 
     @classmethod
-    def coerce(self, data, backend=None):
+    def coerce(
+        self,
+        data: str | os.PathLike[str] | CocoDataset,
+        backend: str | None = None,
+    ) -> 'CocoSqlDatabase':
         """
         Create an SQL CocoDataset from the input pointer.
 
@@ -1446,7 +1472,7 @@ class CocoSqlDatabase(
             raise NotImplementedError
         return self
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         """
         Return only the minimal info when pickling this object.
 
@@ -1488,7 +1514,7 @@ class CocoSqlDatabase(
             'tag': self.tag,
         }
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: Mapping[str, Any]) -> None:
         """
         Reopen new readonly connections when unpickling the object.
         """
@@ -1498,7 +1524,7 @@ class CocoSqlDatabase(
         # Make unpickled objects readonly
         self.connect(readonly=True)
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """
         Disconnect from an existing session and drop references to SQL / cache
         objects.
@@ -1509,7 +1535,9 @@ class CocoSqlDatabase(
         self.engine = None
         self.index = None
 
-    def connect(self, readonly=False, verbose=0, must_exist=False):
+    def connect(
+        self, readonly: bool = False, verbose: int = 0, must_exist: bool = False
+    ) -> 'CocoSqlDatabase':
         """
         Connects this instance to the underlying database.
 
@@ -1620,10 +1648,10 @@ class CocoSqlDatabase(
         return self
 
     @property
-    def fpath(self):
+    def fpath(self) -> str:
         return self.uri
 
-    def delete(self, verbose=0):
+    def delete(self, verbose: int = 0) -> None:
         if verbose:
             print(f'delete {self.uri}')
         fpath = self.uri.split('///file:')[-1]
@@ -1645,11 +1673,13 @@ class CocoSqlDatabase(
                 if verbose:
                     print('deleting postgresql database, doesnt exist')
 
-    def table_names(self):
+    def table_names(self) -> list[str]:
         table_names = sqlalchemy.inspect(self.engine).get_table_names()  # type: ignore  # type: ignore
         return table_names
 
-    def populate_from(self, dset, verbose=1):
+    def populate_from(
+        self, dset: CocoDataset, verbose: int = 1
+    ) -> None:
         """
         Copy the information in a :class:`CocoDataset` into this SQL database.
 
@@ -1762,26 +1792,26 @@ class CocoSqlDatabase(
         session.commit()  # type: ignore
 
     @property
-    def dataset(self):
+    def dataset(self) -> dict[str, SqlListProxy]:
         return self.index.dataset  # type: ignore
 
     @property
-    def anns(self):
+    def anns(self) -> SqlDictProxy:
         return self.index.anns  # type: ignore
 
     @property
-    def cats(self):
+    def cats(self) -> SqlDictProxy:
         return self.index.cats  # type: ignore
 
     @property
-    def imgs(self):
+    def imgs(self) -> SqlDictProxy:
         return self.index.imgs  # type: ignore
 
     @property
-    def name_to_cat(self):
+    def name_to_cat(self) -> SqlDictProxy:
         return self.index.name_to_cat  # type: ignore
 
-    def pandas_table(self, table_name, strict=False):
+    def pandas_table(self, table_name: str, strict: bool = False) -> Any:
         """
         Loads an entire SQL table as a pandas DataFrame
 
@@ -1824,7 +1854,7 @@ class CocoSqlDatabase(
 
         return table_df
 
-    def raw_table(self, table_name):
+    def raw_table(self, table_name: str) -> list[dict[str, Any]]:
         inspector = sqlalchemy.inspect(self.engine)  # type: ignore
         column_infos = inspector.get_columns(table_name)  # type: ignore
         column_names = [d['name'] for d in column_infos]
@@ -2185,7 +2215,7 @@ class CocoSqlDatabase(
         rows = result.fetchall()
         return rows
 
-    def tabular_targets(self):
+    def tabular_targets(self) -> Any:
         """
         Convenience method to create an in-memory summary of basic annotation
         properties with minimal SQL overhead.
@@ -2242,20 +2272,20 @@ class CocoSqlDatabase(
         return table_names
 
     @property
-    def bundle_dpath(self):
+    def bundle_dpath(self) -> str | os.PathLike[str] | None:
         return self.img_root
 
     @bundle_dpath.setter
-    def bundle_dpath(self, value):
+    def bundle_dpath(self, value: str | os.PathLike[str] | None) -> None:
         self.img_root = value
 
     @property
-    def data_fpath(self):
+    def data_fpath(self) -> str:
         """data_fpath is an alias of fpath"""
         return self.fpath
 
     @data_fpath.setter
-    def data_fpath(self, value):
+    def data_fpath(self, value: str) -> None:
         self.fpath = value  # type: ignore
 
     def _orig_coco_fpath(self):
@@ -2365,8 +2395,12 @@ class CocoSqlDatabase(
 
 
 def cached_sql_coco_view(
-    dct_db_fpath=None, sql_db_fpath=None, dset=None, force_rewrite=False, backend=None
-):
+    dct_db_fpath: str | os.PathLike[str] | None = None,
+    sql_db_fpath: str | os.PathLike[str] | None = None,
+    dset: CocoDataset | None = None,
+    force_rewrite: bool = False,
+    backend: str | None = None,
+) -> CocoSqlDatabase:
     """
     Attempts to load a cached SQL-View dataset, only loading and converting the
     json dataset if necessary.
@@ -2387,11 +2421,16 @@ def cached_sql_coco_view(
     elif dset is not None:
         if dct_db_fpath is not None:
             raise ValueError('must specify dset xor dct_db_fpath')
+        if dset.fpath is None:
+            raise ValueError('dataset must have a file path to build a cached SQL view')
         dct_db_fpath = dset.fpath
         bundle_dpath = dset.bundle_dpath
         tag = dset.tag
     else:
         raise AssertionError
+
+    assert dct_db_fpath is not None
+    dct_db_fpath = os.fspath(dct_db_fpath)
 
     if backend is None:
         backend = 'sqlite'
@@ -2449,6 +2488,8 @@ def cached_sql_coco_view(
         else:
             raise KeyError(backend)
 
+    assert sql_db_fpath is not None
+    sql_db_fpath = os.fspath(sql_db_fpath)
     if backend == 'sqlite':
         cache_product = [sql_db_fpath]
     else:
@@ -2508,7 +2549,12 @@ def cached_sql_coco_view(
     return self
 
 
-def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False, backend=None):
+def ensure_sql_coco_view(
+    dset: CocoDataset,
+    db_fpath: str | os.PathLike[str] | None = None,
+    force_rewrite: bool = False,
+    backend: str | None = None,
+) -> CocoSqlDatabase:
     """
     Create a cached on-disk SQL view of an on-disk COCO dataset.
 
@@ -2523,7 +2569,9 @@ def ensure_sql_coco_view(dset, db_fpath=None, force_rewrite=False, backend=None)
     )
 
 
-def demo(num=10, backend=None):
+def demo(
+    num: int = 10, backend: str | None = None
+) -> tuple[CocoSqlDatabase, CocoDataset]:
     import kwcoco
 
     dset = kwcoco.CocoDataset.demo(
@@ -2546,20 +2594,29 @@ def demo(num=10, backend=None):
     return self, dset
 
 
-def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
+def assert_dsets_allclose(
+    dset1: CocoDataset | CocoSqlDatabase,
+    dset2: CocoDataset | CocoSqlDatabase,
+    tag1: str = 'dset1',
+    tag2: str = 'dset2',
+) -> bool:
     # Test that the duck types are working
+    index1 = dset1.index
+    index2 = dset2.index
+    if index1 is None or index2 is None:
+        raise AssertionError('datasets must have built indexes')
     compare = {}
     compare['gid_to_aids'] = {
-        tag1: dict(dset1.index.gid_to_aids),
-        tag2: dict(dset2.index.gid_to_aids),
+        tag1: dict(index1.gid_to_aids),
+        tag2: dict(index2.gid_to_aids),
     }
     compare['cid_to_aids'] = {
-        tag1: dict(dset1.index.cid_to_aids),
-        tag2: dict(dset2.index.cid_to_aids),
+        tag1: dict(index1.cid_to_aids),
+        tag2: dict(index2.cid_to_aids),
     }
     compare['vidid_to_gids'] = {
-        tag1: dict(dset1.index.vidid_to_gids),
-        tag2: dict(dset2.index.vidid_to_gids),
+        tag1: dict(index1.vidid_to_gids),
+        tag2: dict(index2.vidid_to_gids),
     }
     for key, pair in compare.items():
         lut1 = pair[tag1]
@@ -2572,16 +2629,16 @@ def assert_dsets_allclose(dset1, dset2, tag1='dset1', tag2='dset2'):
     # The row dictionaries may have extra Nones on the SQL side
     # So the comparison logic is slightly more involved here
     compare = {}
-    compare['imgs'] = {tag1: dict(dset1.index.imgs), tag2: dict(dset2.index.imgs)}
-    compare['anns'] = {tag1: dict(dset1.index.anns), tag2: dict(dset2.index.anns)}
-    compare['cats'] = {tag1: dict(dset1.index.cats), tag2: dict(dset2.index.cats)}
+    compare['imgs'] = {tag1: dict(index1.imgs), tag2: dict(index2.imgs)}
+    compare['anns'] = {tag1: dict(index1.anns), tag2: dict(index2.anns)}
+    compare['cats'] = {tag1: dict(index1.cats), tag2: dict(index2.cats)}
     compare['file_name_to_img'] = {
-        tag1: dict(dset1.index.file_name_to_img),
-        tag2: dict(dset2.index.file_name_to_img),
+        tag1: dict(index1.file_name_to_img),
+        tag2: dict(index2.file_name_to_img),
     }
     compare['name_to_cat'] = {
-        tag1: dict(dset1.index.name_to_cat),
-        tag2: dict(dset2.index.name_to_cat),
+        tag1: dict(index1.name_to_cat),
+        tag2: dict(index2.name_to_cat),
     }
     special_cols = {'_bbox_x', '_bbox_y', '_bbox_w', '_bbox_h'}
     for key, pair in compare.items():
@@ -2879,6 +2936,8 @@ def devcheck():
     with timerit.Timer('annots'):
         self.annots()
 
+    if self.index is None:
+        raise AssertionError('SQL dataset index is not initialized')
     proxy = self.index.imgs
     gids = list(proxy.keys())
 

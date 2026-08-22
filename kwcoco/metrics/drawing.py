@@ -3,11 +3,21 @@ from __future__ import annotations
 import numpy as np
 import ubelt as ub
 import warnings
+from collections.abc import Collection, Mapping, Sequence
+from typing import Any, Hashable, TypeVar
+
+
+K = TypeVar('K', bound=Hashable)
 
 
 def draw_perclass_roc(
-    cx_to_info, classes=None, prefix='', fnum=1, fp_axis='count', **kw
-):
+    cx_to_info: Mapping[Any, Mapping[str, Any]],
+    classes: Sequence[str] | None = None,
+    prefix: str = '',
+    fnum: int = 1,
+    fp_axis: str = 'count',
+    **kw: Any,
+) -> Any:
     """
     Args:
         cx_to_info (kwcoco.metrics.confusion_measures.PerClass_Measures | Dict):
@@ -76,7 +86,7 @@ def draw_perclass_roc(
     return ax
 
 
-def demo_format_options():
+def demo_format_options() -> None:
     # https://docs.python.org/3.10/library/string.html#formatstrings
 
     grid = {
@@ -96,7 +106,9 @@ def demo_format_options():
         print(out)
 
 
-def concice_si_display(val, eps=1e-8, precision=2, si_thresh=4):
+def concice_si_display(
+    val: float | int, eps: float = 1e-8, precision: int = 2, si_thresh: int = 4
+) -> str:
     """
     Display numbers in scientific notation if above a threshold
 
@@ -163,7 +175,7 @@ def concice_si_display(val, eps=1e-8, precision=2, si_thresh=4):
     return val_str
 
 
-def format_scientific_notation(val, precision=2):
+def format_scientific_notation(val: float | int, precision: int = 2) -> str:
     # Test this better
     val_str = ('{:.' + str(precision) + 'e}').format(val)
     lhs, rhs = val_str.split('e')
@@ -178,7 +190,7 @@ def format_scientific_notation(val, precision=2):
     return val_str
 
 
-def _realpos_label_suffix(info):
+def _realpos_label_suffix(info: Mapping[str, Any]) -> str:
     """
     Creates a label suffix that indicates the number of real positive cases
     versus the total amount of cases considered for an evaluation curve.
@@ -222,7 +234,13 @@ def _realpos_label_suffix(info):
         return '{}/{}'.format(rpt_dsp, nsupport_dsp)
 
 
-def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
+def draw_perclass_prcurve(
+    cx_to_info: Mapping[Any, Mapping[str, Any]],
+    classes: Sequence[str] | None = None,
+    prefix: str = '',
+    fnum: int = 1,
+    **kw: Any,
+) -> Any:
     """
     Args:
         cx_to_info (kwcoco.metrics.confusion_measures.PerClass_Measures | Dict):
@@ -361,8 +379,13 @@ def draw_perclass_prcurve(cx_to_info, classes=None, prefix='', fnum=1, **kw):
 
 
 def draw_perclass_thresholds(
-    cx_to_info, key='mcc', classes=None, prefix='', fnum=1, **kw
-):
+    cx_to_info: Mapping[Any, Mapping[str, Any]],
+    key: str = 'mcc',
+    classes: Sequence[str] | None = None,
+    prefix: str = '',
+    fnum: int = 1,
+    **kw: Any,
+) -> Any:
     """
     Args:
         cx_to_info (kwcoco.metrics.confusion_measures.PerClass_Measures | Dict):
@@ -439,7 +462,9 @@ def draw_perclass_thresholds(
     return ax
 
 
-def draw_roc(info, prefix='', fnum=1, **kw):
+def draw_roc(
+    info: Mapping[str, Any], prefix: str = '', fnum: int = 1, **kw: Any
+) -> Any:
     """
     Args:
         info (Measures | Dict)
@@ -532,7 +557,9 @@ def draw_roc(info, prefix='', fnum=1, **kw):
     return ax
 
 
-def draw_prcurve(info, prefix='', fnum=1, **kw):
+def draw_prcurve(
+    info: Mapping[str, Any], prefix: str = '', fnum: int = 1, **kw: Any
+) -> Any:
     """
     Draws a single pr curve.
 
@@ -625,7 +652,13 @@ def draw_prcurve(info, prefix='', fnum=1, **kw):
     return ax
 
 
-def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
+def draw_threshold_curves(
+    info: Mapping[str, Any],
+    keys: Sequence[str] | None = None,
+    prefix: str = '',
+    fnum: int = 1,
+    **kw: Any,
+) -> Any:
     """
     Args:
         info (Measures | Dict)
@@ -738,9 +771,12 @@ def draw_threshold_curves(info, keys=None, prefix='', fnum=1, **kw):
     return ax
 
 
-def determenistic_colors(keys, preset_colors):
+def determenistic_colors(
+    keys: Collection[K], preset_colors: Mapping[K, Any]
+) -> dict[K, Any]:
     # TODO: port to kwimage / kwplot
-    known_colors = ub.udict(preset_colors) & keys
+    keyset = set(keys)
+    known_colors = {k: v for k, v in preset_colors.items() if k in keyset}
     needs_colors = set(keys) - set(known_colors)
     if needs_colors:
         import matplotlib as mpl

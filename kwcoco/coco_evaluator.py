@@ -70,10 +70,20 @@ import os
 import scriptconfig as scfg
 import ubelt as ub
 import warnings
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from typing import IO, Any
 from os.path import exists
 from os.path import isdir
 from os.path import isfile
 from kwcoco.util.dict_like import DictProxy
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
+    from kwcoco.metrics.confusion_measures import Measures, PerClass_Measures
+    from kwcoco.metrics.confusion_vectors import ConfusionVectors
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
 
 
 class CocoEvalConfig(scfg.DataConfig):
@@ -336,14 +346,14 @@ class CocoEvaluator:
         >>> results = coco_eval.evaluate()
     """
 
-    def __init__(coco_eval, config):
+    def __init__(coco_eval, config: Mapping[str, Any] | CocoEvalConfig) -> None:
         coco_eval.config = CocoEvalConfig(**config)
         coco_eval._is_init = False
         coco_eval._logs = []
         coco_eval._verbose = 1
         coco_eval._dmet = None
 
-    def log(coco_eval, msg, level='INFO'):
+    def log(coco_eval, msg: str, level: str = 'INFO') -> None:
         if coco_eval._verbose:
             print(msg)
         coco_eval._logs.append((level, msg))
@@ -777,7 +787,7 @@ class CocoEvaluator:
 
         return dmet
 
-    def evaluate(coco_eval):
+    def evaluate(coco_eval) -> 'CocoResults':
         """
         Executes the main evaluation logic. Performs assignments between
         detections to make DetectionMetrics object, then creates per-item and
@@ -957,8 +967,13 @@ class CocoEvaluator:
 
 
 def dmet_area_weights(
-    dmet, orig_weights, cfsn_vecs, area_ranges, coco_eval, use_area_attr=False
-):
+    dmet: 'DetectionMetrics',
+    orig_weights: 'np.ndarray',
+    cfsn_vecs: 'ConfusionVectors',
+    area_ranges: Iterable[str | tuple[float, float] | list[float]],
+    coco_eval: CocoEvaluator,
+    use_area_attr: bool | str = False,
+) -> Iterator[tuple[str | tuple[float, float] | list[float], Sequence[float], 'np.ndarray']]:
     """
     Hacky function to compute confusion vector ignore weights for different
     area thresholds. Needs to be slightly refactored.
@@ -977,13 +992,13 @@ def dmet_area_weights(
     for minmax_key in area_ranges:
         if isinstance(minmax_key, str):
             if minmax_key == 'small':
-                minmax = [0**2, 32**2]
+                minmax = [0.0, 32.0**2]
             elif minmax_key == 'medium':
-                minmax = [32**2, 96**2]
+                minmax = [32.0**2, 96.0**2]
             elif minmax_key == 'large':
-                minmax = [96**2, 1e5**2]
+                minmax = [96.0**2, 1e5**2]
             elif minmax_key == 'all':
-                minmax = [0, float('inf')]
+                minmax = [0.0, float('inf')]
             else:
                 raise KeyError(minmax_key)
         else:
@@ -1041,7 +1056,7 @@ def dmet_area_weights(
         yield minmax_key, minmax, new_weights
 
 
-class CocoResults(ub.NiceRepr, DictProxy):  # type: ignore
+class CocoResults(ub.NiceRepr, DictProxy[str, 'CocoSingleResult']):
     """
     CommandLine:
         xdoctest -m /home/joncrall/code/kwcoco/kwcoco/coco_evaluator.py CocoResults
@@ -1081,10 +1096,16 @@ class CocoResults(ub.NiceRepr, DictProxy):  # type: ignore
 
     """
 
-    def __init__(results, resdata=None):
-        results.proxy = resdata  # type: ignore
+    def __init__(results, resdata: dict[str, 'CocoSingleResult'] | None = None) -> None:
+        results.proxy = {} if resdata is None else resdata
 
-    def dump_figures(results, out_dpath, expt_title=None, figsize='auto', tight=True):
+    def dump_figures(
+        results,
+        out_dpath: str | os.PathLike[str],
+        expt_title: str | None = None,
+        figsize: str | tuple[float, float] = 'auto',
+        tight: bool = True,
+    ) -> None:
         for key, result in results.items():
             dpath = ub.ensuredir((os.fspath(out_dpath), key))
             if expt_title is None:
@@ -1093,7 +1114,7 @@ class CocoResults(ub.NiceRepr, DictProxy):  # type: ignore
                 title = expt_title + ' ' + str(key)
             result.dump_figures(dpath, expt_title=title, figsize=figsize, tight=tight)
 
-    def __json__(results):
+    def __json__(results) -> dict[str, Any]:
         from kwcoco.util.util_json import ensure_json_serializable
 
         state = {
@@ -1108,23 +1129,26 @@ class CocoResults(ub.NiceRepr, DictProxy):  # type: ignore
         return state
 
     @classmethod
-    def from_json(cls, state):
+    def from_json(cls, state: Mapping[str, Any]) -> 'CocoResults':
         self = cls({})
         for key, val in state.items():
             result = CocoSingleResult.from_json(val)
             self[key] = result
         return self
 
-    def dump(result, file, indent='    '):
+    def dump(
+        result,
+        file: str | os.PathLike[str] | IO[str],
+        indent: int | str | None = '    ',
+    ) -> None:
         """
         Serialize to json file
         """
         import json
-        import pathlib
 
-        if isinstance(file, (str, pathlib.Path)):
-            with open(file, 'w') as fp:
-                return result.dump(fp, indent=indent)
+        if isinstance(file, (str, os.PathLike)):
+            with open(os.fspath(file), 'w') as fp:
+                result.dump(fp, indent=indent)
         else:
             state = result.__json__()
             json.dump(state, file, indent=indent)
@@ -1167,13 +1191,19 @@ class CocoSingleResult(ub.NiceRepr):
         >>> print('state = {}'.format(ub.urepr(state, nl=-1)))
     """
 
-    def __init__(result, nocls_measures, ovr_measures, cfsn_vecs, meta=None):
+    def __init__(
+        result,
+        nocls_measures: 'Measures',
+        ovr_measures: 'PerClass_Measures',
+        cfsn_vecs: 'ConfusionVectors | None',
+        meta: dict[str, Any] | None = None,
+    ) -> None:
         result.nocls_measures = nocls_measures
         result.ovr_measures = ovr_measures
         result.cfsn_vecs = cfsn_vecs
         result.meta = meta
 
-    def __nice__(result):
+    def __nice__(result) -> str:
         text = ub.urepr(
             {
                 'nocls_measures': result.nocls_measures,
@@ -1184,7 +1214,8 @@ class CocoSingleResult(ub.NiceRepr):
         return text
 
     @classmethod
-    def from_json(cls, state):
+    def from_json(cls, state: Mapping[str, Any]) -> 'CocoSingleResult':
+        state = dict(state)
         from kwcoco.metrics.confusion_vectors import Measures
         from kwcoco.metrics.confusion_vectors import PerClass_Measures
 
@@ -1199,7 +1230,7 @@ class CocoSingleResult(ub.NiceRepr):
         self = cls(**state)
         return self
 
-    def __json__(result):
+    def __json__(result) -> dict[str, Any]:
         state = {
             'nocls_measures': result.nocls_measures.__json__(),
             'ovr_measures': result.ovr_measures.__json__(),
@@ -1211,26 +1242,34 @@ class CocoSingleResult(ub.NiceRepr):
         ensure_json_serializable(state, normalize_containers=True, verbose=0)
         return state
 
-    def dump(result, file, indent='    '):
+    def dump(
+        result,
+        file: str | os.PathLike[str] | IO[str],
+        indent: int | str | None = '    ',
+    ) -> None:
         """
         Serialize to json file
         """
         import json
 
-        try:
-            fpath = os.fspath(file)
-        except TypeError:
-            state = result.__json__()
-            json.dump(state, file, indent=indent)
-        else:
+        if isinstance(file, (str, os.PathLike)):
             import safer
 
+            fpath = os.fspath(file)
             with safer.open(fpath, 'w', temp_file=not ub.WIN32) as fp:
-                return result.dump(fp, indent=indent)
+                result.dump(fp, indent=indent)
+        else:
+            state = result.__json__()
+            json.dump(state, file, indent=indent)
 
     def dump_figures(
-        result, out_dpath, expt_title=None, figsize='auto', tight=True, verbose=1
-    ):
+        result,
+        out_dpath: str | os.PathLike[str],
+        expt_title: str | None = None,
+        figsize: str | tuple[float, float] = 'auto',
+        tight: bool = True,
+        verbose: int = 1,
+    ) -> None:
         if expt_title is None:
             expt_title = result.meta.get('expt_title', '')  # type: ignore
         metrics_dpath = ub.ensuredir(os.fspath(out_dpath))
@@ -1310,6 +1349,8 @@ class CocoSingleResult(ub.NiceRepr):
         # FIXME: robustly skip in cases where predictions have no class information
         try:
             cfsn_vecs = result.cfsn_vecs
+            if cfsn_vecs is None:
+                raise ValueError('confusion vectors are unavailable')
             fig = kwplot.figure(fnum=3, doclf=True)
             confusion = cfsn_vecs.confusion_matrix()
             ax = kwplot.plot_matrix(confusion, fnum=3, showvals=0, logscale=True)
