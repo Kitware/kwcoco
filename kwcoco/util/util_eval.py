@@ -3,6 +3,9 @@ Defines a safer eval function
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, MutableMapping
+from typing import Any
+
 class RestrictedSyntaxError(Exception):
     """
     An exception raised by restricted_eval if a disallowed expression is given
@@ -11,7 +14,12 @@ class RestrictedSyntaxError(Exception):
     pass
 
 
-def restricted_eval(expr, max_chars=32, local_dict=None, builtins_passlist=None):
+def restricted_eval(
+    expr: str,
+    max_chars: int = 32,
+    local_dict: MutableMapping[str, Any] | None = None,
+    builtins_passlist: Iterable[str] | None = None,
+) -> Any:
     """
     A restricted form of Python's eval that is meant to be slightly safer
 
@@ -73,5 +81,6 @@ def restricted_eval(expr, max_chars=32, local_dict=None, builtins_passlist=None)
     for name in code.co_names:
         if name not in allowed_names:
             raise RestrictedSyntaxError(f'Use of {name} not allowed')
-    result = eval(code, local_dict, local_dict)
+    eval_dict = dict(local_dict)
+    result = eval(code, eval_dict, eval_dict)
     return result

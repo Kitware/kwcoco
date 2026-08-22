@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator
+from typing import Any, cast, IO
 import networkx as nx
 from networkx.utils import open_file
 
@@ -55,8 +57,12 @@ class UtfUndirectedGlyphs(_UtfBaseGlyphs):
 
 
 def generate_network_text(
-    graph, with_labels=True, sources=None, max_depth=None, ascii_only=False
-):
+    graph: nx.Graph,
+    with_labels: bool | str = True,
+    sources: Iterable[Any] | None = None,
+    max_depth: int | None = None,
+    ascii_only: bool = False,
+) -> Iterator[str]:
     """Generate lines in the "network text" format
 
     This works via a depth-first traversal of the graph and writing a line for
@@ -127,9 +133,10 @@ def generate_network_text(
     is_directed = graph.is_directed()
 
     if is_directed:
+        directed_graph = cast(nx.DiGraph, graph)
         glyphs = AsciiDirectedGlyphs if ascii_only else UtfDirectedGlyphs
-        succ = graph.succ
-        pred = graph.pred
+        succ = directed_graph.succ
+        pred = directed_graph.pred
     else:
         glyphs = AsciiUndirectedGlyphs if ascii_only else UtfUndirectedGlyphs
         succ = graph.adj
@@ -153,6 +160,8 @@ def generate_network_text(
         # nodes that will reach the entire graph
         if sources is None:
             sources = _find_sources(graph)
+        else:
+            sources = list(sources)
 
         # Populate the stack with each:
         # 1. parent node in the DFS tree (or None for root nodes),
@@ -315,14 +324,14 @@ def generate_network_text(
 
 @open_file(1, 'w')
 def write_network_text(
-    graph,
-    path=None,
-    with_labels=True,
-    sources=None,
-    max_depth=None,
-    ascii_only=False,
-    end='\n',
-):
+    graph: nx.Graph,
+    path: str | IO[str] | Callable[[str], Any] | None = None,
+    with_labels: bool | str = True,
+    sources: Iterable[Any] | None = None,
+    max_depth: int | None = None,
+    ascii_only: bool = False,
+    end: str = '\n',
+) -> None:
     """Creates a nice text representation of a graph
 
     This works via a depth-first traversal of the graph and writing a line for
@@ -431,17 +440,16 @@ def write_network_text(
         │   └─╼  ...
         └─╼  ...
     """
-    if path is None:
-        # The path is unspecified, write to stdout
+    # The open_file decorator resolves filesystem path arguments before this
+    # body executes, so only file objects, callables, and None remain here.
+    resolved_path = cast(IO[str] | Callable[[str], Any] | None, path)
+    _write: Callable[[str], Any]
+    if resolved_path is None:
         _write = sys.stdout.write
-    elif hasattr(path, 'write'):
-        # The path is already an open file
-        _write = path.write
-    elif callable(path):
-        # The path is a custom callable
-        _write = path
+    elif callable(resolved_path):
+        _write = cast(Callable[[str], Any], resolved_path)
     else:
-        raise TypeError(type(path))
+        _write = resolved_path.write
 
     for line in generate_network_text(
         graph,
@@ -453,15 +461,16 @@ def write_network_text(
         _write(line + end)
 
 
-def _find_sources(graph):
+def _find_sources(graph: nx.Graph) -> list[Any]:
     """
     Determine a minimal set of nodes such that the entire graph is reachable
     """
     # For each connected part of the graph, choose at least
     # one node as a starting point, preferably without a parent
     if graph.is_directed():
+        directed_graph = cast(nx.DiGraph, graph)
         # Choose one node from each SCC with minimum in_degree
-        sccs = list(nx.strongly_connected_components(graph))
+        sccs = list(nx.strongly_connected_components(directed_graph))
         # condensing the SCCs forms a dag, the nodes in this graph with
         # 0 in-degree correspond to the SCCs from which the minimum set
         # of nodes from which all other nodes can be reached.
@@ -470,14 +479,14 @@ def _find_sources(graph):
         # Note: the order of mapping differs between pypy and cpython
         # so we have to loop over graph nodes for consistency
         mapping = scc_graph.graph['mapping']
-        for n in graph.nodes:
+        for n in directed_graph.nodes:
             sn = mapping[n]
             supernode_to_nodes[sn].append(n)
         sources = []
         for sn in scc_graph.nodes():
             if scc_graph.in_degree[sn] == 0:
                 scc = supernode_to_nodes[sn]
-                node = min(scc, key=lambda n: graph.in_degree[n])
+                node = min(scc, key=lambda n: directed_graph.in_degree[n])
                 sources.append(node)
     else:
         # For undirected graph, the entire graph will be reachable as

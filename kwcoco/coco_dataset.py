@@ -56,7 +56,7 @@ References:
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, IO, cast
+from typing import TYPE_CHECKING, Any, IO, Iterable, Mapping, cast
 
 import copy
 import sys
@@ -1187,7 +1187,9 @@ class CocoDataset(
         unique_video_names = UniqueNameRemapper(policy='warn', name_type='video')
         unique_track_names = UniqueNameRemapper(policy='warn', name_type='track')
 
-        def update_ifnotin(d1, d2):
+        def update_ifnotin(
+            d1: dict[str, Any], d2: Mapping[str, Any]
+        ) -> dict[str, Any]:
             """copies keys from d2 that doent exist in d1 into d1"""
             for k, v in d2.items():
                 if k not in d1:
@@ -1485,7 +1487,9 @@ class CocoDataset(
             return merged
 
         # New behavior is simplified and I believe it is correct
-        def longest_common_prefix(items, sep='/'):
+        def longest_common_prefix(
+            items: Iterable[str], sep: str = '/'
+        ) -> str:
             """
             Example:
                 >>> items = [

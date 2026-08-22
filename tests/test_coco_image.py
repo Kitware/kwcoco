@@ -40,6 +40,7 @@ def test_coco_image_add_asset():
     orig_num_assets = len(coco_img.assets)
 
     primary_asset = coco_img.primary_asset()
+    assert primary_asset is not None
     new_asset1 = primary_asset.copy()
     # Remove the asset id, so a new one is created (which will be important
     # once assets move to their own table). But is not currently necessary in

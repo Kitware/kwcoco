@@ -7,6 +7,7 @@ Rerooting is harder than you would think
 from __future__ import annotations
 
 import os
+import pathlib
 from typing import TYPE_CHECKING
 
 import ubelt as ub
@@ -15,7 +16,9 @@ if TYPE_CHECKING:
     import kwcoco
 
 
-def special_reroot_single(dset: kwcoco.CocoDataset, verbose: int = 0):
+def special_reroot_single(
+    dset: kwcoco.CocoDataset, verbose: int = 0
+) -> list[str]:
     bundle_dpath = ub.Path(dset.bundle_dpath).absolute()
     resolved_bundle_dpath = ub.Path(dset.bundle_dpath).resolve()
 
@@ -34,7 +37,9 @@ def special_reroot_single(dset: kwcoco.CocoDataset, verbose: int = 0):
     return any_modified
 
 
-def resolve_relative_to(path, dpath, strict=False):
+def resolve_relative_to(
+    path: pathlib.Path, dpath: pathlib.Path, strict: bool = False
+) -> pathlib.Path:
     """
     Given a path, try to resolve its symlinks such that it is relative to the
     given dpath.
@@ -104,7 +109,7 @@ def resolve_relative_to(path, dpath, strict=False):
     return resolved_rel
 
 
-def resolve_directory_symlinks(path):
+def resolve_directory_symlinks(path: pathlib.Path) -> pathlib.Path:
     """
     Only resolve symlinks of directories, not the base file
     """

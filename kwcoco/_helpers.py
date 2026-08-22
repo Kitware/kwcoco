@@ -6,7 +6,7 @@ recycle ids, do renaming, extend sortedcontainers etc...
 """
 from __future__ import annotations
 
-from typing import Any, Mapping, Protocol
+from typing import Any, Literal, Mapping, Protocol
 
 import sortedcontainers
 
@@ -106,13 +106,13 @@ class _ID_Remapper:
         new_tids = [4, 5, 6, 7, 7, 8, 9, 10]
     """
 
-    def __init__(self, reuse=False):
-        self.blocklist = set()
-        self.mapping = dict()
+    def __init__(self, reuse: bool = False) -> None:
+        self.blocklist: set[Any] = set()
+        self.mapping: dict[Any, Any] = {}
         self.reuse = reuse
         self._nextid = 0
 
-    def remap(self, old_id):
+    def remap(self, old_id: Any) -> Any:
         """
         Convert a old-id into a new-id. If self.reuse is True then we will
         return the same id if it hasn't been blocked yet.
@@ -131,7 +131,7 @@ class _ID_Remapper:
             self.mapping[old_id] = new_id
         return new_id
 
-    def block_seen(self):
+    def block_seen(self) -> None:
         """
         Mark all seen ids as unable to be used.
         Any ids sent to remap will now generate new ids.
@@ -139,7 +139,7 @@ class _ID_Remapper:
         self.blocklist.update(self.mapping.values())
         self.mapping = dict()
 
-    def next_id(self):
+    def next_id(self) -> int:
         """Generate a new id that hasnt been used yet"""
         next_id = self._nextid
         self._nextid += 1
@@ -180,7 +180,11 @@ class UniqueNameRemapper:
         >>> print(f'ex={ex}')
     """
 
-    def __init__(self, policy='warn', name_type='unspecified'):
+    def __init__(
+        self,
+        policy: Literal['ignore', 'warn', 'error'] = 'warn',
+        name_type: str = 'unspecified',
+    ) -> None:
         """
         Args:
             policy (str):
@@ -193,17 +197,17 @@ class UniqueNameRemapper:
         """
         import re
 
-        self._seen = set()
+        self._seen: set[str] = set()
         self.suffix_pat = re.compile(r'(.*)_v(\d+)')
         if policy not in {'ignore', 'warn', 'error'}:
             raise ValueError('policy must be ignore, warn, or ignore')
         self.policy = policy
         self.name_type = name_type
 
-    def __contains__(self, name):
+    def __contains__(self, name: object) -> bool:
         return name in self._seen
 
-    def remap(self, name):
+    def remap(self, name: str) -> str:
         """
         Args:
             name (str): name to check / rename
@@ -263,13 +267,13 @@ class _CategoryID_Remapper:
         >>>     10: {'name': 'cat9', 'id': 10}}
     """
 
-    def __init__(self):
-        self._name_to_cat = {}
-        self._id_to_cat = {}
-        self._categories = []
+    def __init__(self) -> None:
+        self._name_to_cat: dict[str, dict[str, Any]] = {}
+        self._id_to_cat: dict[int, dict[str, Any]] = {}
+        self._categories: list[dict[str, Any]] = []
         self._nextid = 1
 
-    def remap(self, old_cat):
+    def remap(self, old_cat: Mapping[str, Any]) -> dict[str, Any]:
         import ubelt as ub
 
         catname = old_cat['name']
@@ -310,7 +314,7 @@ def _lut_annot_frame_index(imgs, anns, aid):
 
 
 class SortedSet(sortedcontainers.SortedSet):
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return string representation of sorted set.
 
         ``ss.__repr__()`` <==> ``repr(ss)``

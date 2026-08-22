@@ -680,13 +680,15 @@ class MixinCocoConstructors:
         from kwcoco.util.util_parallel import coerce_num_workers
 
         _loader = partial(kwcoco.CocoDataset.coerce, verbose=verbose)
-        workers = coerce_num_workers(workers)
-        workers = min(workers, len(datas))
+        resolved_workers = coerce_num_workers(workers)
+        if resolved_workers is None:
+            resolved_workers = 0
+        resolved_workers = min(resolved_workers, len(datas))
         # Reuse coerce_multiple logic but overload the loader function.
         yield from cls._load_multiple(
             _loader,
             datas,
-            workers=workers,
+            workers=resolved_workers,
             mode=mode,
             verbose=verbose,
             postprocess=postprocess,

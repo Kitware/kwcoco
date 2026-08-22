@@ -16,7 +16,7 @@ from __future__ import annotations
 import collections.abc
 import datetime as datetime_mod
 import os
-from typing import Any, cast, Iterator, Sequence, TYPE_CHECKING, TypeVar
+from typing import Any, cast, Iterator, Literal, overload, Sequence, TYPE_CHECKING, TypedDict, TypeVar
 
 import numpy as np
 import ubelt as ub
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     import kwimage
 
     from kwcoco.coco_objects1d import Annots
+    from delayed_image.delayed_nodes import DelayedImage
 
 
 CocoObjectT = TypeVar('CocoObjectT', bound='_CocoObject')
@@ -244,7 +245,7 @@ class CocoImage(_CocoObject):
                 stats['channels'] = stats['channels'].spec
         return stats
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: object) -> bool:
         if '_unstructured' in self._proxy:
             if AliasedDictProxy.__contains__(self, key):
                 return True
@@ -384,6 +385,44 @@ class CocoImage(_CocoObject):
         fname = primary['file_name']
         fpath = dpath / fname
         return fpath
+
+    @overload
+    def primary_asset(
+        self,
+        requires: Sequence[str] | None = None,
+    ) -> dict[str, Any] | None: ...
+
+    @overload
+    def primary_asset(
+        self,
+        requires: Sequence[str] | None = None,
+        *,
+        as_dict: Literal[True],
+    ) -> dict[str, Any] | None: ...
+
+    @overload
+    def primary_asset(
+        self,
+        requires: Sequence[str] | None = None,
+        *,
+        as_dict: Literal[False],
+    ) -> CocoImage | CocoAsset | None: ...
+
+    @overload
+    def primary_asset(
+        self,
+        requires: Sequence[str] | None,
+        as_dict: Literal[True],
+        /,
+    ) -> dict[str, Any] | None: ...
+
+    @overload
+    def primary_asset(
+        self,
+        requires: Sequence[str] | None,
+        as_dict: Literal[False],
+        /,
+    ) -> CocoImage | CocoAsset | None: ...
 
     def primary_asset(
         self, requires: Sequence[str] | None = None, as_dict: bool = True
@@ -939,15 +978,15 @@ class CocoImage(_CocoObject):
 
     def imdelay(
         self,
-        channels=None,
-        space='image',
-        resolution=None,
-        bundle_dpath=None,
-        interpolation='linear',
-        antialias=True,
-        nodata_method=None,
-        RESOLUTION_KEY=None,
-    ):
+        channels: str | FusedChannelSpec | None = None,
+        space: str = 'image',
+        resolution: str | float | None = None,
+        bundle_dpath: 'str | PathLike | None' = None,
+        interpolation: str = 'linear',
+        antialias: bool = True,
+        nodata_method: str | None = None,
+        RESOLUTION_KEY: str | collections.abc.Iterable[str] | None = None,
+    ) -> 'DelayedImage':
         """
         Perform a delayed load on the data in this image.
 
@@ -1382,7 +1421,7 @@ class CocoImage(_CocoObject):
         space: str = 'image',
         channel: str | FusedChannelSpec | None = None,
         RESOLUTION_KEY: str | collections.abc.Iterable[str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> ResolutionInfo:
         """
         Returns the resolution of this CocoImage in the requested space if
         known. Errors if this information is not registered.
@@ -1419,19 +1458,24 @@ class CocoImage(_CocoObject):
         if RESOLUTION_KEY is None:
             RESOLUTION_KEY = DEFAULT_RESOLUTION_KEYS
 
-        def aliased_get(d, keys, default=None):
-            if not ub.iterable(keys):
+        def aliased_get(
+            d: collections.abc.Mapping[str, Any] | None,
+            keys: str | collections.abc.Iterable[str],
+            default: Any = None,
+        ) -> Any:
+            if d is None:
+                return default
+            if isinstance(keys, str):
                 return d.get(keys, default)
-            else:
-                found = 0
-                for key in keys:
-                    if key in d:
-                        found = 1
-                        val = d[key]
-                        break
-                if not found:
-                    val = default
-                return val
+            found = 0
+            for key in keys:
+                if key in d:
+                    found = 1
+                    val = d[key]
+                    break
+            if not found:
+                val = default
+            return val
 
         if space == 'video':
             vid_resolution_expr = aliased_get(self.video, RESOLUTION_KEY, None)
@@ -1444,8 +1488,8 @@ class CocoImage(_CocoObject):
                 vid_resolution = (
                     self.warp_vid_from_img @ img_resolution_mat.inv()
                 ).inv()
-                vid_resolution_info = {
-                    'mag': vid_resolution.decompose()['scale'],
+                vid_resolution_info: ResolutionInfo = {
+                    'mag': _coerce_resolution_mag(vid_resolution.decompose()['scale']),
                     'unit': img_resolution_info['unit'],
                 }
             else:
@@ -1462,8 +1506,8 @@ class CocoImage(_CocoObject):
                 img_resolution = (
                     self.warp_img_from_vid @ vid_resolution_mat.inv()
                 ).inv()
-                img_resolution_info = {
-                    'mag': img_resolution.decompose()['scale'],
+                img_resolution_info: ResolutionInfo = {
+                    'mag': _coerce_resolution_mag(img_resolution.decompose()['scale']),
                     'unit': vid_resolution_info['unit'],
                 }
             else:
@@ -1475,7 +1519,7 @@ class CocoImage(_CocoObject):
                     'must specify a channel to ask for the asset resolution'
                 )
             # Use existing code to get the resolution of the image (could be more efficient)
-            space_resolution_info = self.resolution(
+            space_resolution_info: ResolutionInfo = self.resolution(
                 'image', RESOLUTION_KEY=RESOLUTION_KEY
             ).copy()
             # Adjust the image resolution based on the asset scale factor
@@ -1485,7 +1529,9 @@ class CocoImage(_CocoObject):
             )
             img_res_mat = kwimage.Affine.scale(space_resolution_info['mag'])
             aux_res_mat = img_res_mat @ warp_img_from_aux
-            space_resolution_info['mag'] = np.array(aux_res_mat.decompose()['scale'])
+            space_resolution_info['mag'] = _coerce_resolution_mag(
+                aux_res_mat.decompose()['scale']
+            )
         else:
             raise KeyError(space)
         return space_resolution_info
@@ -1582,7 +1628,7 @@ class CocoImage(_CocoObject):
         'kwcoco', 'delay', new_func=imdelay, deprecate='now'
     )
 
-    def show(self, **kwargs):
+    def show(self, **kwargs: Any) -> Any:
         """
         Show the image with matplotlib if possible
 
@@ -1797,7 +1843,24 @@ def _delay_load_imglike(bundle_dpath, obj, nodata_method=None):
     return info
 
 
-def parse_quantity(expr):
+
+class ParsedQuantity(TypedDict):
+    magnitude: str
+    spaces: str
+    unit: str
+
+
+class ResolutionInfo(TypedDict):
+    mag: tuple[float, float]
+    unit: str | None
+
+
+def _coerce_resolution_mag(data: Any) -> tuple[float, float]:
+    x, y = data
+    return (float(x), float(y))
+
+
+def parse_quantity(expr: str) -> ParsedQuantity:
     import re
 
     expr_pat = re.compile(
@@ -1808,10 +1871,10 @@ def parse_quantity(expr):
     match = expr_pat.match(expr.strip())
     if match is None:
         raise ValueError(f'Unable to parse {expr!r}')
-    return match.groupdict()
+    return cast(ParsedQuantity, match.groupdict())
 
 
-def coerce_resolution(expr):
+def coerce_resolution(expr: str | int | float) -> ResolutionInfo:
     if isinstance(expr, str):
         result = parse_quantity(expr)
         unit = result['unit']
@@ -1820,7 +1883,7 @@ def coerce_resolution(expr):
         x = y = float(expr)
         unit = None
 
-    parsed = {
+    parsed: ResolutionInfo = {
         'mag': (x, y),
         'unit': unit,
     }

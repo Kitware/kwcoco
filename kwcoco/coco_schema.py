@@ -45,16 +45,17 @@ Example:
 """
 from __future__ import annotations
 
-from kwcoco.util.jsonschema_elements import SchemaElements
+from kwcoco.util.jsonschema_elements import Element, SchemaElements
 from collections import OrderedDict
+from typing import Any
 import ubelt as ub
 
 
-def deprecated(*args):
+def deprecated(*args: Any) -> Element:
     return ANY(description='deprecated')
 
 
-def TUPLE(*args, **kw):
+def TUPLE(*args: Element, **kw: Any) -> Element:
     if args and ub.allsame(args):
         return ARRAY(TYPE=ub.peek(args), numItems=len(args), **kw)
     else:

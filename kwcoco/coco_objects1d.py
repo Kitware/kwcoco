@@ -1326,8 +1326,15 @@ class CocoImageView(_BaseView):
         self._getter = getter
         self._ids = ids
 
-    def __getitem__(self, index):
-        return self._getter(self._ids[index])
+    @overload
+    def __getitem__(self, index: int) -> 'CocoImage': ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list['CocoImage']: ...
+
+    def __getitem__(
+        self, index: int | slice
+    ) -> 'CocoImage | list[CocoImage]':
         if isinstance(index, slice):
             return [self._getter(_id) for _id in self._ids[index]]
         else:

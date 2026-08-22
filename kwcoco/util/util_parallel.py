@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 
-def coerce_num_workers(num_workers='auto', minimum=0):
+def coerce_num_workers(
+    num_workers: int | str | None = 'auto', minimum: int = 0
+) -> int | None:
     """
     Return some number of CPUs based on a chosen heuristic
 
@@ -40,10 +42,11 @@ def coerce_num_workers(num_workers='auto', minimum=0):
     import psutil
     from kwcoco.util.util_eval import restricted_eval
 
-    try:
-        num_workers = int(num_workers)
-    except Exception:
-        pass
+    if num_workers is not None:
+        try:
+            num_workers = int(num_workers)
+        except Exception:
+            pass
 
     if isinstance(num_workers, str):
         num_workers = num_workers.lower()

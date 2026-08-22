@@ -4,6 +4,9 @@ Extensions to sklearn constructs
 from __future__ import annotations
 
 import warnings
+from collections.abc import Iterator
+from typing import Any
+
 import numpy as np
 from sklearn.utils.validation import check_array
 from sklearn.model_selection._split import (
@@ -31,14 +34,21 @@ class StratifiedGroupKFold(_BaseKFold):
         Number of folds. Must be at least 2.
     """
 
-    def __init__(self, n_splits=3, shuffle=False, random_state=None):
+    def __init__(
+        self,
+        n_splits: int = 3,
+        shuffle: bool = False,
+        random_state: Any = None,
+    ) -> None:
         if not shuffle:
             random_state = None
         super(StratifiedGroupKFold, self).__init__(
             n_splits=n_splits, shuffle=shuffle, random_state=random_state
         )
 
-    def _make_test_folds(self, X, y=None, groups=None):  # type: ignore
+    def _make_test_folds(
+        self, X: Any, y: Any = None, groups: Any = None
+    ) -> np.ndarray:  # type: ignore
         """
         Args:
             X (ndarray): data
@@ -151,12 +161,16 @@ class StratifiedGroupKFold(_BaseKFold):
 
         return test_folds
 
-    def _iter_test_masks(self, X, y=None, groups=None):  # type: ignore
+    def _iter_test_masks(
+        self, X: Any, y: Any = None, groups: Any = None
+    ) -> Iterator[np.ndarray]:  # type: ignore
         test_folds = self._make_test_folds(X, y, groups)
         for i in range(self.n_splits):
             yield test_folds == i
 
-    def split(self, X, y, groups=None):  # type: ignore
+    def split(
+        self, X: Any, y: Any, groups: Any = None
+    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:  # type: ignore
         """Generate indices to split data into training and test set."""
         y = check_array(y, ensure_2d=False, dtype=None)
         return super(StratifiedGroupKFold, self).split(X, y, groups)

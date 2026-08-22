@@ -83,8 +83,9 @@ class CocoUnionCLI(scfg.DataConfig):
 
         from kwcoco.util.util_parallel import coerce_num_workers
 
-        io_workers = config.io_workers
-        io_workers = coerce_num_workers(io_workers)
+        io_workers = coerce_num_workers(config.io_workers)
+        if io_workers is None:
+            io_workers = 0
         io_workers = min(io_workers, len(config.src))
         if io_workers == 1:
             io_workers = 0

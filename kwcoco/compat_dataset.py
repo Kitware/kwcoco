@@ -17,11 +17,21 @@ from __future__ import annotations
 
 from kwcoco.coco_dataset import CocoDataset
 from kwcoco._helpers import _coerce_info_list
-from typing import Iterable, List, Optional, Union
+from typing import Any, Iterable, List, Optional, Protocol, Union
 from os import PathLike
 import itertools as it
 import ubelt as ub
 import numpy as np
+
+class _ImgToAnnsProxy(Protocol):
+    def __getitem__(self, gid: int, /) -> list[dict[str, Any]]: ...
+    def __contains__(self, key: object, /) -> bool: ...
+    def keys(self) -> Iterable[int]: ...
+
+
+class _CatToImgsProxy(Protocol):
+    def __getitem__(self, cid: int, /) -> Iterable[int]: ...
+    def keys(self) -> Iterable[int]: ...
 
 
 class COCO(CocoDataset):
@@ -38,7 +48,7 @@ class COCO(CocoDataset):
         >>> print('self.catToImgs = {!r}'.format(self.catToImgs))
     """
 
-    def __init__(self, annotation_file=None, **kw):
+    def __init__(self, annotation_file: Any = None, **kw: Any) -> None:
         if annotation_file is not None:
             if 'data' in kw:
                 raise ValueError('cannot specify data and annotation file')
@@ -46,10 +56,10 @@ class COCO(CocoDataset):
             annotation_file = kw.pop('data')
         super().__init__(annotation_file, **kw)
 
-    def createIndex(self):
+    def createIndex(self) -> None:
         self._build_index()
 
-    def info(self):
+    def info(self) -> None:
         """
         Print information about the annotation file.
         """
@@ -58,26 +68,26 @@ class COCO(CocoDataset):
                 print('{}: {}'.format(key, value))
 
     @property
-    def imgToAnns(self):
+    def imgToAnns(self) -> _ImgToAnnsProxy:
         from scriptconfig.dict_like import DictLike
 
         class ProxyImgToAnns(DictLike):
-            def __init__(self, parent):
+            def __init__(self, parent: COCO) -> None:
                 self.parent = parent
 
-            def getitem(self, gid):  # type: ignore
+            def getitem(self, gid: int) -> list[dict[str, Any]]:  # type: ignore
                 aids = self.parent.index.gid_to_aids[gid]
                 anns = list(ub.take(self.parent.index.anns, aids))
                 return anns
 
-            def keys(self):
+            def keys(self) -> Iterable[int]:
                 return self.parent.index.gid_to_aids.keys()
 
         imgToAnns = ProxyImgToAnns(parent=self)
         return imgToAnns
 
     @property
-    def catToImgs(self):
+    def catToImgs(self) -> _CatToImgsProxy:
         """
         unlike the name implies, this actually goes from category to image ids
         Name retained for backward compatibility
@@ -85,7 +95,13 @@ class COCO(CocoDataset):
         catToImgs = self.index.cid_to_gids
         return catToImgs
 
-    def getAnnIds(self, imgIds=[], catIds=[], areaRng=[], iscrowd=None):
+    def getAnnIds(
+        self,
+        imgIds: int | Iterable[int] = [],
+        catIds: int | Iterable[int] = [],
+        areaRng: Iterable[float] = [],
+        iscrowd: bool | None = None,
+    ) -> list[int]:
         """
         Get ann ids that satisfy given filter conditions. default skips that filter
 
@@ -108,31 +124,34 @@ class COCO(CocoDataset):
             >>> self.getAnnIds(imgIds=[1])
             >>> self.getAnnIds(catIds=[3])
         """
-        imgIds = imgIds if ub.iterable(imgIds) else [imgIds]
-        catIds = catIds if ub.iterable(catIds) else [catIds]
+        img_ids = [imgIds] if isinstance(imgIds, int) else list(imgIds)
+        cat_ids = [catIds] if isinstance(catIds, int) else list(catIds)
+        area_rng = list(areaRng)
 
-        if len(imgIds) == len(catIds) == len(areaRng) == 0:
+        if len(img_ids) == len(cat_ids) == len(area_rng) == 0:
             anns = self.dataset['annotations']
         else:
-            if not len(imgIds) == 0:
+            if img_ids:
                 lists = [
-                    self.imgToAnns[imgId] for imgId in imgIds if imgId in self.imgToAnns
+                    self.imgToAnns[imgId]
+                    for imgId in img_ids
+                    if imgId in self.imgToAnns
                 ]
                 anns = list(it.chain.from_iterable(lists))
             else:
                 anns = self.dataset['annotations']
             anns = (
                 anns
-                if len(catIds) == 0
-                else [ann for ann in anns if ann['category_id'] in catIds]
+                if not cat_ids
+                else [ann for ann in anns if ann['category_id'] in cat_ids]
             )
             anns = (
                 anns
-                if len(areaRng) == 0
+                if not area_rng
                 else [
                     ann
                     for ann in anns
-                    if ann['area'] > areaRng[0] and ann['area'] < areaRng[1]
+                    if ann['area'] > area_rng[0] and ann['area'] < area_rng[1]
                 ]
             )
         if iscrowd is not None:
@@ -141,7 +160,12 @@ class COCO(CocoDataset):
             ids = [ann['id'] for ann in anns]
         return ids
 
-    def getCatIds(self, catNms=[], supNms=[], catIds=[]):
+    def getCatIds(
+        self,
+        catNms: str | Iterable[str] = [],
+        supNms: str | Iterable[str] = [],
+        catIds: int | Iterable[int] = [],
+    ) -> list[int]:
         """
         filtering parameters. default skips that filter.
 
@@ -162,24 +186,28 @@ class COCO(CocoDataset):
             >>> self.getCatIds(supNms=['raster'])
             >>> self.getCatIds(catIds=[3])
         """
-        catNms = catNms if ub.iterable(catNms) else [catNms]
-        supNms = supNms if ub.iterable(supNms) else [supNms]
-        catIds = catIds if ub.iterable(catIds) else [catIds]
+        cat_nms = [catNms] if isinstance(catNms, str) else list(catNms)
+        sup_nms = [supNms] if isinstance(supNms, str) else list(supNms)
+        cat_ids = [catIds] if isinstance(catIds, int) else list(catIds)
 
         cats = self.dataset['categories']
-        if catNms or supNms or catIds:
+        if cat_nms or sup_nms or cat_ids:
             cats = self.dataset['categories']
-            if catNms:
-                cats = [cat for cat in cats if cat['name'] in catNms]
-            if supNms:
-                cats = [cat for cat in cats if cat.get('supercategory', None) in supNms]
-            if catIds:
-                cats = [cat for cat in cats if cat['id'] in catIds]
+            if cat_nms:
+                cats = [cat for cat in cats if cat['name'] in cat_nms]
+            if sup_nms:
+                cats = [cat for cat in cats if cat.get('supercategory', None) in sup_nms]
+            if cat_ids:
+                cats = [cat for cat in cats if cat['id'] in cat_ids]
 
         ids = [cat['id'] for cat in cats]
         return ids
 
-    def getImgIds(self, imgIds=[], catIds=[]):
+    def getImgIds(
+        self,
+        imgIds: int | Iterable[int] = [],
+        catIds: int | Iterable[int] = [],
+    ) -> list[int]:
         """
         Get img ids that satisfy given filter conditions.
 
@@ -198,21 +226,23 @@ class COCO(CocoDataset):
             >>> self.getImgIds(catIds=[3, 6, 7])
             >>> self.getImgIds(catIds=[3, 6, 7], imgIds=[1, 2])
         """
-        imgIds = imgIds if ub.iterable(imgIds) else [imgIds]
-        catIds = catIds if ub.iterable(catIds) else [catIds]
+        img_ids = [imgIds] if isinstance(imgIds, int) else list(imgIds)
+        cat_ids = [catIds] if isinstance(catIds, int) else list(catIds)
 
-        if not imgIds:
+        if not img_ids:
             valid_gids = set(self.imgs.keys())
         else:
-            valid_gids = set(imgIds)
+            valid_gids = set(img_ids)
 
-        for catId in catIds:
+        for catId in cat_ids:
             aids = self.index.cid_to_aids.get(catId, [])  # type: ignore
             hascat_gids = set(self.annots(list(aids)).lookup('image_id'))
             valid_gids &= hascat_gids
         return sorted(valid_gids)
 
-    def loadAnns(self, ids=[]):
+    def loadAnns(
+        self, ids: int | Iterable[int] = []
+    ) -> list[dict[str, Any]]:
         """
         Load anns with the specified ids.
 
@@ -226,7 +256,9 @@ class COCO(CocoDataset):
             return [self.anns[ids]]
         return [self.anns[id] for id in ids]
 
-    def loadCats(self, ids=[]):
+    def loadCats(
+        self, ids: int | Iterable[int] = []
+    ) -> list[dict[str, Any]]:
         """
         Load cats with the specified ids.
 
@@ -240,7 +272,9 @@ class COCO(CocoDataset):
             return [self.cats[ids]]
         return [self.cats[id] for id in ids]
 
-    def loadImgs(self, ids=[]):
+    def loadImgs(
+        self, ids: int | Iterable[int] = []
+    ) -> list[dict[str, Any]]:
         """
         Load anns with the specified ids.
 
@@ -254,7 +288,9 @@ class COCO(CocoDataset):
             return [self.imgs[ids]]
         return [self.imgs[id] for id in ids]
 
-    def showAnns(self, anns, draw_bbox=False):
+    def showAnns(
+        self, anns: Iterable[dict[str, Any]], draw_bbox: bool = False
+    ) -> None:
         """
         Display the specified annotations.
 
@@ -264,7 +300,9 @@ class COCO(CocoDataset):
         aids = [ann['id'] for ann in anns]
         self.show_image(aids=aids, show_boxes=draw_bbox)
 
-    def loadRes(self, resFile):
+    def loadRes(
+        self, resFile: str | np.ndarray | list[dict[str, Any]]
+    ) -> COCO:
         """
         Load result file and return a result api object.
 
@@ -422,7 +460,9 @@ class COCO(CocoDataset):
             verbose=verbose,
         )
 
-    def loadNumpyAnnotations(self, data):
+    def loadNumpyAnnotations(
+        self, data: np.ndarray
+    ) -> list[dict[str, Any]]:
         """
         Convert result data from a numpy array [Nx7] where each row contains {imageID,x1,y1,w,h,score,class}
 
@@ -448,7 +488,7 @@ class COCO(CocoDataset):
             ]
         return ann
 
-    def annToRLE(self, ann):
+    def annToRLE(self, ann: dict[str, Any]) -> dict[str, Any]:
         """
         Convert annotation which can be polygons, uncompressed RLE to RLE.
 
@@ -493,7 +533,7 @@ class COCO(CocoDataset):
             )
         return rle
 
-    def annToMask(self, ann):
+    def annToMask(self, ann: dict[str, Any]) -> np.ndarray:
         """
         Convert annotation which can be polygons, uncompressed RLE, or RLE to
         binary mask.

@@ -21,10 +21,13 @@ Example:
     >>>         print('{} = {}'.format(key, value))
 
 """
+from collections.abc import Callable, Mapping
+from typing import Any
+
 import ubelt as ub
 
 
-class Element(dict):
+class Element(dict[str, Any]):
     """
     A dictionary used to define an element of a JSON Schema.
 
@@ -78,7 +81,12 @@ class Element(dict):
         'examples': NotImplemented,
     }
 
-    def __init__(self, base, options=None, _magic=None):
+    def __init__(
+        self,
+        base: Mapping[str, Any],
+        options: Mapping[str, Any] | set[str] | list[str] | tuple[str, ...] | None = None,
+        _magic: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    ) -> None:
         """
         Args:
             base (dict): the keys / values this schema must contain
@@ -88,26 +96,28 @@ class Element(dict):
                 formal jsonschema specs. TODO: _magic is a terrible name, we
                 need to rename it with something descriptive.
         """
-        self._base = base
+        self._base = dict(base)
 
         if options is None:
             options = {}
         if isinstance(options, (set, list, tuple)):
             options = {k: None for k in options}
 
-        self._options = ub.dict_union(options, self.__generics__)
+        self._options = dict(options)
+        self._options.update(self.__generics__)
         self._magic = _magic
-        super().__init__(base)
+        super().__init__(self._base)
 
-    def __call__(self, *args, **kw):
+    def __call__(self, *args: Any, **kw: Any) -> Element:
         # newbase = base | (kw & options)  # imagine all the syntax
         if self._magic:
             kw = self._magic(kw)
-        newbase = ub.dict_union(self._base, ub.dict_isect(kw, self._options))
+        newbase = self._base.copy()
+        newbase.update({key: value for key, value in kw.items() if key in self._options})
         new = Element(newbase, self._options, self._magic)
         return new
 
-    def validate(self, instance=ub.NoParam):
+    def validate(self, instance: Any = ub.NoParam) -> Element | None:
         """
         If ``instance`` is given, validates that that dictionary conforms to
         this schema. Otherwise validates that this is a valid schema element.
@@ -125,7 +135,7 @@ class Element(dict):
         else:
             return jsonschema.validate(instance, schema=self)
 
-    def __or__(self, other):
+    def __or__(self, other: Mapping[str, Any]) -> Element:
         """
         Syntax for making an anyOf relationship
 
@@ -156,21 +166,21 @@ class ScalarElements:
     """
 
     @property
-    def NULL(self):
+    def NULL(self) -> Element:
         """
         https://json-schema.org/understanding-json-schema/reference/null.html
         """
         return Element(base={'type': 'null'}, options={})
 
     @property
-    def BOOLEAN(self):
+    def BOOLEAN(self) -> Element:
         """
         https://json-schema.org/understanding-json-schema/reference/null.html
         """
         return Element(base={'type': 'boolean'}, options={})
 
     @property
-    def STRING(self):
+    def STRING(self) -> Element:
         """
         https://json-schema.org/understanding-json-schema/reference/string.html
         """
@@ -183,7 +193,7 @@ class ScalarElements:
         )
 
     @property
-    def NUMBER(self):
+    def NUMBER(self) -> Element:
         """
         https://json-schema.org/understanding-json-schema/reference/numeric.html#number
         """
@@ -197,7 +207,7 @@ class ScalarElements:
         )
 
     @property
-    def INTEGER(self):
+    def INTEGER(self) -> Element:
         """
         https://json-schema.org/understanding-json-schema/reference/numeric.html#integer
         """
@@ -227,19 +237,19 @@ class QuantifierElements:
     """
 
     @property
-    def ANY(self):
+    def ANY(self) -> Element:
         return Element({})
 
-    def ALLOF(self, *TYPES):
+    def ALLOF(self, *TYPES: Mapping[str, Any]) -> Element:
         return Element({'allOf': list(TYPES)})
 
-    def ANYOF(self, *TYPES):
+    def ANYOF(self, *TYPES: Mapping[str, Any]) -> Element:
         return Element({'anyOf': list(TYPES)})
 
-    def ONEOF(self, *TYPES):
+    def ONEOF(self, *TYPES: Mapping[str, Any]) -> Element:
         return Element({'oneOf': list(TYPES)})
 
-    def NOT(self, TYPE):
+    def NOT(self, TYPE: Mapping[str, Any]) -> Element:
         return Element({'not': TYPE})
 
 
@@ -257,7 +267,9 @@ class ContainerElements:
         {'type': 'object', 'properties': {}}
     """
 
-    def ARRAY(self, TYPE=None, **kw):
+    def ARRAY(
+        self, TYPE: Mapping[str, Any] | None = None, **kw: Any
+    ) -> Element:
         """
         https://json-schema.org/understanding-json-schema/reference/array.html
 
@@ -272,7 +284,7 @@ class ContainerElements:
         if TYPE is None:
             TYPE = {}
 
-        def _magic(kw):
+        def _magic(kw: dict[str, Any]) -> dict[str, Any]:
             numItems = kw.pop('numItems', None)
             if numItems is not None:
                 kw.update(
@@ -296,7 +308,9 @@ class ContainerElements:
         )
         return self(**_magic(kw))
 
-    def OBJECT(self, PROPERTIES=None, **kw):
+    def OBJECT(
+        self, PROPERTIES: Mapping[str, Any] | None = None, **kw: Any
+    ) -> Element:
         """
         https://json-schema.org/understanding-json-schema/reference/object.html
 
