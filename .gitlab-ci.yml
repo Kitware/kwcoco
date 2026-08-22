@@ -484,16 +484,6 @@ test/sdist/minimal-loose/cp314-linux-x86_64:
 build/wheel:
   <<: *build_wheel_template
   image: python:3.14
-test/minimal-loose/cp38-linux-x86_64:
-  <<: *test_minimal-loose_template
-  image: python:3.8
-  needs:
-  - build/wheel
-test/minimal-loose/cp39-linux-x86_64:
-  <<: *test_minimal-loose_template
-  image: python:3.9
-  needs:
-  - build/wheel
 test/minimal-loose/cp310-linux-x86_64:
   <<: *test_minimal-loose_template
   image: python:3.10
@@ -514,14 +504,9 @@ test/minimal-loose/cp313-linux-x86_64:
   image: python:3.13
   needs:
   - build/wheel
-test/full-loose/cp38-linux-x86_64:
-  <<: *test_full-loose_template
-  image: python:3.8
-  needs:
-  - build/wheel
-test/full-loose/cp39-linux-x86_64:
-  <<: *test_full-loose_template
-  image: python:3.9
+test/minimal-loose/cp314-linux-x86_64:
+  <<: *test_minimal-loose_template
+  image: python:3.14
   needs:
   - build/wheel
 test/full-loose/cp310-linux-x86_64:
@@ -544,14 +529,9 @@ test/full-loose/cp313-linux-x86_64:
   image: python:3.13
   needs:
   - build/wheel
-test/minimal-strict/cp38-linux-x86_64:
-  <<: *test_minimal-strict_template
-  image: python:3.8
-  needs:
-  - build/wheel
-test/minimal-strict/cp39-linux-x86_64:
-  <<: *test_minimal-strict_template
-  image: python:3.9
+test/full-loose/cp314-linux-x86_64:
+  <<: *test_full-loose_template
+  image: python:3.14
   needs:
   - build/wheel
 test/minimal-strict/cp310-linux-x86_64:
@@ -574,14 +554,9 @@ test/minimal-strict/cp313-linux-x86_64:
   image: python:3.13
   needs:
   - build/wheel
-test/full-strict/cp38-linux-x86_64:
-  <<: *test_full-strict_template
-  image: python:3.8
-  needs:
-  - build/wheel
-test/full-strict/cp39-linux-x86_64:
-  <<: *test_full-strict_template
-  image: python:3.9
+test/minimal-strict/cp314-linux-x86_64:
+  <<: *test_minimal-strict_template
+  image: python:3.14
   needs:
   - build/wheel
 test/full-strict/cp310-linux-x86_64:
@@ -602,6 +577,11 @@ test/full-strict/cp312-linux-x86_64:
 test/full-strict/cp313-linux-x86_64:
   <<: *test_full-strict_template
   image: python:3.13
+  needs:
+  - build/wheel
+test/full-strict/cp314-linux-x86_64:
+  <<: *test_full-strict_template
+  image: python:3.14
   needs:
   - build/wheel
 lint:

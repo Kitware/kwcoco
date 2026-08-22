@@ -17,8 +17,6 @@ requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -197,12 +195,11 @@ min_python = "3.10"
 main_python = "3.14"
 url = "https://gitlab.kitware.com/computer-vision/kwcoco"
 ci_cpython_versions = [
-  "3.8",
-  "3.9",
   "3.10",
   "3.11",
   "3.12",
   "3.13",
+  "3.14",
 ]
 extra_full_strict_lines = [
   "pip install GDAL==3.3.1 --find-links https://girder.github.io/large_image_wheels -U",
