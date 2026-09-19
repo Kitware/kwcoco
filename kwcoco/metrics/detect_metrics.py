@@ -694,6 +694,98 @@ class DetectionMetrics(ub.NiceRepr):
             cfsn_vecs = iou_to_cfsn[iou_thresh_list[0]]
             return cfsn_vecs
 
+    def confusion_vectors_v2(
+        dmet,
+        iou_thresh: float | Iterable[float] = 0.5,
+        *,
+        iou_type: str = 'bbox',
+        overlap_backend: str = 'auto',
+        gids: Iterable[int] | None = None,
+        compat: str = 'mutex',
+        prioritize: str = 'iou',
+        ignore_classes: str | Iterable[str] | None = None,
+        max_dets: int | None = None,
+        truth_reuse_policy: str = 'never',
+        min_iou: float | None = None,
+        spatial_threshold: int | None = 50_000,
+    ) -> ConfusionVectors | dict[float, ConfusionVectors]:
+        """Experimental reusable-candidate confusion-vector path.
+
+        This is intentionally separate from :meth:`confusion_vectors` while
+        ``assignment_v2`` semantics are still being measured.  In addition to
+        bbox IoU it supports experimental native instance-mask assignment via
+        ``iou_type='segm'``.  Segmentation mode currently rejects ignore-region
+        and crowd semantics rather than silently applying bbox-only behavior.
+        """
+        import kwarray
+        from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
+
+        if isinstance(iou_thresh, Iterable):
+            thresholds = [float(t) for t in iou_thresh]
+            multi = True
+        else:
+            thresholds = [float(iou_thresh)]
+            multi = False
+        if min_iou is None:
+            min_iou = min(thresholds) if thresholds else 0.0
+
+        if gids is None:
+            gids = sorted(dmet._imgname_to_gid.values())
+        else:
+            gids = list(gids)
+
+        iou_to_yaccum = {t: ub.ddict(list) for t in thresholds}
+        classes = dmet.classes
+        for gid in gids:
+            true_dets = dmet.true_detections(gid)
+            pred_dets = dmet.pred_detections(gid)
+            image_dims = dmet.gid_to_image_dims.get(gid, None)
+            index = AssignmentCandidateIndex.build(
+                true_dets,
+                pred_dets,
+                classes=classes,
+                compat=compat,
+                prioritize=prioritize,
+                min_iou=float(min_iou),
+                spatial_threshold=spatial_threshold,
+                iou_type=iou_type,
+                overlap_backend=overlap_backend,
+                image_dims=image_dims,
+            )
+            iou_to_y = index.assign_many(
+                thresholds,
+                bg_weight=1.0,
+                bg_cidx=-1,
+                ignore_classes=ignore_classes,
+                max_dets=max_dets,
+                truth_reuse_policy=truth_reuse_policy,
+            )
+            for t, y in iou_to_y.items():
+                y = dict(y)
+                y['gid'] = [gid] * len(y['pred'])
+                accum = iou_to_yaccum[t]
+                for key, vals in y.items():
+                    accum[key].extend(vals)
+
+        iou_to_cfsn = {}
+        for t, y_accum in iou_to_yaccum.items():
+            data = {}
+            for key, vals in y_accum.items():
+                dtype = None
+                if key in {'iou', 'score', 'weight'}:
+                    dtype = np.float32
+                elif key in {'pxs', 'txs', 'gid', 'pred', 'true', 'rank'}:
+                    dtype = np.int32
+                data[key] = np.asarray(vals, dtype=dtype)
+            if not data:
+                data = {k: np.empty((0,)) for k in ['gid'] + ASSIGN_COLUMNS}
+            cfsn_data = kwarray.DataFrameArray(data)
+            iou_to_cfsn[t] = ConfusionVectors(cfsn_data, classes=classes)
+
+        if multi:
+            return iou_to_cfsn
+        return iou_to_cfsn[thresholds[0]]
+
     def score_kwant(dmet, iou_thresh: float = 0.5) -> dict[str, typing.Any]:
         """
         Scores the detections using kwant

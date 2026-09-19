@@ -1,4 +1,6 @@
 ### Fixed
+* Add an experimental native instance-mask assignment path in `assignment_v2`, backed by batched compressed-RLE IoU and exposed through `DetectionMetrics.confusion_vectors_v2`.
+* Add a Phase-2 comparison runner that decomposes native mask assignment from native and COCO accumulation.
 
 * Official COCO segmentation metric coercion now treats polygon parts with
   fewer than three vertices as zero-area geometry instead of allowing
@@ -1268,3 +1270,9 @@ Bug in `CocoImage.add_asset` where json serialization was broken
 
 ### Added
 * Initial version
+
+### Development
+
+* Add Phase-1 / Phase-1.5 metric comparison harnesses to separate assignment,
+  accumulation, box-IoU backend, and mask-RLE backend effects before native
+  instance-mask assignment is changed.

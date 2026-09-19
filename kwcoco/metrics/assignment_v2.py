@@ -214,7 +214,10 @@ class AssignmentCandidateIndex:
     cx_to_matchable_txs: dict[int, np.ndarray]
     cand_txs: list[np.ndarray]
     cand_ious: list[np.ndarray]
-    build_stats: dict[str, int]
+    iou_type: str
+    overlap_backend: dict[str, Any] | None
+    image_dims: tuple[int, int] | None
+    build_stats: dict[str, Any]
 
     @classmethod
     def build(
@@ -228,6 +231,9 @@ class AssignmentCandidateIndex:
         bias: float = 0.0,
         min_iou: float = 0.5,
         spatial_threshold: int | None = 50_000,
+        iou_type: str = 'bbox',
+        overlap_backend: str = 'auto',
+        image_dims: tuple[int, int] | None = None,
     ) -> 'AssignmentCandidateIndex':
         """
         Build a reusable candidate index.
@@ -240,14 +246,31 @@ class AssignmentCandidateIndex:
             prioritize: currently only ``iou`` is implemented.
             bias: IoU bias forwarded to kwimage Boxes.ious.
             min_iou: discard candidate pairs below this threshold.
-            spatial_threshold: if a compatible block has more than this many
-                dense pairs, try the sparse grid candidate generator.  Use
-                ``None`` to always use dense compatible blocks.
+            spatial_threshold: if a compatible bbox block has more than this
+                many dense pairs, try the sparse grid candidate generator.
+                Segmentation overlap currently uses one batched mask-IoU call
+                per compatible class block.
+            iou_type: ``'bbox'`` or experimental ``'segm'`` overlap.
+            overlap_backend: mask-IoU backend for ``iou_type='segm'``.
+            image_dims: required ``(height, width)`` canvas for segmentation
+                rasterization.
         """
         if prioritize != 'iou':
             raise NotImplementedError(
                 'assignment_v2 currently implements prioritize="iou" only'
             )
+        if iou_type not in {'bbox', 'segm'}:
+            raise KeyError(iou_type)
+        if iou_type == 'segm':
+            if bias != 0:
+                raise NotImplementedError(
+                    'segmentation IoU does not define bbox-style bias'
+                )
+            if image_dims is None:
+                raise ValueError(
+                    'image_dims=(height, width) is required for segmentation IoU'
+                )
+            image_dims = tuple(map(int, image_dims))
         valid_compat_keys = {'ancestors', 'mutex', 'all'}
         if compat not in valid_compat_keys:
             raise KeyError(compat)
@@ -311,16 +334,41 @@ class AssignmentCandidateIndex:
         cand_ious: list[np.ndarray] = [
             np.empty(0, dtype=float) for _ in range(len(pred_dets))
         ]
-        build_stats = {
+        build_stats: dict[str, Any] = {
+            'iou_type': iou_type,
             'dense_blocks': 0,
             'spatial_blocks': 0,
             'dense_pairs_considered': 0,
             'sparse_pairs_considered': 0,
+            'mask_pairs_considered': 0,
             'pairs_kept': 0,
         }
 
         pred_ltrb = _boxes_to_ltrb(pred_dets.boxes)
         true_ltrb = _boxes_to_ltrb(true_dets.boxes)
+
+        pred_rles = true_rles = None
+        mask_iou_func = None
+        overlap_metadata = None
+        if iou_type == 'segm':
+            from kwcoco.metrics.overlap import detections_to_rles
+            from kwcoco.metrics.overlap import resolve_mask_iou_backend
+
+            truth_crowd = np.asarray(
+                true_dets.data.get('iscrowd', np.zeros(len(true_dets), dtype=bool)),
+                dtype=bool,
+            )
+            if np.any(truth_crowd):
+                raise NotImplementedError(
+                    'assignment_v2 segmentation mode does not yet implement '
+                    'COCO crowd truth reuse semantics'
+                )
+            pred_rles = detections_to_rles(pred_dets, image_dims)
+            true_rles = detections_to_rles(true_dets, image_dims)
+            mask_iou_func, overlap_metadata = resolve_mask_iou_backend(
+                overlap_backend
+            )
+            build_stats['overlap_backend'] = overlap_metadata
 
         for pred_cx in unique_pcxs:
             pred_idxs = np.where(pred_cxs == pred_cx)[0].astype(int)
@@ -328,6 +376,39 @@ class AssignmentCandidateIndex:
             if len(pred_idxs) == 0 or len(true_idxs) == 0:
                 continue
             dense_pair_count = int(len(pred_idxs) * len(true_idxs))
+            if iou_type == 'segm':
+                assert pred_rles is not None
+                assert true_rles is not None
+                assert mask_iou_func is not None
+                block_pred_rles = [pred_rles[int(px)] for px in pred_idxs]
+                block_true_rles = [true_rles[int(tx)] for tx in true_idxs]
+                crowd = [0] * len(block_true_rles)
+                ious = np.asarray(
+                    mask_iou_func(block_pred_rles, block_true_rles, crowd),
+                    dtype=float,
+                )
+                expected = (len(pred_idxs), len(true_idxs))
+                if ious.shape != expected:
+                    if ious.size == 0 and 0 in expected:
+                        ious = np.empty(expected, dtype=float)
+                    else:
+                        raise ValueError(
+                            'mask IoU backend returned unexpected shape: '
+                            f'{ious.shape!r} != {expected!r}'
+                        )
+                build_stats['dense_blocks'] += 1
+                build_stats['mask_pairs_considered'] += dense_pair_count
+                for px, row in zip(pred_idxs, ious):
+                    keep = row > min_iou
+                    if np.any(keep):
+                        txs = true_idxs[keep]
+                        iou_vals = np.asarray(row[keep], dtype=float)
+                        order = np.argsort(-iou_vals, kind='mergesort')
+                        cand_txs[int(px)] = txs[order]
+                        cand_ious[int(px)] = iou_vals[order]
+                        build_stats['pairs_kept'] += int(len(order))
+                continue
+
             use_spatial = (
                 spatial_threshold is not None
                 and dense_pair_count > spatial_threshold
@@ -379,6 +460,9 @@ class AssignmentCandidateIndex:
             cx_to_matchable_txs=cx_to_matchable_txs,
             cand_txs=cand_txs,
             cand_ious=cand_ious,
+            iou_type=iou_type,
+            overlap_backend=overlap_metadata,
+            image_dims=image_dims,
             build_stats=build_stats,
         )
 
@@ -396,6 +480,11 @@ class AssignmentCandidateIndex:
         if truth_reuse_policy != 'never':
             raise NotImplementedError(
                 'assignment_v2 currently implements truth_reuse_policy="never" only'
+            )
+        if self.iou_type == 'segm' and ignore_classes is not None:
+            raise NotImplementedError(
+                'mask-aware ignore-region assignment is not implemented yet; '
+                'pass ignore_classes=None for experimental segmentation scoring'
             )
         if iou_thresh < self.min_iou:
             raise ValueError(
@@ -571,6 +660,9 @@ def assign_confusion_vectors_v2(
     truth_reuse_policy: str = 'never',
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
+    iou_type: str = 'bbox',
+    overlap_backend: str = 'auto',
+    image_dims: tuple[int, int] | None = None,
 ) -> dict[str, list[int | float]]: ...
 
 
@@ -591,6 +683,9 @@ def assign_confusion_vectors_v2(
     truth_reuse_policy: str = 'never',
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
+    iou_type: str = 'bbox',
+    overlap_backend: str = 'auto',
+    image_dims: tuple[int, int] | None = None,
 ) -> dict[float, dict[str, list[int | float]]]: ...
 
 
@@ -610,6 +705,9 @@ def assign_confusion_vectors_v2(
     truth_reuse_policy: str = 'never',
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
+    iou_type: str = 'bbox',
+    overlap_backend: str = 'auto',
+    image_dims: tuple[int, int] | None = None,
 ) -> dict[str, list[int | float]] | dict[float, dict[str, list[int | float]]]:
     """
     Convenience wrapper around :class:`AssignmentCandidateIndex`.
@@ -635,6 +733,9 @@ def assign_confusion_vectors_v2(
         bias=bias,
         min_iou=float(min_iou),
         spatial_threshold=spatial_threshold,
+        iou_type=iou_type,
+        overlap_backend=overlap_backend,
+        image_dims=image_dims,
     )
     results = index.assign_many(
         iou_thresh_list,

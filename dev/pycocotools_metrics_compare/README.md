@@ -166,3 +166,155 @@ existing `ConfusionVectors -> Measures` pipeline.
 
 Phase 1 should answer which mask overlap backend to use by default and whether
 there are compatibility/performance reasons to retain more than one backend.
+
+## Phase-1 orchestration bundle
+
+`run_phase1_suite.py` is the next measurement gate.  It leaves production
+metric semantics unchanged and adds the experiments needed before native mask
+assignment is designed.
+
+It compares the current native assignment implementation against the
+experimental `assignment_v2.AssignmentCandidateIndex` over the complete
+COCO-style IoU threshold set (`0.50:0.05:0.95`).  Both the dense v2 candidate
+builder and its automatic sparse-grid path are measured.  The report preserves
+row-level assignment differences as `(gid, tx, px, true-class, pred-class)`
+multisets, not only scalar AP differences.
+
+It also runs deterministic hand-built cases for:
+
+* an IoU exactly equal to 0.50;
+* equal-score duplicate detections;
+* one prediction competing for two overlapping truths;
+* empty prediction and empty truth inputs;
+* a polygon-with-hole truth against a filled prediction.
+
+Three scaling sweeps are included:
+
+* image count with `CocoDataset.demo('shapesN')`;
+* image resolution with the same shapes generator;
+* object density using `CocoDataset.demo('vidshapes1', num_tracks=...)`.
+
+The density sweep uses `render=False`; scoring depends only on KWCoco geometry,
+not image bytes.  Prediction perturbations still use the package's existing
+`perterb_coco()` machinery.
+
+Every experiment is caught independently.  A failure is serialized with its
+traceback and the suite continues, which makes a partial long run useful for
+analysis instead of losing all later measurements.
+
+### Quick measurement gate
+
+Run the focused unit tests first, then the quick suite:
+
+```bash
+pytest \
+    tests/test_coco_instance_metrics.py \
+    tests/test_metrics_assignment_v2.py \
+    tests/test_metrics_phase1_suite.py
+
+python dev/pycocotools_metrics_compare/run_phase1_suite.py \
+    --mode=quick \
+    --output-dpath=_metric_compare_phase1_quick
+```
+
+The command writes one uploadable artifact:
+
+```text
+_metric_compare_phase1_quick/kwcoco_metrics_phase1_quick.tar.gz
+```
+
+Upload that tarball for analysis.  It contains the full JSON report, a compact
+Markdown status/timing table, and Git/source-state metadata.
+
+### Full scaling run
+
+After the quick bundle is clean enough to interpret, run:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase1_suite.py \
+    --mode=full \
+    --output-dpath=_metric_compare_phase1_full
+```
+
+The output to upload is:
+
+```text
+_metric_compare_phase1_full/kwcoco_metrics_phase1_full.tar.gz
+```
+
+The full mode increases image-count, resolution, and object-density sweeps and
+uses repeated timings.  Keep quick/full reports from a no-`kwimage_ext`
+environment, and repeat the same command unchanged in an environment with
+`kwimage_ext` when available.  Backend availability is part of the report, so
+those runs remain distinguishable.
+
+### Interpretation gate before Phase 2
+
+Do not promote `assignment_v2` or implement native mask assignment solely
+because it is newer or faster.  First inspect:
+
+1. where v1 and v2 assignment row multisets disagree;
+2. whether those disagreements are score-tie / hierarchy / ignore-policy
+   semantics or defects;
+3. how v1 and v2 scale with images and object density;
+4. whether v2's sparse candidate builder changes any assignments;
+5. where native-vs-official deltas enter: assignment or accumulation;
+6. whether `kwimage_ext` and current pycocotools mask kernels agree numerically
+   and which is faster on the same RLE inputs.
+
+Only then should Phase 2 generalize the reusable candidate graph around a
+bbox/mask overlap provider.
+
+## Phase-1.5: acceleration-backend characterization
+
+The initial Phase-1 runs showed that installing `kwimage_ext` can materially
+change native assignment throughput, especially for dense box IoU matrices.
+Before changing assignment architecture, run the low-level backend suite:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase15_suite.py \
+    --mode=quick \
+    --output-dpath=_metric_compare_phase15_quick
+```
+
+Upload:
+
+```text
+_metric_compare_phase15_quick/kwcoco_metrics_phase15_quick.tar.gz
+```
+
+Run the exact same command in each relevant environment: no extension, legacy
+Cython extension, and Rust extension.  The report records which public backend
+actually dispatched and separately probes `kwimage_ext._rust` when available.
+
+Phase-1.5 measures:
+
+* NumPy, kwimage automatic, public kwimage_ext, and direct Rust box-IoU paths;
+* pycocotools, public kwimage_ext, and direct Rust COCO-RLE IoU paths;
+* rectangle, fragmented, and sparse/noisy RLE complexity;
+* adaptive repetitions so sub-millisecond wrapper overhead is not mistaken for
+  kernel throughput;
+* exact/numerical parity and threshold-decision parity at IoU 0.50/0.75/0.95;
+* RLE compressed-byte, decode, area, and bbox parity;
+* inherited edge cases: one-dimensional bboxes, `iscrowd` length validation,
+  Nx2 quadrilaterals, and degenerate polygons.
+
+Only after the same Phase-1.5 profile is available from the legacy and Rust
+backends should native mask assignment choose its production overlap backend.
+
+## Phase 2: native instance-mask assignment
+
+`run_phase2_native_mask.py` exercises the experimental geometry-independent
+`assignment_v2` path with `iou_type='segm'`.  It compares native mask
+assignment + native `Measures`, COCOeval assignment + native `Measures`, and
+full COCOeval accumulation at the same controlled perturbation cases.
+
+The native segmentation path intentionally requires explicit image dimensions
+and currently rejects crowd / ignore-region semantics.  This keeps the first
+measurement surface honest while those semantics are designed separately.
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase2_native_mask.py \
+    --mode=quick \
+    --output-dpath=_metric_compare_phase2_native_mask
+```
