@@ -10,6 +10,7 @@ Vectorized metrics for **detection / classification / segmentation**. Core patte
 * `confusion_measures.py`: thresholded counts → metrics (PR/ROC curves, AP variants, MCC, etc.); `ap_method` controls AP style.
 * `assignment.py`: IoU matching → confusion vectors.
 * `detect_metrics.py`: end-to-end detection eval (from `kwimage.Detections` or `CocoDataset`); can score via kwcoco, VOC, or `pycocotools`.
+* `coco_metrics.py`: narrow strict-MS-COCO compatibility helpers and stable named summaries for official bbox / instance-mask `pycocotools` metrics.
 * `segmentation_metrics.py`, `voc_metrics.py`, `clf_report.py`, `drawing.py`, `functional.py`: task helpers + plotting/utilities (mostly operate on vectors/measures).
 
 ## kwcoco vs `pycocotools` (mental model)
@@ -22,9 +23,31 @@ Vectorized metrics for **detection / classification / segmentation**. Core patte
 
 ## Interop
 
-* `DetectionMetrics.score_pycocotools()` wraps official COCO eval (after conversion). Expect small deltas vs `score_kwcoco()` due to smoothing/AP details.
+* `DetectionMetrics.score_pycocotools(iou_type=...)` wraps official COCO eval (after conversion). `iou_type='bbox'` is the historical default; `iou_type='segm'` computes official instance-mask metrics. Expect small deltas vs `score_kwcoco()` due to smoothing/AP details.
+* `CocoEvaluator.evaluate_pycocotools()` is the dataset-level API for named official COCO box / mask AP and AR summaries. Keep this separate from the custom confusion-vector evaluator unless its assignment geometry is explicitly generalized.
+* KWCoco polygons may contain interiors (holes), which strict MS-COCO polygons cannot represent. Preserve rich geometry internally and convert only incompatible cases to exact RLE at the pycocotools boundary.
 * `with_confusion=True` returns confusion vectors from the pycocotools assignment for side-by-side debugging.
 * COCO “mutex” matching (pred category must equal truth) corresponds to `compat='mutex'` in kwcoco builders.
+
+
+## Metric backend comparison
+
+The official `pycocotools` bridge is a reference backend, not a replacement for
+kwcoco's confusion-vector architecture.  Before changing assignment or AP
+semantics, use `dev/pycocotools_metrics_compare/compare_metrics.py` to identify
+which layer causes a difference.
+
+The comparison suite separates:
+
+* overlap-kernel behavior (`kwimage_ext` versus current pycocotools masks);
+* assignment behavior (kwcoco versus COCOeval);
+* accumulation behavior (kwcoco `Measures` versus COCOeval accumulation).
+
+For bbox evaluation it can measure all three combinations.  For instance masks,
+Phase 1 measures COCOeval assignment followed by either kwcoco `Measures` or
+COCOeval accumulation.  Native kwcoco mask assignment is deliberately a future
+extension so its overlap backend and semantics can be chosen from measured
+evidence instead of being hard-coded into the reference bridge.
 
 ## Debug / Usage
 

@@ -83,6 +83,7 @@ class DetectionMetrics(ub.NiceRepr):
 
     gid_to_true_dets: Dict[int, kwimage.Detections]
     gid_to_pred_dets: Dict[int, kwimage.Detections]
+    gid_to_image_dims: dict[int, tuple[int, int]]
     _imgname_to_gid: dict[str, int]
 
     def __init__(
@@ -99,11 +100,13 @@ class DetectionMetrics(ub.NiceRepr):
         dmet.classes = classes
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}
+        dmet.gid_to_image_dims = {}
         dmet._imgname_to_gid = {}
 
     def clear(dmet) -> None:
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}
+        dmet.gid_to_image_dims = {}
         dmet._imgname_to_gid = {}
 
     def __nice__(dmet) -> str:
@@ -207,18 +210,46 @@ class DetectionMetrics(ub.NiceRepr):
             for gid in ub.ProgIter(gids, desc=desc, verbose=verbose):
                 img = coco_dset.imgs[gid]
                 imgname = img['file_name']
-                aids = coco_dset.gid_to_aids[gid]
+                height = img.get('height', None)
+                width = img.get('width', None)
+                img_dims = None
+                if height is not None and width is not None:
+                    img_dims = (int(height), int(width))
+                aids = list(coco_dset.gid_to_aids[gid])
                 annots = [coco_dset.anns[aid] for aid in aids]
                 # dets = true_coco.annots(gid=gid).detections
                 dets = kwimage.Detections.from_coco_annots(
                     annots, dset=coco_dset, classes=classes
                 )
-                yield dets, imgname, gid
+                # ``from_coco_annots`` historically normalizes segmentations
+                # to polygons.  Keep the source segmentation backend here so
+                # official mask evaluation does not polygonize exact RLE input.
+                dets.data['segmentations'] = kwimage.SegmentationList.coerce(
+                    [a.get('segmentation', None) for a in annots]
+                )
+                # Keep COCO-only metadata needed by the official evaluator.
+                # Arbitrary Detections data columns survive indexing/warping.
+                dets.data['aids'] = np.asarray(aids, dtype=int)
+                dets.data['iscrowd'] = np.asarray(
+                    [bool(a.get('iscrowd', False)) for a in annots],
+                    dtype=bool,
+                )
+                dets.data['ignore'] = np.asarray(
+                    [bool(a.get('ignore', False)) for a in annots],
+                    dtype=bool,
+                )
+                yield dets, imgname, gid, img_dims
 
-        for dets, imgname, gid in _coco_to_dets(true_coco, desc='add truth'):
-            self.add_truth(dets, imgname, gid=gid)
+        for dets, imgname, gid, img_dims in _coco_to_dets(
+            true_coco, desc='add truth'
+        ):
+            self.add_truth(dets, imgname, gid=gid, img_dims=img_dims)
 
-        for dets, imgname, gid in _coco_to_dets(pred_coco, desc='add pred'):
+        for dets, imgname, gid, _img_dims in _coco_to_dets(
+            pred_coco, desc='add pred'
+        ):
+            # Truth image dimensions are authoritative.  Do not introduce a
+            # new bbox-scoring failure mode if prediction metadata disagrees.
             self.add_predictions(dets, imgname, gid=gid)
 
         return self
@@ -245,6 +276,7 @@ class DetectionMetrics(ub.NiceRepr):
         pred_dets: kwimage.Detections,
         imgname: str | None = None,
         gid: int | None = None,
+        img_dims: tuple[int, int] | None = None,
     ) -> None:
         """
         Register/Add predicted detections for an image
@@ -257,8 +289,14 @@ class DetectionMetrics(ub.NiceRepr):
             imgname (str | None): a unique string to identify the image
 
             gid (int | None): the integer image id if known
+
+            img_dims (Tuple[int, int] | None):
+                ``(height, width)`` if known. Required for official COCO
+                instance-segmentation scoring when a rich segmentation must
+                be represented as a full-image RLE.
         """
         gid = dmet._register_imagename(imgname, gid)
+        dmet._register_image_dims(gid, img_dims)
         dmet.gid_to_pred_dets[gid] = pred_dets
 
     def add_truth(
@@ -266,6 +304,7 @@ class DetectionMetrics(ub.NiceRepr):
         true_dets: kwimage.Detections,
         imgname: str | None = None,
         gid: int | None = None,
+        img_dims: tuple[int, int] | None = None,
     ) -> None:
         """
         Register/Add groundtruth detections for an image
@@ -278,9 +317,31 @@ class DetectionMetrics(ub.NiceRepr):
             imgname (str | None): a unique string to identify the image
 
             gid (int | None): the integer image id if known
+
+            img_dims (Tuple[int, int] | None):
+                ``(height, width)`` if known. Required for official COCO
+                instance-segmentation scoring when a rich segmentation must
+                be represented as a full-image RLE.
         """
         gid = dmet._register_imagename(imgname, gid)
+        dmet._register_image_dims(gid, img_dims)
         dmet.gid_to_true_dets[gid] = true_dets
+
+    def _register_image_dims(
+        dmet, gid: int, img_dims: tuple[int, int] | None
+    ) -> None:
+        if img_dims is None:
+            return
+        img_dims = tuple(map(int, img_dims))
+        if len(img_dims) != 2 or min(img_dims) <= 0:
+            raise ValueError(f'invalid image dimensions: {img_dims!r}')
+        old_dims = dmet.gid_to_image_dims.get(gid, None)
+        if old_dims is not None and old_dims != img_dims:
+            raise ValueError(
+                f'conflicting dimensions for gid={gid}: '
+                f'{old_dims!r} != {img_dims!r}'
+            )
+        dmet.gid_to_image_dims[gid] = img_dims
 
     def true_detections(dmet, gid: int) -> kwimage.Detections:
         """gets Detections representation for groundtruth in an image"""
@@ -832,13 +893,30 @@ class DetectionMetrics(ub.NiceRepr):
         voc_scores = vmet.score(iou_thresh, bias=bias, method=method)
         return voc_scores
 
-    def _to_coco(dmet):
+    def _to_coco(dmet, iou_type: str = 'bbox'):
         """
-        Convert to a coco representation of truth and predictions
+        Convert truth and predictions to a strict COCO representation.
 
-        with inverse aid mappings
+        Args:
+            iou_type (str):
+                ``'bbox'`` preserves the historical box-only conversion.
+                ``'segm'`` additionally emits strict MS-COCO segmentations
+                and uses raster mask area for area-range evaluation.
+
+        Returns:
+            Tuple[CocoDataset, CocoDataset, dict, dict]:
+                prediction dataset, truth dataset, and inverse annotation
+                mappings used to reconstruct confusion vectors.
         """
         import kwcoco
+
+        if iou_type not in {'bbox', 'segm'}:
+            raise KeyError(f'Unsupported COCO iou_type={iou_type!r}')
+
+        if iou_type == 'segm':
+            from kwcoco.metrics.coco_metrics import (
+                coerce_pycocotools_segmentation,
+            )
 
         true = kwcoco.CocoDataset()
         pred = kwcoco.CocoDataset()
@@ -850,7 +928,6 @@ class DetectionMetrics(ub.NiceRepr):
             raise ValueError('classes are required to convert metrics to COCO')
 
         for node in classes:
-            # cid = classes.graph.node[node]['id']
             cid = classes.index(node)
             supercategory = list(classes.graph.pred[node])
             if len(supercategory) == 0:
@@ -870,8 +947,12 @@ class DetectionMetrics(ub.NiceRepr):
             )
 
         for imgname, gid in dmet._imgname_to_gid.items():
-            true.add_image(imgname, id=gid)
-            pred.add_image(imgname, id=gid)
+            image_kw = {}
+            img_dims = dmet.gid_to_image_dims.get(gid, None)
+            if img_dims is not None:
+                image_kw['height'], image_kw['width'] = img_dims
+            true.add_image(imgname, id=gid, **image_kw)
+            pred.add_image(imgname, id=gid, **image_kw)
 
         idx_to_id = {
             idx: classes.index(node) for idx, node in enumerate(classes.idx_to_node)
@@ -885,10 +966,34 @@ class DetectionMetrics(ub.NiceRepr):
                 pred_scores = np.ones(len(pred_dets))
             pred_cids = list(ub.take(idx_to_id, pred_dets.class_idxs))
             pred_xywh = pred_boxes.to_xywh().data.tolist()
+            pred_segs = pred_dets.data.get('segmentations', None)
 
             dt_aids = []
-            for bbox, cid, score in zip(pred_xywh, pred_cids, pred_scores):
-                aid = pred.add_annotation(gid, cid, bbox=bbox, score=score)
+            for px, (bbox, cid, score) in enumerate(
+                zip(pred_xywh, pred_cids, pred_scores)
+            ):
+                ann_kw = {
+                    'bbox': bbox,
+                    'score': float(score),
+                }
+                if iou_type == 'segm':
+                    img_dims = dmet.gid_to_image_dims.get(gid, None)
+                    if img_dims is None:
+                        raise ValueError(
+                            'Image dimensions are required for COCO '
+                            f'instance-segmentation scoring (gid={gid})'
+                        )
+                    if pred_segs is None:
+                        raise ValueError(
+                            'Predicted segmentations are required for '
+                            f'iou_type="segm" (gid={gid}, px={px})'
+                        )
+                    strict_seg, seg_area = coerce_pycocotools_segmentation(
+                        pred_segs[px], img_dims
+                    )
+                    ann_kw['segmentation'] = strict_seg
+                    ann_kw['area'] = seg_area
+                aid = pred.add_annotation(gid, cid, **ann_kw)
                 dt_aids.append(aid)
 
             dt_aid_to_px.update(dict(zip(dt_aids, range(len(dt_aids)))))
@@ -901,10 +1006,40 @@ class DetectionMetrics(ub.NiceRepr):
                 true_weights = np.ones(len(true_boxes))
             true_cids = list(ub.take(idx_to_id, true_dets.class_idxs))
             true_xywh = true_boxes.to_xywh().data.tolist()
+            true_segs = true_dets.data.get('segmentations', None)
+            true_crowd = true_dets.data.get('iscrowd', None)
+            true_ignore = true_dets.data.get('ignore', None)
 
             gt_aids = []
-            for bbox, cid, weight in zip(true_xywh, true_cids, true_weights):
-                aid = true.add_annotation(gid, cid, bbox=bbox, weight=weight)
+            for tx, (bbox, cid, weight) in enumerate(
+                zip(true_xywh, true_cids, true_weights)
+            ):
+                ann_kw = {
+                    'bbox': bbox,
+                    'weight': float(weight),
+                }
+                if true_crowd is not None:
+                    ann_kw['iscrowd'] = bool(true_crowd[tx])
+                if true_ignore is not None:
+                    ann_kw['ignore'] = bool(true_ignore[tx])
+                if iou_type == 'segm':
+                    img_dims = dmet.gid_to_image_dims.get(gid, None)
+                    if img_dims is None:
+                        raise ValueError(
+                            'Image dimensions are required for COCO '
+                            f'instance-segmentation scoring (gid={gid})'
+                        )
+                    if true_segs is None:
+                        raise ValueError(
+                            'Truth segmentations are required for '
+                            f'iou_type="segm" (gid={gid}, tx={tx})'
+                        )
+                    strict_seg, seg_area = coerce_pycocotools_segmentation(
+                        true_segs[tx], img_dims
+                    )
+                    ann_kw['segmentation'] = strict_seg
+                    ann_kw['area'] = seg_area
+                aid = true.add_annotation(gid, cid, **ann_kw)
                 gt_aids.append(aid)
 
             gt_aid_to_tx.update(dict(zip(gt_aids, range(len(gt_aids)))))
@@ -917,12 +1052,19 @@ class DetectionMetrics(ub.NiceRepr):
         with_confusion: bool = False,
         verbose: int = 0,
         iou_thresholds: Iterable[float] | np.ndarray | None = None,
+        iou_type: str = 'bbox',
     ) -> dict[str, typing.Any]:
         """
         score using ms-coco method
 
+        Args:
+            iou_type (str):
+                Official COCO geometry to score. ``'bbox'`` retains the
+                historical behavior. ``'segm'`` evaluates instance masks.
+
         Returns:
-            Dict : dictionary with pct info
+            Dict : dictionary with pct info. With standard COCO parameters,
+            the ``summary`` field contains named official AP / AR statistics.
 
         Example:
             >>> # xdoctest: +REQUIRES(module:pycocotools)
@@ -976,7 +1118,12 @@ class DetectionMetrics(ub.NiceRepr):
         from pycocotools import cocoeval
         from kwcoco.util.util_monkey import SupressPrint
 
-        pred, true, gt_aid_to_tx, dt_aid_to_px = dmet._to_coco()
+        if iou_type not in {'bbox', 'segm'}:
+            raise KeyError(f'Unsupported COCO iou_type={iou_type!r}')
+
+        pred, true, gt_aid_to_tx, dt_aid_to_px = dmet._to_coco(
+            iou_type=iou_type
+        )
 
         # The original pycoco-api prints to much, suppress it
         quiet = verbose == 0
@@ -985,16 +1132,24 @@ class DetectionMetrics(ub.NiceRepr):
             cocoDt = pred._aspycoco()
 
             for ann in cocoGt.dataset['annotations']:
-                w, h = ann['bbox'][-2:]
-                ann['ignore'] = ann['weight'] < 0.5
-                ann['area'] = w * h
-                ann['iscrowd'] = False
+                if iou_type == 'bbox':
+                    # Preserve the historical bbox evaluator semantics exactly.
+                    ann['ignore'] = ann['weight'] < 0.5
+                    ann['iscrowd'] = False
+                    w, h = ann['bbox'][-2:]
+                    ann['area'] = w * h
+                else:
+                    ann['ignore'] = bool(
+                        ann.get('ignore', False) or ann['weight'] < 0.5
+                    )
+                    ann['iscrowd'] = bool(ann.get('iscrowd', False))
 
             for ann in cocoDt.dataset['annotations']:
-                w, h = ann['bbox'][-2:]
-                ann['area'] = w * h
+                if iou_type == 'bbox':
+                    w, h = ann['bbox'][-2:]
+                    ann['area'] = w * h
 
-            evaler = cocoeval.COCOeval(cocoGt, cocoDt, iouType='bbox')
+            evaler = cocoeval.COCOeval(cocoGt, cocoDt, iouType=iou_type)
 
             modified_params = False
             if iou_thresholds is None:
@@ -1033,9 +1188,17 @@ class DetectionMetrics(ub.NiceRepr):
             else:
                 print('standard pycocotools params')
                 evaler.summarize()
+                # NOTE: ``mAP`` historically exposed COCO AP50 here. Keep the
+                # legacy value for compatibility, while the new named summary
+                # exposes the official AP / AP50 distinction explicitly.
                 coco_ap = evaler.stats[1]
                 pct_info['mAP'] = coco_ap
+                from kwcoco.metrics.coco_metrics import (
+                    summarize_pycocotools_eval,
+                )
+                pct_info.update(summarize_pycocotools_eval(evaler))
 
+            pct_info['iou_type'] = iou_type
             pct_info['evalar_stats'] = evaler.stats
 
         # 'mAP': coco_ap,
@@ -1618,29 +1781,33 @@ def pycocotools_confusion_vectors(
             for k, v in y.items():
                 y_accum[k].extend(v)
 
-        _data = {}
-        for k, v in ub.ProgIter(
-            list(y_accum.items()), desc='ndarray convert', verbose=verbose
-        ):
-            # Try to use 32 bit types for large evaluation problems
-            dtype = None
-            if k in {'iou', 'score', 'weight'}:
-                dtype = np.float32
-            if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
-                dtype = np.int32
-            try:
-                _data[k] = np.asarray(v, dtype=dtype)
-            except TypeError:
-                _data[k] = np.asarray(v)
+    # Convert the accumulated rows once after all COCO eval-image records have
+    # been visited.  Historically this conversion happened inside the loop,
+    # repeatedly rebuilding larger arrays and making confusion extraction
+    # unnecessarily superlinear in the number of eval records.
+    _data = {}
+    for k, v in ub.ProgIter(
+        list(y_accum.items()), desc='ndarray convert', verbose=verbose
+    ):
+        # Try to use 32 bit types for large evaluation problems
+        dtype = None
+        if k in {'iou', 'score', 'weight'}:
+            dtype = np.float32
+        if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
+            dtype = np.int32
+        try:
+            _data[k] = np.asarray(v, dtype=dtype)
+        except TypeError:
+            _data[k] = np.asarray(v)
 
-        # Avoid pandas when possible
-        cfsn_data = kwarray.DataFrameArray(_data)
+    # Avoid pandas when possible
+    cfsn_data = kwarray.DataFrameArray(_data)
 
-        # if _tracking_probs:
-        #     y_prob = np.vstack(prob_accum)
-        # else:
-        y_prob = None
-        cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes, probs=y_prob)
+    # if _tracking_probs:
+    #     y_prob = np.vstack(prob_accum)
+    # else:
+    y_prob = None
+    cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes, probs=y_prob)
     return cfsn_vecs
 
 

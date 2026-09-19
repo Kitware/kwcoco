@@ -667,6 +667,8 @@ class CocoEvaluator:
                 )
                 ssegs = [a.get('segmentation') for a in anns]
                 weights = [a.get('weight', 1) for a in anns]
+                iscrowd = [bool(a.get('iscrowd', False)) for a in anns]
+                ignore = [bool(a.get('ignore', False)) for a in anns]
 
                 # Is defaulting to NAN correct here?
 
@@ -691,6 +693,8 @@ class CocoEvaluator:
                     datakeys=['aids'],
                     **kw,
                 ).numpy()
+                dets.data['iscrowd'] = np.asarray(iscrowd, dtype=bool)
+                dets.data['ignore'] = np.asarray(ignore, dtype=bool)
                 gid_to_det[gid] = dets
         elif COCO_SAMPLER_CLS and isinstance(dataset, COCO_SAMPLER_CLS):
             # Input is an ndsampler.CocoSampler object
@@ -771,21 +775,103 @@ class CocoEvaluator:
         # TODO: we need to update DetectionMetrics so the alignment of images
         # is more explicit.
         dmet = DetectionMetrics(classes=classes)
+        true_coco = coco_eval.true_extra.get('coco_dset', None)
         for true_gid, pred_gid in ub.ProgIter(
             zip(coco_eval.true_image_ids, coco_eval.pred_image_ids),
             total=len(coco_eval.true_image_ids),
         ):
             pred_dets = gid_to_pred[pred_gid]
             true_dets = gid_to_true[true_gid]
+            img_dims = None
+            if true_coco is not None:
+                img = true_coco.imgs[true_gid]
+                height = img.get('height', None)
+                width = img.get('width', None)
+                if height is not None and width is not None:
+                    img_dims = (int(height), int(width))
             # Note: these require common identifiers.
-            dmet.add_predictions(pred_dets, gid=pred_gid)
-            dmet.add_truth(true_dets, gid=true_gid)
+            dmet.add_predictions(pred_dets, gid=pred_gid, img_dims=img_dims)
+            dmet.add_truth(true_dets, gid=true_gid, img_dims=img_dims)
 
         if 0:
             voc_info = dmet.score_voc(ignore_classes='ignore')
             print('voc_info = {!r}'.format(voc_info))
 
         return dmet
+
+    def evaluate_pycocotools(
+        coco_eval,
+        iou_types: str | Iterable[str] = ('bbox',),
+        verbose: int = 0,
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Compute official COCO summaries for boxes and/or instance masks.
+
+        This is intentionally separate from :meth:`evaluate`, whose custom
+        confusion-vector machinery remains box-assignment based.  The method
+        uses the official ``pycocotools.COCOeval`` implementation for each
+        requested geometry and returns stable named AP/AR values.
+
+        Args:
+            iou_types:
+                One or more of ``'bbox'`` and ``'segm'``. A comma-separated
+                string is accepted for convenience.
+
+            verbose:
+                Passed to :meth:`DetectionMetrics.score_pycocotools`.
+
+        Returns:
+            Dict[str, Dict]:
+                Mapping from IoU type to a JSON-friendly record containing
+                ``summary``, raw ``stats``, and the effective COCO parameters.
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:pycocotools)
+            >>> import kwcoco
+            >>> from kwcoco.coco_evaluator import CocoEvaluator
+            >>> true = kwcoco.CocoDataset.demo('shapes8')
+            >>> pred = true.copy()
+            >>> for ann in pred.anns.values():
+            >>>     ann['score'] = 1.0
+            >>> evaluator = CocoEvaluator({
+            >>>     'true_dataset': true,
+            >>>     'pred_dataset': pred,
+            >>> })
+            >>> official = evaluator.evaluate_pycocotools('bbox')
+            >>> assert official['bbox']['summary']['AP50'] > 0.99
+        """
+        if isinstance(iou_types, str):
+            iou_types = [p.strip() for p in iou_types.split(',') if p.strip()]
+        else:
+            iou_types = list(iou_types)
+        if not iou_types:
+            raise ValueError('At least one iou_type is required')
+        bad_types = set(iou_types) - {'bbox', 'segm'}
+        if bad_types:
+            raise KeyError(f'Unsupported COCO iou_types={sorted(bad_types)!r}')
+
+        dmet = getattr(coco_eval, '_dmet', None)
+        if dmet is None:
+            dmet = coco_eval._build_dmet()
+            coco_eval._dmet = dmet
+
+        results = {}
+        for iou_type in iou_types:
+            info = dmet.score_pycocotools(
+                verbose=verbose,
+                with_evaler=False,
+                with_confusion=False,
+                iou_thresholds=None,
+                iou_type=iou_type,
+            )
+            results[iou_type] = {
+                'backend': info['backend'],
+                'iou_type': info['iou_type'],
+                'summary': info['summary'],
+                'stats': info['stats'],
+                'params': info['params'],
+            }
+        return results
 
     def evaluate(coco_eval) -> 'CocoResults':
         """

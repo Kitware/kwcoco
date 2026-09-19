@@ -1,3 +1,10 @@
+### Fixed
+
+* Official COCO segmentation metric coercion now treats polygon parts with
+  fewer than three vertices as zero-area geometry instead of allowing
+  ``pycocotools.frPyObjects`` to mis-dispatch four-coordinate degenerate
+  polygons as bounding boxes.
+
 # Changelog
 
 We are currently working on porting this changelog to the specifications in
@@ -6,6 +13,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ## Version 0.9.1 - Unreleased
+
+
+### Added
+* Extend the official pycocotools metric bridge with explicit `bbox` and `segm` IoU modes, named COCO AP/AR summaries, and a `CocoEvaluator.evaluate_pycocotools` convenience API. Rich kwcoco polygons with holes are converted to exact RLE only at the strict MS-COCO evaluation boundary.
+* Add `dev/pycocotools_metrics_compare/`, a measured comparison suite that decomposes native kwcoco versus official COCO scoring into overlap, assignment, confusion-vector accumulation, and final AP/AR stages. The suite benchmarks the stabilized `kwimage_ext` mask-IoU backend against the installed pycocotools mask kernel on identical RLE inputs, records each backend separately, and explicitly skips the `kwimage_ext` row when the optional extension is unavailable rather than conflating it with a fallback.
 
 
 ## Version 0.9.0 - Released 2026-08-22
@@ -25,6 +37,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add channels option to coco stats.
 
 ### Fixed
+
+* Normalize rich/new-style ``N x 2`` polygons to strict flattened MS-COCO
+  polygon lists before calling ``pycocotools.frPyObjects``.  This avoids a
+  pycocotools dispatch ambiguity where a four-vertex polygon can be mistaken
+  for a four-element bounding box.
 * Keep dynamically maintained image, annotation, video, category, and track
   indexes consistent across bulk image insertion, clearing images,
   retained-annotation track removal, and rejected single-item additions,
