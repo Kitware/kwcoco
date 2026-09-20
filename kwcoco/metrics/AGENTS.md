@@ -10,7 +10,9 @@ Vectorized metrics for **detection / classification / segmentation**. Core patte
 * `confusion_measures.py`: thresholded counts → metrics (PR/ROC curves, AP variants, MCC, etc.); `ap_method` controls AP style.
 * `assignment.py`: IoU matching → confusion vectors.
 * `detect_metrics.py`: end-to-end detection eval (from `kwimage.Detections` or `CocoDataset`); can score via kwcoco, VOC, or `pycocotools`.
-* `coco_metrics.py`: narrow strict-MS-COCO compatibility helpers and stable named summaries for official bbox / instance-mask `pycocotools` metrics.
+* `coco_metrics.py`: strict-MS-COCO reference helpers plus the narrow native
+  COCO assignment-row accumulator; keep official conversion and native
+  accumulation conceptually separate.
 * `segmentation_metrics.py`, `voc_metrics.py`, `clf_report.py`, `drawing.py`, `functional.py`: task helpers + plotting/utilities (mostly operate on vectors/measures).
 
 ## kwcoco vs `pycocotools` (mental model)
@@ -95,6 +97,62 @@ labeled as kwcoco.
 
 Run `dev/pycocotools_metrics_compare/run_phase23_native_coco.py` when changing
 area, maxDet, mask geometry, tie ordering, or native summary semantics.  Use
-`--assert-parity` for the COCO-compatibility regression corpus.  Historical bbox
-`CocoEvaluator.evaluate()` remains on assignment-v1 unless a separate bbox
-parity campaign explicitly changes that decision.
+`--assert-parity` for the COCO-compatibility regression corpus.  The corpus must
+retain cases for arbitrary kwcoco truth weights (which COCO scoring ignores) and
+a literal category named `background` (which COCO treats as an ordinary label).
+Do not special-case category names in the native COCO accumulator.
+
+Native result records keep `backend='kwcoco'` for the package-level backend and
+also expose an explicit implementation id, `official=False`, the official
+reference implementation name, requested backend choices, and resolved backend
+provenance.  Official summary records expose the same versioned result-schema
+metadata with `official=True`. Preserve this distinction when extending the API.
+
+`overlap_backend='auto'` and `raster_backend='auto'` must prefer `kwimage_ext`
+and fall back to `pycocotools`.  If neither optional backend is importable, the
+error should name both installation choices rather than silently changing
+geometry semantics.
+
+Historical bbox `CocoEvaluator.evaluate()` remains on assignment-v1 unless a
+separate bbox parity campaign explicitly changes that decision.
+
+### Phase-2.4 / Phase-3 COCO conformance gate
+
+The native COCO campaign now has a stronger target than the 12 scalar summary
+values. `score_native_coco(..., with_eval=True)` and
+`score_pycocotools(..., with_eval=True)` expose the accumulated COCO precision,
+recall, and sampled-score tensors. Use
+`dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py` to compare
+those tensors, their absent-category masks, row assignments, and summaries.
+
+Phase 3 also adds an **explicit** native COCO bbox compatibility profile. This
+does not promote assignment-v2 as the default bbox matcher. Preserve these
+boundaries:
+
+* `CocoEvaluator.evaluate()` remains the historical kwcoco bbox evaluator.
+* Generic `assignment_v2` bbox keeps `bbox_overlap_mode='legacy'` by default.
+* Native COCO bbox scoring explicitly uses `bbox_overlap_mode='coco'`.
+* The COCO bbox profile uses continuous-coordinate IoU, crowd
+  intersection/detection-area, reusable ignored crowd truths, inclusive
+  thresholds, category-scoped maxDets, and COCO equal-IoU truth tie behavior.
+* `DetectionMetrics.score_pycocotools()` keeps its historical direct-method
+  bbox annotation policy by default. `CocoEvaluator.evaluate_pycocotools()`
+  opts into strict `bbox_annotation_policy='coco'` for official reference use.
+
+Do not call bbox-v2 parity with COCO proof of parity with historical kwcoco
+bbox assignment. Those are different contracts and must remain separate.
+
+For new COCO compatibility changes, the preferred acceptance command is:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py \
+    --mode=full --assert-parity \
+    --output-dpath=_metric_compare_phase3_coco_conformance_full
+```
+
+A mismatch should be localized in this order: overlap -> per-image assignment
+-> accumulated tensor -> 12-value summary. Do not tune summary values directly
+when a lower layer disagrees. The conformance gate also exercises a nonstandard
+parameter grid and normalized image subset; avoid hard-coding standard COCO
+tensor dimensions in either the native or official wrapper. COCO's explicit
+IoU threshold 1.0 uses the reference comparison cap ``1 - 1e-10``.

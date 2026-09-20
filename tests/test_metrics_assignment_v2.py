@@ -1,6 +1,7 @@
 """
 Tests for the experimental assignment_v2 module.
 """
+import pytest
 
 
 def _row_signature(y):
@@ -305,3 +306,60 @@ def test_assignment_v2_default_compat_matches_v1():
     assert _row_signature(y2) == _row_signature(y1)
     assert y2['txs'] == [0]
     assert y2['pxs'] == [0]
+
+
+@pytest.mark.parametrize('empty_side', ['truth', 'prediction'])
+def test_assignment_v2_coco_bbox_accepts_empty_box_arrays(empty_side):
+    """COCO bbox construction must preserve the Nx4 axis for empty images."""
+    import kwimage
+    import numpy as np
+
+    from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
+
+    empty_boxes = kwimage.Boxes([], 'xywh')
+    one_box = kwimage.Boxes([[0, 0, 10, 10]], 'xywh')
+    empty_classes = np.empty(0, dtype=int)
+    one_class = np.array([0], dtype=int)
+
+    if empty_side == 'truth':
+        true_dets = kwimage.Detections(
+            boxes=empty_boxes,
+            class_idxs=empty_classes,
+        )
+        pred_dets = kwimage.Detections(
+            boxes=one_box,
+            class_idxs=one_class,
+            scores=np.array([0.9]),
+        )
+    else:
+        true_dets = kwimage.Detections(
+            boxes=one_box,
+            class_idxs=one_class,
+        )
+        pred_dets = kwimage.Detections(
+            boxes=empty_boxes,
+            class_idxs=empty_classes,
+            scores=np.empty(0, dtype=float),
+        )
+
+    index = AssignmentCandidateIndex.build(
+        true_dets,
+        pred_dets,
+        classes=['thing'],
+        compat='mutex',
+        iou_type='bbox',
+        bbox_overlap_mode='coco',
+        threshold_policy='inclusive',
+        min_iou=0.5,
+    )
+    assert index.true_areas.shape == (len(true_dets),)
+    assert index.pred_areas.shape == (len(pred_dets),)
+
+    rows = index.assign(0.5, ignore_classes=None)
+    assert len(rows['txs']) == 1
+    if empty_side == 'truth':
+        assert rows['txs'] == [-1]
+        assert rows['pxs'] == [0]
+    else:
+        assert rows['txs'] == [0]
+        assert rows['pxs'] == [-1]

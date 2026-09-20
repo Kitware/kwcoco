@@ -150,6 +150,10 @@ def test_coco_evaluator_official_multi_geometry_api():
     assert official['bbox']['summary']['AP50'] > 0.99
     assert official['segm']['summary']['AP50'] < 0.01
     assert official['bbox']['backend'] == 'pycocotools.COCOeval'
+    assert official['bbox']['implementation'] == 'pycocotools.COCOeval'
+    assert official['bbox']['official'] is True
+    assert official['bbox']['result_schema'] == 'coco_detection_summary_v1'
+    assert official['bbox']['reference_implementation'] == 'pycocotools.COCOeval'
     assert official['bbox']['iou_type'] == 'bbox'
     assert official['segm']['iou_type'] == 'segm'
 
@@ -277,3 +281,40 @@ def test_official_mask_assignment_can_use_native_kwcoco_measures():
     assert native_measures['mAP'] < perfect_native['mAP']
     assert perfect_native['mAP'] > 0.99
     assert info['summary']['AP50'] < 0.01
+
+
+def test_score_pycocotools_same_length_iou_threshold_override():
+    """Explicit IoU vectors are compared by value, not only by length."""
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    true_seg = _outer_square()
+    true, pred = _make_single_instance_dsets(true_seg, true_seg)
+    dmet = DetectionMetrics.from_coco(true, pred)
+
+    # Passing the exact standard vector explicitly is still a standard COCO
+    # evaluation and must retain the stable named summary surface.
+    standard = np.arange(0.50, 0.96, 0.05)
+    standard_info = dmet.score_pycocotools(
+        iou_type='segm', iou_thresholds=standard, with_evaler=True, verbose=0
+    )
+    assert np.allclose(standard_info['evaler'].params.iouThrs, standard)
+    assert 'summary' in standard_info
+    assert standard_info['result_schema'] == 'coco_detection_summary_v1'
+
+    # A different vector with the same length must actually replace COCOeval's
+    # defaults.  The previous conditional accidentally ignored this case.
+    custom = np.linspace(0.10, 0.55, len(standard))
+    custom_info = dmet.score_pycocotools(
+        iou_type='segm', iou_thresholds=custom, with_evaler=True, verbose=0
+    )
+    assert np.allclose(custom_info['evaler'].params.iouThrs, custom)
+
+    # Even a small explicit change is a real parameter override. Do not use a
+    # tolerance test to decide whether the caller's grid should be installed.
+    near_standard = standard.copy()
+    near_standard[-1] += 1e-12
+    near_info = dmet.score_pycocotools(
+        iou_type='segm', iou_thresholds=near_standard,
+        with_evaler=True, verbose=0
+    )
+    assert np.array_equal(near_info['evaler'].params.iouThrs, near_standard)

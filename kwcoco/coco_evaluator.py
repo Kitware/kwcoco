@@ -9,9 +9,12 @@ TODO:
     - [ ] does evaluate return one result or multiple results
           based on different configurations?
 
-    - [ ] max_dets - TODO: in original pycocoutils but not here
+    - [ ] Historical ``evaluate()`` does not expose COCO ``maxDets``.
+          Native COCO-compatible bbox / instance-mask summaries are available
+          separately via ``evaluate_native_coco()``.
 
-    - [ ] Flag that allows for polygon instead of bounding box overlap
+    - [ ] Historical ``evaluate()`` remains bbox-assignment based. The native
+          COCO compatibility evaluator is intentionally a separate API.
 
     - [ ] How do we note what iou_thresh and area-range were in
           the result plots?
@@ -527,6 +530,47 @@ class CocoEvaluator:
         if not coco_eval._is_init:
             coco_eval._init()
 
+    def _strict_coco_category_idxs(coco_eval):
+        """Return declared truth categories in the evaluator's unified space.
+
+        ``CocoEvaluator`` historically injects a synthetic ``background``
+        class while rectifying truth/prediction class spaces. That bookkeeping
+        class is useful to the legacy confusion-vector evaluator, but it is not
+        a COCO category and must not create an extra K-axis entry in strict
+        COCO tensors. Conversely, a dataset may genuinely declare a category
+        whose literal name is ``background``; that category must remain.
+
+        When the evaluator was built from an actual CocoDataset, use its
+        declared category records to distinguish those cases. For raw
+        ``gid -> Detections`` inputs there is no source category declaration,
+        so all unified classes remain eligible.
+        """
+        coco_eval._ensure_init()
+        true_coco = coco_eval.true_extra.get('coco_dset', None)
+        if true_coco is None:
+            return None
+
+        def _normalize_name(name):
+            return str(name).lower().replace(' ', '_')
+
+        declared_names = [
+            cat['name'] for cat in true_coco.cats.values()
+        ]
+        selected = []
+        missing = []
+        for name in declared_names:
+            unified_name = _normalize_name(name)
+            try:
+                selected.append(coco_eval.classes.node_to_idx[unified_name])
+            except KeyError:
+                missing.append(name)
+        if missing:
+            raise AssertionError(
+                'Declared truth categories were not present in the unified '
+                f'evaluator class space: {missing!r}'
+            )
+        return sorted(set(map(int, selected)))
+
     @classmethod
     def _rectify_classes(coco_eval, true_classes, pred_classes):
         import kwcoco
@@ -803,6 +847,14 @@ class CocoEvaluator:
         coco_eval,
         iou_types: str | Iterable[str] = ('bbox',),
         verbose: int = 0,
+        *,
+        with_eval: bool = False,
+        iou_thresholds: Iterable[float] | None = None,
+        recall_thresholds: Iterable[float] | None = None,
+        area_ranges: Mapping[str, Iterable[float]] | None = None,
+        max_dets: Iterable[int] | None = None,
+        gids: Iterable[int] | None = None,
+        bbox_annotation_policy: str = 'coco',
     ) -> dict[str, dict[str, Any]]:
         """
         Compute official COCO summaries for boxes and/or instance masks.
@@ -819,11 +871,24 @@ class CocoEvaluator:
 
             verbose:
                 Passed to :meth:`DetectionMetrics.score_pycocotools`.
+            with_eval:
+                Include copies of the full COCO precision / recall / score
+                tensors for differential analysis.
+            iou_thresholds, recall_thresholds, area_ranges, max_dets, gids:
+                Optional COCO parameter overrides. These are shared with the
+                native COCO evaluator so nonstandard tensor grids can be
+                compared directly. Image ids are unique-sorted like COCOeval.
+            bbox_annotation_policy:
+                ``'coco'`` is the strict reference behavior and preserves
+                bbox crowd annotations. ``'historical'`` is available only
+                for explicit compatibility with the older direct scoring
+                behavior.
 
         Returns:
             Dict[str, Dict]:
                 Mapping from IoU type to a JSON-friendly record containing
-                ``summary``, raw ``stats``, and the effective COCO parameters.
+                versioned implementation metadata, ``summary``, raw ``stats``,
+                and the effective COCO parameters.
 
         Example:
             >>> # xdoctest: +REQUIRES(module:pycocotools)
@@ -854,23 +919,37 @@ class CocoEvaluator:
         if dmet is None:
             dmet = coco_eval._build_dmet()
             coco_eval._dmet = dmet
+        category_idxs = coco_eval._strict_coco_category_idxs()
 
         results = {}
         for iou_type in iou_types:
             info = dmet.score_pycocotools(
                 verbose=verbose,
+                with_eval=with_eval,
                 with_evaler=False,
                 with_confusion=False,
-                iou_thresholds=None,
+                iou_thresholds=iou_thresholds,
+                recall_thresholds=recall_thresholds,
+                area_ranges=area_ranges,
+                max_dets=max_dets,
+                gids=gids,
+                category_idxs=category_idxs,
                 iou_type=iou_type,
+                bbox_annotation_policy=bbox_annotation_policy,
             )
             results[iou_type] = {
                 'backend': info['backend'],
+                'implementation': info['implementation'],
+                'result_schema': info['result_schema'],
+                'official': info['official'],
+                'reference_implementation': info['reference_implementation'],
                 'iou_type': info['iou_type'],
                 'summary': info['summary'],
                 'stats': info['stats'],
                 'params': info['params'],
             }
+            if with_eval:
+                results[iou_type]['eval'] = info['eval']
         return results
 
     def evaluate_native_coco(
@@ -881,14 +960,50 @@ class CocoEvaluator:
         raster_backend: str = 'auto',
         annotation_ignore_policy: str = 'coco',
         ignore_classes: str | Iterable[str] | None = None,
+        iou_thresholds: Iterable[float] | None = None,
+        recall_thresholds: Iterable[float] | None = None,
+        area_ranges: Mapping[str, Iterable[float]] | None = None,
+        max_dets: Iterable[int] | None = None,
+        gids: Iterable[int] | None = None,
         with_details: bool = False,
+        with_eval: bool = False,
     ) -> dict[str, dict[str, Any]]:
-        """Compute native COCO-shaped summaries for instance masks.
+        """Compute native COCO-compatible bbox and/or instance-mask summaries.
 
         This is the native counterpart to :meth:`evaluate_pycocotools`, but
         it intentionally remains a separate API and labels itself as kwcoco.
-        The current implementation supports only ``iou_type='segm'`` so the
-        historical bbox evaluator is not silently replaced by assignment-v2.
+        Bbox support is explicit on this method and does not replace the
+        historical default :meth:`evaluate` path. It uses the dedicated COCO
+        bbox profile in assignment-v2, including crowd overlap semantics.
+
+        The returned records include ``official=False``, the native
+        implementation identifier, the official reference implementation
+        identifier,
+        requested/resolved geometry backend provenance, and the standard 12
+        named COCO detection summary values.
+
+        Args:
+            iou_types:
+                One or more of ``'bbox'`` and ``'segm'``. A comma-separated
+                string is accepted for consistency with
+                :meth:`evaluate_pycocotools`.
+            overlap_backend:
+                ``'auto'``, ``'kwimage_ext'``, or ``'pycocotools'``.
+            raster_backend:
+                ``'auto'``, ``'kwimage_ext'``, or ``'pycocotools'``.
+            annotation_ignore_policy:
+                ``'coco'`` for reference annotation-ignore semantics or
+                ``'kwcoco'`` to additionally honor explicit kwcoco ``ignore``.
+            ignore_classes:
+                Optional kwcoco ignore-region class names. This is a native
+                extension and is not part of official COCOeval semantics.
+            iou_thresholds, recall_thresholds, area_ranges, max_dets, gids:
+                Optional COCO parameter overrides. The official and native
+                wrappers accept the same grid controls for differential use.
+            with_details:
+                Include per-class scalar diagnostics for each summary slice.
+            with_eval:
+                Include the full COCO precision / recall / score tensor.
         """
         if isinstance(iou_types, str):
             iou_types = [p.strip() for p in iou_types.split(',') if p.strip()]
@@ -896,17 +1011,15 @@ class CocoEvaluator:
             iou_types = list(iou_types)
         if not iou_types:
             raise ValueError('At least one iou_type is required')
-        bad_types = set(iou_types) - {'segm'}
+        bad_types = set(iou_types) - {'bbox', 'segm'}
         if bad_types:
-            raise KeyError(
-                'Native COCO-shaped scoring currently supports only segm; '
-                f'unsupported iou_types={sorted(bad_types)!r}'
-            )
+            raise KeyError(f'Unsupported native COCO iou_types={sorted(bad_types)!r}')
 
         dmet = getattr(coco_eval, '_dmet', None)
         if dmet is None:
             dmet = coco_eval._build_dmet()
             coco_eval._dmet = dmet
+        category_idxs = coco_eval._strict_coco_category_idxs()
 
         results = {}
         for iou_type in iou_types:
@@ -916,7 +1029,14 @@ class CocoEvaluator:
                 raster_backend=raster_backend,
                 annotation_ignore_policy=annotation_ignore_policy,
                 ignore_classes=ignore_classes,
+                iou_thresholds=iou_thresholds,
+                recall_thresholds=recall_thresholds,
+                area_ranges=area_ranges,
+                max_dets=max_dets,
+                gids=gids,
+                category_idxs=category_idxs,
                 with_details=with_details,
+                with_eval=with_eval,
             )
         return results
 

@@ -286,6 +286,37 @@ def make_accumulator_curve_case():
     return true, pred, {'kind': 'nontrivial_accumulation_curve'}
 
 
+def make_truth_weights_case():
+    """COCOeval ignores kwcoco's arbitrary truth-weight extension."""
+    true, pred = _base_dsets(dims=(64, 64), gids=(1, 2))
+    box = [8, 8, 20, 20]
+    seg = _poly(8, 8, 28, 28)
+    for gid, weight in [(1, 0.01), (2, 100.0)]:
+        true.add_annotation(
+            id=gid, image_id=gid, category_id=1, bbox=box,
+            segmentation=seg, weight=weight)
+    pred.add_annotation(
+        id=11, image_id=1, category_id=1, bbox=box,
+        segmentation=seg, score=.9)
+    return true, pred, {
+        'kind': 'non_coco_truth_weights',
+        'dmet_truth_weights': {1: [0.01], 2: [100.0]},
+    }
+
+
+def make_background_named_category_case():
+    """A literal COCO category named background must still be scored."""
+    true, pred = _base_dsets(categories=('background',))
+    box = [8, 8, 20, 20]
+    seg = _poly(8, 8, 28, 28)
+    true.add_annotation(
+        id=1, image_id=1, category_id=1, bbox=box, segmentation=seg)
+    pred.add_annotation(
+        id=11, image_id=1, category_id=1, bbox=box,
+        segmentation=seg, score=.9)
+    return true, pred, {'kind': 'literal_background_category'}
+
+
 CUSTOM_CASES = {
     'area_priority': make_area_priority_case,
     'max_dets': make_maxdets_case,
@@ -296,6 +327,8 @@ CUSTOM_CASES = {
     'max_dets_100': make_maxdets_100_case,
     'empty_category': make_empty_category_case,
     'accumulator_curve': make_accumulator_curve_case,
+    'truth_weights': make_truth_weights_case,
+    'background_category': make_background_named_category_case,
 }
 
 
@@ -311,6 +344,10 @@ def compare_case(case_name, profile, seed=0):
     true_dset, pred_dset, spec = _case_data(case_name, profile, seed)
     dmet, dmet_timing = timed_call(
         lambda: DetectionMetrics.from_coco(true_dset, pred_dset), repeat=1)
+    for gid, weights in spec.get('dmet_truth_weights', {}).items():
+        dmet.gid_to_true_dets[gid].data['weights'] = np.asarray(
+            weights, dtype=float
+        )
 
     native, native_wall = timed_call(
         lambda: dmet.score_native_coco(
@@ -351,6 +388,11 @@ def compare_case(case_name, profile, seed=0):
         },
         'native': {
             'backend': native['backend'],
+            'implementation': native['implementation'],
+            'result_schema': native['result_schema'],
+            'official': native['official'],
+            'reference_implementation': native['reference_implementation'],
+            'iou_type': native['iou_type'],
             'assignment': native['assignment'],
             'accumulator': native['accumulator'],
             'summary': native['summary'],
@@ -359,6 +401,12 @@ def compare_case(case_name, profile, seed=0):
             'timing': native['timing'],
         },
         'official': {
+            'backend': official['backend'],
+            'implementation': official['implementation'],
+            'result_schema': official['result_schema'],
+            'official': official['official'],
+            'reference_implementation': official['reference_implementation'],
+            'iou_type': official['iou_type'],
             'summary': official['summary'],
             'params': official['params'],
         },
@@ -438,10 +486,31 @@ def summary_lines(report):
             f"{timing['assignment_seconds']:.6f} | "
             f"{timing['accumulation_seconds']:.6f} | {wall_ratio:.2f}x |"
         )
+    successful = [
+        exp['result'] for exp in report['experiments'] if exp['status'] == 'ok'
+    ]
+    if successful:
+        first = successful[0]
+        native = first['native']
+        official = first['official']
+        provenance = native['provenance']
+        lines.extend([
+            '',
+            f"Result schema: `{native['result_schema']}`",
+            f"Native implementation: `{native['implementation']}` "
+            f"(`official={native['official']}`)",
+            f"Reference implementation: `{official['implementation']}` "
+            f"(`official={official['official']}`)",
+            'Resolved native backends: '
+            f"overlap={provenance['overlap_backends']}, "
+            f"raster={provenance['raster_backends']}, "
+            f"area={provenance['area_backends']}",
+        ])
     lines.extend([
         '',
         'The JSON report contains all 12 named AP/AR deltas, row-level '
-        'assignment disagreement counts at IoU 0.50/0.75/0.95, backend '
+        'assignment disagreement counts at IoU 0.50/0.75/0.95, shared '
+        'result-schema / implementation metadata, resolved native backend '
         'provenance, and timing decomposition.',
     ])
     return lines
@@ -469,6 +538,37 @@ def parity_failures(report, tol):
             failures.append(f"{exp['name']}: runner error")
             continue
         result = exp['result']
+        native = result['native']
+        official = result['official']
+        if native['result_schema'] != official['result_schema']:
+            failures.append(
+                f"{exp['name']}: result schema mismatch: "
+                f"{native['result_schema']!r} != {official['result_schema']!r}"
+            )
+        if native['official'] is not False:
+            failures.append(
+                f"{exp['name']}: native record must declare official=False"
+            )
+        if official['official'] is not True:
+            failures.append(
+                f"{exp['name']}: reference record must declare official=True"
+            )
+        if native['reference_implementation'] != official['implementation']:
+            failures.append(
+                f"{exp['name']}: native reference implementation does not "
+                'identify the official implementation'
+            )
+        if native['iou_type'] != 'segm' or official['iou_type'] != 'segm':
+            failures.append(
+                f"{exp['name']}: Phase-2.3 records must both use iou_type='segm'"
+            )
+        provenance = native['provenance']
+        if result['dataset']['n_true'] + result['dataset']['n_pred']:
+            for key in ['overlap_backends', 'raster_backends', 'area_backends']:
+                if not provenance.get(key):
+                    failures.append(
+                        f"{exp['name']}: missing resolved native provenance {key!r}"
+                    )
         bad_metrics = {
             key: value
             for key, value in result['absolute_delta'].items()

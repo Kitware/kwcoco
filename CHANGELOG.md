@@ -1,20 +1,3 @@
-### Fixed
-
-### Added
-* Native assignment-v2 instance-mask scoring now defaults to COCO-compatible polygon rasterization and inclusive IoU thresholds, supports reusable COCO crowd truths with zero-weight matches, and implements mask-aware kwcoco ignore-class suppression using unioned ignore masks.
-* Added a Phase-2.2 crowd/ignore comparison suite covering crowd reuse, regular-vs-crowd priority, exact-IoU threshold boundaries, native ignore-class unions, and explicit annotation-ignore policy.
-* Added an experimental COCO-compatible native polygon rasterizer for instance-mask assignment. It prefers `kwimage_ext` Rust `frPoly`/RLE codecs and retains pycocotools as a reference fallback.
-* Added explicit `strict` (`IoU > threshold`) versus `inclusive` (`IoU >= threshold`) boundary policy to `assignment_v2`.
-* Added the Phase-2.1 rasterization/threshold comparison suite, including per-annotation Rust-vs-pycocotools RLE parity and mismatch-pair IoU diagnostics.
-
-* Add an experimental native instance-mask assignment path in `assignment_v2`, backed by batched compressed-RLE IoU and exposed through `DetectionMetrics.confusion_vectors_v2`.
-* Add a Phase-2 comparison runner that decomposes native mask assignment from native and COCO accumulation.
-
-* Official COCO segmentation metric coercion now treats polygon parts with
-  fewer than three vertices as zero-area geometry instead of allowing
-  ``pycocotools.frPyObjects`` to mis-dispatch four-coordinate degenerate
-  polygons as bounding boxes.
-
 # Changelog
 
 We are currently working on porting this changelog to the specifications in
@@ -26,9 +9,68 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Added
-* Extend the official pycocotools metric bridge with explicit `bbox` and `segm` IoU modes, named COCO AP/AR summaries, and a `CocoEvaluator.evaluate_pycocotools` convenience API. Rich kwcoco polygons with holes are converted to exact RLE only at the strict MS-COCO evaluation boundary.
-* Add `dev/pycocotools_metrics_compare/`, a measured comparison suite that decomposes native kwcoco versus official COCO scoring into overlap, assignment, confusion-vector accumulation, and final AP/AR stages. The suite benchmarks the stabilized `kwimage_ext` mask-IoU backend against the installed pycocotools mask kernel on identical RLE inputs, records each backend separately, and explicitly skips the `kwimage_ext` row when the optional extension is unavailable rather than conflating it with a fallback.
+* Extend the official pycocotools metric bridge with explicit `bbox` and `segm`
+  IoU modes, named COCO AP/AR summaries, and a
+  `CocoEvaluator.evaluate_pycocotools` convenience API. Rich kwcoco polygons
+  with holes are converted to exact RLE only at the strict MS-COCO evaluation
+  boundary.
+* Add `dev/pycocotools_metrics_compare/`, a measured comparison suite that
+  decomposes native kwcoco versus official COCO scoring into overlap,
+  assignment, accumulation, and final AP/AR stages while keeping backend
+  provenance observable.
+* Add experimental reusable `assignment_v2` instance-mask assignment backed by
+  batched compressed-RLE IoU, COCO-compatible polygon rasterization, inclusive
+  threshold support, crowd reuse, and mask-aware kwcoco ignore-region
+  suppression.
+* Add native COCO-compatible dataset scoring through
+  `DetectionMetrics.score_native_coco` and
+  `CocoEvaluator.evaluate_native_coco`, with assignment-time area ranges,
+  per-image/per-category `maxDets`, stable COCO accumulation, reusable
+  candidate geometry, explicit backend provenance, and a versioned result
+  schema shared with the official-reference summary surface.
+* Add optional full COCO evaluation tensor output (`precision`, `recall`, and
+  sampled `scores`) to native and pycocotools scoring. Both wrappers accept
+  matching IoU, recall, area-range, maxDet, and image-subset parameter grids for
+  differential testing beyond the standard 10x101x4x3 setting.
+* Add an explicit native COCO bbox compatibility profile without changing the
+  historical `CocoEvaluator.evaluate()` bbox path. The profile implements
+  continuous-coordinate bbox IoU, COCO crowd intersection-over-detection-area,
+  reusable ignored crowds, inclusive thresholds, category-scoped `maxDets`,
+  stable score ties, and COCO equal-IoU truth tie behavior.
+* Add the Phase-2.4 / Phase-3 bbox+segmentation conformance runner with complete
+  tensor comparisons, row-assignment checks, adversarial geometry fixtures,
+  nonstandard parameter grids, deterministic randomized cases, and optional
+  stress profiles against official `pycocotools.COCOeval`.
 
+### Changed
+* `CocoEvaluator.evaluate_pycocotools()` uses strict COCO bbox crowd annotation
+  semantics by default. The lower-level
+  `DetectionMetrics.score_pycocotools()` retains an explicit historical bbox
+  annotation policy for direct-call compatibility.
+* Native COCO bbox candidate generation may use spatial pruning for large
+  compatible-class blocks, but retained overlaps are always recomputed with
+  COCO crowd semantics so sparse and dense paths are equivalent.
+
+### Fixed
+* Normalize rich/new-style `N x 2` polygons to strict flattened MS-COCO polygon
+  lists before calling `pycocotools.frPyObjects`, avoiding its four-element
+  bbox dispatch ambiguity. Degenerate polygon parts become explicit zero-area
+  RLE instead of being misread as boxes.
+* Native COCO-compatible scoring ignores kwcoco's arbitrary truth-weight
+  extension and treats a category literally named `background` as an ordinary
+  COCO category.
+* Fix explicit `score_pycocotools(iou_thresholds=...)` handling so an alternate
+  threshold vector with the standard length is applied, while explicitly
+  passing the unchanged standard vector retains the standard named summary.
+* Mirror COCOeval image-id normalization, stable equal-IoU truth tie behavior,
+  and its `min(t, 1 - 1e-10)` matching cap for explicit IoU threshold 1.0.
+* Treat valid negative detection scores correctly in full-tensor conformance by
+  using the precision population mask rather than score sign to identify absent
+  sampled-score cells.
+* Preserve empty bbox inputs as `0 x 4` coordinate matrices in assignment-v2,
+  and keep `CocoEvaluator`'s synthetic background bookkeeping class off strict
+  COCO category axes while retaining genuinely declared `background`
+  categories.
 
 ## Version 0.9.0 - Released 2026-08-22
 
@@ -1278,9 +1320,3 @@ Bug in `CocoImage.add_asset` where json serialization was broken
 
 ### Added
 * Initial version
-
-### Development
-
-* Add Phase-1 / Phase-1.5 metric comparison harnesses to separate assignment,
-  accumulation, box-IoU backend, and mask-RLE backend effects before native
-  instance-mask assignment is changed.

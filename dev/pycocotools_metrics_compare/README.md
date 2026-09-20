@@ -428,7 +428,93 @@ _metric_compare_phase23_native_coco/kwcoco_metrics_phase23_native_coco_quick.tar
 The report includes the 12 named native and official AP/AR values, absolute
 summary deltas, row-level assignment differences at IoU 0.50/0.75/0.95,
 backend provenance, and candidate-build / assignment / accumulation timing.
+Native and official records also expose a shared versioned summary schema plus
+an explicit implementation / ``official`` distinction.  ``--assert-parity``
+checks that contract as well as requiring resolved native overlap, raster, and
+area backend provenance, so a passing evidence bundle validates the public
+result identity in addition to AP/AR and row assignment parity.
 The adversarial corpus includes area-priority matching, `maxDets`, a negative
 image, crowd behavior, equal-score accumulation order, all three area bins,
-100-detection truncation, prediction-only categories, and a nontrivial
-precision/recall curve in addition to the existing perturbation cases.
+100-detection truncation, prediction-only categories, arbitrary kwcoco truth
+weights, a literal category named `background`, and a nontrivial precision/
+recall curve in addition to the existing perturbation cases.  The truth-weight
+case protects the COCO contract: native COCO scoring deliberately ignores
+kwcoco's non-COCO weighting extension while preserving assignment-generated
+zero weight for crowd / area / ignore semantics.
+
+Before treating Phase 2.3 as production-ready, run both the focused pytest set
+above and the full parity profile:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase23_native_coco.py \
+    --mode=full \
+    --assert-parity \
+    --output-dpath=_metric_compare_phase23_native_coco_full
+```
+
+Generated ``_metric_compare_*`` directories and result tarballs are evidence,
+not source files; do not commit them.
+
+## Phase 2.4 / Phase 3: tensor conformance and explicit native bbox COCO
+
+Phase 2.4 raises the differential target from the 12 standard summary scalars
+to the full COCO accumulation state. Native and official evaluation can expose
+precision ``[T,R,K,A,M]``, recall ``[T,K,A,M]``, and sampled score
+``[T,R,K,A,M]`` tensors. The conformance runner requires both the populated
+values and the ``-1`` absent-category masks to agree.
+
+Phase 3 adds an explicit native COCO bbox profile without changing historical
+``CocoEvaluator.evaluate()`` or assignment-v2's generic bbox default. The
+profile implements COCO continuous-coordinate bbox overlap, crowd
+intersection-over-detection-area, reusable/ignored crowd matches, inclusive
+thresholds, area-priority matching, category-scoped ``maxDets``, stable score
+ties, and COCO equal-IoU truth tie behavior.
+
+Run the focused tests:
+
+```bash
+pytest -q \
+    tests/test_coco_instance_metrics.py \
+    tests/test_metrics_assignment_v2.py \
+    tests/test_metrics_native_mask_v2.py \
+    tests/test_metrics_native_mask_crowd_ignore.py \
+    tests/test_metrics_native_coco_v2.py
+```
+
+Then run the new two-geometry differential suite:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py \
+    --mode=quick \
+    --assert-parity \
+    --output-dpath=_metric_compare_phase3_coco_conformance_quick
+
+python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py \
+    --mode=full \
+    --assert-parity \
+    --output-dpath=_metric_compare_phase3_coco_conformance_full
+```
+
+A larger stress profile is also available when runtime / memory scaling is the
+question:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py \
+    --mode=stress \
+    --assert-parity \
+    --output-dpath=_metric_compare_phase3_coco_conformance_stress
+```
+
+The runner compares standard summary values, assignments at IoU
+0.50/0.75/0.95, every populated tensor cell, tensor parameter metadata
+(including normalized image ids), absent-slice masks, backend provenance, and
+native/reference wall time for both
+``bbox`` and ``segm``. Selected fixtures are additionally evaluated on a
+nonstandard IoU / recall / area / maxDet grid and a repeated/reordered image
+subset, so tensor parity is not inferred only from the familiar standard
+``10 x 101 x K x 4 x 3`` shape. The adversarial corpus also includes valid
+negative detection scores and kwcoco-only explicit-ignore metadata. Geometry
+fixtures include fractional polygons, rich polygons with holes (exact RLE strict
+boundary), and compressed RLE input.
+Generated ``_metric_compare_*`` directories remain evidence artifacts and must
+not be committed.

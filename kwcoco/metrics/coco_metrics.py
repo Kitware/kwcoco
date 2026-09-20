@@ -1,18 +1,22 @@
 """
-Helpers for official MS-COCO reference metrics.
+COCO-compatible metric helpers.
 
-The functions in this module deliberately bridge to ``pycocotools``.  They
-provide an ecosystem-compatible reference backend; they do not replace
-kwcoco's native ``ConfusionVectors -> Measures`` metric architecture.  See
-``dev/pycocotools_metrics_compare`` for the measured comparison suite used to
-separate overlap, assignment, and accumulation differences.
+This module contains two deliberately separate pieces of infrastructure:
 
-This module contains the narrow compatibility layer needed when rich kwcoco
-segmentations are passed to ``pycocotools``.  KWCoco permits polygon interiors
-(holes), whereas the original MS-COCO polygon representation does not.  For
-metric computation we preserve ordinary polygons as polygons and encode only
-representations that cannot be expressed losslessly in strict MS-COCO polygon
-form as RLE masks.
+* the strict ``pycocotools`` bridge used for the official COCO reference path;
+* the small native COCO accumulator used by ``DetectionMetrics.score_native_coco``.
+
+The official bridge remains the reference implementation.  The native path
+exists so reusable kwcoco assignment rows can be accumulated with the same
+stable score ordering, precision envelope, and 101 recall samples without
+routing through generic ``ConfusionVectors -> Measures`` behavior.
+
+KWCoco permits polygon interiors (holes), whereas the original MS-COCO polygon
+representation does not.  At the strict reference boundary ordinary polygons
+remain polygons and representations that cannot be expressed losslessly are
+encoded as exact RLE masks.  See ``dev/pycocotools_metrics_compare`` for the
+comparison suite that keeps overlap, assignment, and accumulation differences
+independently observable.
 """
 from __future__ import annotations
 
@@ -46,6 +50,288 @@ COCO_AREA_RANGES = {
     'medium': (float(32 ** 2), float(96 ** 2)),
     'large': (float(96 ** 2), 1e10),
 }
+
+
+NATIVE_COCO_IMPLEMENTATION = 'kwcoco.native_coco'
+OFFICIAL_COCO_IMPLEMENTATION = 'pycocotools.COCOeval'
+COCO_DETECTION_RESULT_SCHEMA = 'coco_detection_summary_v1'
+COCO_EVAL_TENSOR_SCHEMA = 'coco_detection_eval_tensor_v1'
+
+
+def accumulate_coco_assignment_rows(
+    rows,
+    classes,
+    *,
+    category_idxs=None,
+    ignore_classes=None,
+    recall_thresholds=COCO_RECALL_THRESHOLDS,
+    with_details=False,
+):
+    """Accumulate one COCO assignment slice from explicit kwcoco rows.
+
+    Args:
+        rows (Mapping[str, Sequence]):
+            Assignment rows containing at least ``true``, ``pred``, ``score``,
+            and ``weight``.  A zero row weight means the row is ignored by the
+            COCO slice; positive weights are treated as one event.  Native COCO
+            scoring normalizes kwcoco truth weights before assignment, so this
+            binary interpretation is only carrying COCO ignore state.
+
+        classes:
+            Category sequence / ``CategoryTree`` used by the assignment rows.
+
+        category_idxs (Sequence[int] | None):
+            Optional subset of class indexes to expose on the COCO category
+            axis. Assignment rows remain in the original class-index space;
+            the returned tensors are compacted to this ordered subset. This
+            is used by :class:`CocoEvaluator` to exclude its historical
+            synthetic background bookkeeping class while preserving a real
+            COCO category literally named ``background`` when one is declared.
+
+        ignore_classes (Iterable[str] | str | None):
+            Optional kwcoco extension: classes excluded from native summary
+            aggregation.  Matching ignore-region behavior is handled earlier
+            by assignment.
+
+        recall_thresholds (Sequence[float]):
+            Recall samples.  The standard COCO setting has 101 values from
+            zero through one inclusive.
+
+        with_details (bool):
+            Include per-class scalar diagnostics.
+
+    Returns:
+        dict:
+            ``mAP`` / ``mAR`` and the number of classes that contain scored
+            ground truth in this slice.
+
+    Notes:
+        COCOeval uses a stable descending mergesort for detection scores.  This
+        matters for equal-score TP/FP rows.  The helper intentionally lives
+        here instead of changing historical generic ``Measures`` tie behavior.
+    """
+    true = np.asarray(rows.get('true', []), dtype=np.int32)
+    pred = np.asarray(rows.get('pred', []), dtype=np.int32)
+    score = np.asarray(rows.get('score', []), dtype=float)
+    weight = np.asarray(rows.get('weight', []), dtype=float)
+    lengths = {len(true), len(pred), len(score), len(weight)}
+    if len(lengths) != 1:
+        raise ValueError(
+            'COCO assignment columns must have equal length: '
+            f'true={len(true)}, pred={len(pred)}, score={len(score)}, '
+            f'weight={len(weight)}'
+        )
+
+    recall_thresholds = np.asarray(recall_thresholds, dtype=float)
+    if ignore_classes is None:
+        ignored_names = set()
+    elif isinstance(ignore_classes, str):
+        ignored_names = {ignore_classes.casefold()}
+    else:
+        ignored_names = {str(name).casefold() for name in ignore_classes}
+
+    # Assignment rows use weight=0 for COCO ignore state (crowd, out-of-range,
+    # explicit annotation ignore, or configured ignore regions).  COCO itself
+    # has no fractional truth-weight semantics, so positive rows count once.
+    scored = weight > 0
+
+    if category_idxs is None:
+        category_idxs = list(range(len(classes)))
+    else:
+        category_idxs = list(map(int, category_idxs))
+        if len(set(category_idxs)) != len(category_idxs):
+            raise ValueError('category_idxs must be unique')
+        invalid = [cx for cx in category_idxs if cx < 0 or cx >= len(classes)]
+        if invalid:
+            raise ValueError(
+                f'category_idxs contains out-of-range indexes: {invalid!r}'
+            )
+
+    num_classes = len(category_idxs)
+    num_recalls = len(recall_thresholds)
+    precision_tensor = -np.ones((num_recalls, num_classes), dtype=float)
+    recall_tensor = -np.ones(num_classes, dtype=float)
+    score_tensor = -np.ones((num_recalls, num_classes), dtype=float)
+    realpos_tensor = np.zeros(num_classes, dtype=int)
+
+    ap_values = []
+    recall_values = []
+    perclass = {}
+    for out_cx, cx in enumerate(category_idxs):
+        node = classes[cx]
+        name = str(node)
+        if name.casefold() in ignored_names:
+            continue
+
+        true_flags = true == cx
+        realpos_total = int(np.count_nonzero(true_flags & scored))
+        realpos_tensor[out_cx] = realpos_total
+        if realpos_total <= 0:
+            continue
+
+        pred_flags = pred == cx
+        cls_score = score[pred_flags]
+        cls_scored = scored[pred_flags]
+        cls_is_tp = true[pred_flags] == cx
+        if len(cls_score) == 0:
+            ap = 0.0
+            recall = 0.0
+            sampled = np.zeros(num_recalls, dtype=float)
+            sampled_scores = np.zeros(num_recalls, dtype=float)
+        else:
+            # Sorting negated scores preserves original row order for ties.
+            order = np.argsort(-cls_score, kind='mergesort')
+            cls_scored = cls_scored[order]
+            cls_is_tp = cls_is_tp[order]
+
+            tp = np.cumsum(cls_scored & cls_is_tp, dtype=float)
+            fp = np.cumsum(cls_scored & ~cls_is_tp, dtype=float)
+            rc = tp / realpos_total
+            pr = tp / (tp + fp + np.spacing(1))
+            if len(pr) > 1:
+                pr = np.maximum.accumulate(pr[::-1])[::-1]
+
+            inds = np.searchsorted(rc, recall_thresholds, side='left')
+            sampled = np.zeros(num_recalls, dtype=float)
+            sampled_scores = np.zeros(num_recalls, dtype=float)
+            valid = inds < len(pr)
+            sampled[valid] = pr[inds[valid]]
+            sampled_scores[valid] = cls_score[order][inds[valid]]
+            ap = float(sampled.mean())
+            recall = float(rc[-1])
+
+        precision_tensor[:, out_cx] = sampled
+        recall_tensor[out_cx] = recall
+        score_tensor[:, out_cx] = sampled_scores
+        ap_values.append(ap)
+        recall_values.append(recall)
+        if with_details:
+            perclass[name] = {
+                'class_idx': int(cx),
+                'category_axis_idx': int(out_cx),
+                'ap': ap,
+                'recall': recall,
+                'realpos_total': realpos_total,
+            }
+
+    if ap_values:
+        mean_ap = float(np.mean(ap_values))
+        mean_recall = float(np.mean(recall_values))
+    else:
+        mean_ap = -1.0
+        mean_recall = -1.0
+    info = {
+        'mAP': mean_ap,
+        'mAR': mean_recall,
+        'num_valid_classes': len(ap_values),
+        'precision': precision_tensor,
+        'recall': recall_tensor,
+        'scores': score_tensor,
+        'realpos_total': realpos_tensor,
+    }
+    if with_details:
+        info['perclass'] = perclass
+    return info
+
+
+def snapshot_pycocotools_eval(evaler) -> dict[str, Any]:
+    """Copy the accumulated COCOeval tensors into a stable kwcoco record.
+
+    The arrays mirror ``COCOeval.eval`` exactly:
+
+    * precision: ``[T, R, K, A, M]``
+    * recall: ``[T, K, A, M]``
+    * scores: ``[T, R, K, A, M]``
+
+    Keeping this representation explicit gives the native implementation a
+    stronger differential target than the 12 scalar summary values alone.
+    """
+    eval_info = evaler.eval
+    params = evaler.params
+    return {
+        'schema': COCO_EVAL_TENSOR_SCHEMA,
+        'counts': list(map(int, eval_info['counts'])),
+        'precision': np.asarray(eval_info['precision'], dtype=float).copy(),
+        'recall': np.asarray(eval_info['recall'], dtype=float).copy(),
+        'scores': np.asarray(eval_info['scores'], dtype=float).copy(),
+        'iou_thresholds': np.asarray(params.iouThrs, dtype=float).tolist(),
+        'recall_thresholds': np.asarray(params.recThrs, dtype=float).tolist(),
+        'category_ids': list(map(int, params.catIds)),
+        'image_ids': list(map(int, params.imgIds)),
+        'area_ranges': [list(map(float, r)) for r in params.areaRng],
+        'area_range_labels': list(params.areaRngLbl),
+        'max_dets': list(map(int, params.maxDets)),
+    }
+
+
+def summarize_coco_eval_tensor(eval_info: dict[str, Any]) -> dict[str, float]:
+    """Compute the standard 12 detection statistics from a COCO eval tensor.
+
+    This mirrors the selection semantics of ``COCOeval.summarize`` while
+    operating on the stable tensor record used by the native differential
+    harness. Missing requested standard slices are reported as ``-1`` rather
+    than guessed from neighboring parameters.
+    """
+    precision = np.asarray(eval_info['precision'], dtype=float)
+    recall = np.asarray(eval_info['recall'], dtype=float)
+    iou_thresholds = np.asarray(eval_info['iou_thresholds'], dtype=float)
+    area_labels = list(eval_info['area_range_labels'])
+    max_dets = list(map(int, eval_info['max_dets']))
+
+    def _mean_valid(values):
+        values = np.asarray(values, dtype=float)
+        valid = values > -1
+        if not np.any(valid):
+            return -1.0
+        return float(np.mean(values[valid]))
+
+    def _area_index(label):
+        try:
+            return area_labels.index(label)
+        except ValueError:
+            return None
+
+    def _maxdet_index(value):
+        try:
+            return max_dets.index(int(value))
+        except ValueError:
+            return None
+
+    def _threshold_indices(value=None):
+        if value is None:
+            return np.arange(len(iou_thresholds), dtype=int)
+        idxs = np.where(iou_thresholds == float(value))[0]
+        return idxs.astype(int)
+
+    def _ap(*, iou=None, area='all', max_det=100):
+        ai = _area_index(area)
+        mi = _maxdet_index(max_det)
+        ti = _threshold_indices(iou)
+        if ai is None or mi is None or len(ti) == 0:
+            return -1.0
+        return _mean_valid(precision[ti, :, :, ai, mi])
+
+    def _ar(*, area='all', max_det=100):
+        ai = _area_index(area)
+        mi = _maxdet_index(max_det)
+        if ai is None or mi is None:
+            return -1.0
+        return _mean_valid(recall[:, :, ai, mi])
+
+    return {
+        'AP': _ap(area='all', max_det=100),
+        'AP50': _ap(iou=0.50, area='all', max_det=100),
+        'AP75': _ap(iou=0.75, area='all', max_det=100),
+        'AP_small': _ap(area='small', max_det=100),
+        'AP_medium': _ap(area='medium', max_det=100),
+        'AP_large': _ap(area='large', max_det=100),
+        'AR1': _ar(area='all', max_det=1),
+        'AR10': _ar(area='all', max_det=10),
+        'AR100': _ar(area='all', max_det=100),
+        'AR_small': _ar(area='small', max_det=100),
+        'AR_medium': _ar(area='medium', max_det=100),
+        'AR_large': _ar(area='large', max_det=100),
+    }
 
 
 def _rle_json_safe(rle: dict[str, Any]) -> dict[str, Any]:
@@ -262,31 +548,39 @@ def coerce_pycocotools_segmentation(
 
 
 def summarize_pycocotools_eval(evaler) -> dict[str, Any]:
-    """Return stable, named JSON-friendly values from a standard COCOeval."""
-    stats = np.asarray(evaler.stats, dtype=float).ravel()
-    if len(stats) != len(COCO_DETECTION_STAT_KEYS):
-        raise ValueError(
-            'Expected standard 12-element COCO detection stats, '
-            f'got {len(stats)}. Custom IoU/area summarization should be '
-            'reported separately from the standard COCO summary.'
-        )
-    summary = {
-        key: float(value)
-        for key, value in zip(COCO_DETECTION_STAT_KEYS, stats)
-    }
+    """Return a stable JSON-friendly record from an accumulated COCOeval.
+
+    The record is defined from the accumulated tensor rather than depending on
+    ``COCOeval.summarize()`` having been called first.  This keeps the official
+    wrapper usable for nonstandard IoU / recall / area / maxDet grids while the
+    familiar 12 named statistics retain COCO's slice-selection semantics.
+    Missing standard slices are reported as ``-1``.
+    """
+    eval_record = snapshot_pycocotools_eval(evaler)
+    summary = summarize_coco_eval_tensor(eval_record)
+    stats = [summary[key] for key in COCO_DETECTION_STAT_KEYS]
     params = {
-        'iou_thresholds': np.asarray(evaler.params.iouThrs).astype(float).tolist(),
-        'recall_thresholds': np.asarray(evaler.params.recThrs).astype(float).tolist(),
-        'max_dets': list(map(int, evaler.params.maxDets)),
-        'area_ranges': [list(map(float, r)) for r in evaler.params.areaRng],
-        'area_range_labels': list(evaler.params.areaRngLbl),
+        'iou_thresholds': eval_record['iou_thresholds'],
+        'recall_thresholds': eval_record['recall_thresholds'],
+        'max_dets': eval_record['max_dets'],
+        'area_ranges': eval_record['area_ranges'],
+        'area_range_labels': eval_record['area_range_labels'],
+        'area_range_map': {
+            label: list(bounds) for label, bounds in zip(
+                eval_record['area_range_labels'], eval_record['area_ranges']
+            )
+        },
         'image_ids': list(map(int, evaler.params.imgIds)),
-        'category_ids': list(map(int, evaler.params.catIds)),
+        'category_ids': eval_record['category_ids'],
     }
     return {
-        'backend': 'pycocotools.COCOeval',
+        'backend': OFFICIAL_COCO_IMPLEMENTATION,
+        'implementation': OFFICIAL_COCO_IMPLEMENTATION,
+        'result_schema': COCO_DETECTION_RESULT_SCHEMA,
+        'official': True,
+        'reference_implementation': OFFICIAL_COCO_IMPLEMENTATION,
         'iou_type': str(evaler.params.iouType),
         'summary': summary,
-        'stats': stats.tolist(),
+        'stats': stats,
         'params': params,
     }

@@ -166,7 +166,18 @@ def _box_cells(box_ltrb: np.ndarray, cell_size: float) -> list[tuple[int, int]] 
 
 def _boxes_to_ltrb(boxes) -> np.ndarray:
     """Coerce a kwimage Boxes object to a numpy LTRB array."""
-    return np.asarray(boxes.to_ltrb().data, dtype=float)
+    data = np.asarray(boxes.to_ltrb().data, dtype=float)
+    if data.size == 0:
+        # kwimage can represent an empty Boxes payload as shape ``(0,)``.
+        # Downstream bbox candidate construction is matrix-oriented and must
+        # retain the coordinate axis even when one side of an image is empty.
+        data = data.reshape(0, 4)
+    elif data.ndim != 2 or data.shape[1] != 4:
+        raise ValueError(
+            'Expected boxes coercible to an Nx4 LTRB matrix, got '
+            f'shape={data.shape!r}'
+        )
+    return data
 
 
 def _ltrb_intersects(
@@ -192,6 +203,68 @@ def _threshold_mask(values, threshold: float, policy: str):
     if policy == 'inclusive':
         return values >= threshold
     raise KeyError(policy)
+
+
+def _candidate_order(txs, ious, *, coco_tie_break=False):
+    """Order candidates by overlap with an explicit equal-IoU policy.
+
+    COCOeval scans ground truths in stable input order and replaces the best
+    match when a later ground truth has *equal* overlap.  Therefore the
+    equivalent pre-sorted representation prefers the later truth index for
+    equal IoU.  Generic assignment-v2 keeps its existing stable-earlier tie
+    convention unless a COCO compatibility profile opts in.
+    """
+    txs = np.asarray(txs, dtype=int)
+    ious = np.asarray(ious, dtype=float)
+    if coco_tie_break:
+        return np.lexsort((-txs, -ious))
+    return np.argsort(-ious, kind='mergesort')
+
+
+def _coco_bbox_overlaps(
+    pred_ltrb: np.ndarray,
+    true_ltrb: np.ndarray,
+    true_crowd_flags: np.ndarray,
+) -> np.ndarray:
+    """COCO continuous-coordinate bbox overlap with crowd semantics.
+
+    For ordinary truths this is standard IoU.  For ``iscrowd`` truths,
+    pycocotools defines overlap as intersection divided by detection area so
+    multiple detections can be absorbed by the same crowd region.
+    """
+    pred_ltrb = np.asarray(pred_ltrb, dtype=float)
+    true_ltrb = np.asarray(true_ltrb, dtype=float)
+    crowd = np.asarray(true_crowd_flags, dtype=bool)
+    shape = (len(pred_ltrb), len(true_ltrb))
+    if 0 in shape:
+        return np.empty(shape, dtype=float)
+
+    px1 = pred_ltrb[:, 0][:, None]
+    py1 = pred_ltrb[:, 1][:, None]
+    px2 = pred_ltrb[:, 2][:, None]
+    py2 = pred_ltrb[:, 3][:, None]
+    tx1 = true_ltrb[:, 0][None, :]
+    ty1 = true_ltrb[:, 1][None, :]
+    tx2 = true_ltrb[:, 2][None, :]
+    ty2 = true_ltrb[:, 3][None, :]
+
+    iw = np.maximum(0.0, np.minimum(px2, tx2) - np.maximum(px1, tx1))
+    ih = np.maximum(0.0, np.minimum(py2, ty2) - np.maximum(py1, ty1))
+    inter = iw * ih
+
+    parea = (
+        np.maximum(0.0, pred_ltrb[:, 2] - pred_ltrb[:, 0])
+        * np.maximum(0.0, pred_ltrb[:, 3] - pred_ltrb[:, 1])
+    )[:, None]
+    tarea = (
+        np.maximum(0.0, true_ltrb[:, 2] - true_ltrb[:, 0])
+        * np.maximum(0.0, true_ltrb[:, 3] - true_ltrb[:, 1])
+    )[None, :]
+    union = parea + tarea - inter
+    denom = np.where(crowd[None, :], parea, union)
+    overlaps = np.zeros(shape, dtype=float)
+    np.divide(inter, denom, out=overlaps, where=denom > 0)
+    return overlaps
 
 
 @dataclass
@@ -226,6 +299,7 @@ class AssignmentCandidateIndex:
     cand_txs: list[np.ndarray]
     cand_ious: list[np.ndarray]
     iou_type: str
+    bbox_overlap_mode: str
     overlap_backend: dict[str, Any] | None
     segmentation_rasterizer: str
     raster_backend: dict[str, Any] | None
@@ -254,6 +328,7 @@ class AssignmentCandidateIndex:
         min_iou: float = 0.5,
         spatial_threshold: int | None = 50_000,
         iou_type: str = 'bbox',
+        bbox_overlap_mode: str = 'legacy',
         overlap_backend: str = 'auto',
         segmentation_rasterizer: str = 'auto',
         raster_backend: str = 'auto',
@@ -277,6 +352,11 @@ class AssignmentCandidateIndex:
                 Segmentation overlap currently uses one batched mask-IoU call
                 per compatible class block.
             iou_type: ``'bbox'`` or experimental ``'segm'`` overlap.
+            bbox_overlap_mode: ``'legacy'`` preserves the existing v2 bbox
+                overlap / crowd behavior. ``'coco'`` uses continuous-coordinate
+                COCO bbox overlap, including intersection-over-detection-area
+                for crowd truths. Native COCO bbox scoring opts into this
+                explicitly; it is not the generic v2 bbox default.
             overlap_backend: mask-IoU backend for ``iou_type='segm'``.
             segmentation_rasterizer: ``'kwimage'`` or COCO-compatible
                 ``'coco'`` polygon rasterization.
@@ -284,7 +364,8 @@ class AssignmentCandidateIndex:
             threshold_policy: ``'strict'`` uses ``IoU > threshold`` (legacy
                 kwcoco semantics); ``'inclusive'`` uses ``IoU >= threshold``
                 to match COCOeval's threshold boundary. ``'auto'`` selects
-                strict bbox matching and inclusive segmentation matching.
+                strict legacy-bbox matching and inclusive matching for
+                segmentation or the explicit COCO bbox profile.
             annotation_ignore_policy: annotation-level ignore semantics for
                 segmentation mode. ``'coco'`` matches official COCOeval's
                 crowd-only ignore behavior; ``'kwcoco'`` additionally honors
@@ -299,8 +380,23 @@ class AssignmentCandidateIndex:
             )
         if iou_type not in {'bbox', 'segm'}:
             raise KeyError(iou_type)
+        if bbox_overlap_mode not in {'legacy', 'coco'}:
+            raise KeyError(bbox_overlap_mode)
+        if bbox_overlap_mode == 'coco' and bias != 0:
+            raise ValueError(
+                'bbox_overlap_mode="coco" requires bias=0 because COCO '
+                'uses continuous-coordinate bbox geometry without pixel bias'
+            )
+        if iou_type != 'bbox' and bbox_overlap_mode != 'legacy':
+            raise ValueError(
+                'bbox_overlap_mode only applies when iou_type="bbox"'
+            )
         if threshold_policy == 'auto':
-            threshold_policy = 'inclusive' if iou_type == 'segm' else 'strict'
+            threshold_policy = (
+                'inclusive'
+                if iou_type == 'segm' or bbox_overlap_mode == 'coco'
+                else 'strict'
+            )
         if threshold_policy not in {'strict', 'inclusive'}:
             raise KeyError(threshold_policy)
         if annotation_ignore_policy not in {'none', 'coco', 'kwcoco'}:
@@ -382,6 +478,7 @@ class AssignmentCandidateIndex:
         ]
         build_stats: dict[str, Any] = {
             'iou_type': iou_type,
+            'bbox_overlap_mode': bbox_overlap_mode,
             'threshold_policy': threshold_policy,
             'segmentation_rasterizer': segmentation_rasterizer,
             'annotation_ignore_policy': annotation_ignore_policy,
@@ -408,7 +505,11 @@ class AssignmentCandidateIndex:
             true_dets.data.get('ignore', np.zeros(len(true_dets), dtype=bool)),
             dtype=bool,
         )
-        if annotation_ignore_policy == 'none' or iou_type != 'segm':
+        coco_annotation_mode = (
+            iou_type == 'segm'
+            or (iou_type == 'bbox' and bbox_overlap_mode == 'coco')
+        )
+        if annotation_ignore_policy == 'none' or not coco_annotation_mode:
             true_crowd_flags = np.zeros(len(true_dets), dtype=bool)
             true_annotation_ignore_flags = np.zeros(len(true_dets), dtype=bool)
         elif annotation_ignore_policy == 'coco':
@@ -459,6 +560,18 @@ class AssignmentCandidateIndex:
             true_heights = np.maximum(0, true_ltrb[:, 3] - true_ltrb[:, 1])
             pred_areas = pred_widths * pred_heights
             true_areas = true_widths * true_heights
+            area_metadata = {
+                'name': 'numpy_bbox_area',
+                'kind': 'bbox_area',
+            }
+            build_stats['area_backend'] = area_metadata
+            if bbox_overlap_mode == 'coco':
+                overlap_metadata = {
+                    'name': 'numpy_coco_bbox',
+                    'kind': 'bbox_iou',
+                    'crowd': 'intersection_over_detection_area',
+                }
+                build_stats['overlap_backend'] = overlap_metadata
 
         for pred_cx in unique_pcxs:
             pred_idxs = np.where(pred_cxs == pred_cx)[0].astype(int)
@@ -493,7 +606,9 @@ class AssignmentCandidateIndex:
                     if np.any(keep):
                         txs = true_idxs[keep]
                         iou_vals = np.asarray(row[keep], dtype=float)
-                        order = np.argsort(-iou_vals, kind='mergesort')
+                        order = _candidate_order(
+                            txs, iou_vals, coco_tie_break=True
+                        )
                         cand_txs[int(px)] = txs[order]
                         cand_ious[int(px)] = iou_vals[order]
                         build_stats['pairs_kept'] += int(len(order))
@@ -505,31 +620,58 @@ class AssignmentCandidateIndex:
                 and min_iou > 0
             )
             if use_spatial:
-                used = _populate_sparse_candidates(
-                    pred_dets,
-                    true_dets,
-                    pred_ltrb,
-                    true_ltrb,
-                    pred_idxs,
-                    true_idxs,
-                    bias=bias,
-                    min_iou=min_iou,
-                    cand_txs=cand_txs,
-                    cand_ious=cand_ious,
-                    build_stats=build_stats,
-                )
+                if bbox_overlap_mode == 'coco':
+                    used = _populate_sparse_coco_bbox_candidates(
+                        pred_ltrb,
+                        true_ltrb,
+                        true_crowd_flags,
+                        pred_idxs,
+                        true_idxs,
+                        min_iou=min_iou,
+                        threshold_policy=threshold_policy,
+                        cand_txs=cand_txs,
+                        cand_ious=cand_ious,
+                        build_stats=build_stats,
+                    )
+                else:
+                    used = _populate_sparse_candidates(
+                        pred_dets,
+                        true_dets,
+                        pred_ltrb,
+                        true_ltrb,
+                        pred_idxs,
+                        true_idxs,
+                        bias=bias,
+                        min_iou=min_iou,
+                        cand_txs=cand_txs,
+                        cand_ious=cand_ious,
+                        build_stats=build_stats,
+                    )
                 if used:
                     continue
 
             build_stats['dense_blocks'] += 1
             build_stats['dense_pairs_considered'] += dense_pair_count
-            ious = pred_dets.boxes[pred_idxs].ious(true_dets.boxes[true_idxs], bias=bias)
+            if bbox_overlap_mode == 'coco':
+                ious = _coco_bbox_overlaps(
+                    pred_ltrb[pred_idxs],
+                    true_ltrb[true_idxs],
+                    true_crowd_flags[true_idxs],
+                )
+            else:
+                ious = pred_dets.boxes[pred_idxs].ious(
+                    true_dets.boxes[true_idxs], bias=bias
+                )
             for px, row in zip(pred_idxs, ious):
                 keep = _threshold_mask(row, min_iou, threshold_policy)
                 if np.any(keep):
                     txs = true_idxs[keep]
                     iou_vals = np.asarray(row[keep], dtype=float)
-                    order = np.argsort(-iou_vals, kind='mergesort')
+                    order = _candidate_order(
+                        txs,
+                        iou_vals,
+                        coco_tie_break=(bbox_overlap_mode == 'coco'),
+                    )
                     cand_txs[int(px)] = txs[order]
                     cand_ious[int(px)] = iou_vals[order]
                     build_stats['pairs_kept'] += int(len(order))
@@ -551,6 +693,7 @@ class AssignmentCandidateIndex:
             cand_txs=cand_txs,
             cand_ious=cand_ious,
             iou_type=iou_type,
+            bbox_overlap_mode=bbox_overlap_mode,
             overlap_backend=overlap_metadata,
             segmentation_rasterizer=segmentation_rasterizer,
             raster_backend=build_stats.get('rasterization', {}).get('raster_backend'),
@@ -834,6 +977,58 @@ class AssignmentCandidateIndex:
         return {float(t): self.assign(float(t), **kwargs) for t in iou_thresh}
 
 
+
+def _populate_sparse_coco_bbox_candidates(
+    pred_ltrb: np.ndarray,
+    true_ltrb: np.ndarray,
+    true_crowd_flags: np.ndarray,
+    pred_idxs: np.ndarray,
+    true_idxs: np.ndarray,
+    *,
+    min_iou: float,
+    threshold_policy: str,
+    cand_txs: list[np.ndarray],
+    cand_ious: list[np.ndarray],
+    build_stats: dict[str, int],
+) -> bool:
+    """Populate a sparse COCO bbox candidate block without changing overlap.
+
+    The spatial index is only a geometric prefilter for positive-overlap box
+    pairs.  The retained value is still computed by ``_coco_bbox_overlaps`` so
+    crowd truths use intersection / detection-area exactly as the dense path.
+    """
+    true_local_ltrb = true_ltrb[true_idxs]
+    index = BoxSpatialIndex.build(true_local_ltrb)
+    if index is None:
+        return False
+    # A successfully built index is sufficient to make the sparse result
+    # authoritative, even when every prediction is disjoint from every truth.
+    # Falling back to a dense block in that case would defeat the optimization.
+    used_any = True
+    build_stats['spatial_blocks'] += 1
+    for px in pred_idxs:
+        # COCO bbox geometry has no pixel-coordinate bias.
+        local_txs = index.query(pred_ltrb[int(px)], bias=0.0)
+        if len(local_txs) == 0:
+            continue
+        global_txs = true_idxs[local_txs]
+        build_stats['sparse_pairs_considered'] += int(len(global_txs))
+        row = _coco_bbox_overlaps(
+            pred_ltrb[[int(px)]],
+            true_ltrb[global_txs],
+            true_crowd_flags[global_txs],
+        )[0]
+        keep = _threshold_mask(row, min_iou, threshold_policy)
+        if np.any(keep):
+            txs = global_txs[keep]
+            iou_vals = np.asarray(row[keep], dtype=float)
+            order = _candidate_order(txs, iou_vals, coco_tie_break=True)
+            cand_txs[int(px)] = txs[order]
+            cand_ious[int(px)] = iou_vals[order]
+            build_stats['pairs_kept'] += int(len(order))
+        used_any = True
+    return used_any
+
 def _populate_sparse_candidates(
     pred_dets,
     true_dets,
@@ -895,6 +1090,7 @@ def assign_confusion_vectors_v2(
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
     iou_type: str = 'bbox',
+    bbox_overlap_mode: str = 'legacy',
     overlap_backend: str = 'auto',
     segmentation_rasterizer: str = 'auto',
     raster_backend: str = 'auto',
@@ -924,6 +1120,7 @@ def assign_confusion_vectors_v2(
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
     iou_type: str = 'bbox',
+    bbox_overlap_mode: str = 'legacy',
     overlap_backend: str = 'auto',
     segmentation_rasterizer: str = 'auto',
     raster_backend: str = 'auto',
@@ -952,6 +1149,7 @@ def assign_confusion_vectors_v2(
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
     iou_type: str = 'bbox',
+    bbox_overlap_mode: str = 'legacy',
     overlap_backend: str = 'auto',
     segmentation_rasterizer: str = 'auto',
     raster_backend: str = 'auto',
@@ -984,6 +1182,7 @@ def assign_confusion_vectors_v2(
         min_iou=float(min_iou),
         spatial_threshold=spatial_threshold,
         iou_type=iou_type,
+        bbox_overlap_mode=bbox_overlap_mode,
         overlap_backend=overlap_backend,
         segmentation_rasterizer=segmentation_rasterizer,
         raster_backend=raster_backend,

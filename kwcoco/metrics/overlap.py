@@ -66,7 +66,10 @@ def resolve_mask_iou_backend(backend: str = 'auto'):
             return mask_utils.iou, {'name': 'pycocotools'}
 
     detail = ', '.join(f'{name}: {ex!r}' for name, ex in errors)
-    raise ImportError(f'no mask IoU backend is available ({detail})')
+    raise ImportError(
+        'native mask IoU requires either kwimage_ext or pycocotools; '
+        f'neither backend is available ({detail})'
+    )
 
 
 class _CocoRasterBackend:
@@ -153,7 +156,10 @@ def resolve_coco_raster_backend(backend: str = 'auto'):
                 'pycocotools', mask_utils, metadata), metadata
 
     detail = ', '.join(f'{name}: {ex!r}' for name, ex in errors)
-    raise ImportError(f'no COCO raster backend is available ({detail})')
+    raise ImportError(
+        'COCO-compatible mask rasterization requires either kwimage_ext or '
+        f'pycocotools; neither backend is available ({detail})'
+    )
 
 
 def _polygon_parts_and_holes(mpoly):
