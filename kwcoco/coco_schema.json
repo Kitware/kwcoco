@@ -234,36 +234,6 @@
                             {
                                 "anyOf": [
                                     {
-                                        "type": "object",
-                                        "properties": {
-                                            "exterior": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "array",
-                                                    "items": {"type": "number"},
-                                                    "minItems": 2,
-                                                    "maxItems": 2
-                                                },
-                                                "description": "counter-clockwise xy exterior points"
-                                            },
-                                            "interiors": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "array",
-                                                        "items": {"type": "number"},
-                                                        "minItems": 2,
-                                                        "maxItems": 2
-                                                    },
-                                                    "description": "clockwise xy hole"
-                                                }
-                                            }
-                                        },
-                                        "title": "KWCOCO_POLYGON",
-                                        "description": "A new-style polygon format that supports holes"
-                                    },
-                                    {
                                         "type": "array",
                                         "items": {
                                             "type": "object",
@@ -298,18 +268,48 @@
                                     },
                                     {
                                         "type": "array",
-                                        "items": {"type": "number"},
-                                        "description": "an old-style polygon [x1,y1,v1,...,xk,yk,vk]",
-                                        "title": "MSCOCO_POLYGON"
-                                    },
-                                    {
-                                        "type": "array",
                                         "items": {
                                             "type": "array",
                                             "items": {"type": "number"},
                                             "description": "an old-style polygon [x1,y1,v1,...,xk,yk,vk]",
                                             "title": "MSCOCO_POLYGON"
                                         }
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "exterior": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {"type": "number"},
+                                                    "minItems": 2,
+                                                    "maxItems": 2
+                                                },
+                                                "description": "counter-clockwise xy exterior points"
+                                            },
+                                            "interiors": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {"type": "number"},
+                                                        "minItems": 2,
+                                                        "maxItems": 2
+                                                    },
+                                                    "description": "clockwise xy hole"
+                                                }
+                                            }
+                                        },
+                                        "title": "KWCOCO_POLYGON",
+                                        "description": "A new-style polygon format that supports holes"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {"type": "number"},
+                                        "description": "an old-style polygon [x1,y1,v1,...,xk,yk,vk]",
+                                        "title": "MSCOCO_POLYGON"
                                     }
                                 ]
                             },

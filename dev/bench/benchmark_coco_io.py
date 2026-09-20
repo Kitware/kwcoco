@@ -41,7 +41,6 @@ class PeakRSS:
         self._stop = threading.Event()
 
     def __enter__(self):
-        gc.collect()
         self.base = self.proc.memory_info().rss
         self.peak = self.base
 
@@ -65,7 +64,6 @@ class PeakRSS:
 
 def measure(label, func, *, meta=None):
     """Measure wall time, CPU time, incremental peak RSS, and output bytes."""
-    gc.collect()
     wall0 = time.perf_counter()
     cpu0 = time.process_time()
     with PeakRSS() as rss:
@@ -112,7 +110,9 @@ def _zip_bytes(data, fpath, compression, compresslevel=None):
     return fpath
 
 
-def benchmark_loaded_dataset(dset, label, workdir, check_missing=True):
+def benchmark_loaded_dataset(
+    dset, label, workdir, check_missing=True, include_lzma=False
+):
     """Benchmark validation and output paths for one already loaded dataset."""
     meta = {
         'dataset': label,
@@ -121,12 +121,22 @@ def benchmark_loaded_dataset(dset, label, workdir, check_missing=True):
     }
     rows = []
 
-    for stage, config in [
-        ('validate_schema', _validation_config(schema=True)),
+    validation_cases = [
+        ('validate_schema_jsonschema', _validation_config(schema=True)),
         ('validate_unique', _validation_config(unique=True)),
         ('validate_channels', _validation_config(channels=True)),
         ('validate_annot_attrs', _validation_config(annot_attrs=True)),
-    ]:
+    ]
+    try:
+        import fastjsonschema  # NOQA
+    except ImportError:
+        pass
+    else:
+        fast_config = _validation_config(schema=True)
+        fast_config['schema_backend'] = 'fastjsonschema'
+        validation_cases.insert(1, ('validate_schema_fastjsonschema', fast_config))
+
+    for stage, config in validation_cases:
         _, row = measure(stage, lambda c=config: dset.validate(**c), meta=meta)
         rows.append(row)
 
@@ -172,11 +182,14 @@ def benchmark_loaded_dataset(dset, label, workdir, check_missing=True):
     rows.append(row)
 
     codec_cases = [
-        ('zip_lzma', zipfile.ZIP_LZMA, None),
         ('zip_deflate_6', zipfile.ZIP_DEFLATED, 6),
         ('zip_deflate_1', zipfile.ZIP_DEFLATED, 1),
         ('zip_stored', zipfile.ZIP_STORED, None),
     ]
+    if include_lzma:
+        # LZMA can take minutes on large manifests, so it is deliberately
+        # excluded from the default benchmark loop.
+        codec_cases.append(('zip_lzma', zipfile.ZIP_LZMA, None))
     codec_paths = {}
     for name, codec, level in codec_cases:
         fpath = workdir / f'{label}.{name}.kwcoco.zip'
@@ -197,9 +210,17 @@ def benchmark_loaded_dataset(dset, label, workdir, check_missing=True):
         rows.append(row)
 
     default_zip = workdir / f'{label}.default.kwcoco.zip'
+
+    def dump_default_zip_core():
+        # Use a caller-owned file object so this benchmark isolates KWCoco's
+        # serialization / compression path from the safer.open wrapper.
+        with default_zip.open('wb') as file:
+            dset.dump(file, compress=True)
+        return default_zip
+
     _, row = measure(
-        'cocodataset_dump_default_zip',
-        lambda: (dset.dump(default_zip, temp_file=False), default_zip)[1],
+        'cocodataset_dump_default_zip_core',
+        dump_default_zip_core,
         meta=meta,
     )
     rows.append(row)
@@ -323,6 +344,11 @@ def main():
         help='skip filesystem existence validation for real manifests',
     )
     parser.add_argument(
+        '--include-lzma',
+        action='store_true',
+        help='include the intentionally slow LZMA comparison case',
+    )
+    parser.add_argument(
         '--workdir',
         type=Path,
         default=None,
@@ -357,6 +383,7 @@ def main():
                     manifest.stem.replace('.', '_'),
                     workdir,
                     check_missing=not args.skip_missing,
+                    include_lzma=args.include_lzma,
                 )
             )
 
@@ -375,9 +402,15 @@ def main():
                 dset = kwcoco.CocoDataset(data)
                 all_rows.extend(
                     benchmark_loaded_dataset(
-                        dset, label, workdir, check_missing=False
+                        dset,
+                        label,
+                        workdir,
+                        check_missing=False,
+                        include_lzma=args.include_lzma,
                     )
                 )
+                del dset, data
+                gc.collect()
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

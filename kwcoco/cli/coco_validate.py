@@ -53,6 +53,17 @@ class CocoValidateCLI(scfg.DataConfig):
 
     schema = scfg.Value(True, isflag=True, help='if True, validate the json-schema')
 
+    schema_backend = scfg.Value(
+        'jsonschema',
+        choices=['jsonschema', 'fastjsonschema'],
+        help=ub.paragraph(
+            """
+            JSON-schema implementation to use. The fastjsonschema backend is
+            optional and optimized for high-volume validation.
+            """
+        ),
+    )
+
     unique = scfg.Value(
         True, isflag=True, help='if True, validate unique secondary keys'
     )

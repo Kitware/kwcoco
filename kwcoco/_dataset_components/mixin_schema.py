@@ -9,6 +9,15 @@ import ubelt as ub
 MixinCocoSchemaT = TypeVar('MixinCocoSchemaT', bound='MixinCocoSchema')
 
 
+@ub.memoize
+def _cached_fast_coco_schema_validator():
+    """Compile the optional fastjsonschema validator once per process."""
+    import fastjsonschema
+    from kwcoco.coco_schema import COCO_SCHEMA
+
+    return fastjsonschema.compile(COCO_SCHEMA)
+
+
 class MixinCocoSchema:
     """
     Methods for validating and conforming dataset structure.
@@ -196,6 +205,12 @@ class MixinCocoSchema:
             **config :
                 schema (default=True): if True, validate the json-schema
 
+                schema_backend (default='jsonschema'):
+                    JSON-schema implementation to use. The default preserves
+                    existing validation behavior. ``'fastjsonschema'`` is an
+                    optional substantially faster backend for trusted
+                    high-volume validation workflows.
+
                 unique (default=True): if True, validate unique secondary keys
 
                 missing (default=True): if True, validate registered files exist
@@ -265,18 +280,36 @@ class MixinCocoSchema:
             result['warnings'].append(msg)
 
         if config.get('schema', True):
-            import jsonschema
+            schema_backend = config.get('schema_backend', 'jsonschema')
             from kwcoco.coco_schema import COCO_SCHEMA
 
             if verbose:
-                print('Validate json-schema')
-            try:
-                COCO_SCHEMA.validate(dset.dataset)  # type: ignore
-            except jsonschema.exceptions.ValidationError as ex:
-                err = ex
-                print(f'err.absolute_path={err.absolute_path}')
-                msg = 'Failed to validate schema: {}'.format(str(err))
-                _error(msg)
+                print(f'Validate json-schema with {schema_backend}')
+
+            if schema_backend == 'jsonschema':
+                import jsonschema
+
+                try:
+                    COCO_SCHEMA.validate(dset.dataset)  # type: ignore
+                except jsonschema.exceptions.ValidationError as ex:
+                    err = ex
+                    if verbose:
+                        print(f'err.absolute_path={err.absolute_path}')
+                    msg = 'Failed to validate schema: {}'.format(str(err))
+                    _error(msg)
+            elif schema_backend == 'fastjsonschema':
+                import fastjsonschema
+
+                try:
+                    _cached_fast_coco_schema_validator()(dset.dataset)
+                except fastjsonschema.JsonSchemaException as ex:
+                    msg = 'Failed to validate schema: {}'.format(str(ex))
+                    _error(msg)
+            else:
+                raise KeyError(
+                    'Unknown schema_backend={!r}. Expected one of: '
+                    "'jsonschema', 'fastjsonschema'".format(schema_backend)
+                )
 
         def _check_unique(dset, table_key, col_key, required=True):
             if verbose:

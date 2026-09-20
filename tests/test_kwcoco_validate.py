@@ -75,3 +75,66 @@ def test_duplicate_multi_band_validate():
 
     with pytest.raises(Exception):
         dset.validate(missing=False, fastfail=True)
+
+
+def test_fastjsonschema_backend_accept_reject_parity():
+    """The opt-in fast backend should agree on representative cases."""
+    import copy
+
+    import pytest
+
+    pytest.importorskip('fastjsonschema')
+    import kwcoco
+
+    dset = kwcoco.CocoDataset()
+    gid = dset.add_image(
+        id=1, file_name='image.jpg', width=32, height=32, channels='rgb'
+    )
+    dset.add_category(id=1, name='object')
+    dset.add_annotation(
+        id=1,
+        image_id=gid,
+        category_id=1,
+        bbox=[0, 0, 10, 10],
+        segmentation=[{
+            'exterior': [[0, 0], [10, 0], [10, 10], [0, 10]],
+            'interiors': [],
+        }],
+    )
+
+    def schema_errors(data, backend):
+        candidate = kwcoco.CocoDataset(copy.deepcopy(data), autobuild=False)
+        result = candidate.validate(
+            schema=True,
+            schema_backend=backend,
+            unique=False,
+            missing=False,
+            corrupted=False,
+            channels=False,
+            img_attrs=False,
+            annot_attrs=False,
+            verbose=0,
+        )
+        return result['errors']
+
+    valid_data = dset.dataset
+    assert not schema_errors(valid_data, 'jsonschema')
+    assert not schema_errors(valid_data, 'fastjsonschema')
+
+    invalid_cases = []
+
+    bad_image_id = copy.deepcopy(valid_data)
+    bad_image_id['images'][0]['id'] = 'not-an-integer'
+    invalid_cases.append(bad_image_id)
+
+    bad_bbox = copy.deepcopy(valid_data)
+    bad_bbox['annotations'][0]['bbox'] = [0, 0, 'bad-width', 10]
+    invalid_cases.append(bad_bbox)
+
+    bad_polygon = copy.deepcopy(valid_data)
+    bad_polygon['annotations'][0]['segmentation'] = [['bad-coordinate']]
+    invalid_cases.append(bad_polygon)
+
+    for data in invalid_cases:
+        assert schema_errors(data, 'jsonschema')
+        assert schema_errors(data, 'fastjsonschema')
