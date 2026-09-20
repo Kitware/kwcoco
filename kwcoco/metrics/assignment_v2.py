@@ -37,9 +37,10 @@ decision says otherwise:
 * V2 uses a stable descending score sort, so equal-score predictions retain
   their input order.  V1 reverses ``argsort`` output, and its tie order is not
   the same contract.
-* V2 currently implements only ``prioritize='iou'`` and
-  ``truth_reuse_policy='never'``.  V1 also supports class-prioritized matching
-  and least-used truth reuse.
+* V2 currently implements only ``prioritize='iou'`` and ordinary truth reuse
+  policy ``'never'``. Segmentation mode additionally implements COCO-style
+  reusable crowd truths. V1 also supports class-prioritized matching and
+  least-used ordinary truth reuse.
 * V2 emits an additional ``rank`` column and can reuse one candidate index for
   multiple IoU thresholds.
 
@@ -184,6 +185,15 @@ def _ltrb_intersects(
     )
 
 
+def _threshold_mask(values, threshold: float, policy: str):
+    """Apply an explicit IoU threshold boundary convention."""
+    if policy == 'strict':
+        return values > threshold
+    if policy == 'inclusive':
+        return values >= threshold
+    raise KeyError(policy)
+
+
 @dataclass
 class AssignmentCandidateIndex:
     """
@@ -195,8 +205,9 @@ class AssignmentCandidateIndex:
     pairwise overlaps or compatible-class groups.
 
     The candidate graph is deliberately sparse: only candidate pairs with
-    ``iou > min_iou`` are retained.  For COCO-style AP50:95, ``min_iou=0.5``
-    is sufficient for all threshold queries.
+    pairs passing the configured ``threshold_policy`` at ``min_iou`` are retained.
+    For COCO-style AP50:95, ``min_iou=0.5`` is sufficient for all threshold
+    queries.
     """
 
     true_dets: 'kwimage.Detections'
@@ -216,6 +227,14 @@ class AssignmentCandidateIndex:
     cand_ious: list[np.ndarray]
     iou_type: str
     overlap_backend: dict[str, Any] | None
+    segmentation_rasterizer: str
+    raster_backend: dict[str, Any] | None
+    threshold_policy: str
+    annotation_ignore_policy: str
+    true_crowd_flags: np.ndarray
+    true_annotation_ignore_flags: np.ndarray
+    pred_rles: list[dict[str, Any]] | None
+    true_rles: list[dict[str, Any]] | None
     image_dims: tuple[int, int] | None
     build_stats: dict[str, Any]
 
@@ -233,6 +252,10 @@ class AssignmentCandidateIndex:
         spatial_threshold: int | None = 50_000,
         iou_type: str = 'bbox',
         overlap_backend: str = 'auto',
+        segmentation_rasterizer: str = 'auto',
+        raster_backend: str = 'auto',
+        threshold_policy: str = 'auto',
+        annotation_ignore_policy: str = 'coco',
         image_dims: tuple[int, int] | None = None,
     ) -> 'AssignmentCandidateIndex':
         """
@@ -252,6 +275,18 @@ class AssignmentCandidateIndex:
                 per compatible class block.
             iou_type: ``'bbox'`` or experimental ``'segm'`` overlap.
             overlap_backend: mask-IoU backend for ``iou_type='segm'``.
+            segmentation_rasterizer: ``'kwimage'`` or COCO-compatible
+                ``'coco'`` polygon rasterization.
+            raster_backend: backend for COCO-compatible polygon rasterization.
+            threshold_policy: ``'strict'`` uses ``IoU > threshold`` (legacy
+                kwcoco semantics); ``'inclusive'`` uses ``IoU >= threshold``
+                to match COCOeval's threshold boundary. ``'auto'`` selects
+                strict bbox matching and inclusive segmentation matching.
+            annotation_ignore_policy: annotation-level ignore semantics for
+                segmentation mode. ``'coco'`` matches official COCOeval's
+                crowd-only ignore behavior; ``'kwcoco'`` additionally honors
+                an explicit truth ``ignore`` column; ``'none'`` disables both
+                crowd reuse and annotation-level ignore.
             image_dims: required ``(height, width)`` canvas for segmentation
                 rasterization.
         """
@@ -261,6 +296,14 @@ class AssignmentCandidateIndex:
             )
         if iou_type not in {'bbox', 'segm'}:
             raise KeyError(iou_type)
+        if threshold_policy == 'auto':
+            threshold_policy = 'inclusive' if iou_type == 'segm' else 'strict'
+        if threshold_policy not in {'strict', 'inclusive'}:
+            raise KeyError(threshold_policy)
+        if annotation_ignore_policy not in {'none', 'coco', 'kwcoco'}:
+            raise KeyError(annotation_ignore_policy)
+        if segmentation_rasterizer not in {'auto', 'kwimage', 'coco'}:
+            raise KeyError(segmentation_rasterizer)
         if iou_type == 'segm':
             if bias != 0:
                 raise NotImplementedError(
@@ -336,6 +379,9 @@ class AssignmentCandidateIndex:
         ]
         build_stats: dict[str, Any] = {
             'iou_type': iou_type,
+            'threshold_policy': threshold_policy,
+            'segmentation_rasterizer': segmentation_rasterizer,
+            'annotation_ignore_policy': annotation_ignore_policy,
             'dense_blocks': 0,
             'spatial_blocks': 0,
             'dense_pairs_considered': 0,
@@ -350,25 +396,47 @@ class AssignmentCandidateIndex:
         pred_rles = true_rles = None
         mask_iou_func = None
         overlap_metadata = None
+        raw_crowd_flags = np.asarray(
+            true_dets.data.get('iscrowd', np.zeros(len(true_dets), dtype=bool)),
+            dtype=bool,
+        )
+        raw_ignore_flags = np.asarray(
+            true_dets.data.get('ignore', np.zeros(len(true_dets), dtype=bool)),
+            dtype=bool,
+        )
+        if annotation_ignore_policy == 'none' or iou_type != 'segm':
+            true_crowd_flags = np.zeros(len(true_dets), dtype=bool)
+            true_annotation_ignore_flags = np.zeros(len(true_dets), dtype=bool)
+        elif annotation_ignore_policy == 'coco':
+            # Match the current official COCOeval implementation: for bbox /
+            # segm evaluation, annotation-level ignore is driven by iscrowd.
+            true_crowd_flags = raw_crowd_flags.copy()
+            true_annotation_ignore_flags = raw_crowd_flags.copy()
+        else:  # kwcoco
+            true_crowd_flags = raw_crowd_flags.copy()
+            true_annotation_ignore_flags = raw_crowd_flags | raw_ignore_flags
+
         if iou_type == 'segm':
             from kwcoco.metrics.overlap import detections_to_rles
             from kwcoco.metrics.overlap import resolve_mask_iou_backend
 
-            truth_crowd = np.asarray(
-                true_dets.data.get('iscrowd', np.zeros(len(true_dets), dtype=bool)),
-                dtype=bool,
+            pred_rles, pred_raster_meta = detections_to_rles(
+                pred_dets, image_dims,
+                rasterizer=segmentation_rasterizer,
+                raster_backend=raster_backend,
             )
-            if np.any(truth_crowd):
-                raise NotImplementedError(
-                    'assignment_v2 segmentation mode does not yet implement '
-                    'COCO crowd truth reuse semantics'
-                )
-            pred_rles = detections_to_rles(pred_dets, image_dims)
-            true_rles = detections_to_rles(true_dets, image_dims)
+            true_rles, true_raster_meta = detections_to_rles(
+                true_dets, image_dims,
+                rasterizer=segmentation_rasterizer,
+                raster_backend=raster_backend,
+            )
+            if pred_raster_meta != true_raster_meta:
+                raise AssertionError('prediction/truth raster backends disagree')
             mask_iou_func, overlap_metadata = resolve_mask_iou_backend(
                 overlap_backend
             )
             build_stats['overlap_backend'] = overlap_metadata
+            build_stats['rasterization'] = pred_raster_meta
 
         for pred_cx in unique_pcxs:
             pred_idxs = np.where(pred_cxs == pred_cx)[0].astype(int)
@@ -382,7 +450,7 @@ class AssignmentCandidateIndex:
                 assert mask_iou_func is not None
                 block_pred_rles = [pred_rles[int(px)] for px in pred_idxs]
                 block_true_rles = [true_rles[int(tx)] for tx in true_idxs]
-                crowd = [0] * len(block_true_rles)
+                crowd = true_crowd_flags[true_idxs].astype(np.uint8).tolist()
                 ious = np.asarray(
                     mask_iou_func(block_pred_rles, block_true_rles, crowd),
                     dtype=float,
@@ -399,7 +467,7 @@ class AssignmentCandidateIndex:
                 build_stats['dense_blocks'] += 1
                 build_stats['mask_pairs_considered'] += dense_pair_count
                 for px, row in zip(pred_idxs, ious):
-                    keep = row > min_iou
+                    keep = _threshold_mask(row, min_iou, threshold_policy)
                     if np.any(keep):
                         txs = true_idxs[keep]
                         iou_vals = np.asarray(row[keep], dtype=float)
@@ -435,7 +503,7 @@ class AssignmentCandidateIndex:
             build_stats['dense_pairs_considered'] += dense_pair_count
             ious = pred_dets.boxes[pred_idxs].ious(true_dets.boxes[true_idxs], bias=bias)
             for px, row in zip(pred_idxs, ious):
-                keep = row > min_iou
+                keep = _threshold_mask(row, min_iou, threshold_policy)
                 if np.any(keep):
                     txs = true_idxs[keep]
                     iou_vals = np.asarray(row[keep], dtype=float)
@@ -462,6 +530,14 @@ class AssignmentCandidateIndex:
             cand_ious=cand_ious,
             iou_type=iou_type,
             overlap_backend=overlap_metadata,
+            segmentation_rasterizer=segmentation_rasterizer,
+            raster_backend=build_stats.get('rasterization', {}).get('raster_backend'),
+            threshold_policy=threshold_policy,
+            annotation_ignore_policy=annotation_ignore_policy,
+            true_crowd_flags=true_crowd_flags,
+            true_annotation_ignore_flags=true_annotation_ignore_flags,
+            pred_rles=pred_rles,
+            true_rles=true_rles,
             image_dims=image_dims,
             build_stats=build_stats,
         )
@@ -481,11 +557,6 @@ class AssignmentCandidateIndex:
             raise NotImplementedError(
                 'assignment_v2 currently implements truth_reuse_policy="never" only'
             )
-        if self.iou_type == 'segm' and ignore_classes is not None:
-            raise NotImplementedError(
-                'mask-aware ignore-region assignment is not implemented yet; '
-                'pass ignore_classes=None for experimental segmentation scoring'
-            )
         if iou_thresh < self.min_iou:
             raise ValueError(
                 f'iou_thresh={iou_thresh!r} is below cached min_iou={self.min_iou!r}'
@@ -500,14 +571,22 @@ class AssignmentCandidateIndex:
         true_ignore_flags = np.zeros(len(self.true_dets), dtype=bool)  # type: ignore
         pred_ignore_flags = np.zeros(len(self.pred_dets), dtype=bool)  # type: ignore
         if ignore_classes is not None:
-            true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
-                self.true_dets,
-                self.pred_dets,
-                ioaa_thresh=iou_thresh,
-                ignore_classes=ignore_classes,
-            )
+            if self.iou_type == 'segm':
+                true_ignore_flags, pred_ignore_flags = self._mask_ignore_regions(
+                    iou_thresh=iou_thresh, ignore_classes=ignore_classes
+                )
+            else:
+                true_ignore_flags, pred_ignore_flags = _filter_ignore_regions(
+                    self.true_dets,
+                    self.pred_dets,
+                    ioaa_thresh=iou_thresh,
+                    ignore_classes=ignore_classes,
+                )
             true_available[true_ignore_flags] = False
             pred_order = pred_order[~pred_ignore_flags[pred_order]]
+
+        annotation_ignore_flags = self.true_annotation_ignore_flags
+        crowd_flags = self.true_crowd_flags
 
         y_pred: list = []
         y_true: list = []
@@ -527,18 +606,31 @@ class AssignmentCandidateIndex:
             chosen_tx = -1
             chosen_iou = -1.0
             if len(txs):
-                valid = (ious > iou_thresh) & true_available[txs]
+                threshold_valid = _threshold_mask(
+                    ious, iou_thresh, self.threshold_policy
+                )
+                reusable = crowd_flags[txs]
+                available = (true_available[txs] | reusable) & ~true_ignore_flags[txs]
+                valid = threshold_valid & available
                 if np.any(valid):
-                    # Candidate arrays are already sorted by descending IoU.
-                    chosen_pos = int(np.where(valid)[0][0])
+                    # COCOeval sorts ignored truths after regular truths.  The
+                    # candidate arrays here are sorted by descending overlap,
+                    # so explicitly prefer the best non-ignored candidate and
+                    # only fall back to an ignored/crowd truth when necessary.
+                    normal_valid = valid & ~annotation_ignore_flags[txs]
+                    choose_from = normal_valid if np.any(normal_valid) else valid
+                    chosen_pos = int(np.where(choose_from)[0][0])
                     chosen_tx = int(txs[chosen_pos])
                     chosen_iou = float(ious[chosen_pos])
 
             if chosen_tx >= 0:
-                true_available[chosen_tx] = False
+                if not crowd_flags[chosen_tx]:
+                    true_available[chosen_tx] = False
                 true_nmatches[chosen_tx] += 1
                 true_cx = int(self.true_cxs[chosen_tx])
-                if 'weights' in self.true_dets.data:  # type: ignore
+                if annotation_ignore_flags[chosen_tx]:
+                    weight = 0.0
+                elif 'weights' in self.true_dets.data:  # type: ignore
                     weight = float(self.true_dets.weights[chosen_tx])  # type: ignore
                 else:
                     weight = 1.0
@@ -566,6 +658,7 @@ class AssignmentCandidateIndex:
                 y_rank.append(int(self.pred_rank[px]))
 
         unused_flags = true_nmatches == 0
+        unused_flags = unused_flags & np.logical_not(annotation_ignore_flags)
         if ignore_classes is not None:
             unused_flags = unused_flags & np.logical_not(true_ignore_flags)
         unused_txs = np.where(unused_flags)[0]
@@ -592,6 +685,71 @@ class AssignmentCandidateIndex:
             'pxs': y_pxs,
             'rank': y_rank,
         }
+
+    def _mask_ignore_regions(
+        self,
+        *,
+        iou_thresh: float,
+        ignore_classes: str | Iterable[str],
+    ):
+        """Compute kwcoco class-based ignore flags in mask geometry.
+
+        This intentionally differs from annotation-level COCO crowd handling.
+        Ignore-class truths are excluded from ordinary matching, and predictions
+        sufficiently covered by the union of those masks are removed from the
+        confusion rows.
+        """
+        import kwarray
+        from kwcoco.metrics.overlap import mask_ignore_region_flags
+
+        true_flags = np.zeros(len(self.true_dets), dtype=bool)
+        pred_flags = np.zeros(len(self.pred_dets), dtype=bool)
+        if not ub.iterable(ignore_classes):
+            ignore_classes = {ignore_classes}
+        else:
+            ignore_classes = set(ignore_classes)
+
+        classes = self.true_dets.classes
+        if classes is None or not ignore_classes:
+            return true_flags, pred_flags
+
+        normalized = set()
+        for name in ignore_classes:
+            if name in classes:
+                normalized.add(name)
+            else:
+                lowered = str(name).lower()
+                matches = [c for c in classes if str(c).lower() == lowered]
+                if matches:
+                    normalized.add(matches[0])
+        ignore_cidxs = [classes.index(c) for c in normalized]
+        if ignore_cidxs:
+            true_flags = kwarray.isect_flags(self.true_cxs, ignore_cidxs)
+
+        if np.any(true_flags) and len(self.pred_dets):
+            if self.pred_rles is None or self.true_rles is None:
+                raise AssertionError('segmentation ignore requires cached RLEs')
+            ignore_rles = [
+                self.true_rles[int(tx)] for tx in np.where(true_flags)[0]
+            ]
+            overlap_backend = 'auto'
+            if self.overlap_backend is not None:
+                overlap_backend = self.overlap_backend.get('name', 'auto')
+            raster_backend = 'auto'
+            if self.raster_backend is not None:
+                raster_backend = self.raster_backend.get('name', 'auto')
+            pred_flags, _meta = mask_ignore_region_flags(
+                self.pred_rles,
+                ignore_rles,
+                threshold=iou_thresh,
+                # Preserve historical kwcoco ignore-region semantics: IOAA
+                # must be strictly greater than the threshold even when the
+                # instance-assignment boundary uses COCO-inclusive IoU.
+                threshold_policy='strict',
+                overlap_backend=overlap_backend,
+                raster_backend=raster_backend,
+            )
+        return true_flags, pred_flags
 
     def assign_many(
         self,
@@ -662,6 +820,10 @@ def assign_confusion_vectors_v2(
     spatial_threshold: int | None = 50_000,
     iou_type: str = 'bbox',
     overlap_backend: str = 'auto',
+    segmentation_rasterizer: str = 'auto',
+    raster_backend: str = 'auto',
+    threshold_policy: str = 'auto',
+    annotation_ignore_policy: str = 'coco',
     image_dims: tuple[int, int] | None = None,
 ) -> dict[str, list[int | float]]: ...
 
@@ -685,6 +847,10 @@ def assign_confusion_vectors_v2(
     spatial_threshold: int | None = 50_000,
     iou_type: str = 'bbox',
     overlap_backend: str = 'auto',
+    segmentation_rasterizer: str = 'auto',
+    raster_backend: str = 'auto',
+    threshold_policy: str = 'auto',
+    annotation_ignore_policy: str = 'coco',
     image_dims: tuple[int, int] | None = None,
 ) -> dict[float, dict[str, list[int | float]]]: ...
 
@@ -707,6 +873,10 @@ def assign_confusion_vectors_v2(
     spatial_threshold: int | None = 50_000,
     iou_type: str = 'bbox',
     overlap_backend: str = 'auto',
+    segmentation_rasterizer: str = 'auto',
+    raster_backend: str = 'auto',
+    threshold_policy: str = 'auto',
+    annotation_ignore_policy: str = 'coco',
     image_dims: tuple[int, int] | None = None,
 ) -> dict[str, list[int | float]] | dict[float, dict[str, list[int | float]]]:
     """
@@ -735,6 +905,10 @@ def assign_confusion_vectors_v2(
         spatial_threshold=spatial_threshold,
         iou_type=iou_type,
         overlap_backend=overlap_backend,
+        segmentation_rasterizer=segmentation_rasterizer,
+        raster_backend=raster_backend,
+        threshold_policy=threshold_policy,
+        annotation_ignore_policy=annotation_ignore_policy,
         image_dims=image_dims,
     )
     results = index.assign_many(

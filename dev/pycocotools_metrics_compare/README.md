@@ -318,3 +318,66 @@ python dev/pycocotools_metrics_compare/run_phase2_native_mask.py \
     --mode=quick \
     --output-dpath=_metric_compare_phase2_native_mask
 ```
+
+## Phase 2.1: rasterization and threshold-boundary localization
+
+The first native-mask run showed a small number of assignment differences even
+when the RLE-IoU kernel itself was numerically identical to pycocotools.  The
+next comparison therefore varies polygon rasterization and IoU threshold
+boundary independently:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase21_rasterization.py \
+    --mode=quick \
+    --output-dpath=_metric_compare_phase21_rasterization
+```
+
+Upload:
+
+```text
+_metric_compare_phase21_rasterization/kwcoco_metrics_phase21_rasterization_quick.tar.gz
+```
+
+The native variants are:
+
+* `kwimage_strict`: historical `Segmentation.to_mask()` rasterization and
+  `IoU > threshold`;
+* `coco_rust_strict`: COCO `frPoly` rasterization through `kwimage_ext` Rust,
+  but the same strict threshold convention;
+* `coco_rust_inclusive`: COCO/Rust rasterization and `IoU >= threshold`;
+* `coco_pycoco_inclusive`: the same native matcher, but pycocotools polygon
+  rasterization as an independent codec reference.
+
+The report also compares Rust- and pycocotools-rasterized RLE bytes one
+annotation at a time and records pairwise IoUs for every assignment mismatch.
+Do not implement crowd/ignore semantics until this layer is localized.
+
+
+## Phase 2.2: crowd and ignore semantics
+
+Native instance-mask assignment now separates two concepts that are easy to
+conflate:
+
+* **COCO crowd semantics** are annotation-level behavior. Crowd truth masks use
+  intersection-over-detection-area for overlap, may match multiple detections,
+  and matched detections receive zero metric weight. COCO-compatible native
+  mask assignment defaults to COCO polygon rasterization and an inclusive IoU
+  threshold boundary.
+* **kwcoco ignore classes** are region-suppression semantics. Truth annotations
+  whose class is configured as an ignore class are unioned in mask space;
+  predictions whose intersection-over-prediction-area is strictly greater than
+  the ignore threshold are removed from scoring. This remains distinct from
+  COCO crowd behavior.
+
+Current official pycocotools bbox/segm evaluation derives annotation-level
+ignore from ``iscrowd``. The experimental native path therefore exposes
+``annotation_ignore_policy='coco'`` for reference parity and
+``annotation_ignore_policy='kwcoco'`` when an explicit truth ``ignore`` column
+should also carry zero metric weight.
+
+Run the focused comparison with:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase22_crowd_ignore.py \
+    --output-dpath=_metric_compare_phase22_crowd_ignore
+```

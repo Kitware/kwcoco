@@ -700,6 +700,10 @@ class DetectionMetrics(ub.NiceRepr):
         *,
         iou_type: str = 'bbox',
         overlap_backend: str = 'auto',
+        segmentation_rasterizer: str = 'auto',
+        raster_backend: str = 'auto',
+        threshold_policy: str = 'auto',
+        annotation_ignore_policy: str = 'coco',
         gids: Iterable[int] | None = None,
         compat: str = 'mutex',
         prioritize: str = 'iou',
@@ -714,8 +718,10 @@ class DetectionMetrics(ub.NiceRepr):
         This is intentionally separate from :meth:`confusion_vectors` while
         ``assignment_v2`` semantics are still being measured.  In addition to
         bbox IoU it supports experimental native instance-mask assignment via
-        ``iou_type='segm'``.  Segmentation mode currently rejects ignore-region
-        and crowd semantics rather than silently applying bbox-only behavior.
+        ``iou_type='segm'``.  Segmentation mode defaults to COCO-compatible
+        polygon rasterization and inclusive IoU thresholds, implements COCO
+        crowd reuse/ignore weighting, and keeps kwcoco's class-based ignore
+        regions as a separate explicit mechanism.
         """
         import kwarray
         from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
@@ -750,6 +756,10 @@ class DetectionMetrics(ub.NiceRepr):
                 spatial_threshold=spatial_threshold,
                 iou_type=iou_type,
                 overlap_backend=overlap_backend,
+                segmentation_rasterizer=segmentation_rasterizer,
+                raster_backend=raster_backend,
+                threshold_policy=threshold_policy,
+                annotation_ignore_policy=annotation_ignore_policy,
                 image_dims=image_dims,
             )
             iou_to_y = index.assign_many(

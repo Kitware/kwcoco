@@ -58,3 +58,23 @@ evidence instead of being hard-coded into the reference bridge.
 
 ---
 
+
+### Phase-1 assignment comparison gate
+
+Before changing production assignment semantics or adding native instance-mask
+assignment, run `dev/pycocotools_metrics_compare/run_phase1_suite.py`.  It
+compares the legacy native matcher with `assignment_v2` over the full
+COCO-style IoU threshold set and records row-level differences, timing, sparse
+candidate-index behavior, official COCO reference metrics, mask-kernel backend
+identity, and dense saliency accumulation behavior.
+
+Treat `assignment_v2` as experimental until measured differences are
+classified.  In particular, do not promote it solely because its reusable
+candidate graph is a better architectural fit for mask overlaps.
+
+### Phase-1.5 backend gate
+
+When backend availability changes (notably a legacy-vs-Rust `kwimage_ext`
+installation), run `dev/pycocotools_metrics_compare/run_phase15_suite.py` and
+retain both result bundles.  Do not infer assignment-algorithm speedups from a
+run where the underlying overlap backend also changed.

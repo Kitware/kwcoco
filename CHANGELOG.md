@@ -1,4 +1,12 @@
 ### Fixed
+
+### Added
+* Native assignment-v2 instance-mask scoring now defaults to COCO-compatible polygon rasterization and inclusive IoU thresholds, supports reusable COCO crowd truths with zero-weight matches, and implements mask-aware kwcoco ignore-class suppression using unioned ignore masks.
+* Added a Phase-2.2 crowd/ignore comparison suite covering crowd reuse, regular-vs-crowd priority, exact-IoU threshold boundaries, native ignore-class unions, and explicit annotation-ignore policy.
+* Added an experimental COCO-compatible native polygon rasterizer for instance-mask assignment. It prefers `kwimage_ext` Rust `frPoly`/RLE codecs and retains pycocotools as a reference fallback.
+* Added explicit `strict` (`IoU > threshold`) versus `inclusive` (`IoU >= threshold`) boundary policy to `assignment_v2`.
+* Added the Phase-2.1 rasterization/threshold comparison suite, including per-annotation Rust-vs-pycocotools RLE parity and mismatch-pair IoU diagnostics.
+
 * Add an experimental native instance-mask assignment path in `assignment_v2`, backed by batched compressed-RLE IoU and exposed through `DetectionMetrics.confusion_vectors_v2`.
 * Add a Phase-2 comparison runner that decomposes native mask assignment from native and COCO accumulation.
 
