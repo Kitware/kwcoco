@@ -475,15 +475,16 @@ def random_single_video_dset(
     coercable_height = image_size[1]
 
     if isinstance(coercable_width, distributions.Distribution):
-        video_width = int(coercable_width.sample())
-        video_height = int(coercable_height.sample())  # type: ignore
         image_width_distri = coercable_width
+    else:
+        image_width_distri = distributions.Constant(coercable_width)
+    if isinstance(coercable_height, distributions.Distribution):
         image_height_distri = coercable_height
     else:
-        video_width = coercable_width
-        video_height = coercable_height
-        image_width_distri = distributions.Constant(coercable_width)
         image_height_distri = distributions.Constant(coercable_height)
+
+    video_width = int(np.asarray(image_width_distri.sample()).item())
+    video_height = int(np.asarray(image_height_distri.sample()).item())
 
     video_dsize = (video_width, video_height)
     video_window = kwimage.Boxes([[0, 0, video_width, video_height]], 'xywh')

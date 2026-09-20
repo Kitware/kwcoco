@@ -2044,8 +2044,8 @@ class DetectionMetrics(ub.NiceRepr):
                 evaler.params.recThrs = recall_thresholds
 
             if area_ranges is not None:
-                labels = []
-                values = []
+                area_labels: list[str] = []
+                area_values: list[list[float] | list[int]] = []
                 for label, bounds in area_ranges.items():
                     pair = tuple(map(float, bounds))
                     if len(pair) != 2:
@@ -2055,25 +2055,27 @@ class DetectionMetrics(ub.NiceRepr):
                     if not np.isfinite(lo) or lo < 0 or np.isnan(hi) or hi < lo:
                         raise ValueError(
                             f'invalid area range {label!r}: {pair!r}')
-                    labels.append(str(label))
-                    values.append(list(pair))
-                if not values:
+                    area_labels.append(str(label))
+                    area_values.append(list(pair))
+                if not area_values:
                     raise ValueError('area_ranges must not be empty')
                 if (
-                    labels != list(evaler.params.areaRngLbl)
-                    or values != [list(map(float, r)) for r in evaler.params.areaRng]
+                    area_labels != list(evaler.params.areaRngLbl)
+                    or area_values != [
+                        list(map(float, r)) for r in evaler.params.areaRng
+                    ]
                 ):
                     modified_params = True
-                evaler.params.areaRngLbl = labels
-                evaler.params.areaRng = values
+                evaler.params.areaRngLbl = area_labels
+                evaler.params.areaRng = area_values
 
             if max_dets is not None:
-                values = sorted(set(map(int, max_dets)))
-                if not values or any(v < 0 for v in values):
-                    raise ValueError(f'invalid max_dets={values!r}')
-                if values != list(map(int, evaler.params.maxDets)):
+                max_det_values: list[int] = sorted(set(map(int, max_dets)))
+                if not max_det_values or any(v < 0 for v in max_det_values):
+                    raise ValueError(f'invalid max_dets={max_det_values!r}')
+                if max_det_values != list(map(int, evaler.params.maxDets)):
                     modified_params = True
-                evaler.params.maxDets = values
+                evaler.params.maxDets = max_det_values
 
             print('evaler.params.iouThrs = {!r}'.format(evaler.params.iouThrs))
 
