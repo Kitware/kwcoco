@@ -43,11 +43,12 @@ The comparison suite separates:
 * assignment behavior (kwcoco versus COCOeval);
 * accumulation behavior (kwcoco `Measures` versus COCOeval accumulation).
 
-For bbox evaluation it can measure all three combinations.  For instance masks,
-Phase 1 measures COCOeval assignment followed by either kwcoco `Measures` or
-COCOeval accumulation.  Native kwcoco mask assignment is deliberately a future
-extension so its overlap backend and semantics can be chosen from measured
-evidence instead of being hard-coded into the reference bridge.
+For bbox evaluation it can measure all three combinations.  Instance-mask work
+has progressed through native reusable candidate indexes, COCO-compatible
+polygon rasterization, inclusive mask thresholds, crowd semantics, and kwcoco
+ignore-region semantics.  Keep the official COCO path as an independent
+reference so assignment differences and accumulation differences remain
+separately measurable.
 
 ## Debug / Usage
 
@@ -78,3 +79,16 @@ When backend availability changes (notably a legacy-vs-Rust `kwimage_ext`
 installation), run `dev/pycocotools_metrics_compare/run_phase15_suite.py` and
 retain both result bundles.  Do not infer assignment-algorithm speedups from a
 run where the underlying overlap backend also changed.
+
+### Phase-2.3 native COCO-shaped mask gate
+
+`DetectionMetrics.score_native_coco(iou_type='segm')` is the dataset-level
+native mask summary surface.  It uses assignment-time COCO area semantics,
+per-image/per-category `maxDets`, one reusable candidate index per image, and
+native `ConfusionVectors -> Measures` accumulation.  It is not official
+COCOeval and must stay labeled as kwcoco.
+
+Run `dev/pycocotools_metrics_compare/run_phase23_native_coco.py` when changing
+area, maxDet, mask geometry, or native summary semantics.  Historical bbox
+`CocoEvaluator.evaluate()` remains on assignment-v1 unless a separate bbox
+parity campaign explicitly changes that decision.

@@ -102,6 +102,9 @@ class _CocoRasterBackend:
             return self.module.encode(mask)[0]
         return self.module.encode(np.asfortranarray(mask))
 
+    def area(self, rles):
+        return self.module.area(rles)
+
     def empty_rle(self, dims):
         height, width = map(int, dims)
         if self.name == 'kwimage_ext':
@@ -322,6 +325,28 @@ def detections_to_rles(
         'raster_backend': None if resolved is None else resolved[1],
     }
     return rles, metadata
+
+
+def rle_areas(rles, *, backend: str = 'auto'):
+    """Measure areas of compressed COCO RLEs without decoding masks.
+
+    Returns:
+        tuple[np.ndarray, dict]:
+            Per-mask areas and backend provenance.
+    """
+    codec, metadata = resolve_coco_raster_backend(backend)
+    if not rles:
+        return np.empty(0, dtype=float), metadata
+    areas = np.asarray(codec.area(rles), dtype=float)
+    if areas.ndim == 0:
+        areas = areas.reshape(1)
+    areas = areas.reshape(-1)
+    if len(areas) != len(rles):
+        raise ValueError(
+            'RLE area backend returned unexpected shape: '
+            f'{areas.shape!r} for {len(rles)} masks'
+        )
+    return areas, metadata
 
 
 

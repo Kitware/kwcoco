@@ -873,6 +873,53 @@ class CocoEvaluator:
             }
         return results
 
+    def evaluate_native_coco(
+        coco_eval,
+        iou_types: str | Iterable[str] = ('segm',),
+        *,
+        overlap_backend: str = 'auto',
+        raster_backend: str = 'auto',
+        annotation_ignore_policy: str = 'coco',
+        ignore_classes: str | Iterable[str] | None = None,
+        with_details: bool = False,
+    ) -> dict[str, dict[str, Any]]:
+        """Compute native COCO-shaped summaries for instance masks.
+
+        This is the native counterpart to :meth:`evaluate_pycocotools`, but
+        it intentionally remains a separate API and labels itself as kwcoco.
+        The current implementation supports only ``iou_type='segm'`` so the
+        historical bbox evaluator is not silently replaced by assignment-v2.
+        """
+        if isinstance(iou_types, str):
+            iou_types = [p.strip() for p in iou_types.split(',') if p.strip()]
+        else:
+            iou_types = list(iou_types)
+        if not iou_types:
+            raise ValueError('At least one iou_type is required')
+        bad_types = set(iou_types) - {'segm'}
+        if bad_types:
+            raise KeyError(
+                'Native COCO-shaped scoring currently supports only segm; '
+                f'unsupported iou_types={sorted(bad_types)!r}'
+            )
+
+        dmet = getattr(coco_eval, '_dmet', None)
+        if dmet is None:
+            dmet = coco_eval._build_dmet()
+            coco_eval._dmet = dmet
+
+        results = {}
+        for iou_type in iou_types:
+            results[iou_type] = dmet.score_native_coco(
+                iou_type=iou_type,
+                overlap_backend=overlap_backend,
+                raster_backend=raster_backend,
+                annotation_ignore_policy=annotation_ignore_policy,
+                ignore_classes=ignore_classes,
+                with_details=with_details,
+            )
+        return results
+
     def evaluate(coco_eval) -> 'CocoResults':
         """
         Executes the main evaluation logic. Performs assignments between

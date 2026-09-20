@@ -381,3 +381,42 @@ Run the focused comparison with:
 python dev/pycocotools_metrics_compare/run_phase22_crowd_ignore.py \
     --output-dpath=_metric_compare_phase22_crowd_ignore
 ```
+
+## Phase 2.3: dataset-level native COCO-shaped mask summary
+
+Phase 2.3 adds assignment-time area ranges, COCO-style per-image/per-category
+`maxDets`, and a native dataset summary built from the reusable mask candidate
+indexes. The native summary remains explicitly distinct from official
+`COCOeval`: assignment is native `assignment_v2`, while accumulation uses
+`ConfusionVectors -> Measures` with `ap_method='pycocotools'`.
+
+Run the focused tests first:
+
+```bash
+pytest -q \
+    tests/test_coco_instance_metrics.py \
+    tests/test_metrics_assignment_v2.py \
+    tests/test_metrics_native_mask_v2.py \
+    tests/test_metrics_native_mask_crowd_ignore.py \
+    tests/test_metrics_native_coco_v2.py
+```
+
+Then run the deterministic comparison suite:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase23_native_coco.py \
+    --mode=quick \
+    --output-dpath=_metric_compare_phase23_native_coco
+```
+
+Upload:
+
+```text
+_metric_compare_phase23_native_coco/kwcoco_metrics_phase23_native_coco_quick.tar.gz
+```
+
+The report includes the 12 named native and official AP/AR values, absolute
+summary deltas, row-level assignment differences at IoU 0.50/0.75/0.95,
+backend provenance, and candidate-build / assignment / accumulation timing.
+The adversarial corpus includes area-priority matching, `maxDets`, a negative
+image, and crowd behavior in addition to the existing perturbation cases.

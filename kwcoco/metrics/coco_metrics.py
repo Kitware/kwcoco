@@ -37,6 +37,16 @@ COCO_DETECTION_STAT_KEYS = (
 )
 
 
+COCO_IOU_THRESHOLDS = tuple(np.linspace(0.50, 0.95, 10).tolist())
+COCO_MAX_DETS = (1, 10, 100)
+COCO_AREA_RANGES = {
+    'all': (0.0, 1e10),
+    'small': (0.0, float(32 ** 2)),
+    'medium': (float(32 ** 2), float(96 ** 2)),
+    'large': (float(96 ** 2), 1e10),
+}
+
+
 def _rle_json_safe(rle: dict[str, Any]) -> dict[str, Any]:
     """Normalize a pycocotools RLE into a JSON-compatible dictionary."""
     rle = dict(rle)

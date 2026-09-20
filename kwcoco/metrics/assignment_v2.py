@@ -235,6 +235,9 @@ class AssignmentCandidateIndex:
     true_annotation_ignore_flags: np.ndarray
     pred_rles: list[dict[str, Any]] | None
     true_rles: list[dict[str, Any]] | None
+    pred_areas: np.ndarray
+    true_areas: np.ndarray
+    area_backend: dict[str, Any] | None
     image_dims: tuple[int, int] | None
     build_stats: dict[str, Any]
 
@@ -396,6 +399,7 @@ class AssignmentCandidateIndex:
         pred_rles = true_rles = None
         mask_iou_func = None
         overlap_metadata = None
+        area_metadata = None
         raw_crowd_flags = np.asarray(
             true_dets.data.get('iscrowd', np.zeros(len(true_dets), dtype=bool)),
             dtype=bool,
@@ -418,6 +422,7 @@ class AssignmentCandidateIndex:
 
         if iou_type == 'segm':
             from kwcoco.metrics.overlap import detections_to_rles
+            from kwcoco.metrics.overlap import rle_areas
             from kwcoco.metrics.overlap import resolve_mask_iou_backend
 
             pred_rles, pred_raster_meta = detections_to_rles(
@@ -435,8 +440,25 @@ class AssignmentCandidateIndex:
             mask_iou_func, overlap_metadata = resolve_mask_iou_backend(
                 overlap_backend
             )
+            pred_areas, pred_area_meta = rle_areas(
+                pred_rles, backend=raster_backend
+            )
+            true_areas, true_area_meta = rle_areas(
+                true_rles, backend=raster_backend
+            )
+            if pred_area_meta != true_area_meta:
+                raise AssertionError('prediction/truth area backends disagree')
+            area_metadata = pred_area_meta
             build_stats['overlap_backend'] = overlap_metadata
             build_stats['rasterization'] = pred_raster_meta
+            build_stats['area_backend'] = area_metadata
+        else:
+            pred_widths = np.maximum(0, pred_ltrb[:, 2] - pred_ltrb[:, 0])
+            pred_heights = np.maximum(0, pred_ltrb[:, 3] - pred_ltrb[:, 1])
+            true_widths = np.maximum(0, true_ltrb[:, 2] - true_ltrb[:, 0])
+            true_heights = np.maximum(0, true_ltrb[:, 3] - true_ltrb[:, 1])
+            pred_areas = pred_widths * pred_heights
+            true_areas = true_widths * true_heights
 
         for pred_cx in unique_pcxs:
             pred_idxs = np.where(pred_cxs == pred_cx)[0].astype(int)
@@ -538,6 +560,9 @@ class AssignmentCandidateIndex:
             true_annotation_ignore_flags=true_annotation_ignore_flags,
             pred_rles=pred_rles,
             true_rles=true_rles,
+            pred_areas=pred_areas,
+            true_areas=true_areas,
+            area_backend=area_metadata,
             image_dims=image_dims,
             build_stats=build_stats,
         )
@@ -550,9 +575,22 @@ class AssignmentCandidateIndex:
         bg_cidx: int = -1,
         ignore_classes: str | Iterable[str] | None = 'ignore',
         max_dets: int | None = None,
+        max_dets_scope: str = 'image',
+        area_range: tuple[float, float] | None = None,
         truth_reuse_policy: str = 'never',
     ) -> dict[str, list[int | float]]:
-        """Run greedy assignment for one IoU threshold."""
+        """Run greedy assignment for one IoU threshold.
+
+        Args:
+            max_dets_scope:
+                ``'image'`` preserves the original v2 behavior. ``'category'``
+                applies the cap independently to each prediction category,
+                matching the normal COCO ``useCats=1`` evaluation scope.
+            area_range:
+                Optional inclusive ``(min_area, max_area)`` range. Truths
+                outside the range remain matchable ignored candidates, and an
+                unmatched prediction outside the range receives zero weight.
+        """
         if truth_reuse_policy != 'never':
             raise NotImplementedError(
                 'assignment_v2 currently implements truth_reuse_policy="never" only'
@@ -562,11 +600,44 @@ class AssignmentCandidateIndex:
                 f'iou_thresh={iou_thresh!r} is below cached min_iou={self.min_iou!r}'
             )
 
+        if max_dets_scope not in {'image', 'category'}:
+            raise KeyError(max_dets_scope)
+
         true_available = np.ones(len(self.true_dets), dtype=bool)  # type: ignore
         true_nmatches = np.zeros(len(self.true_dets), dtype=int)  # type: ignore
         pred_order = self.pred_order
         if max_dets is not None and np.isfinite(max_dets):
-            pred_order = pred_order[: int(max_dets)]
+            max_dets = int(max_dets)
+            if max_dets < 0:
+                raise ValueError('max_dets must be nonnegative')
+            if max_dets_scope == 'image':
+                pred_order = pred_order[:max_dets]
+            else:
+                counts: dict[int, int] = defaultdict(int)
+                keep = []
+                for px in pred_order:
+                    cx = int(self.pred_cxs[int(px)])
+                    if counts[cx] < max_dets:
+                        keep.append(int(px))
+                        counts[cx] += 1
+                pred_order = np.asarray(keep, dtype=int)
+
+        true_area_ignore_flags = np.zeros(len(self.true_dets), dtype=bool)
+        pred_area_ignore_flags = np.zeros(len(self.pred_dets), dtype=bool)
+        if area_range is not None:
+            if len(area_range) != 2:
+                raise ValueError('area_range must be a (min_area, max_area) pair')
+            min_area, max_area = map(float, area_range)
+            if not np.isfinite(min_area) or min_area < 0:
+                raise ValueError(f'invalid minimum area: {min_area!r}')
+            if np.isnan(max_area) or max_area < min_area:
+                raise ValueError(f'invalid maximum area: {max_area!r}')
+            true_area_ignore_flags = (
+                (self.true_areas < min_area) | (self.true_areas > max_area)
+            )
+            pred_area_ignore_flags = (
+                (self.pred_areas < min_area) | (self.pred_areas > max_area)
+            )
 
         true_ignore_flags = np.zeros(len(self.true_dets), dtype=bool)  # type: ignore
         pred_ignore_flags = np.zeros(len(self.pred_dets), dtype=bool)  # type: ignore
@@ -585,7 +656,9 @@ class AssignmentCandidateIndex:
             true_available[true_ignore_flags] = False
             pred_order = pred_order[~pred_ignore_flags[pred_order]]
 
-        annotation_ignore_flags = self.true_annotation_ignore_flags
+        annotation_ignore_flags = (
+            self.true_annotation_ignore_flags | true_area_ignore_flags
+        )
         crowd_flags = self.true_crowd_flags
 
         y_pred: list = []
@@ -651,7 +724,8 @@ class AssignmentCandidateIndex:
                 y_pred.append(pred_cx)
                 y_true.append(bg_cidx)
                 y_score.append(score)
-                y_weight.append(float(bg_weight))
+                weight = 0.0 if pred_area_ignore_flags[px] else float(bg_weight)
+                y_weight.append(weight)
                 y_iou.append(-1.0)
                 y_pxs.append(px)
                 y_txs.append(-1)
@@ -815,6 +889,8 @@ def assign_confusion_vectors_v2(
     prioritize: str = 'iou',
     ignore_classes: str | Iterable[str] | None = 'ignore',
     max_dets: int | None = None,
+    max_dets_scope: str = 'image',
+    area_range: tuple[float, float] | None = None,
     truth_reuse_policy: str = 'never',
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
@@ -842,6 +918,8 @@ def assign_confusion_vectors_v2(
     prioritize: str = 'iou',
     ignore_classes: str | Iterable[str] | None = 'ignore',
     max_dets: int | None = None,
+    max_dets_scope: str = 'image',
+    area_range: tuple[float, float] | None = None,
     truth_reuse_policy: str = 'never',
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
@@ -868,6 +946,8 @@ def assign_confusion_vectors_v2(
     prioritize: str = 'iou',
     ignore_classes: str | Iterable[str] | None = 'ignore',
     max_dets: int | None = None,
+    max_dets_scope: str = 'image',
+    area_range: tuple[float, float] | None = None,
     truth_reuse_policy: str = 'never',
     min_iou: float | None = None,
     spatial_threshold: int | None = 50_000,
@@ -917,6 +997,8 @@ def assign_confusion_vectors_v2(
         bg_cidx=bg_cidx,
         ignore_classes=ignore_classes,
         max_dets=max_dets,
+        max_dets_scope=max_dets_scope,
+        area_range=area_range,
         truth_reuse_policy=truth_reuse_policy,
     )
     if multi_iou:
