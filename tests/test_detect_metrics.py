@@ -302,3 +302,31 @@ def test_auc_all_tp_no_fp_regression():
 
     assert m['trunc_auc'] == 1.0
     assert m['auc'] == 1.0
+
+
+def test_null_prediction_categories_are_preserved():
+    """Regression test for category-less predictions in legacy assignment."""
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    dmet = DetectionMetrics.demo(
+        nimgs=3,
+        null_pred=1,
+        classes=3,
+        nboxes=10,
+        n_fp=3,
+        box_noise=0.1,
+        with_probs=False,
+    )
+
+    assert all(
+        cx is None
+        for dets in dmet.gid_to_pred_dets.values()
+        for cx in dets.class_idxs
+    )
+
+    cfsn_vecs = dmet.confusion_vectors()
+    assert any(cx is None for cx in cfsn_vecs.data['pred'])
+
+    # Exercise the two downstream operations used by the affected doctests.
+    cfsn_vecs.binarize_classless().measures()
+    cfsn_vecs.binarize_ovr().measures()
