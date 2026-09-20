@@ -25,10 +25,11 @@ KWCoco exposes several metric families that should not be conflated.
 Native COCO summary and tensor
 ------------------------------
 
-The native COCO path is useful when callers need inspectable kwcoco assignment
-rows while retaining COCO matching and accumulation semantics. With standard
-parameters it uses ten IoU thresholds from 0.50 through 0.95, 101 recall
-samples, the standard inclusive area ranges, and per-image/per-category
+The native COCO path retains inspectable kwcoco assignment semantics while
+using a compact match representation for normal scoring. Explicit assignment
+rows are materialized only for diagnostic/native-extension requests. With
+standard parameters it uses ten IoU thresholds from 0.50 through 0.95, 101
+recall samples, the standard inclusive area ranges, and per-image/per-category
 ``maxDets`` values of 1, 10, and 100.
 
 ``with_eval=True`` additionally returns the full COCO evaluation tensors:
@@ -119,7 +120,33 @@ The requested and resolved backend names are recorded in the result's
 ``provenance`` dictionary. ``kwimage_ext`` is an optional acceleration backend.
 
 Native bbox COCO evaluation has no mask dependency. Its overlap provenance is
-``numpy_coco_bbox`` and its area provenance is ``numpy_bbox_area``.
+``numpy_coco_bbox`` and its area provenance is ``numpy_coco_xywh_area``.
+
+Greedy assignment has a separate optional acceleration switch.  The
+``assignment_backend`` parameter accepts ``'auto'``, ``'python'``, or
+``'kwimage_ext'``.  ``'auto'`` prefers the batched Rust
+``kwimage_ext.coco_greedy_match_grid`` kernel when that capability is installed
+and falls back to the Python assignment-v2 reference implementation otherwise.
+The compiled kernel operates only on the already-built sparse candidate graph
+and batches all active area ranges and IoU thresholds in one call per image.
+Normal COCO accumulation consumes the resulting compact NumPy match arrays
+directly; it does not expand them into Python confusion-row dictionaries.
+Explicit rows remain available when callers request per-class details or native
+kwcoco ignore-region semantics.  Geometry, area policy, class compatibility,
+and COCO tensor semantics remain in kwcoco.  The requested and resolved
+assignment backends are recorded in ``params`` / ``provenance``. Native kwcoco
+ignore-class regions remain on the Python row backend because their suppression
+mask depends on the IoU threshold.
+
+For backend differential testing, force both implementations explicitly::
+
+   python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py \
+       --mode=full --assignment-backend=python --assert-parity \
+       --output-dpath=_metric_compare_phase3_python
+
+   python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py \
+       --mode=full --assignment-backend=kwimage_ext --assert-parity \
+       --output-dpath=_metric_compare_phase3_rust
 
 If neither ``kwimage_ext`` nor ``pycocotools`` is importable, native mask
 scoring raises an ``ImportError`` that names both backend choices rather than
@@ -145,6 +172,11 @@ Semantics fixed for COCO compatibility
   corresponding weighting extension.
 * A category literally named ``background`` is an ordinary COCO category name;
   it is not silently removed from native COCO aggregation.
+* Strict ``CocoEvaluator`` COCO wrappers key category identity by the declared
+  truth category ids and do not inherit the historical evaluator's lowercase /
+  space-to-underscore class-name rectification. Distinct categories such as
+  ``Foo Bar`` and ``foo_bar`` therefore remain distinct on the COCO category
+  axis, even though the internal tensor axis is densely indexed.
 
 KWCoco extensions
 -----------------

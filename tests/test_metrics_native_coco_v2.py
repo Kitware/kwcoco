@@ -627,6 +627,25 @@ def test_native_coco_auto_backend_reports_actual_provenance():
     }
 
 
+
+def test_native_coco_bbox_provenance_uses_coco_xywh_area():
+    """Strict COCO bbox provenance names the XYWH area implementation."""
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    dims = (64, 64)
+    true, pred = _empty_pair(dims=dims)
+    mask = np.zeros(dims, dtype=np.uint8)
+    mask[8:24, 8:24] = 1
+    _add_mask_ann(true, mask, aid=1)
+    _add_mask_ann(pred, mask, aid=11, score=.9)
+
+    dmet = DetectionMetrics.from_coco(true, pred)
+    native = dmet.score_native_coco(iou_type='bbox')
+    provenance = native['provenance']
+    assert provenance['overlap_backends'] == ['numpy_coco_bbox']
+    assert provenance['area_backends'] == ['numpy_coco_xywh_area']
+
+
 def test_native_coco_reuses_one_candidate_index_per_image(monkeypatch):
     import kwcoco
     from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
@@ -697,7 +716,7 @@ def test_native_coco_perfect_summary_and_evaluator_surface():
     assert native['official'] is False
     assert native['reference_implementation'] == 'pycocotools.COCOeval'
     assert native['assignment'] == 'assignment_v2'
-    assert native['accumulator'] == 'assignment_rows->coco_tensor'
+    assert native['accumulator'] == 'compact_matches->coco_tensor'
     assert len(native['params']['recall_thresholds']) == 101
     assert native['summary']['AP'] > .99
     assert native['summary']['AR100'] > .99
@@ -1204,3 +1223,303 @@ def test_coco_bbox_sparse_candidate_path_matches_dense_path():
             threshold, max_dets=100, max_dets_scope='category',
             area_range=(0.0, 1e10), ignore_classes=None)
         assert d == s
+
+
+def test_coco_bbox_fractional_origin_preserves_xywh_area_boundaries():
+    """COCO bbox area must use authored XYWH width/height, not x2-x1."""
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    true, pred = _empty_pair(dims=(256, 256))
+    bbox = [64.2, 64.4, 96.0, 96.0]
+    poly = [[
+        bbox[0], bbox[1],
+        bbox[0] + bbox[2], bbox[1],
+        bbox[0] + bbox[2], bbox[1] + bbox[3],
+        bbox[0], bbox[1] + bbox[3],
+    ]]
+    true.add_annotation(
+        id=1, image_id=1, category_id=1, bbox=bbox, segmentation=poly)
+    pred.add_annotation(
+        id=11, image_id=1, category_id=1, bbox=bbox,
+        segmentation=poly, score=.9)
+
+    dmet = DetectionMetrics.from_coco(true, pred)
+    native = dmet.score_native_coco(iou_type='bbox', with_eval=True)
+    official = dmet.score_pycocotools(
+        iou_type='bbox', bbox_annotation_policy='coco', with_eval=True)
+    _assert_eval_tensor_parity(native, official)
+    assert native['summary']['AP_medium'] == pytest.approx(1.0)
+    assert native['summary']['AP_large'] == pytest.approx(1.0)
+
+
+def test_assignment_v2_truncate_max_dets_matches_direct_assignment():
+    """Derived smaller maxDet prefixes must equal direct greedy matching."""
+    import kwimage
+    from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
+
+    true = kwimage.Detections(
+        boxes=kwimage.Boxes([
+            [0, 0, 10, 10],
+            [20, 0, 10, 10],
+            [40, 0, 10, 10],
+        ], 'xywh'),
+        class_idxs=np.array([0, 0, 0]),
+    )
+    pred = kwimage.Detections(
+        boxes=kwimage.Boxes([
+            [50, 50, 10, 10],  # highest-score FP
+            [0, 0, 10, 10],    # TP only visible at maxDet >= 2
+            [40, 0, 10, 10],   # TP only visible at maxDet >= 3
+        ], 'xywh'),
+        class_idxs=np.array([0, 0, 0]),
+        scores=np.array([.99, .90, .80]),
+    )
+    index = AssignmentCandidateIndex.build(
+        true, pred,
+        classes=['thing'],
+        compat='mutex',
+        iou_type='bbox',
+        bbox_overlap_mode='coco',
+        threshold_policy='inclusive',
+        annotation_ignore_policy='coco',
+        min_iou=.5,
+    )
+    large = index.assign(
+        .5, max_dets=3, max_dets_scope='category',
+        area_range=(0.0, 1e10), ignore_classes=None)
+    for max_det in [0, 1, 2, 3]:
+        direct = index.assign(
+            .5, max_dets=max_det, max_dets_scope='category',
+            area_range=(0.0, 1e10), ignore_classes=None)
+        if max_det == 3:
+            derived = large
+        else:
+            derived = index.truncate_max_dets(
+                large, max_det, max_dets_scope='category')
+        assert derived == direct
+
+
+def test_native_coco_reuses_largest_maxdet_assignment_prefix():
+    """Full standard tensors should match only four area bases per threshold."""
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    true, pred = _empty_pair(dims=(64, 64))
+    bbox = [8.0, 8.0, 16.0, 16.0]
+    poly = [[8, 8, 24, 8, 24, 24, 8, 24]]
+    true.add_annotation(
+        id=1, image_id=1, category_id=1, bbox=bbox, segmentation=poly)
+    pred.add_annotation(
+        id=11, image_id=1, category_id=1, bbox=bbox,
+        segmentation=poly, score=.9)
+
+    dmet = DetectionMetrics.from_coco(true, pred)
+    result = dmet.score_native_coco(iou_type='bbox', with_eval=True)
+    timing = result['timing']
+    assert timing['assignment_slices'] == 12
+    assert timing['assignment_base_slices'] == 4
+    assert timing['assignment_calls'] == 4 * 10
+
+
+def test_native_coco_caps_predictions_before_candidate_geometry():
+    """Candidate geometry should not include detections beyond largest maxDet."""
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    true, pred = _empty_pair(dims=(128, 128))
+    truth_bbox = [8.0, 8.0, 16.0, 16.0]
+    poly = [[8, 8, 24, 8, 24, 24, 8, 24]]
+    true.add_annotation(
+        id=1, image_id=1, category_id=1,
+        bbox=truth_bbox, segmentation=poly)
+    for px in range(5):
+        x = 8.0 if px == 0 else 48.0 + px
+        bbox = [x, 8.0, 16.0, 16.0]
+        pred.add_annotation(
+            id=11 + px, image_id=1, category_id=1,
+            bbox=bbox,
+            segmentation=[[x, 8, x + 16, 8, x + 16, 24, x, 24]],
+            score=1.0 - px * .1,
+        )
+
+    dmet = DetectionMetrics.from_coco(true, pred)
+    params = {'max_dets': [1, 2]}
+    native = dmet.score_native_coco(
+        iou_type='bbox', with_eval=True, **params)
+    official = dmet.score_pycocotools(
+        iou_type='bbox', bbox_annotation_policy='coco', with_eval=True,
+        **params)
+    _assert_eval_tensor_parity(native, official)
+    timing = native['timing']
+    assert timing['candidate_predictions_before_maxdet'] == 5
+    assert timing['candidate_predictions_after_maxdet'] == 2
+
+
+@pytest.mark.parametrize('iou_type', ['bbox', 'segm'])
+def test_native_coco_kwimage_ext_assignment_backend_matches_python(iou_type):
+    """Rust only replaces the greedy kernel; the full tensors stay identical."""
+    from kwcoco.metrics.assignment_v2 import resolve_assignment_grid_backend
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    try:
+        resolve_assignment_grid_backend('kwimage_ext')
+    except ImportError:
+        pytest.skip('kwimage_ext coco_greedy_match Rust capability is unavailable')
+
+    dims = (96, 96)
+    true, pred = _empty_pair(dims=dims)
+    mask1 = np.zeros(dims, dtype=np.uint8)
+    mask1[8:32, 8:32] = 1
+    mask2 = np.zeros(dims, dtype=np.uint8)
+    mask2[40:72, 44:76] = 1
+    _add_mask_ann(true, mask1, aid=1)
+    _add_mask_ann(true, mask2, aid=2, iscrowd=1)
+    _add_mask_ann(pred, mask1, aid=11, score=.95)
+    shifted = np.roll(mask2, 2, axis=1)
+    _add_mask_ann(pred, shifted, aid=12, score=.90)
+    _add_mask_ann(pred, mask2, aid=13, score=.85)
+
+    dmet = DetectionMetrics.from_coco(true, pred)
+    common = {
+        'iou_type': iou_type,
+        'with_eval': True,
+    }
+    if iou_type == 'segm':
+        common.update({
+            'overlap_backend': 'pycocotools',
+            'raster_backend': 'pycocotools',
+        })
+    python_result = dmet.score_native_coco(
+        assignment_backend='python', **common)
+    rust_result = dmet.score_native_coco(
+        assignment_backend='kwimage_ext', **common)
+    assert python_result['summary'] == rust_result['summary']
+    for key in ['precision', 'recall', 'scores', 'realpos_total']:
+        np.testing.assert_array_equal(
+            python_result['eval'][key], rust_result['eval'][key])
+    assert rust_result['params']['assignment_backend'] == 'kwimage_ext'
+    assert (
+        rust_result['provenance']['resolved_assignment_backend']['kind']
+        == 'rust'
+    )
+    assert rust_result['timing']['compact_match_path'] is True
+    assert rust_result['accumulator'] == 'compact_matches->coco_tensor'
+    assert rust_result['timing']['assignment_batches'] == (
+        rust_result['timing']['candidate_index_builds']
+    )
+
+
+def test_coco_evaluator_forwards_assignment_backend():
+    from kwcoco.coco_evaluator import CocoEvaluator
+    from kwcoco.metrics.assignment_v2 import resolve_assignment_grid_backend
+
+    try:
+        resolve_assignment_grid_backend('kwimage_ext')
+    except ImportError:
+        pytest.skip('kwimage_ext coco_greedy_match Rust capability is unavailable')
+
+    dims = (64, 64)
+    true, pred = _empty_pair(dims=dims)
+    mask = np.zeros(dims, dtype=np.uint8)
+    mask[8:24, 8:24] = 1
+    _add_mask_ann(true, mask, aid=1)
+    _add_mask_ann(pred, mask, aid=11, score=.9)
+    evaluator = CocoEvaluator({'true_dataset': true, 'pred_dataset': pred})
+    result = evaluator.evaluate_native_coco(
+        'bbox', assignment_backend='kwimage_ext', with_eval=True)['bbox']
+    assert result['summary']['AP50'] == pytest.approx(1.0)
+    assert result['params']['assignment_backend'] == 'kwimage_ext'
+
+
+@pytest.mark.parametrize('iou_type', ['bbox', 'segm'])
+def test_native_coco_compact_path_matches_explicit_row_reference(iou_type):
+    """The fast compact path must equal the inspectable explicit-row path."""
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    dims = (128, 128)
+    true, pred = _empty_pair(dims=dims)
+    mask1 = np.zeros(dims, dtype=np.uint8)
+    mask1[8:40, 8:40] = 1
+    mask2 = np.zeros(dims, dtype=np.uint8)
+    mask2[56:104, 60:108] = 1
+    _add_mask_ann(true, mask1, aid=1)
+    _add_mask_ann(true, mask2, aid=2, iscrowd=1)
+    _add_mask_ann(pred, mask1, aid=11, score=.95)
+    shifted = np.roll(mask2, 3, axis=1)
+    _add_mask_ann(pred, shifted, aid=12, score=.90)
+    fp = np.zeros(dims, dtype=np.uint8)
+    fp[2:12, 90:100] = 1
+    _add_mask_ann(pred, fp, aid=13, score=.85)
+
+    dmet = DetectionMetrics.from_coco(true, pred)
+    common = {'iou_type': iou_type, 'with_eval': True}
+    if iou_type == 'segm':
+        common.update({
+            'overlap_backend': 'pycocotools',
+            'raster_backend': 'pycocotools',
+        })
+    compact = dmet.score_native_coco(
+        assignment_backend='python', with_details=False, **common)
+    explicit = dmet.score_native_coco(
+        assignment_backend='python', with_details=True, **common)
+    assert compact['summary'] == explicit['summary']
+    assert compact['accumulator'] == 'compact_matches->coco_tensor'
+    assert explicit['accumulator'] == 'assignment_rows->coco_tensor'
+    for key in ['precision', 'recall', 'scores', 'realpos_total']:
+        np.testing.assert_array_equal(
+            compact['eval'][key], explicit['eval'][key])
+
+
+def test_compact_grid_batches_all_standard_area_ranges_per_image():
+    """Full COCO tensors cross the compiled boundary once per image."""
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    true, pred = _empty_pair(dims=(64, 64))
+    mask = np.zeros((64, 64), dtype=np.uint8)
+    mask[8:24, 8:24] = 1
+    _add_mask_ann(true, mask, aid=1)
+    _add_mask_ann(pred, mask, aid=11, score=.9)
+    dmet = DetectionMetrics.from_coco(true, pred)
+    result = dmet.score_native_coco(
+        iou_type='bbox', assignment_backend='python', with_eval=True)
+    timing = result['timing']
+    assert timing['compact_match_path'] is True
+    assert timing['assignment_base_slices'] == 4
+    assert timing['assignment_calls'] == 4 * 10
+    assert timing['assignment_batches'] == 1
+
+
+def test_strict_coco_evaluator_preserves_category_id_collisions_in_legacy_names():
+    """Strict COCO category ids must survive legacy name normalization collisions."""
+    import kwcoco
+    from kwcoco.coco_evaluator import CocoEvaluator
+
+    true = kwcoco.CocoDataset()
+    true.add_category('Foo Bar', id=1)
+    true.add_category('foo_bar', id=2)
+    true.add_image(id=1, file_name='img.png', width=64, height=64)
+    true.add_annotation(
+        id=1, image_id=1, category_id=1,
+        bbox=[4, 4, 12, 12],
+        segmentation=[[4, 4, 16, 4, 16, 16, 4, 16]],
+    )
+    true.add_annotation(
+        id=2, image_id=1, category_id=2,
+        bbox=[32, 32, 16, 16],
+        segmentation=[[32, 32, 48, 32, 48, 48, 32, 48]],
+    )
+    pred = true.copy()
+    for ann in pred.anns.values():
+        ann['score'] = .9 if ann['category_id'] == 1 else .8
+
+    evaluator = CocoEvaluator({
+        'true_dataset': true,
+        'pred_dataset': pred,
+    })
+    native = evaluator.evaluate_native_coco(
+        'bbox', with_eval=True, assignment_backend='python')['bbox']
+    official = evaluator.evaluate_pycocotools(
+        'bbox', with_eval=True)['bbox']
+    assert native['eval']['counts'][2] == 2
+    assert native['eval']['category_ids'] == [0, 1]
+    assert native['eval']['category_names'] == ['Foo Bar', 'foo_bar']
+    _assert_eval_tensor_parity(native, official)
+    assert native['summary']['AP50'] == pytest.approx(1.0)

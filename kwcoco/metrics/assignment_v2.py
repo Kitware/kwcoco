@@ -53,6 +53,7 @@ separately characterize the documented differences.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import functools
 from collections import defaultdict
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, overload
@@ -72,6 +73,92 @@ if TYPE_CHECKING:
 
 
 V2_ASSIGN_COLUMNS = ASSIGN_COLUMNS + ['rank']
+
+
+@functools.lru_cache(maxsize=3)
+def _resolve_assignment_backend_cached(backend: str):
+    """Cache immutable backend resolution state for repeated area batches."""
+    if backend not in {'auto', 'python', 'kwimage_ext'}:
+        raise KeyError(backend)
+    if backend in {'auto', 'kwimage_ext'}:
+        try:
+            from kwimage_ext.algo import assignment as ext_assignment
+            func = ext_assignment.coco_greedy_match
+            metadata = ext_assignment.backend_metadata()
+        except Exception as ex:
+            if backend == 'kwimage_ext':
+                raise ImportError(
+                    'assignment_backend="kwimage_ext" requires a kwimage_ext '
+                    'build with the coco_greedy_match Rust capability'
+                ) from ex
+        else:
+            return 'kwimage_ext', func, tuple(sorted(metadata.items()))
+    metadata = {
+        'name': 'kwcoco.assignment_v2.python',
+        'kind': 'python',
+        'module': __name__,
+    }
+    return 'python', None, tuple(sorted(metadata.items()))
+
+
+def resolve_assignment_backend(backend: str = 'auto'):
+    """Resolve the optional compiled greedy-assignment backend.
+
+    Returns:
+        tuple: ``(key, function, metadata)`` where ``function`` is ``None``
+        for the Python implementation.  ``auto`` only falls back when the
+        kwimage_ext capability is absent; an explicitly requested Rust backend
+        fails loudly instead of silently changing provenance.
+
+    Notes:
+        Backend discovery is cached because native COCO evaluation resolves the
+        same kernel for many image/area batches.  A fresh metadata dictionary is
+        returned on every call so result provenance cannot mutate the cache.
+    """
+    key, func, metadata_items = _resolve_assignment_backend_cached(backend)
+    return key, func, dict(metadata_items)
+
+
+@functools.lru_cache(maxsize=3)
+def _resolve_assignment_grid_backend_cached(backend: str):
+    """Resolve the optional area x threshold batched assignment kernel."""
+    if backend not in {'auto', 'python', 'kwimage_ext'}:
+        raise KeyError(backend)
+    if backend in {'auto', 'kwimage_ext'}:
+        try:
+            from kwimage_ext.algo import assignment as ext_assignment
+            func = ext_assignment.coco_greedy_match_grid
+            metadata = ext_assignment.backend_metadata()
+            capabilities = set(metadata.get('capabilities', []))
+            if 'coco-assignment-grid' not in capabilities:
+                raise ImportError(
+                    'kwimage_ext is installed but lacks '
+                    'coco-assignment-grid support'
+                )
+        except Exception as ex:
+            if backend == 'kwimage_ext':
+                raise ImportError(
+                    'assignment_backend="kwimage_ext" requires a kwimage_ext '
+                    'build with the coco_greedy_match_grid Rust capability'
+                ) from ex
+        else:
+            metadata = dict(metadata)
+            metadata['name'] = 'kwimage_ext.coco_greedy_match_grid'
+            metadata['capability'] = 'coco-assignment-grid'
+            return 'kwimage_ext', func, tuple(sorted(metadata.items()))
+    metadata = {
+        'name': 'kwcoco.assignment_v2.python_grid',
+        'kind': 'python',
+        'module': __name__,
+        'capability': 'coco-assignment-grid',
+    }
+    return 'python', None, tuple(sorted(metadata.items()))
+
+
+def resolve_assignment_grid_backend(backend: str = 'auto'):
+    """Resolve the compact area x threshold assignment backend."""
+    key, func, metadata_items = _resolve_assignment_grid_backend_cached(backend)
+    return key, func, dict(metadata_items)
 
 
 @dataclass
@@ -180,6 +267,19 @@ def _boxes_to_ltrb(boxes) -> np.ndarray:
     return data
 
 
+def _boxes_to_xywh(boxes) -> np.ndarray:
+    """Coerce a kwimage Boxes object to a numpy XYWH array."""
+    data = np.asarray(boxes.to_xywh().data, dtype=float)
+    if data.size == 0:
+        data = data.reshape(0, 4)
+    elif data.ndim != 2 or data.shape[1] != 4:
+        raise ValueError(
+            'Expected boxes coercible to an Nx4 XYWH matrix, got '
+            f'shape={data.shape!r}'
+        )
+    return data
+
+
 def _ltrb_intersects(
     left: np.ndarray, right: np.ndarray, bias: float = 0.0
 ) -> np.ndarray:
@@ -225,6 +325,9 @@ def _coco_bbox_overlaps(
     pred_ltrb: np.ndarray,
     true_ltrb: np.ndarray,
     true_crowd_flags: np.ndarray,
+    *,
+    pred_areas: np.ndarray | None = None,
+    true_areas: np.ndarray | None = None,
 ) -> np.ndarray:
     """COCO continuous-coordinate bbox overlap with crowd semantics.
 
@@ -252,14 +355,18 @@ def _coco_bbox_overlaps(
     ih = np.maximum(0.0, np.minimum(py2, ty2) - np.maximum(py1, ty1))
     inter = iw * ih
 
-    parea = (
-        np.maximum(0.0, pred_ltrb[:, 2] - pred_ltrb[:, 0])
-        * np.maximum(0.0, pred_ltrb[:, 3] - pred_ltrb[:, 1])
-    )[:, None]
-    tarea = (
-        np.maximum(0.0, true_ltrb[:, 2] - true_ltrb[:, 0])
-        * np.maximum(0.0, true_ltrb[:, 3] - true_ltrb[:, 1])
-    )[None, :]
+    if pred_areas is None:
+        pred_areas = (
+            np.maximum(0.0, pred_ltrb[:, 2] - pred_ltrb[:, 0])
+            * np.maximum(0.0, pred_ltrb[:, 3] - pred_ltrb[:, 1])
+        )
+    if true_areas is None:
+        true_areas = (
+            np.maximum(0.0, true_ltrb[:, 2] - true_ltrb[:, 0])
+            * np.maximum(0.0, true_ltrb[:, 3] - true_ltrb[:, 1])
+        )
+    parea = np.asarray(pred_areas, dtype=float)[:, None]
+    tarea = np.asarray(true_areas, dtype=float)[None, :]
     union = parea + tarea - inter
     denom = np.where(crowd[None, :], parea, union)
     overlaps = np.zeros(shape, dtype=float)
@@ -292,6 +399,8 @@ class AssignmentCandidateIndex:
     min_iou: float
     pred_order: np.ndarray
     pred_rank: np.ndarray
+    pred_category_rank: np.ndarray
+    max_category_size: int
     pred_scores: np.ndarray
     pred_cxs: np.ndarray
     true_cxs: np.ndarray
@@ -314,6 +423,11 @@ class AssignmentCandidateIndex:
     area_backend: dict[str, Any] | None
     image_dims: tuple[int, int] | None
     build_stats: dict[str, Any]
+    area_ignore_cache: dict[
+        tuple[float, float], tuple[np.ndarray, np.ndarray]
+    ]
+    pred_order_cache: dict[tuple[str, int], np.ndarray]
+    candidate_csr_cache: tuple[np.ndarray, np.ndarray, np.ndarray] | None
 
     @classmethod
     def build(
@@ -435,6 +549,14 @@ class AssignmentCandidateIndex:
             len(pred_dets), fill_value=-1, dtype=int
         )
         pred_rank[pred_order] = np.arange(len(pred_order))
+        pred_category_rank = np.full(len(pred_dets), fill_value=-1, dtype=int)
+        category_counts: dict[int, int] = defaultdict(int)
+        for px in pred_order:
+            px = int(px)
+            cx = int(pred_cxs[px])
+            pred_category_rank[px] = category_counts[cx]
+            category_counts[cx] += 1
+        max_category_size = max(category_counts.values(), default=0)
 
         unique_tcxs = sorted(set(map(int, true_cxs.tolist())))
         unique_pcxs = sorted(set(map(int, pred_cxs.tolist())))
@@ -554,14 +676,28 @@ class AssignmentCandidateIndex:
             build_stats['rasterization'] = pred_raster_meta
             build_stats['area_backend'] = area_metadata
         else:
-            pred_widths = np.maximum(0, pred_ltrb[:, 2] - pred_ltrb[:, 0])
-            pred_heights = np.maximum(0, pred_ltrb[:, 3] - pred_ltrb[:, 1])
-            true_widths = np.maximum(0, true_ltrb[:, 2] - true_ltrb[:, 0])
-            true_heights = np.maximum(0, true_ltrb[:, 3] - true_ltrb[:, 1])
+            if bbox_overlap_mode == 'coco':
+                # Preserve the original COCO XYWH width / height values for
+                # area calculations.  Reconstructing them as ``x2 - x1`` can
+                # move an exact 32^2 / 96^2 boundary across an area slice when
+                # the origin is fractional due to floating-point cancellation.
+                pred_xywh = _boxes_to_xywh(pred_dets.boxes)
+                true_xywh = _boxes_to_xywh(true_dets.boxes)
+                pred_widths = np.maximum(0, pred_xywh[:, 2])
+                pred_heights = np.maximum(0, pred_xywh[:, 3])
+                true_widths = np.maximum(0, true_xywh[:, 2])
+                true_heights = np.maximum(0, true_xywh[:, 3])
+                area_name = 'numpy_coco_xywh_area'
+            else:
+                pred_widths = np.maximum(0, pred_ltrb[:, 2] - pred_ltrb[:, 0])
+                pred_heights = np.maximum(0, pred_ltrb[:, 3] - pred_ltrb[:, 1])
+                true_widths = np.maximum(0, true_ltrb[:, 2] - true_ltrb[:, 0])
+                true_heights = np.maximum(0, true_ltrb[:, 3] - true_ltrb[:, 1])
+                area_name = 'numpy_bbox_area'
             pred_areas = pred_widths * pred_heights
             true_areas = true_widths * true_heights
             area_metadata = {
-                'name': 'numpy_bbox_area',
+                'name': area_name,
                 'kind': 'bbox_area',
             }
             build_stats['area_backend'] = area_metadata
@@ -625,6 +761,8 @@ class AssignmentCandidateIndex:
                         pred_ltrb,
                         true_ltrb,
                         true_crowd_flags,
+                        pred_areas,
+                        true_areas,
                         pred_idxs,
                         true_idxs,
                         min_iou=min_iou,
@@ -657,6 +795,8 @@ class AssignmentCandidateIndex:
                     pred_ltrb[pred_idxs],
                     true_ltrb[true_idxs],
                     true_crowd_flags[true_idxs],
+                    pred_areas=pred_areas[pred_idxs],
+                    true_areas=true_areas[true_idxs],
                 )
             else:
                 ious = pred_dets.boxes[pred_idxs].ious(
@@ -686,6 +826,8 @@ class AssignmentCandidateIndex:
             min_iou=float(min_iou),
             pred_order=pred_order,
             pred_rank=pred_rank,
+            pred_category_rank=pred_category_rank,
+            max_category_size=max_category_size,
             pred_scores=pred_scores,
             pred_cxs=pred_cxs,
             true_cxs=true_cxs,
@@ -708,7 +850,40 @@ class AssignmentCandidateIndex:
             area_backend=area_metadata,
             image_dims=image_dims,
             build_stats=build_stats,
+            area_ignore_cache={},
+            pred_order_cache={},
+            candidate_csr_cache=None,
         )
+
+    def _candidate_csr(self):
+        """Return a lazily flattened CSR view of the sparse candidates."""
+        cached = self.candidate_csr_cache
+        if cached is None:
+            counts = np.fromiter(
+                (len(txs) for txs in self.cand_txs),
+                dtype=np.int64,
+                count=len(self.cand_txs),
+            )
+            offsets = np.empty(len(counts) + 1, dtype=np.int64)
+            offsets[0] = 0
+            np.cumsum(counts, out=offsets[1:])
+            if offsets[-1]:
+                flat_txs = np.concatenate(self.cand_txs).astype(
+                    np.int64, copy=False
+                )
+                flat_ious = np.concatenate(self.cand_ious).astype(
+                    np.float64, copy=False
+                )
+            else:
+                flat_txs = np.empty(0, dtype=np.int64)
+                flat_ious = np.empty(0, dtype=np.float64)
+            cached = (
+                np.ascontiguousarray(offsets),
+                np.ascontiguousarray(flat_txs),
+                np.ascontiguousarray(flat_ious),
+            )
+            self.candidate_csr_cache = cached
+        return cached
 
     def assign(
         self,
@@ -748,39 +923,11 @@ class AssignmentCandidateIndex:
 
         true_available = np.ones(len(self.true_dets), dtype=bool)  # type: ignore
         true_nmatches = np.zeros(len(self.true_dets), dtype=int)  # type: ignore
-        pred_order = self.pred_order
-        if max_dets is not None and np.isfinite(max_dets):
-            max_dets = int(max_dets)
-            if max_dets < 0:
-                raise ValueError('max_dets must be nonnegative')
-            if max_dets_scope == 'image':
-                pred_order = pred_order[:max_dets]
-            else:
-                counts: dict[int, int] = defaultdict(int)
-                keep = []
-                for px in pred_order:
-                    cx = int(self.pred_cxs[int(px)])
-                    if counts[cx] < max_dets:
-                        keep.append(int(px))
-                        counts[cx] += 1
-                pred_order = np.asarray(keep, dtype=int)
+        pred_order = self._pred_order_for(max_dets, max_dets_scope)
 
-        true_area_ignore_flags = np.zeros(len(self.true_dets), dtype=bool)
-        pred_area_ignore_flags = np.zeros(len(self.pred_dets), dtype=bool)
-        if area_range is not None:
-            if len(area_range) != 2:
-                raise ValueError('area_range must be a (min_area, max_area) pair')
-            min_area, max_area = map(float, area_range)
-            if not np.isfinite(min_area) or min_area < 0:
-                raise ValueError(f'invalid minimum area: {min_area!r}')
-            if np.isnan(max_area) or max_area < min_area:
-                raise ValueError(f'invalid maximum area: {max_area!r}')
-            true_area_ignore_flags = (
-                (self.true_areas < min_area) | (self.true_areas > max_area)
-            )
-            pred_area_ignore_flags = (
-                (self.pred_areas < min_area) | (self.pred_areas > max_area)
-            )
+        true_area_ignore_flags, pred_area_ignore_flags = self._area_ignore_flags(
+            area_range
+        )
 
         true_ignore_flags = np.zeros(len(self.true_dets), dtype=bool)  # type: ignore
         pred_ignore_flags = np.zeros(len(self.pred_dets), dtype=bool)  # type: ignore
@@ -803,6 +950,14 @@ class AssignmentCandidateIndex:
             self.true_annotation_ignore_flags | true_area_ignore_flags
         )
         crowd_flags = self.true_crowd_flags
+        true_cxs = self.true_cxs
+        pred_cxs = self.pred_cxs
+        pred_scores = self.pred_scores
+        cand_txs = self.cand_txs
+        cand_ious = self.cand_ious
+        pred_rank = self.pred_rank
+        true_weights = self.true_dets.data.get('weights', None)  # type: ignore
+        inclusive = self.threshold_policy == 'inclusive'
 
         y_pred: list = []
         y_true: list = []
@@ -815,39 +970,53 @@ class AssignmentCandidateIndex:
 
         for px in pred_order:
             px = int(px)
-            pred_cx = int(self.pred_cxs[px])
-            score = float(self.pred_scores[px])
-            txs = self.cand_txs[px]
-            ious = self.cand_ious[px]
+            pred_cx = int(pred_cxs[px])
+            score = float(pred_scores[px])
+            txs = cand_txs[px]
+            ious = cand_ious[px]
             chosen_tx = -1
             chosen_iou = -1.0
             if len(txs):
-                threshold_valid = _threshold_mask(
-                    ious, iou_thresh, self.threshold_policy
-                )
-                reusable = crowd_flags[txs]
-                available = (true_available[txs] | reusable) & ~true_ignore_flags[txs]
-                valid = threshold_valid & available
-                if np.any(valid):
-                    # COCOeval sorts ignored truths after regular truths.  The
-                    # candidate arrays here are sorted by descending overlap,
-                    # so explicitly prefer the best non-ignored candidate and
-                    # only fall back to an ignored/crowd truth when necessary.
-                    normal_valid = valid & ~annotation_ignore_flags[txs]
-                    choose_from = normal_valid if np.any(normal_valid) else valid
-                    chosen_pos = int(np.where(choose_from)[0][0])
-                    chosen_tx = int(txs[chosen_pos])
-                    chosen_iou = float(ious[chosen_pos])
+                # Candidate arrays are already sorted by descending overlap.
+                # Scanning them directly is substantially cheaper than
+                # allocating several tiny boolean numpy arrays per prediction,
+                # and it naturally stops once overlap falls below threshold.
+                ignored_fallback_tx = -1
+                ignored_fallback_iou = -1.0
+                for cand_pos in range(len(txs)):
+                    cand_iou = float(ious[cand_pos])
+                    if inclusive:
+                        if cand_iou < iou_thresh:
+                            break
+                    else:
+                        if cand_iou <= iou_thresh:
+                            break
+                    tx = int(txs[cand_pos])
+                    if true_ignore_flags[tx]:
+                        continue
+                    if not true_available[tx] and not crowd_flags[tx]:
+                        continue
+                    if annotation_ignore_flags[tx]:
+                        if ignored_fallback_tx < 0:
+                            ignored_fallback_tx = tx
+                            ignored_fallback_iou = cand_iou
+                        continue
+                    chosen_tx = tx
+                    chosen_iou = cand_iou
+                    break
+                if chosen_tx < 0 and ignored_fallback_tx >= 0:
+                    chosen_tx = ignored_fallback_tx
+                    chosen_iou = ignored_fallback_iou
 
             if chosen_tx >= 0:
                 if not crowd_flags[chosen_tx]:
                     true_available[chosen_tx] = False
                 true_nmatches[chosen_tx] += 1
-                true_cx = int(self.true_cxs[chosen_tx])
+                true_cx = int(true_cxs[chosen_tx])
                 if annotation_ignore_flags[chosen_tx]:
                     weight = 0.0
-                elif 'weights' in self.true_dets.data:  # type: ignore
-                    weight = float(self.true_dets.weights[chosen_tx])  # type: ignore
+                elif true_weights is not None:
+                    weight = float(true_weights[chosen_tx])
                 else:
                     weight = 1.0
                 assigned_pred_cx = pred_cx
@@ -862,7 +1031,7 @@ class AssignmentCandidateIndex:
                 y_iou.append(chosen_iou)
                 y_pxs.append(px)
                 y_txs.append(chosen_tx)
-                y_rank.append(int(self.pred_rank[px]))
+                y_rank.append(int(pred_rank[px]))
             else:
                 y_pred.append(pred_cx)
                 y_true.append(bg_cidx)
@@ -872,15 +1041,15 @@ class AssignmentCandidateIndex:
                 y_iou.append(-1.0)
                 y_pxs.append(px)
                 y_txs.append(-1)
-                y_rank.append(int(self.pred_rank[px]))
+                y_rank.append(int(pred_rank[px]))
 
         unused_flags = true_nmatches == 0
         unused_flags = unused_flags & np.logical_not(annotation_ignore_flags)
         if ignore_classes is not None:
             unused_flags = unused_flags & np.logical_not(true_ignore_flags)
         unused_txs = np.where(unused_flags)[0]
-        if 'weights' in self.true_dets.data:  # type: ignore
-            unused_y_weight = self.true_dets.weights[unused_txs].tolist()  # type: ignore
+        if true_weights is not None:
+            unused_y_weight = np.asarray(true_weights)[unused_txs].tolist()
         else:
             unused_y_weight = [1.0] * len(unused_txs)
         y_pred.extend([-1] * len(unused_txs))
@@ -902,6 +1071,147 @@ class AssignmentCandidateIndex:
             'pxs': y_pxs,
             'rank': y_rank,
         }
+
+    def _pred_order_for(
+        self,
+        max_dets: int | None,
+        max_dets_scope: str,
+    ) -> np.ndarray:
+        """Return the stable score order after a cached maxDet cap."""
+        if max_dets is None or not np.isfinite(max_dets):
+            return self.pred_order
+        max_dets = int(max_dets)
+        if max_dets < 0:
+            raise ValueError('max_dets must be nonnegative')
+        key = (max_dets_scope, max_dets)
+        cached = self.pred_order_cache.get(key, None)
+        if cached is not None:
+            return cached
+        if max_dets_scope == 'image':
+            order = self.pred_order[:max_dets]
+        elif max_dets_scope == 'category':
+            if max_dets >= self.max_category_size:
+                order = self.pred_order
+            else:
+                flags = self.pred_category_rank[self.pred_order] < max_dets
+                order = self.pred_order[flags]
+        else:  # guarded by assign, useful for direct internal calls too
+            raise KeyError(max_dets_scope)
+        self.pred_order_cache[key] = order
+        return order
+
+    def _area_ignore_flags(
+        self,
+        area_range: tuple[float, float] | None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return cached truth/prediction area-ignore masks."""
+        if area_range is None:
+            return (
+                np.zeros(len(self.true_dets), dtype=bool),
+                np.zeros(len(self.pred_dets), dtype=bool),
+            )
+        if len(area_range) != 2:
+            raise ValueError('area_range must be a (min_area, max_area) pair')
+        min_area, max_area = map(float, area_range)
+        if not np.isfinite(min_area) or min_area < 0:
+            raise ValueError(f'invalid minimum area: {min_area!r}')
+        if np.isnan(max_area) or max_area < min_area:
+            raise ValueError(f'invalid maximum area: {max_area!r}')
+        key = (min_area, max_area)
+        cached = self.area_ignore_cache.get(key, None)
+        if cached is None:
+            cached = (
+                (self.true_areas < min_area) | (self.true_areas > max_area),
+                (self.pred_areas < min_area) | (self.pred_areas > max_area),
+            )
+            self.area_ignore_cache[key] = cached
+        return cached
+
+    def truncate_max_dets(
+        self,
+        rows: dict[str, list[int | float]],
+        max_dets: int,
+        *,
+        max_dets_scope: str = 'category',
+        bg_cidx: int = -1,
+    ) -> dict[str, list[int | float]]:
+        """Derive a smaller maxDet assignment from a larger-prefix result.
+
+        Greedy matching is score ordered, so matches made by detections inside
+        a smaller score prefix are independent of detections that come later.
+        Removing the later rows is therefore equivalent to rerunning matching,
+        except that a regular truth matched only by a removed detection must be
+        restored as a false-negative row.
+        """
+        max_dets = int(max_dets)
+        if max_dets < 0:
+            raise ValueError('max_dets must be nonnegative')
+        pxs = np.asarray(rows.get('pxs', []), dtype=int)
+        txs = np.asarray(rows.get('txs', []), dtype=int)
+        weights = np.asarray(rows.get('weight', []), dtype=float)
+        if not (len(pxs) == len(txs) == len(weights)):
+            raise ValueError('assignment rows are missing aligned trace columns')
+
+        pred_rows = pxs >= 0
+        if max_dets_scope == 'image':
+            pred_keep = np.zeros(len(rows.get('pred', [])), dtype=bool)
+            pred_keep[pred_rows] = self.pred_rank[pxs[pred_rows]] < max_dets
+        elif max_dets_scope == 'category':
+            pred_keep = np.zeros(len(rows.get('pred', [])), dtype=bool)
+            pred_keep[pred_rows] = (
+                self.pred_category_rank[pxs[pred_rows]] < max_dets
+            )
+        else:
+            raise KeyError(max_dets_scope)
+        # Direct assignment always emits score-ranked prediction rows first,
+        # then false-negative rows in truth-index order. Rebuild that same row
+        # shape instead of simply filtering the larger result so the derived
+        # view remains row-for-row comparable to a direct rerun.
+        result = {
+            key: [
+                value for value, flag in zip(values, pred_keep.tolist()) if flag
+            ]
+            for key, values in rows.items()
+        }
+
+        kept_match_txs = set(
+            txs[pred_keep & (txs >= 0) & (weights > 0)].tolist()
+        )
+        fn_weights = {
+            int(tx): float(weight)
+            for tx, weight, is_pred in zip(txs, weights, pred_rows)
+            if not is_pred and tx >= 0
+        }
+        dropped_regular_matches = pred_rows & ~pred_keep & (txs >= 0) & (weights > 0)
+        for row_idx in np.where(dropped_regular_matches)[0]:
+            tx = int(txs[row_idx])
+            if tx not in kept_match_txs:
+                fn_weights[tx] = float(weights[row_idx])
+
+        if fn_weights:
+            fn_score = -np.inf if USE_NEG_INF else 0.0
+            for tx in sorted(fn_weights):
+                for key in result:
+                    if key == 'pred':
+                        value = bg_cidx
+                    elif key == 'true':
+                        value = int(self.true_cxs[tx])
+                    elif key == 'score':
+                        value = fn_score
+                    elif key == 'weight':
+                        value = fn_weights[tx]
+                    elif key == 'iou':
+                        value = -1.0
+                    elif key == 'txs':
+                        value = tx
+                    elif key in {'pxs', 'rank'}:
+                        value = -1
+                    else:
+                        raise KeyError(
+                            f'Cannot synthesize truncated assignment column {key!r}'
+                        )
+                    result[key].append(value)
+        return result
 
     def _mask_ignore_regions(
         self,
@@ -968,13 +1278,421 @@ class AssignmentCandidateIndex:
             )
         return true_flags, pred_flags
 
+
+    def _match_coco_grid_python(
+        self,
+        thresholds,
+        pred_order,
+        annotation_ignore_grid,
+        true_ignore_flags,
+    ):
+        """Reference compact matcher over area x threshold slices."""
+        thresholds = np.asarray(thresholds, dtype=float)
+        pred_order = np.asarray(pred_order, dtype=int)
+        annotation_ignore_grid = np.asarray(annotation_ignore_grid, dtype=bool)
+        true_ignore_flags = np.asarray(true_ignore_flags, dtype=bool)
+        num_area = len(annotation_ignore_grid)
+        num_thresh = len(thresholds)
+        num_pred = len(pred_order)
+        num_true = len(self.true_dets)  # type: ignore
+        match_txs = np.full(
+            (num_area, num_thresh, num_pred), -1, dtype=np.int64
+        )
+        match_ious = np.full(match_txs.shape, -1.0, dtype=float)
+        true_nmatches = np.zeros(
+            (num_area, num_thresh, num_true), dtype=np.int64
+        )
+        crowd_flags = self.true_crowd_flags
+        inclusive = self.threshold_policy == 'inclusive'
+        cand_txs = self.cand_txs
+        cand_ious = self.cand_ious
+
+        for ai in range(num_area):
+            annotation_ignore = annotation_ignore_grid[ai]
+            for ti, threshold in enumerate(thresholds):
+                true_available = ~true_ignore_flags.copy()
+                for oi, px_ in enumerate(pred_order):
+                    px = int(px_)
+                    chosen_tx = -1
+                    chosen_iou = -1.0
+                    fallback_tx = -1
+                    fallback_iou = -1.0
+                    txs = cand_txs[px]
+                    ious = cand_ious[px]
+                    for ci in range(len(txs)):
+                        cand_iou = float(ious[ci])
+                        if inclusive:
+                            if cand_iou < threshold:
+                                break
+                        else:
+                            if cand_iou <= threshold:
+                                break
+                        tx = int(txs[ci])
+                        if true_ignore_flags[tx]:
+                            continue
+                        if not true_available[tx] and not crowd_flags[tx]:
+                            continue
+                        if annotation_ignore[tx]:
+                            if fallback_tx < 0:
+                                fallback_tx = tx
+                                fallback_iou = cand_iou
+                            continue
+                        chosen_tx = tx
+                        chosen_iou = cand_iou
+                        break
+                    if chosen_tx < 0 and fallback_tx >= 0:
+                        chosen_tx = fallback_tx
+                        chosen_iou = fallback_iou
+                    if chosen_tx >= 0:
+                        if not crowd_flags[chosen_tx]:
+                            true_available[chosen_tx] = False
+                        true_nmatches[ai, ti, chosen_tx] += 1
+                        match_txs[ai, ti, oi] = chosen_tx
+                        match_ious[ai, ti, oi] = chosen_iou
+        return match_txs, match_ious, true_nmatches
+
+    def match_coco_grid(
+        self,
+        thresholds,
+        area_ranges,
+        *,
+        assignment_backend='auto',
+        max_dets=None,
+        max_dets_scope='category',
+    ):
+        """Return compact COCO match state for all area/IoU slices.
+
+        This path intentionally does not materialize confusion rows.  It is
+        restricted to COCO-compatible scoring where class-based ignore regions
+        are not requested; diagnostic/native-extension paths continue to use
+        :meth:`assign_many`.
+        """
+        thresholds = np.asarray(list(map(float, thresholds)), dtype=float)
+        if len(thresholds) == 0:
+            raise ValueError('thresholds must not be empty')
+        if np.any(thresholds < self.min_iou):
+            raise ValueError(
+                'threshold below cached min_iou: '
+                f'{thresholds.min()!r} < {self.min_iou!r}'
+            )
+        area_ranges = list(area_ranges)
+        pred_order = self._pred_order_for(max_dets, max_dets_scope)
+        true_ignore_flags = np.zeros(len(self.true_dets), dtype=bool)  # type: ignore
+        annotation_rows = []
+        pred_area_rows = []
+        for area_range in area_ranges:
+            true_area_ignore, pred_area_ignore = self._area_ignore_flags(area_range)
+            annotation_rows.append(
+                self.true_annotation_ignore_flags | true_area_ignore
+            )
+            pred_area_rows.append(pred_area_ignore[pred_order])
+        if annotation_rows:
+            annotation_ignore_grid = np.stack(annotation_rows, axis=0)
+            pred_area_ignore_grid = np.stack(pred_area_rows, axis=0)
+        else:
+            annotation_ignore_grid = np.empty(
+                (0, len(self.true_dets)), dtype=bool  # type: ignore
+            )
+            pred_area_ignore_grid = np.empty((0, len(pred_order)), dtype=bool)
+
+        backend_key, rust_func, backend_meta = resolve_assignment_grid_backend(
+            assignment_backend
+        )
+        if backend_key == 'kwimage_ext':
+            offsets, flat_txs, flat_ious = self._candidate_csr()
+            match_txs, match_ious, true_nmatches = rust_func(
+                offsets,
+                flat_txs,
+                flat_ious,
+                pred_order,
+                thresholds,
+                true_ignore_flags,
+                annotation_ignore_grid,
+                self.true_crowd_flags,
+                inclusive=self.threshold_policy == 'inclusive',
+            )
+            match_txs = np.asarray(match_txs, dtype=np.int64)
+            match_ious = np.asarray(match_ious, dtype=float)
+            true_nmatches = np.asarray(true_nmatches, dtype=np.int64)
+        else:
+            match_txs, match_ious, true_nmatches = self._match_coco_grid_python(
+                thresholds,
+                pred_order,
+                annotation_ignore_grid,
+                true_ignore_flags,
+            )
+
+        expected_match_shape = (
+            len(area_ranges), len(thresholds), len(pred_order)
+        )
+        expected_truth_shape = (
+            len(area_ranges), len(thresholds), len(self.true_dets)  # type: ignore
+        )
+        if match_txs.shape != expected_match_shape:
+            raise ValueError(
+                f'compact matcher returned {match_txs.shape!r}, '
+                f'expected {expected_match_shape!r}'
+            )
+        if match_ious.shape != expected_match_shape:
+            raise ValueError(
+                f'compact matcher IoUs returned {match_ious.shape!r}, '
+                f'expected {expected_match_shape!r}'
+            )
+        if true_nmatches.shape != expected_truth_shape:
+            raise ValueError(
+                f'compact matcher truth counts returned {true_nmatches.shape!r}, '
+                f'expected {expected_truth_shape!r}'
+            )
+
+        return {
+            'pred_order': np.asarray(pred_order, dtype=np.int64),
+            'pred_cxs': np.asarray(self.pred_cxs[pred_order], dtype=np.int32),
+            'pred_scores': np.asarray(self.pred_scores[pred_order], dtype=float),
+            'pred_category_rank': np.asarray(
+                self.pred_category_rank[pred_order], dtype=np.int32
+            ),
+            'match_txs': match_txs,
+            'match_ious': match_ious,
+            'true_nmatches': true_nmatches,
+            'true_cxs': np.asarray(self.true_cxs, dtype=np.int32),
+            'annotation_ignore_flags': annotation_ignore_grid,
+            'pred_area_ignore_flags': pred_area_ignore_grid,
+            'backend': backend_key,
+            'backend_metadata': backend_meta,
+        }
+
+    def _materialize_match_matrices(
+        self,
+        thresholds,
+        pred_order,
+        match_txs,
+        match_ious,
+        true_nmatches,
+        *,
+        bg_weight,
+        bg_cidx,
+        true_ignore_flags,
+        annotation_ignore_flags,
+        pred_area_ignore_flags,
+    ):
+        """Convert compact batched match matrices into v2 assignment rows."""
+        thresholds = list(map(float, thresholds))
+        pred_order = np.asarray(pred_order, dtype=int)
+        match_txs = np.asarray(match_txs, dtype=np.int64)
+        match_ious = np.asarray(match_ious, dtype=float)
+        true_nmatches = np.asarray(true_nmatches, dtype=np.int64)
+        expected_matches = (len(thresholds), len(pred_order))
+        expected_truth = (len(thresholds), len(self.true_dets))  # type: ignore
+        if match_txs.shape != expected_matches or match_ious.shape != expected_matches:
+            raise ValueError(
+                'assignment backend returned unexpected match shape: '
+                f'{match_txs.shape!r}, {match_ious.shape!r} != {expected_matches!r}'
+            )
+        if true_nmatches.shape != expected_truth:
+            raise ValueError(
+                'assignment backend returned unexpected truth-count shape: '
+                f'{true_nmatches.shape!r} != {expected_truth!r}'
+            )
+
+        pred_cxs = self.pred_cxs[pred_order]
+        pred_scores = self.pred_scores[pred_order]
+        pred_ranks = self.pred_rank[pred_order]
+        pred_area_ignored = pred_area_ignore_flags[pred_order]
+        true_weights = self.true_dets.data.get('weights', None)  # type: ignore
+        if true_weights is not None:
+            true_weights = np.asarray(true_weights, dtype=float)
+        fn_score = -np.inf if USE_NEG_INF else 0.0
+        results = {}
+
+        for ti, threshold in enumerate(thresholds):
+            row_txs = match_txs[ti]
+            matched = row_txs >= 0
+            y_pred = np.asarray(pred_cxs, dtype=int).copy()
+            y_true = np.full(len(pred_order), bg_cidx, dtype=int)
+            y_score = np.asarray(pred_scores, dtype=float).copy()
+            y_weight = np.full(len(pred_order), float(bg_weight), dtype=float)
+            y_iou = np.asarray(match_ious[ti], dtype=float).copy()
+            y_pxs = np.asarray(pred_order, dtype=int).copy()
+            y_txs = np.asarray(row_txs, dtype=int).copy()
+            y_rank = np.asarray(pred_ranks, dtype=int).copy()
+
+            if np.any(matched):
+                matched_pos = np.where(matched)[0]
+                matched_txs = row_txs[matched]
+                matched_true_cxs = self.true_cxs[matched_txs]
+                y_true[matched] = matched_true_cxs
+                if self.compat == 'ancestors':
+                    y_pred[matched] = matched_true_cxs
+                if true_weights is None:
+                    y_weight[matched] = 1.0
+                else:
+                    y_weight[matched] = true_weights[matched_txs]
+                ignored_matches = annotation_ignore_flags[matched_txs]
+                if np.any(ignored_matches):
+                    y_weight[matched_pos[ignored_matches]] = 0.0
+
+            unmatched = ~matched
+            if np.any(unmatched):
+                area_ignored_fp = unmatched & pred_area_ignored
+                y_weight[area_ignored_fp] = 0.0
+
+            unused_flags = true_nmatches[ti] == 0
+            unused_flags &= np.logical_not(annotation_ignore_flags)
+            unused_flags &= np.logical_not(true_ignore_flags)
+            unused_txs = np.where(unused_flags)[0]
+            if len(unused_txs):
+                if true_weights is None:
+                    fn_weights = np.ones(len(unused_txs), dtype=float)
+                else:
+                    fn_weights = true_weights[unused_txs]
+                y_pred = np.concatenate([
+                    y_pred,
+                    np.full(len(unused_txs), bg_cidx, dtype=int),
+                ])
+                y_true = np.concatenate([y_true, self.true_cxs[unused_txs]])
+                y_score = np.concatenate([
+                    y_score,
+                    np.full(len(unused_txs), fn_score, dtype=float),
+                ])
+                y_weight = np.concatenate([y_weight, fn_weights])
+                y_iou = np.concatenate([
+                    y_iou,
+                    np.full(len(unused_txs), -1.0, dtype=float),
+                ])
+                y_pxs = np.concatenate([
+                    y_pxs,
+                    np.full(len(unused_txs), -1, dtype=int),
+                ])
+                y_txs = np.concatenate([y_txs, unused_txs])
+                y_rank = np.concatenate([
+                    y_rank,
+                    np.full(len(unused_txs), -1, dtype=int),
+                ])
+
+            results[threshold] = {
+                'pred': y_pred.tolist(),
+                'true': y_true.tolist(),
+                'score': y_score.tolist(),
+                'weight': y_weight.tolist(),
+                'iou': y_iou.tolist(),
+                'txs': y_txs.tolist(),
+                'pxs': y_pxs.tolist(),
+                'rank': y_rank.tolist(),
+            }
+        return results
+
+    def _assign_many_kwimage_ext(
+        self,
+        thresholds,
+        rust_func,
+        *,
+        bg_weight,
+        bg_cidx,
+        ignore_classes,
+        max_dets,
+        max_dets_scope,
+        area_range,
+        truth_reuse_policy,
+    ):
+        """Run threshold-batched matching through kwimage_ext Rust."""
+        if truth_reuse_policy != 'never':
+            raise NotImplementedError(
+                'Rust assignment currently implements truth_reuse_policy="never" only'
+            )
+        if ignore_classes is not None:
+            raise NotImplementedError(
+                'Rust batched assignment does not yet implement threshold-dependent '
+                'kwcoco ignore-class regions; use assignment_backend="python"'
+            )
+        pred_order = self._pred_order_for(max_dets, max_dets_scope)
+        true_area_ignore_flags, pred_area_ignore_flags = self._area_ignore_flags(
+            area_range
+        )
+        true_ignore_flags = np.zeros(len(self.true_dets), dtype=bool)  # type: ignore
+        annotation_ignore_flags = (
+            self.true_annotation_ignore_flags | true_area_ignore_flags
+        )
+        offsets, flat_txs, flat_ious = self._candidate_csr()
+        match_txs, match_ious, true_nmatches = rust_func(
+            offsets,
+            flat_txs,
+            flat_ious,
+            pred_order,
+            np.asarray(thresholds, dtype=np.float64),
+            true_ignore_flags,
+            annotation_ignore_flags,
+            self.true_crowd_flags,
+            inclusive=self.threshold_policy == 'inclusive',
+        )
+        return self._materialize_match_matrices(
+            thresholds,
+            pred_order,
+            match_txs,
+            match_ious,
+            true_nmatches,
+            bg_weight=bg_weight,
+            bg_cidx=bg_cidx,
+            true_ignore_flags=true_ignore_flags,
+            annotation_ignore_flags=annotation_ignore_flags,
+            pred_area_ignore_flags=pred_area_ignore_flags,
+        )
+
     def assign_many(
         self,
         iou_thresh: Iterable[float],
+        *,
+        assignment_backend: str = 'auto',
         **kwargs: Any,
     ) -> dict[float, dict[str, list[int | float]]]:
-        """Run repeated threshold queries from the same candidate index."""
-        return {float(t): self.assign(float(t), **kwargs) for t in iou_thresh}
+        """Run repeated threshold queries from the same candidate index.
+
+        ``assignment_backend='auto'`` uses the optional kwimage_ext Rust
+        threshold-batched kernel when available and semantics permit it.
+        ``ignore_classes`` currently requires the Python reference path because
+        kwcoco ignore-region membership itself depends on the IoU threshold.
+        """
+        thresholds = [float(t) for t in iou_thresh]
+        for threshold in thresholds:
+            if threshold < self.min_iou:
+                raise ValueError(
+                    f'iou_thresh={threshold!r} is below cached min_iou={self.min_iou!r}'
+                )
+        requested_backend = assignment_backend
+        key, func, _metadata = resolve_assignment_backend(assignment_backend)
+        ignore_classes = kwargs.get('ignore_classes', 'ignore')
+        if key == 'kwimage_ext' and ignore_classes is not None:
+            if requested_backend == 'kwimage_ext':
+                raise NotImplementedError(
+                    'assignment_backend="kwimage_ext" does not yet support '
+                    'threshold-dependent ignore_classes'
+                )
+            key = 'python'
+            func = None
+        if key == 'python':
+            return {
+                threshold: self.assign(threshold, **kwargs)
+                for threshold in thresholds
+            }
+        assert func is not None
+        rust_kwargs = {
+            'bg_weight': kwargs.pop('bg_weight', 1.0),
+            'bg_cidx': kwargs.pop('bg_cidx', -1),
+            'ignore_classes': kwargs.pop('ignore_classes', 'ignore'),
+            'max_dets': kwargs.pop('max_dets', None),
+            'max_dets_scope': kwargs.pop('max_dets_scope', 'image'),
+            'area_range': kwargs.pop('area_range', None),
+            'truth_reuse_policy': kwargs.pop('truth_reuse_policy', 'never'),
+        }
+        if kwargs:
+            raise TypeError(
+                'Unexpected assignment kwargs for Rust backend: '
+                f'{sorted(kwargs)!r}'
+            )
+        return self._assign_many_kwimage_ext(
+            thresholds,
+            func,
+            **rust_kwargs,
+        )
 
 
 
@@ -982,6 +1700,8 @@ def _populate_sparse_coco_bbox_candidates(
     pred_ltrb: np.ndarray,
     true_ltrb: np.ndarray,
     true_crowd_flags: np.ndarray,
+    pred_areas: np.ndarray,
+    true_areas: np.ndarray,
     pred_idxs: np.ndarray,
     true_idxs: np.ndarray,
     *,
@@ -1017,6 +1737,8 @@ def _populate_sparse_coco_bbox_candidates(
             pred_ltrb[[int(px)]],
             true_ltrb[global_txs],
             true_crowd_flags[global_txs],
+            pred_areas=pred_areas[[int(px)]],
+            true_areas=true_areas[global_txs],
         )[0]
         keep = _threshold_mask(row, min_iou, threshold_policy)
         if np.any(keep):

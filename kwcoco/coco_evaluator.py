@@ -447,6 +447,27 @@ class CocoEvaluator:
         else:
             pred_classes = kwcoco.CategoryTree()
 
+        # Preserve the exact pre-rectification class/id space for strict COCO
+        # evaluation. The historical evaluator intentionally normalizes class
+        # names (e.g. lower-case and spaces -> underscores); strict COCO uses
+        # category ids and must not collapse distinct declared categories.
+        strict_gid_to_true = {}
+        for gid, det in gid_to_true.items():
+            strict_det = det.copy()
+            strict_det.meta['classes'] = true_classes
+            strict_gid_to_true[gid] = strict_det
+        strict_gid_to_pred = {}
+        for gid, det in gid_to_pred.items():
+            strict_det = det.copy()
+            strict_det.meta['classes'] = pred_classes
+            strict_gid_to_pred[gid] = strict_det
+        coco_eval._strict_coco_source = {
+            'true_classes': true_classes,
+            'pred_classes': pred_classes,
+            'gid_to_true': strict_gid_to_true,
+            'gid_to_pred': strict_gid_to_pred,
+        }
+
         classes, unified_cid_maps = CocoEvaluator._rectify_classes(
             true_classes, pred_classes
         )
@@ -843,6 +864,70 @@ class CocoEvaluator:
 
         return dmet
 
+    def _build_strict_coco_dmet(coco_eval):
+        """Build DetectionMetrics in the exact truth category-id space.
+
+        The legacy evaluator rectifies class names for historical convenience.
+        Strict COCO scoring instead uses declared truth category ids to preserve
+        category identity, exactly like COCOeval matching semantics. Prediction
+        categories absent from truth are discarded because COCOeval's category
+        axis is defined by ground truth. The internal DetectionMetrics category
+        axis may still be densely indexed after this identity-preserving map.
+        """
+        from kwcoco.metrics import DetectionMetrics
+        import numpy as np
+
+        coco_eval._ensure_init()
+        cached = getattr(coco_eval, '_strict_coco_dmet', None)
+        if cached is not None:
+            return cached
+        source = getattr(coco_eval, '_strict_coco_source', None)
+        if source is None:
+            dmet = coco_eval._build_dmet()
+            coco_eval._strict_coco_dmet = dmet
+            return dmet
+
+        true_classes = source['true_classes']
+        pred_classes = source['pred_classes']
+        gid_to_true = source['gid_to_true']
+        gid_to_pred = source['gid_to_pred']
+        dmet = DetectionMetrics(classes=true_classes)
+        true_coco = coco_eval.true_extra.get('coco_dset', None)
+
+        for true_gid, pred_gid in zip(
+            coco_eval.true_image_ids, coco_eval.pred_image_ids
+        ):
+            true_dets = gid_to_true[true_gid].copy()
+            true_dets.meta['classes'] = true_classes
+            pred_dets = gid_to_pred[pred_gid].copy()
+            old_cxs = np.asarray(pred_dets.class_idxs, dtype=int)
+            if len(old_cxs):
+                old_cids = np.array([
+                    pred_classes.idx_to_id[int(cx)] for cx in old_cxs
+                ], dtype=int)
+                keep = np.array([
+                    int(cid) in true_classes.id_to_idx for cid in old_cids
+                ], dtype=bool)
+                pred_dets = pred_dets.compress(keep)
+                kept_cids = old_cids[keep]
+                pred_dets.data['class_idxs'] = np.array([
+                    true_classes.id_to_idx[int(cid)] for cid in kept_cids
+                ], dtype=int)
+            pred_dets.meta['classes'] = true_classes
+
+            img_dims = None
+            if true_coco is not None:
+                img = true_coco.imgs[true_gid]
+                height = img.get('height', None)
+                width = img.get('width', None)
+                if height is not None and width is not None:
+                    img_dims = (int(height), int(width))
+            dmet.add_truth(true_dets, gid=true_gid, img_dims=img_dims)
+            dmet.add_predictions(pred_dets, gid=pred_gid, img_dims=img_dims)
+
+        coco_eval._strict_coco_dmet = dmet
+        return dmet
+
     def evaluate_pycocotools(
         coco_eval,
         iou_types: str | Iterable[str] = ('bbox',),
@@ -915,11 +1000,8 @@ class CocoEvaluator:
         if bad_types:
             raise KeyError(f'Unsupported COCO iou_types={sorted(bad_types)!r}')
 
-        dmet = getattr(coco_eval, '_dmet', None)
-        if dmet is None:
-            dmet = coco_eval._build_dmet()
-            coco_eval._dmet = dmet
-        category_idxs = coco_eval._strict_coco_category_idxs()
+        dmet = coco_eval._build_strict_coco_dmet()
+        category_idxs = None
 
         results = {}
         for iou_type in iou_types:
@@ -958,6 +1040,7 @@ class CocoEvaluator:
         *,
         overlap_backend: str = 'auto',
         raster_backend: str = 'auto',
+        assignment_backend: str = 'auto',
         annotation_ignore_policy: str = 'coco',
         ignore_classes: str | Iterable[str] | None = None,
         iou_thresholds: Iterable[float] | None = None,
@@ -991,6 +1074,11 @@ class CocoEvaluator:
                 ``'auto'``, ``'kwimage_ext'``, or ``'pycocotools'``.
             raster_backend:
                 ``'auto'``, ``'kwimage_ext'``, or ``'pycocotools'``.
+            assignment_backend:
+                ``'auto'``, ``'python'``, or ``'kwimage_ext'``. The optional
+                Rust path batches every active area range and IoU threshold
+                over the sparse candidate graph; evaluator and accumulation
+                semantics remain in kwcoco.
             annotation_ignore_policy:
                 ``'coco'`` for reference annotation-ignore semantics or
                 ``'kwcoco'`` to additionally honor explicit kwcoco ``ignore``.
@@ -1015,11 +1103,8 @@ class CocoEvaluator:
         if bad_types:
             raise KeyError(f'Unsupported native COCO iou_types={sorted(bad_types)!r}')
 
-        dmet = getattr(coco_eval, '_dmet', None)
-        if dmet is None:
-            dmet = coco_eval._build_dmet()
-            coco_eval._dmet = dmet
-        category_idxs = coco_eval._strict_coco_category_idxs()
+        dmet = coco_eval._build_strict_coco_dmet()
+        category_idxs = None
 
         results = {}
         for iou_type in iou_types:
@@ -1027,6 +1112,7 @@ class CocoEvaluator:
                 iou_type=iou_type,
                 overlap_backend=overlap_backend,
                 raster_backend=raster_backend,
+                assignment_backend=assignment_backend,
                 annotation_ignore_policy=annotation_ignore_policy,
                 ignore_classes=ignore_classes,
                 iou_thresholds=iou_thresholds,

@@ -518,3 +518,174 @@ fixtures include fractional polygons, rich polygons with holes (exact RLE strict
 boundary), and compressed RLE input.
 Generated ``_metric_compare_*`` directories remain evidence artifacts and must
 not be committed.
+
+## Native COCO performance profiling
+
+The Phase-3 conformance timing is intentionally part of a correctness runner:
+it uses a single wall-time sample per case and its stress profile primarily
+scales image count / canvas size.  Use `profile_native_coco.py` before making
+performance changes.  It builds `DetectionMetrics` outside the timed region,
+warms both scorers, repeats unprofiled timing, checks native/reference parity,
+and can run separate cProfile, line-profiler, and tracemalloc diagnostics.
+
+The current full conformance evidence suggests the first performance campaign
+should concentrate on assignment and accumulation rather than mask geometry
+construction.  In the recorded Phase-3 full run, the median native phase
+fractions were approximately:
+
+```text
+                 candidate build     assignment     accumulation
+bbox                  2.3%              52.7%           38.0%
+segm                  3.6%              51.0%           37.3%
+```
+
+Treat these as directional because the conformance runner records one wall-time
+sample per case.  The profiling runner uses warmups and repeats for decisions.
+
+Start with the same generated workload used by conformance:
+
+```bash
+python dev/pycocotools_metrics_compare/profile_native_coco.py \
+    --scenario perfect \
+    --dataset-mode full \
+    --iou-type bbox \
+    --with-eval \
+    --warmup 2 \
+    --repeat 7 \
+    --output-dpath=_metric_profile_native_coco
+
+python dev/pycocotools_metrics_compare/profile_native_coco.py \
+    --scenario perfect \
+    --dataset-mode full \
+    --iou-type segm \
+    --with-eval \
+    --warmup 2 \
+    --repeat 7 \
+    --output-dpath=_metric_profile_native_coco
+```
+
+Two synthetic pressure cases probe behavior the conformance corpus does not
+stress strongly:
+
+```bash
+# Many predictions in one category. COCO only needs the top largest maxDet
+# (normally 100). The optimized native path applies that cap before candidate
+# geometry, making this a regression/performance pressure case.
+python dev/pycocotools_metrics_compare/profile_native_coco.py \
+    --scenario maxdet-pressure \
+    --iou-type bbox \
+    --with-eval \
+    --num-objects 1000 \
+    --warmup 2 \
+    --repeat 7 \
+    --profile cprofile \
+    --output-dpath=_metric_profile_native_coco
+
+# Long mutually-overlapping candidate lists. This emphasizes the Python greedy
+# assignment loop rather than spatial rejection.
+python dev/pycocotools_metrics_compare/profile_native_coco.py \
+    --scenario candidate-heavy \
+    --iou-type bbox \
+    --with-eval \
+    --num-objects 400 \
+    --warmup 2 \
+    --repeat 7 \
+    --profile cprofile \
+    --output-dpath=_metric_profile_native_coco
+```
+
+For line-level attribution, install the optional profiler only in the
+benchmarking environment:
+
+```bash
+uv pip install line-profiler
+
+python dev/pycocotools_metrics_compare/profile_native_coco.py \
+    --scenario perfect \
+    --dataset-mode full \
+    --iou-type bbox \
+    --with-eval \
+    --warmup 1 \
+    --repeat 5 \
+    --profile line \
+    --output-dpath=_metric_profile_native_coco
+```
+
+The line profile is focused on `score_native_coco`, candidate-index build /
+assignment, COCO bbox overlap / sparse candidate generation, native COCO
+accumulation, and mask raster/area conversion.  Timing repeats are always run
+without profiler instrumentation; profiler and tracemalloc runs are separate,
+so their overhead does not contaminate the reported benchmark median.
+
+The first profile-driven optimization pass implemented the two strongest
+hypotheses below: largest-maxDet reuse and scalar scanning of the already
+overlap-sorted candidate lists. It also caps prediction geometry at the largest
+requested per-category maxDet before candidate construction. Standard
+``with_eval=True`` therefore performs four area-base assignments per IoU/image
+instead of twelve area×maxDet assignments, reducing the standard 32-image,
+10-IoU case from 3840 to 1280 calls to ``AssignmentCandidateIndex.assign()``.
+The profiler reports both the logical 12 tensor slices and the actual base
+assignment/call counts so this optimization remains observable.
+
+After the pure-Python optimization pass, the recorded repeated-timing
+baseline was approximately ``2.649x`` COCOeval for the 32-image perfect bbox
+profile and ``1.750x`` for perfect segmentation, while the maxDet-pressure and
+candidate-heavy bbox workloads were already faster than COCOeval at ``0.238x``
+and ``0.310x`` respectively.  This is why the compiled pass targets the many
+small threshold assignments in realistic multi-image evaluation rather than
+moving overlap geometry into Rust.
+
+A second profile-driven pass adds an optional **batched Rust greedy
+assignment kernel** in ``kwimage_ext``.  ``AssignmentCandidateIndex.assign_many``
+can flatten its already-sorted sparse candidate lists to a CSR representation
+once and evaluate the complete IoU threshold family in one PyO3 call.  The
+kernel deliberately does not own geometry, category compatibility, area policy,
+row materialization, or accumulation.  The Python matcher remains the semantic
+reference and fallback.
+
+Select the backend explicitly when measuring:
+
+```bash
+python dev/pycocotools_metrics_compare/profile_native_coco.py \
+    --scenario perfect --dataset-mode full --iou-type bbox --with-eval \
+    --assignment-backend python --warmup 2 --repeat 7 \
+    --output-dpath=_metric_profile_native_coco_python
+
+python dev/pycocotools_metrics_compare/profile_native_coco.py \
+    --scenario perfect --dataset-mode full --iou-type bbox --with-eval \
+    --assignment-backend kwimage_ext --warmup 2 --repeat 7 \
+    --output-dpath=_metric_profile_native_coco_rust
+```
+
+The profiler distinguishes logical threshold queries from compiled backend
+batches.  For the standard full tensor, the Python path still represents 1280
+threshold assignments on the 32-image perfect profile, while Rust receives ten
+thresholds at once for each image/area base.  Force both backends through the
+full conformance runner before accepting a speedup:
+
+```bash
+python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py \
+    --mode=full --assignment-backend=python --assert-parity \
+    --output-dpath=_metric_compare_phase3_assignment_python
+
+python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py \
+    --mode=full --assignment-backend=kwimage_ext --assert-parity \
+    --output-dpath=_metric_compare_phase3_assignment_rust
+```
+
+The remaining performance hypotheses after the batched kernel are:
+
+1. **row materialization:** COCO accumulation consumes only true class,
+   predicted class, score, and ignore/weight state, while inspectable assignment
+   rows retain IoU, truth/pred indexes, and rank as well.
+2. **accumulator reuse:** class masks and stable score sorting are repeated for
+   each IoU/area/maxDet slice.  The full-tensor path may be able to share score
+   order and other static state across thresholds.
+3. **Python/Rust boundary cost:** if small images do not benefit from Rust,
+   measure CSR flattening, NumPy conversion, and row materialization separately
+   before moving additional evaluator policy into compiled code.
+
+Do not optimize candidate geometry first merely because it is conceptually
+expensive.  The measured full corpus currently attributes a small median
+fraction of native runtime to candidate construction; confirm a workload where
+that changes before complicating the overlap backend.

@@ -142,6 +142,28 @@ boundaries:
 Do not call bbox-v2 parity with COCO proof of parity with historical kwcoco
 bbox assignment. Those are different contracts and must remain separate.
 
+Strict native COCO scoring may accelerate the greedy candidate-graph matcher
+with ``assignment_backend='kwimage_ext'``.  The Rust capability is deliberately
+a narrow kernel: kwcoco still owns candidate geometry, COCO area / ignore
+policy, and tensor semantics.  The production compact path batches every active
+area range and IoU threshold in one backend call per image and feeds compact
+match arrays directly into the COCO accumulator instead of materializing Python
+confusion-row dictionaries.  Keep ``assignment_backend='python'`` as the
+readable compact semantic reference and fallback.  Explicit assignment rows are
+still materialized for diagnostic ``with_details`` requests and native kwcoco
+ignore-region semantics. ``auto`` may select Rust only when the grid capability
+is present and the requested semantics are supported.  In particular,
+threshold-dependent kwcoco ``ignore_classes`` remain Python-owned.  Every Rust
+assignment change must pass the same full bbox+segm tensor conformance gate as
+Python, preferably with both backends forced in separate runs.
+
+Strict ``CocoEvaluator`` COCO wrappers must also bypass the historical class-name
+rectification used by ``evaluate()``.  Declared truth category ids define
+identity for the strict native/official wrappers, so labels such as ``Foo Bar``
+and ``foo_bar`` remain distinct even if the internal tensor axis is densely
+indexed.  Do not move that normalization into the strict
+COCO path merely to share setup code with the historical evaluator.
+
 For new COCO compatibility changes, the preferred acceptance command is:
 
 ```bash

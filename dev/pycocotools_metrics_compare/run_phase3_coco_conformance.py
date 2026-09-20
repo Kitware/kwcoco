@@ -466,6 +466,7 @@ def _geometry_compare(
     parameter_profile='standard',
     parameter_overrides=None,
     compare_assignment=True,
+    assignment_backend='auto',
 ):
     score_kw = dict(parameter_overrides or {})
     native, native_wall = timed_call(
@@ -474,6 +475,7 @@ def _geometry_compare(
             overlap_backend='auto',
             raster_backend='auto',
             annotation_ignore_policy='coco',
+            assignment_backend=assignment_backend,
             with_eval=True,
             **score_kw,
         ), repeat=1)
@@ -555,7 +557,7 @@ def _geometry_compare(
         },
     }
 
-def compare_case(case_name, profile, seed, tol):
+def compare_case(case_name, profile, seed, tol, assignment_backend='auto'):
     from kwcoco.metrics.detect_metrics import DetectionMetrics
 
     if case_name.startswith('random_mixed_seed_'):
@@ -571,7 +573,8 @@ def compare_case(case_name, profile, seed, tol):
     parameter_profiles = {}
     for iou_type in IOU_TYPES:
         geometry[iou_type] = _geometry_compare(
-            dmet, iou_type, tol, parameter_profile='standard')
+            dmet, iou_type, tol, parameter_profile='standard',
+            assignment_backend=assignment_backend)
         if case_name in CUSTOM_GRID_CASES:
             custom = dict(CUSTOM_PARAMETER_GRID)
             gids = sorted(
@@ -589,6 +592,7 @@ def compare_case(case_name, profile, seed, tol):
                     parameter_profile='custom_grid',
                     parameter_overrides=custom,
                     compare_assignment=False,
+                    assignment_backend=assignment_backend,
                 )
             )
 
@@ -614,7 +618,7 @@ def _case_plan(profile):
     return list(dict.fromkeys(names))
 
 
-def build_report(mode, tol):
+def build_report(mode, tol, assignment_backend='auto'):
     profile = dict(PROFILES[mode])
     cases = _case_plan(profile)
     report = {
@@ -626,13 +630,16 @@ def build_report(mode, tol):
         'source_state': source_state(),
         'profile': profile,
         'iou_types': list(IOU_TYPES),
+        'assignment_backend': assignment_backend,
         'cases': cases,
         'experiments': [],
     }
     for idx, case_name in enumerate(cases):
         print(f'Running Phase-3 COCO conformance case {case_name!r}')
         try:
-            result = compare_case(case_name, profile, seed=idx, tol=tol)
+            result = compare_case(
+                case_name, profile, seed=idx, tol=tol,
+                assignment_backend=assignment_backend)
         except Exception as ex:
             report['experiments'].append({
                 'name': case_name,
@@ -690,7 +697,7 @@ def parity_failures(report, tol):
             if iou_type == 'bbox':
                 if provenance.get('overlap_backends') != ['numpy_coco_bbox']:
                     failures.append(f'{prefix}: bbox overlap provenance mismatch')
-                if provenance.get('area_backends') != ['numpy_bbox_area']:
+                if provenance.get('area_backends') != ['numpy_coco_xywh_area']:
                     failures.append(f'{prefix}: bbox area provenance mismatch')
             else:
                 for key in ['overlap_backends', 'raster_backends', 'area_backends']:
@@ -738,7 +745,8 @@ def parity_failures(report, tol):
 def summary_lines(report):
     lines = [
         '# kwcoco Phase-2.4 / Phase-3 COCO conformance', '',
-        f"Mode: `{report['mode']}`", '',
+        f"Mode: `{report['mode']}`",
+        f"Assignment backend: `{report.get('assignment_backend', 'auto')}`", '',
         '| case | geom/profile | status | AP delta | assignment delta @.50 | '
         'precision max delta | recall max delta | score max delta | native/COCO wall |',
         '| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
@@ -800,6 +808,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=sorted(PROFILES), default='quick')
     parser.add_argument(
+        '--assignment-backend', choices=['auto', 'python', 'kwimage_ext'],
+        default='auto', help='native greedy assignment kernel',
+    )
+    parser.add_argument(
         '--output-dpath', type=Path,
         default=Path('_metric_compare_phase3_coco_conformance'))
     parser.add_argument(
@@ -810,7 +822,9 @@ def main(argv=None):
         help='absolute tolerance used by --assert-parity')
     args = parser.parse_args(argv)
 
-    report = build_report(args.mode, tol=args.parity_tol)
+    report = build_report(
+        args.mode, tol=args.parity_tol,
+        assignment_backend=args.assignment_backend)
     bundle = write_bundle(report, args.output_dpath)
     print('Phase-2.4 / Phase-3 COCO conformance suite complete')
     print(f'  bundle: {bundle}')

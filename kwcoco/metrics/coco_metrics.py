@@ -234,6 +234,465 @@ def accumulate_coco_assignment_rows(
     return info
 
 
+def accumulate_coco_compact_matches(
+    batches,
+    classes,
+    *,
+    thresholds,
+    max_dets,
+    category_idxs=None,
+    recall_thresholds=COCO_RECALL_THRESHOLDS,
+):
+    """Accumulate COCO tensors directly from compact per-image match arrays.
+
+    This is the fast counterpart to :func:`accumulate_coco_assignment_rows`.
+    It deliberately consumes the matcher state *before* confusion rows are
+    materialized.  That avoids the expensive round-trip
+
+    ``NumPy match arrays -> Python row lists -> NumPy accumulator arrays``
+
+    on the normal COCO scoring path while keeping explicit rows available to
+    callers that request diagnostics.
+
+    Each batch is a mapping with these fields:
+
+    ``pred_cxs``
+        Prediction category indexes in stable score order.
+    ``pred_scores``
+        Scores aligned with ``pred_cxs``.
+    ``pred_category_rank``
+        Zero-based stable score rank within each prediction category.
+    ``match_txs``
+        ``[T, P]`` matched truth indexes, ``-1`` for unmatched predictions.
+    ``true_cxs``
+        Truth category indexes local to the image.
+    ``annotation_ignore_flags``
+        Truth ignore state for the current area slice.  This already includes
+        COCO crowd and area-range ignore semantics.
+    ``pred_area_ignore_flags``
+        Prediction area-ignore state aligned with the prediction order.
+
+    Args:
+        batches (Sequence[Mapping]): Per-image compact match state.
+        classes: Category sequence / ``CategoryTree``.
+        thresholds (Sequence[float]): Matching thresholds represented by the
+            first axis of every ``match_txs`` array.
+        max_dets (Sequence[int]): Per-image/per-category score prefixes to
+            accumulate from the largest-prefix matching result.
+        category_idxs (Sequence[int] | None): Category-axis subset.
+        recall_thresholds (Sequence[float]): COCO recall samples.
+
+    Returns:
+        dict: Tensor fragments with shapes ``[T,R,K,M]`` for precision/scores
+        and ``[T,K,M]`` for recall/real-positive counts.
+    """
+    thresholds = np.asarray(thresholds, dtype=float)
+    recall_thresholds = np.asarray(recall_thresholds, dtype=float)
+    max_dets = list(map(int, max_dets))
+    if category_idxs is None:
+        category_idxs = list(range(len(classes)))
+    else:
+        category_idxs = list(map(int, category_idxs))
+
+    T = len(thresholds)
+    R = len(recall_thresholds)
+    K = len(category_idxs)
+    M = len(max_dets)
+    precision = -np.ones((T, R, K, M), dtype=float)
+    recall = -np.ones((T, K, M), dtype=float)
+    scores = -np.ones((T, R, K, M), dtype=float)
+    realpos = np.zeros((T, K, M), dtype=int)
+
+    if batches:
+        pred_cxs_parts = []
+        pred_scores_parts = []
+        pred_rank_parts = []
+        pred_area_ignore_parts = []
+        matched_true_cx_parts = [[] for _ in range(T)]
+        matched_ignore_parts = [[] for _ in range(T)]
+        realpos_by_class = np.zeros(len(classes), dtype=np.int64)
+
+        for batch in batches:
+            pred_cxs = np.asarray(batch['pred_cxs'], dtype=np.int32)
+            pred_scores = np.asarray(batch['pred_scores'], dtype=float)
+            pred_rank = np.asarray(batch['pred_category_rank'], dtype=np.int32)
+            pred_area_ignore = np.asarray(
+                batch['pred_area_ignore_flags'], dtype=bool
+            )
+            match_txs = np.asarray(batch['match_txs'], dtype=np.int64)
+            true_cxs = np.asarray(batch['true_cxs'], dtype=np.int32)
+            annotation_ignore = np.asarray(
+                batch['annotation_ignore_flags'], dtype=bool
+            )
+            if match_txs.shape != (T, len(pred_cxs)):
+                raise ValueError(
+                    'compact match shape mismatch: '
+                    f'{match_txs.shape!r} != {(T, len(pred_cxs))!r}'
+                )
+            if not (
+                len(pred_cxs)
+                == len(pred_scores)
+                == len(pred_rank)
+                == len(pred_area_ignore)
+            ):
+                raise ValueError('compact prediction columns must align')
+            if len(true_cxs) != len(annotation_ignore):
+                raise ValueError('compact truth columns must align')
+
+            eligible_txs = np.where(~annotation_ignore)[0]
+            if len(eligible_txs):
+                realpos_by_class += np.bincount(
+                    true_cxs[eligible_txs], minlength=len(classes)
+                )
+
+            pred_cxs_parts.append(pred_cxs)
+            pred_scores_parts.append(pred_scores)
+            pred_rank_parts.append(pred_rank)
+            pred_area_ignore_parts.append(pred_area_ignore)
+
+            for ti in range(T):
+                row_txs = match_txs[ti]
+                matched = row_txs >= 0
+                row_true_cx = np.full(len(row_txs), -1, dtype=np.int32)
+                row_ignore = np.zeros(len(row_txs), dtype=bool)
+                if np.any(matched):
+                    matched_txs = row_txs[matched]
+                    row_true_cx[matched] = true_cxs[matched_txs]
+                    row_ignore[matched] = annotation_ignore[matched_txs]
+                matched_true_cx_parts[ti].append(row_true_cx)
+                matched_ignore_parts[ti].append(row_ignore)
+
+        pred_cxs = (
+            np.concatenate(pred_cxs_parts)
+            if pred_cxs_parts else np.empty(0, dtype=np.int32)
+        )
+        pred_scores = (
+            np.concatenate(pred_scores_parts)
+            if pred_scores_parts else np.empty(0, dtype=float)
+        )
+        pred_rank = (
+            np.concatenate(pred_rank_parts)
+            if pred_rank_parts else np.empty(0, dtype=np.int32)
+        )
+        pred_area_ignore = (
+            np.concatenate(pred_area_ignore_parts)
+            if pred_area_ignore_parts else np.empty(0, dtype=bool)
+        )
+        matched_true_cx = np.stack([
+            np.concatenate(parts) if parts else np.empty(0, dtype=np.int32)
+            for parts in matched_true_cx_parts
+        ], axis=0)
+        matched_ignore = np.stack([
+            np.concatenate(parts) if parts else np.empty(0, dtype=bool)
+            for parts in matched_ignore_parts
+        ], axis=0)
+    else:
+        pred_cxs = np.empty(0, dtype=np.int32)
+        pred_scores = np.empty(0, dtype=float)
+        pred_rank = np.empty(0, dtype=np.int32)
+        pred_area_ignore = np.empty(0, dtype=bool)
+        matched_true_cx = np.empty((T, 0), dtype=np.int32)
+        matched_ignore = np.empty((T, 0), dtype=bool)
+        realpos_by_class = np.zeros(len(classes), dtype=np.int64)
+
+    for mi, max_det in enumerate(max_dets):
+        prefix = pred_rank < int(max_det)
+        for out_cx, cx in enumerate(category_idxs):
+            realpos_total = int(realpos_by_class[cx])
+            realpos[:, out_cx, mi] = realpos_total
+            if realpos_total <= 0:
+                continue
+
+            cls_flags = prefix & (pred_cxs == cx)
+            cls_score = pred_scores[cls_flags]
+            cls_area_ignore = pred_area_ignore[cls_flags]
+            if len(cls_score):
+                # COCO stable global descending score order.  Input batch order
+                # is already normalized image order, so mergesort preserves the
+                # required image/prediction tie order.
+                order = np.argsort(-cls_score, kind='mergesort')
+                sorted_score = cls_score[order]
+            else:
+                order = np.empty(0, dtype=int)
+                sorted_score = cls_score
+
+            for ti in range(T):
+                if len(cls_score) == 0:
+                    sampled = np.zeros(R, dtype=float)
+                    sampled_scores = np.zeros(R, dtype=float)
+                    final_recall = 0.0
+                else:
+                    cls_true_cx = matched_true_cx[ti, cls_flags]
+                    cls_ignored = matched_ignore[ti, cls_flags]
+                    matched = cls_true_cx >= 0
+                    scored = ~cls_ignored
+                    scored &= ~(~matched & cls_area_ignore)
+                    is_tp = cls_true_cx == cx
+
+                    scored = scored[order]
+                    is_tp = is_tp[order]
+                    tp = np.cumsum(scored & is_tp, dtype=float)
+                    fp = np.cumsum(scored & ~is_tp, dtype=float)
+                    rc = tp / realpos_total
+                    pr = tp / (tp + fp + np.spacing(1))
+                    if len(pr) > 1:
+                        pr = np.maximum.accumulate(pr[::-1])[::-1]
+                    inds = np.searchsorted(
+                        rc, recall_thresholds, side='left'
+                    )
+                    sampled = np.zeros(R, dtype=float)
+                    sampled_scores = np.zeros(R, dtype=float)
+                    valid = inds < len(pr)
+                    sampled[valid] = pr[inds[valid]]
+                    sampled_scores[valid] = sorted_score[inds[valid]]
+                    final_recall = float(rc[-1])
+
+                precision[ti, :, out_cx, mi] = sampled
+                recall[ti, out_cx, mi] = final_recall
+                scores[ti, :, out_cx, mi] = sampled_scores
+
+    return {
+        'precision': precision,
+        'recall': recall,
+        'scores': scores,
+        'realpos_total': realpos,
+    }
+
+
+def accumulate_coco_compact_grid(
+    batches,
+    classes,
+    *,
+    thresholds,
+    max_dets,
+    num_areas,
+    category_idxs=None,
+    recall_thresholds=COCO_RECALL_THRESHOLDS,
+):
+    """Accumulate a full area-grid COCO tensor from compact image matches.
+
+    This is the production companion to
+    :func:`accumulate_coco_compact_matches`.  The matcher has already shared
+    candidate geometry across area ranges and IoU thresholds; this accumulator
+    preserves that sharing instead of splitting the result back into separate
+    area streams. Prediction columns are concatenated once and stable score
+    orders are computed once per category / maxDet pair, then reused for every
+    area range and threshold.
+
+    Each batch contains ``match_txs`` with shape ``[A,T,P]``,
+    ``annotation_ignore_flags`` with shape ``[A,Ntrue]``, and
+    ``pred_area_ignore_flags`` with shape ``[A,P]`` in addition to the common
+    compact prediction/truth columns documented by
+    :func:`accumulate_coco_compact_matches`.
+
+    Returns:
+        dict: ``precision`` / ``scores`` with shape ``[T,R,K,A,M]`` and
+        ``recall`` / ``realpos_total`` with shape ``[T,K,A,M]``.
+    """
+    thresholds = np.asarray(thresholds, dtype=float)
+    recall_thresholds = np.asarray(recall_thresholds, dtype=float)
+    max_dets = list(map(int, max_dets))
+    num_areas = int(num_areas)
+    if num_areas < 0:
+        raise ValueError('num_areas must be nonnegative')
+    if category_idxs is None:
+        category_idxs = list(range(len(classes)))
+    else:
+        category_idxs = list(map(int, category_idxs))
+
+    T = len(thresholds)
+    R = len(recall_thresholds)
+    K = len(category_idxs)
+    A = num_areas
+    M = len(max_dets)
+    precision = -np.ones((T, R, K, A, M), dtype=float)
+    recall = -np.ones((T, K, A, M), dtype=float)
+    scores = -np.ones((T, R, K, A, M), dtype=float)
+    realpos = np.zeros((T, K, A, M), dtype=int)
+
+    pred_cxs_parts = []
+    pred_scores_parts = []
+    pred_rank_parts = []
+    normalized_batches = []
+    for batch in batches:
+        pred_cxs = np.asarray(batch['pred_cxs'], dtype=np.int32)
+        pred_scores = np.asarray(batch['pred_scores'], dtype=float)
+        pred_rank = np.asarray(batch['pred_category_rank'], dtype=np.int32)
+        match_txs = np.asarray(batch['match_txs'], dtype=np.int64)
+        true_cxs = np.asarray(batch['true_cxs'], dtype=np.int32)
+        annotation_ignore = np.asarray(
+            batch['annotation_ignore_flags'], dtype=bool
+        )
+        pred_area_ignore = np.asarray(
+            batch['pred_area_ignore_flags'], dtype=bool
+        )
+        expected_match = (A, T, len(pred_cxs))
+        expected_truth = (A, len(true_cxs))
+        expected_pred_ignore = (A, len(pred_cxs))
+        if match_txs.shape != expected_match:
+            raise ValueError(
+                'compact grid match shape mismatch: '
+                f'{match_txs.shape!r} != {expected_match!r}'
+            )
+        if annotation_ignore.shape != expected_truth:
+            raise ValueError(
+                'compact grid truth-ignore shape mismatch: '
+                f'{annotation_ignore.shape!r} != {expected_truth!r}'
+            )
+        if pred_area_ignore.shape != expected_pred_ignore:
+            raise ValueError(
+                'compact grid prediction-ignore shape mismatch: '
+                f'{pred_area_ignore.shape!r} != {expected_pred_ignore!r}'
+            )
+        if not (len(pred_cxs) == len(pred_scores) == len(pred_rank)):
+            raise ValueError('compact prediction columns must align')
+        pred_cxs_parts.append(pred_cxs)
+        pred_scores_parts.append(pred_scores)
+        pred_rank_parts.append(pred_rank)
+        normalized_batches.append({
+            'match_txs': match_txs,
+            'true_cxs': true_cxs,
+            'annotation_ignore_flags': annotation_ignore,
+            'pred_area_ignore_flags': pred_area_ignore,
+        })
+
+    pred_cxs = (
+        np.concatenate(pred_cxs_parts)
+        if pred_cxs_parts else np.empty(0, dtype=np.int32)
+    )
+    pred_scores = (
+        np.concatenate(pred_scores_parts)
+        if pred_scores_parts else np.empty(0, dtype=float)
+    )
+    pred_rank = (
+        np.concatenate(pred_rank_parts)
+        if pred_rank_parts else np.empty(0, dtype=np.int32)
+    )
+
+    # Stable global score orders are area/threshold invariant.  Cache the
+    # selected global prediction indexes once, then reuse them throughout the
+    # A x T tensor loops.
+    score_order_cache = {}
+    for mi, max_det in enumerate(max_dets):
+        prefix = pred_rank < int(max_det)
+        for out_cx, cx in enumerate(category_idxs):
+            global_idxs = np.where(prefix & (pred_cxs == cx))[0]
+            if len(global_idxs):
+                local_order = np.argsort(
+                    -pred_scores[global_idxs], kind='mergesort'
+                )
+                sorted_global_idxs = global_idxs[local_order]
+                sorted_scores = pred_scores[sorted_global_idxs]
+            else:
+                sorted_global_idxs = np.empty(0, dtype=np.int64)
+                sorted_scores = np.empty(0, dtype=float)
+            score_order_cache[(out_cx, mi)] = (
+                sorted_global_idxs,
+                sorted_scores,
+            )
+
+    for ai in range(A):
+        realpos_by_class = np.zeros(len(classes), dtype=np.int64)
+        pred_area_parts = []
+        matched_true_parts = [[] for _ in range(T)]
+        matched_ignore_parts = [[] for _ in range(T)]
+
+        for batch in normalized_batches:
+            match_txs = batch['match_txs'][ai]
+            true_cxs = batch['true_cxs']
+            annotation_ignore = batch['annotation_ignore_flags'][ai]
+            pred_area_parts.append(batch['pred_area_ignore_flags'][ai])
+
+            eligible_txs = np.where(~annotation_ignore)[0]
+            if len(eligible_txs):
+                realpos_by_class += np.bincount(
+                    true_cxs[eligible_txs], minlength=len(classes)
+                )
+
+            for ti in range(T):
+                row_txs = match_txs[ti]
+                matched = row_txs >= 0
+                row_true_cx = np.full(len(row_txs), -1, dtype=np.int32)
+                row_ignore = np.zeros(len(row_txs), dtype=bool)
+                if np.any(matched):
+                    matched_txs = row_txs[matched]
+                    row_true_cx[matched] = true_cxs[matched_txs]
+                    row_ignore[matched] = annotation_ignore[matched_txs]
+                matched_true_parts[ti].append(row_true_cx)
+                matched_ignore_parts[ti].append(row_ignore)
+
+        pred_area_ignore = (
+            np.concatenate(pred_area_parts)
+            if pred_area_parts else np.empty(0, dtype=bool)
+        )
+        matched_true_cx = np.stack([
+            np.concatenate(parts) if parts else np.empty(0, dtype=np.int32)
+            for parts in matched_true_parts
+        ], axis=0)
+        matched_ignore = np.stack([
+            np.concatenate(parts) if parts else np.empty(0, dtype=bool)
+            for parts in matched_ignore_parts
+        ], axis=0)
+
+        for mi, _max_det in enumerate(max_dets):
+            for out_cx, cx in enumerate(category_idxs):
+                realpos_total = int(realpos_by_class[cx])
+                realpos[:, out_cx, ai, mi] = realpos_total
+                if realpos_total <= 0:
+                    continue
+
+                sorted_global_idxs, sorted_score = score_order_cache[
+                    (out_cx, mi)
+                ]
+                if len(sorted_global_idxs):
+                    cls_area_ignore = pred_area_ignore[sorted_global_idxs]
+                else:
+                    cls_area_ignore = np.empty(0, dtype=bool)
+
+                for ti in range(T):
+                    if len(sorted_global_idxs) == 0:
+                        sampled = np.zeros(R, dtype=float)
+                        sampled_scores = np.zeros(R, dtype=float)
+                        final_recall = 0.0
+                    else:
+                        cls_true_cx = matched_true_cx[
+                            ti, sorted_global_idxs
+                        ]
+                        cls_ignored = matched_ignore[
+                            ti, sorted_global_idxs
+                        ]
+                        matched = cls_true_cx >= 0
+                        scored = ~cls_ignored
+                        scored &= ~(~matched & cls_area_ignore)
+                        is_tp = cls_true_cx == cx
+
+                        tp = np.cumsum(scored & is_tp, dtype=float)
+                        fp = np.cumsum(scored & ~is_tp, dtype=float)
+                        rc = tp / realpos_total
+                        pr = tp / (tp + fp + np.spacing(1))
+                        if len(pr) > 1:
+                            pr = np.maximum.accumulate(pr[::-1])[::-1]
+                        inds = np.searchsorted(
+                            rc, recall_thresholds, side='left'
+                        )
+                        sampled = np.zeros(R, dtype=float)
+                        sampled_scores = np.zeros(R, dtype=float)
+                        valid = inds < len(pr)
+                        sampled[valid] = pr[inds[valid]]
+                        sampled_scores[valid] = sorted_score[inds[valid]]
+                        final_recall = float(rc[-1])
+
+                    precision[ti, :, out_cx, ai, mi] = sampled
+                    recall[ti, out_cx, ai, mi] = final_recall
+                    scores[ti, :, out_cx, ai, mi] = sampled_scores
+
+    return {
+        'precision': precision,
+        'recall': recall,
+        'scores': scores,
+        'realpos_total': realpos,
+    }
+
 def snapshot_pycocotools_eval(evaler) -> dict[str, Any]:
     """Copy the accumulated COCOeval tensors into a stable kwcoco record.
 

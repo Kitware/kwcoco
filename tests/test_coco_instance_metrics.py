@@ -169,6 +169,31 @@ def test_default_pycocotools_mode_remains_bbox():
     assert implicit['iou_type'] == explicit['iou_type'] == 'bbox'
 
 
+def test_score_pycocotools_preserves_legacy_positional_prefix():
+    """New COCO controls must not reinterpret long-standing positional args."""
+    import inspect
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    sig = inspect.signature(DetectionMetrics.score_pycocotools)
+    params = list(sig.parameters.values())
+    assert [p.name for p in params[:6]] == [
+        'dmet', 'with_evaler', 'with_confusion', 'verbose',
+        'iou_thresholds', 'iou_type',
+    ]
+    assert sig.parameters['with_eval'].kind is inspect.Parameter.KEYWORD_ONLY
+
+    true, pred = _make_single_instance_dsets(_outer_square(), _outer_square())
+    dmet = DetectionMetrics.from_coco(true, pred)
+    # Before the native-COCO campaign this call meant:
+    #   with_evaler=False, with_confusion=True, verbose=0,
+    #   iou_thresholds=None, iou_type='bbox'.
+    # Keep that exact positional interpretation.
+    info = dmet.score_pycocotools(False, True, 0, None, 'bbox')
+    assert 'iou_to_cfsn_vecs' in info
+    assert 'eval' not in info
+    assert info['iou_type'] == 'bbox'
+
+
 def test_rle_input_remains_mask_exact_through_metric_bridge():
     from pycocotools import mask as mask_utils
     from kwcoco.metrics.detect_metrics import DetectionMetrics
@@ -308,6 +333,16 @@ def test_score_pycocotools_same_length_iou_threshold_override():
         iou_type='segm', iou_thresholds=custom, with_evaler=True, verbose=0
     )
     assert np.allclose(custom_info['evaler'].params.iouThrs, custom)
+    assert custom_info['mAP'] == custom_info['summary']['AP50']
+
+    # The historical ``mAP`` compatibility alias remains present even when
+    # the custom grid has no 0.50 slice. In that case the named COCO AP50
+    # statistic (and therefore the legacy alias) is explicitly unavailable.
+    no_ap50_info = dmet.score_pycocotools(
+        iou_type='segm', iou_thresholds=[0.6, 0.8], verbose=0
+    )
+    assert no_ap50_info['summary']['AP50'] == -1
+    assert no_ap50_info['mAP'] == -1
 
     # Even a small explicit change is a real parameter override. Do not use a
     # tolerance test to decide whether the caller's grid should be installed.

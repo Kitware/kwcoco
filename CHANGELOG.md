@@ -1,5 +1,7 @@
 # Changelog
 
+* Fix Phase-3 conformance provenance checks/documentation to expect `numpy_coco_xywh_area` for strict COCO bbox scoring after the fractional-origin XYWH area-boundary fix.
+
 We are currently working on porting this changelog to the specifications in
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -41,6 +43,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   tensor comparisons, row-assignment checks, adversarial geometry fixtures,
   nonstandard parameter grids, deterministic randomized cases, and optional
   stress profiles against official `pycocotools.COCOeval`.
+* Add a dedicated native-COCO performance profiling runner with warmup/repeat
+  timing, reference parity checks, synthetic maxDet/candidate-pressure cases,
+  cProfile output, optional line-profiler output, and Python allocation tracking.
+* Add an optional ``kwimage_ext`` Rust assignment backend for native COCO
+  scoring.  It batches the IoU threshold family over one CSR candidate graph
+  while keeping candidate geometry, COCO policy, row materialization, and
+  accumulation in kwcoco; the Python matcher remains the reference/fallback.
+* Add a compact native-COCO scoring path that batches all active area ranges
+  and IoU thresholds per image, consumes compact match arrays directly during
+  COCO accumulation, and avoids constructing Python confusion-row dictionaries
+  unless diagnostics or kwcoco-specific ignore semantics require them.
 
 ### Changed
 * `CocoEvaluator.evaluate_pycocotools()` uses strict COCO bbox crowd annotation
@@ -50,6 +63,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Native COCO bbox candidate generation may use spatial pruning for large
   compatible-class blocks, but retained overlaps are always recomputed with
   COCO crowd semantics so sparse and dense paths are equivalent.
+* Strict native/official ``CocoEvaluator`` COCO wrappers now key category
+  identity by declared truth category ids instead of inheriting the historical
+  evaluator's lowercase / space-to-underscore class-name rectification.
+  Historical ``CocoEvaluator.evaluate()`` behavior is unchanged.
 
 ### Fixed
 * Normalize rich/new-style `N x 2` polygons to strict flattened MS-COCO polygon
@@ -71,6 +88,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   and keep `CocoEvaluator`'s synthetic background bookkeeping class off strict
   COCO category axes while retaining genuinely declared `background`
   categories.
+* Preserve the historical positional argument prefix of
+  `DetectionMetrics.score_pycocotools()` after adding tensor controls, and keep
+  its legacy `mAP` (AP50) alias present on custom parameter grids.
+* Optimize native COCO assignment after profiling showed the greedy matcher was
+  the dominant cost: cache area/maxDet preparation, scan sorted candidates
+  without per-prediction NumPy temporaries, derive smaller maxDet slices from
+  one largest-prefix assignment, and cap predictions before overlap geometry.
+* Match pycocotools bbox area arithmetic at fractional origins by preserving
+  authored XYWH widths/heights for COCO area slices and overlap denominators.
 
 ## Version 0.9.0 - Released 2026-08-22
 

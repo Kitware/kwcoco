@@ -363,3 +363,105 @@ def test_assignment_v2_coco_bbox_accepts_empty_box_arrays(empty_side):
     else:
         assert rows['txs'] == [0]
         assert rows['pxs'] == [-1]
+
+
+def test_assignment_v2_kwimage_ext_batched_kernel_matches_python():
+    """The optional Rust kernel must be row-for-row identical to Python."""
+    import numpy as np
+    import kwimage
+
+    from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
+    from kwcoco.metrics.assignment_v2 import resolve_assignment_backend
+
+    try:
+        resolve_assignment_backend('kwimage_ext')
+    except ImportError:
+        pytest.skip('kwimage_ext coco_greedy_match Rust capability is unavailable')
+
+    true = kwimage.Detections(
+        boxes=kwimage.Boxes([
+            [0, 0, 20, 20],
+            [8, 0, 20, 20],
+            [40, 0, 16, 16],
+        ], 'xywh'),
+        class_idxs=np.array([0, 0, 0]),
+    )
+    true.data['iscrowd'] = np.array([0, 1, 0])
+    pred = kwimage.Detections(
+        boxes=kwimage.Boxes([
+            [0, 0, 20, 20],
+            [9, 0, 18, 20],
+            [40, 0, 16, 16],
+            [100, 100, 8, 8],
+        ], 'xywh'),
+        class_idxs=np.array([0, 0, 0, 0]),
+        scores=np.array([.95, .90, .85, .80]),
+    )
+    index = AssignmentCandidateIndex.build(
+        true,
+        pred,
+        classes=['thing'],
+        compat='mutex',
+        iou_type='bbox',
+        bbox_overlap_mode='coco',
+        threshold_policy='inclusive',
+        annotation_ignore_policy='coco',
+        min_iou=.5,
+        spatial_threshold=None,
+    )
+    kwargs = {
+        'ignore_classes': None,
+        'max_dets': 3,
+        'max_dets_scope': 'category',
+        'area_range': (0.0, 20 ** 2),
+        'truth_reuse_policy': 'never',
+    }
+    thresholds = [.5, .75, .95]
+    py_rows = index.assign_many(
+        thresholds, assignment_backend='python', **kwargs)
+    rust_rows = index.assign_many(
+        thresholds, assignment_backend='kwimage_ext', **kwargs)
+    assert rust_rows == py_rows
+
+    offsets, flat_txs, flat_ious = index._candidate_csr()
+    assert offsets.shape == (len(pred) + 1,)
+    assert offsets[-1] == len(flat_txs) == len(flat_ious)
+
+
+def test_assignment_v2_auto_keeps_python_for_ignore_classes():
+    """Threshold-dependent native ignore regions are still Python-owned."""
+    import numpy as np
+    import kwimage
+
+    from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
+
+    classes = ['thing', 'ignore']
+    true = kwimage.Detections(
+        boxes=kwimage.Boxes([[0, 0, 10, 10]], 'xywh'),
+        class_idxs=np.array([1]),
+        classes=classes,
+    )
+    pred = kwimage.Detections(
+        boxes=kwimage.Boxes([[0, 0, 10, 10]], 'xywh'),
+        class_idxs=np.array([0]),
+        scores=np.array([.9]),
+        classes=classes,
+    )
+    index = AssignmentCandidateIndex.build(
+        true, pred, classes=classes, min_iou=.5, spatial_threshold=None)
+    auto = index.assign_many(
+        [.5, .75], assignment_backend='auto', ignore_classes='ignore')
+    python = index.assign_many(
+        [.5, .75], assignment_backend='python', ignore_classes='ignore')
+    assert auto == python
+
+
+def test_assignment_backend_resolution_metadata_is_not_shared_mutable_state():
+    from kwcoco.metrics.assignment_v2 import resolve_assignment_backend
+
+    key1, func1, meta1 = resolve_assignment_backend('python')
+    meta1['caller_mutation'] = True
+    key2, func2, meta2 = resolve_assignment_backend('python')
+    assert key1 == key2 == 'python'
+    assert func1 is func2 is None
+    assert 'caller_mutation' not in meta2
