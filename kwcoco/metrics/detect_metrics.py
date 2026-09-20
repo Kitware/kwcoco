@@ -147,6 +147,7 @@ class DetectionMetrics(ub.NiceRepr):
         # For each image
         unique_gids, grouped_indexes = kwarray.group_indices(all_gids)
         for gid, rowxs in zip(unique_gids, grouped_indexes):
+            gid = typing.cast(int, gid)
             # Find the confusion rows that correspond to it
             txs = all_txs[rowxs]
             pxs = all_pxs[rowxs]
@@ -332,8 +333,8 @@ class DetectionMetrics(ub.NiceRepr):
     ) -> None:
         if img_dims is None:
             return
-        img_dims = tuple(map(int, img_dims))
-        if len(img_dims) != 2 or min(img_dims) <= 0:
+        img_dims = (int(img_dims[0]), int(img_dims[1]))
+        if min(img_dims) <= 0:
             raise ValueError(f'invalid image dimensions: {img_dims!r}')
         old_dims = dmet.gid_to_image_dims.get(gid, None)
         if old_dims is not None and old_dims != img_dims:
@@ -1056,30 +1057,39 @@ class DetectionMetrics(ub.NiceRepr):
                         len(true_dets), dtype=np.float32
                     )
 
-            build_kw = {
-                'classes': classes,
-                'compat': 'mutex',
-                'prioritize': 'iou',
-                'min_iou': min(assignment_thresholds.values()),
-                # Spatial pruning is semantics-preserving for bbox because
-                # retained overlaps are recomputed with the selected profile.
-                'spatial_threshold': 50_000 if iou_type == 'bbox' else None,
-                'iou_type': iou_type,
-                'threshold_policy': 'inclusive',
-                'annotation_ignore_policy': annotation_ignore_policy,
-                'image_dims': image_dims,
-            }
+            common_min_iou = min(assignment_thresholds.values())
             if iou_type == 'segm':
-                build_kw.update({
-                    'overlap_backend': overlap_backend,
-                    'segmentation_rasterizer': 'coco',
-                    'raster_backend': raster_backend,
-                })
+                index = AssignmentCandidateIndex.build(
+                    true_dets,
+                    pred_dets,
+                    classes=classes,
+                    compat='mutex',
+                    prioritize='iou',
+                    min_iou=common_min_iou,
+                    spatial_threshold=None,
+                    iou_type='segm',
+                    threshold_policy='inclusive',
+                    annotation_ignore_policy=annotation_ignore_policy,
+                    image_dims=image_dims,
+                    overlap_backend=overlap_backend,
+                    segmentation_rasterizer='coco',
+                    raster_backend=raster_backend,
+                )
             else:
-                build_kw.update({'bbox_overlap_mode': 'coco'})
-            index = AssignmentCandidateIndex.build(
-                true_dets, pred_dets, **build_kw
-            )
+                index = AssignmentCandidateIndex.build(
+                    true_dets,
+                    pred_dets,
+                    classes=classes,
+                    compat='mutex',
+                    prioritize='iou',
+                    min_iou=common_min_iou,
+                    spatial_threshold=50_000,
+                    iou_type='bbox',
+                    bbox_overlap_mode='coco',
+                    threshold_policy='inclusive',
+                    annotation_ignore_policy=annotation_ignore_policy,
+                    image_dims=image_dims,
+                )
             gid_to_index[gid] = index
         candidate_build_seconds = time.perf_counter() - build_start
 
@@ -2070,7 +2080,7 @@ class DetectionMetrics(ub.NiceRepr):
             evaler.evaluate()
             evaler.accumulate()
 
-            pct_info = {}
+            pct_info: dict[str, typing.Any] = {}
             from kwcoco.metrics.coco_metrics import summarize_pycocotools_eval
 
             if modified_params:
@@ -2348,9 +2358,9 @@ class DetectionMetrics(ub.NiceRepr):
 
             for gid in range(nimgs):
                 # Sample random variables
-                nboxes_ = nboxes_RV()
-                n_fp_ = n_fp_RV()
-                n_fn_ = n_fn_RV()
+                nboxes_ = int(np.asarray(nboxes_RV()).item())
+                n_fp_ = int(np.asarray(n_fp_RV()).item())
+                n_fn_ = int(np.asarray(n_fn_RV()).item())
 
                 imgname = 'img_{}'.format(gid)
                 dmet._register_imagename(imgname, gid)
@@ -2361,7 +2371,7 @@ class DetectionMetrics(ub.NiceRepr):
                 )
                 # Prevent 0 sized boxes: increase w/h by 1
                 true_boxes.data[..., 2:4] += 1
-                true_cxs = frgnd_cx_RV(len(true_boxes))
+                true_cxs = np.asarray(frgnd_cx_RV(len(true_boxes)), dtype=int)
                 true_weights = np.ones(len(true_boxes), dtype=np.int32)
 
                 # Initialize predicted detections as a copy of truth
@@ -2372,8 +2382,8 @@ class DetectionMetrics(ub.NiceRepr):
                 pred_boxes.data = np.abs(pred_boxes.data.astype(float) + box_noise_RV())
 
                 # Perterb class predictions
-                change = cls_noise_RV(len(pred_cxs))
-                pred_cxs_swap = frgnd_cx_RV(len(pred_cxs))
+                change = np.asarray(cls_noise_RV(len(pred_cxs)), dtype=bool)
+                pred_cxs_swap = np.asarray(frgnd_cx_RV(len(pred_cxs)), dtype=int)
                 pred_cxs[change] = pred_cxs_swap[change]
 
                 # Drop true positive boxes
@@ -2383,15 +2393,15 @@ class DetectionMetrics(ub.NiceRepr):
 
                 # pred_scores = np.linspace(true_min, true_max, len(pred_boxes))[::-1]
                 n_tp_ = len(pred_boxes)
-                pred_scores = true_score_RV(n_tp_)
+                pred_scores = np.asarray(true_score_RV(n_tp_), dtype=float)
 
                 # Add false positive boxes
                 if n_fp_:
                     false_boxes = kwimage.Boxes.random(
                         num=n_fp_, scale=scale, rng=rng, format='cxywh'
                     )
-                    false_cxs = frgnd_cx_RV(n_fp_)
-                    false_scores = false_score_RV(n_fp_)
+                    false_cxs = np.asarray(frgnd_cx_RV(n_fp_), dtype=int)
+                    false_scores = np.asarray(false_score_RV(n_fp_), dtype=float)
 
                     pred_boxes.data = np.vstack([pred_boxes.data, false_boxes.data])
                     pred_cxs = np.hstack([pred_cxs, false_cxs])

@@ -5,6 +5,7 @@ from __future__ import annotations
 Visualize annotations on kwcoco video frames.
 """
 import math
+from typing import Any
 import ubelt as ub
 import scriptconfig as scfg
 from delayed_image.channel_spec import ChannelSpec, FusedChannelSpec
@@ -581,6 +582,7 @@ def _resolve_channel_groups(coco_img, channels, verbose, request_grouped_bands, 
     """
     Resolve which channel groups to request and how to visualize them.
     """
+    chan_groups: list[dict[str, Any]]
     if channels is not None:
         if isinstance(channels, list):
             channels = ','.join(channels)

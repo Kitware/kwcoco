@@ -886,18 +886,21 @@ class BinaryConfusionVectors(ub.NiceRepr):
         rng = kwarray.ensure_rng(rng)
         score = rng.rand(n)  # type: ignore
 
-        data = kwarray.DataFrameArray(
-            {
-                'is_true': (score > p_true).astype(np.uint8),
-                'pred_score': score,
-            }
-        )
+        is_true = (score > p_true).astype(np.uint8)
+        pred_score = score.copy()
 
         flip_flags = rng.rand(n) < p_error  # type: ignore
-        data['is_true'][flip_flags] = 1 - data['is_true'][flip_flags]
+        is_true[flip_flags] = 1 - is_true[flip_flags]
 
         miss_flags = rng.rand(n) < p_miss  # type: ignore
-        data['pred_score'][miss_flags] = -np.inf
+        pred_score[miss_flags] = -np.inf
+
+        data = kwarray.DataFrameArray(
+            {
+                'is_true': is_true,
+                'pred_score': pred_score,
+            }
+        )
 
         classes = ['c1', 'c2', 'c3']
         self = cls(data, cx=1, classes=classes)
@@ -1026,8 +1029,8 @@ class BinaryConfusionVectors(ub.NiceRepr):
             >>> self._binary_clf_curves()
         """
         data = self.data
-        y_true = data['is_true'].astype(np.uint8)
-        y_score = data['pred_score']
+        y_true = np.asarray(data['is_true']).astype(np.uint8)
+        y_score = np.asarray(data['pred_score'])
         sample_weight = data._data.get('weight', None)  # type: ignore
 
         npad = 0
@@ -1101,8 +1104,8 @@ class BinaryConfusionVectors(ub.NiceRepr):
 
     def draw_distribution(self) -> Any:
         data = self.data
-        y_true = data['is_true'].astype(np.uint8)
-        y_score = data['pred_score']
+        y_true = np.asarray(data['is_true']).astype(np.uint8)
+        y_score = np.asarray(data['pred_score'])
 
         y_true = y_true.astype(bool)
 

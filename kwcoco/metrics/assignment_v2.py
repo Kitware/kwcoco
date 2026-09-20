@@ -526,7 +526,7 @@ class AssignmentCandidateIndex:
                 raise ValueError(
                     'image_dims=(height, width) is required for segmentation IoU'
                 )
-            image_dims = tuple(map(int, image_dims))
+            image_dims = (int(image_dims[0]), int(image_dims[1]))
         valid_compat_keys = {'ancestors', 'mutex', 'all'}
         if compat not in valid_compat_keys:
             raise KeyError(compat)
@@ -644,6 +644,8 @@ class AssignmentCandidateIndex:
             true_annotation_ignore_flags = raw_crowd_flags | raw_ignore_flags
 
         if iou_type == 'segm':
+            if image_dims is None:  # narrowed above; keep this local for type safety
+                raise AssertionError('segmentation image dimensions were not resolved')
             from kwcoco.metrics.overlap import detections_to_rles
             from kwcoco.metrics.overlap import rle_areas
             from kwcoco.metrics.overlap import resolve_mask_iou_backend
@@ -1235,7 +1237,7 @@ class AssignmentCandidateIndex:
 
         true_flags = np.zeros(len(self.true_dets), dtype=bool)
         pred_flags = np.zeros(len(self.pred_dets), dtype=bool)
-        if not ub.iterable(ignore_classes):
+        if isinstance(ignore_classes, str):
             ignore_classes = {ignore_classes}
         else:
             ignore_classes = set(ignore_classes)

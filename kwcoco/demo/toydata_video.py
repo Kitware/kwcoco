@@ -557,8 +557,8 @@ def random_single_video_dset(
     for frame_idx, gid in enumerate(image_ids):
         if verbose > 3:
             print('generate gid = {!r}'.format(gid))
-        image_height = int(image_height_distri.sample())  # type: ignore
-        image_width = int(image_width_distri.sample())
+        image_height = int(np.asarray(image_height_distri.sample()).item())
+        image_width = int(np.asarray(image_width_distri.sample()).item())
 
         warp_vid_from_img = kwimage.Affine.coerce(
             scale=(video_width / image_width, video_height / image_height)
@@ -831,7 +831,8 @@ def populate_random_timestamps(coco_dset, timestamps=True, rng=None):
 
     for vidid, imgs in vidid_to_imgs.items():
         imgs = sorted(imgs, key=lambda g: g.get('frame_index', None))
-        new_times = sorted(time_distri.sample(len(imgs)))
+        sampled_times = np.asarray(time_distri.sample(len(imgs))).reshape(-1)
+        new_times = sorted(sampled_times.tolist())
         for img, timestamp in zip(imgs, new_times):
             ts = util_time.datetime.fromtimestamp(timestamp)  # type: ignore
             img['timestamp'] = ts.isoformat()

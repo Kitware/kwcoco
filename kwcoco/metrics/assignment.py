@@ -228,16 +228,18 @@ def _assign_confusion_vectors(
 
     # Group true boxes by class
     # Keep track which true boxes are available / not assigned
-    unique_tcxs, tgroupxs = kwarray.group_indices(true_dets.class_idxs)
+    true_cxs = np.asarray(true_dets.class_idxs, dtype=int)
+    unique_tcxs, tgroupxs = kwarray.group_indices(true_cxs)
+    unique_tcxs = np.asarray(unique_tcxs, dtype=int)
     cx_to_txs = dict(zip(unique_tcxs, tgroupxs))
 
-    unique_pcxs = np.array(sorted(set(pred_dets.class_idxs)))
+    unique_pcxs = np.unique(np.asarray(pred_dets.class_idxs, dtype=int))
 
     if classes is None:
         import kwcoco
 
         # Build mutually exclusive category tree
-        all_cxs = sorted(set(map(int, unique_pcxs)) | set(map(int, unique_tcxs)))
+        all_cxs = sorted(set(unique_pcxs.tolist()) | set(unique_tcxs.tolist()))
         all_cxs = list(range(max(all_cxs) + 1))
         classes = kwcoco.CategoryTree.from_mutex(all_cxs)
 

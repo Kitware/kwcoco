@@ -273,7 +273,7 @@ def segmentation_to_rle(
 
     if segmentation is None:
         raise ValueError('segmentation is required for segmentation IoU')
-    dims = tuple(map(int, dims))
+    dims = (int(dims[0]), int(dims[1]))
     if len(dims) != 2 or min(dims) <= 0:
         raise ValueError(f'invalid image dimensions: {dims!r}')
     if rasterizer not in {'auto', 'kwimage', 'coco'}:

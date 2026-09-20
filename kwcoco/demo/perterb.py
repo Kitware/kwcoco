@@ -126,8 +126,8 @@ def perterb_coco(coco_dset, **kwargs):
 
     for gid in ub.ProgIter(coco_dset.imgs.keys(), desc='perterb imgs', verbose=verbose):
         # Sample random variables
-        n_fp_ = n_fp_RV()
-        n_fn_ = n_fn_RV()
+        n_fp_ = int(np.asarray(n_fp_RV()).item())
+        n_fn_ = int(np.asarray(n_fn_RV()).item())
 
         true_annots = coco_dset.annots(gid=gid)
         aids = true_annots.aids
@@ -167,7 +167,7 @@ def perterb_coco(coco_dset, **kwargs):
             if new_sseg is not None:
                 ann['segmentation'] = new_sseg.to_coco(style='new')
             ann['bbox'] = [new_x, new_y, new_w, new_h]
-            ann['score'] = float(true_score_RV(1)[0])
+            ann['score'] = float(np.asarray(true_score_RV(1)).reshape(-1)[0])
 
             if cls_noise_RV():
                 # Perterb class predictions
@@ -191,8 +191,8 @@ def perterb_coco(coco_dset, **kwargs):
             false_boxes = kwimage.Boxes.random(
                 num=n_fp_, scale=scale, rng=rng, format='cxywh'
             )
-            false_cxs = frgnd_cx_RV(n_fp_)
-            false_scores = false_score_RV(n_fp_)
+            false_cxs = np.asarray(frgnd_cx_RV(n_fp_))
+            false_scores = np.asarray(false_score_RV(n_fp_))
             false_dets = kwimage.Detections(
                 boxes=false_boxes,
                 class_idxs=false_cxs,

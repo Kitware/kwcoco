@@ -74,7 +74,7 @@ import scriptconfig as scfg
 import ubelt as ub
 import warnings
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from typing import IO, Any
+from typing import IO, Any, cast
 from os.path import exists
 from os.path import isdir
 from os.path import isfile
@@ -1346,6 +1346,7 @@ def dmet_area_weights(
         gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
         new_ignore = np.zeros(len(cfsn_vecs.data), dtype=bool)
         for gid, groupx in zip(gids, groupxs):
+            gid = cast(int, gid)
             if use_area_attr:
                 # Use coco area attribute (if available)
                 try:

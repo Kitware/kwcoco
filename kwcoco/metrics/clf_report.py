@@ -519,7 +519,7 @@ def ovr_classification_report(
     )  # probably better numpy way to do this
 
     mc_scores = kwarray.normalize(mc_probs, mode='linear')
-    total_scores = mc_scores.sum(axis=1, keepdims=0)
+    total_scores = mc_scores.sum(axis=1, keepdims=False)
     # max_scores = mc_scores.max(axis=1, keepdims=0)
 
     class_metrics = ub.odict()

@@ -4,6 +4,8 @@ from __future__ import annotations
 """
 Wraps the logic in kwcoco/coco_evaluator.py with a command line script
 """
+from typing import Any, cast
+
 from kwcoco import coco_evaluator
 import scriptconfig as scfg
 import ubelt as ub
@@ -232,16 +234,17 @@ def main(cmdline=True, **kw):
     if truth_dset is not None and result_cfsn_vecs is not None:
         # Use the first result with confusion vectors for the example ranking.
         print('Attempting to draw examples')
-        gid_to_stats = {}
+        gid_to_stats: dict[int, dict[str, Any]] = {}
         gids, groupxs = kwarray.group_indices(result_cfsn_vecs.data['gid'])
         for gid, groupx in zip(gids, groupxs):
+            gid = cast(int, gid)
             true_vec = result_cfsn_vecs.data['true'][groupx]
             pred_vec = result_cfsn_vecs.data['pred'][groupx]
             is_true = true_vec > 0
             is_pred = pred_vec > 0
             has_pred = is_true & is_pred
 
-            stats = {
+            stats: dict[str, Any] = {
                 'num_assigned_pred': has_pred.sum(),
                 'num_true': is_true.sum(),
                 'num_pred': is_pred.sum(),
@@ -249,8 +252,12 @@ def main(cmdline=True, **kw):
             stats['frac_assigned'] = stats['num_assigned_pred'] / stats['num_true']
             gid_to_stats[gid] = stats
 
-        set([stats['frac_assigned'] for stast in gid_to_stats.values()])
-        gid = ub.argmax(gid_to_stats, key=lambda x: x['num_pred'] * x['num_true'])
+        gid = max(
+            gid_to_stats,
+            key=lambda gid: (
+                gid_to_stats[gid]['num_pred'] * gid_to_stats[gid]['num_true']
+            ),
+        )
         stat_gids = [gid]
 
         rng = kwarray.ensure_rng(None)

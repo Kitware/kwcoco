@@ -113,6 +113,9 @@ class MixinCocoSchema:
     Methods for validating and conforming dataset structure.
     """
 
+    # Supplied by CocoDataset, the concrete class that owns this mixin.
+    dataset: dict[str, Any]
+
     def conform(self: MixinCocoSchemaT, **config: Any) -> MixinCocoSchemaT:
         """
         Make the COCO file conform a stricter spec, infers attributes where
