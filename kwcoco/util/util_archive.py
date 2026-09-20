@@ -356,7 +356,11 @@ def _coerce_zipfile_compression(compression: str | int) -> int:
 
     compression_name = compression
     if compression_name == 'auto':
-        priority = ['ZIP_LZMA', 'ZIP_DEFLATED', 'ZIP_BZIP2', 'ZIP_STORED']
+        # Prefer a broadly supported fast codec for automatic archive writes.
+        # KWCoco manifests are control-plane metadata, so spending substantial
+        # CPU for maximal compression is a poor default.  LZMA remains
+        # available when callers request it explicitly.
+        priority = ['ZIP_DEFLATED', 'ZIP_LZMA', 'ZIP_BZIP2', 'ZIP_STORED']
         available = _available_zipfile_compressions()
         found = None
         for cand in priority:
