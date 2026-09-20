@@ -178,3 +178,22 @@ when a lower layer disagrees. The conformance gate also exercises a nonstandard
 parameter grid and normalized image subset; avoid hard-coding standard COCO
 tensor dimensions in either the native or official wrapper. COCO's explicit
 IoU threshold 1.0 uses the reference comparison cap ``1 - 1e-10``.
+
+
+### Release evidence and large-scale benchmarking
+
+After semantic/tensor conformance is green, use
+``dev/pycocotools_metrics_compare/run_release_benchmark.py`` for release and
+publication evidence.  Keep timing and memory passes separate, run every backend
+in an isolated process, and treat peak process RSS (not tracemalloc) as the
+primary total-memory metric because native C/Rust allocations matter.  The
+benchmark must retain complete precision/recall/sample-score tensor parity on
+every scaling workload and record CPU/RAM/package/git/backend provenance.
+
+For technical reports, publish raw timing distributions and workload counts,
+not only a best-case speedup.  Report both core scorer and public
+``CocoEvaluator`` scopes when making user-facing latency claims.  Synthetic
+scaling results should be paired with at least one real truth/prediction corpus
+before making application-specific claims.  Keep ``pycocotools.COCOeval`` named
+as the official reference even when the accelerated native path is faster on
+measured workloads.

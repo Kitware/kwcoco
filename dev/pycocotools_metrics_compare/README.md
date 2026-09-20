@@ -689,3 +689,42 @@ Do not optimize candidate geometry first merely because it is conceptually
 expensive.  The measured full corpus currently attributes a small median
 fraction of native runtime to candidate construction; confirm a workload where
 that changes before complicating the overlap backend.
+
+## Release-scale timing, memory, and publication evidence
+
+Once Phase-3 tensor conformance is green, use `run_release_benchmark.py` for
+release evidence rather than quoting the small conformance timings.  It runs
+each backend in an isolated process, measures timing and peak RSS separately,
+checks complete COCO tensor parity on the scaling workloads, records hardware /
+package / git provenance, and generates JSON, CSV, Markdown, and an uploadable
+tar bundle.
+
+A short smoke run is:
+
+```bash
+python dev/pycocotools_metrics_compare/run_release_benchmark.py \
+    --suite=quick \
+    --backends=official,native-rust,native-python \
+    --iou-types=bbox,segm \
+    --output-dpath=_metric_release_quick
+```
+
+The publication-oriented campaign is intentionally longer:
+
+```bash
+python dev/pycocotools_metrics_compare/run_release_benchmark.py \
+    --suite=publication \
+    --backends=official,native-rust,native-python \
+    --parity-backends=native-rust,native-python \
+    --iou-types=bbox,segm \
+    --scopes=core,evaluator \
+    --eval-modes=tensor \
+    --warmup=2 --repeat=7 --memory-repeat=3 \
+    --conformance-mode=full \
+    --output-dpath=_metric_release_publication
+```
+
+Use `--truth-coco` and `--pred-coco` to repeat the same methodology on a real
+project validation set.  Peak process RSS is the primary memory measure because
+it includes native C/Rust allocations; optional `--python-allocations` adds
+tracemalloc diagnostics but is not a substitute for RSS.

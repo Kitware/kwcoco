@@ -2,3 +2,4 @@
 -r requirements/tests.txt
 -r requirements/optional.txt
 -r requirements/postgresql.txt
+-r requirements/metrics.txt

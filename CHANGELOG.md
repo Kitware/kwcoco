@@ -11,6 +11,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Added
+* Add a release-scale native COCO evidence harness that benchmarks isolated-process wall time, peak RSS, optional Python allocations, throughput, full tensor parity, and public-evaluator/core scopes against official pycocotools; emit raw JSONL, CSV/JSON summaries, a publication-oriented Markdown report, and an uploadable evidence bundle.
+* Add a dedicated ``metrics`` optional dependency extra for installing both the official pycocotools reference and the optional ``kwimage_ext`` acceleration backend, including modern Python 3.12+ kwimage_ext installation support.
+* Add a declarative xcookie CI source check that runs quick Python/Rust COCO tensor conformance plus an isolated-process release-benchmark smoke test.
 * Extend the official pycocotools metric bridge with explicit `bbox` and `segm`
   IoU modes, named COCO AP/AR summaries, and a
   `CocoEvaluator.evaluate_pycocotools` convenience API. Rich kwcoco polygons

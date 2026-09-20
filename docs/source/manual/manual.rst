@@ -16,6 +16,7 @@ Manual Docs
 .. toctree::
     getting_started
     native_coco_metrics
+    native_coco_benchmarking
     on_autocomplete
     concepts/gotchas
     concepts/index
