@@ -21,6 +21,11 @@ pint>=0.18      ; python_version < '3.12'                                 # Pyth
 
 ujson>=5.2.0 ; python_version >= '3.7'
 
+# Optional accelerated JSON-schema validation backend. CocoDataset.validate
+# uses this automatically when available and preserves jsonschema as the
+# required compatibility fallback.
+fastjsonschema>=2.15.0
+
 # xdev availpkg sqlalchemy
 sqlalchemy>=2.0.36    ; python_version < '4.0'  and python_version >= '3.13'    # Python 3.13+
 sqlalchemy>=2.0.21    ; python_version < '3.13' and python_version >= '3.12'    # Python 3.12

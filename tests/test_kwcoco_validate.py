@@ -78,7 +78,7 @@ def test_duplicate_multi_band_validate():
 
 
 def test_fastjsonschema_backend_accept_reject_parity():
-    """The opt-in fast backend should agree on representative cases."""
+    """The explicit fast backend should agree on representative cases."""
     import copy
 
     import pytest

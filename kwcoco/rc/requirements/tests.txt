@@ -3,3 +3,6 @@ xdoctest>=1.1.5
 timerit>=0.3.0
 pytest>=6.2.4
 pytest-cov>=2.12.1    
+
+# Exercise the optional accelerated schema backend in the compatibility suite.
+fastjsonschema>=2.15.0

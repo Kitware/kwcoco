@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from typing import Any, TypeVar
 import warnings
 
@@ -15,7 +16,96 @@ def _cached_fast_coco_schema_validator():
     import fastjsonschema
     from kwcoco.coco_schema import COCO_SCHEMA
 
-    return fastjsonschema.compile(COCO_SCHEMA)
+    # Match the historical jsonschema behavior. The reference validation call
+    # does not apply schema defaults and does not install a FormatChecker.
+    return fastjsonschema.compile(
+        COCO_SCHEMA,
+        use_default=False,
+        use_formats=False,
+    )
+
+
+@ub.memoize
+def _cached_jsonschema_validator():
+    """Build the reference validator once instead of rechecking the schema."""
+    from jsonschema.validators import validator_for
+    from kwcoco.coco_schema import COCO_SCHEMA
+
+    validator_cls = validator_for(COCO_SCHEMA)
+    validator_cls.check_schema(COCO_SCHEMA)
+    return validator_cls(COCO_SCHEMA)
+
+
+def _fastjsonschema_available() -> bool:
+    """Check if the optional accelerated schema backend can be imported."""
+    return importlib.util.find_spec('fastjsonschema') is not None
+
+
+def _resolve_schema_backend(schema_backend: str) -> str:
+    """Resolve ``auto`` while keeping explicit backend requests strict."""
+    valid_backends = {'auto', 'jsonschema', 'fastjsonschema'}
+    if schema_backend not in valid_backends:
+        raise KeyError(
+            'Unknown schema_backend={!r}. Expected one of: {}'.format(
+                schema_backend, sorted(valid_backends)
+            )
+        )
+
+    if schema_backend == 'auto':
+        if _fastjsonschema_available():
+            return 'fastjsonschema'
+        return 'jsonschema'
+
+    if schema_backend == 'fastjsonschema' and not _fastjsonschema_available():
+        raise ModuleNotFoundError(
+            "schema_backend='fastjsonschema' requires the optional "
+            "'fastjsonschema' package. Install kwcoco with its optional "
+            "dependencies or install fastjsonschema directly."
+        )
+    return schema_backend
+
+
+def _validate_schema_jsonschema(data):
+    """Return the jsonschema validation error, or ``None`` on success."""
+    import jsonschema
+
+    try:
+        _cached_jsonschema_validator().validate(data)
+    except jsonschema.exceptions.ValidationError as ex:
+        return ex
+    return None
+
+
+def _validate_schema_fastjsonschema(data):
+    """Return the fastjsonschema validation error, or ``None`` on success."""
+    import fastjsonschema
+
+    try:
+        _cached_fast_coco_schema_validator()(data)
+    except fastjsonschema.JsonSchemaException as ex:
+        return ex
+    return None
+
+
+def _contains_tuple(data) -> bool:
+    """Detect Python tuples that fastjsonschema treats as JSON arrays.
+
+    The reference ``jsonschema`` backend intentionally recognizes Python
+    lists, but not tuples, as JSON arrays. ``fastjsonschema`` recognizes both.
+    Normal serialized KWCoco data is list/dict based, so this linear scan is a
+    small compatibility tax on the accelerated path and only triggers the
+    slower validator when tuple semantics could matter.
+    """
+    stack = [data]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, tuple):
+            return True
+        if isinstance(item, dict):
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
 
 
 class MixinCocoSchema:
@@ -205,11 +295,15 @@ class MixinCocoSchema:
             **config :
                 schema (default=True): if True, validate the json-schema
 
-                schema_backend (default='jsonschema'):
-                    JSON-schema implementation to use. The default preserves
-                    existing validation behavior. ``'fastjsonschema'`` is an
-                    optional substantially faster backend for trusted
-                    high-volume validation workflows.
+                schema_backend (default='auto'):
+                    JSON-schema implementation to use. ``'auto'`` uses the
+                    optional substantially faster ``fastjsonschema`` backend
+                    when it is installed and otherwise falls back to the
+                    required ``jsonschema`` backend. If the fast validator
+                    rejects data in auto mode, validation is retried with
+                    ``jsonschema`` to preserve compatibility with values the
+                    reference backend accepts. Explicit ``'jsonschema'`` and
+                    ``'fastjsonschema'`` modes are also available.
 
                 unique (default=True): if True, validate unique secondary keys
 
@@ -280,36 +374,58 @@ class MixinCocoSchema:
             result['warnings'].append(msg)
 
         if config.get('schema', True):
-            schema_backend = config.get('schema_backend', 'jsonschema')
-            from kwcoco.coco_schema import COCO_SCHEMA
+            schema_backend = config.get('schema_backend', 'auto')
+            resolved_schema_backend = _resolve_schema_backend(schema_backend)
 
             if verbose:
-                print(f'Validate json-schema with {schema_backend}')
+                if schema_backend == resolved_schema_backend:
+                    print(f'Validate json-schema with {resolved_schema_backend}')
+                else:
+                    print(
+                        'Validate json-schema with {} '
+                        '(auto resolved to {})'.format(
+                            schema_backend, resolved_schema_backend
+                        )
+                    )
 
-            if schema_backend == 'jsonschema':
-                import jsonschema
-
-                try:
-                    COCO_SCHEMA.validate(dset.dataset)  # type: ignore
-                except jsonschema.exceptions.ValidationError as ex:
-                    err = ex
-                    if verbose:
-                        print(f'err.absolute_path={err.absolute_path}')
-                    msg = 'Failed to validate schema: {}'.format(str(err))
-                    _error(msg)
-            elif schema_backend == 'fastjsonschema':
-                import fastjsonschema
-
-                try:
-                    _cached_fast_coco_schema_validator()(dset.dataset)
-                except fastjsonschema.JsonSchemaException as ex:
-                    msg = 'Failed to validate schema: {}'.format(str(ex))
-                    _error(msg)
+            if resolved_schema_backend == 'jsonschema':
+                schema_error = _validate_schema_jsonschema(dset.dataset)
             else:
-                raise KeyError(
-                    'Unknown schema_backend={!r}. Expected one of: '
-                    "'jsonschema', 'fastjsonschema'".format(schema_backend)
-                )
+                has_tuple = schema_backend == 'auto' and _contains_tuple(dset.dataset)
+                if has_tuple:
+                    # fastjsonschema treats tuples as arrays whereas the
+                    # historical jsonschema backend does not. Skip the fast
+                    # validator when that semantic difference can matter.
+                    schema_error = _validate_schema_jsonschema(dset.dataset)
+                else:
+                    schema_error = _validate_schema_fastjsonschema(dset.dataset)
+
+                if schema_error is not None and schema_backend == 'auto' and not has_tuple:
+                    # The two Python implementations intentionally differ in
+                    # a few non-JSON-native type details. fastjsonschema is
+                    # stricter for some numeric classes (e.g. numpy integer
+                    # values used as JSON numbers). Normal JSON-native
+                    # manifests avoid this case. On a fast rejection, pay the
+                    # slower reference-validator cost to preserve historical
+                    # jsonschema acceptance behavior.
+                    reference_error = _validate_schema_jsonschema(dset.dataset)
+                    if reference_error is None:
+                        if schema_error is not None and verbose > 1:
+                            print(
+                                'fastjsonschema rejected data accepted by '
+                                'jsonschema; accepted via compatibility fallback'
+                            )
+                        schema_error = None
+                    else:
+                        # Preserve the reference backend's error behavior for
+                        # genuinely invalid data in auto mode.
+                        schema_error = reference_error
+
+            if schema_error is not None:
+                if verbose and hasattr(schema_error, 'absolute_path'):
+                    print(f'err.absolute_path={schema_error.absolute_path}')
+                msg = 'Failed to validate schema: {}'.format(str(schema_error))
+                _error(msg)
 
         def _check_unique(dset, table_key, col_key, required=True):
             if verbose:

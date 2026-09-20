@@ -121,8 +121,12 @@ def benchmark_loaded_dataset(
     }
     rows = []
 
+    auto_config = _validation_config(schema=True)
+    jsonschema_config = _validation_config(schema=True)
+    jsonschema_config['schema_backend'] = 'jsonschema'
     validation_cases = [
-        ('validate_schema_jsonschema', _validation_config(schema=True)),
+        ('validate_schema_auto', auto_config),
+        ('validate_schema_jsonschema', jsonschema_config),
         ('validate_unique', _validation_config(unique=True)),
         ('validate_channels', _validation_config(channels=True)),
         ('validate_annot_attrs', _validation_config(annot_attrs=True)),
