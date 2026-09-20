@@ -363,6 +363,85 @@ def test_native_coco_negative_images_contribute_false_positives():
     assert 0 < native['summary']['AP50'] < 1
 
 
+def test_native_coco_score_ties_preserve_coco_stable_order():
+    """COCO uses stable descending score order during accumulation."""
+    import kwcoco
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    dims = (64, 64)
+    true = kwcoco.CocoDataset()
+    pred = kwcoco.CocoDataset()
+    for dset in [true, pred]:
+        dset.add_category(name='thing', id=1)
+        for gid in [1, 2]:
+            dset.add_image(
+                id=gid, file_name=f'im{gid}.png', width=64, height=64
+            )
+
+    mask = np.zeros(dims, dtype=np.uint8)
+    mask[8:24, 8:24] = 1
+    false_mask = np.zeros(dims, dtype=np.uint8)
+    false_mask[36:52, 36:52] = 1
+    true.add_annotation(
+        id=1, image_id=1, category_id=1,
+        bbox=_bbox_from_mask(mask), segmentation=_rle(mask)
+    )
+    # Equal scores are intentional.  With gids traversed in sorted order,
+    # COCO accumulation sees the TP first and must preserve that tie order.
+    pred.add_annotation(
+        id=11, image_id=1, category_id=1,
+        bbox=_bbox_from_mask(mask), segmentation=_rle(mask), score=.5
+    )
+    pred.add_annotation(
+        id=12, image_id=2, category_id=1,
+        bbox=_bbox_from_mask(false_mask), segmentation=_rle(false_mask),
+        score=.5
+    )
+
+    dmet = DetectionMetrics.from_coco(true, pred)
+    native = dmet.score_native_coco(
+        overlap_backend='pycocotools', raster_backend='pycocotools'
+    )
+    official = dmet.score_pycocotools(iou_type='segm')
+    assert native['summary']['AP50'] > .99
+    assert native['summary']['AP50'] == pytest.approx(
+        official['summary']['AP50'], abs=1e-12
+    )
+    assert native['summary']['AP'] == pytest.approx(
+        official['summary']['AP'], abs=1e-12
+    )
+
+
+def test_native_coco_maxdets_100_truncates_before_matching():
+    from kwcoco.metrics.detect_metrics import DetectionMetrics
+
+    dims = (64, 64)
+    true, pred = _empty_pair(dims=dims)
+    truth = np.zeros(dims, dtype=np.uint8)
+    false = np.zeros(dims, dtype=np.uint8)
+    truth[4:16, 4:16] = 1
+    false[40:52, 40:52] = 1
+    _add_mask_ann(true, truth, aid=1)
+    for idx in range(100):
+        _add_mask_ann(
+            pred, false, aid=1000 + idx, score=1.0 - idx * .001
+        )
+    _add_mask_ann(pred, truth, aid=2000, score=.5)
+
+    dmet = DetectionMetrics.from_coco(true, pred)
+    native = dmet.score_native_coco(
+        overlap_backend='pycocotools', raster_backend='pycocotools'
+    )
+    official = dmet.score_pycocotools(iou_type='segm')
+    assert native['summary']['AR100'] == 0.0
+    assert native['summary']['AR100'] == pytest.approx(
+        official['summary']['AR100'], abs=1e-12
+    )
+    assert native['summary']['AP'] == pytest.approx(
+        official['summary']['AP'], abs=1e-12
+    )
+
+
 def test_native_coco_reuses_one_candidate_index_per_image(monkeypatch):
     import kwcoco
     from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
@@ -426,6 +505,8 @@ def test_native_coco_perfect_summary_and_evaluator_surface():
     assert tuple(native['summary']) == COCO_DETECTION_STAT_KEYS
     assert native['backend'] == 'kwcoco'
     assert native['assignment'] == 'assignment_v2'
+    assert native['accumulator'] == 'assignment_rows->coco101'
+    assert len(native['params']['recall_thresholds']) == 101
     assert native['summary']['AP'] > .99
     assert native['summary']['AR100'] > .99
     assert native['summary']['AP'] == pytest.approx(

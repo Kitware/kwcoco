@@ -387,8 +387,17 @@ python dev/pycocotools_metrics_compare/run_phase22_crowd_ignore.py \
 Phase 2.3 adds assignment-time area ranges, COCO-style per-image/per-category
 `maxDets`, and a native dataset summary built from the reusable mask candidate
 indexes. The native summary remains explicitly distinct from official
-`COCOeval`: assignment is native `assignment_v2`, while accumulation uses
-`ConfusionVectors -> Measures` with `ap_method='pycocotools'`.
+`COCOeval`: assignment is native `assignment_v2`, while the COCO-shaped
+summary uses a narrow native 101-recall-point accumulator over the explicit
+assignment rows.  Generic `ConfusionVectors -> Measures` remains available
+for kwcoco's broader metric analyses and is not globally changed for this
+compatibility target.
+
+The dedicated summary accumulator is intentional.  COCO accumulation requires
+a stable descending mergesort for equal detection scores.  Historical generic
+binary-curve code has different tie ordering, so routing the COCO-shaped
+summary through it can change AP even when assignment is identical.  Keeping
+the rule local avoids changing established `Measures` behavior.
 
 Run the focused tests first:
 
@@ -406,6 +415,7 @@ Then run the deterministic comparison suite:
 ```bash
 python dev/pycocotools_metrics_compare/run_phase23_native_coco.py \
     --mode=quick \
+    --assert-parity \
     --output-dpath=_metric_compare_phase23_native_coco
 ```
 
@@ -419,4 +429,6 @@ The report includes the 12 named native and official AP/AR values, absolute
 summary deltas, row-level assignment differences at IoU 0.50/0.75/0.95,
 backend provenance, and candidate-build / assignment / accumulation timing.
 The adversarial corpus includes area-priority matching, `maxDets`, a negative
-image, and crowd behavior in addition to the existing perturbation cases.
+image, crowd behavior, equal-score accumulation order, all three area bins,
+100-detection truncation, prediction-only categories, and a nontrivial
+precision/recall curve in addition to the existing perturbation cases.

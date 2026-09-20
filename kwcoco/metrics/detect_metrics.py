@@ -816,9 +816,10 @@ class DetectionMetrics(ub.NiceRepr):
     ) -> dict[str, typing.Any]:
         """Compute a native kwcoco COCO-shaped instance-mask summary.
 
-        This uses the reusable :mod:`assignment_v2` candidate graph and the
-        native ``ConfusionVectors -> Measures`` accumulator.  It deliberately
-        does *not* claim to be official COCOeval.  The exact-reference path is
+        This uses the reusable :mod:`assignment_v2` candidate graph followed
+        by a small native COCO-style 101-recall-point accumulator over the
+        explicit assignment rows.  It deliberately does *not* claim to be
+        official COCOeval.  The exact-reference path is
         :meth:`score_pycocotools`.
 
         The standard COCO detection summary slices are reproduced with native
@@ -833,12 +834,12 @@ class DetectionMetrics(ub.NiceRepr):
             parity is a separate explicit campaign.
         """
         import time
-        import kwarray
         from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
         from kwcoco.metrics.coco_metrics import COCO_AREA_RANGES
         from kwcoco.metrics.coco_metrics import COCO_DETECTION_STAT_KEYS
         from kwcoco.metrics.coco_metrics import COCO_IOU_THRESHOLDS
         from kwcoco.metrics.coco_metrics import COCO_MAX_DETS
+        from kwcoco.metrics.coco_metrics import COCO_RECALL_THRESHOLDS
 
         if iou_type != 'segm':
             raise KeyError(
@@ -889,38 +890,27 @@ class DetectionMetrics(ub.NiceRepr):
         else:
             measure_ignore_classes = set(ignore_classes)
 
-        def rows_to_confusion(y_accum):
-            data = {}
-            for key, vals in y_accum.items():
-                dtype = None
-                if key in {'iou', 'score', 'weight'}:
-                    dtype = np.float32
-                elif key in {
-                    'pxs', 'txs', 'gid', 'pred', 'true', 'rank'
-                }:
-                    dtype = np.int32
-                data[key] = np.asarray(vals, dtype=dtype)
-            if not data:
-                data = {
-                    k: np.empty((0,))
-                    for k in ['gid'] + ASSIGN_COLUMNS + ['rank']
-                }
-            return ConfusionVectors(
-                kwarray.DataFrameArray(data), classes=classes
-            )
+        recall_thresholds = np.asarray(COCO_RECALL_THRESHOLDS, dtype=float)
 
-        def scalar_metrics(cfsn_vecs):
-            ovr = cfsn_vecs.binarize_ovr(
-                mode=1,
-                ignore_classes=measure_ignore_classes,
-            )
-            measure_info = ovr.measures(
-                stabalize_thresh=0,
-                monotonic_ppv=True,
-                ap_method='pycocotools',
-            )
-            perclass_measures = measure_info['perclass']
-            data = cfsn_vecs.data
+        def scalar_metrics(y_accum):
+            """Reduce explicit assignment rows with COCO accumulation rules.
+
+            This intentionally stays local to ``score_native_coco`` instead
+            of changing historical :class:`Measures` semantics.  In
+            particular, COCOeval requires a stable descending mergesort for
+            detection scores.  The generic binary-curve machinery has its own
+            historical tie behavior, so using it here can change AP when
+            equal-score TP/FP rows are present.
+
+            The precision-envelope and 101 recall-point calculation mirrors
+            the semantics of ``pycocotools.cocoeval.COCOeval.accumulate`` but
+            operates directly on kwcoco's reusable assignment rows rather
+            than copying COCOeval's tensor-oriented implementation.
+            """
+            true = np.asarray(y_accum.get('true', []), dtype=np.int32)
+            pred = np.asarray(y_accum.get('pred', []), dtype=np.int32)
+            score = np.asarray(y_accum.get('score', []), dtype=float)
+            weight = np.asarray(y_accum.get('weight', []), dtype=float)
             ap_values = []
             recall_values = []
             perclass = {}
@@ -928,26 +918,42 @@ class DetectionMetrics(ub.NiceRepr):
                 name = str(node)
                 if name == 'background' or node in measure_ignore_classes:
                     continue
-                true_flags = data['true'] == cx
-                realpos_total = float(data['weight'][true_flags].sum())
+                true_flags = true == cx
+                realpos_total = float(weight[true_flags].sum())
                 if realpos_total <= 0:
                     continue
-                matched_flags = (
-                    true_flags
-                    & (data['pred'] == cx)
-                    & (data['pxs'] >= 0)
-                )
-                matched_weight = float(data['weight'][matched_flags].sum())
-                recall = matched_weight / realpos_total
-                measures = perclass_measures.get(node, None)
-                if measures is None:
-                    measures = perclass_measures.get(name, None)
-                if measures is None:
+
+                pred_flags = pred == cx
+                cls_score = score[pred_flags]
+                cls_weight = weight[pred_flags]
+                cls_is_tp = true[pred_flags] == cx
+                if len(cls_score) == 0:
                     ap = 0.0
+                    recall = 0.0
                 else:
-                    ap = float(measures['ap'])
-                    if not np.isfinite(ap):
-                        ap = 0.0
+                    # COCOeval deliberately uses mergesort here.  Sorting the
+                    # negated scores preserves the original row order for
+                    # ties; sorting ascending and reversing does not.
+                    order = np.argsort(-cls_score, kind='mergesort')
+                    cls_weight = cls_weight[order]
+                    cls_is_tp = cls_is_tp[order]
+
+                    tp = np.cumsum(cls_weight * cls_is_tp, dtype=float)
+                    fp = np.cumsum(cls_weight * ~cls_is_tp, dtype=float)
+                    rc = tp / realpos_total
+                    pr = tp / (tp + fp + np.spacing(1))
+                    if len(pr) > 1:
+                        pr = np.maximum.accumulate(pr[::-1])[::-1]
+
+                    inds = np.searchsorted(
+                        rc, recall_thresholds, side='left'
+                    )
+                    sampled = np.zeros(len(recall_thresholds), dtype=float)
+                    valid = inds < len(pr)
+                    sampled[valid] = pr[inds[valid]]
+                    ap = float(sampled.mean())
+                    recall = float(rc[-1])
+
                 ap_values.append(ap)
                 recall_values.append(recall)
                 if with_details:
@@ -1011,8 +1017,9 @@ class DetectionMetrics(ub.NiceRepr):
             accum_start = time.perf_counter()
             threshold_metrics = {}
             for threshold in thresholds:
-                cfsn_vecs = rows_to_confusion(y_accum[threshold])
-                threshold_metrics[threshold] = scalar_metrics(cfsn_vecs)
+                threshold_metrics[threshold] = scalar_metrics(
+                    y_accum[threshold]
+                )
             accumulation_seconds += time.perf_counter() - accum_start
             slice_metrics[(area_label, max_dets)] = threshold_metrics
 
@@ -1067,11 +1074,12 @@ class DetectionMetrics(ub.NiceRepr):
             'iou_type': 'segm',
             'geometry': 'segm',
             'assignment': 'assignment_v2',
-            'accumulator': 'ConfusionVectors->Measures',
+            'accumulator': 'assignment_rows->coco101',
             'summary': summary,
             'stats': stats,
             'params': {
                 'iou_thresholds': thresholds,
+                'recall_thresholds': list(COCO_RECALL_THRESHOLDS),
                 'max_dets': list(COCO_MAX_DETS),
                 'max_dets_scope': 'image-category',
                 'area_ranges': {
@@ -1084,7 +1092,7 @@ class DetectionMetrics(ub.NiceRepr):
                     None if ignore_classes is None
                     else sorted(map(str, measure_ignore_classes))
                 ),
-                'ap_method': 'pycocotools',
+                'ap_method': 'coco101',
             },
             'provenance': {
                 'overlap_backends': overlap_names,

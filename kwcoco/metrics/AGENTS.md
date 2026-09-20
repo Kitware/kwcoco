@@ -85,10 +85,16 @@ run where the underlying overlap backend also changed.
 `DetectionMetrics.score_native_coco(iou_type='segm')` is the dataset-level
 native mask summary surface.  It uses assignment-time COCO area semantics,
 per-image/per-category `maxDets`, one reusable candidate index per image, and
-native `ConfusionVectors -> Measures` accumulation.  It is not official
-COCOeval and must stay labeled as kwcoco.
+a dedicated native COCO 101-recall-point accumulator over explicit assignment
+rows.  Do not route this summary back through generic `Measures`: COCO requires
+stable descending score ordering for ties, while historical generic curve code
+has different tie behavior.  `ConfusionVectors -> Measures` remains the
+general kwcoco analysis path and should not be globally changed merely for
+COCO compatibility.  The native summary is not official COCOeval and must stay
+labeled as kwcoco.
 
 Run `dev/pycocotools_metrics_compare/run_phase23_native_coco.py` when changing
-area, maxDet, mask geometry, or native summary semantics.  Historical bbox
+area, maxDet, mask geometry, tie ordering, or native summary semantics.  Use
+`--assert-parity` for the COCO-compatibility regression corpus.  Historical bbox
 `CocoEvaluator.evaluate()` remains on assignment-v1 unless a separate bbox
 parity campaign explicitly changes that decision.

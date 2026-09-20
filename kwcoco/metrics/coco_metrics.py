@@ -38,6 +38,7 @@ COCO_DETECTION_STAT_KEYS = (
 
 
 COCO_IOU_THRESHOLDS = tuple(np.linspace(0.50, 0.95, 10).tolist())
+COCO_RECALL_THRESHOLDS = tuple(np.linspace(0.0, 1.0, 101).tolist())
 COCO_MAX_DETS = (1, 10, 100)
 COCO_AREA_RANGES = {
     'all': (0.0, 1e10),
