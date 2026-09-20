@@ -8,8 +8,7 @@ import numpy as np
 
 
 def _load_module():
-    import kwcoco
-    repo = Path(kwcoco.__file__).resolve().parent.parent
+    repo = Path(__file__).resolve().parents[1]
     fpath = repo / 'dev/pycocotools_metrics_compare/run_phase15_suite.py'
     spec = importlib.util.spec_from_file_location('kwcoco_metric_phase15_suite', fpath)
     module = importlib.util.module_from_spec(spec)

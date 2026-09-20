@@ -1,6 +1,19 @@
 """Focused tests for experimental native instance-mask assignment."""
 
 
+def _require_native_mask_backend():
+    """Skip tests that exercise optional native mask-codec capabilities."""
+    import pytest
+    from kwcoco.metrics.overlap import resolve_coco_raster_backend
+    from kwcoco.metrics.overlap import resolve_mask_iou_backend
+
+    try:
+        resolve_mask_iou_backend('auto')
+        resolve_coco_raster_backend('auto')
+    except ImportError as ex:
+        pytest.skip(str(ex))
+
+
 def _same_box_disjoint_masks():
     import kwimage
     import numpy as np
@@ -26,6 +39,7 @@ def _same_box_disjoint_masks():
 
 
 def test_segmentation_assignment_separates_box_and_mask_geometry():
+    _require_native_mask_backend()
     from kwcoco.metrics.assignment_v2 import assign_confusion_vectors_v2
 
     dims, true, pred = _same_box_disjoint_masks()
@@ -53,6 +67,7 @@ def test_segmentation_assignment_separates_box_and_mask_geometry():
 
 
 def test_segmentation_assignment_reuses_overlap_for_multiple_thresholds():
+    _require_native_mask_backend()
     from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
 
     dims, true, pred = _same_box_disjoint_masks()
@@ -71,6 +86,7 @@ def test_segmentation_assignment_reuses_overlap_for_multiple_thresholds():
 
 
 def test_detection_metrics_v2_mask_path_on_coco_data():
+    _require_native_mask_backend()
     import kwcoco
     from kwcoco.demo.perterb import perterb_coco
     from kwcoco.metrics.detect_metrics import DetectionMetrics
@@ -118,6 +134,7 @@ def _half_overlap_rle_case():
 
 
 def test_segmentation_threshold_policy_is_explicit():
+    _require_native_mask_backend()
     from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
 
     dims, true, pred = _half_overlap_rle_case()
@@ -170,3 +187,49 @@ def test_coco_rasterizer_kwimage_ext_matches_pycocotools():
     ref_mask = mask_utils.decode(ref_rle)
     assert np.array_equal(rust_mask, ref_mask)
     assert float(mask_utils.area(rust_rle)) == float(mask_utils.area(ref_rle))
+
+
+def test_dense_kwimage_mask_uses_resolved_coco_codec():
+    """Dense masks should encode through kwcoco's resolved codec adapter."""
+    import kwimage
+    import numpy as np
+    from kwcoco.metrics.overlap import _segmentation_to_coco_rle
+
+    class DummyCodec:
+        def __init__(self):
+            self.seen = None
+
+        def encode_one(self, mask):
+            self.seen = np.asarray(mask)
+            return {'size': list(mask.shape), 'counts': b'dummy'}
+
+    codec = DummyCodec()
+    mask = kwimage.Mask(np.ones((3, 4), dtype=np.uint8), 'c_mask')
+    rle = _segmentation_to_coco_rle(
+        mask, (3, 4), _resolved_backend=(codec, {'name': 'dummy'}))
+    assert rle == {'size': [3, 4], 'counts': b'dummy'}
+    assert codec.seen.flags['C_CONTIGUOUS']
+    assert codec.seen.sum() == 12
+
+
+def test_missing_mask_backend_raises_dependency_error_first(monkeypatch):
+    """Do not leak kwimage's internal RLE NotImplementedError to callers."""
+    import pytest
+    import kwcoco.metrics.overlap as overlap
+    from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
+
+    dims, true, pred = _same_box_disjoint_masks()
+
+    def _missing_backend(_backend='auto'):
+        raise ImportError('sentinel missing native mask backend')
+
+    monkeypatch.setattr(overlap, 'resolve_mask_iou_backend', _missing_backend)
+    with pytest.raises(ImportError, match='sentinel missing native mask backend'):
+        AssignmentCandidateIndex.build(
+            true, pred,
+            compat='mutex',
+            min_iou=0.5,
+            iou_type='segm',
+            image_dims=dims,
+            spatial_threshold=None,
+        )

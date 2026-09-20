@@ -6,9 +6,7 @@ from pathlib import Path
 
 
 def _load_phase1_module():
-    import kwcoco
-
-    repo_dpath = Path(kwcoco.__file__).resolve().parent.parent
+    repo_dpath = Path(__file__).resolve().parents[1]
     fpath = repo_dpath / 'dev/pycocotools_metrics_compare/run_phase1_suite.py'
     spec = importlib.util.spec_from_file_location('kwcoco_metric_phase1_suite', fpath)
     module = importlib.util.module_from_spec(spec)

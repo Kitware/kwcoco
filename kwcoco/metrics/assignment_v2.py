@@ -648,6 +648,13 @@ class AssignmentCandidateIndex:
             from kwcoco.metrics.overlap import rle_areas
             from kwcoco.metrics.overlap import resolve_mask_iou_backend
 
+            # Resolve the required overlap capability before rasterization.
+            # Without a native COCO mask backend, kwimage's dense-mask to
+            # compressed-RLE conversion can otherwise leak a lower-level
+            # NotImplementedError instead of our documented dependency error.
+            mask_iou_func, overlap_metadata = resolve_mask_iou_backend(
+                overlap_backend
+            )
             pred_rles, pred_raster_meta = detections_to_rles(
                 pred_dets, image_dims,
                 rasterizer=segmentation_rasterizer,
@@ -660,9 +667,6 @@ class AssignmentCandidateIndex:
             )
             if pred_raster_meta != true_raster_meta:
                 raise AssertionError('prediction/truth raster backends disagree')
-            mask_iou_func, overlap_metadata = resolve_mask_iou_backend(
-                overlap_backend
-            )
             pred_areas, pred_area_meta = rle_areas(
                 pred_rles, backend=raster_backend
             )

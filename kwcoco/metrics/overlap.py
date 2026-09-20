@@ -197,13 +197,26 @@ def _segmentation_to_coco_rle(
         raise ValueError('unable to coerce segmentation')
 
     data = seg.data
-    if isinstance(data, kwimage.Mask):
-        return _backend_ready_rle(data.to_bytes_rle().data)
+    if isinstance(data, kwimage.Mask) and data.format == 'bytes_rle':
+        return _backend_ready_rle(data.data)
 
     if _resolved_backend is None:
         codec, metadata = resolve_coco_raster_backend(raster_backend)
     else:
         codec, metadata = _resolved_backend
+
+    if isinstance(data, kwimage.Mask):
+        # Do not delegate dense-mask compression to kwimage here.  Kwimage's
+        # ``Mask.to_bytes_rle`` only knows about its historical C backend and
+        # can raise NotImplementedError when kwimage_ext is the available COCO
+        # codec.  Encode through the backend we explicitly resolved above.
+        dense = np.asarray(data.to_c_mask().data, dtype=np.uint8)
+        if dense.shape != (height, width):
+            raise ValueError(
+                'segmentation mask canvas mismatch: '
+                f'{dense.shape!r} != {(height, width)!r}'
+            )
+        return _backend_ready_rle(codec.encode_one(dense))
 
     mpoly = data.to_multi_polygon()
     parts = _polygon_parts_and_holes(mpoly)
