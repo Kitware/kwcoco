@@ -23,7 +23,7 @@ def estimate_image_sunlight(dset):
     from kwutil.util_math import Rational
 
     sunlight_values = []
-    for img in dset.images().objs_iter():
+    for img in dset.images().objs:
         if 'geos_point' not in img:
             sunlight = math.nan
         else:

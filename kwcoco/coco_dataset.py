@@ -1665,7 +1665,7 @@ class CocoDataset(
             # Preserve the existing runtime ordering behavior here; the raw
             # dataset dictionaries are intentionally open-ended.
             sub_track_ids = sorted(cast(Any, track_ids))
-            new_dataset['tracks'] = list(self.tracks(sub_track_ids).objs_iter())
+            new_dataset['tracks'] = list(self.tracks(sub_track_ids).objs)
 
         new_dataset['img_root'] = self.dataset.get('img_root', None)  # type: ignore
 

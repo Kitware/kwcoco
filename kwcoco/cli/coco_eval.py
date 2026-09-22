@@ -67,10 +67,10 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
             >>> dpath = ub.Path.appdir('kwcoco/tests/eval').ensuredir()
             >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
             >>> kwargs = {
-            >>>     'box_noise': 0.5,
-            >>>     'n_fp': (0, 10),
-            >>>     'n_fn': (0, 10),
-            >>> }
+            ...     'box_noise': 0.5,
+            ...     'n_fp': (0, 10),
+            ...     'n_fn': (0, 10),
+            ... }
             >>> pred_dset = perterb_coco(true_dset, **kwargs)
             >>> true_dset.fpath = dpath / 'true.mscoco.json'
             >>> pred_dset.fpath = dpath / 'pred.mscoco.json'
@@ -79,12 +79,12 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
             >>> pred_dset.dump(pred_dset.fpath)
             >>> draw = False  # set to false for faster tests
             >>> kw = dict(
-            >>>     true_dataset=true_dset.fpath,
-            >>>     pred_dataset=pred_dset.fpath,
-            >>>     confusion_fpath=confusion_fpath,
-            >>>     draw=draw,
-            >>>     out_dpath=dpath
-            >>> )
+            ...     true_dataset=true_dset.fpath,
+            ...     pred_dataset=pred_dset.fpath,
+            ...     confusion_fpath=confusion_fpath,
+            ...     draw=draw,
+            ...     out_dpath=dpath
+            ... )
             >>> cmdline = False
             >>> CocoEvalCLI.main(cmdline=cmdline, **kw)
 
@@ -124,7 +124,7 @@ def main(cmdline=True, **kw):
     cli_config = CocoEvalCLI.cli(cmdline=cmdline, data=kw)
     print('cli_config = {}'.format(ub.urepr(cli_config, nl=1)))
 
-    eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__) # type: ignore
+    eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__)  # type: ignore
 
     coco_eval = coco_evaluator.CocoEvaluator(eval_config)
     coco_eval._init()
@@ -321,11 +321,11 @@ def build_confusion_datasets(coco_eval, results):
 
         # Ensure true and pred categories exist in the cfsn dataset
         for cat in true_dset.categories().objs:
-            new_cat = ub.udict(cat) - {'id'} # type: ignore
+            new_cat = ub.udict(cat) - {'id'}  # type: ignore
             cfsn_dset.ensure_category(**new_cat)
 
         # Mark the predicted annotations in the confusion dataset
-        for ann in cfsn_dset.annots().objs_iter():
+        for ann in cfsn_dset.annots().objs:
             ann.update(
                 {
                     'role': 'pred',
