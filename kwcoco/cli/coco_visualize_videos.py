@@ -736,11 +736,49 @@ def _render_frame(
     dets = None
     trails = None
     if draw_anns and anns:
-        dets = kwimage.Detections.from_coco_annots(anns, dset=coco_dset)
-        if ann_score_thresh:
-            flags = [float(ann.get('score', 1)) > ann_score_thresh for ann in anns]
-            dets = dets.compress(flags)
-        dets = dets.warp(warp_viz_from_img)
+        # ``kwimage.Detections.from_coco_annots`` requires a bbox for each
+        # annotation. KWCoco itself permits bbox-less annotations (for
+        # example point annotations used as metadata), so restrict the
+        # detection overlay to annotations with drawable boxes instead of
+        # failing the entire visualization.
+        drawable_anns = [
+            ann for ann in anns if ann.get('bbox', None) is not None
+        ]
+        if verbose > 1 and len(drawable_anns) != len(anns):
+            num_skipped = len(anns) - len(drawable_anns)
+            print(f'Skip {num_skipped} bbox-less annotations for gid={img["id"]}')
+
+        if drawable_anns:
+            # Preserve explicit per-annotation colors. Confusion datasets
+            # written by ``kwcoco eval --confusion_fpath`` store TP / FP / FN
+            # colors directly on annotations. Fall back to category color,
+            # then the historical blue default.
+            import numpy as np
+
+            colors = []
+            for ann in drawable_anns:
+                color = ann.get('color', None)
+                if color is None:
+                    cid = ann.get('category_id', None)
+                    if cid is not None:
+                        cat = coco_dset.index.cats.get(cid, None)
+                        if cat is not None:
+                            color = cat.get('color', None)
+                if color is None:
+                    color = 'blue'
+                colors.append(kwimage.Color.coerce(color).as01())
+
+            dets = kwimage.Detections.from_coco_annots(
+                drawable_anns, dset=coco_dset
+            )
+            dets.data['colors'] = np.asarray(colors)
+            if ann_score_thresh:
+                flags = [
+                    float(ann.get('score', 1)) > ann_score_thresh
+                    for ann in drawable_anns
+                ]
+                dets = dets.compress(flags)
+            dets = dets.warp(warp_viz_from_img)
 
     if draw_track_trails and coco_img.img.get('video_id', None) is not None:
         if space != 'video':
@@ -999,9 +1037,17 @@ def _draw_channel_group(
         ann_chan_dpath.ensuredir()
         ann_canvas = kwimage.ensure_float01(canvas, copy=True)
         if dets is not None:
-            # Draw boxes/segmentations/labels as requested.
+            # Draw boxes/segmentations/labels as requested. Annotation-level
+            # colors are kept as an ndarray internally so Detections.compress
+            # stays aligned, but ``draw_on`` has a special string comparison
+            # for ``color='classes'`` and therefore needs a plain sequence at
+            # the API boundary.
+            draw_colors = dets.data.get('colors', 'blue')
+            if not isinstance(draw_colors, str):
+                draw_colors = draw_colors.tolist()
             ann_canvas = dets.draw_on(
                 ann_canvas,
+                color=draw_colors,
                 boxes=bool(draw_boxes),
                 sseg=bool(draw_segmentations),
                 labels=bool(draw_labels),
