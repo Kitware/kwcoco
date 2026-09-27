@@ -95,6 +95,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Make ``CocoDataset.add_auxiliary_item()`` emit the same deprecation as the
   corresponding ``CocoImage`` alias, and fix ``CocoSqlDatabase.data_fpath``
   assignment to update its canonical SQL URI.
+* Make ``CocoImage.find_asset()`` continue past a base image with unspecified
+  channels so channel lookups can reach explicitly labeled auxiliary assets.
 * Make routine `CocoDataset.validate()` progress quiet by default, reserve
   per-check progress for verbosity level 2, and avoid printing validation
   warnings in addition to emitting them through Python's warnings system. The
