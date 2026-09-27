@@ -124,7 +124,7 @@ An informal spec is as follows:
     annotation = {
         'id': int,
         'image_id': int,
-        'category_id': int,
+        'category_id': int | None,
 
         'track_id': <int | str | uuid>  # indicates association between annotations across images
 

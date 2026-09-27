@@ -220,7 +220,13 @@
                         "maxItems": 4
                     },
                     "area": {"type": "number", "description": "The optional MS-COCO annotation area"},
-                    "category_id": {"type": "integer", "description": "The category id of this annotation"},
+                    "category_id": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "null"}
+                        ],
+                        "description": "The category id of this annotation. None is allowed for uncategorized annotations."
+                    },
                     "track_id": {
                         "anyOf": [
                             {"type": "integer"},

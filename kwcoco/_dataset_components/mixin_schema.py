@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
 from typing import Any, TypeVar
 import warnings
 
 import ubelt as ub
+
+
+logger = logging.getLogger(__name__)
 
 
 MixinCocoSchemaT = TypeVar('MixinCocoSchemaT', bound='MixinCocoSchema')
@@ -261,8 +265,10 @@ class MixinCocoSchema:
                         except ValueError:
                             REMOVE_HOLES = 1
                             if REMOVE_HOLES:
-                                print(
-                                    'Warning: converting to legacy polygon is removing holes'
+                                warnings.warn(
+                                    'Converting to a legacy polygon removes holes',
+                                    UserWarning,
+                                    stacklevel=2,
                                 )
                                 mpoly = poly.to_shapely()
                                 from shapely.geometry import Polygon, MultiPolygon
@@ -324,12 +330,20 @@ class MixinCocoSchema:
                 bundle directory. if>0, paths must be relative to bundle
                 root.  if>1, paths must be inside bundle root.
 
-                img_attrs (default='warn'):
+                img_attrs (default=False):
                 if truthy, check that image attributes contain width and
                 height entries. If 'warn', then warn if they do not exist.
                 If 'error', then fail.
 
-                verbose (default=1): verbosity flag
+                annot_attrs (default=False):
+                    if truthy, check that annotations contain bbox entries.
+                    This is opt-in because bbox is not required by the kwcoco
+                    schema. If 'warn', then warn if values are missing. If
+                    'error', then fail.
+
+                verbose (default=0): verbosity flag. Level 1 reports
+                    validation problems. Level 2 also reports individual
+                    validation checks and progress.
 
                 workers (int): number of workers for parallel checks. defaults to 0
 
@@ -360,7 +374,7 @@ class MixinCocoSchema:
             'errors': [],
             'warnings': [],
         }
-        verbose = config.get('verbose', 1)
+        verbose = config.get('verbose', 0)
         fastfail = config.get('fastfail', 0)
 
         def _error(msg):
@@ -371,16 +385,22 @@ class MixinCocoSchema:
             result['errors'].append(msg)
 
         def _warn(msg):
-            if verbose:
-                print(msg)
-            warnings.warn(msg, UserWarning)
+            # Do not also print warnings. The warnings subsystem already gives
+            # callers filtering / routing controls, and printing here produced
+            # duplicate user-facing diagnostics.
+            warnings.warn(msg, UserWarning, stacklevel=4)
             result['warnings'].append(msg)
 
         if config.get('schema', True):
             schema_backend = config.get('schema_backend', 'auto')
             resolved_schema_backend = _resolve_schema_backend(schema_backend)
 
-            if verbose:
+            logger.debug(
+                'Validate json-schema with %s (requested=%s)',
+                resolved_schema_backend,
+                schema_backend,
+            )
+            if verbose > 1:
                 if schema_backend == resolved_schema_backend:
                     print(f'Validate json-schema with {resolved_schema_backend}')
                 else:
@@ -413,6 +433,11 @@ class MixinCocoSchema:
                     # jsonschema acceptance behavior.
                     reference_error = _validate_schema_jsonschema(dset.dataset)
                     if reference_error is None:
+                        if schema_error is not None:
+                            logger.debug(
+                                'fastjsonschema rejected data accepted by '
+                                'jsonschema; accepted via compatibility fallback'
+                            )
                         if schema_error is not None and verbose > 1:
                             print(
                                 'fastjsonschema rejected data accepted by '
@@ -425,13 +450,19 @@ class MixinCocoSchema:
                         schema_error = reference_error
 
             if schema_error is not None:
-                if verbose and hasattr(schema_error, 'absolute_path'):
+                if hasattr(schema_error, 'absolute_path'):
+                    logger.debug(
+                        'schema validation error absolute_path=%r',
+                        schema_error.absolute_path,
+                    )
+                if verbose > 1 and hasattr(schema_error, 'absolute_path'):
                     print(f'err.absolute_path={schema_error.absolute_path}')
                 msg = 'Failed to validate schema: {}'.format(str(schema_error))
                 _error(msg)
 
         def _check_unique(dset, table_key, col_key, required=True):
-            if verbose:
+            logger.debug('Check table %r has unique %r', table_key, col_key)
+            if verbose > 1:
                 print('Check table {!r} has unique {!r}'.format(table_key, col_key))
             items = dset.dataset.get(table_key, [])
             seen = set()
@@ -458,7 +489,8 @@ class MixinCocoSchema:
                     _warn(msg)
 
         def _check_attrs(dset, table_key, col_key, required=True):
-            if verbose:
+            logger.debug('Check table %r entries have attr %r', table_key, col_key)
+            if verbose > 1:
                 print(
                     'Check table {!r} entries have attr {!r}'.format(table_key, col_key)
                 )
@@ -482,7 +514,13 @@ class MixinCocoSchema:
         def _check_subtable_attrs(
             dset, table_key, subtable_keys, col_key, required=True
         ):
-            if verbose:
+            logger.debug(
+                'Check subtable %r / %r entries have attr %r',
+                table_key,
+                subtable_keys,
+                col_key,
+            )
+            if verbose > 1:
                 print(
                     'Check subtable {!r} / {!r} entries have attr {!r}'.format(
                         table_key, subtable_keys, col_key
@@ -542,9 +580,9 @@ class MixinCocoSchema:
                 required=required,
             )
 
-        if config.get('annot_attrs', True):
+        if config.get('annot_attrs', False):
             required = config.get('annot_attrs', False) == 'error'
-            _check_attrs(dset, table_key='annotations', col_key='bbox', required=False)
+            _check_attrs(dset, table_key='annotations', col_key='bbox', required=required)
 
         if config.get('channels', True):
             for img in self.dataset.get('images', []):  # type: ignore
@@ -574,7 +612,9 @@ class MixinCocoSchema:
                                 )
                             seen.add(chan)
         if config.get('missing', True):
-            missing = dset.missing_images(check_aux=True, verbose=verbose)  # type: ignore
+            missing = dset.missing_images(  # type: ignore
+                check_aux=True, verbose=max(verbose - 1, 0)
+            )
             if missing:
                 msg = ub.paragraph(
                     f"""
@@ -587,7 +627,9 @@ class MixinCocoSchema:
 
         if config.get('corrupted', False):
             corrupted = dset.corrupted_images(  # type: ignore
-                check_aux=True, verbose=verbose, workers=config.get('workers', 0)
+                check_aux=True,
+                verbose=max(verbose - 1, 0),
+                workers=config.get('workers', 0),
             )
             if corrupted:
                 msg = ub.paragraph(

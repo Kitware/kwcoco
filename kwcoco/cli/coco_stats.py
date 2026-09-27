@@ -474,7 +474,7 @@ def _dataset_disk_usage(dset):
     # Collect all filepaths from images. iter_image_filepaths() typically
     # includes primary + auxiliary assets.
     filepaths = []
-    for coco_img in dset.images().coco_images_iter():
+    for coco_img in dset.images().coco_images:
         for fpath in coco_img.iter_image_filepaths():
             if fpath is not None:
                 filepaths.append(ub.Path(fpath))

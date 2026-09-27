@@ -118,7 +118,21 @@ class CocoValidateCLI(scfg.DataConfig):
         ),
     )
 
-    verbose = scfg.Value(1, help='verbosity flag')
+    annot_attrs = scfg.Value(
+        False,
+        help=ub.paragraph(
+            """
+            if truthy, check that annotations contain bbox entries. Bboxes are
+            optional in the kwcoco schema, so this check is disabled by
+            default. Use 'warn' or 'error' to request it explicitly.
+            """
+        ),
+    )
+
+    verbose = scfg.Value(
+        1,
+        help='verbosity: 0=silent progress, 1=problems, 2=checks/progress',
+    )
 
     fastfail = scfg.Value(False, isflag=True, help='if True raise errors immediately')
 

@@ -72,6 +72,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Historical ``CocoEvaluator.evaluate()`` behavior is unchanged.
 
 ### Fixed
+* Make routine `CocoDataset.validate()` progress quiet by default, reserve
+  per-check progress for verbosity level 2, and avoid printing validation
+  warnings in addition to emitting them through Python's warnings system. The
+  optional bbox-presence check is now opt-in because bbox is not required by
+  the kwcoco schema.
+* Allow `category_id=None` in the annotation schema, matching
+  `CocoDataset.add_annotation()` and the dataset index's long-standing support
+  for uncategorized annotations.
+* Remove the remaining internal `Images.coco_images_iter()` use and report
+  vectorized-accessor deprecations at the external call site.
 * Normalize rich/new-style `N x 2` polygons to strict flattened MS-COCO polygon
   lists before calling `pycocotools.frPyObjects`, avoiding its four-element
   bbox dispatch ambiguity. Degenerate polygon parts become explicit zero-area

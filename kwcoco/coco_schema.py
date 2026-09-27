@@ -400,7 +400,15 @@ ANNOTATION = OBJECT(
                 'area',
                 NUMBER(description='The optional MS-COCO annotation area'),
             ),
-            ('category_id', INTEGER(description='The category id of this annotation')),
+            (
+                'category_id',
+                ANYOF(INTEGER, NULL)(
+                    description=(
+                        'The category id of this annotation. None is allowed '
+                        'for uncategorized annotations.'
+                    )
+                ),
+            ),
             (
                 'track_id',
                 ANYOF(INTEGER, STRING, UUID)(

@@ -185,6 +185,7 @@ class ObjectList1D(ub.NiceRepr):
             error='1.0.0',
             remove='1.1.0',
             migration=('use `.objs` instead.'),
+            stacklevel=2,
         )
         return ub.take(self._id_to_obj, self._ids)
 
@@ -757,6 +758,7 @@ class Images(ObjectList1D):
             error='1.0.0',
             remove='1.1.0',
             migration=('use `.coco_images` instead.'),
+            stacklevel=2,
         )
         yield from (self._dset.coco_image(gid) for gid in self)
 
@@ -1098,6 +1100,7 @@ class Annots(ObjectList1D):
             error='1.0.0',
             remove='1.1.0',
             migration=('use `Annots.lookup("bbox")`.'),
+            stacklevel=2,
         )
 
         xywh = self.lookup('bbox')
