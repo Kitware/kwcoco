@@ -70,7 +70,7 @@ Example:
 from __future__ import annotations
 
 import os
-import scriptconfig as scfg
+import kwconf
 import ubelt as ub
 import warnings
 from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -89,24 +89,26 @@ if TYPE_CHECKING:
     from kwcoco.metrics.detect_metrics import DetectionMetrics
 
 
-class CocoEvalConfig(scfg.DataConfig):
+class CocoEvalConfig(kwconf.Config):
+    __special_options__ = True
+
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
 
-    true_dataset = scfg.Value(
-        None, type=str, position=1, help='coercable true detections', tags=['in_path']
+    true_dataset = kwconf.Value(
+        None, parser=str, position=1, help='coercable true detections', tags=['in_path']
     )
-    pred_dataset = scfg.Value(
+    pred_dataset = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         position=2,
         help='coercable predicted detections',
         tags=['in_path'],
     )
-    ignore_classes = scfg.Value(
+    ignore_classes = kwconf.Value(
         None,
-        type=list,
+        parser='csv',
         help=ub.paragraph(
             """
             classes to ignore (give them zero weight)
@@ -114,14 +116,14 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    implicit_negative_classes = scfg.Value(
-        ['background'], help=None, tags=['algo_param']
+    implicit_negative_classes = kwconf.Value(
+        ['background'], parser='csv', help=None, tags=['algo_param']
     )
-    implicit_ignore_classes = scfg.Value(['ignore'], help=None, tags=['algo_param'])
-    fp_cutoff = scfg.Value(
+    implicit_ignore_classes = kwconf.Value(['ignore'], parser='csv', help=None, tags=['algo_param'])
+    fp_cutoff = kwconf.Value(
         float('inf'), help='False positive cutoff for ROC', tags=['algo_param']
     )
-    iou_thresh = scfg.Value(
+    iou_thresh = kwconf.Value(
         0.5,
         alias=['ovthresh'],
         help=ub.paragraph(
@@ -131,7 +133,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    compat = scfg.Value(
+    compat = kwconf.Value(
         'mutex',
         help=ub.paragraph(
             """
@@ -145,7 +147,7 @@ class CocoEvalConfig(scfg.DataConfig):
         choices=['all', 'mutex', 'ancestors'],
         tags=['algo_param'],
     )
-    monotonic_ppv = scfg.Value(
+    monotonic_ppv = kwconf.Value(
         True,
         help=ub.paragraph(
             """
@@ -156,7 +158,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    ap_method = scfg.Value(
+    ap_method = kwconf.Value(
         'pycocotools',
         help=ub.paragraph(
             """
@@ -167,7 +169,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    use_area_attr = scfg.Value(
+    use_area_attr = kwconf.Value(
         'try',
         help=ub.paragraph(
             """
@@ -179,8 +181,9 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    area_range = scfg.Value(
+    area_range = kwconf.Value(
         ['all'],
+        parser='csv',
         help=ub.paragraph(
             """
             Minimum and maximum object areas to consider. May specified
@@ -196,7 +199,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    max_dets = scfg.Value(
+    max_dets = kwconf.Value(
         float('inf'),
         help=ub.paragraph(
             """
@@ -205,7 +208,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    truth_reuse_policy = scfg.Value(
+    truth_reuse_policy = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -214,7 +217,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    iou_bias = scfg.Value(
+    iou_bias = kwconf.Value(
         1,
         help=ub.paragraph(
             """
@@ -223,7 +226,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    force_pycocoutils = scfg.Value(
+    force_pycocoutils = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -232,7 +235,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    assign_workers = scfg.Value(
+    assign_workers = kwconf.Value(
         8,
         help=ub.paragraph(
             """
@@ -241,7 +244,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['perf_param'],
     )
-    load_workers = scfg.Value(
+    load_workers = kwconf.Value(
         0,
         help=ub.paragraph(
             """
@@ -250,9 +253,9 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['perf_param'],
     )
-    classes_of_interest = scfg.Value(
+    classes_of_interest = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
             if specified only these classes are given weight. Input should be a
@@ -261,7 +264,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    use_image_names = scfg.Value(
+    use_image_names = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -430,7 +433,7 @@ class CocoEvaluator:
                 new_gid_to_pred[new_gid] = pred
 
             gid_to_pred = new_gid_to_pred
-            pred_coco._build_index()
+            pred_coco.rebuild_index()
             # These should now be the same.
             pred_image_ids = true_image_ids
 

@@ -324,11 +324,12 @@ def ensure_voc_coco(dpath=None):
 
 
 def main():
-    import scriptconfig as scfg
+    import kwconf
 
-    class GrabVOC_Config(scfg.Config):
+    class GrabVOC_Config(kwconf.Config):
+        __special_options__ = True
         __default__ = {
-            'dpath': scfg.Path(ub.expandpath('~/data/VOC'), help='download location')
+            'dpath': kwconf.Value(ub.expandpath('~/data/VOC'), parser=str, help='download location')
         }
 
     config = GrabVOC_Config()

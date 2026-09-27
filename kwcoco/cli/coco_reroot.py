@@ -2,10 +2,11 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoRerootCLI(scfg.DataConfig):
+class CocoRerootCLI(KWCocoConfig):
     """
     Reroot image paths onto a new image root.
 
@@ -31,25 +32,25 @@ class CocoRerootCLI(scfg.DataConfig):
         kwcoco reroot --src=special:shapes8 --dst rerooted.json
         kwcoco reroot --src=special:shapes8 --new_prefix=foo --check=True --dst rerooted.json
     """
-    src = scfg.Value(None, help=('Input coco dataset path'), position=1)
+    src = kwconf.Value(None, help=('Input coco dataset path'), position=1)
 
-    dst = scfg.Value(None, help=('Output coco dataset path'), position=2)
+    dst = kwconf.Value(None, help=('Output coco dataset path'), position=2)
 
-    new_prefix = scfg.Value(
+    new_prefix = kwconf.Value(
         None, help=('New prefix to insert before every image file name.')
     )
 
-    old_prefix = scfg.Value(
+    old_prefix = kwconf.Value(
         None, help=('Old prefix to remove from the start of every image file name.')
     )
 
-    absolute = scfg.Value(
+    absolute = kwconf.Value(
         True, isflag=True, help=('If False, the output file uses relative paths')
     )
 
-    check = scfg.Value(True, isflag=True, help=('If True, checks that all data exists'))
+    check = kwconf.Value(True, isflag=True, help=('If True, checks that all data exists'))
 
-    autofix = scfg.Value(
+    autofix = kwconf.Value(
         False,
         isflag=True,
         help=(
@@ -64,12 +65,12 @@ class CocoRerootCLI(scfg.DataConfig):
         ),
     )
 
-    compress = scfg.Value(
+    compress = kwconf.Value(
         'auto',
         help='if True writes results with compression. DEPRECATED. Just use a .zip suffix.',
     )
 
-    inplace = scfg.Value(
+    inplace = kwconf.Value(
         False,
         isflag=True,
         help=(
@@ -78,7 +79,7 @@ class CocoRerootCLI(scfg.DataConfig):
     )
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         r"""
         CommandLine:
             xdoctest -m kwcoco.cli.coco_reroot CocoRerootCLI.main:0
@@ -91,9 +92,9 @@ class CocoRerootCLI(scfg.DataConfig):
             >>> old_dset = kwcoco.CocoDataset.demo('special:shapes8')
             >>> dst_fpath = dpath / 'reroot_output.kwcoco.zip'
             >>> kw = {'src': old_dset.fpath, 'dst': dst_fpath, 'absolute': False}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoRerootCLI
-            >>> cls.main(cmdline=cmdline, **kw)
+            >>> cls.main(argv=argv, **kw)
             >>> assert dst_fpath.exists()
             >>> new_dset = kwcoco.CocoDataset(dst_fpath)
             >>> assert new_dset.dataset != old_dset.dataset
@@ -104,14 +105,14 @@ class CocoRerootCLI(scfg.DataConfig):
         Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoRerootCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
         import kwcoco
         from os.path import dirname, abspath
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
 
         try:
             import rich

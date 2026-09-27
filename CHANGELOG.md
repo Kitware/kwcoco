@@ -59,6 +59,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   unless diagnostics or kwcoco-specific ignore semantics require them.
 
 ### Changed
+* Port kwcoco's command/configuration layer from ``scriptconfig`` to
+  ``kwconf``. The CLI keeps config-file special options enabled, accepts
+  explicit boolean spellings such as ``--flag=false``, preserves options that
+  support both bare and explicit-value forms, and uses ``argv`` consistently
+  for programmatic CLI invocation.
+* Make ``CocoDataset.conform()`` and low-level diagnostic helpers quiet by
+  default; CLI commands opt into user-facing progress explicitly.
 * `CocoEvaluator.evaluate_pycocotools()` uses strict COCO bbox crowd annotation
   semantics by default. The lower-level
   `DetectionMetrics.score_pycocotools()` retains an explicit historical bbox
@@ -72,6 +79,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Historical ``CocoEvaluator.evaluate()`` behavior is unchanged.
 
 ### Fixed
+* Repair the root CLI registration for ``move_assets``, correct its source and
+  destination defaults, preserve numeric ``--verbose`` / table-count options
+  under kwconf, and make ``validate --workers`` a value option instead of a
+  boolean flag.
+* Make the legacy ``kwcoco.kpf``, ``kwcoco.kw18``, channel-spec, and
+  sensor-channel modules usable forwarding shims through the 1.0 deprecation
+  boundary, and activate the long-promised ``_build_index()`` deprecation.
+* Make ``CocoDataset.load_image()`` choose the direct primary-image path or
+  compositional channel path explicitly, so decoder, filesystem, and path
+  resolution errors are no longer swallowed by exception-driven fallback.
+* Make ``DuplicateAddError`` and ``InvalidAddError`` inherit from ``AddError``,
+  and stop ``CocoDataset.subset()`` from injecting the legacy ``img_root``
+  field.
+* Make ``CocoDataset.add_auxiliary_item()`` emit the same deprecation as the
+  corresponding ``CocoImage`` alias, and fix ``CocoSqlDatabase.data_fpath``
+  assignment to update its canonical SQL URI.
 * Make routine `CocoDataset.validate()` progress quiet by default, reserve
   per-check progress for verbosity level 2, and avoid printing validation
   warnings in addition to emitting them through Python's warnings system. The

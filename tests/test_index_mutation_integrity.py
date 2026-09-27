@@ -359,3 +359,20 @@ def test_remove_categories_keep_annots_without_index():
     # the explicit category_id=None bucket.
     assert 1 not in dset.index.cid_to_aids.get(None, set())
     assert dset.index.cid_to_aids[2] == {2}
+
+
+def test_add_error_subclasses_are_catchable_by_base_class():
+    assert issubclass(exceptions.DuplicateAddError, exceptions.AddError)
+    assert issubclass(exceptions.InvalidAddError, exceptions.AddError)
+
+
+def test_dataset_add_auxiliary_item_warns_and_forwards():
+    dset = kwcoco.CocoDataset()
+    gid = dset.add_image(file_name='base.png', width=8, height=8)
+    with pytest.warns(FutureWarning, match='add_auxiliary_item'):
+        dset.add_auxiliary_item(
+            gid, file_name='aux.tif', channels='nir', width=8, height=8
+        )
+    aux = dset.coco_image(gid).find_asset('nir')
+    assert aux is not None
+    assert aux['file_name'] == 'aux.tif'

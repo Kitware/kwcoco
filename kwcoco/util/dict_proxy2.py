@@ -38,14 +38,14 @@ class DictInterface(Generic[K, V]):
 
 
     Example:
-        from scriptconfig.dict_like import DictLike
-        class DuckDict(DictLike):
+        from kwcoco.util.dict_proxy2 import DictInterface
+        class DuckDict(DictInterface):
             def __init__(self, _data=None):
                 if _data is None:
                     _data = {}
                 self._data = _data
 
-            def getitem(self, key):
+            def __getitem__(self, key):
                 return self._data[key]
 
             def keys(self):

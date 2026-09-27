@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import scriptconfig as scfg
+import kwconf
 import ubelt as ub
 
 
-class ConvertImagenetCLI(scfg.DataConfig):
+class ConvertImagenetCLI(kwconf.Config):
+    __special_options__ = True
     """
     Converts the standard ILSVR 2017 dataset from PascalVOC to KWCoco.
 
@@ -31,7 +32,7 @@ class ConvertImagenetCLI(scfg.DataConfig):
 
     """
 
-    ilsvrc_dpath = scfg.Value(
+    ilsvrc_dpath = kwconf.Value(
         None,
         help=ub.codeblock(
             """
@@ -41,14 +42,14 @@ class ConvertImagenetCLI(scfg.DataConfig):
         position=1,
     )
 
-    workers = scfg.Value('auto', help='number of IO workers')
+    workers = kwconf.Value('auto', help='number of IO workers')
 
     @classmethod
-    def main(cls, cmdline=1, **kwargs):
+    def main(cls, argv=True, **kwargs):
         import rich
         from rich.markup import escape
 
-        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)
+        config = cls.cli(argv=argv, data=kwargs, strict=True)
         rich.print('config = ' + escape(ub.urepr(config, nl=1)))
 
         ilsvrc_dpath = config.ilsvrc_dpath

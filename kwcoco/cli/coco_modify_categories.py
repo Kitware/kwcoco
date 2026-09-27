@@ -2,10 +2,11 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoModifyCatsCLI(scfg.DataConfig):
+class CocoModifyCatsCLI(KWCocoConfig):
     """
     Remove, rename, reorder, re-id, or coarsen categories.
     """
@@ -22,11 +23,11 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         kwcoco modify_categories --src=special:shapes8 --dst modcats.json --keep=[] --keep_annots=True
         kwcoco modify_categories --src=special:shapes8 --dst modcats.json --start_id=0 --order "[star,background]"
     """
-    src = scfg.Value(None, help=('Path to the coco dataset'), position=1)
+    src = kwconf.Value(None, help=('Path to the coco dataset'), position=1)
 
-    dst = scfg.Value(None, help=('Save the modified dataset to a new file'))
+    dst = kwconf.Value(None, help=('Save the modified dataset to a new file'))
 
-    keep_annots = scfg.Value(
+    keep_annots = kwconf.Value(
         False,
         help=(
             'if False, removes annotations when categories are removed, '
@@ -34,7 +35,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         ),
     )
 
-    remove_empty_images = scfg.Value(
+    remove_empty_images = kwconf.Value(
         False,
         isflag=True,
         help=(
@@ -43,7 +44,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         ),
     )
 
-    remove = scfg.Value(
+    remove = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -52,7 +53,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         ),
     )
 
-    keep = scfg.Value(
+    keep = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -61,9 +62,9 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         ),
     )
 
-    rename = scfg.Value(
+    rename = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
         category mapping as a YAML dictionary. The old format format:
@@ -73,9 +74,9 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         ),
     )
 
-    start_id = scfg.Value(
+    start_id = kwconf.Value(
         None,
-        type=int,
+        parser=int,
         help=ub.paragraph(
             """
         if specified, then normalize category IDs to be consecutive and
@@ -84,9 +85,9 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         ),
     )
 
-    order = scfg.Value(
+    order = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
         if specified this is a YAML list, reorder to the first categories
@@ -96,7 +97,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         ),
     )
 
-    compress = scfg.Value(
+    compress = kwconf.Value(
         'auto',
         help=ub.paragraph(
             """
@@ -106,7 +107,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         ),
     )
 
-    verbose = scfg.Value(
+    verbose = kwconf.Value(
         True,
         isflag=True,
         help=ub.paragraph(
@@ -117,7 +118,7 @@ class CocoModifyCatsCLI(scfg.DataConfig):
     )
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         Example:
             >>> from kwcoco.cli.coco_modify_categories import *  # NOQA
@@ -127,9 +128,9 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             >>> old_dset = kwcoco.CocoDataset.demo('special:shapes8')
             >>> dst_fpath = dpath / 'modified_category.kwcoco.zip'
             >>> kw = {'src': old_dset.fpath, 'dst': dst_fpath, 'keep': []}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoModifyCatsCLI
-            >>> cls.main(cmdline=cmdline, **kw)
+            >>> cls.main(argv=argv, **kw)
             >>> assert dst_fpath.exists()
             >>> new_dset = kwcoco.CocoDataset(dst_fpath)
             >>> assert len(new_dset.cats) == 0
@@ -148,9 +149,9 @@ class CocoModifyCatsCLI(scfg.DataConfig):
             >>>     'start_id': 3,
             >>>     'order': 'sort',
             >>> }
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoModifyCatsCLI
-            >>> cls.main(cmdline=cmdline, **kw)
+            >>> cls.main(argv=argv, **kw)
             >>> assert dst_fpath.exists()
             >>> new_dset = kwcoco.CocoDataset(dst_fpath)
             >>> assert min(new_dset.categories().lookup('id')) == 3
@@ -160,18 +161,18 @@ class CocoModifyCatsCLI(scfg.DataConfig):
         Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoModifyCatsCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
         import kwcoco
 
         if 0:
-            config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+            config = cls.cli(data=kw, argv=argv, strict=True)
             print('config = {}'.format(ub.urepr(dict(config), nl=1)))
         else:
             # newstyle
-            config = cls.cli(data=kw, argv=cmdline, strict=True, verbose='auto')
+            config = cls.cli(data=kw, argv=argv, strict=True, verbose='auto')
 
         if config['src'] is None:
             raise Exception('must specify source: {}'.format(config['src']))

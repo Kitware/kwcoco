@@ -7,11 +7,12 @@ Visualize annotations on kwcoco video frames.
 import math
 from typing import Any
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 from delayed_image.channel_spec import ChannelSpec, FusedChannelSpec
 
 
-class CocoVisualizeVideosCLI(scfg.DataConfig):
+class CocoVisualizeVideosCLI(KWCocoConfig):
     """
     Visualize one or more videos from a kwcoco dataset.
 
@@ -28,7 +29,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         >>>     'workers': 0,
         >>>     'draw_labels': False,
         >>> }
-        >>> CocoVisualizeVideosCLI.main(cmdline=False, **kw)
+        >>> CocoVisualizeVideosCLI.main(argv=False, **kw)
         >>> assert len(list(dpath.glob('**/*.jpg'))) > 0
 
     Example:
@@ -64,7 +65,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         >>>     'draw_header': False,
         >>>     'draw_chancode': False,
         >>> }
-        >>> CocoVisualizeVideosCLI.main(cmdline=False, **kw)
+        >>> CocoVisualizeVideosCLI.main(argv=False, **kw)
         >>> assert len(list((dpath / 'viz').glob('**/*.jpg'))) > 0
 
     Example:
@@ -106,7 +107,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         >>>     'workers': 0,
         >>>     'draw_labels': False,
         >>> }
-        >>> CocoVisualizeVideosCLI.main(cmdline=False, **kw)
+        >>> CocoVisualizeVideosCLI.main(argv=False, **kw)
         >>> assert len(list((dpath / 'viz').glob('**/*.jpg'))) > 0
     """
 
@@ -117,9 +118,9 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
     # dev/to_port/coco_visualize_videos.py entrypoint. Project-specific
     # heuristics and deprecated logic were intentionally removed.
 
-    src = scfg.Value(None, help='Input kwcoco dataset', position=1)
+    src = kwconf.Value(None, help='Input kwcoco dataset', position=1)
 
-    viz_dpath = scfg.Value(
+    viz_dpath = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -129,7 +130,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    video = scfg.Value(
+    video = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -139,7 +140,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    gids = scfg.Value(
+    gids = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -149,9 +150,9 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    select_images = scfg.Value(
+    select_images = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
         A jq-style query for image dictionaries. Requires the "jq" python
@@ -160,9 +161,9 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    select_videos = scfg.Value(
+    select_videos = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
         A jq-style query for video dictionaries. Requires the "jq" python
@@ -171,7 +172,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    include_loose = scfg.Value(
+    include_loose = kwconf.Value(
         True,
         isflag=True,
         help=ub.paragraph(
@@ -181,16 +182,16 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    workers = scfg.Value('auto', help='Number of parallel workers')
+    workers = kwconf.Value('auto', help='Number of parallel workers')
 
-    space = scfg.Value('video', help='Render in image or video space')
+    space = kwconf.Value('video', help='Render in image or video space')
 
-    max_dim = scfg.Value(1024, help='Resize if larger than this dimension')
-    min_dim = scfg.Value(256, help='Resize if smaller than this dimension')
-    resolution = scfg.Value(None, help='Output resolution (if supported)')
+    max_dim = kwconf.Value(1024, help='Resize if larger than this dimension')
+    min_dim = kwconf.Value(256, help='Resize if smaller than this dimension')
+    resolution = kwconf.Value(None, help='Output resolution (if supported)')
 
-    channels = scfg.Value(None, type=str, help='Only visualize these channels')
-    any3 = scfg.Value(
+    channels = kwconf.Value(None, parser=str, help='Only visualize these channels')
+    any3 = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -200,8 +201,8 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    draw_imgs = scfg.Value(True, isflag=True, help='Draw images')
-    draw_anns = scfg.Value(
+    draw_imgs = kwconf.Value(True, isflag=True, help='Draw images')
+    draw_anns = kwconf.Value(
         'auto',
         help=ub.paragraph(
             """
@@ -209,20 +210,20 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         """
         ),
     )
-    draw_boxes = scfg.Value(True, help='Draw bounding boxes')
-    draw_segmentations = scfg.Value(True, help='Draw segmentation polygons')
-    draw_labels = scfg.Value(True, help='Draw annotation labels')
-    ann_thickness = scfg.Value(2, help='Annotation line thickness')
-    alpha = scfg.Value(None, help='Annotation transparency')
-    ann_score_thresh = scfg.Value(0, help='Drop annotations below this score')
+    draw_boxes = kwconf.Value(True, help='Draw bounding boxes')
+    draw_segmentations = kwconf.Value(True, help='Draw segmentation polygons')
+    draw_labels = kwconf.Value(True, help='Draw annotation labels')
+    ann_thickness = kwconf.Value(2, help='Annotation line thickness')
+    alpha = kwconf.Value(None, help='Annotation transparency')
+    ann_score_thresh = kwconf.Value(0, help='Drop annotations below this score')
 
-    draw_valid_region = scfg.Value(False, help='Draw valid image regions')
-    draw_header = scfg.Value(True, help='Draw header text')
-    draw_chancode = scfg.Value(True, help='Draw channel code text')
+    draw_valid_region = kwconf.Value(False, help='Draw valid image regions')
+    draw_header = kwconf.Value(True, help='Draw header text')
+    draw_chancode = kwconf.Value(True, help='Draw channel code text')
 
-    cmap = scfg.Value(
+    cmap = kwconf.Value(
         'viridis',
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
         Name of a colormap for single channel data. Can also be a YAML
@@ -231,7 +232,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    skip_missing = scfg.Value(
+    skip_missing = kwconf.Value(
         True,
         isflag=True,
         help=ub.paragraph(
@@ -240,7 +241,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         """
         ),
     )
-    skip_aggressive = scfg.Value(
+    skip_aggressive = kwconf.Value(
         False,
         isflag=True,
         help=ub.paragraph(
@@ -250,7 +251,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    draw_track_trails = scfg.Value(
+    draw_track_trails = kwconf.Value(
         False,
         isflag=True,
         help=ub.paragraph(
@@ -260,10 +261,10 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         ),
     )
 
-    verbose = scfg.Value(0, isflag=True, help='verbosity level')
+    verbose = kwconf.Value(0, bare=1, parser='auto', help='verbosity level')
 
     @classmethod
-    def main(cls, cmdline=True, **kwargs):
+    def main(cls, argv=True, **kwargs):
         """
         CommandLine:
             xdoctest -m kwcoco.cli.coco_visualize_videos CocoVisualizeVideosCLI.main
@@ -274,7 +275,7 @@ class CocoVisualizeVideosCLI(scfg.DataConfig):
         from kwutil import util_parallel
         from kwcoco._helpers import _query_image_ids
 
-        config = cls.cli(data=kwargs, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kwargs, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:

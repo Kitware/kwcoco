@@ -143,6 +143,8 @@ class MixinCocoSchema:
 
                 workers (int): number of parallel jobs for IO tasks
 
+                verbose (int): verbosity / progress level. Defaults to 0.
+
         Returns:
             Self: the inplace modified kwcoco dataset
 
@@ -155,8 +157,12 @@ class MixinCocoSchema:
             >>> assert 'area' in dset.index.anns[1]
         """
 
+        verbose = config.get('verbose', 0)
+
         if config.get('ensure_imgsize', True):
-            self._ensure_imgsize(workers=config.get('workers', 8))  # type: ignore
+            self._ensure_imgsize(
+                workers=config.get('workers', 8), verbose=verbose
+            )  # type: ignore
 
             for vidid, gids in self.index.vidid_to_gids.items():  # type: ignore
                 if len(gids):
@@ -172,7 +178,9 @@ class MixinCocoSchema:
                         video['height'] = height_cand[0]
 
         if config.get('pycocotools_info', True):
-            for ann in ub.ProgIter(self.dataset['annotations'], desc='update anns'):  # type: ignore
+            for ann in ub.ProgIter(
+                self.dataset['annotations'], desc='update anns', verbose=verbose
+            ):  # type: ignore
                 if 'iscrowd' not in ann:
                     ann['iscrowd'] = False
 
@@ -196,7 +204,8 @@ class MixinCocoSchema:
                                 `kwimage.MultiPolygon.coerce` or a misformatted
                                 segmentation
                                 """
-                                )
+                                ),
+                                stacklevel=2,
                             )
                     else:
                         try:
@@ -208,7 +217,8 @@ class MixinCocoSchema:
                                 Unable to add "area" key because an annotation
                                 is missing or has a malformed "bbox" entry
                                 """
-                                )
+                                ),
+                                stacklevel=2,
                             )
                         else:
                             ann['area'] = w * h
@@ -243,7 +253,9 @@ class MixinCocoSchema:
             except Exception:
                 kpcats = None
             for ann in ub.ProgIter(
-                self.dataset['annotations'], desc='update orig coco anns'  # type: ignore
+                self.dataset['annotations'],
+                desc='update orig coco anns',
+                verbose=verbose,  # type: ignore
             ):
                 # Use segmentation if available
                 if 'segmentation' in ann:

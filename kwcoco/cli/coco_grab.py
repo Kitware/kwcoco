@@ -24,10 +24,11 @@ TODO:
     - [ ] Integrate MOTChallenge
 """
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoGrabCLI(scfg.DataConfig):
+class CocoGrabCLI(KWCocoConfig):
     """
     Grab standard datasets in kwcoco form.
 
@@ -38,7 +39,7 @@ class CocoGrabCLI(scfg.DataConfig):
     __command__ = 'grab'
 
     __default__ = {
-        'names': scfg.Value(
+        'names': kwconf.Value(
             [],
             nargs='+',
             position=1,
@@ -49,8 +50,9 @@ class CocoGrabCLI(scfg.DataConfig):
             """
             ),
         ),
-        'dpath': scfg.Path(
+        'dpath': kwconf.Value(
             ub.Path.appdir('kwcoco', 'data', type='cache'),
+            parser=ub.Path,
             help=ub.paragraph(
                 """
                 Download directory
@@ -60,8 +62,8 @@ class CocoGrabCLI(scfg.DataConfig):
     }
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+    def main(cls, argv=True, **kw):
+        config = cls.cli(data=kw, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         ensured = []

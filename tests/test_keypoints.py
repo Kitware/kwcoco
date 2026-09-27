@@ -113,7 +113,7 @@ def test_keypoint_formats():
                     catid = dset.ensure_category(**cat)
             if keypoint_classes is not None:
                 dset.dataset['keypoint_categories'] = list(keypoint_classes.to_coco())
-                dset._build_index()
+                dset.rebuild_index()
             image_id = dset.add_image(file_name='dummy.png')
             failpoint = 'CocoDataset.add_annotation'
             dset.add_annotation(

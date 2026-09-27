@@ -6,34 +6,37 @@ import sys
 import ubelt as ub
 
 
-def main(cmdline=True, **kw):
+CLI_MODULE_NAMES = [
+    'coco_stats',
+    'coco_union',
+    'coco_split',
+    'coco_show',
+    'coco_toydata',
+    'coco_eval',
+    'coco_conform',
+    'coco_modify_categories',
+    'coco_reroot',
+    'coco_fixup',
+    'coco_move',
+    'coco_move_assets',
+    'coco_validate',
+    'coco_subset',
+    'coco_grab',
+    'coco_info',
+    'coco_plot_stats',
+    'coco_visualize_videos',
+    'find_unregistered_images',
+    'finish_install',
+]
+
+
+def main(argv=True, **kw):
     """
     kw = dict(command='stats')
-    cmdline = False
+    argv = False
     """
-    modnames = [
-        'coco_stats',
-        'coco_union',
-        'coco_split',
-        'coco_show',
-        'coco_toydata',
-        'coco_eval',
-        'coco_conform',
-        'coco_modify_categories',
-        'coco_reroot',
-        'coco_fixup',
-        'coco_move',
-        'coco_validate',
-        'coco_subset',
-        'coco_grab',
-        'coco_info',
-        'coco_plot_stats',
-        'coco_visualize_videos',
-        'find_unregistered_images',
-        'finish_install',
-    ]
     module_lut = {}
-    for name in modnames:
+    for name in CLI_MODULE_NAMES:
         mod = ub.import_module_from_name('kwcoco.cli.{}'.format(name))
         module_lut[name] = mod
 
@@ -46,22 +49,18 @@ def main(cmdline=True, **kw):
 
     KWCOCO_LOOSE_CLI = os.environ.get('KWCOCO_LOOSE_CLI', '')
 
-    from scriptconfig.modal import ModalCLI
+    import kwconf
 
-    modal = ModalCLI(
+    import kwcoco
+
+    modal = kwconf.ModalCLI(
         description=ub.codeblock(
             """
         The Kitware COCO CLI
         """
-        )
+        ),
+        version=kwcoco.__version__,
     )
-
-    def get_version(self):
-        import kwcoco
-
-        return kwcoco.__version__
-
-    modal.__class__.version = property(get_version) # type: ignore
 
     for cli_module in cli_modules:
         cli_config = None
@@ -102,7 +101,7 @@ def main(cmdline=True, **kw):
             _yeah_boid()
             sys.exit(0)
 
-    ret = modal.run(strict=not KWCOCO_LOOSE_CLI)
+    ret = modal.run(argv=argv, strict=not KWCOCO_LOOSE_CLI)
     return ret
 
 

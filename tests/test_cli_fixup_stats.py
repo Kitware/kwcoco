@@ -61,7 +61,7 @@ def test_coco_fixup_missing_src():
     from kwcoco.cli.coco_fixup import CocoFixup
 
     with pytest.raises(ValueError, match='must specify source'):
-        CocoFixup.main(cmdline=0, src=None, dst='unused.json')
+        CocoFixup.main(argv=False, src=None, dst='unused.json')
 
 
 def test_coco_fixup_invalid_corrupted_assets(tmp_path):
@@ -92,7 +92,7 @@ def test_coco_fixup_missing_osgeo(monkeypatch, tmp_path):
     monkeypatch.delitem(sys.modules, 'osgeo.gdal', raising=False)
 
     CocoFixup.main(
-        cmdline=0,
+        argv=False,
         src=dset.fpath,
         dst=dst,
         missing_assets=False,
@@ -106,7 +106,7 @@ def test_coco_stats_missing_src():
     from kwcoco.cli.coco_stats import CocoStatsCLI
 
     with pytest.raises(ValueError, match='must specify source'):
-        CocoStatsCLI.main(cmdline=0, src=None)
+        CocoStatsCLI.main(argv=False, src=None)
 
 
 def test_coco_stats_does_not_clobber_pandas_option(tmp_path):
@@ -122,7 +122,7 @@ def test_coco_stats_does_not_clobber_pandas_option(tmp_path):
     pd.set_option('max_colwidth', 123)
     try:
         CocoStatsCLI.main(
-            cmdline=0,
+            argv=False,
             src=str(dset.fpath),
             format='json',
             extended=False,

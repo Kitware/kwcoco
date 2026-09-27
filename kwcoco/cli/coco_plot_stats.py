@@ -14,10 +14,10 @@ Example:
     >>> import kwcoco
     >>> dpath = ub.Path.appdir('kwcoco/tests/vis_stats').ensuredir()
     >>> coco_fpath = kwcoco.CocoDataset.demo('vidshapes8').fpath
-    >>> cmdline = 0
+    >>> argv = False
     >>> kwargs = dict(src=coco_fpath, dst_dpath=dpath)
     >>> cls = PlotStatsCLI
-    >>> cls.main(cmdline=cmdline, **kwargs)
+    >>> cls.main(argv=argv, **kwargs)
 
 Example:
     >>> # xdoctest: +REQUIRES(module:kwplot)
@@ -31,17 +31,18 @@ Example:
     >>> dset = kwcoco.CocoDataset.demo('vidshapes8', image_size='random',
     >>>                                timestamps=True, rng=rng)
     >>> coco_fpath = dset.fpath
-    >>> cmdline = 0
+    >>> argv = False
     >>> kwargs = dict(src=coco_fpath, dst_dpath=dpath)
     >>> cls = PlotStatsCLI
-    >>> cls.main(cmdline=cmdline, **kwargs)
+    >>> cls.main(argv=argv, **kwargs)
 """
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 import ubelt as ub
 import os
 
 
-class PlotStatsCLI(scfg.DataConfig):
+class PlotStatsCLI(KWCocoConfig):
     """
     Inspect properties of dataset and write raw data tables and visual plots.
     """
@@ -49,13 +50,13 @@ class PlotStatsCLI(scfg.DataConfig):
     __command__ = 'plot_stats'
     __alias__ = ['visual_stats']
 
-    src = scfg.Value(None, help='path to kwcoco file', position=1)
+    src = kwconf.Value(None, help='path to kwcoco file', position=1)
 
     #
     # from kwcoco.cli.coco_plot_stats import Plots  # NOQA
     # print(', '.join(Plots.available_plot_funcs().keys()))
     # TODO: keep this in sync
-    plots = scfg.Value(
+    plots = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -83,17 +84,17 @@ class PlotStatsCLI(scfg.DataConfig):
         position=2,
     )
 
-    dst_fpath = scfg.Value(
+    dst_fpath = kwconf.Value(
         'auto',
         help='manifest of results. If unspecfied defaults to dst_dpath / "stats.json"',
     )
-    dst_dpath = scfg.Value('./coco_annot_stats', help='directory to dump results')
+    dst_dpath = kwconf.Value('./coco_annot_stats', help='directory to dump results')
 
-    with_process_context = scfg.Value(
+    with_process_context = kwconf.Value(
         True, help='set to false to disable process contxt'
     )
 
-    options = scfg.Value(
+    options = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -102,17 +103,17 @@ class PlotStatsCLI(scfg.DataConfig):
         ),
     )
 
-    dpi = scfg.Value(300, help='dpi for figures')
+    dpi = kwconf.Value(300, help='dpi for figures')
 
     @classmethod
-    def main(cls, cmdline=1, **kwargs):
+    def main(cls, argv=True, **kwargs):
         from kwcoco.util.util_rich import rich_print
 
         try:
             from rich.markup import escape
         except ImportError:
             from ubelt import identity as escape
-        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
+        config = cls.cli(argv=argv, data=kwargs, strict=True)  # type: ignore
         rich_print('config = ' + escape(ub.urepr(config, nl=1)))
         run(config)
 

@@ -15,7 +15,7 @@ def test_validate_missing():
     tmp_coco_fpath = dpath / 'tmp.kwcoco.json'
 
     coco_subset.CocoSubsetCLI.main(
-        cmdline=0, src=dset, dst=tmp_coco_fpath, copy_assets=True
+        argv=False, src=dset, dst=tmp_coco_fpath, copy_assets=True
     )
 
     dset2 = kwcoco.CocoDataset(tmp_coco_fpath)
@@ -26,5 +26,5 @@ def test_validate_missing():
     import pytest
 
     with pytest.raises(Exception) as ex:
-        coco_validate.CocoValidateCLI.main(cmdline=0, src=[dset2])
+        coco_validate.CocoValidateCLI.main(argv=False, src=[dset2])
     assert 'The first one is' in ex.value.args[0]

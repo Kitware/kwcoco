@@ -23,7 +23,7 @@ below were already fixed as bugs (noted) — verify rather than redo.
 heavy deps on every invocation, including `--help` and shell completion —
 `cli/coco_eval.py:7` pulls the whole metrics stack at module level,
 `cli/coco_visualize_videos.py:10` pulls delayed_image. Options:
-scriptconfig ModalCLI lazy registration by module-path string, or defer heavy
+kwconf ModalCLI lazy registration by module-path string, if supported, or defer heavy
 imports into `main()` in the offending modules (most modules already follow
 that convention). Measure: `time kwcoco --help` before/after (target: well
 under 1s).

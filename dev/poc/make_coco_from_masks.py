@@ -6,7 +6,7 @@ Currently, there is no mechanism to associate annotations with images, and that
 would need to be created for this script to be useful in real-world cases.
 """
 
-import scriptconfig as scfg
+import kwconf
 import ubelt as ub
 import kwimage
 import numpy as np
@@ -51,18 +51,23 @@ def _make_intmask_demodata(rng=None):
     return dpath
 
 
-class MakeCocoFromMasksCLI(scfg.Config):
+class MakeCocoFromMasksCLI(kwconf.Config):
+    __special_options__ = True
     """
     Create a COCO file from bitmasks
     """
 
     __command__ = 'coco_from_masks'
-    default = {
-        'src': scfg.PathList(help='a file, globstr, or comma-separated list of files'),
-        'dst': scfg.Value('masks.mscoco.json', help='output path'),
-        'serialization': scfg.Value('vector', help='can be raster or vector'),
+    __default__ = {
+        'src': kwconf.Value(
+            default_factory=list,
+            parser='csv',
+            help='a file, globstr, or comma-separated list of files',
+        ),
+        'dst': kwconf.Value('masks.mscoco.json', help='output path'),
+        'serialization': kwconf.Value('vector', help='can be raster or vector'),
     }
-    epilog = r"""
+    __epilog__ = r"""
     Example Usage:
         # hack to make the demo data
         python -c "import make_coco_from_masks; print(make_coco_from_masks._make_intmask_demodata())"
@@ -85,7 +90,7 @@ class MakeCocoFromMasksCLI(scfg.Config):
     """
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         CommandLine:
             xdoctest -m make_coco_from_masks.py MakeCocoFromMasksCLI.main
@@ -93,10 +98,10 @@ class MakeCocoFromMasksCLI(scfg.Config):
         Example:
             >>> import ubelt as ub
             >>> cls = MakeCocoFromMasksCLI
-            >>> cmdline = False
+            >>> argv = False
             >>> dpath = _make_intmask_demodata()
             >>> kw = {'src': join(dpath, '*.png'), 'dst': 'masks.mscoco.json'}
-            >>> fpath = cls.main(cmdline, **kw)
+            >>> fpath = cls.main(argv, **kw)
             >>> # Check validity
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset(fpath)
@@ -106,7 +111,7 @@ class MakeCocoFromMasksCLI(scfg.Config):
         """
         import kwcoco
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=2)))
         serialization_method = config['serialization']
 
@@ -114,7 +119,18 @@ class MakeCocoFromMasksCLI(scfg.Config):
         coco_dset = kwcoco.CocoDataset()
 
         # Path to each mask object
+        import glob
+        import os
+
         mask_fpaths = config['src']
+        if isinstance(mask_fpaths, (str, os.PathLike)):
+            mask_fpaths = [mask_fpaths]
+        expanded_fpaths = []
+        for pattern in mask_fpaths:
+            pattern = os.path.expanduser(os.fspath(pattern))
+            matches = sorted(glob.glob(pattern))
+            expanded_fpaths.extend(matches or [pattern])
+        mask_fpaths = expanded_fpaths
         for mask_fpath in mask_fpaths:
             # I assume each mask corresponds to a single image, but I dont know
             # what those images should be at the moment. TODO: if this is going

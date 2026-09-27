@@ -33,14 +33,15 @@ And check stats / visualize the results:
 
 from __future__ import annotations
 import numpy as np
-import scriptconfig as scfg
+import kwconf
 import ubelt as ub
 import kwarray
 import kwcoco
 import kwimage
 
 
-class HeatmapExtractorConfig(scfg.DataConfig):
+class HeatmapExtractorConfig(kwconf.Config):
+    __special_options__ = True
     """
     CLI options for the illustrative heatmap extractor.
 
@@ -64,20 +65,20 @@ class HeatmapExtractorConfig(scfg.DataConfig):
         >>> assert (dpath / 'out.kwcoco.json').exists()
     """
 
-    coco_fpath = scfg.Value(
+    coco_fpath = kwconf.Value(
         'special:vidshapes8',
         position=1,
         help='Input kwcoco dataset path or special name',
     )
-    dst_coco_fpath = scfg.Value('heatmap.kwcoco.json', help='Output kwcoco file')
-    asset_dpath = scfg.Value(
+    dst_coco_fpath = kwconf.Value('heatmap.kwcoco.json', help='Output kwcoco file')
+    asset_dpath = kwconf.Value(
         'assets/heatmaps',
         help='Where to store written heatmaps (ideally next to dst_coco_fpath)',
     )
-    heatmap_channel = scfg.Value('salient', help='Name of the output heatmap channel')
-    sigma = scfg.Value(7.0, help='Gaussian blur applied to whiteness response')
-    thresh = scfg.Value(0.3, help='Threshold floor for minimum heatmap value')
-    quantize = scfg.Value(
+    heatmap_channel = kwconf.Value('salient', help='Name of the output heatmap channel')
+    sigma = kwconf.Value(7.0, help='Gaussian blur applied to whiteness response')
+    thresh = kwconf.Value(0.3, help='Threshold floor for minimum heatmap value')
+    quantize = kwconf.Value(
         True, isflag=True, help='Quantize (uint8/png) instead of float32/tif'
     )
 

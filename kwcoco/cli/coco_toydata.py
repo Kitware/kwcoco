@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 #!/usr/bin/env python
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 import ubelt as ub
 
 
-class CocoToyDataCLI(scfg.DataConfig):
+class CocoToyDataCLI(KWCocoConfig):
     """
     Create COCO toydata for demo and testing purposes.
     """
 
     __command__ = 'toydata'
     __alias__ = ['demodata']
-    key = scfg.Value(
+    key = kwconf.Value(
         'shapes8',
         position=1,
         help=ub.paragraph(
@@ -36,7 +37,7 @@ class CocoToyDataCLI(scfg.DataConfig):
             """
         ),
     )
-    dst = scfg.Value(
+    dst = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -46,7 +47,7 @@ class CocoToyDataCLI(scfg.DataConfig):
             """
         ),
     )
-    bundle_dpath = scfg.Value(
+    bundle_dpath = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -56,7 +57,7 @@ class CocoToyDataCLI(scfg.DataConfig):
             """
         ),
     )
-    use_cache = scfg.Value(
+    use_cache = kwconf.Value(
         True,
         isflag=True,
         help=ub.paragraph(
@@ -67,9 +68,9 @@ class CocoToyDataCLI(scfg.DataConfig):
             """
         ),
     )
-    verbose = scfg.Value(False, help='Verbosity')
+    verbose = kwconf.Value(False, help='Verbosity')
 
-    sensorchan = scfg.Value(
+    sensorchan = kwconf.Value(
         None, help='Control the sensor / channels with a sensorchanspec'
     )
 
@@ -94,20 +95,20 @@ class CocoToyDataCLI(scfg.DataConfig):
     """
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         Example:
             >>> from kwcoco.cli.coco_toydata import *  # NOQA
             >>> import ubelt as ub
             >>> dpath = ub.Path.appdir('kwcoco/tests/cli/demo').ensuredir()
             >>> kw = {'key': 'shapes8', 'dst': dpath / 'test.json'}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoToyDataCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
         import kwcoco
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         demo_kwargs = {

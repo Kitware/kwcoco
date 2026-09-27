@@ -3155,7 +3155,7 @@ def reorder_video_frames(dset):
             video_report['stats'] = 'fixed'
         info.append(video_report)
 
-    dset._build_index()
+    dset.rebuild_index()
     print('reorder check info = {}'.format(ub.urepr(info, nl=1)))
     return info
 

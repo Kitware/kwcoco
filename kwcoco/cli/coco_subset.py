@@ -2,23 +2,24 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoSubsetCLI(scfg.DataConfig):
+class CocoSubsetCLI(KWCocoConfig):
     """
     Take a subset of this dataset and write it to a new file
     """
 
     __command__ = 'subset'
 
-    src = scfg.Value(None, position=1, help='input dataset path')
+    src = kwconf.Value(None, position=1, help='input dataset path')
 
-    dst = scfg.Value(None, position=2, help='output dataset path')
+    dst = kwconf.Value(None, position=2, help='output dataset path')
 
-    include_categories = scfg.Value(
+    include_categories = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
             a comma separated list of categories, if specified only
@@ -27,7 +28,7 @@ class CocoSubsetCLI(scfg.DataConfig):
         ),
     )  # TODO: pattern matching?
 
-    gids = scfg.Value(
+    gids = kwconf.Value(
         None,
         alias=['image_ids'],
         help=ub.paragraph(
@@ -39,9 +40,9 @@ class CocoSubsetCLI(scfg.DataConfig):
         ),
     )
 
-    select_images = scfg.Value(
+    select_images = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
             Can be a coercable YAML list of image ids, or...
@@ -65,7 +66,7 @@ class CocoSubsetCLI(scfg.DataConfig):
         ),
     )
 
-    select_videos = scfg.Value(
+    select_videos = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -83,7 +84,7 @@ class CocoSubsetCLI(scfg.DataConfig):
         ),
     )
 
-    channels = scfg.Value(
+    channels = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -96,7 +97,7 @@ class CocoSubsetCLI(scfg.DataConfig):
     # FIXME: this can cause issues if the src kwcoco points to files
     # outside of its bundle directory. Is there an inuitive way to handle
     # this? Maybe this followed by a move-assets operation?
-    copy_assets = scfg.Value(
+    copy_assets = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -105,9 +106,9 @@ class CocoSubsetCLI(scfg.DataConfig):
         ),
     )
 
-    compress = scfg.Value('auto', help='if True writes results with compression')
+    compress = kwconf.Value('auto', help='if True writes results with compression')
 
-    absolute = scfg.Value(
+    absolute = kwconf.Value(
         'auto',
         help=ub.paragraph(
             """
@@ -128,7 +129,7 @@ class CocoSubsetCLI(scfg.DataConfig):
     # images/annotations that contain a special attribute?
     # images with a maximum / minimum number of annotations?
 
-    # 'rng': scfg.Value(None, help='random seed'),
+    # 'rng': kwconf.Value(None, help='random seed'),
     __epilog__ = """
     Example Usage:
         kwcoco subset --src special:shapes8 --dst=foo.kwcoco.json
@@ -141,7 +142,7 @@ class CocoSubsetCLI(scfg.DataConfig):
     """
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         CommandLine:
             xdoctest -m kwcoco.cli.coco_subset CocoSubsetCLI.main
@@ -153,13 +154,13 @@ class CocoSubsetCLI(scfg.DataConfig):
             >>> kw = {'src': 'special:shapes8',
             >>>       'dst': dpath / 'subset.json',
             >>>       'include_categories': 'superstar'}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoSubsetCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
         import kwcoco
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:

@@ -713,7 +713,7 @@ class CocoImage(_CocoObject):
         Example:
             >>> import kwcoco
             >>> coco_img = kwcoco.CocoImage({'width': 128, 'height': 128})
-            >>> coco_img.add_auxiliary_item(
+            >>> coco_img.add_asset(
             >>>     'rgb.png', channels='red|green|blue', width=32, height=32)
             >>> assert coco_img.find_asset_obj('red') is not None
             >>> assert coco_img.find_asset_obj('green') is not None
@@ -728,7 +728,7 @@ class CocoImage(_CocoObject):
             >>> # Test with concise channel code
             >>> import kwcoco
             >>> coco_img = kwcoco.CocoImage({'width': 128, 'height': 128})
-            >>> coco_img.add_auxiliary_item(
+            >>> coco_img.add_asset(
             >>>     'msi.png', channels='foo.0:128', width=32, height=32)
             >>> assert coco_img.find_asset_obj('foo') is None
             >>> assert coco_img.find_asset_obj('foo.3') is not None
@@ -1088,7 +1088,7 @@ class CocoImage(_CocoObject):
             >>> imdata = np.random.rand(6, 6, 5)
             >>> imdata[:] = np.arange(5)[None, None, :]
             >>> channels = FusedChannelSpec.coerce('Aux:5')
-            >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
+            >>> coco_img.add_asset(imdata=imdata, channels=channels)
             >>> delayed = coco_img.imdelay(channels='B1|Aux:2:4')
             >>> final = delayed.finalize()
 

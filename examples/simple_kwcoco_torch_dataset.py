@@ -129,7 +129,7 @@ class KWCocoSimpleTorchDataset(DatasetBase):
         if 0:
             # Note: there is an experimental method for lazy image operations
             # we may default to recommending in the future.
-            raw_img = self.coco_dset.delayed_load(gid).finalize()
+            raw_img = self.coco_dset.coco_image(gid).imdelay().finalize()
         else:
             # For now, we will just do things in the most transparent way
             image_fpath = self.coco_dset.get_image_fpath(gid)

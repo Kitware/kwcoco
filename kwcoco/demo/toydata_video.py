@@ -220,7 +220,7 @@ def random_video_dset(
     if verbose > 2:
         print('build index')
 
-    dset._build_index()
+    dset.rebuild_index()
 
     if verbose > 2:
         print('finished random_video_dset')
@@ -793,7 +793,7 @@ def random_single_video_dset(
             dset, rng=rng, dpath=dpath, renderkw=renderkw, verbose=verbose
         )
     if autobuild:
-        dset._build_index()
+        dset.rebuild_index()
     return dset
 
 
@@ -946,7 +946,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     import kwcoco
 
     rng = kwarray.ensure_rng(rng)
-    dset._build_index()
+    dset.rebuild_index()
 
     if 0:
         dset._ensure_json_serializable()
@@ -1023,7 +1023,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
                     kwimage.imwrite(aux_fpath, auxdata, space=None, **imwrite_kw)
             img['auxiliary'] = auxiliaries
 
-    dset._build_index()
+    dset.rebuild_index()
     return dset
 
 

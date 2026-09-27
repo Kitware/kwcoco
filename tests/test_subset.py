@@ -59,7 +59,7 @@ def test_subset_cli_with_gids():
         'gids': subset_gids,
     }
     print('config1 = {}'.format(ub.urepr(config1, nl=1)))
-    coco_subset.CocoSubsetCLI.main(cmdline=False, **config1)
+    coco_subset.CocoSubsetCLI.main(argv=False, **config1)
     dst_dset2 = kwcoco.CocoDataset(dst_fpath2)
     print('dst_dset2.dataset = {}'.format(ub.urepr(dst_dset2.dataset, nl=2)))
     assert len(dst_dset2.index.imgs) == 2
@@ -85,9 +85,19 @@ def test_subset_cli_with_jq():
     dst_fpath1 = join(dpath, 'output.kwcoco.json')
     config2 = {'src': dset.fpath, 'dst': dst_fpath1, 'select_images': '.id % 2 == 0'}
     print('config2 = {}'.format(ub.urepr(config2, nl=1)))
-    coco_subset.CocoSubsetCLI.main(cmdline=False, **config2)
+    coco_subset.CocoSubsetCLI.main(argv=False, **config2)
     dst_dset1 = kwcoco.CocoDataset(dst_fpath1)
 
     assert len(dst_dset1.index.imgs) == 2
     assert ub.peek(dst_dset1.index.anns.values())['user'] == 'me'
     print('dst_dset1.dataset = {}'.format(ub.urepr(dst_dset1.dataset, nl=2)))
+
+
+def test_subset_does_not_inject_legacy_img_root():
+    import kwcoco
+
+    dset = kwcoco.CocoDataset()
+    gid = dset.add_image(file_name='image.png')
+    subset = dset.subset([gid])
+
+    assert 'img_root' not in subset.dataset

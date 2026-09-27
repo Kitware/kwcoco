@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 #!/usr/bin/env python3
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 import ubelt as ub
 
 
-class CocoMoveAssetsCLI(scfg.DataConfig):
+class CocoMoveAssetsCLI(KWCocoConfig):
     """
     Move assets and update corresponding kwcoco files as well
 
@@ -21,21 +22,23 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
     bundle may be put into a bad state.
     """
 
-    src = scfg.Value('source asset file or folder')
-    dst = scfg.Value('destination asset file or folder')
-    io_workers = scfg.Value(0, help='io workers')
-    dry = scfg.Value(
+    __command__ = 'move_assets'
+
+    src = kwconf.Value(None, position=1, help='source asset file or folder')
+    dst = kwconf.Value(None, position=2, help='destination asset file or folder')
+    io_workers = kwconf.Value(0, help='io workers')
+    dry = kwconf.Value(
         False,
         isflag=True,
-        short_alias=['-n'],
+        short_alias=['n'],
         help='if True do a dry run, only report what would be done',
     )
-    coco_fpaths = scfg.Value(
+    coco_fpaths = kwconf.Value(
         [], nargs='+', help='coco files modified by the move operation'
     )
 
     @classmethod
-    def main(cls, cmdline=1, **kwargs):
+    def main(cls, argv=True, **kwargs):
         """
         CommandLine:
             xdoctest -m kwcoco.cli.coco_move_assets CocoMoveAssetsCLI.main
@@ -46,20 +49,20 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
             >>> import kwcoco
             >>> dset = kwcoco.CocoDataset.demo('shapes8')
             >>> cls = CocoMoveAssetsCLI
-            >>> cmdline = False
+            >>> argv = False
             >>> kwargs = {
             >>>     'coco_fpaths': [dset.fpath],
             >>>     'src': ub.Path(dset.bundle_dpath) / '_assets',
             >>>     'dst': ub.Path(dset.bundle_dpath) / 'new_asset_dir',
             >>>     'dry': True,
             >>> }
-            >>> cls.main(cmdline=cmdline, **kwargs)
+            >>> cls.main(argv=argv, **kwargs)
 
         Example:
             >>> # xdoctest: +SKIP
             >>> # xdoctest: +REQUIRES(module:pint)
             >>> # development use-case. TODO: turn into a real doctest
-            >>> cmdline = 0
+            >>> argv = False
             >>> kwargs = dict(
             >>>     coco_fpaths=['*_E.kwcoco.zip', '*_mae.kwcoco.zip'],
             >>>     src='./_assets/teamfeats',
@@ -67,18 +70,18 @@ class CocoMoveAssetsCLI(scfg.DataConfig):
             >>>     io_workers='avail',
             >>> )
 
-            >>> cmdline = 0
+            >>> argv = False
             >>> kwargs = dict(
             >>>     coco_fpaths=['*_M.kwcoco.zip', '*_rutgers_material_seg_v4.kwcoco.zip'],
             >>>     src='./_teamfeats',
             >>>     dst='./teamfeats/materials',
             >>>     io_workers='avail',
             >>> )
-            >>> main(cmdline=cmdline, **kwargs)
+            >>> main(argv=argv, **kwargs)
         """
         import rich
 
-        config = CocoMoveAssetsCLI.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
+        config = CocoMoveAssetsCLI.cli(argv=argv, data=kwargs, strict=True)  # type: ignore
         rich.print('config = ' + ub.urepr(config, nl=1))
         from kwutil import util_path
         import kwcoco

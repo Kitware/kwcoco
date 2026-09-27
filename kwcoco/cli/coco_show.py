@@ -2,10 +2,11 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoShowCLI(scfg.DataConfig):
+class CocoShowCLI(KWCocoConfig):
     """
     Visualize a COCO image using matplotlib or opencv, optionally writing
     it to disk.
@@ -19,28 +20,28 @@ class CocoShowCLI(scfg.DataConfig):
         kwcoco show --src=special:shapes8 --gid=1 --dst out.png
     """
     __default__ = {
-        'src': scfg.Value(None, help=('Path to the coco dataset'), position=1),
-        'gid': scfg.Value(
+        'src': kwconf.Value(None, help=('Path to the coco dataset'), position=1),
+        'gid': kwconf.Value(
             None, help=('Image id to show, if unspecified the first image is shown')
         ),
-        'aid': scfg.Value(
+        'aid': kwconf.Value(
             None, help=('Annotation id to show, mutually exclusive with gid')
         ),
-        'dst': scfg.Value(
+        'dst': kwconf.Value(
             None,
             help=(
                 'Save the image to the specified file. '
                 'If unspecified, the image is shown with pyplot'
             ),
         ),
-        'mode': scfg.Value(
+        'mode': kwconf.Value(
             'matplotlib',
             choices=['matplotlib', 'opencv'],
             help='method used to draw the image',
         ),
-        'channels': scfg.Value(
+        'channels': kwconf.Value(
             None,
-            type=str,
+            parser=str,
             help=ub.paragraph(
                 """
                 By default uses the default channels (usually this is rgb),
@@ -48,16 +49,16 @@ class CocoShowCLI(scfg.DataConfig):
                 """
             ),
         ),
-        'show_annots': scfg.Value(
+        'show_annots': kwconf.Value(
             True, isflag=True, help=('Overlay annotations on display')
         ),
-        'show_labels': scfg.Value(
+        'show_labels': kwconf.Value(
             False, isflag=True, help=('Overlay labels on annotations')
         ),
     }
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         TODO:
             - [ ] Visualize multispectral data with assets
@@ -75,23 +76,23 @@ class CocoShowCLI(scfg.DataConfig):
             >>> dset = kwcoco.CocoDataset.demo('special:shapes8')
             >>> fpath = dpath / 'show_output.png'
             >>> kw = {'src': dset.fpath, 'mode': 'opencv', 'dst': fpath}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoShowCLI
-            >>> cls.main(cmdline=cmdline, **kw)
+            >>> cls.main(argv=argv, **kw)
             >>> assert fpath.exists()
 
         Example:
             >>> # xdoctest: +SKIP
             >>> kw = {'src': 'special:shapes8'}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoShowCLI
-            >>> cls.main(cmdline=cmdline, **kw)
+            >>> cls.main(argv=argv, **kw)
         """
         import kwcoco
         import kwimage
         import kwplot
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:

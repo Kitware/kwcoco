@@ -38,7 +38,7 @@ def perterb_coco(coco_dset, **kwargs):
         >>> import kwplot
         >>> kwplot.autompl()
         >>> gid = 1
-        >>> canvas = true_dset.delayed_load(gid).finalize()
+        >>> canvas = true_dset.coco_image(gid).imdelay().finalize()
         >>> canvas = true_dset.annots(gid=gid).detections.draw_on(canvas, color='green')
         >>> canvas = pred_dset.annots(gid=gid).detections.draw_on(canvas, color='blue')
         >>> kwplot.imshow(canvas)
@@ -212,7 +212,7 @@ def perterb_coco(coco_dset, **kwargs):
 
     if index_invalidated:
         new_dset.index.clear()
-        new_dset._build_index()
+        new_dset.rebuild_index()
     new_dset.remove_annotations(remove_aids)
 
     for ann in false_anns:
@@ -277,7 +277,7 @@ def perterb_coco(coco_dset, **kwargs):
             # heatmap_fpath = dummy_heatmap_dpath / 'dummy_heatmap_{}.tif'.format(img['id'])
             # kwimage.imwrite(heatmap_fpath, hwc_probs, backend='gdal', compress='NONE',
             #                 blocksize=96)
-            coco_img.add_auxiliary_item(
+            coco_img.add_asset(
                 # file_name=str(heatmap_fpath),
                 imdata=hwc_probs,
                 channels=chanspec,

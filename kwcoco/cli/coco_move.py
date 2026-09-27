@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 #!/usr/bin/env python3
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 import ubelt as ub
 
 
-class CocoMove(scfg.DataConfig):
+class CocoMove(KWCocoConfig):
     """
     Move a kwcoco file to a new location while maintaining relative paths.
     This is equivalent to a regular copy followed by ``kwcoco reroot`` followed
@@ -17,15 +18,15 @@ class CocoMove(scfg.DataConfig):
     __command__ = 'move'
     __alias__ = ['mv']
 
-    src = scfg.Value(None, help='coco file to move', position=1)
-    dst = scfg.Value(None, help='new location to move to', position=2)
+    src = kwconf.Value(None, help='coco file to move', position=1)
+    dst = kwconf.Value(None, help='new location to move to', position=2)
 
-    absolute = scfg.Value(False, help=('If False, the output file uses relative paths'))
+    absolute = kwconf.Value(False, help=('If False, the output file uses relative paths'))
 
-    check = scfg.Value(True, help=('If True, checks that all data exists'))
+    check = kwconf.Value(True, help=('If True, checks that all data exists'))
 
     @classmethod
-    def main(CocoMove, cmdline=1, **kwargs):
+    def main(CocoMove, argv=True, **kwargs):
         """
         Example:
             >>> import ubelt as ub
@@ -34,10 +35,10 @@ class CocoMove(scfg.DataConfig):
             >>> dpath = ub.Path.appdir('kwcoco/doctest/move')
             >>> dpath.delete().ensuredir()
             >>> dset = kwcoco.CocoDataset.demo('vidshapes2', dpath=dpath)
-            >>> cmdline = 0
+            >>> argv = False
             >>> dst = (ub.Path(dset.bundle_dpath) / 'new_dpath').ensuredir()
             >>> kwargs = dict(src=dset.fpath, dst=dst)
-            >>> coco_move.CocoMove.main(cmdline=cmdline, **kwargs)
+            >>> coco_move.CocoMove.main(argv=argv, **kwargs)
             >>> assert dst.exists()
             >>> assert not ub.Path(dset.fpath).exists()
         """
@@ -46,7 +47,7 @@ class CocoMove(scfg.DataConfig):
         except ImportError:
             rich_print = print # type: ignore
 
-        config = CocoMove.cli(cmdline=cmdline, data=kwargs, strict=True) # type: ignore
+        config = CocoMove.cli(argv=argv, data=kwargs, strict=True) # type: ignore
         rich_print('config = ' + ub.urepr(config, nl=1))
         import kwcoco
 

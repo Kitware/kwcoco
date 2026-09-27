@@ -477,7 +477,7 @@ def convert_camvid_raw_to_coco(camvid_raw_info):
             dset.show_image(gid)
             xdev.InteractiveIter.draw()
 
-    dset._build_index()
+    dset.rebuild_index()
     dset._build_hashid()
     return dset
 
@@ -625,10 +625,10 @@ def main():
         ~/.cache/kwcoco/camvid/camvid-master/camvid-vali.mscoco.json
         ~/.cache/kwcoco/camvid/camvid-master/camvid-test.mscoco.json
     """
-    # import scriptconfig as scfg
-    # class GrabCamVid_Config(scfg.Config):
+    # import kwconf
+    # class GrabCamVid_Config(kwconf.Config):
     #     default = {
-    #         'dpath': scfg.Path(
+    #         'dpath': kwconf.Value(
     #             ub.gPath.appdir('kwcoco', 'camvid'), help='download location')
     #     }
     # config = GrabCamVid_Config()

@@ -57,7 +57,7 @@ class COCO(CocoDataset):
         super().__init__(annotation_file, **kw)
 
     def createIndex(self) -> None:
-        self._build_index()
+        self.rebuild_index()
 
     def info(self) -> None:
         """
@@ -69,13 +69,13 @@ class COCO(CocoDataset):
 
     @property
     def imgToAnns(self) -> _ImgToAnnsProxy:
-        from scriptconfig.dict_like import DictLike
+        from kwcoco.util.dict_proxy2 import DictInterface
 
-        class ProxyImgToAnns(DictLike):
+        class ProxyImgToAnns(DictInterface):
             def __init__(self, parent: COCO) -> None:
                 self.parent = parent
 
-            def getitem(self, gid: int) -> list[dict[str, Any]]:  # type: ignore
+            def __getitem__(self, gid: int) -> list[dict[str, Any]]:
                 aids = self.parent.index.gid_to_aids[gid]
                 anns = list(ub.take(self.parent.index.anns, aids))
                 return anns

@@ -7,7 +7,7 @@ Wraps the logic in kwcoco/coco_evaluator.py with a command line script
 from typing import Any, cast
 
 from kwcoco import coco_evaluator
-import scriptconfig as scfg
+import kwconf
 import ubelt as ub
 
 
@@ -24,14 +24,16 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     __alias__ = ['eval_detections', 'evaluate_detections']
 
     # These should go into the CLI args, not the class config args
-    expt_title = scfg.Value('', type=str, help='title for plots', tags=['perf_param'])
-    draw = scfg.Value(True, isflag=1, help='draw metric plots', tags=['perf_param'])  # type: ignore
-    out_dpath = scfg.Value(
-        './coco_metrics', type=str, help='where to dump results', tags=['out_path']
+    expt_title = kwconf.Value('', parser=str, help='title for plots', tags=['perf_param'])
+    draw = kwconf.Value(
+        True, isflag=1, help='draw metric plots', tags=['perf_param']
     )
-    out_fpath = scfg.Value(
+    out_dpath = kwconf.Value(
+        './coco_metrics', parser=str, help='where to dump results', tags=['out_path']
+    )
+    out_fpath = kwconf.Value(
         'auto',
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
         Where to dump the json file containing result. If "auto",
@@ -41,7 +43,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
         tags=['out_path', 'primary'],
     )
 
-    confusion_fpath = scfg.Value(
+    confusion_fpath = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -55,7 +57,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     )
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
 
         Example:
@@ -85,21 +87,21 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
             ...     draw=draw,
             ...     out_dpath=dpath
             ... )
-            >>> cmdline = False
-            >>> CocoEvalCLI.main(cmdline=cmdline, **kw)
+            >>> argv = False
+            >>> CocoEvalCLI.main(argv=argv, **kw)
 
         Ignore:
             geowatch visualize ~/.cache/kwcoco/tests/eval/confusion.kwcoco.json --smart --animate=False --role_order="true,pred"
             geowatch visualize ~/.cache/kwcoco/tests/eval/confusion.kwcoco.json --smart --animate=False --channels="r|g|b,r|g|b" --role_order="true,pred"
 
         """
-        main(cmdline=cmdline, **kw)
+        main(argv=argv, **kw)
 
 
 __cli__ = CocoEvalCLI
 
 
-def main(cmdline=True, **kw):
+def main(argv=True, **kw):
     r"""
     TODO:
         - [X] should live in kwcoco.cli.coco_eval
@@ -121,7 +123,7 @@ def main(cmdline=True, **kw):
     import kwimage
     import kwarray
 
-    cli_config = CocoEvalCLI.cli(cmdline=cmdline, data=kw)
+    cli_config = CocoEvalCLI.cli(argv=argv, data=kw)
     print('cli_config = {}'.format(ub.urepr(cli_config, nl=1)))
 
     eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__)  # type: ignore

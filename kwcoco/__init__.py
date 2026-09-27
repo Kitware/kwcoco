@@ -178,7 +178,7 @@ CocoDataset methods (via MixinCocoAddRemove)
  * :func:`kwcoco.CocoDataset.add_annotation<kwcoco.coco_dataset.MixinCocoAddRemove.add_annotation>` - Register a new annotation with the dataset
  * :func:`kwcoco.CocoDataset.add_annotations<kwcoco.coco_dataset.MixinCocoAddRemove.add_annotations>` - Faster less-safe multi-item alternative to add_annotation.
  * :func:`kwcoco.CocoDataset.add_asset<kwcoco.coco_dataset.MixinCocoAddRemove.add_asset>` - Adds an auxiliary / asset item to the image dictionary.
- * :func:`kwcoco.CocoDataset.add_auxiliary_item<kwcoco.coco_dataset.MixinCocoAddRemove.add_auxiliary_item>` - Adds an auxiliary / asset item to the image dictionary.
+ * :func:`kwcoco.CocoDataset.add_asset<kwcoco.coco_dataset.MixinCocoAddRemove.add_asset>` - Adds an asset item to the image dictionary.
  * :func:`kwcoco.CocoDataset.add_categories<kwcoco.coco_dataset.MixinCocoAddRemove.add_categories>` - Faster less-safe multi-item alternative to add_category.
  * :func:`kwcoco.CocoDataset.add_category<kwcoco.coco_dataset.MixinCocoAddRemove.add_category>` - Register a new category with the dataset
  * :func:`kwcoco.CocoDataset.add_image<kwcoco.coco_dataset.MixinCocoAddRemove.add_image>` - Register a new image with the dataset

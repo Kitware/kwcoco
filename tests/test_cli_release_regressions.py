@@ -61,7 +61,7 @@ def test_coco_eval_auto_output_path(monkeypatch, tmp_path):
 
     out_dpath = tmp_path / 'metrics'
     coco_eval.main(
-        cmdline=0,
+        argv=False,
         true_dataset='unused-truth.json',
         pred_dataset='unused-pred.json',
         out_dpath=out_dpath,

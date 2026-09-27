@@ -9,7 +9,7 @@ class AddError(ValueError):
     pass
 
 
-class DuplicateAddError(ValueError):
+class DuplicateAddError(AddError):
     """
     Error when trying to add a duplicate item
     """
@@ -17,7 +17,7 @@ class DuplicateAddError(ValueError):
     pass
 
 
-class InvalidAddError(ValueError):
+class InvalidAddError(AddError):
     """
     Error when trying to invalid data
     """

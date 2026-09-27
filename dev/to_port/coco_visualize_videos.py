@@ -28,11 +28,12 @@ CommandLine:
     python -m geowatch.cli.coco_visualize_videos --src=$KWCOCO_FPATH --viz_dpath=$VIZ_DPATH --zoom_to_tracks=True --start_frame=1 --num_frames=5 --animate=True
 """
 
-import scriptconfig as scfg
+import kwconf
 import ubelt as ub
 
 
-class CocoVisualizeConfig(scfg.DataConfig):
+class CocoVisualizeConfig(kwconf.Config):
+    __special_options__ = True
     """
     Visualizes annotations on kwcoco video frames on each band
 
@@ -63,8 +64,8 @@ class CocoVisualizeConfig(scfg.DataConfig):
     """
 
     __default__ = {
-        'src': scfg.Value('data.kwcoco.json', help='Input dataset', position=1),
-        'viz_dpath': scfg.Value(
+        'src': kwconf.Value('data.kwcoco.json', help='Input dataset', position=1),
+        'viz_dpath': kwconf.Value(
             None,
             help=ub.paragraph(
                 """
@@ -73,18 +74,18 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'workers': scfg.Value('auto', help='Number of parallel procs'),
-        'max_workers': scfg.Value(None, help='DEPRECATED USE workers'),
-        'space': scfg.Value('video', help='Can be image or video space'),
-        'max_dim': scfg.Value(
+        'workers': kwconf.Value('auto', help='Number of parallel procs'),
+        'max_workers': kwconf.Value(None, help='DEPRECATED USE workers'),
+        'space': kwconf.Value('video', help='Can be image or video space'),
+        'max_dim': kwconf.Value(
             None,
             help='If specified, the visualization will resize if it has a dimension larger than this',
         ),
-        'min_dim': scfg.Value(
+        'min_dim': kwconf.Value(
             384,
             help='If specified, the visualization will resize if it has a dimension smaller than this',
         ),
-        'resolution': scfg.Value(
+        'resolution': kwconf.Value(
             None,
             help=ub.paragraph(
                 """
@@ -93,8 +94,8 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'channels': scfg.Value(None, type=str, help='only viz these channels'),
-        'any3': scfg.Value(
+        'channels': kwconf.Value(None, parser=str, help='only viz these channels'),
+        'any3': kwconf.Value(
             False,
             help=ub.paragraph(
                 """
@@ -106,7 +107,7 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'draw_imgs': scfg.Value(
+        'draw_imgs': kwconf.Value(
             True,
             isflag=True,
             help=ub.paragraph(
@@ -115,9 +116,10 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'draw_anns': scfg.Value(
+        'draw_anns': kwconf.Value(
             'auto',
-            isflag=True,
+            bare=True,
+            parser='auto',
             help=ub.paragraph(
                 """
             Control if images with annotations are drawn. Using "auto" means
@@ -125,7 +127,7 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'draw_track_trails': scfg.Value(
+        'draw_track_trails': kwconf.Value(
             False,
             isflag=True,
             help=ub.paragraph(
@@ -136,12 +138,12 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'draw_valid_region': scfg.Value(
+        'draw_valid_region': kwconf.Value(
             False, help='If True, draw the valid region if it exists'
         ),
-        'cmap': scfg.Value(
+        'cmap': kwconf.Value(
             'viridis',
-            type=str,
+            parser=str,
             help=ub.paragraph(
                 """
             Name of a colormap for single channel data.
@@ -151,23 +153,24 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'animate': scfg.Value(
+        'animate': kwconf.Value(
             'auto',
-            isflag=True,
+            bare=True,
+            parser='auto',
             help='If True, make an animated gif from the output. Defaults to False.',
         ),
-        'num_frames': scfg.Value(
+        'num_frames': kwconf.Value(
             None,
-            type=str,
+            parser='auto',
             help='show the first N frames from each video, if None, all are shown',
         ),
-        'start_frame': scfg.Value(
-            0, type=str, help='If specified each video will start on this frame'
+        'start_frame': kwconf.Value(
+            0, parser='auto', help='If specified each video will start on this frame'
         ),
-        'ann_score_thresh': scfg.Value(
+        'ann_score_thresh': kwconf.Value(
             0, help='If annotations have a score, remove any under this threshold'
         ),
-        'skip_missing': scfg.Value(
+        'skip_missing': kwconf.Value(
             True,
             isflag=True,
             help=ub.paragraph(
@@ -176,7 +179,7 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'skip_aggressive': scfg.Value(
+        'skip_aggressive': kwconf.Value(
             False,
             isflag=True,
             help=ub.paragraph(
@@ -185,7 +188,7 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'only_boxes': scfg.Value(
+        'only_boxes': kwconf.Value(
             False,
             isflag=True,
             help=ub.paragraph(
@@ -196,48 +199,48 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'draw_segmentations': scfg.Value(
+        'draw_segmentations': kwconf.Value(
             True, help='If True draw annotation segmentation polygons'
         ),
-        'draw_labels': scfg.Value(True, help='If True draw text labels on annotations'),
-        'draw_boxes': scfg.Value(
+        'draw_labels': kwconf.Value(True, help='If True draw text labels on annotations'),
+        'draw_boxes': kwconf.Value(
             True, help='If True draw bounding boxes around annotations'
         ),
-        'alpha': scfg.Value(None, help='transparency / opacity of annotations'),
-        'darken_images': scfg.Value(
+        'alpha': kwconf.Value(None, help='transparency / opacity of annotations'),
+        'darken_images': kwconf.Value(
             False,
             help='if specified, darken the images so annotations stand out better',
         ),
         # TODO: better support for this
         # TODO: use the kwcoco_video_data, has good logic for this
-        'zoom_to_tracks': scfg.Value(
+        'zoom_to_tracks': kwconf.Value(
             False,
             isflag=True,
-            type=str,
+            parser=str,
             help='If True, zoom to tracked annotations. Experimental, might not work perfectly yet.',
         ),
-        'norm_over_time': scfg.Value(
+        'norm_over_time': kwconf.Value(
             False, isflag=True, help='If True, normalize data over time'
         ),
-        'fixed_normalization_scheme': scfg.Value(
+        'fixed_normalization_scheme': kwconf.Value(
             None,
-            type=str,
+            parser=str,
             help='Use a fixed normalization scheme for visualization; e.g. "scaled_25percentile"',
         ),
-        'extra_header': scfg.Value(None, help='Extra text to include in the header'),
-        'draw_header': scfg.Value(True, help='If False disables drawing the header'),
-        'draw_chancode': scfg.Value(
+        'extra_header': kwconf.Value(None, help='Extra text to include in the header'),
+        'draw_header': kwconf.Value(True, help='If False disables drawing the header'),
+        'draw_chancode': kwconf.Value(
             True, help='If False disables drawing the channel code'
         ),
-        'include_sensors': scfg.Value(
+        'include_sensors': kwconf.Value(
             None, help='If specified can be comma separated valid sensors'
         ),
-        'exclude_sensors': scfg.Value(
+        'exclude_sensors': kwconf.Value(
             None, help='If specified can be comma separated invalid sensors'
         ),
-        'select_images': scfg.Value(
+        'select_images': kwconf.Value(
             None,
-            type=str,
+            parser=str,
             help=ub.paragraph(
                 """
                 Can be a YAML list of image ids, or...
@@ -264,7 +267,7 @@ class CocoVisualizeConfig(scfg.DataConfig):
                 """
             ),
         ),
-        'select_videos': scfg.Value(
+        'select_videos': kwconf.Value(
             None,
             help=ub.paragraph(
                 """
@@ -285,17 +288,18 @@ class CocoVisualizeConfig(scfg.DataConfig):
                 """
             ),
         ),
-        'verbose': scfg.Value(0, isflag=True, help='verbosity level'),
-        'stack': scfg.Value(
+        'verbose': kwconf.Value(0, bare=1, parser='auto', help='verbosity level'),
+        'stack': kwconf.Value(
             'auto',
-            isflag=True,
+            bare=True,
+            parser='auto',
             help=ub.paragraph(
                 """
             If True stack late fused channels in the same image.
             """
             ),
         ),
-        'stack_axis': scfg.Value(
+        'stack_axis': kwconf.Value(
             0,
             help=ub.paragraph(
                 """
@@ -305,7 +309,7 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'role_order': scfg.Value(
+        'role_order': kwconf.Value(
             None,
             help=ub.paragraph(
                 """
@@ -314,7 +318,7 @@ class CocoVisualizeConfig(scfg.DataConfig):
             """
             ),
         ),
-        'smart': scfg.Value(
+        'smart': kwconf.Value(
             False,
             isflag=True,
             help=ub.paragraph(
@@ -328,7 +332,7 @@ class CocoVisualizeConfig(scfg.DataConfig):
     }
 
 
-def main(cmdline=True, **kwargs):
+def main(argv=True, **kwargs):
     """
     CommandLine:
         xdoctest -m geowatch.cli.coco_visualize_videos main:2
@@ -351,8 +355,8 @@ def main(cmdline=True, **kwargs):
         >>>     'channels': None,
         >>>     'zoom_to_tracks': True,
         >>> }
-        >>> cmdline = False
-        >>> main(cmdline=cmdline, **kwargs)
+        >>> argv = False
+        >>> main(argv=argv, **kwargs)
 
     Example:
         >>> import kwcoco
@@ -372,8 +376,8 @@ def main(cmdline=True, **kwargs):
         >>>     'zoom_to_tracks': False,
         >>>     'stack': 'only',
         >>> }
-        >>> cmdline = False
-        >>> main(cmdline=cmdline, **kwargs)
+        >>> argv = False
+        >>> main(argv=argv, **kwargs)
 
     Example:
         >>> # Test ability to draw track trails
@@ -413,12 +417,10 @@ def main(cmdline=True, **kwargs):
         >>>     'workers': 0,
         >>>     'verbose': 101,
         >>> }
-        >>> cmdline = False
-        >>> main(cmdline=cmdline, **kwargs)
+        >>> argv = False
+        >>> main(argv=argv, **kwargs)
     """
-    config = CocoVisualizeConfig.cli(
-        data=kwargs, cmdline=cmdline and {'strict': True}, strict=True
-    )
+    config = CocoVisualizeConfig.cli(data=kwargs, argv=argv, strict=True)
     from kwutil import util_parallel
     from kwutil import util_resources
     from geowatch.utils import kwcoco_extensions
@@ -569,10 +571,10 @@ def main(cmdline=True, **kwargs):
 
     pool = ub.JobPool(mode='thread', max_workers=max_workers)
 
-    from scriptconfig.smartcast import smartcast
+    from kwconf.coerce import auto
 
-    num_frames = smartcast(config['num_frames'])
-    start_frame = smartcast(config['start_frame'])
+    num_frames = auto(config['num_frames'])
+    start_frame = auto(config['start_frame'])
     end_frame = None if num_frames is None else start_frame + num_frames
 
     selected_gids = None
@@ -827,12 +829,13 @@ def main(cmdline=True, **kwargs):
     if config['animate']:
         # TODO: develop this idea more
         # Try to parse out an animation config
-        import scriptconfig as scfg
+        import kwconf
         from kwutil import util_yaml
 
-        class AnimateConfig(scfg.DataConfig):
+        class AnimateConfig(kwconf.Config):
+            __special_options__ = True
             # TODO: should be able to load from an alias
-            frames_per_second = scfg.Value(0.7, alias=['fps'])
+            frames_per_second = kwconf.Value(0.7, alias=['fps'])
 
         animate_config = dict(AnimateConfig())
         if isinstance(config['animate'], str) and config['animate'] not in {'oops'}:
@@ -2126,4 +2129,4 @@ def draw_polyline_on_image(image, xy_pts, color=None, thickness=1):
 
 
 if __name__ == '__main__':
-    main(cmdline=True)
+    main(argv=True)

@@ -9,7 +9,7 @@ Prereqs: 03–09
 
 - [ ] Unify worker flags: `io_workers` (stats/union/move_assets/
       find_unregistered_images) vs `workers` (validate/conform/fixup/
-      visualize). Recommended: accept both everywhere via scriptconfig
+      visualize). Recommended: accept both everywhere via kwconf
       alias, document `workers` as canonical. Remove the accidental
       `isflag=True` on the *int* `workers` at `cli/coco_validate.py:113`.
 - [ ] Unify missing-`src` handling: modules raise bare `Exception` or
@@ -38,7 +38,7 @@ Prereqs: 03–09
 - [ ] Surface hidden behaviors: `coco_show` `'both'` mode and the
       xdev InteractiveIter loop (`coco_show.py:125,136-149`), `coco_stats`
       `embed` hack (`:58-60`) — document or remove. Remove the
-      class-level monkey-patch of `version` onto scriptconfig's ModalCLI
+      class-level monkey-patch of `version` onto kwconf's ModalCLI
       (`cli/__main__.py:59-64`) in favor of an instance attribute or
       upstream support.
 

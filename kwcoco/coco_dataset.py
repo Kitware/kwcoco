@@ -836,7 +836,7 @@ class CocoDataset(
         if verbose:
             print('done.')
 
-    def _check_json_serializable(self, verbose: Any = 1) -> list:
+    def _check_json_serializable(self, verbose: Any = 0) -> list:
         """
         Debug which part of a coco dataset might not be json serializable
         """
@@ -945,7 +945,7 @@ class CocoDataset(
             raise AssertionError('Failed index checks: {}'.format(list(failed_checks)))
         return True
 
-    def _check_pointers(self, verbose: Any = 1) -> bool:
+    def _check_pointers(self, verbose: Any = 0) -> bool:
         """
         Check that all category and image ids referenced by annotations exist
         """
@@ -1031,8 +1031,16 @@ class CocoDataset(
         return True
 
     def _build_index(self) -> None:
-        # use rebuild_index instead
-        # ub.schedule_deprecation
+        ub.schedule_deprecation(
+            'kwcoco',
+            name='_build_index',
+            type='method',
+            migration='Use rebuild_index() instead.',
+            deprecate='0.9.0',
+            error='1.0.0',
+            remove='1.1.0',
+            stacklevel=2,
+        )
         self.index.build(self)
 
     def rebuild_index(self) -> None:
@@ -1667,7 +1675,6 @@ class CocoDataset(
             sub_track_ids = sorted(cast(Any, track_ids))
             new_dataset['tracks'] = list(self.tracks(sub_track_ids).objs)
 
-        new_dataset['img_root'] = self.dataset.get('img_root', None)  # type: ignore
 
         if copy:
             from copy import deepcopy

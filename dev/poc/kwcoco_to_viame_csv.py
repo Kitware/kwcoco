@@ -5,13 +5,14 @@ References:
     https://viame.readthedocs.io/en/latest/section_links/detection_file_conversions.html
 """
 
-import scriptconfig as scfg
+import kwconf
 
 
-class ConvertConfig(scfg.Config):
-    default = {
-        'src': scfg.Value('in.mscoco.json'),
-        'dst': scfg.Value('out.viame.csv'),
+class ConvertConfig(kwconf.Config):
+    __special_options__ = True
+    __default__ = {
+        'src': kwconf.Value('in.mscoco.json'),
+        'dst': kwconf.Value('out.viame.csv'),
     }
 
 
@@ -22,7 +23,7 @@ def main(**kw):
             --src /data/public/Aerial/US_ALASKA_MML_SEALION/2007/sealions_2007_v9.kwcoco.json \
             --dst /data/public/Aerial/US_ALASKA_MML_SEALION/2007/sealions_2007_v9.viame.csv
     """
-    config = ConvertConfig(default=kw, cmdline=True)
+    config = ConvertConfig.cli(data=kw, argv=True)
 
     import kwcoco
     import kwimage

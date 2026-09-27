@@ -430,8 +430,8 @@ def make_adversarial_case(name):
     else:
         raise KeyError(name)
 
-    true._build_index()
-    pred._build_index()
+    true.rebuild_index()
+    pred.rebuild_index()
     return true, pred, {'builder': 'handcrafted', 'case': name}
 
 

@@ -18,7 +18,7 @@
   * `coco_image.py`, `channel_spec.py`, `sensorchan_spec.py`: image + channel/sensor metadata, multispectral helpers.
   * `compat_dataset.py`: pycocotools-like API + conversion compatibility.
   * `coco_evaluator.py`, `coco_objects1d.py`, `metrics/`: eval + metrics (**metrics has its own AGENTS.md**).
-  * `cli/`: `python -m kwcoco` / `kwcoco` (`scriptconfig` CLI: stats/union/subset/split/validate/conform/reroot/toydata/demodata/eval/grab/info/visual_stats/etc.).
+  * `cli/`: `python -m kwcoco` / `kwcoco` (`kwconf` CLI: stats/union/subset/split/validate/conform/reroot/toydata/demodata/eval/grab/info/visual_stats/etc.).
   * `formats/` converters; `demo/` synthetic data; `data/` dataset access; `rc/` resources; `util/` geometry/delayed-image/vectorized ops.
   * schema refs: `coco_schema.*`, `coco_schema_informal.rst`; specialized: `kw18.py`, `kpf.py`.
 * `tests/`: pytest + xdoctest; mirrors major features (CLI, dataset ops, video/multispectral, metrics, SQL, tracks, etc.).

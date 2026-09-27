@@ -99,7 +99,7 @@ Demo/util: `boids.py:261-269,513-537`; `perterb.py:341-393` (dead
       `coco_evaluator.py:421`, `cli/coco_union.py:135`, demo modules,
       `data/grab_camvid.py:481`). Migrate internal callers to
       `rebuild_index`, then enable the scheduled deprecation.
-- [ ] `add_auxiliary_item = add_asset` alias: `mixin_add_remove.py:182-183`
+- [x] `add_auxiliary_item` now uses the scheduled deprecation wrapper around `add_asset`.
       is a bare alias while `coco_image.py:1532` wraps the same name in
       `deprecated_function_alias` — make both warn.
 - [ ] `img_root`/`data_root` properties (`mixin_extras.py:894-910`) and the

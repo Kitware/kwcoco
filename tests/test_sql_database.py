@@ -12,11 +12,33 @@ def have_sqlalchemy():
 
 
 def have_postgresql():
+    """Check that the optional PostgreSQL test service is actually usable."""
+    import os
+
     try:
-        import psycopg2  # NOQA
+        import psycopg2
     except ImportError:
         return False
-    return True  # todo: make robust
+
+    connect_kw = {
+        'dbname': 'postgres',
+        'host': os.environ.get('KWCOCO_HOST', 'localhost'),
+        'port': os.environ.get('KWCOCO_PORT', '5432'),
+        'user': os.environ.get('KWCOCO_USER', 'admin'),
+        'password': os.environ.get('KWCOCO_PASSWD', 'admin'),
+        'connect_timeout': 1,
+    }
+    try:
+        conn = psycopg2.connect(**connect_kw)
+    except psycopg2.OperationalError:
+        if os.environ.get('KWCOCO_WITH_POSTGRESQL'):
+            # An explicit request for PostgreSQL testing means a broken test
+            # service should fail loudly instead of being silently skipped.
+            raise
+        return False
+    else:
+        conn.close()
+        return True
 
 
 def test_coerce_as_postgresql():
@@ -273,3 +295,16 @@ def test_python_index_maps():
                     assert sql_v[k] == dct_v[k]
             else:
                 assert sql_v == dct_v
+
+
+def test_sql_data_fpath_alias_setter():
+    import pytest
+
+    if not have_sqlalchemy():
+        pytest.skip('requires sqlalchemy')
+    from kwcoco.coco_sql_dataset import CocoSqlDatabase
+
+    dset = CocoSqlDatabase('sqlite:///old.sqlite')
+    dset.data_fpath = 'sqlite:///new.sqlite'
+    assert dset.data_fpath == 'sqlite:///new.sqlite'
+    assert dset.fpath == 'sqlite:///new.sqlite'

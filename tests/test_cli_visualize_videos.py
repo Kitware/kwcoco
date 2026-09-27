@@ -34,7 +34,7 @@ def test_visualize_videos_cli_smoke(tmp_path):
     viz_dpath = ub.Path(tmp_path) / 'viz'
 
     coco_visualize_videos.__cli__.main(
-        cmdline=False,
+        argv=False,
         src=dset.fpath,
         viz_dpath=viz_dpath,
         workers=0,
@@ -94,7 +94,7 @@ def test_visualize_respects_annotation_colors_and_bboxless_annots(tmp_path):
     viz_dpath = ub.Path(tmp_path) / 'viz'
 
     coco_visualize_videos.__cli__.main(
-        cmdline=False,
+        argv=False,
         src=dset.fpath,
         viz_dpath=viz_dpath,
         workers=0,

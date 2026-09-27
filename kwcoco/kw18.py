@@ -1,3 +1,4 @@
+"""Compatibility shim for :mod:`kwcoco.formats.kw18`."""
 from __future__ import annotations
 
 import ubelt as ub
@@ -8,6 +9,11 @@ ub.schedule_deprecation(
     'module',
     'use kwcoco.formats.kw18 instead',
     deprecate='0.8.4',
-    error='0.9.0',
-    remove='0.10.0',
+    error='1.0.0',
+    remove='1.1.0',
+    stacklevel=2,
 )
+
+from kwcoco.formats.kw18 import KW18 as KW18
+
+__all__ = ['KW18']

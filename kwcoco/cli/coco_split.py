@@ -2,10 +2,11 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoSplitCLI(scfg.DataConfig):
+class CocoSplitCLI(KWCocoConfig):
     """
     Splits a COCO files into two or more parts base on some criteria.
 
@@ -19,36 +20,37 @@ class CocoSplitCLI(scfg.DataConfig):
 
     __command__ = 'split'
     __default__ = {
-        'src': scfg.Value(None, help='input dataset to split', position=1),
-        'dst1': scfg.Value(
+        'src': kwconf.Value(None, help='input dataset to split', position=1),
+        'dst1': kwconf.Value(
             'split1.kwcoco.json', help='output path of the larger split'
         ),
-        'dst2': scfg.Value(
+        'dst2': kwconf.Value(
             'split2.kwcoco.json', help='output path of the smaller split'
         ),
-        'train_fpath': scfg.Value(
+        'train_fpath': kwconf.Value(
             None,
             help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2',
         ),
-        'vali_fpath': scfg.Value(
+        'vali_fpath': kwconf.Value(
             None,
             help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2',
         ),
-        'test_fpath': scfg.Value(
+        'test_fpath': kwconf.Value(
             None,
             help='if specified, must also specify train_fpath, vali_fpath, and test_fpath. Mutex with dst1 and dst2',
         ),
-        'factor': scfg.Value(
+        'factor': kwconf.Value(
             3,
             help='number of items in dset1 for each item in dset2. Also defines the maximum number of splits that could be written.',
         ),
-        'rng': scfg.Value(None, help='A random seed for reproducible splits'),
-        'balance_categories': scfg.Value(
+        'rng': kwconf.Value(None, help='A random seed for reproducible splits'),
+        'balance_categories': kwconf.Value(
             True, help='if True tries to balance annotation categories across splits'
         ),
-        'num_write': scfg.Value(
+        'num_write': kwconf.Value(
             1,
-            isflag=True,
+            bare=1,
+            parser='auto',
             help=ub.paragraph(
                 """
             The number of splits to write. Can be between 1 and ``factor``.
@@ -58,7 +60,7 @@ class CocoSplitCLI(scfg.DataConfig):
             """
             ),
         ),
-        'splitter': scfg.Value(
+        'splitter': kwconf.Value(
             'auto',
             help=ub.paragraph(
                 """
@@ -70,7 +72,7 @@ class CocoSplitCLI(scfg.DataConfig):
             ),
             choices=['auto', 'image', 'video'],
         ),
-        'compress': scfg.Value('auto', help='if True writes results with compression'),
+        'compress': kwconf.Value('auto', help='if True writes results with compression'),
     }
     __epilog__ = """
     Example Usage:
@@ -80,7 +82,7 @@ class CocoSplitCLI(scfg.DataConfig):
     """
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         CommandLine:
             xdoctest -m kwcoco.cli.coco_split CocoSplitCLI.main
@@ -92,15 +94,15 @@ class CocoSplitCLI(scfg.DataConfig):
             >>> kw = {'src': 'special:vidshapes8',
             >>>       'dst1': dpath / 'train.json',
             >>>       'dst2': dpath / 'test.json'}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoSplitCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
         import kwcoco
         import kwarray
         from kwcoco.util import util_sklearn
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:

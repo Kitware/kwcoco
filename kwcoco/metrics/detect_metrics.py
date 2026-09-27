@@ -2726,7 +2726,7 @@ def eval_detections_cli(**kw: typing.Any) -> None:
     CommandLine:
         xdoctest -m ~/code/kwcoco/kwcoco/metrics/detect_metrics.py eval_detections_cli
     """
-    import scriptconfig as scfg
+    import kwconf
     import kwcoco
 
     ub.schedule_deprecation(
@@ -2739,17 +2739,18 @@ def eval_detections_cli(**kw: typing.Any) -> None:
         migration=('Use `kwcoco eval` in kwcoco.cli.coco_eval instead. '),
     )
 
-    class EvalDetectionCLI(scfg.Config):
-        default = {
-            'true': scfg.Path(None, help='true coco dataset'),
-            'pred': scfg.Path(None, help='predicted coco dataset'),
-            'out_dpath': scfg.Path('./out', help='output directory'),
+    class EvalDetectionCLI(kwconf.Config):
+        __special_options__ = True
+        __default__ = {
+            'true': kwconf.Value(None, parser=str, help='true coco dataset'),
+            'pred': kwconf.Value(None, parser=str, help='predicted coco dataset'),
+            'out_dpath': kwconf.Value('./out', parser=str, help='output directory'),
         }
         pass
 
     config = EvalDetectionCLI()
-    cmdline = kw.pop('cmdline', True)
-    config.load(kw, cmdline=cmdline)
+    argv = kw.pop('argv', True)
+    config.load(kw, argv=argv)
 
     true_coco = kwcoco.CocoDataset(config['true'])
     pred_coco = kwcoco.CocoDataset(config['pred'])

@@ -117,10 +117,10 @@ class CocoSqlRuntime:
         self
 
 
-from scriptconfig.dict_like import DictLike  # NOQA
+from kwcoco.util.dict_proxy2 import DictInterface  # NOQA
 
 
-class SqlDictProxy(ub.NiceRepr, DictLike):
+class SqlDictProxy(ub.NiceRepr, DictInterface):
     """
     Args:
         session (Session): the sqlalchemy session
@@ -161,7 +161,7 @@ class SqlDictProxy(ub.NiceRepr, DictLike):
             yield key
 
 
-class SqlIdGroupDictProxy(ub.NiceRepr, DictLike):
+class SqlIdGroupDictProxy(ub.NiceRepr, DictInterface):
     def __init__(proxy, session, valattr, keyattr):
         proxy.valattr = valattr
         proxy.keyattr = keyattr

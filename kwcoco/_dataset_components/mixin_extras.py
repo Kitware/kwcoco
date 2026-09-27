@@ -74,7 +74,7 @@ class MixinCocoExtras:
         return dset_id
 
     def _ensure_imgsize(
-        self, workers: int = 0, verbose: int = 1, fail: bool = False
+        self, workers: int = 0, verbose: int = 0, fail: bool = False
     ) -> dict:
         """
         Populate the imgsize field if it does not exist.

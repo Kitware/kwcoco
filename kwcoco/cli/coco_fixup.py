@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 #!/usr/bin/env python3
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 import ubelt as ub
 
 """
@@ -13,16 +14,16 @@ TODO:
 """
 
 
-class CocoFixup(scfg.DataConfig):
+class CocoFixup(KWCocoConfig):
     __command__ = 'fixup'
 
-    src = scfg.Value(None, position=1, help='path to input dataset')
+    src = kwconf.Value(None, position=1, help='path to input dataset')
 
-    dst = scfg.Value(None, position=2, help='path to output dataset')
+    dst = kwconf.Value(None, position=2, help='path to output dataset')
 
-    missing_assets = scfg.Value(True, help='if True remove missing assets')
+    missing_assets = kwconf.Value(True, help='if True remove missing assets')
 
-    corrupted_assets = scfg.Value(
+    corrupted_assets = kwconf.Value(
         True,
         help=(
             'if True remove corrupted assets. '
@@ -30,7 +31,7 @@ class CocoFixup(scfg.DataConfig):
         ),
     )
 
-    inplace = scfg.Value(
+    inplace = kwconf.Value(
         False,
         isflag=True,
         help=(
@@ -38,10 +39,10 @@ class CocoFixup(scfg.DataConfig):
         ),
     )
 
-    workers = scfg.Value(0)
+    workers = kwconf.Value(0)
 
     @classmethod
-    def main(cls, cmdline=1, **kwargs):
+    def main(cls, argv=True, **kwargs):
         """
         CommandLine:
             xdoctest -m kwcoco.cli.coco_fixup CocoFixup.main
@@ -61,16 +62,16 @@ class CocoFixup(scfg.DataConfig):
             >>> print(f'src_dset={src_dset}')
             >>> dst = src.augment(prefix='fixed-')
             >>> kwargs = dict(src=src, dst=dst)
-            >>> cmdline = 0
+            >>> argv = False
             >>> cls = CocoFixup
-            >>> cls.main(cmdline=cmdline, **kwargs)
+            >>> cls.main(argv=argv, **kwargs)
             >>> assert dst.exists()
             >>> dst_dset = kwcoco.CocoDataset(dst)
             >>> print(f'dst_dset={dst_dset}')
             >>> assert dst_dset.n_images < src_dset.n_images
             >>> assert dst_dset.n_videos < src_dset.n_videos
         """
-        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True) # type: ignore
+        config = cls.cli(argv=argv, data=kwargs, strict=True) # type: ignore
 
         try:
             import rich

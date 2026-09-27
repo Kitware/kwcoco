@@ -7,16 +7,17 @@ References:
 
 import ubelt as ub
 from os.path import dirname, join, isdir
-import scriptconfig as scfg
+import kwconf
 
 
-class ConvertConfig(scfg.Config):
-    default = {
-        'src': scfg.PathList('in.viame.csv'),
-        'dst': scfg.Value('out.kwcoco.json'),
+class ConvertConfig(kwconf.Config):
+    __special_options__ = True
+    __default__ = {
+        'src': kwconf.Value(['in.viame.csv'], parser='csv'),
+        'dst': kwconf.Value('out.kwcoco.json'),
         'new_root': None,
         'old_root': None,
-        'images': scfg.Value(
+        'images': kwconf.Value(
             None,
             help='image list file or path to image directory if the CSV does not specify image names',
         ),
@@ -121,11 +122,22 @@ def coco_from_viame_csv(csv_fpaths, images=None):
     return dset
 
 
-def main(cmdline=True, **kw):
-    config = ConvertConfig(default=kw, cmdline=cmdline)
+def main(argv=True, **kw):
+    config = ConvertConfig.cli(data=kw, argv=argv)
     print('config = {}'.format(ub.urepr(dict(config), nl=1)))
     # TODO: ability to map image ids to agree with another coco file
+    import glob
+    import os
+
     csv_fpaths = config['src']
+    if isinstance(csv_fpaths, (str, os.PathLike)):
+        csv_fpaths = [csv_fpaths]
+    expanded_fpaths = []
+    for pattern in csv_fpaths:
+        pattern = os.path.expanduser(os.fspath(pattern))
+        matches = sorted(glob.glob(pattern))
+        expanded_fpaths.extend(matches or [pattern])
+    csv_fpaths = expanded_fpaths
     new_root = config['new_root']
     old_root = config['old_root']
     images = config['images']

@@ -156,7 +156,7 @@ def remap_category_ids_demo():
         new_cid = cid_mapping[old_cid]
         ann['category_id'] = new_cid
 
-    dset._build_index()
+    dset.rebuild_index()
 
 
 def filter_images_by_attribute():
