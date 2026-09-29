@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Optional, Sequence, Tuple
 
 import kwarray
 import numpy as np
@@ -137,9 +137,7 @@ class Boids(ub.NiceRepr):
     ) -> None:
         if dims != 2:
             raise NotImplementedError('Boids currently supports only dims=2')
-        self.rng = cast(
-            np.random.RandomState, kwarray.ensure_rng(rng, api='numpy')
-        )
+        self.rng = kwarray.ensure_rng(rng, api='numpy')
         self.num = num
         self.dims = dims
 

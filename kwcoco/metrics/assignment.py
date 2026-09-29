@@ -228,17 +228,29 @@ def _assign_confusion_vectors(
 
     # Group true boxes by class
     # Keep track which true boxes are available / not assigned
-    unique_tcxs, tgroupxs = kwarray.group_indices(true_dets.class_idxs)
+    true_cxs = np.asarray(true_dets.class_idxs, dtype=int)
+    unique_tcxs, tgroupxs = kwarray.group_indices(true_cxs)
+    unique_tcxs = np.asarray(unique_tcxs, dtype=int)
     cx_to_txs = dict(zip(unique_tcxs, tgroupxs))
 
-    unique_pcxs = np.array(sorted(set(pred_dets.class_idxs)))
+    # Predicted class indices may legitimately contain ``None``.  This is
+    # used to represent a prediction with no assigned category, and the
+    # assignment logic treats those predictions as unmatched rather than
+    # coercing them into an integer category.
+    pred_class_idxs: list[int | None] = np.asarray(
+        pred_dets.class_idxs, dtype=object
+    ).tolist()
+    unique_pcxs: list[int | None] = list(dict.fromkeys(pred_class_idxs))
 
     if classes is None:
         import kwcoco
 
-        # Build mutually exclusive category tree
-        all_cxs = sorted(set(map(int, unique_pcxs)) | set(map(int, unique_tcxs)))
-        all_cxs = list(range(max(all_cxs) + 1))
+        # Build mutually exclusive category tree.  Null predictions do not
+        # introduce a category into the tree.
+        numeric_pcxs = [cx for cx in unique_pcxs if cx is not None]
+        all_cxs = sorted(set(numeric_pcxs) | set(unique_tcxs.tolist()))
+        if all_cxs:
+            all_cxs = list(range(max(all_cxs) + 1))
         classes = kwcoco.CategoryTree.from_mutex(all_cxs)
 
     cx_to_ancestors = classes.idx_to_ancestor_idxs()
@@ -253,12 +265,16 @@ def _assign_confusion_vectors(
         cx_to_matchable_cxs = {cx: [cx] for cx in unique_pcxs}
     elif compat == 'ancestors':
         cx_to_matchable_cxs = {
-            cx: sorted(
-                [cx]
-                + sorted(
-                    ub.take(
-                        classes.node_to_idx,
-                        nx.ancestors(classes.graph, classes.idx_to_node[cx]),
+            cx: (
+                []
+                if cx is None
+                else sorted(
+                    [cx]
+                    + sorted(
+                        ub.take(
+                            classes.node_to_idx,
+                            nx.ancestors(classes.graph, classes.idx_to_node[cx]),
+                        )
                     )
                 )
             )
@@ -285,10 +301,15 @@ def _assign_confusion_vectors(
             compat_txs = np.array(sorted(ub.flatten(compat_txs)), dtype=int)
             cx_to_matchable_txs[cx] = compat_txs
 
-        # Batch up the IOU pre-computation between compatible truths / preds
+        # Batch up the IOU pre-computation between compatible truths / preds.
+        # Reuse the normalized class-index list so null categories stay typed as
+        # ``int | None`` rather than being widened to ``object`` by numpy.
         iou_lookup = {}
-        unique_pred_cxs, pgroupxs = kwarray.group_indices(pred_dets.class_idxs)
-        for cx, pred_idxs in zip(unique_pred_cxs, pgroupxs):
+        cx_to_pxs: dict[int | None, list[int]] = {}
+        for px, cx in enumerate(pred_class_idxs):
+            cx_to_pxs.setdefault(cx, []).append(px)
+        for cx, pred_idx_list in cx_to_pxs.items():
+            pred_idxs = np.asarray(pred_idx_list, dtype=int)
             true_idxs = cx_to_matchable_txs[cx]
             ious = pred_dets.boxes[pred_idxs].ious(
                 true_dets.boxes[true_idxs], bias=bias

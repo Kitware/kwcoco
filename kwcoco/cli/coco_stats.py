@@ -2,10 +2,11 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoStatsCLI(scfg.DataConfig):
+class CocoStatsCLI(KWCocoConfig):
     """
     Compute summary statistics about a COCO dataset.
 
@@ -18,11 +19,11 @@ class CocoStatsCLI(scfg.DataConfig):
 
     __command__ = 'stats'
 
-    src = scfg.Value(['special:shapes8'], position=1, help='path to dataset', nargs='+')
-    basic = scfg.Value(True, isflag=True, help='show basic stats')
-    extended = scfg.Value(True, isflag=True, help='show extended stats')
-    catfreq = scfg.Value(True, isflag=True, help='show category frequency stats')
-    boxes = scfg.Value(
+    src = kwconf.Value(['special:shapes8'], position=1, help='path to dataset', nargs='+')
+    basic = kwconf.Value(True, isflag=True, help='show basic stats')
+    extended = kwconf.Value(True, isflag=True, help='show extended stats')
+    catfreq = kwconf.Value(True, isflag=True, help='show category frequency stats')
+    boxes = kwconf.Value(
         False,
         isflag=True,
         help=ub.paragraph(
@@ -31,20 +32,20 @@ class CocoStatsCLI(scfg.DataConfig):
             """
         ),
     )
-    image_size = scfg.Value(False, isflag=True, help='show image size stats')
-    annot_attrs = scfg.Value(
+    image_size = kwconf.Value(False, isflag=True, help='show image size stats')
+    annot_attrs = kwconf.Value(
         False, isflag=True, help='show annotation attribute information'
     )
-    image_attrs = scfg.Value(
+    image_attrs = kwconf.Value(
         False, isflag=True, help='show image attribute information'
     )
-    video_attrs = scfg.Value(
+    video_attrs = kwconf.Value(
         False, isflag=True, help='show video attribute information'
     )
-    channels = scfg.Value(
+    channels = kwconf.Value(
         False, isflag=True, help='show channel and sensor information'
     )
-    io_workers = scfg.Value(
+    io_workers = kwconf.Value(
         0,
         help=ub.paragraph(
             """
@@ -53,12 +54,12 @@ class CocoStatsCLI(scfg.DataConfig):
         ),
     )
 
-    disk_usage = scfg.Value(False, isflag=True, help='measure disk usage of assets')
+    disk_usage = kwconf.Value(False, isflag=True, help='measure disk usage of assets')
 
-    embed = scfg.Value(
+    embed = kwconf.Value(
         False, isflag=True, help='embed into interactive shell for debugging'
     )
-    format = scfg.Value(
+    format = kwconf.Value(
         'human', help='output format. Can be "human", "json", or "yaml"'
     )
 
@@ -69,7 +70,7 @@ class CocoStatsCLI(scfg.DataConfig):
     """
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         CommandLine:
             xdoctest -m kwcoco.cli.coco_stats CocoStatsCLI.main:0
@@ -77,9 +78,9 @@ class CocoStatsCLI(scfg.DataConfig):
 
         Example:
             >>> kw = {'src': 'special:shapes8'}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoStatsCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
 
         Example:
             >>> # xdoctest: +REQUIRES(module:pyyaml)
@@ -96,19 +97,19 @@ class CocoStatsCLI(scfg.DataConfig):
             >>>     'disk_usage': True,
             >>>     'boxes': True,
             >>> }
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoStatsCLI
             >>> print('-- Test YAML format --')
             >>> kw['format'] = 'yaml'
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
             >>> print('-- Test Human format --')
             >>> kw['format'] = 'human'
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
         import kwcoco
         import numpy as np
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         try:
             from rich import print as rich_print
         except ImportError:
@@ -474,7 +475,7 @@ def _dataset_disk_usage(dset):
     # Collect all filepaths from images. iter_image_filepaths() typically
     # includes primary + auxiliary assets.
     filepaths = []
-    for coco_img in dset.images().coco_images_iter():
+    for coco_img in dset.images().coco_images:
         for fpath in coco_img.iter_image_filepaths():
             if fpath is not None:
                 filepaths.append(ub.Path(fpath))

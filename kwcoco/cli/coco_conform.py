@@ -2,10 +2,11 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoConformCLI(scfg.DataConfig):
+class CocoConformCLI(KWCocoConfig):
     """
     Infer properties to make the COCO file conform to different specs.
 
@@ -26,12 +27,12 @@ class CocoConformCLI(scfg.DataConfig):
         kwcoco conform special:shapes8 conformed.json
     """
 
-    src = scfg.Value(None, position=1, help='the path to the input coco dataset')
+    src = kwconf.Value(None, position=1, help='the path to the input coco dataset')
     # FIXME: required is broken with --help
 
-    dst = scfg.Value(None, position=2, help='the location to save the output dataset.')
+    dst = kwconf.Value(None, position=2, help='the location to save the output dataset.')
 
-    ensure_imgsize = scfg.Value(
+    ensure_imgsize = kwconf.Value(
         True,
         help=ub.paragraph(
             """
@@ -40,7 +41,7 @@ class CocoConformCLI(scfg.DataConfig):
         ),
     )
 
-    pycocotools_info = scfg.Value(
+    pycocotools_info = kwconf.Value(
         True,
         help=ub.paragraph(
             """
@@ -49,7 +50,7 @@ class CocoConformCLI(scfg.DataConfig):
         ),
     )
 
-    legacy = scfg.Value(
+    legacy = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -58,7 +59,7 @@ class CocoConformCLI(scfg.DataConfig):
         ),
     )
 
-    mmlab = scfg.Value(
+    mmlab = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -68,9 +69,9 @@ class CocoConformCLI(scfg.DataConfig):
         ),
     )
 
-    compress = scfg.Value('auto', help='if True writes results with compression')
+    compress = kwconf.Value('auto', help='if True writes results with compression')
 
-    workers = scfg.Value(
+    workers = kwconf.Value(
         8,
         help=ub.paragraph(
             """
@@ -79,7 +80,9 @@ class CocoConformCLI(scfg.DataConfig):
         ),
     )
 
-    inplace = scfg.Value(
+    verbose = kwconf.Value(1, help='verbosity / progress level')
+
+    inplace = kwconf.Value(
         False,
         isflag=True,
         help=(
@@ -88,7 +91,7 @@ class CocoConformCLI(scfg.DataConfig):
     )
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         Example:
             >>> from kwcoco.cli.coco_conform import *  # NOQA
@@ -97,13 +100,13 @@ class CocoConformCLI(scfg.DataConfig):
             >>> dpath = ub.Path.appdir('kwcoco/tests/cli/conform').ensuredir()
             >>> dst = dpath / 'out.kwcoco.json'
             >>> kw = {'src': 'special:shapes8', 'dst': dst, 'compress': True}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoConformCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
         import kwcoco
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(dict(config), nl=1)))
 
         if config['src'] is None:

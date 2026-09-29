@@ -2,21 +2,22 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
-class CocoUnionCLI(scfg.DataConfig):
+class CocoUnionCLI(KWCocoConfig):
     """
     Combine multiple COCO datasets into a single merged dataset.
     """
 
     __command__ = 'union'
 
-    src = scfg.Value([], position=1, help='path to multiple input datasets', nargs='+')
+    src = kwconf.Value([], position=1, help='path to multiple input datasets', nargs='+')
 
-    dst = scfg.Value('combo.kwcoco.json', help='path to output dataset')
+    dst = kwconf.Value('combo.kwcoco.json', help='path to output dataset')
 
-    absolute = scfg.Value(
+    absolute = kwconf.Value(
         False,
         isflag=True,
         help=ub.paragraph(
@@ -26,7 +27,7 @@ class CocoUnionCLI(scfg.DataConfig):
         ),
     )
 
-    remember_parent = scfg.Value(
+    remember_parent = kwconf.Value(
         False,
         isflag=True,
         help=ub.paragraph(
@@ -37,7 +38,7 @@ class CocoUnionCLI(scfg.DataConfig):
         ),
     )
 
-    io_workers = scfg.Value(
+    io_workers = kwconf.Value(
         'avail-2',
         help=ub.paragraph(
             """
@@ -47,7 +48,7 @@ class CocoUnionCLI(scfg.DataConfig):
         ),
     )
 
-    compress = scfg.Value('auto', help='if True writes results with compression')
+    compress = kwconf.Value('auto', help='if True writes results with compression')
 
     __epilog__ = """
     Example Usage:
@@ -55,7 +56,7 @@ class CocoUnionCLI(scfg.DataConfig):
     """
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         Example:
             >>> from kwcoco.cli.coco_union import *  # NOQA
@@ -66,11 +67,11 @@ class CocoUnionCLI(scfg.DataConfig):
             >>>     'src': ['special:shapes8', 'special:shapes1'],
             >>>     'dst': dst_fpath
             >>> }
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoUnionCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         import kwcoco
 
         print('config = {}'.format(ub.urepr(config, nl=1)))
@@ -133,7 +134,7 @@ class CocoUnionCLI(scfg.DataConfig):
 
 
 def _postprocess_absolute(dset):
-    dset._build_index()
+    dset.rebuild_index()
     dset.reroot(absolute=True)
     return dset
 

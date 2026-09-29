@@ -131,10 +131,14 @@ MSCOCO_POLYGON = ARRAY(
 MSCOCO_MULTIPOLYGON = ARRAY(MSCOCO_POLYGON)
 
 POLYGON = ANYOF(
-    KWCOCO_POLYGON,
+    # Put the two annotation-level encodings first. JSON Schema ``anyOf``
+    # validity is order-independent, but validators can short-circuit after
+    # the first successful branch. These are the common KWCoco and MS-COCO
+    # representations for annotation segmentations.
     ARRAY(KWCOCO_POLYGON),
-    MSCOCO_POLYGON,
     MSCOCO_MULTIPOLYGON,
+    KWCOCO_POLYGON,
+    MSCOCO_POLYGON,
 )
 
 RUN_LENGTH_ENCODING = STRING(
@@ -396,7 +400,15 @@ ANNOTATION = OBJECT(
                 'area',
                 NUMBER(description='The optional MS-COCO annotation area'),
             ),
-            ('category_id', INTEGER(description='The category id of this annotation')),
+            (
+                'category_id',
+                ANYOF(INTEGER, NULL)(
+                    description=(
+                        'The category id of this annotation. None is allowed '
+                        'for uncategorized annotations.'
+                    )
+                ),
+            ),
             (
                 'track_id',
                 ANYOF(INTEGER, STRING, UUID)(

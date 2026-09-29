@@ -101,7 +101,7 @@ def test_union_subdirs_to_root():
 
     from kwcoco.cli import coco_union
 
-    coco_union.__cli__.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+    coco_union.__cli__.main(argv=False, src=src_fpaths, dst=dst_fpath)
 
     dst = kwcoco.CocoDataset(dst_fpath)
     assert not any(dst.missing_images())
@@ -150,7 +150,7 @@ def test_union_subdirs_to_new_subdir():
 
     from kwcoco.cli import coco_union
 
-    coco_union.__cli__.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+    coco_union.__cli__.main(argv=False, src=src_fpaths, dst=dst_fpath)
 
     dst = kwcoco.CocoDataset(dst_fpath)
     dst.validate()
@@ -199,7 +199,7 @@ def test_union_subdirs_to_existing_subdir():
 
     from kwcoco.cli import coco_union
 
-    coco_union.__cli__.main(cmdline=0, src=src_fpaths, dst=dst_fpath)
+    coco_union.__cli__.main(argv=False, src=src_fpaths, dst=dst_fpath)
 
     dst = kwcoco.CocoDataset(dst_fpath)
     dst.validate()
@@ -262,7 +262,7 @@ def test_duplicate_union_with_tracks_no_tracktable():
         ann.pop('segmentation')
         ann.pop('keypoints')
     del dset1.dataset['tracks']
-    dset1._build_index()
+    dset1.rebuild_index()
 
     combo1 = kwcoco.CocoDataset.union(dset1, dset1, disjoint_tracks=True)
     track_names1 = combo1.tracks().lookup('name')

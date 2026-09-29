@@ -172,14 +172,14 @@ class CocoIndex:
             >>> self = dset = kwcoco.CocoDataset()
             >>> self.index.cid_to_gids
         """
-        from scriptconfig.dict_like import DictLike
+        from kwcoco.util.dict_proxy2 import DictInterface
 
-        class ProxyCidToGids(DictLike):
+        class ProxyCidToGids(DictInterface):
             def __init__(self, index):
                 self.index = index
 
-            def getitem(self, cid: Any) -> Any:  # type: ignore
-                aids = self.index.cid_to_aids[cid]
+            def __getitem__(self, key: Any) -> Any:
+                aids = self.index.cid_to_aids[key]
                 gids = {self.index.anns[aid]['image_id'] for aid in aids}
                 return gids
 

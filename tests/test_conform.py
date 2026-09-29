@@ -90,3 +90,18 @@ def test_conform_legacy_uses_empty_mscoco_info_dict():
     )
 
     assert dset.dataset['info'] == {}
+
+
+def test_conform_is_quiet_by_default(capsys):
+    import kwcoco
+
+    dset = kwcoco.CocoDataset()
+    gid = dset.add_image(file_name='unused.png', width=16, height=16)
+    cid = dset.add_category(name='cat')
+    dset.add_annotation(image_id=gid, category_id=cid, bbox=[0, 0, 4, 4])
+
+    dset.conform()
+
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert captured.err == ''

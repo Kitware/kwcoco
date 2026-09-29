@@ -1,11 +1,143 @@
 # Changelog
 
+* Fix Phase-3 conformance provenance checks/documentation to expect `numpy_coco_xywh_area` for strict COCO bbox scoring after the fractional-origin XYWH area-boundary fix.
+
 We are currently working on porting this changelog to the specifications in
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 0.9.0 - Unreleased
+## Version 0.9.1 - Unreleased
+
+
+### Added
+* Add a cross-version metric timeline harness that benchmarks the historical `CocoEvaluator.evaluate()` contract on one frozen workload, compares complete serialized metric curves/counts against older git refs, records source-only runtime ratios under one dependency environment, and reports metric capability evolution across releases.
+* Add a release-scale native COCO evidence harness that benchmarks isolated-process wall time, peak RSS, optional Python allocations, throughput, full tensor parity, and public-evaluator/core scopes against official pycocotools; emit raw JSONL, CSV/JSON summaries, a publication-oriented Markdown report, and an uploadable evidence bundle.
+* Add a dedicated ``metrics`` optional dependency extra for installing both the official pycocotools reference and the optional ``kwimage_ext`` acceleration backend, including modern Python 3.12+ kwimage_ext installation support.
+* Add a declarative xcookie CI source check that runs quick Python/Rust COCO tensor conformance plus an isolated-process release-benchmark smoke test.
+* Extend the official pycocotools metric bridge with explicit `bbox` and `segm`
+  IoU modes, named COCO AP/AR summaries, and a
+  `CocoEvaluator.evaluate_pycocotools` convenience API. Rich kwcoco polygons
+  with holes are converted to exact RLE only at the strict MS-COCO evaluation
+  boundary.
+* Add `dev/pycocotools_metrics_compare/`, a measured comparison suite that
+  decomposes native kwcoco versus official COCO scoring into overlap,
+  assignment, accumulation, and final AP/AR stages while keeping backend
+  provenance observable.
+* Add experimental reusable `assignment_v2` instance-mask assignment backed by
+  batched compressed-RLE IoU, COCO-compatible polygon rasterization, inclusive
+  threshold support, crowd reuse, and mask-aware kwcoco ignore-region
+  suppression.
+* Add native COCO-compatible dataset scoring through
+  `DetectionMetrics.score_native_coco` and
+  `CocoEvaluator.evaluate_native_coco`, with assignment-time area ranges,
+  per-image/per-category `maxDets`, stable COCO accumulation, reusable
+  candidate geometry, explicit backend provenance, and a versioned result
+  schema shared with the official-reference summary surface.
+* Add optional full COCO evaluation tensor output (`precision`, `recall`, and
+  sampled `scores`) to native and pycocotools scoring. Both wrappers accept
+  matching IoU, recall, area-range, maxDet, and image-subset parameter grids for
+  differential testing beyond the standard 10x101x4x3 setting.
+* Add an explicit native COCO bbox compatibility profile without changing the
+  historical `CocoEvaluator.evaluate()` bbox path. The profile implements
+  continuous-coordinate bbox IoU, COCO crowd intersection-over-detection-area,
+  reusable ignored crowds, inclusive thresholds, category-scoped `maxDets`,
+  stable score ties, and COCO equal-IoU truth tie behavior.
+* Add the Phase-2.4 / Phase-3 bbox+segmentation conformance runner with complete
+  tensor comparisons, row-assignment checks, adversarial geometry fixtures,
+  nonstandard parameter grids, deterministic randomized cases, and optional
+  stress profiles against official `pycocotools.COCOeval`.
+* Add a dedicated native-COCO performance profiling runner with warmup/repeat
+  timing, reference parity checks, synthetic maxDet/candidate-pressure cases,
+  cProfile output, optional line-profiler output, and Python allocation tracking.
+* Add an optional ``kwimage_ext`` Rust assignment backend for native COCO
+  scoring.  It batches the IoU threshold family over one CSR candidate graph
+  while keeping candidate geometry, COCO policy, row materialization, and
+  accumulation in kwcoco; the Python matcher remains the reference/fallback.
+* Add a compact native-COCO scoring path that batches all active area ranges
+  and IoU thresholds per image, consumes compact match arrays directly during
+  COCO accumulation, and avoids constructing Python confusion-row dictionaries
+  unless diagnostics or kwcoco-specific ignore semantics require them.
+
+### Changed
+* Port kwcoco's command/configuration layer from ``scriptconfig`` to
+  ``kwconf``. The CLI keeps config-file special options enabled, accepts
+  explicit boolean spellings such as ``--flag=false``, preserves options that
+  support both bare and explicit-value forms, and uses ``argv`` consistently
+  for programmatic CLI invocation.
+* Make ``CocoDataset.conform()`` and low-level diagnostic helpers quiet by
+  default; CLI commands opt into user-facing progress explicitly.
+* `CocoEvaluator.evaluate_pycocotools()` uses strict COCO bbox crowd annotation
+  semantics by default. The lower-level
+  `DetectionMetrics.score_pycocotools()` retains an explicit historical bbox
+  annotation policy for direct-call compatibility.
+* Native COCO bbox candidate generation may use spatial pruning for large
+  compatible-class blocks, but retained overlaps are always recomputed with
+  COCO crowd semantics so sparse and dense paths are equivalent.
+* Strict native/official ``CocoEvaluator`` COCO wrappers now key category
+  identity by declared truth category ids instead of inheriting the historical
+  evaluator's lowercase / space-to-underscore class-name rectification.
+  Historical ``CocoEvaluator.evaluate()`` behavior is unchanged.
+
+### Fixed
+* Repair the root CLI registration for ``move_assets``, correct its source and
+  destination defaults, preserve numeric ``--verbose`` / table-count options
+  under kwconf, and make ``validate --workers`` a value option instead of a
+  boolean flag.
+* Make the legacy ``kwcoco.kpf``, ``kwcoco.kw18``, channel-spec, and
+  sensor-channel modules usable forwarding shims through the 1.0 deprecation
+  boundary, and activate the long-promised ``_build_index()`` deprecation.
+* Make ``CocoDataset.load_image()`` choose the direct primary-image path or
+  compositional channel path explicitly, so decoder, filesystem, and path
+  resolution errors are no longer swallowed by exception-driven fallback.
+* Make ``DuplicateAddError`` and ``InvalidAddError`` inherit from ``AddError``,
+  and stop ``CocoDataset.subset()`` from injecting the legacy ``img_root``
+  field.
+* Make ``CocoDataset.add_auxiliary_item()`` emit the same deprecation as the
+  corresponding ``CocoImage`` alias, and fix ``CocoSqlDatabase.data_fpath``
+  assignment to update its canonical SQL URI.
+* Make ``CocoImage.find_asset()`` continue past a base image with unspecified
+  channels so channel lookups can reach explicitly labeled auxiliary assets.
+* Make routine `CocoDataset.validate()` progress quiet by default, reserve
+  per-check progress for verbosity level 2, and avoid printing validation
+  warnings in addition to emitting them through Python's warnings system. The
+  optional bbox-presence check is now opt-in because bbox is not required by
+  the kwcoco schema.
+* Allow `category_id=None` in the annotation schema, matching
+  `CocoDataset.add_annotation()` and the dataset index's long-standing support
+  for uncategorized annotations.
+* Remove the remaining internal `Images.coco_images_iter()` use and report
+  vectorized-accessor deprecations at the external call site.
+* Normalize rich/new-style `N x 2` polygons to strict flattened MS-COCO polygon
+  lists before calling `pycocotools.frPyObjects`, avoiding its four-element
+  bbox dispatch ambiguity. Degenerate polygon parts become explicit zero-area
+  RLE instead of being misread as boxes.
+* Native COCO-compatible scoring ignores kwcoco's arbitrary truth-weight
+  extension and treats a category literally named `background` as an ordinary
+  COCO category.
+* Fix explicit `score_pycocotools(iou_thresholds=...)` handling so an alternate
+  threshold vector with the standard length is applied, while explicitly
+  passing the unchanged standard vector retains the standard named summary.
+* Mirror COCOeval image-id normalization, stable equal-IoU truth tie behavior,
+  and its `min(t, 1 - 1e-10)` matching cap for explicit IoU threshold 1.0.
+* Treat valid negative detection scores correctly in full-tensor conformance by
+  using the precision population mask rather than score sign to identify absent
+  sampled-score cells.
+* Preserve empty bbox inputs as `0 x 4` coordinate matrices in assignment-v2,
+  and keep `CocoEvaluator`'s synthetic background bookkeeping class off strict
+  COCO category axes while retaining genuinely declared `background`
+  categories.
+* Preserve the historical positional argument prefix of
+  `DetectionMetrics.score_pycocotools()` after adding tensor controls, and keep
+  its legacy `mAP` (AP50) alias present on custom parameter grids.
+* Optimize native COCO assignment after profiling showed the greedy matcher was
+  the dominant cost: cache area/maxDet preparation, scan sorted candidates
+  without per-prediction NumPy temporaries, derive smaller maxDet slices from
+  one largest-prefix assignment, and cap predictions before overlap geometry.
+* Match pycocotools bbox area arithmetic at fractional origins by preserving
+  authored XYWH widths/heights for COCO area slices and overlap denominators.
+
+## Version 0.9.0 - Released 2026-08-22
 
 
 ### Changed
@@ -22,6 +154,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Add channels option to coco stats.
 
 ### Fixed
+
+* Normalize rich/new-style ``N x 2`` polygons to strict flattened MS-COCO
+  polygon lists before calling ``pycocotools.frPyObjects``.  This avoids a
+  pycocotools dispatch ambiguity where a four-vertex polygon can be mistaken
+  for a four-element bounding box.
 * Keep dynamically maintained image, annotation, video, category, and track
   indexes consistent across bulk image insertion, clearing images,
   retained-annotation track removal, and rejected single-item additions,

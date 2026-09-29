@@ -77,7 +77,7 @@ def benchmark_large_hyperspectral():
             gid = coco_dset.add_image(**img)
 
             # Demonstrate how to load a single small slice
-            delayed = coco_dset.delayed_load(gid)
+            delayed = coco_dset.coco_image(gid).imdelay()
             cropped = delayed.crop((slice(432, 432 + 64), slice(432, 432 + 64)))
             final_data = cropped.finalize()
 
@@ -89,7 +89,7 @@ def benchmark_large_hyperspectral():
             # Time how long it takes to do this.
             kwcoco_prog = ub.ProgIter(slider, desc='read-sliding-via-kwcoco')
             for slices in kwcoco_prog:
-                delayed = coco_dset.delayed_load(gid)
+                delayed = coco_dset.coco_image(gid).imdelay()
                 cropped = delayed.crop(slices)
                 final_data = cropped.finalize()
 

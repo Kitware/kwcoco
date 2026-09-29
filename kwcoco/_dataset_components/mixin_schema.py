@@ -1,18 +1,132 @@
 from __future__ import annotations
 
-from typing import Any, TypeVar
+import importlib.util
+import logging
+from typing import Any, TYPE_CHECKING, TypeVar
 import warnings
 
 import ubelt as ub
 
 
+logger = logging.getLogger(__name__)
+
+
 MixinCocoSchemaT = TypeVar('MixinCocoSchemaT', bound='MixinCocoSchema')
+
+
+@ub.memoize
+def _cached_fast_coco_schema_validator():
+    """Compile the optional fastjsonschema validator once per process."""
+    import fastjsonschema
+    from kwcoco.coco_schema import COCO_SCHEMA
+
+    # Match the historical jsonschema behavior. The reference validation call
+    # does not apply schema defaults and does not install a FormatChecker.
+    return fastjsonschema.compile(
+        COCO_SCHEMA,
+        use_default=False,
+        use_formats=False,
+    )
+
+
+@ub.memoize
+def _cached_jsonschema_validator():
+    """Build the reference validator once instead of rechecking the schema."""
+    from jsonschema.validators import validator_for
+    from kwcoco.coco_schema import COCO_SCHEMA
+
+    validator_cls = validator_for(COCO_SCHEMA)
+    validator_cls.check_schema(COCO_SCHEMA)
+    return validator_cls(COCO_SCHEMA)
+
+
+def _fastjsonschema_available() -> bool:
+    """Check if the optional accelerated schema backend can be imported."""
+    return importlib.util.find_spec('fastjsonschema') is not None
+
+
+def _resolve_schema_backend(schema_backend: str) -> str:
+    """Resolve ``auto`` while keeping explicit backend requests strict."""
+    valid_backends = {'auto', 'jsonschema', 'fastjsonschema'}
+    if schema_backend not in valid_backends:
+        raise KeyError(
+            'Unknown schema_backend={!r}. Expected one of: {}'.format(
+                schema_backend, sorted(valid_backends)
+            )
+        )
+
+    if schema_backend == 'auto':
+        if _fastjsonschema_available():
+            return 'fastjsonschema'
+        return 'jsonschema'
+
+    if schema_backend == 'fastjsonschema' and not _fastjsonschema_available():
+        raise ModuleNotFoundError(
+            "schema_backend='fastjsonschema' requires the optional "
+            "'fastjsonschema' package. Install kwcoco with its optional "
+            "dependencies or install fastjsonschema directly."
+        )
+    return schema_backend
+
+
+def _validate_schema_jsonschema(data):
+    """Return the jsonschema validation error, or ``None`` on success."""
+    import jsonschema
+
+    try:
+        _cached_jsonschema_validator().validate(data)
+    except jsonschema.exceptions.ValidationError as ex:
+        return ex
+    return None
+
+
+def _validate_schema_fastjsonschema(data):
+    """Return the fastjsonschema validation error, or ``None`` on success."""
+    import fastjsonschema
+
+    try:
+        _cached_fast_coco_schema_validator()(data)
+    except fastjsonschema.JsonSchemaException as ex:
+        return ex
+    return None
+
+
+def _contains_tuple(data) -> bool:
+    """Detect Python tuples that fastjsonschema treats as JSON arrays.
+
+    The reference ``jsonschema`` backend intentionally recognizes Python
+    lists, but not tuples, as JSON arrays. ``fastjsonschema`` recognizes both.
+    Normal serialized KWCoco data is list/dict based, so this linear scan is a
+    small compatibility tax on the accelerated path and only triggers the
+    slower validator when tuple semantics could matter.
+    """
+    stack = [data]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, tuple):
+            return True
+        if isinstance(item, dict):
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
 
 
 class MixinCocoSchema:
     """
     Methods for validating and conforming dataset structure.
     """
+
+    # Supplied by CocoDataset, the concrete class that owns this mixin.
+    dataset: dict[str, Any]
+
+    if TYPE_CHECKING:
+        # Supplied by MixinCocoExtras on the concrete CocoDataset. Keep this
+        # declaration type-checker-only so it does not alter mixin MRO lookup.
+        def _ensure_imgsize(
+            self, workers: int = 0, verbose: int = 0, fail: bool = False
+        ) -> dict[str, Any]:
+            ...
 
     def conform(self: MixinCocoSchemaT, **config: Any) -> MixinCocoSchemaT:
         """
@@ -37,6 +151,8 @@ class MixinCocoSchema:
 
                 workers (int): number of parallel jobs for IO tasks
 
+                verbose (int): verbosity / progress level. Defaults to 0.
+
         Returns:
             Self: the inplace modified kwcoco dataset
 
@@ -49,8 +165,12 @@ class MixinCocoSchema:
             >>> assert 'area' in dset.index.anns[1]
         """
 
+        verbose = config.get('verbose', 0)
+
         if config.get('ensure_imgsize', True):
-            self._ensure_imgsize(workers=config.get('workers', 8))  # type: ignore
+            self._ensure_imgsize(
+                workers=config.get('workers', 8), verbose=verbose
+            )
 
             for vidid, gids in self.index.vidid_to_gids.items():  # type: ignore
                 if len(gids):
@@ -66,7 +186,9 @@ class MixinCocoSchema:
                         video['height'] = height_cand[0]
 
         if config.get('pycocotools_info', True):
-            for ann in ub.ProgIter(self.dataset['annotations'], desc='update anns'):  # type: ignore
+            for ann in ub.ProgIter(
+                self.dataset['annotations'], desc='update anns', verbose=verbose
+            ):  # type: ignore
                 if 'iscrowd' not in ann:
                     ann['iscrowd'] = False
 
@@ -90,7 +212,8 @@ class MixinCocoSchema:
                                 `kwimage.MultiPolygon.coerce` or a misformatted
                                 segmentation
                                 """
-                                )
+                                ),
+                                stacklevel=2,
                             )
                     else:
                         try:
@@ -102,7 +225,8 @@ class MixinCocoSchema:
                                 Unable to add "area" key because an annotation
                                 is missing or has a malformed "bbox" entry
                                 """
-                                )
+                                ),
+                                stacklevel=2,
                             )
                         else:
                             ann['area'] = w * h
@@ -137,7 +261,9 @@ class MixinCocoSchema:
             except Exception:
                 kpcats = None
             for ann in ub.ProgIter(
-                self.dataset['annotations'], desc='update orig coco anns'  # type: ignore
+                self.dataset['annotations'],
+                desc='update orig coco anns',
+                verbose=verbose,  # type: ignore
             ):
                 # Use segmentation if available
                 if 'segmentation' in ann:
@@ -159,8 +285,10 @@ class MixinCocoSchema:
                         except ValueError:
                             REMOVE_HOLES = 1
                             if REMOVE_HOLES:
-                                print(
-                                    'Warning: converting to legacy polygon is removing holes'
+                                warnings.warn(
+                                    'Converting to a legacy polygon removes holes',
+                                    UserWarning,
+                                    stacklevel=2,
                                 )
                                 mpoly = poly.to_shapely()
                                 from shapely.geometry import Polygon, MultiPolygon
@@ -196,6 +324,16 @@ class MixinCocoSchema:
             **config :
                 schema (default=True): if True, validate the json-schema
 
+                schema_backend (default='auto'):
+                    JSON-schema implementation to use. ``'auto'`` uses the
+                    optional substantially faster ``fastjsonschema`` backend
+                    when it is installed and otherwise falls back to the
+                    required ``jsonschema`` backend. If the fast validator
+                    rejects data in auto mode, validation is retried with
+                    ``jsonschema`` to preserve compatibility with values the
+                    reference backend accepts. Explicit ``'jsonschema'`` and
+                    ``'fastjsonschema'`` modes are also available.
+
                 unique (default=True): if True, validate unique secondary keys
 
                 missing (default=True): if True, validate registered files exist
@@ -212,12 +350,20 @@ class MixinCocoSchema:
                 bundle directory. if>0, paths must be relative to bundle
                 root.  if>1, paths must be inside bundle root.
 
-                img_attrs (default='warn'):
+                img_attrs (default=False):
                 if truthy, check that image attributes contain width and
                 height entries. If 'warn', then warn if they do not exist.
                 If 'error', then fail.
 
-                verbose (default=1): verbosity flag
+                annot_attrs (default=False):
+                    if truthy, check that annotations contain bbox entries.
+                    This is opt-in because bbox is not required by the kwcoco
+                    schema. If 'warn', then warn if values are missing. If
+                    'error', then fail.
+
+                verbose (default=0): verbosity flag. Level 1 reports
+                    validation problems. Level 2 also reports individual
+                    validation checks and progress.
 
                 workers (int): number of workers for parallel checks. defaults to 0
 
@@ -248,7 +394,7 @@ class MixinCocoSchema:
             'errors': [],
             'warnings': [],
         }
-        verbose = config.get('verbose', 1)
+        verbose = config.get('verbose', 0)
         fastfail = config.get('fastfail', 0)
 
         def _error(msg):
@@ -259,27 +405,84 @@ class MixinCocoSchema:
             result['errors'].append(msg)
 
         def _warn(msg):
-            if verbose:
-                print(msg)
-            warnings.warn(msg, UserWarning)
+            # Do not also print warnings. The warnings subsystem already gives
+            # callers filtering / routing controls, and printing here produced
+            # duplicate user-facing diagnostics.
+            warnings.warn(msg, UserWarning, stacklevel=4)
             result['warnings'].append(msg)
 
         if config.get('schema', True):
-            import jsonschema
-            from kwcoco.coco_schema import COCO_SCHEMA
+            schema_backend = config.get('schema_backend', 'auto')
+            resolved_schema_backend = _resolve_schema_backend(schema_backend)
 
-            if verbose:
-                print('Validate json-schema')
-            try:
-                COCO_SCHEMA.validate(dset.dataset)  # type: ignore
-            except jsonschema.exceptions.ValidationError as ex:
-                err = ex
-                print(f'err.absolute_path={err.absolute_path}')
-                msg = 'Failed to validate schema: {}'.format(str(err))
+            logger.debug(
+                'Validate json-schema with %s (requested=%s)',
+                resolved_schema_backend,
+                schema_backend,
+            )
+            if verbose > 1:
+                if schema_backend == resolved_schema_backend:
+                    print(f'Validate json-schema with {resolved_schema_backend}')
+                else:
+                    print(
+                        'Validate json-schema with {} '
+                        '(auto resolved to {})'.format(
+                            schema_backend, resolved_schema_backend
+                        )
+                    )
+
+            if resolved_schema_backend == 'jsonschema':
+                schema_error = _validate_schema_jsonschema(dset.dataset)
+            else:
+                has_tuple = schema_backend == 'auto' and _contains_tuple(dset.dataset)
+                if has_tuple:
+                    # fastjsonschema treats tuples as arrays whereas the
+                    # historical jsonschema backend does not. Skip the fast
+                    # validator when that semantic difference can matter.
+                    schema_error = _validate_schema_jsonschema(dset.dataset)
+                else:
+                    schema_error = _validate_schema_fastjsonschema(dset.dataset)
+
+                if schema_error is not None and schema_backend == 'auto' and not has_tuple:
+                    # The two Python implementations intentionally differ in
+                    # a few non-JSON-native type details. fastjsonschema is
+                    # stricter for some numeric classes (e.g. numpy integer
+                    # values used as JSON numbers). Normal JSON-native
+                    # manifests avoid this case. On a fast rejection, pay the
+                    # slower reference-validator cost to preserve historical
+                    # jsonschema acceptance behavior.
+                    reference_error = _validate_schema_jsonschema(dset.dataset)
+                    if reference_error is None:
+                        if schema_error is not None:
+                            logger.debug(
+                                'fastjsonschema rejected data accepted by '
+                                'jsonschema; accepted via compatibility fallback'
+                            )
+                        if schema_error is not None and verbose > 1:
+                            print(
+                                'fastjsonschema rejected data accepted by '
+                                'jsonschema; accepted via compatibility fallback'
+                            )
+                        schema_error = None
+                    else:
+                        # Preserve the reference backend's error behavior for
+                        # genuinely invalid data in auto mode.
+                        schema_error = reference_error
+
+            if schema_error is not None:
+                if hasattr(schema_error, 'absolute_path'):
+                    logger.debug(
+                        'schema validation error absolute_path=%r',
+                        schema_error.absolute_path,
+                    )
+                if verbose > 1 and hasattr(schema_error, 'absolute_path'):
+                    print(f'err.absolute_path={schema_error.absolute_path}')
+                msg = 'Failed to validate schema: {}'.format(str(schema_error))
                 _error(msg)
 
         def _check_unique(dset, table_key, col_key, required=True):
-            if verbose:
+            logger.debug('Check table %r has unique %r', table_key, col_key)
+            if verbose > 1:
                 print('Check table {!r} has unique {!r}'.format(table_key, col_key))
             items = dset.dataset.get(table_key, [])
             seen = set()
@@ -306,7 +509,8 @@ class MixinCocoSchema:
                     _warn(msg)
 
         def _check_attrs(dset, table_key, col_key, required=True):
-            if verbose:
+            logger.debug('Check table %r entries have attr %r', table_key, col_key)
+            if verbose > 1:
                 print(
                     'Check table {!r} entries have attr {!r}'.format(table_key, col_key)
                 )
@@ -330,7 +534,13 @@ class MixinCocoSchema:
         def _check_subtable_attrs(
             dset, table_key, subtable_keys, col_key, required=True
         ):
-            if verbose:
+            logger.debug(
+                'Check subtable %r / %r entries have attr %r',
+                table_key,
+                subtable_keys,
+                col_key,
+            )
+            if verbose > 1:
                 print(
                     'Check subtable {!r} / {!r} entries have attr {!r}'.format(
                         table_key, subtable_keys, col_key
@@ -390,9 +600,9 @@ class MixinCocoSchema:
                 required=required,
             )
 
-        if config.get('annot_attrs', True):
+        if config.get('annot_attrs', False):
             required = config.get('annot_attrs', False) == 'error'
-            _check_attrs(dset, table_key='annotations', col_key='bbox', required=False)
+            _check_attrs(dset, table_key='annotations', col_key='bbox', required=required)
 
         if config.get('channels', True):
             for img in self.dataset.get('images', []):  # type: ignore
@@ -422,7 +632,9 @@ class MixinCocoSchema:
                                 )
                             seen.add(chan)
         if config.get('missing', True):
-            missing = dset.missing_images(check_aux=True, verbose=verbose)  # type: ignore
+            missing = dset.missing_images(  # type: ignore
+                check_aux=True, verbose=max(verbose - 1, 0)
+            )
             if missing:
                 msg = ub.paragraph(
                     f"""
@@ -435,7 +647,9 @@ class MixinCocoSchema:
 
         if config.get('corrupted', False):
             corrupted = dset.corrupted_images(  # type: ignore
-                check_aux=True, verbose=verbose, workers=config.get('workers', 0)
+                check_aux=True,
+                verbose=max(verbose - 1, 0),
+                workers=config.get('workers', 0),
             )
             if corrupted:
                 msg = ub.paragraph(

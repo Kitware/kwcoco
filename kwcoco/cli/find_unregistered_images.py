@@ -25,29 +25,30 @@ Example:
     >>> assert len(list(ub.Path(dset.bundle_dpath).glob('**/*.png'))) == 10
     >>> from kwcoco.cli.find_unregistered_images import FindUnregisteredImagesCLI
     >>> cls = FindUnregisteredImagesCLI
-    >>> cmdline = 0
+    >>> argv = False
     >>> #
     >>> # Calling FindUnregisteredImage with action=list just prints
     >>> kwargs = dict(src=dset.fpath, action='list')
-    >>> cls.main(cmdline=cmdline, **kwargs)
+    >>> cls.main(argv=argv, **kwargs)
     >>> assert len(list(ub.Path(dset.bundle_dpath).glob('**/*.png'))) == 10
     >>> # Calling FindUnregisteredImage with action=list with verbose=0 has pipeable output
     >>> kwargs = dict(src=dset.fpath, action='list', verbose=0)
-    >>> cls.main(cmdline=cmdline, **kwargs)
+    >>> cls.main(argv=argv, **kwargs)
     >>> assert len(list(ub.Path(dset.bundle_dpath).glob('**/*.png'))) == 10
     >>> #
     >>> # Calling FindUnregisteredImage with action=delete removes the data
     >>> kwargs = dict(src=dset.fpath, action='delete')
-    >>> cls.main(cmdline=cmdline, **kwargs)
+    >>> cls.main(argv=argv, **kwargs)
     >>> assert len(list(ub.Path(dset.bundle_dpath).glob('**/*.png'))) == 8
     >>> # Cleanup
     >>> dpath.delete()
 """
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 import ubelt as ub
 
 
-class FindUnregisteredImagesCLI(scfg.DataConfig):
+class FindUnregisteredImagesCLI(KWCocoConfig):
     """
     Find images in a kwcoco bundle that are not registered in a kwcoco file.
 
@@ -56,14 +57,14 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
 
     __command__ = 'find_unregistered_images'
 
-    src = scfg.Value(
+    src = kwconf.Value(
         None,
         nargs='+',
         help='all kwcoco paths that register data in this bundle',
         position=1,
     )
 
-    image_dpath = scfg.Value(
+    image_dpath = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -74,28 +75,28 @@ class FindUnregisteredImagesCLI(scfg.DataConfig):
         ),
     )
 
-    action = scfg.Value(
+    action = kwconf.Value(
         'ask',
         help='What to do when an unregistered images is found.',
         choices=['ask', 'delete', 'list'],
     )
 
-    io_workers = scfg.Value('avail', help='number of io workers')
+    io_workers = kwconf.Value('avail', help='number of io workers')
 
-    verbose = scfg.Value(1, help='set to 0 for quiet pipeable output')
+    verbose = kwconf.Value(1, help='set to 0 for quiet pipeable output')
 
     @classmethod
-    def main(cls, cmdline=1, **kwargs):
+    def main(cls, argv=True, **kwargs):
         """
         Example:
             >>> # xdoctest: +SKIP
             >>> from kwcoco.cli.find_unregistered_images import *  # NOQA
-            >>> cmdline = 0
+            >>> argv = False
             >>> kwargs = dict()
             >>> cls = FindUnregisteredImagesCLI
-            >>> cls.main(cmdline=cmdline, **kwargs)
+            >>> cls.main(argv=argv, **kwargs)
         """
-        config = cls.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
+        config = cls.cli(argv=argv, data=kwargs, strict=True)  # type: ignore
         from kwcoco.util.util_rich import rich_print
 
         if config.verbose:

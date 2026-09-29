@@ -85,7 +85,7 @@ several features.
 
 * Efficient random sampling of image subregions using `delayed_image <https://gitlab.kitware.com/computer-vision/delayed_image>`_.
 
-* A Command Line Interface (CLI) for manipulating / inspecting coco files using `scriptconfig <https://gitlab.kitware.com/utils/scriptconfig>`_.
+* A Command Line Interface (CLI) for manipulating / inspecting coco files using `kwconf <https://kwconf.readthedocs.io/en/latest/>`_.
 
 * Transparent coco file compression (e.g. i.e. read from / write to zipfiles)
 
@@ -104,7 +104,7 @@ The KWCOCO CLI
 --------------
 
 After installing KWCOCO, you will also have the ``kwcoco`` command line tool.
-This uses a ``scriptconfig`` / ``argparse`` CLI interface. Running ``kwcoco
+This uses a ``kwconf`` / ``argparse`` CLI interface. Running ``kwcoco
 --help`` should provide a good starting point.
 
 .. code-block::

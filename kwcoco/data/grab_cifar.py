@@ -254,18 +254,23 @@ def convert_cifar100(dpath=None):
 
 
 def main():
-    import scriptconfig as scfg
+    import kwconf
 
-    class GrabCIFAR_Config(scfg.Config):
+    class GrabCIFAR_Config(kwconf.Config):
+        __special_options__ = True
         """
         Ensure the CIFAR dataset exists in kwcoco format and prints its
         location and a bit of info.
         """
 
         __default__ = {
-            'dpath': scfg.Path(ub.Path.appdir('kwcoco/data'), help='download location'),
-            'with_10': scfg.Value(True, help='do cifar 10'),
-            'with_100': scfg.Value(True, help='do cifar 100'),
+            'dpath': kwconf.Value(
+                ub.Path.appdir('kwcoco/data'),
+                parser=ub.Path,
+                help='download location',
+            ),
+            'with_10': kwconf.Value(True, help='do cifar 10'),
+            'with_100': kwconf.Value(True, help='do cifar 100'),
         }
 
     config = GrabCIFAR_Config()

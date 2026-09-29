@@ -9,9 +9,12 @@ TODO:
     - [ ] does evaluate return one result or multiple results
           based on different configurations?
 
-    - [ ] max_dets - TODO: in original pycocoutils but not here
+    - [ ] Historical ``evaluate()`` does not expose COCO ``maxDets``.
+          Native COCO-compatible bbox / instance-mask summaries are available
+          separately via ``evaluate_native_coco()``.
 
-    - [ ] Flag that allows for polygon instead of bounding box overlap
+    - [ ] Historical ``evaluate()`` remains bbox-assignment based. The native
+          COCO compatibility evaluator is intentionally a separate API.
 
     - [ ] How do we note what iou_thresh and area-range were in
           the result plots?
@@ -67,11 +70,11 @@ Example:
 from __future__ import annotations
 
 import os
-import scriptconfig as scfg
+import kwconf
 import ubelt as ub
 import warnings
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from typing import IO, Any
+from typing import IO, Any, cast
 from os.path import exists
 from os.path import isdir
 from os.path import isfile
@@ -86,24 +89,26 @@ if TYPE_CHECKING:
     from kwcoco.metrics.detect_metrics import DetectionMetrics
 
 
-class CocoEvalConfig(scfg.DataConfig):
+class CocoEvalConfig(kwconf.Config):
+    __special_options__ = True
+
     """
     Evaluate and score predicted versus truth detections / classifications in a COCO dataset
     """
 
-    true_dataset = scfg.Value(
-        None, type=str, position=1, help='coercable true detections', tags=['in_path']
+    true_dataset = kwconf.Value(
+        None, parser=str, position=1, help='coercable true detections', tags=['in_path']
     )
-    pred_dataset = scfg.Value(
+    pred_dataset = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         position=2,
         help='coercable predicted detections',
         tags=['in_path'],
     )
-    ignore_classes = scfg.Value(
+    ignore_classes = kwconf.Value(
         None,
-        type=list,
+        parser='csv',
         help=ub.paragraph(
             """
             classes to ignore (give them zero weight)
@@ -111,14 +116,14 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    implicit_negative_classes = scfg.Value(
-        ['background'], help=None, tags=['algo_param']
+    implicit_negative_classes = kwconf.Value(
+        ['background'], parser='csv', help=None, tags=['algo_param']
     )
-    implicit_ignore_classes = scfg.Value(['ignore'], help=None, tags=['algo_param'])
-    fp_cutoff = scfg.Value(
+    implicit_ignore_classes = kwconf.Value(['ignore'], parser='csv', help=None, tags=['algo_param'])
+    fp_cutoff = kwconf.Value(
         float('inf'), help='False positive cutoff for ROC', tags=['algo_param']
     )
-    iou_thresh = scfg.Value(
+    iou_thresh = kwconf.Value(
         0.5,
         alias=['ovthresh'],
         help=ub.paragraph(
@@ -128,7 +133,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    compat = scfg.Value(
+    compat = kwconf.Value(
         'mutex',
         help=ub.paragraph(
             """
@@ -142,7 +147,7 @@ class CocoEvalConfig(scfg.DataConfig):
         choices=['all', 'mutex', 'ancestors'],
         tags=['algo_param'],
     )
-    monotonic_ppv = scfg.Value(
+    monotonic_ppv = kwconf.Value(
         True,
         help=ub.paragraph(
             """
@@ -153,7 +158,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    ap_method = scfg.Value(
+    ap_method = kwconf.Value(
         'pycocotools',
         help=ub.paragraph(
             """
@@ -164,7 +169,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    use_area_attr = scfg.Value(
+    use_area_attr = kwconf.Value(
         'try',
         help=ub.paragraph(
             """
@@ -176,8 +181,9 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    area_range = scfg.Value(
+    area_range = kwconf.Value(
         ['all'],
+        parser='csv',
         help=ub.paragraph(
             """
             Minimum and maximum object areas to consider. May specified
@@ -193,7 +199,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    max_dets = scfg.Value(
+    max_dets = kwconf.Value(
         float('inf'),
         help=ub.paragraph(
             """
@@ -202,7 +208,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    truth_reuse_policy = scfg.Value(
+    truth_reuse_policy = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -211,7 +217,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    iou_bias = scfg.Value(
+    iou_bias = kwconf.Value(
         1,
         help=ub.paragraph(
             """
@@ -220,7 +226,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    force_pycocoutils = scfg.Value(
+    force_pycocoutils = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -229,7 +235,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    assign_workers = scfg.Value(
+    assign_workers = kwconf.Value(
         8,
         help=ub.paragraph(
             """
@@ -238,7 +244,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['perf_param'],
     )
-    load_workers = scfg.Value(
+    load_workers = kwconf.Value(
         0,
         help=ub.paragraph(
             """
@@ -247,9 +253,9 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['perf_param'],
     )
-    classes_of_interest = scfg.Value(
+    classes_of_interest = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
             if specified only these classes are given weight. Input should be a
@@ -258,7 +264,7 @@ class CocoEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    use_image_names = scfg.Value(
+    use_image_names = kwconf.Value(
         False,
         help=ub.paragraph(
             """
@@ -427,7 +433,7 @@ class CocoEvaluator:
                 new_gid_to_pred[new_gid] = pred
 
             gid_to_pred = new_gid_to_pred
-            pred_coco._build_index()
+            pred_coco.rebuild_index()
             # These should now be the same.
             pred_image_ids = true_image_ids
 
@@ -443,6 +449,27 @@ class CocoEvaluator:
             pred_classes = ub.peek(gid_to_pred.values()).classes
         else:
             pred_classes = kwcoco.CategoryTree()
+
+        # Preserve the exact pre-rectification class/id space for strict COCO
+        # evaluation. The historical evaluator intentionally normalizes class
+        # names (e.g. lower-case and spaces -> underscores); strict COCO uses
+        # category ids and must not collapse distinct declared categories.
+        strict_gid_to_true = {}
+        for gid, det in gid_to_true.items():
+            strict_det = det.copy()
+            strict_det.meta['classes'] = true_classes
+            strict_gid_to_true[gid] = strict_det
+        strict_gid_to_pred = {}
+        for gid, det in gid_to_pred.items():
+            strict_det = det.copy()
+            strict_det.meta['classes'] = pred_classes
+            strict_gid_to_pred[gid] = strict_det
+        coco_eval._strict_coco_source = {
+            'true_classes': true_classes,
+            'pred_classes': pred_classes,
+            'gid_to_true': strict_gid_to_true,
+            'gid_to_pred': strict_gid_to_pred,
+        }
 
         classes, unified_cid_maps = CocoEvaluator._rectify_classes(
             true_classes, pred_classes
@@ -526,6 +553,47 @@ class CocoEvaluator:
     def _ensure_init(coco_eval):
         if not coco_eval._is_init:
             coco_eval._init()
+
+    def _strict_coco_category_idxs(coco_eval):
+        """Return declared truth categories in the evaluator's unified space.
+
+        ``CocoEvaluator`` historically injects a synthetic ``background``
+        class while rectifying truth/prediction class spaces. That bookkeeping
+        class is useful to the legacy confusion-vector evaluator, but it is not
+        a COCO category and must not create an extra K-axis entry in strict
+        COCO tensors. Conversely, a dataset may genuinely declare a category
+        whose literal name is ``background``; that category must remain.
+
+        When the evaluator was built from an actual CocoDataset, use its
+        declared category records to distinguish those cases. For raw
+        ``gid -> Detections`` inputs there is no source category declaration,
+        so all unified classes remain eligible.
+        """
+        coco_eval._ensure_init()
+        true_coco = coco_eval.true_extra.get('coco_dset', None)
+        if true_coco is None:
+            return None
+
+        def _normalize_name(name):
+            return str(name).lower().replace(' ', '_')
+
+        declared_names = [
+            cat['name'] for cat in true_coco.cats.values()
+        ]
+        selected = []
+        missing = []
+        for name in declared_names:
+            unified_name = _normalize_name(name)
+            try:
+                selected.append(coco_eval.classes.node_to_idx[unified_name])
+            except KeyError:
+                missing.append(name)
+        if missing:
+            raise AssertionError(
+                'Declared truth categories were not present in the unified '
+                f'evaluator class space: {missing!r}'
+            )
+        return sorted(set(map(int, selected)))
 
     @classmethod
     def _rectify_classes(coco_eval, true_classes, pred_classes):
@@ -667,6 +735,8 @@ class CocoEvaluator:
                 )
                 ssegs = [a.get('segmentation') for a in anns]
                 weights = [a.get('weight', 1) for a in anns]
+                iscrowd = [bool(a.get('iscrowd', False)) for a in anns]
+                ignore = [bool(a.get('ignore', False)) for a in anns]
 
                 # Is defaulting to NAN correct here?
 
@@ -691,6 +761,8 @@ class CocoEvaluator:
                     datakeys=['aids'],
                     **kw,
                 ).numpy()
+                dets.data['iscrowd'] = np.asarray(iscrowd, dtype=bool)
+                dets.data['ignore'] = np.asarray(ignore, dtype=bool)
                 gid_to_det[gid] = dets
         elif COCO_SAMPLER_CLS and isinstance(dataset, COCO_SAMPLER_CLS):
             # Input is an ndsampler.CocoSampler object
@@ -771,21 +843,291 @@ class CocoEvaluator:
         # TODO: we need to update DetectionMetrics so the alignment of images
         # is more explicit.
         dmet = DetectionMetrics(classes=classes)
+        true_coco = coco_eval.true_extra.get('coco_dset', None)
         for true_gid, pred_gid in ub.ProgIter(
             zip(coco_eval.true_image_ids, coco_eval.pred_image_ids),
             total=len(coco_eval.true_image_ids),
         ):
             pred_dets = gid_to_pred[pred_gid]
             true_dets = gid_to_true[true_gid]
+            img_dims = None
+            if true_coco is not None:
+                img = true_coco.imgs[true_gid]
+                height = img.get('height', None)
+                width = img.get('width', None)
+                if height is not None and width is not None:
+                    img_dims = (int(height), int(width))
             # Note: these require common identifiers.
-            dmet.add_predictions(pred_dets, gid=pred_gid)
-            dmet.add_truth(true_dets, gid=true_gid)
+            dmet.add_predictions(pred_dets, gid=pred_gid, img_dims=img_dims)
+            dmet.add_truth(true_dets, gid=true_gid, img_dims=img_dims)
 
         if 0:
             voc_info = dmet.score_voc(ignore_classes='ignore')
             print('voc_info = {!r}'.format(voc_info))
 
         return dmet
+
+    def _build_strict_coco_dmet(coco_eval):
+        """Build DetectionMetrics in the exact truth category-id space.
+
+        The legacy evaluator rectifies class names for historical convenience.
+        Strict COCO scoring instead uses declared truth category ids to preserve
+        category identity, exactly like COCOeval matching semantics. Prediction
+        categories absent from truth are discarded because COCOeval's category
+        axis is defined by ground truth. The internal DetectionMetrics category
+        axis may still be densely indexed after this identity-preserving map.
+        """
+        from kwcoco.metrics import DetectionMetrics
+        import numpy as np
+
+        coco_eval._ensure_init()
+        cached = getattr(coco_eval, '_strict_coco_dmet', None)
+        if cached is not None:
+            return cached
+        source = getattr(coco_eval, '_strict_coco_source', None)
+        if source is None:
+            dmet = coco_eval._build_dmet()
+            coco_eval._strict_coco_dmet = dmet
+            return dmet
+
+        true_classes = source['true_classes']
+        pred_classes = source['pred_classes']
+        gid_to_true = source['gid_to_true']
+        gid_to_pred = source['gid_to_pred']
+        dmet = DetectionMetrics(classes=true_classes)
+        true_coco = coco_eval.true_extra.get('coco_dset', None)
+
+        for true_gid, pred_gid in zip(
+            coco_eval.true_image_ids, coco_eval.pred_image_ids
+        ):
+            true_dets = gid_to_true[true_gid].copy()
+            true_dets.meta['classes'] = true_classes
+            pred_dets = gid_to_pred[pred_gid].copy()
+            old_cxs = np.asarray(pred_dets.class_idxs, dtype=int)
+            if len(old_cxs):
+                old_cids = np.array([
+                    pred_classes.idx_to_id[int(cx)] for cx in old_cxs
+                ], dtype=int)
+                keep = np.array([
+                    int(cid) in true_classes.id_to_idx for cid in old_cids
+                ], dtype=bool)
+                pred_dets = pred_dets.compress(keep)
+                kept_cids = old_cids[keep]
+                pred_dets.data['class_idxs'] = np.array([
+                    true_classes.id_to_idx[int(cid)] for cid in kept_cids
+                ], dtype=int)
+            pred_dets.meta['classes'] = true_classes
+
+            img_dims = None
+            if true_coco is not None:
+                img = true_coco.imgs[true_gid]
+                height = img.get('height', None)
+                width = img.get('width', None)
+                if height is not None and width is not None:
+                    img_dims = (int(height), int(width))
+            dmet.add_truth(true_dets, gid=true_gid, img_dims=img_dims)
+            dmet.add_predictions(pred_dets, gid=pred_gid, img_dims=img_dims)
+
+        coco_eval._strict_coco_dmet = dmet
+        return dmet
+
+    def evaluate_pycocotools(
+        coco_eval,
+        iou_types: str | Iterable[str] = ('bbox',),
+        verbose: int = 0,
+        *,
+        with_eval: bool = False,
+        iou_thresholds: Iterable[float] | None = None,
+        recall_thresholds: Iterable[float] | None = None,
+        area_ranges: Mapping[str, Iterable[float]] | None = None,
+        max_dets: Iterable[int] | None = None,
+        gids: Iterable[int] | None = None,
+        bbox_annotation_policy: str = 'coco',
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Compute official COCO summaries for boxes and/or instance masks.
+
+        This is intentionally separate from :meth:`evaluate`, whose custom
+        confusion-vector machinery remains box-assignment based.  The method
+        uses the official ``pycocotools.COCOeval`` implementation for each
+        requested geometry and returns stable named AP/AR values.
+
+        Args:
+            iou_types:
+                One or more of ``'bbox'`` and ``'segm'``. A comma-separated
+                string is accepted for convenience.
+
+            verbose:
+                Passed to :meth:`DetectionMetrics.score_pycocotools`.
+            with_eval:
+                Include copies of the full COCO precision / recall / score
+                tensors for differential analysis.
+            iou_thresholds, recall_thresholds, area_ranges, max_dets, gids:
+                Optional COCO parameter overrides. These are shared with the
+                native COCO evaluator so nonstandard tensor grids can be
+                compared directly. Image ids are unique-sorted like COCOeval.
+            bbox_annotation_policy:
+                ``'coco'`` is the strict reference behavior and preserves
+                bbox crowd annotations. ``'historical'`` is available only
+                for explicit compatibility with the older direct scoring
+                behavior.
+
+        Returns:
+            Dict[str, Dict]:
+                Mapping from IoU type to a JSON-friendly record containing
+                versioned implementation metadata, ``summary``, raw ``stats``,
+                and the effective COCO parameters.
+
+        Example:
+            >>> # xdoctest: +REQUIRES(module:pycocotools)
+            >>> import kwcoco
+            >>> from kwcoco.coco_evaluator import CocoEvaluator
+            >>> true = kwcoco.CocoDataset.demo('shapes8')
+            >>> pred = true.copy()
+            >>> for ann in pred.anns.values():
+            >>>     ann['score'] = 1.0
+            >>> evaluator = CocoEvaluator({
+            >>>     'true_dataset': true,
+            >>>     'pred_dataset': pred,
+            >>> })
+            >>> official = evaluator.evaluate_pycocotools('bbox')
+            >>> assert official['bbox']['summary']['AP50'] > 0.99
+        """
+        if isinstance(iou_types, str):
+            iou_types = [p.strip() for p in iou_types.split(',') if p.strip()]
+        else:
+            iou_types = list(iou_types)
+        if not iou_types:
+            raise ValueError('At least one iou_type is required')
+        bad_types = set(iou_types) - {'bbox', 'segm'}
+        if bad_types:
+            raise KeyError(f'Unsupported COCO iou_types={sorted(bad_types)!r}')
+
+        dmet = coco_eval._build_strict_coco_dmet()
+        category_idxs = None
+
+        results = {}
+        for iou_type in iou_types:
+            info = dmet.score_pycocotools(
+                verbose=verbose,
+                with_eval=with_eval,
+                with_evaler=False,
+                with_confusion=False,
+                iou_thresholds=iou_thresholds,
+                recall_thresholds=recall_thresholds,
+                area_ranges=area_ranges,
+                max_dets=max_dets,
+                gids=gids,
+                category_idxs=category_idxs,
+                iou_type=iou_type,
+                bbox_annotation_policy=bbox_annotation_policy,
+            )
+            results[iou_type] = {
+                'backend': info['backend'],
+                'implementation': info['implementation'],
+                'result_schema': info['result_schema'],
+                'official': info['official'],
+                'reference_implementation': info['reference_implementation'],
+                'iou_type': info['iou_type'],
+                'summary': info['summary'],
+                'stats': info['stats'],
+                'params': info['params'],
+            }
+            if with_eval:
+                results[iou_type]['eval'] = info['eval']
+        return results
+
+    def evaluate_native_coco(
+        coco_eval,
+        iou_types: str | Iterable[str] = ('segm',),
+        *,
+        overlap_backend: str = 'auto',
+        raster_backend: str = 'auto',
+        assignment_backend: str = 'auto',
+        annotation_ignore_policy: str = 'coco',
+        ignore_classes: str | Iterable[str] | None = None,
+        iou_thresholds: Iterable[float] | None = None,
+        recall_thresholds: Iterable[float] | None = None,
+        area_ranges: Mapping[str, Iterable[float]] | None = None,
+        max_dets: Iterable[int] | None = None,
+        gids: Iterable[int] | None = None,
+        with_details: bool = False,
+        with_eval: bool = False,
+    ) -> dict[str, dict[str, Any]]:
+        """Compute native COCO-compatible bbox and/or instance-mask summaries.
+
+        This is the native counterpart to :meth:`evaluate_pycocotools`, but
+        it intentionally remains a separate API and labels itself as kwcoco.
+        Bbox support is explicit on this method and does not replace the
+        historical default :meth:`evaluate` path. It uses the dedicated COCO
+        bbox profile in assignment-v2, including crowd overlap semantics.
+
+        The returned records include ``official=False``, the native
+        implementation identifier, the official reference implementation
+        identifier,
+        requested/resolved geometry backend provenance, and the standard 12
+        named COCO detection summary values.
+
+        Args:
+            iou_types:
+                One or more of ``'bbox'`` and ``'segm'``. A comma-separated
+                string is accepted for consistency with
+                :meth:`evaluate_pycocotools`.
+            overlap_backend:
+                ``'auto'``, ``'kwimage_ext'``, or ``'pycocotools'``.
+            raster_backend:
+                ``'auto'``, ``'kwimage_ext'``, or ``'pycocotools'``.
+            assignment_backend:
+                ``'auto'``, ``'python'``, or ``'kwimage_ext'``. The optional
+                Rust path batches every active area range and IoU threshold
+                over the sparse candidate graph; evaluator and accumulation
+                semantics remain in kwcoco.
+            annotation_ignore_policy:
+                ``'coco'`` for reference annotation-ignore semantics or
+                ``'kwcoco'`` to additionally honor explicit kwcoco ``ignore``.
+            ignore_classes:
+                Optional kwcoco ignore-region class names. This is a native
+                extension and is not part of official COCOeval semantics.
+            iou_thresholds, recall_thresholds, area_ranges, max_dets, gids:
+                Optional COCO parameter overrides. The official and native
+                wrappers accept the same grid controls for differential use.
+            with_details:
+                Include per-class scalar diagnostics for each summary slice.
+            with_eval:
+                Include the full COCO precision / recall / score tensor.
+        """
+        if isinstance(iou_types, str):
+            iou_types = [p.strip() for p in iou_types.split(',') if p.strip()]
+        else:
+            iou_types = list(iou_types)
+        if not iou_types:
+            raise ValueError('At least one iou_type is required')
+        bad_types = set(iou_types) - {'bbox', 'segm'}
+        if bad_types:
+            raise KeyError(f'Unsupported native COCO iou_types={sorted(bad_types)!r}')
+
+        dmet = coco_eval._build_strict_coco_dmet()
+        category_idxs = None
+
+        results = {}
+        for iou_type in iou_types:
+            results[iou_type] = dmet.score_native_coco(
+                iou_type=iou_type,
+                overlap_backend=overlap_backend,
+                raster_backend=raster_backend,
+                assignment_backend=assignment_backend,
+                annotation_ignore_policy=annotation_ignore_policy,
+                ignore_classes=ignore_classes,
+                iou_thresholds=iou_thresholds,
+                recall_thresholds=recall_thresholds,
+                area_ranges=area_ranges,
+                max_dets=max_dets,
+                gids=gids,
+                category_idxs=category_idxs,
+                with_details=with_details,
+                with_eval=with_eval,
+            )
+        return results
 
     def evaluate(coco_eval) -> 'CocoResults':
         """
@@ -1007,6 +1349,7 @@ def dmet_area_weights(
         gids, groupxs = kwarray.group_indices(cfsn_vecs.data['gid'])
         new_ignore = np.zeros(len(cfsn_vecs.data), dtype=bool)
         for gid, groupx in zip(gids, groupxs):
+            gid = cast(int, gid)
             if use_area_attr:
                 # Use coco area attribute (if available)
                 try:

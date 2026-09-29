@@ -83,6 +83,7 @@ class DetectionMetrics(ub.NiceRepr):
 
     gid_to_true_dets: Dict[int, kwimage.Detections]
     gid_to_pred_dets: Dict[int, kwimage.Detections]
+    gid_to_image_dims: dict[int, tuple[int, int]]
     _imgname_to_gid: dict[str, int]
 
     def __init__(
@@ -99,11 +100,13 @@ class DetectionMetrics(ub.NiceRepr):
         dmet.classes = classes
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}
+        dmet.gid_to_image_dims = {}
         dmet._imgname_to_gid = {}
 
     def clear(dmet) -> None:
         dmet.gid_to_true_dets = {}
         dmet.gid_to_pred_dets = {}
+        dmet.gid_to_image_dims = {}
         dmet._imgname_to_gid = {}
 
     def __nice__(dmet) -> str:
@@ -144,6 +147,7 @@ class DetectionMetrics(ub.NiceRepr):
         # For each image
         unique_gids, grouped_indexes = kwarray.group_indices(all_gids)
         for gid, rowxs in zip(unique_gids, grouped_indexes):
+            gid = typing.cast(int, gid)
             # Find the confusion rows that correspond to it
             txs = all_txs[rowxs]
             pxs = all_pxs[rowxs]
@@ -207,18 +211,46 @@ class DetectionMetrics(ub.NiceRepr):
             for gid in ub.ProgIter(gids, desc=desc, verbose=verbose):
                 img = coco_dset.imgs[gid]
                 imgname = img['file_name']
-                aids = coco_dset.gid_to_aids[gid]
+                height = img.get('height', None)
+                width = img.get('width', None)
+                img_dims = None
+                if height is not None and width is not None:
+                    img_dims = (int(height), int(width))
+                aids = list(coco_dset.gid_to_aids[gid])
                 annots = [coco_dset.anns[aid] for aid in aids]
                 # dets = true_coco.annots(gid=gid).detections
                 dets = kwimage.Detections.from_coco_annots(
                     annots, dset=coco_dset, classes=classes
                 )
-                yield dets, imgname, gid
+                # ``from_coco_annots`` historically normalizes segmentations
+                # to polygons.  Keep the source segmentation backend here so
+                # official mask evaluation does not polygonize exact RLE input.
+                dets.data['segmentations'] = kwimage.SegmentationList.coerce(
+                    [a.get('segmentation', None) for a in annots]
+                )
+                # Keep COCO-only metadata needed by the official evaluator.
+                # Arbitrary Detections data columns survive indexing/warping.
+                dets.data['aids'] = np.asarray(aids, dtype=int)
+                dets.data['iscrowd'] = np.asarray(
+                    [bool(a.get('iscrowd', False)) for a in annots],
+                    dtype=bool,
+                )
+                dets.data['ignore'] = np.asarray(
+                    [bool(a.get('ignore', False)) for a in annots],
+                    dtype=bool,
+                )
+                yield dets, imgname, gid, img_dims
 
-        for dets, imgname, gid in _coco_to_dets(true_coco, desc='add truth'):
-            self.add_truth(dets, imgname, gid=gid)
+        for dets, imgname, gid, img_dims in _coco_to_dets(
+            true_coco, desc='add truth'
+        ):
+            self.add_truth(dets, imgname, gid=gid, img_dims=img_dims)
 
-        for dets, imgname, gid in _coco_to_dets(pred_coco, desc='add pred'):
+        for dets, imgname, gid, _img_dims in _coco_to_dets(
+            pred_coco, desc='add pred'
+        ):
+            # Truth image dimensions are authoritative.  Do not introduce a
+            # new bbox-scoring failure mode if prediction metadata disagrees.
             self.add_predictions(dets, imgname, gid=gid)
 
         return self
@@ -245,6 +277,7 @@ class DetectionMetrics(ub.NiceRepr):
         pred_dets: kwimage.Detections,
         imgname: str | None = None,
         gid: int | None = None,
+        img_dims: tuple[int, int] | None = None,
     ) -> None:
         """
         Register/Add predicted detections for an image
@@ -257,8 +290,14 @@ class DetectionMetrics(ub.NiceRepr):
             imgname (str | None): a unique string to identify the image
 
             gid (int | None): the integer image id if known
+
+            img_dims (Tuple[int, int] | None):
+                ``(height, width)`` if known. Required for official or native
+                COCO-compatible instance-segmentation scoring when masks must
+                be represented in full-image coordinates.
         """
         gid = dmet._register_imagename(imgname, gid)
+        dmet._register_image_dims(gid, img_dims)
         dmet.gid_to_pred_dets[gid] = pred_dets
 
     def add_truth(
@@ -266,6 +305,7 @@ class DetectionMetrics(ub.NiceRepr):
         true_dets: kwimage.Detections,
         imgname: str | None = None,
         gid: int | None = None,
+        img_dims: tuple[int, int] | None = None,
     ) -> None:
         """
         Register/Add groundtruth detections for an image
@@ -278,9 +318,31 @@ class DetectionMetrics(ub.NiceRepr):
             imgname (str | None): a unique string to identify the image
 
             gid (int | None): the integer image id if known
+
+            img_dims (Tuple[int, int] | None):
+                ``(height, width)`` if known. Required for official or native
+                COCO-compatible instance-segmentation scoring when masks must
+                be represented in full-image coordinates.
         """
         gid = dmet._register_imagename(imgname, gid)
+        dmet._register_image_dims(gid, img_dims)
         dmet.gid_to_true_dets[gid] = true_dets
+
+    def _register_image_dims(
+        dmet, gid: int, img_dims: tuple[int, int] | None
+    ) -> None:
+        if img_dims is None:
+            return
+        img_dims = (int(img_dims[0]), int(img_dims[1]))
+        if min(img_dims) <= 0:
+            raise ValueError(f'invalid image dimensions: {img_dims!r}')
+        old_dims = dmet.gid_to_image_dims.get(gid, None)
+        if old_dims is not None and old_dims != img_dims:
+            raise ValueError(
+                f'conflicting dimensions for gid={gid}: '
+                f'{old_dims!r} != {img_dims!r}'
+            )
+        dmet.gid_to_image_dims[gid] = img_dims
 
     def true_detections(dmet, gid: int) -> kwimage.Detections:
         """gets Detections representation for groundtruth in an image"""
@@ -633,6 +695,806 @@ class DetectionMetrics(ub.NiceRepr):
             cfsn_vecs = iou_to_cfsn[iou_thresh_list[0]]
             return cfsn_vecs
 
+    def confusion_vectors_v2(
+        dmet,
+        iou_thresh: float | Iterable[float] = 0.5,
+        *,
+        iou_type: str = 'bbox',
+        overlap_backend: str = 'auto',
+        segmentation_rasterizer: str = 'auto',
+        raster_backend: str = 'auto',
+        threshold_policy: str = 'auto',
+        annotation_ignore_policy: str = 'coco',
+        gids: Iterable[int] | None = None,
+        compat: str = 'mutex',
+        prioritize: str = 'iou',
+        ignore_classes: str | Iterable[str] | None = None,
+        max_dets: int | None = None,
+        max_dets_scope: str = 'image',
+        area_range: tuple[float, float] | None = None,
+        truth_reuse_policy: str = 'never',
+        min_iou: float | None = None,
+        spatial_threshold: int | None = 50_000,
+        bbox_overlap_mode: str = 'legacy',
+    ) -> ConfusionVectors | dict[float, ConfusionVectors]:
+        """Experimental reusable-candidate confusion-vector path.
+
+        This is intentionally separate from :meth:`confusion_vectors` while
+        ``assignment_v2`` semantics are still being measured.  In addition to
+        bbox IoU it supports experimental native instance-mask assignment via
+        ``iou_type='segm'``.  Segmentation mode defaults to COCO-compatible
+        polygon rasterization and inclusive IoU thresholds, implements COCO
+        crowd reuse/ignore weighting, and keeps kwcoco's class-based ignore
+        regions as a separate explicit mechanism. ``area_range`` applies
+        inclusive assignment-time area semantics. ``max_dets_scope`` defaults
+        to the original image-wide v2 cap; native COCO-shaped scoring uses the
+        COCO category-scoped variant explicitly.
+        """
+        import kwarray
+        from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
+
+        if isinstance(iou_thresh, Iterable):
+            thresholds = [float(t) for t in iou_thresh]
+            multi = True
+        else:
+            thresholds = [float(iou_thresh)]
+            multi = False
+        if min_iou is None:
+            min_iou = min(thresholds) if thresholds else 0.0
+
+        if gids is None:
+            gids = sorted(dmet._imgname_to_gid.values())
+        else:
+            gids = list(gids)
+
+        iou_to_yaccum = {t: ub.ddict(list) for t in thresholds}
+        classes = dmet.classes
+        for gid in gids:
+            true_dets = dmet.true_detections(gid)
+            pred_dets = dmet.pred_detections(gid)
+            image_dims = dmet.gid_to_image_dims.get(gid, None)
+            index = AssignmentCandidateIndex.build(
+                true_dets,
+                pred_dets,
+                classes=classes,
+                compat=compat,
+                prioritize=prioritize,
+                min_iou=float(min_iou),
+                spatial_threshold=spatial_threshold,
+                iou_type=iou_type,
+                bbox_overlap_mode=bbox_overlap_mode,
+                overlap_backend=overlap_backend,
+                segmentation_rasterizer=segmentation_rasterizer,
+                raster_backend=raster_backend,
+                threshold_policy=threshold_policy,
+                annotation_ignore_policy=annotation_ignore_policy,
+                image_dims=image_dims,
+            )
+            iou_to_y = index.assign_many(
+                thresholds,
+                bg_weight=1.0,
+                bg_cidx=-1,
+                ignore_classes=ignore_classes,
+                max_dets=max_dets,
+                max_dets_scope=max_dets_scope,
+                area_range=area_range,
+                truth_reuse_policy=truth_reuse_policy,
+            )
+            for t, y in iou_to_y.items():
+                y = dict(y)
+                y['gid'] = [gid] * len(y['pred'])
+                accum = iou_to_yaccum[t]
+                for key, vals in y.items():
+                    accum[key].extend(vals)
+
+        iou_to_cfsn = {}
+        for t, y_accum in iou_to_yaccum.items():
+            data = {}
+            for key, vals in y_accum.items():
+                dtype = None
+                if key in {'iou', 'score', 'weight'}:
+                    dtype = np.float32
+                elif key in {'pxs', 'txs', 'gid', 'pred', 'true', 'rank'}:
+                    dtype = np.int32
+                data[key] = np.asarray(vals, dtype=dtype)
+            if not data:
+                data = {k: np.empty((0,)) for k in ['gid'] + ASSIGN_COLUMNS}
+            cfsn_data = kwarray.DataFrameArray(data)
+            iou_to_cfsn[t] = ConfusionVectors(cfsn_data, classes=classes)
+
+        if multi:
+            return iou_to_cfsn
+        return iou_to_cfsn[thresholds[0]]
+
+    def score_native_coco(
+        dmet,
+        *,
+        iou_type: str = 'segm',
+        gids: Iterable[int] | None = None,
+        overlap_backend: str = 'auto',
+        raster_backend: str = 'auto',
+        assignment_backend: str = 'auto',
+        annotation_ignore_policy: str = 'coco',
+        ignore_classes: str | Iterable[str] | None = None,
+        iou_thresholds: Iterable[float] | None = None,
+        recall_thresholds: Iterable[float] | None = None,
+        area_ranges: typing.Mapping[str, Iterable[float]] | None = None,
+        max_dets: Iterable[int] | None = None,
+        category_idxs: Iterable[int] | None = None,
+        with_details: bool = False,
+        with_eval: bool = False,
+    ) -> dict[str, typing.Any]:
+        """Compute a native kwcoco COCO-compatible detection summary.
+
+        The native path uses :mod:`assignment_v2` to build one reusable
+        candidate graph per image, then reproduces COCO's area/maxDet matching
+        semantics and 101-point accumulation. Normal scoring keeps assignment
+        state compact through accumulation; explicit rows remain available for
+        diagnostics and native extensions. It remains separate from the
+        historical :meth:`CocoEvaluator.evaluate` path and never changes the
+        default kwcoco bbox matcher.
+
+        Args:
+            iou_type:
+                ``'segm'`` for instance masks or ``'bbox'`` for the explicit
+                Phase-3 COCO bbox profile.  Bbox mode uses continuous-coordinate
+                COCO IoU and crowd intersection-over-detection-area semantics.
+            gids:
+                Optional image-id subset. Repetitions are removed and ids are
+                sorted to mirror COCOeval parameter normalization.
+            overlap_backend, raster_backend:
+                Optional mask backends used only by ``iou_type='segm'``.
+            assignment_backend:
+                ``'auto'``, ``'python'``, or ``'kwimage_ext'``. ``'auto'``
+                uses the optional kwimage_ext area-by-threshold batched Rust
+                greedy matcher when available and falls back to the compact
+                Python reference kernel.
+            annotation_ignore_policy:
+                ``'coco'`` uses COCO crowd ignore semantics. ``'kwcoco'`` also
+                honors explicit kwcoco truth ``ignore`` metadata.
+            ignore_classes:
+                Optional native kwcoco ignore-region extension. Official COCO
+                comparison should leave this unset.
+            iou_thresholds, recall_thresholds, area_ranges, max_dets:
+                Optional COCO parameter overrides. Defaults are the standard
+                detection settings. ``area_ranges`` is a mapping from stable
+                labels to inclusive ``(min_area, max_area)`` pairs.
+            category_idxs:
+                Optional ordered subset of ``dmet.classes`` indexes to expose
+                on the COCO category axis. Matching still uses the complete
+                class space. This is primarily used by ``CocoEvaluator`` to
+                omit its legacy synthetic background bookkeeping category.
+            with_details:
+                Include per-class scalar diagnostics for each computed slice.
+            with_eval:
+                Materialize the full COCO precision / recall / score tensors.
+                When false, only the six slices needed by the standard 12-value
+                summary are assigned, preserving the faster summary path.
+
+        Returns:
+            Dict:
+                A versioned native record with the standard named summary,
+                parameter/provenance metadata, timing, and optionally an
+                ``eval`` tensor record compatible with COCOeval dimensions.
+
+        Notes:
+            COCO does not define kwcoco's arbitrary truth ``weight`` extension,
+            so truth weights are normalized to one before native COCO matching.
+            Crowd / area / configured ignore state is represented separately by
+            assignment-time zero-weight rows.
+        """
+        import time
+        from kwcoco.metrics.assignment_v2 import AssignmentCandidateIndex
+        from kwcoco.metrics.assignment_v2 import resolve_assignment_backend
+        from kwcoco.metrics.assignment_v2 import resolve_assignment_grid_backend
+        from kwcoco.metrics.coco_metrics import COCO_AREA_RANGES
+        from kwcoco.metrics.coco_metrics import COCO_DETECTION_STAT_KEYS
+        from kwcoco.metrics.coco_metrics import COCO_EVAL_TENSOR_SCHEMA
+        from kwcoco.metrics.coco_metrics import COCO_IOU_THRESHOLDS
+        from kwcoco.metrics.coco_metrics import COCO_MAX_DETS
+        from kwcoco.metrics.coco_metrics import COCO_RECALL_THRESHOLDS
+        from kwcoco.metrics.coco_metrics import NATIVE_COCO_IMPLEMENTATION
+        from kwcoco.metrics.coco_metrics import COCO_DETECTION_RESULT_SCHEMA
+        from kwcoco.metrics.coco_metrics import OFFICIAL_COCO_IMPLEMENTATION
+        from kwcoco.metrics.coco_metrics import accumulate_coco_assignment_rows
+        from kwcoco.metrics.coco_metrics import accumulate_coco_compact_grid
+        from kwcoco.metrics.coco_metrics import summarize_coco_eval_tensor
+
+        if iou_type not in {'bbox', 'segm'}:
+            raise KeyError(f'Unsupported native COCO iou_type={iou_type!r}')
+
+        requested_assignment_backend = assignment_backend
+        # The normal COCO path can remain entirely in compact NumPy/Rust match
+        # state. Diagnostic rows and threshold-dependent kwcoco ignore regions
+        # retain the explicit-row reference implementation.
+        use_compact_matches = ignore_classes is None and not with_details
+        if use_compact_matches:
+            resolver = resolve_assignment_grid_backend
+        else:
+            resolver = resolve_assignment_backend
+        resolved_assignment_backend, _assign_func, assignment_backend_meta = (
+            resolver(assignment_backend)
+        )
+        if ignore_classes is not None and resolved_assignment_backend == 'kwimage_ext':
+            if assignment_backend == 'kwimage_ext':
+                raise NotImplementedError(
+                    'assignment_backend="kwimage_ext" does not yet support '
+                    'threshold-dependent kwcoco ignore_classes'
+                )
+            resolved_assignment_backend = 'python'
+            assignment_backend_meta = {
+                'name': 'kwcoco.assignment_v2.python',
+                'kind': 'python',
+                'module': 'kwcoco.metrics.assignment_v2',
+                'fallback_reason': 'ignore_classes',
+            }
+
+        if gids is None:
+            gids = sorted(dmet._imgname_to_gid.values())
+        else:
+            # COCOeval unique-sorts params.imgIds before evaluation. Match
+            # that behavior because image concatenation order is observable
+            # when predictions from different images have equal scores.
+            gids = sorted(set(map(int, gids)))
+
+        if iou_thresholds is None:
+            thresholds = [float(t) for t in COCO_IOU_THRESHOLDS]
+        else:
+            thresholds = [float(t) for t in iou_thresholds]
+        if not thresholds:
+            raise ValueError('iou_thresholds must contain at least one value')
+        if not all(np.isfinite(t) and 0 <= t <= 1 for t in thresholds):
+            raise ValueError(f'invalid iou_thresholds={thresholds!r}')
+        if len(set(thresholds)) != len(thresholds):
+            raise ValueError('iou_thresholds must be unique')
+        # COCOeval caps each matching threshold just below one before the
+        # overlap comparison. This is observable for numerically near-perfect
+        # floating-point bbox overlaps when a caller explicitly requests 1.0.
+        assignment_thresholds = {
+            t: min(t, 1.0 - 1e-10) for t in thresholds
+        }
+
+        if recall_thresholds is None:
+            recalls = [float(t) for t in COCO_RECALL_THRESHOLDS]
+        else:
+            recalls = [float(t) for t in recall_thresholds]
+        if not recalls:
+            raise ValueError('recall_thresholds must contain at least one value')
+        if not all(np.isfinite(t) and 0 <= t <= 1 for t in recalls):
+            raise ValueError(f'invalid recall_thresholds={recalls!r}')
+        if any(b < a for a, b in zip(recalls, recalls[1:])):
+            raise ValueError('recall_thresholds must be nondecreasing')
+
+        if area_ranges is None:
+            area_ranges_ = {
+                key: tuple(map(float, value))
+                for key, value in COCO_AREA_RANGES.items()
+            }
+        else:
+            area_ranges_ = {}
+            for label, value in area_ranges.items():
+                pair = tuple(map(float, value))
+                if len(pair) != 2:
+                    raise ValueError(
+                        f'area range {label!r} must have two values, got {pair!r}'
+                    )
+                lo, hi = pair
+                if not np.isfinite(lo) or lo < 0 or np.isnan(hi) or hi < lo:
+                    raise ValueError(f'invalid area range {label!r}: {pair!r}')
+                area_ranges_[str(label)] = pair
+        if not area_ranges_:
+            raise ValueError('area_ranges must contain at least one range')
+
+        if max_dets is None:
+            max_dets_ = list(map(int, COCO_MAX_DETS))
+        else:
+            max_dets_ = sorted(set(map(int, max_dets)))
+        if not max_dets_ or any(n < 0 for n in max_dets_):
+            raise ValueError(f'invalid max_dets={max_dets_!r}')
+
+        classes = dmet.classes
+        if classes is None:
+            raise ValueError('classes are required for native COCO scoring')
+        if category_idxs is None:
+            category_idxs_ = list(range(len(classes)))
+        else:
+            category_idxs_ = sorted(set(map(int, category_idxs)))
+            invalid = [
+                cx for cx in category_idxs_
+                if cx < 0 or cx >= len(classes)
+            ]
+            if invalid:
+                raise ValueError(
+                    f'category_idxs contains out-of-range indexes: {invalid!r}'
+                )
+        class_names = [str(classes[cx]) for cx in category_idxs_]
+
+        total_start = time.perf_counter()
+        build_start = time.perf_counter()
+        gid_to_index = {}
+        candidate_predictions_before_cap = 0
+        candidate_predictions_after_cap = 0
+        largest_requested_max_det = max(max_dets_)
+        for gid in gids:
+            true_dets = dmet.true_detections(gid)
+            pred_dets = dmet.pred_detections(gid)
+            image_dims = dmet.gid_to_image_dims.get(gid, None)
+
+            # COCOeval computes image/category overlaps only for detections in
+            # the largest requested maxDet prefix. Smaller maxDet tensor slices
+            # are accumulated from that same prefix. Prune before candidate
+            # geometry so low-score detections beyond the largest requested cap
+            # do not consume bbox/mask overlap work at all.
+            candidate_predictions_before_cap += len(pred_dets)
+            if len(pred_dets):
+                pred_scores = np.asarray(
+                    pred_dets.data.get('scores', np.ones(len(pred_dets))),
+                    dtype=float,
+                )
+                pred_cxs = np.asarray(pred_dets.class_idxs, dtype=int)
+                score_order = np.argsort(-pred_scores, kind='mergesort')
+                category_counts = ub.ddict(int)
+                keep_flags = np.zeros(len(pred_dets), dtype=bool)
+                for px in score_order:
+                    px = int(px)
+                    cx = int(pred_cxs[px])
+                    if category_counts[cx] < largest_requested_max_det:
+                        keep_flags[px] = True
+                        category_counts[cx] += 1
+                if not np.all(keep_flags):
+                    pred_dets = pred_dets.take(np.where(keep_flags)[0])
+            candidate_predictions_after_cap += len(pred_dets)
+
+            # COCOeval has no kwcoco truth-weight extension. Preserve crowd /
+            # annotation / area ignore state in assignment, but normalize any
+            # user-authored truth weights for this compatibility profile.
+            true_weights = true_dets.data.get('weights', None)
+            if true_weights is not None:
+                true_weights = np.asarray(true_weights)
+                if not np.all(true_weights == 1):
+                    true_dets = true_dets.copy()
+                    true_dets.data['weights'] = np.ones(
+                        len(true_dets), dtype=np.float32
+                    )
+
+            common_min_iou = min(assignment_thresholds.values())
+            if iou_type == 'segm':
+                index = AssignmentCandidateIndex.build(
+                    true_dets,
+                    pred_dets,
+                    classes=classes,
+                    compat='mutex',
+                    prioritize='iou',
+                    min_iou=common_min_iou,
+                    spatial_threshold=None,
+                    iou_type='segm',
+                    threshold_policy='inclusive',
+                    annotation_ignore_policy=annotation_ignore_policy,
+                    image_dims=image_dims,
+                    overlap_backend=overlap_backend,
+                    segmentation_rasterizer='coco',
+                    raster_backend=raster_backend,
+                )
+            else:
+                index = AssignmentCandidateIndex.build(
+                    true_dets,
+                    pred_dets,
+                    classes=classes,
+                    compat='mutex',
+                    prioritize='iou',
+                    min_iou=common_min_iou,
+                    spatial_threshold=50_000,
+                    iou_type='bbox',
+                    bbox_overlap_mode='coco',
+                    threshold_policy='inclusive',
+                    annotation_ignore_policy=annotation_ignore_policy,
+                    image_dims=image_dims,
+                )
+            gid_to_index[gid] = index
+        candidate_build_seconds = time.perf_counter() - build_start
+
+        if ignore_classes is None:
+            measure_ignore_classes = set()
+        elif isinstance(ignore_classes, str):
+            measure_ignore_classes = {ignore_classes}
+        else:
+            measure_ignore_classes = set(ignore_classes)
+
+        area_labels = list(area_ranges_)
+        if with_eval:
+            requested_slices = [
+                (area_label, max_det)
+                for area_label in area_labels
+                for max_det in max_dets_
+            ]
+        else:
+            # Compute only slices required by the standard summary. If custom
+            # parameters omit a standard slice, it will correctly summarize -1.
+            requested_slices = []
+            for area_label, max_det in [
+                ('all', 1), ('all', 10), ('all', 100),
+                ('small', 100), ('medium', 100), ('large', 100),
+            ]:
+                if area_label in area_ranges_ and max_det in max_dets_:
+                    requested_slices.append((area_label, max_det))
+            if not requested_slices:
+                requested_slices = [
+                    (area_label, max_det)
+                    for area_label in area_labels
+                    for max_det in max_dets_
+                ]
+
+        slice_metrics = {}
+        assignment_seconds = 0.0
+        accumulation_seconds = 0.0
+        assignment_calls = 0
+        assignment_batches = 0
+
+        # COCO matching is score ordered. For a fixed image/category/area/IoU
+        # slice, matches made inside the smaller maxDet prefixes cannot be
+        # changed by detections that occur later in the score order. Match at
+        # the largest requested maxDet and derive the smaller tensor slices.
+        area_to_max_dets = ub.ddict(list)
+        for area_label, max_det in requested_slices:
+            area_to_max_dets[area_label].append(max_det)
+        for area_label in list(area_to_max_dets):
+            area_to_max_dets[area_label] = sorted(set(map(
+                int, area_to_max_dets[area_label]
+            )))
+
+        compact_tensor = None
+        if use_compact_matches:
+            # Fast COCO path: keep matcher output compact all the way into the
+            # accumulator. The Rust backend handles every active area range x
+            # IoU threshold in one call per image; the Python backend mirrors
+            # the same compact contract for differential testing.
+            T = len(thresholds)
+            R = len(recalls)
+            K = len(category_idxs_)
+            A = len(area_labels)
+            M = len(max_dets_)
+            precision = -np.ones((T, R, K, A, M), dtype=float)
+            recall = -np.ones((T, K, A, M), dtype=float)
+            scores = -np.ones((T, R, K, A, M), dtype=float)
+            realpos = np.zeros((T, K, A, M), dtype=int)
+
+            active_area_labels = list(area_to_max_dets)
+            active_area_ranges = [
+                area_ranges_[label] for label in active_area_labels
+            ]
+            largest_active_max_det = max(
+                max(values) for values in area_to_max_dets.values()
+            )
+            effective_thresholds = [
+                assignment_thresholds[t] for t in thresholds
+            ]
+            compact_batches = []
+
+            assign_start = time.perf_counter()
+            for gid, index in gid_to_index.items():
+                compact = index.match_coco_grid(
+                    effective_thresholds,
+                    active_area_ranges,
+                    assignment_backend=resolved_assignment_backend,
+                    max_dets=largest_active_max_det,
+                    max_dets_scope='category',
+                )
+                assignment_calls += (
+                    len(effective_thresholds) * len(active_area_labels)
+                )
+                assignment_batches += 1
+                compact_batches.append(compact)
+            assignment_seconds += time.perf_counter() - assign_start
+
+            accum_start = time.perf_counter()
+            active_max_dets = sorted({
+                max_det
+                for requested in area_to_max_dets.values()
+                for max_det in requested
+            })
+            compact_info = accumulate_coco_compact_grid(
+                compact_batches,
+                classes,
+                thresholds=thresholds,
+                max_dets=active_max_dets,
+                num_areas=len(active_area_labels),
+                category_idxs=category_idxs_,
+                recall_thresholds=recalls,
+            )
+            accumulation_seconds += time.perf_counter() - accum_start
+            for local_ai, area_label in enumerate(active_area_labels):
+                ai = area_labels.index(area_label)
+                for max_det in area_to_max_dets[area_label]:
+                    local_mi = active_max_dets.index(max_det)
+                    mi = max_dets_.index(max_det)
+                    precision[:, :, :, ai, mi] = (
+                        compact_info['precision'][:, :, :, local_ai, local_mi]
+                    )
+                    recall[:, :, ai, mi] = (
+                        compact_info['recall'][:, :, local_ai, local_mi]
+                    )
+                    scores[:, :, :, ai, mi] = (
+                        compact_info['scores'][:, :, :, local_ai, local_mi]
+                    )
+                    realpos[:, :, ai, mi] = (
+                        compact_info['realpos_total'][:, :, local_ai, local_mi]
+                    )
+
+            compact_tensor = {
+                'precision': precision,
+                'recall': recall,
+                'scores': scores,
+                'realpos_total': realpos,
+            }
+        else:
+            # Diagnostic/native-extension path. Keep explicit assignment rows
+            # available when callers request per-class details or threshold-
+            # dependent kwcoco ignore regions.
+            for area_label, requested_max_dets in area_to_max_dets.items():
+                area_range = area_ranges_[area_label]
+                largest_max_det = requested_max_dets[-1]
+                maxdet_to_y_accum = {
+                    max_det: {t: ub.ddict(list) for t in thresholds}
+                    for max_det in requested_max_dets
+                }
+
+                assign_start = time.perf_counter()
+                effective_thresholds = [
+                    assignment_thresholds[t] for t in thresholds
+                ]
+                for gid, index in gid_to_index.items():
+                    y_many = index.assign_many(
+                        effective_thresholds,
+                        assignment_backend=resolved_assignment_backend,
+                        bg_weight=1.0,
+                        bg_cidx=-1,
+                        ignore_classes=ignore_classes,
+                        max_dets=largest_max_det,
+                        max_dets_scope='category',
+                        area_range=area_range,
+                        truth_reuse_policy='never',
+                    )
+                    assignment_calls += len(effective_thresholds)
+                    assignment_batches += 1
+                    for threshold in thresholds:
+                        effective_threshold = assignment_thresholds[threshold]
+                        y_largest = y_many[effective_threshold]
+                        for max_det in requested_max_dets:
+                            if max_det == largest_max_det:
+                                y = y_largest
+                            else:
+                                y = index.truncate_max_dets(
+                                    y_largest,
+                                    max_det,
+                                    max_dets_scope='category',
+                                    bg_cidx=-1,
+                                )
+                            accum = maxdet_to_y_accum[max_det][threshold]
+                            nrows = len(y['pred'])
+                            accum['gid'].extend([gid] * nrows)
+                            for key in ('pred', 'true', 'score', 'weight'):
+                                accum[key].extend(y[key])
+                assignment_seconds += time.perf_counter() - assign_start
+
+                for max_det in requested_max_dets:
+                    accum_start = time.perf_counter()
+                    threshold_metrics = {}
+                    y_accum = maxdet_to_y_accum[max_det]
+                    for threshold in thresholds:
+                        threshold_metrics[threshold] = (
+                            accumulate_coco_assignment_rows(
+                                y_accum[threshold],
+                                classes,
+                                category_idxs=category_idxs_,
+                                ignore_classes=ignore_classes,
+                                recall_thresholds=recalls,
+                                with_details=with_details,
+                            )
+                        )
+                    accumulation_seconds += time.perf_counter() - accum_start
+                    slice_metrics[(area_label, max_det)] = threshold_metrics
+
+        eval_record = None
+        if use_compact_matches:
+            assert compact_tensor is not None
+            T = len(thresholds)
+            R = len(recalls)
+            K = len(category_idxs_)
+            A = len(area_labels)
+            M = len(max_dets_)
+            compact_eval_record = {
+                'schema': COCO_EVAL_TENSOR_SCHEMA,
+                'counts': [T, R, K, A, M],
+                'precision': compact_tensor['precision'],
+                'recall': compact_tensor['recall'],
+                'scores': compact_tensor['scores'],
+                'realpos_total': compact_tensor['realpos_total'],
+                'iou_thresholds': thresholds,
+                'recall_thresholds': recalls,
+                'category_ids': category_idxs_,
+                'category_names': class_names,
+                'image_ids': sorted(map(int, gid_to_index)),
+                'area_ranges': [list(area_ranges_[k]) for k in area_labels],
+                'area_range_labels': area_labels,
+                'max_dets': max_dets_,
+            }
+            summary = summarize_coco_eval_tensor(compact_eval_record)
+            if with_eval:
+                eval_record = compact_eval_record
+        elif with_eval:
+            T = len(thresholds)
+            R = len(recalls)
+            K = len(category_idxs_)
+            A = len(area_labels)
+            M = len(max_dets_)
+            precision = -np.ones((T, R, K, A, M), dtype=float)
+            recall = -np.ones((T, K, A, M), dtype=float)
+            scores = -np.ones((T, R, K, A, M), dtype=float)
+            realpos = np.zeros((T, K, A, M), dtype=int)
+            for ai, area_label in enumerate(area_labels):
+                for mi, max_det in enumerate(max_dets_):
+                    threshold_info = slice_metrics[(area_label, max_det)]
+                    for ti, threshold in enumerate(thresholds):
+                        info = threshold_info[threshold]
+                        precision[ti, :, :, ai, mi] = info['precision']
+                        recall[ti, :, ai, mi] = info['recall']
+                        scores[ti, :, :, ai, mi] = info['scores']
+                        realpos[ti, :, ai, mi] = info['realpos_total']
+            eval_record = {
+                'schema': COCO_EVAL_TENSOR_SCHEMA,
+                'counts': [T, R, K, A, M],
+                'precision': precision,
+                'recall': recall,
+                'scores': scores,
+                'realpos_total': realpos,
+                'iou_thresholds': thresholds,
+                'recall_thresholds': recalls,
+                'category_ids': category_idxs_,
+                'category_names': class_names,
+                'image_ids': sorted(map(int, gid_to_index)),
+                'area_ranges': [list(area_ranges_[k]) for k in area_labels],
+                'area_range_labels': area_labels,
+                'max_dets': max_dets_,
+            }
+            summary = summarize_coco_eval_tensor(eval_record)
+        else:
+            def mean_metric(area_label, max_det, metric, selected=None):
+                threshold_info = slice_metrics.get((area_label, max_det), None)
+                if threshold_info is None:
+                    return -1.0
+                if selected is None:
+                    values = [threshold_info[t][metric] for t in thresholds]
+                else:
+                    candidates = [t for t in thresholds if t == selected]
+                    values = [] if not candidates else [
+                        threshold_info[candidates[0]][metric]
+                    ]
+                values = [v for v in values if v >= 0 and np.isfinite(v)]
+                return float(np.mean(values)) if values else -1.0
+
+            summary = {
+                'AP': mean_metric('all', 100, 'mAP'),
+                'AP50': mean_metric('all', 100, 'mAP', 0.50),
+                'AP75': mean_metric('all', 100, 'mAP', 0.75),
+                'AP_small': mean_metric('small', 100, 'mAP'),
+                'AP_medium': mean_metric('medium', 100, 'mAP'),
+                'AP_large': mean_metric('large', 100, 'mAP'),
+                'AR1': mean_metric('all', 1, 'mAR'),
+                'AR10': mean_metric('all', 10, 'mAR'),
+                'AR100': mean_metric('all', 100, 'mAR'),
+                'AR_small': mean_metric('small', 100, 'mAR'),
+                'AR_medium': mean_metric('medium', 100, 'mAR'),
+                'AR_large': mean_metric('large', 100, 'mAR'),
+            }
+
+        stats = [summary[key] for key in COCO_DETECTION_STAT_KEYS]
+        indexes = list(gid_to_index.values())
+        overlap_names = sorted({
+            idx.overlap_backend.get('name', 'unknown')
+            for idx in indexes
+            if idx.overlap_backend is not None
+        })
+        raster_names = sorted({
+            idx.raster_backend.get('name', 'unknown')
+            for idx in indexes
+            if idx.raster_backend is not None
+        })
+        area_names = sorted({
+            idx.area_backend.get('name', 'unknown')
+            for idx in indexes
+            if idx.area_backend is not None
+        })
+
+        total_seconds = time.perf_counter() - total_start
+        result = {
+            'backend': 'kwcoco',
+            'implementation': NATIVE_COCO_IMPLEMENTATION,
+            'result_schema': COCO_DETECTION_RESULT_SCHEMA,
+            'official': False,
+            'reference_implementation': OFFICIAL_COCO_IMPLEMENTATION,
+            'iou_type': iou_type,
+            'geometry': iou_type,
+            'assignment': 'assignment_v2',
+            'accumulator': (
+                'compact_matches->coco_tensor'
+                if use_compact_matches else 'assignment_rows->coco_tensor'
+            ),
+            'summary': summary,
+            'stats': stats,
+            'params': {
+                'iou_thresholds': thresholds,
+                'recall_thresholds': recalls,
+                'max_dets': max_dets_,
+                'max_dets_scope': 'image-category',
+                'area_ranges': [
+                    list(area_ranges_[key]) for key in area_labels
+                ],
+                'area_range_labels': area_labels,
+                'area_range_map': {
+                    key: list(value) for key, value in area_ranges_.items()
+                },
+                'image_ids': sorted(map(int, gid_to_index)),
+                'category_ids': category_idxs_,
+                'threshold_policy': 'inclusive',
+                'segmentation_rasterizer': (
+                    'coco' if iou_type == 'segm' else None
+                ),
+                'bbox_overlap_mode': (
+                    'coco' if iou_type == 'bbox' else None
+                ),
+                'annotation_ignore_policy': annotation_ignore_policy,
+                'ignore_classes': (
+                    None if ignore_classes is None
+                    else sorted(map(str, measure_ignore_classes))
+                ),
+                'ap_method': 'coco101',
+                'truth_weight_policy': 'coco-unweighted',
+                'assignment_backend': resolved_assignment_backend,
+            },
+            'provenance': {
+                'requested_assignment_backend': requested_assignment_backend,
+                'resolved_assignment_backend': assignment_backend_meta,
+                'requested_overlap_backend': (
+                    overlap_backend if iou_type == 'segm' else None
+                ),
+                'requested_raster_backend': (
+                    raster_backend if iou_type == 'segm' else None
+                ),
+                'overlap_backends': overlap_names,
+                'raster_backends': raster_names,
+                'area_backends': area_names,
+            },
+            'timing': {
+                'candidate_build_seconds': candidate_build_seconds,
+                'assignment_seconds': assignment_seconds,
+                'accumulation_seconds': accumulation_seconds,
+                'total_seconds': total_seconds,
+                'candidate_index_builds': len(gid_to_index),
+                'candidate_predictions_before_maxdet': candidate_predictions_before_cap,
+                'candidate_predictions_after_maxdet': candidate_predictions_after_cap,
+                'assignment_slices': len(requested_slices),
+                'assignment_base_slices': len(area_to_max_dets),
+                'assignment_calls': assignment_calls,
+                'assignment_batches': assignment_batches,
+                'compact_match_path': bool(use_compact_matches),
+            },
+        }
+        if eval_record is not None:
+            result['eval'] = eval_record
+        if with_details:
+            result['details'] = {
+                f'{area_label}:maxDets={max_det}': {
+                    str(t): {
+                        key: value for key, value in info.items()
+                        if key not in {'precision', 'recall', 'scores', 'realpos_total'}
+                    }
+                    for t, info in threshold_info.items()
+                }
+                for (area_label, max_det), threshold_info
+                in slice_metrics.items()
+            }
+        return result
+
     def score_kwant(dmet, iou_thresh: float = 0.5) -> dict[str, typing.Any]:
         """
         Scores the detections using kwant
@@ -832,13 +1694,30 @@ class DetectionMetrics(ub.NiceRepr):
         voc_scores = vmet.score(iou_thresh, bias=bias, method=method)
         return voc_scores
 
-    def _to_coco(dmet):
+    def _to_coco(dmet, iou_type: str = 'bbox'):
         """
-        Convert to a coco representation of truth and predictions
+        Convert truth and predictions to a strict COCO representation.
 
-        with inverse aid mappings
+        Args:
+            iou_type (str):
+                ``'bbox'`` preserves the historical box-only conversion.
+                ``'segm'`` additionally emits strict MS-COCO segmentations
+                and uses raster mask area for area-range evaluation.
+
+        Returns:
+            Tuple[CocoDataset, CocoDataset, dict, dict]:
+                prediction dataset, truth dataset, and inverse annotation
+                mappings used to reconstruct confusion vectors.
         """
         import kwcoco
+
+        if iou_type not in {'bbox', 'segm'}:
+            raise KeyError(f'Unsupported COCO iou_type={iou_type!r}')
+
+        if iou_type == 'segm':
+            from kwcoco.metrics.coco_metrics import (
+                coerce_pycocotools_segmentation,
+            )
 
         true = kwcoco.CocoDataset()
         pred = kwcoco.CocoDataset()
@@ -850,7 +1729,6 @@ class DetectionMetrics(ub.NiceRepr):
             raise ValueError('classes are required to convert metrics to COCO')
 
         for node in classes:
-            # cid = classes.graph.node[node]['id']
             cid = classes.index(node)
             supercategory = list(classes.graph.pred[node])
             if len(supercategory) == 0:
@@ -870,8 +1748,12 @@ class DetectionMetrics(ub.NiceRepr):
             )
 
         for imgname, gid in dmet._imgname_to_gid.items():
-            true.add_image(imgname, id=gid)
-            pred.add_image(imgname, id=gid)
+            image_kw = {}
+            img_dims = dmet.gid_to_image_dims.get(gid, None)
+            if img_dims is not None:
+                image_kw['height'], image_kw['width'] = img_dims
+            true.add_image(imgname, id=gid, **image_kw)
+            pred.add_image(imgname, id=gid, **image_kw)
 
         idx_to_id = {
             idx: classes.index(node) for idx, node in enumerate(classes.idx_to_node)
@@ -885,10 +1767,34 @@ class DetectionMetrics(ub.NiceRepr):
                 pred_scores = np.ones(len(pred_dets))
             pred_cids = list(ub.take(idx_to_id, pred_dets.class_idxs))
             pred_xywh = pred_boxes.to_xywh().data.tolist()
+            pred_segs = pred_dets.data.get('segmentations', None)
 
             dt_aids = []
-            for bbox, cid, score in zip(pred_xywh, pred_cids, pred_scores):
-                aid = pred.add_annotation(gid, cid, bbox=bbox, score=score)
+            for px, (bbox, cid, score) in enumerate(
+                zip(pred_xywh, pred_cids, pred_scores)
+            ):
+                ann_kw = {
+                    'bbox': bbox,
+                    'score': float(score),
+                }
+                if iou_type == 'segm':
+                    img_dims = dmet.gid_to_image_dims.get(gid, None)
+                    if img_dims is None:
+                        raise ValueError(
+                            'Image dimensions are required for COCO '
+                            f'instance-segmentation scoring (gid={gid})'
+                        )
+                    if pred_segs is None:
+                        raise ValueError(
+                            'Predicted segmentations are required for '
+                            f'iou_type="segm" (gid={gid}, px={px})'
+                        )
+                    strict_seg, seg_area = coerce_pycocotools_segmentation(
+                        pred_segs[px], img_dims
+                    )
+                    ann_kw['segmentation'] = strict_seg
+                    ann_kw['area'] = seg_area
+                aid = pred.add_annotation(gid, cid, **ann_kw)
                 dt_aids.append(aid)
 
             dt_aid_to_px.update(dict(zip(dt_aids, range(len(dt_aids)))))
@@ -901,10 +1807,40 @@ class DetectionMetrics(ub.NiceRepr):
                 true_weights = np.ones(len(true_boxes))
             true_cids = list(ub.take(idx_to_id, true_dets.class_idxs))
             true_xywh = true_boxes.to_xywh().data.tolist()
+            true_segs = true_dets.data.get('segmentations', None)
+            true_crowd = true_dets.data.get('iscrowd', None)
+            true_ignore = true_dets.data.get('ignore', None)
 
             gt_aids = []
-            for bbox, cid, weight in zip(true_xywh, true_cids, true_weights):
-                aid = true.add_annotation(gid, cid, bbox=bbox, weight=weight)
+            for tx, (bbox, cid, weight) in enumerate(
+                zip(true_xywh, true_cids, true_weights)
+            ):
+                ann_kw = {
+                    'bbox': bbox,
+                    'weight': float(weight),
+                }
+                if true_crowd is not None:
+                    ann_kw['iscrowd'] = bool(true_crowd[tx])
+                if true_ignore is not None:
+                    ann_kw['ignore'] = bool(true_ignore[tx])
+                if iou_type == 'segm':
+                    img_dims = dmet.gid_to_image_dims.get(gid, None)
+                    if img_dims is None:
+                        raise ValueError(
+                            'Image dimensions are required for COCO '
+                            f'instance-segmentation scoring (gid={gid})'
+                        )
+                    if true_segs is None:
+                        raise ValueError(
+                            'Truth segmentations are required for '
+                            f'iou_type="segm" (gid={gid}, tx={tx})'
+                        )
+                    strict_seg, seg_area = coerce_pycocotools_segmentation(
+                        true_segs[tx], img_dims
+                    )
+                    ann_kw['segmentation'] = strict_seg
+                    ann_kw['area'] = seg_area
+                aid = true.add_annotation(gid, cid, **ann_kw)
                 gt_aids.append(aid)
 
             gt_aid_to_tx.update(dict(zip(gt_aids, range(len(gt_aids)))))
@@ -917,12 +1853,43 @@ class DetectionMetrics(ub.NiceRepr):
         with_confusion: bool = False,
         verbose: int = 0,
         iou_thresholds: Iterable[float] | np.ndarray | None = None,
+        iou_type: str = 'bbox',
+        *,
+        with_eval: bool = False,
+        recall_thresholds: Iterable[float] | np.ndarray | None = None,
+        area_ranges: typing.Mapping[str, Iterable[float]] | None = None,
+        max_dets: Iterable[int] | None = None,
+        gids: Iterable[int] | None = None,
+        category_idxs: Iterable[int] | None = None,
+        bbox_annotation_policy: str = 'historical',
     ) -> dict[str, typing.Any]:
         """
         score using ms-coco method
 
+        Args:
+            iou_type (str):
+                Official COCO geometry to score. ``'bbox'`` retains the
+                historical behavior. ``'segm'`` evaluates instance masks.
+            bbox_annotation_policy (str):
+                ``'historical'`` preserves kwcoco's long-standing direct
+                ``score_pycocotools`` bbox behavior, which disables crowd
+                annotations. ``'coco'`` preserves ``iscrowd`` and is the
+                strict official-reference profile used by the explicit
+                ``CocoEvaluator.evaluate_pycocotools`` API and conformance
+                harness.
+            iou_thresholds, recall_thresholds, area_ranges, max_dets, gids:
+                Optional COCO parameter overrides. Custom grids are accumulated
+                by official COCOeval and returned through the same stable tensor
+                schema as standard parameters.
+            category_idxs:
+                Optional subset of the generated COCO category ids. These ids
+                correspond to indexes in ``dmet.classes``. ``CocoEvaluator``
+                uses this to remove only its synthetic background class from
+                strict COCO evaluation while retaining real declared categories.
+
         Returns:
-            Dict : dictionary with pct info
+            Dict : dictionary with pct info. With standard COCO parameters,
+            the ``summary`` field contains named official AP / AR statistics.
 
         Example:
             >>> # xdoctest: +REQUIRES(module:pycocotools)
@@ -976,7 +1943,14 @@ class DetectionMetrics(ub.NiceRepr):
         from pycocotools import cocoeval
         from kwcoco.util.util_monkey import SupressPrint
 
-        pred, true, gt_aid_to_tx, dt_aid_to_px = dmet._to_coco()
+        if iou_type not in {'bbox', 'segm'}:
+            raise KeyError(f'Unsupported COCO iou_type={iou_type!r}')
+        if bbox_annotation_policy not in {'historical', 'coco'}:
+            raise KeyError(bbox_annotation_policy)
+
+        pred, true, gt_aid_to_tx, dt_aid_to_px = dmet._to_coco(
+            iou_type=iou_type
+        )
 
         # The original pycoco-api prints to much, suppress it
         quiet = verbose == 0
@@ -985,62 +1959,159 @@ class DetectionMetrics(ub.NiceRepr):
             cocoDt = pred._aspycoco()
 
             for ann in cocoGt.dataset['annotations']:
-                w, h = ann['bbox'][-2:]
-                ann['ignore'] = ann['weight'] < 0.5
-                ann['area'] = w * h
-                ann['iscrowd'] = False
+                if iou_type == 'bbox':
+                    if bbox_annotation_policy == 'historical':
+                        # Preserve the long-standing direct-method behavior.
+                        ann['ignore'] = ann['weight'] < 0.5
+                        ann['iscrowd'] = False
+                    else:
+                        # Strict COCO reference behavior: arbitrary kwcoco
+                        # truth weights / explicit ignore are not part of the
+                        # detection metric, while iscrowd is.
+                        ann['ignore'] = False
+                        ann['iscrowd'] = bool(ann.get('iscrowd', False))
+                    w, h = ann['bbox'][-2:]
+                    ann['area'] = w * h
+                else:
+                    # Official segmentation evaluation has no kwcoco truth
+                    # weight / explicit-ignore extension. COCOeval derives its
+                    # detection ignore state from iscrowd and area slicing.
+                    ann['ignore'] = False
+                    ann['iscrowd'] = bool(ann.get('iscrowd', False))
 
             for ann in cocoDt.dataset['annotations']:
-                w, h = ann['bbox'][-2:]
-                ann['area'] = w * h
+                if iou_type == 'bbox':
+                    w, h = ann['bbox'][-2:]
+                    ann['area'] = w * h
 
-            evaler = cocoeval.COCOeval(cocoGt, cocoDt, iouType='bbox')
+            evaler = cocoeval.COCOeval(cocoGt, cocoDt, iouType=iou_type)
 
             modified_params = False
-            if iou_thresholds is None:
-                iou_thresholds = evaler.params.iouThrs
-            else:
-                iou_thresholds = np.array(iou_thresholds)
-
-                if len(iou_thresholds) != len(evaler.params.iouThrs) or np.allclose(
-                    iou_thresholds, evaler.params.iouThrs
-                ):
-                    evaler.params.iouThrs = iou_thresholds
+            if category_idxs is not None:
+                requested = sorted(set(map(int, category_idxs)))
+                available = set(map(int, evaler.params.catIds))
+                invalid = sorted(set(requested) - available)
+                if invalid:
+                    raise ValueError(
+                        'category_idxs contains ids outside the generated '
+                        f'COCO category set: {invalid!r}'
+                    )
+                if requested != sorted(available):
                     modified_params = True
+                evaler.params.catIds = requested
+
+            if gids is not None:
+                requested = sorted(set(map(int, gids)))
+                if requested != sorted(set(map(int, evaler.params.imgIds))):
+                    modified_params = True
+                evaler.params.imgIds = requested
+
+            if iou_thresholds is None:
+                iou_thresholds = np.asarray(evaler.params.iouThrs, dtype=float)
+            else:
+                iou_thresholds = np.asarray(list(iou_thresholds), dtype=float)
+                if (
+                    len(iou_thresholds) == 0
+                    or not np.all(np.isfinite(iou_thresholds))
+                    or np.any(iou_thresholds < 0)
+                    or np.any(iou_thresholds > 1)
+                ):
+                    raise ValueError(
+                        f'invalid iou_thresholds={iou_thresholds!r}')
+                if len(set(map(float, iou_thresholds))) != len(iou_thresholds):
+                    raise ValueError('iou_thresholds must be unique')
+                if not np.array_equal(iou_thresholds, evaler.params.iouThrs):
+                    modified_params = True
+                evaler.params.iouThrs = iou_thresholds
+
+            if recall_thresholds is not None:
+                recall_thresholds = np.asarray(
+                    list(recall_thresholds), dtype=float)
+                if len(recall_thresholds) == 0:
+                    raise ValueError('recall_thresholds must not be empty')
+                if (
+                    not np.all(np.isfinite(recall_thresholds))
+                    or np.any(recall_thresholds < 0)
+                    or np.any(recall_thresholds > 1)
+                    or np.any(np.diff(recall_thresholds) < 0)
+                ):
+                    raise ValueError(
+                        f'invalid recall_thresholds={recall_thresholds!r}')
+                if not np.array_equal(
+                    recall_thresholds, evaler.params.recThrs
+                ):
+                    modified_params = True
+                evaler.params.recThrs = recall_thresholds
+
+            if area_ranges is not None:
+                area_labels: list[str] = []
+                area_values: list[list[float] | list[int]] = []
+                for label, bounds in area_ranges.items():
+                    pair = tuple(map(float, bounds))
+                    if len(pair) != 2:
+                        raise ValueError(
+                            f'area range {label!r} must have two values')
+                    lo, hi = pair
+                    if not np.isfinite(lo) or lo < 0 or np.isnan(hi) or hi < lo:
+                        raise ValueError(
+                            f'invalid area range {label!r}: {pair!r}')
+                    area_labels.append(str(label))
+                    area_values.append(list(pair))
+                if not area_values:
+                    raise ValueError('area_ranges must not be empty')
+                if (
+                    area_labels != list(evaler.params.areaRngLbl)
+                    or area_values != [
+                        list(map(float, r)) for r in evaler.params.areaRng
+                    ]
+                ):
+                    modified_params = True
+                evaler.params.areaRngLbl = area_labels
+                evaler.params.areaRng = area_values
+
+            if max_dets is not None:
+                max_det_values: list[int] = sorted(set(map(int, max_dets)))
+                if not max_det_values or any(v < 0 for v in max_det_values):
+                    raise ValueError(f'invalid max_dets={max_det_values!r}')
+                if max_det_values != list(map(int, evaler.params.maxDets)):
+                    modified_params = True
+                evaler.params.maxDets = max_det_values
 
             print('evaler.params.iouThrs = {!r}'.format(evaler.params.iouThrs))
 
             evaler.evaluate()
             evaler.accumulate()
 
-            # if 0:
-            #     # Get curves at a specific pycocoutils param
-            #     Tx = np.where(evaler.params.iouThrs == 0.5)[0]
-            #     Rx = slice(0, len(evaler.params.recThrs))
-            #     Kx = slice(0, len(evaler.params.catIds))
-            #     Ax = evaler.params.areaRng.index([0, 10000000000.0])
-            #     Mx = evaler.params.maxDets.index(100)
-            #     perclass_prec = evaler.eval['precision'][Tx, Rx, Kx, Ax, Mx]
-            #     perclass_rec = evaler.eval['recall'][Tx, Kx, Ax, Mx]
-            #     perclass_score = evaler.eval['scores'][Tx, Rx, Kx, Ax, Mx]
-
-            pct_info = {}
+            pct_info: dict[str, typing.Any] = {}
+            from kwcoco.metrics.coco_metrics import summarize_pycocotools_eval
 
             if modified_params:
                 print('modified params')
-                stats = pct_summarize2(evaler)
-                evaler.stats = stats
+                pct_info.update(summarize_pycocotools_eval(evaler))
+                evaler.stats = np.asarray(pct_info['stats'], dtype=float)
             else:
                 print('standard pycocotools params')
                 evaler.summarize()
-                coco_ap = evaler.stats[1]
-                pct_info['mAP'] = coco_ap
+                pct_info.update(summarize_pycocotools_eval(evaler))
 
+            # NOTE: ``mAP`` historically exposed COCO AP50 here. Keep that
+            # legacy alias on both standard and custom parameter grids. A
+            # custom grid without an IoU=0.50 slice reports ``-1`` via the
+            # stable named summary rather than dropping the key entirely.
+            pct_info['mAP'] = float(pct_info['summary']['AP50'])
+            pct_info['params']['bbox_annotation_policy'] = (
+                bbox_annotation_policy if iou_type == 'bbox' else None
+            )
+            pct_info['iou_type'] = iou_type
             pct_info['evalar_stats'] = evaler.stats
 
         # 'mAP': coco_ap,
         if with_evaler:
             pct_info['evaler'] = evaler
+
+        if with_eval:
+            from kwcoco.metrics.coco_metrics import snapshot_pycocotools_eval
+            pct_info['eval'] = snapshot_pycocotools_eval(evaler)
 
         if with_confusion:
             iou_to_cfsn_vecs = {}
@@ -1289,9 +2360,9 @@ class DetectionMetrics(ub.NiceRepr):
 
             for gid in range(nimgs):
                 # Sample random variables
-                nboxes_ = nboxes_RV()
-                n_fp_ = n_fp_RV()
-                n_fn_ = n_fn_RV()
+                nboxes_ = int(np.asarray(nboxes_RV()).item())
+                n_fp_ = int(np.asarray(n_fp_RV()).item())
+                n_fn_ = int(np.asarray(n_fn_RV()).item())
 
                 imgname = 'img_{}'.format(gid)
                 dmet._register_imagename(imgname, gid)
@@ -1302,7 +2373,7 @@ class DetectionMetrics(ub.NiceRepr):
                 )
                 # Prevent 0 sized boxes: increase w/h by 1
                 true_boxes.data[..., 2:4] += 1
-                true_cxs = frgnd_cx_RV(len(true_boxes))
+                true_cxs = np.asarray(frgnd_cx_RV(len(true_boxes)), dtype=int)
                 true_weights = np.ones(len(true_boxes), dtype=np.int32)
 
                 # Initialize predicted detections as a copy of truth
@@ -1313,8 +2384,8 @@ class DetectionMetrics(ub.NiceRepr):
                 pred_boxes.data = np.abs(pred_boxes.data.astype(float) + box_noise_RV())
 
                 # Perterb class predictions
-                change = cls_noise_RV(len(pred_cxs))
-                pred_cxs_swap = frgnd_cx_RV(len(pred_cxs))
+                change = np.asarray(cls_noise_RV(len(pred_cxs)), dtype=bool)
+                pred_cxs_swap = np.asarray(frgnd_cx_RV(len(pred_cxs)), dtype=int)
                 pred_cxs[change] = pred_cxs_swap[change]
 
                 # Drop true positive boxes
@@ -1324,15 +2395,15 @@ class DetectionMetrics(ub.NiceRepr):
 
                 # pred_scores = np.linspace(true_min, true_max, len(pred_boxes))[::-1]
                 n_tp_ = len(pred_boxes)
-                pred_scores = true_score_RV(n_tp_)
+                pred_scores = np.asarray(true_score_RV(n_tp_), dtype=float)
 
                 # Add false positive boxes
                 if n_fp_:
                     false_boxes = kwimage.Boxes.random(
                         num=n_fp_, scale=scale, rng=rng, format='cxywh'
                     )
-                    false_cxs = frgnd_cx_RV(n_fp_)
-                    false_scores = false_score_RV(n_fp_)
+                    false_cxs = np.asarray(frgnd_cx_RV(n_fp_), dtype=int)
+                    false_scores = np.asarray(false_score_RV(n_fp_), dtype=float)
 
                     pred_boxes.data = np.vstack([pred_boxes.data, false_boxes.data])
                     pred_cxs = np.hstack([pred_cxs, false_cxs])
@@ -1618,29 +2689,33 @@ def pycocotools_confusion_vectors(
             for k, v in y.items():
                 y_accum[k].extend(v)
 
-        _data = {}
-        for k, v in ub.ProgIter(
-            list(y_accum.items()), desc='ndarray convert', verbose=verbose
-        ):
-            # Try to use 32 bit types for large evaluation problems
-            dtype = None
-            if k in {'iou', 'score', 'weight'}:
-                dtype = np.float32
-            if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
-                dtype = np.int32
-            try:
-                _data[k] = np.asarray(v, dtype=dtype)
-            except TypeError:
-                _data[k] = np.asarray(v)
+    # Convert the accumulated rows once after all COCO eval-image records have
+    # been visited.  Historically this conversion happened inside the loop,
+    # repeatedly rebuilding larger arrays and making confusion extraction
+    # unnecessarily superlinear in the number of eval records.
+    _data = {}
+    for k, v in ub.ProgIter(
+        list(y_accum.items()), desc='ndarray convert', verbose=verbose
+    ):
+        # Try to use 32 bit types for large evaluation problems
+        dtype = None
+        if k in {'iou', 'score', 'weight'}:
+            dtype = np.float32
+        if k in {'pxs', 'txs', 'gid', 'pred', 'true'}:
+            dtype = np.int32
+        try:
+            _data[k] = np.asarray(v, dtype=dtype)
+        except TypeError:
+            _data[k] = np.asarray(v)
 
-        # Avoid pandas when possible
-        cfsn_data = kwarray.DataFrameArray(_data)
+    # Avoid pandas when possible
+    cfsn_data = kwarray.DataFrameArray(_data)
 
-        # if _tracking_probs:
-        #     y_prob = np.vstack(prob_accum)
-        # else:
-        y_prob = None
-        cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes, probs=y_prob)
+    # if _tracking_probs:
+    #     y_prob = np.vstack(prob_accum)
+    # else:
+    y_prob = None
+    cfsn_vecs = ConfusionVectors(cfsn_data, classes=dmet.classes, probs=y_prob)
     return cfsn_vecs
 
 
@@ -1651,7 +2726,7 @@ def eval_detections_cli(**kw: typing.Any) -> None:
     CommandLine:
         xdoctest -m ~/code/kwcoco/kwcoco/metrics/detect_metrics.py eval_detections_cli
     """
-    import scriptconfig as scfg
+    import kwconf
     import kwcoco
 
     ub.schedule_deprecation(
@@ -1664,17 +2739,18 @@ def eval_detections_cli(**kw: typing.Any) -> None:
         migration=('Use `kwcoco eval` in kwcoco.cli.coco_eval instead. '),
     )
 
-    class EvalDetectionCLI(scfg.Config):
-        default = {
-            'true': scfg.Path(None, help='true coco dataset'),
-            'pred': scfg.Path(None, help='predicted coco dataset'),
-            'out_dpath': scfg.Path('./out', help='output directory'),
+    class EvalDetectionCLI(kwconf.Config):
+        __special_options__ = True
+        __default__ = {
+            'true': kwconf.Value(None, parser=str, help='true coco dataset'),
+            'pred': kwconf.Value(None, parser=str, help='predicted coco dataset'),
+            'out_dpath': kwconf.Value('./out', parser=str, help='output directory'),
         }
         pass
 
     config = EvalDetectionCLI()
-    cmdline = kw.pop('cmdline', True)
-    config.load(kw, cmdline=cmdline)
+    argv = kw.pop('argv', True)
+    config.load(kw, argv=argv)
 
     true_coco = kwcoco.CocoDataset(config['true'])
     pred_coco = kwcoco.CocoDataset(config['pred'])

@@ -220,7 +220,7 @@ def random_video_dset(
     if verbose > 2:
         print('build index')
 
-    dset._build_index()
+    dset.rebuild_index()
 
     if verbose > 2:
         print('finished random_video_dset')
@@ -475,15 +475,16 @@ def random_single_video_dset(
     coercable_height = image_size[1]
 
     if isinstance(coercable_width, distributions.Distribution):
-        video_width = int(coercable_width.sample())
-        video_height = int(coercable_height.sample())  # type: ignore
         image_width_distri = coercable_width
+    else:
+        image_width_distri = distributions.Constant(coercable_width)
+    if isinstance(coercable_height, distributions.Distribution):
         image_height_distri = coercable_height
     else:
-        video_width = coercable_width
-        video_height = coercable_height
-        image_width_distri = distributions.Constant(coercable_width)
         image_height_distri = distributions.Constant(coercable_height)
+
+    video_width = int(np.asarray(image_width_distri.sample()).item())
+    video_height = int(np.asarray(image_height_distri.sample()).item())
 
     video_dsize = (video_width, video_height)
     video_window = kwimage.Boxes([[0, 0, video_width, video_height]], 'xywh')
@@ -557,8 +558,8 @@ def random_single_video_dset(
     for frame_idx, gid in enumerate(image_ids):
         if verbose > 3:
             print('generate gid = {!r}'.format(gid))
-        image_height = int(image_height_distri.sample())  # type: ignore
-        image_width = int(image_width_distri.sample())
+        image_height = int(np.asarray(image_height_distri.sample()).item())
+        image_width = int(np.asarray(image_width_distri.sample()).item())
 
         warp_vid_from_img = kwimage.Affine.coerce(
             scale=(video_width / image_width, video_height / image_height)
@@ -792,7 +793,7 @@ def random_single_video_dset(
             dset, rng=rng, dpath=dpath, renderkw=renderkw, verbose=verbose
         )
     if autobuild:
-        dset._build_index()
+        dset.rebuild_index()
     return dset
 
 
@@ -831,7 +832,8 @@ def populate_random_timestamps(coco_dset, timestamps=True, rng=None):
 
     for vidid, imgs in vidid_to_imgs.items():
         imgs = sorted(imgs, key=lambda g: g.get('frame_index', None))
-        new_times = sorted(time_distri.sample(len(imgs)))
+        sampled_times = np.asarray(time_distri.sample(len(imgs))).reshape(-1)
+        new_times = sorted(sampled_times.tolist())
         for img, timestamp in zip(imgs, new_times):
             ts = util_time.datetime.fromtimestamp(timestamp)  # type: ignore
             img['timestamp'] = ts.isoformat()
@@ -944,7 +946,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
     import kwcoco
 
     rng = kwarray.ensure_rng(rng)
-    dset._build_index()
+    dset.rebuild_index()
 
     if 0:
         dset._ensure_json_serializable()
@@ -1021,7 +1023,7 @@ def render_toy_dataset(dset, rng, dpath=None, renderkw=None, verbose=0):
                     kwimage.imwrite(aux_fpath, auxdata, space=None, **imwrite_kw)
             img['auxiliary'] = auxiliaries
 
-    dset._build_index()
+    dset.rebuild_index()
     return dset
 
 

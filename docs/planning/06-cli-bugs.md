@@ -4,8 +4,7 @@ Status: TODO
 Risk: low-medium (user-facing behavior fixes; mostly isolated per subcommand)
 Prereqs: 01
 
-Files: `kwcoco/cli/*`, `kwcoco/__main__.py`. The CLI uses scriptconfig
-(`DataConfig` + `ModalCLI`). Existing CLI tests: `tests/test_cli_validate.py`,
+Files: `kwcoco/cli/*`, `kwcoco/__main__.py`. The CLI uses kwconf (`Config` + `ModalCLI`). Existing CLI tests: `tests/test_cli_validate.py`,
 `tests/test_cli_visualize_videos.py`, `tests/test_cli_fixup_stats.py`;
 `tests/test_kwcoco_cli.py` is permanently skipped (revived in doc 08).
 
@@ -31,8 +30,8 @@ and no file named `auto` was created.
 ### Task 6.2 — `__cli__._main()` AttributeError in three modules
 
 `cli/coco_union.py:147`, `cli/coco_toydata.py:147`, `cli/coco_eval.py:384`
-call `__cli__._main()`; scriptconfig `DataConfig` has no `_main` (verified on
-scriptconfig 0.9.1) — `python -m kwcoco.cli.coco_union` crashes before
+call `__cli__._main()`; neither the former scriptconfig backend nor the
+current kwconf `Config` API provides `_main` — `python -m kwcoco.cli.coco_union` crashes before
 parsing args. The `# type: ignore` comments show the checker flagged it.
 Replace with `__cli__.main()`. Test: parametrized subprocess test running
 `python -m kwcoco.cli.<mod> --help` for every module in `kwcoco/cli/`
@@ -42,7 +41,7 @@ Replace with `__cli__.main()`. Test: parametrized subprocess test running
 
 - `cli/__main__.py:14-34` omits `coco_move_assets` from `modnames` → no
   `kwcoco move_assets` command exists.
-- `cli/coco_move_assets.py:24-25`: `src = scfg.Value('source asset file or folder')`
+- `cli/coco_move_assets.py:24-25`: `src = kwconf.Value('source asset file or folder')`
   passes help text as the default *value* (missing `help=`); an invocation
   without `--src` asserts on `ub.Path('source asset file or folder')`.
 - The config class also lacks `__command__ = 'move_assets'` (required by the

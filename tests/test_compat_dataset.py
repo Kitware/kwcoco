@@ -206,3 +206,29 @@ def test_compat_download_uses_target_without_reroot(monkeypatch, tmp_path):
         ('https://example.com/image.png', target / 'image.png')
     ]
     assert dset.bundle_dpath == original_bundle_dpath
+
+
+def test_private_build_index_deprecation():
+    import pytest
+    import kwcoco
+
+    dset = kwcoco.CocoDataset()
+    with pytest.warns(FutureWarning, match='_build_index'):
+        dset._build_index()
+
+
+def test_legacy_format_modules_still_forward_before_1x():
+    import importlib
+    import sys
+    import pytest
+
+    for modname, symbol in [
+        ('kwcoco.kpf', 'coco_to_kpf'),
+        ('kwcoco.kw18', 'KW18'),
+        ('kwcoco.channel_spec', 'ChannelSpec'),
+        ('kwcoco.sensorchan_spec', 'SensorChanSpec'),
+    ]:
+        sys.modules.pop(modname, None)
+        with pytest.warns(FutureWarning):
+            module = importlib.import_module(modname)
+        assert hasattr(module, symbol)

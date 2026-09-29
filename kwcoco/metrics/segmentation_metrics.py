@@ -28,7 +28,7 @@ from kwcoco.metrics.confusion_measures import MeasureCombiner
 from kwcoco.metrics.confusion_measures import Measures
 from collections.abc import Mapping, Sequence
 from typing import Any, Dict, Protocol
-import scriptconfig as scfg
+import kwconf
 from shapely.ops import unary_union
 from kwcoco.util.util_kwutil import _DelayedBlockingJobQueue, _MaxQueuePool
 
@@ -76,24 +76,26 @@ UNDISTINGUISHED_CLASSES = {'positive'}
 CONTEXT_CLASSES: set[str] = set()
 
 
-class SegmentationEvalConfig(scfg.DataConfig):
+class SegmentationEvalConfig(kwconf.Config):
+    __special_options__ = True
+
     """
     Evaluation script for change/segmentation task
     """
 
-    true_dataset = scfg.Value(
+    true_dataset = kwconf.Value(
         None, help='path to the groundtruth dataset', tags=['in_path']
     )
-    pred_dataset = scfg.Value(
+    pred_dataset = kwconf.Value(
         None, help='path to the predicted dataset', tags=['in_path']
     )
 
-    eval_dpath = scfg.Value(None, help='directory to dump results', tags=['out_path'])
-    eval_fpath = scfg.Value(
+    eval_dpath = kwconf.Value(None, help='directory to dump results', tags=['out_path'])
+    eval_fpath = kwconf.Value(
         None, help='path to dump result summary', tags=['out_path', 'primary']
     )
 
-    score_space = scfg.Value(
+    score_space = kwconf.Value(
         'auto',
         help=ub.paragraph(
             """
@@ -103,7 +105,7 @@ class SegmentationEvalConfig(scfg.DataConfig):
         ),
         tags=['algo_param'],
     )
-    resolution = scfg.Value(
+    resolution = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -113,7 +115,7 @@ class SegmentationEvalConfig(scfg.DataConfig):
         tags=['algo_param'],
     )
 
-    balance_area = scfg.Value(
+    balance_area = kwconf.Value(
         False,
         isflag=True,
         help=ub.paragraph(
@@ -129,48 +131,48 @@ class SegmentationEvalConfig(scfg.DataConfig):
         tags=['algo_param'],
     )
 
-    thresh_bins = scfg.Value(32 * 32, help='threshold resolution.', tags=['algo_param'])
-    salient_channel = scfg.Value(
+    thresh_bins = kwconf.Value(32 * 32, help='threshold resolution.', tags=['algo_param'])
+    salient_channel = kwconf.Value(
         'salient', help='channel that is the positive class', tags=['algo_param']
     )
 
     # options
-    draw_curves = scfg.Value(
+    draw_curves = kwconf.Value(
         'auto', help='flag to draw curves or not', tags=['perf_param']
     )
-    draw_heatmaps = scfg.Value(
+    draw_heatmaps = kwconf.Value(
         'auto', help='flag to draw heatmaps or not', tags=['perf_param']
     )
-    draw_legend = scfg.Value(
+    draw_legend = kwconf.Value(
         True, help='enable/disable the class legend', tags=['perf_param']
     )
-    draw_weights = scfg.Value(
+    draw_weights = kwconf.Value(
         False, help='enable/disable pixel weight visualization', tags=['perf_param']
     )
 
-    draw_components = scfg.Value(
+    draw_components = kwconf.Value(
         False,
         help='if True, draw individual components of the heatmap plots',
         tags=['perf_param'],
     )
-    draw_burnin = scfg.Value(
+    draw_burnin = kwconf.Value(
         False,
         help='if True, burn in text on images for label purposes',
         tags=['perf_param'],
     )
 
-    viz_thresh = scfg.Value('auto', help='visualization threshold')
+    viz_thresh = kwconf.Value('auto', help='visualization threshold')
 
-    workers = scfg.Value(
+    workers = kwconf.Value(
         'auto', help='number of parallel scoring workers', tags=['perf_param']
     )
-    draw_workers = scfg.Value(
+    draw_workers = kwconf.Value(
         'auto', help='number of parallel drawing workers', tags=['perf_param']
     )
 
-    select_images = scfg.Value(
+    select_images = kwconf.Value(
         None,
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
             A json query (via the jq spec) that specifies which images
@@ -196,7 +198,7 @@ class SegmentationEvalConfig(scfg.DataConfig):
         ),
     )
 
-    select_videos = scfg.Value(
+    select_videos = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -217,19 +219,19 @@ class SegmentationEvalConfig(scfg.DataConfig):
     )
 
 
-def main(cmdline: bool | Sequence[str] = True, **kwargs: Any) -> None:
+def main(argv: bool | Sequence[str] = True, **kwargs: Any) -> None:
     """
     Entry point: todo: doctest and CLI structure
 
     todo: ProcessContext to track resource usage
     """
-    if isinstance(cmdline, bool):
+    if isinstance(argv, bool):
         full_config = SegmentationEvalConfig.cli(
-            cmdline=cmdline, data=kwargs, strict=True
+            argv=argv, data=kwargs, strict=True
         )
     else:
         full_config = SegmentationEvalConfig.cli(
-            argv=list(cmdline), data=kwargs, strict=True
+            argv=list(argv), data=kwargs, strict=True
         )
     import rich
 

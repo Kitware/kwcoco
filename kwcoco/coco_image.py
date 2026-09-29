@@ -713,7 +713,7 @@ class CocoImage(_CocoObject):
         Example:
             >>> import kwcoco
             >>> coco_img = kwcoco.CocoImage({'width': 128, 'height': 128})
-            >>> coco_img.add_auxiliary_item(
+            >>> coco_img.add_asset(
             >>>     'rgb.png', channels='red|green|blue', width=32, height=32)
             >>> assert coco_img.find_asset_obj('red') is not None
             >>> assert coco_img.find_asset_obj('green') is not None
@@ -728,7 +728,7 @@ class CocoImage(_CocoObject):
             >>> # Test with concise channel code
             >>> import kwcoco
             >>> coco_img = kwcoco.CocoImage({'width': 128, 'height': 128})
-            >>> coco_img.add_auxiliary_item(
+            >>> coco_img.add_asset(
             >>>     'msi.png', channels='foo.0:128', width=32, height=32)
             >>> assert coco_img.find_asset_obj('foo') is None
             >>> assert coco_img.find_asset_obj('foo.3') is not None
@@ -736,26 +736,29 @@ class CocoImage(_CocoObject):
             >>> assert coco_img.find_asset_obj('foo.3000') is None
 
         Example:
-            >>> # Test a mallformed case. If using this function each
-            >>> # dictionary with file_name must have channels
+            >>> # A base image is not required to declare channels. In that case
+            >>> # channel lookup should continue through its auxiliary assets.
             >>> import kwcoco
             >>> self = kwcoco.CocoImage({
             >>>     'file_name': 'path/to/rgbdata.jpg',
-            >>>     'channels': None,
             >>>     'assets': [
             >>>         {'file_name': 'path/to/depth/data.png', 'channels': 'depth'},
             >>>         {'file_name': 'path/to/opticalflow/data.tif', 'channels': 'flowx|flowy'},
             >>>     ],
             >>> })
-            >>> # Searching for an asset that does not exist returns None
-            >>> import pytest
-            >>> with pytest.raises(TypeError):
-            >>>     self.find_asset_obj('depth')
+            >>> assert self.find_asset_obj('depth')['channels'] == 'depth'
+            >>> assert self.find_asset_obj('missing') is None
         """
         # from delayed_image.channel_spec import FusedChannelSpec
         channels = FusedChannelSpec.coerce(channels)
         for obj in self.iter_asset_objs():
-            obj_channels = FusedChannelSpec.coerce(obj['channels'])
+            obj_channels_expr = obj.get('channels', None)
+            if obj_channels_expr is None and obj is self.img:
+                # ``channels`` is optional on the top-level image. An unlabeled
+                # base image cannot satisfy a channel query, but it should not
+                # prevent searching explicitly-labeled auxiliary assets.
+                continue
+            obj_channels = FusedChannelSpec.coerce(obj_channels_expr)
             if (obj_channels & channels).numel():
                 return obj
 
@@ -1088,7 +1091,7 @@ class CocoImage(_CocoObject):
             >>> imdata = np.random.rand(6, 6, 5)
             >>> imdata[:] = np.arange(5)[None, None, :]
             >>> channels = FusedChannelSpec.coerce('Aux:5')
-            >>> coco_img.add_auxiliary_item(imdata=imdata, channels=channels)
+            >>> coco_img.add_asset(imdata=imdata, channels=channels)
             >>> delayed = coco_img.imdelay(channels='B1|Aux:2:4')
             >>> final = delayed.finalize()
 

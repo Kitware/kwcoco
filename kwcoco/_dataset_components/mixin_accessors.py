@@ -113,15 +113,21 @@ class MixinCocoAccessors:
         Note:
             Prefer to use the CocoImage methods instead
         """
-        try:
+        if channels is None:
+            # The primary image has a direct path. Let filesystem / decoder
+            # errors propagate rather than interpreting them as a signal to
+            # choose another implementation.
             import kwimage
 
-            gpath = self.get_image_fpath(gid_or_img, channels=channels)
-            np_img = kwimage.imread(gpath)
-        except Exception:
-            img = self._resolve_to_img(gid_or_img)  # type: ignore
-            np_img = self.delayed_load(img['id'], channels=channels).finalize()  # type: ignore
-        return np_img
+            gpath = self.get_image_fpath(gid_or_img)
+            return kwimage.imread(gpath)
+
+        # Channel requests may span assets or require channel selection. The
+        # compositional delayed-image API is the canonical implementation for
+        # that case.
+        img = self._resolve_to_img(gid_or_img)
+        coco_img = self.coco_image(img['id'])
+        return coco_img.imdelay(channels=channels).finalize()
 
     def get_image_fpath(
         self, gid_or_img: int | dict, channels: str | None = None

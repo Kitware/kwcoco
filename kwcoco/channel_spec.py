@@ -18,6 +18,7 @@ ub.schedule_deprecation(
     'module',
     'use delayed_image.channel_spec instead',
     deprecate='0.8.4',
-    error='0.9.0',
-    remove='0.10.0',
+    error='1.0.0',
+    remove='1.1.0',
+    stacklevel=2,
 )

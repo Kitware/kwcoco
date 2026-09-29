@@ -74,3 +74,34 @@ def test_internal_archive_name():
     assert zipfile.ZipFile(fpath3).namelist() == ['_data.kwcoco.json']
 
     dpath.delete()  # cleanup
+
+
+def test_auto_compression_prefers_deflate_and_preserves_json_bytes():
+    """Automatic KWCoco ZIP output should optimize for write throughput."""
+    import tempfile
+    import zipfile
+
+    import kwcoco
+    import ubelt as ub
+
+    dset = kwcoco.CocoDataset()
+    dset.add_image(file_name='image.jpg', width=32, height=32)
+
+    file = tempfile.NamedTemporaryFile('wb', delete=False)
+    fpath = ub.Path(file.name)
+    with file:
+        dset.dump(file, compress=True)
+
+    with zipfile.ZipFile(fpath, 'r') as zfile:
+        infos = zfile.infolist()
+        assert len(infos) == 1
+        from kwcoco.util import util_archive
+        if 'ZIP_DEFLATED' in util_archive._available_zipfile_compressions():
+            assert infos[0].compress_type == zipfile.ZIP_DEFLATED
+        member_bytes = zfile.read(infos[0])
+
+    # Changing the ZIP codec must not change the serialized dataset payload.
+    assert member_bytes == dset.dumps().encode('utf8')
+    reloaded = kwcoco.CocoDataset(fpath)
+    assert reloaded.dataset == dset.dataset
+    fpath.delete()

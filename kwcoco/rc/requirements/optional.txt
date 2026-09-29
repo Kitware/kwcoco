@@ -1,8 +1,7 @@
 affine>=2.3.0
 colormath>=3.0.0
 
-kwimage_ext>=0.2.1     ; python_version < '3.12' and python_version >= '3.11'    # Python 3.11+
-kwimage_ext>=0.2.0     ; python_version < '3.11' and python_version >= '3.6'     # Python 3.10
+kwimage_ext>=0.4.1 ; python_version >= '3.10'
 
 kwplot>=0.5.2
 lark>=1.1.2
@@ -21,6 +20,11 @@ pint>=0.23      ; python_version < '4.0'  and python_version >= '3.12'    # Pyth
 pint>=0.18      ; python_version < '3.12'                                 # Python 3.11-
 
 ujson>=5.2.0 ; python_version >= '3.7'
+
+# Optional accelerated JSON-schema validation backend. CocoDataset.validate
+# uses this automatically when available and preserves jsonschema as the
+# required compatibility fallback.
+fastjsonschema>=2.15.0
 
 # xdev availpkg sqlalchemy
 sqlalchemy>=2.0.36    ; python_version < '4.0'  and python_version >= '3.13'    # Python 3.13+

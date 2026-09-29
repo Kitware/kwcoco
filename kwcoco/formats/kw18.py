@@ -42,7 +42,7 @@ import kwarray
 import numpy as np
 import os
 from collections.abc import Mapping
-from typing import IO, TYPE_CHECKING, Any
+from typing import IO, TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     import kwcoco
@@ -231,11 +231,13 @@ class KW18(kwarray.DataFrameArray):
         dset = kwcoco.CocoDataset()
 
         # kw18s don't have category names, so use ids as proxies
-        unique_category_ids = sorted(set(self['object_type_id']))
+        object_type_ids = np.asarray(self['object_type_id'], dtype=int)
+        unique_category_ids = sorted(set(object_type_ids.tolist()))
         for cid in unique_category_ids:
             dset.ensure_category('class_{}'.format(cid), id=cid)
 
-        unique_frame_idxs = ub.argunique(self['frame_number'])
+        frame_numbers = np.asarray(self['frame_number'], dtype=int)
+        unique_frame_idxs = ub.argunique(frame_numbers.tolist())
 
         # kw18 files correspond to one video
         vidid = 1
@@ -243,8 +245,8 @@ class KW18(kwarray.DataFrameArray):
 
         # Index frames of the video
         for idx in unique_frame_idxs:
-            frame_num = self['frame_number'][idx]
-            timestamp = self['timestamp'][idx]
+            frame_num = int(frame_numbers[idx])
+            timestamp = np.asarray(self['timestamp'])[idx]
             if image_paths and frame_num in image_paths:
                 file_name = image_paths[frame_num]
             else:
@@ -257,7 +259,8 @@ class KW18(kwarray.DataFrameArray):
                 timestamp=timestamp,
             )
 
-        for rx, row in self.iterrows():
+        for rx, row_ in self.iterrows():
+            row = cast(dict[str, Any], row_)
             tl_x = row['img_bbox_tl_x']
             tl_y = row['img_bbox_tl_y']
             br_x = row['img_bbox_br_x']

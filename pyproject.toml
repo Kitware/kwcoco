@@ -42,6 +42,7 @@ dynamic.dependencies.file = [
 ]
 dynamic.optional-dependencies.all.file = [
   "requirements/optional.txt",
+  "requirements/metrics.txt",
   "requirements/gdal.txt",
   "requirements/graphics.txt",
   "requirements/headless.txt",
@@ -65,6 +66,9 @@ dynamic.optional-dependencies.headless.file = [
 ]
 dynamic.optional-dependencies.linting.file = [
   "requirements/linting.txt",
+]
+dynamic.optional-dependencies.metrics.file = [
+  "requirements/metrics.txt",
 ]
 dynamic.optional-dependencies.optional.file = [
   "requirements/optional.txt",
@@ -220,4 +224,14 @@ enable_gpg = true
 requirements_package = "kwcoco.rc.requirements"
 entry_points.console_scripts = [
   "kwcoco = kwcoco.cli.__main__:main",
+]
+
+[tool.xcookie.ci_source_checks.native-coco-release-evidence]
+name = "Native COCO conformance and release benchmark smoke"
+python_version = "3.13"
+setup_commands = ["python -m pip install -e '.[metrics]'"]
+commands = [
+  "python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py --mode=quick --assignment-backend=python --assert-parity --output-dpath=_ci_metric_conformance_python",
+  "python dev/pycocotools_metrics_compare/run_phase3_coco_conformance.py --mode=quick --assignment-backend=kwimage_ext --assert-parity --output-dpath=_ci_metric_conformance_rust",
+  "python dev/pycocotools_metrics_compare/run_release_benchmark.py --suite=quick --backends=official,native-rust --parity-backends=native-rust --iou-types=bbox,segm --scopes=core --eval-modes=tensor --warmup=0 --repeat=1 --memory-repeat=1 --output-dpath=_ci_metric_release_smoke",
 ]

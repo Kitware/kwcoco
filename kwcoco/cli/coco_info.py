@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 #!/usr/bin/env python3
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 import ubelt as ub
 
 
@@ -67,7 +68,7 @@ class CocoFileHelper:
         return False
 
 
-class CocoInfoCLI(scfg.DataConfig):
+class CocoInfoCLI(KWCocoConfig):
     """
     Print the first few rows from specified tables. Tries to avoid reading the
     entire file.
@@ -86,61 +87,69 @@ class CocoInfoCLI(scfg.DataConfig):
     __command__ = 'info'
     __alias__ = ['tables']
 
-    src = scfg.Value(None, help='input kwcoco path', position=1)
+    src = kwconf.Value(None, help='input kwcoco path', position=1)
 
-    show_info = scfg.Value(
+    show_info = kwconf.Value(
         'auto',
-        isflag=True,
+        bare=True,
+        parser='auto',
         help='The number of info dictionaries to show. if True, show all of them. The default of "auto" works around an issue. It is set to True if no other table is shown and 0 otherwise',
         short_alias=['i'],
     )
-    show_licenses = scfg.Value(
+    show_licenses = kwconf.Value(
         0,
-        isflag=True,
+        bare=True,
+        parser='auto',
         help='The number of licenses dictionaries to show. if True, show all of them',
         short_alias=['l'],
     )
-    show_categories = scfg.Value(
+    show_categories = kwconf.Value(
         0,
-        isflag=True,
+        bare=True,
+        parser='auto',
         help='The number of category dictionaries to show. if True, show all of them',
         short_alias=['c'],
     )
-    show_videos = scfg.Value(
+    show_videos = kwconf.Value(
         0,
-        isflag=True,
+        bare=True,
+        parser='auto',
         help='The number of video dictionaries to show. if True, show all of them',
         short_alias=['v'],
     )
-    show_images = scfg.Value(
+    show_images = kwconf.Value(
         0,
-        isflag=True,
+        bare=True,
+        parser='auto',
         help='The number of image dictionaries to show. if True, show all of them',
         short_alias=['g'],
     )
     # TODO:
-    show_tracks = scfg.Value(
+    show_tracks = kwconf.Value(
         0,
-        isflag=True,
+        bare=True,
+        parser='auto',
         help='The number of track dictionaries to show. if True, show all of them',
         short_alias=['t'],
     )
-    show_annotations = scfg.Value(
+    show_annotations = kwconf.Value(
         0,
-        isflag=True,
+        bare=True,
+        parser='auto',
         help='The number of annotation dictionaries to show. if True, show all of them',
         short_alias=['a'],
     )
 
-    rich = scfg.Value(True, isflag=True, help='if True, try to use rich')
-    verbose = scfg.Value(
+    rich = kwconf.Value(True, isflag=True, help='if True, try to use rich')
+    verbose = kwconf.Value(
         0,
-        isflag=True,
+        bare=1,
+        parser='auto',
         help='if True, print extra information (i.e. the configuration). If false, then stdout should be redirectable as a regular json object',
     )
 
     # TODO add more ways to query what parts we want to show
-    image_name = scfg.Value(
+    image_name = kwconf.Value(
         None, help='If specified, lookup and show the image with this name'
     )
 
@@ -152,7 +161,7 @@ class CocoInfoCLI(scfg.DataConfig):
             >>> from kwcoco.cli.coco_info import *  # NOQA
             >>> import kwcoco
             >>> cls = CocoInfoCLI
-            >>> argv = 0
+            >>> argv = False
             >>> dset = kwcoco.CocoDataset.demo('vidshapes8')
             >>> # Add some info to the data section
             >>> dset.dataset['info'] = [{'type': 'demo', 'data': 'hi mom'}]
@@ -182,7 +191,7 @@ class CocoInfoCLI(scfg.DataConfig):
             >>> from kwcoco.cli.coco_info import *  # NOQA
             >>> import kwcoco
             >>> cls = CocoInfoCLI
-            >>> argv = 0
+            >>> argv = False
             >>> dset = kwcoco.CocoDataset()
             >>> dset.dataset['info'].append({'type': 'demo', 'data': None})
             >>> kwargs = dict(src=dset, show_info=True)

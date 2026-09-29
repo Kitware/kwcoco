@@ -7,6 +7,7 @@ import ubelt as ub
 
 from kwcoco import exceptions
 from kwcoco._helpers import _delitems
+from kwcoco.util.util_deprecate import deprecated_function_alias
 
 if TYPE_CHECKING:
     from delayed_image.channel_spec import FusedChannelSpec
@@ -256,8 +257,9 @@ class MixinCocoAddRemove:
         coco_img = self.coco_image(gid)
         coco_img.add_asset(file_name=file_name, channels=channels, **kwargs)
 
-    # TODO: deprecated add_auxiliary_item for add_asset
-    add_auxiliary_item = add_asset
+    add_auxiliary_item = deprecated_function_alias(
+        'kwcoco', 'add_auxiliary_item', deprecate='now', new_func=add_asset
+    )
 
     @overload
     def add_annotation(

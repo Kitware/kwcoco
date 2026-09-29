@@ -2,7 +2,8 @@ from __future__ import annotations
 
 #!/usr/bin/env python
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 
 
 # Code to help generate the CLI from keyword arguments to CocoDataset.validate
@@ -22,7 +23,7 @@ sub_parts = list(docscrape_google.parse_google_argblock(subdesc))
 from vimtk._dirty import format_multiple_paragraph_sentences
 for part in sub_parts:
     default = part['type'].split('=')[1]
-    line1 = f"'{part['name']}': scfg.Value({default}, help=ub.paragraph("
+    line1 = f"'{part['name']}': kwconf.Value({default}, help=ub.paragraph("
     kwargs = {}
     wrapped_desc = format_multiple_paragraph_sentences(part['desc'], **kwargs)
     sq = chr(39)
@@ -36,7 +37,7 @@ for part in sub_parts:
 """
 
 
-class CocoValidateCLI(scfg.DataConfig):
+class CocoValidateCLI(KWCocoConfig):
     """
     Validates that a coco file satisfies expected properties.
 
@@ -49,19 +50,31 @@ class CocoValidateCLI(scfg.DataConfig):
 
     __command__ = 'validate'
 
-    src = scfg.Value(None, position=1, help='path to datasets', nargs='+')
+    src = kwconf.Value(None, position=1, help='path to datasets', nargs='+')
 
-    schema = scfg.Value(True, isflag=True, help='if True, validate the json-schema')
+    schema = kwconf.Value(True, isflag=True, help='if True, validate the json-schema')
 
-    unique = scfg.Value(
+    schema_backend = kwconf.Value(
+        'auto',
+        choices=['auto', 'jsonschema', 'fastjsonschema'],
+        help=ub.paragraph(
+            """
+            JSON-schema implementation to use. Auto uses the optional
+            fastjsonschema backend when installed and otherwise uses
+            jsonschema. Explicit backend selection is also supported.
+            """
+        ),
+    )
+
+    unique = kwconf.Value(
         True, isflag=True, help='if True, validate unique secondary keys'
     )
 
-    missing = scfg.Value(
+    missing = kwconf.Value(
         True, isflag=True, help='if True, validate registered files exist'
     )
 
-    corrupted = scfg.Value(
+    corrupted = kwconf.Value(
         False,
         isflag=True,
         help=ub.paragraph(
@@ -71,7 +84,7 @@ class CocoValidateCLI(scfg.DataConfig):
         ),
     )
 
-    channels = scfg.Value(
+    channels = kwconf.Value(
         True,
         isflag=True,
         help=ub.paragraph(
@@ -82,7 +95,7 @@ class CocoValidateCLI(scfg.DataConfig):
         ),
     )
 
-    require_relative = scfg.Value(
+    require_relative = kwconf.Value(
         False,
         isflag=True,
         help=ub.paragraph(
@@ -95,7 +108,7 @@ class CocoValidateCLI(scfg.DataConfig):
         ),
     )
 
-    img_attrs = scfg.Value(
+    img_attrs = kwconf.Value(
         'warn',
         help=ub.paragraph(
             """
@@ -106,13 +119,26 @@ class CocoValidateCLI(scfg.DataConfig):
         ),
     )
 
-    verbose = scfg.Value(1, help='verbosity flag')
+    annot_attrs = kwconf.Value(
+        False,
+        help=ub.paragraph(
+            """
+            if truthy, check that annotations contain bbox entries. Bboxes are
+            optional in the kwcoco schema, so this check is disabled by
+            default. Use 'warn' or 'error' to request it explicitly.
+            """
+        ),
+    )
 
-    fastfail = scfg.Value(False, isflag=True, help='if True raise errors immediately')
+    verbose = kwconf.Value(
+        1,
+        help='verbosity: 0=silent progress, 1=problems, 2=checks/progress',
+    )
 
-    workers = scfg.Value(
+    fastfail = kwconf.Value(False, isflag=True, help='if True raise errors immediately')
+
+    workers = kwconf.Value(
         0,
-        isflag=True,
         help=ub.paragraph(
             """
             number of workers for checks that support parallelization
@@ -123,7 +149,7 @@ class CocoValidateCLI(scfg.DataConfig):
     # TODO: Move these to a different tool. This should only validate,
     # not fix anything.
     # TODO: See new coco_fixup.py script and use that instead.
-    fix = scfg.Value(
+    fix = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -138,7 +164,7 @@ class CocoValidateCLI(scfg.DataConfig):
         ),
     )
 
-    dst = scfg.Value(
+    dst = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -155,18 +181,18 @@ class CocoValidateCLI(scfg.DataConfig):
     """
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
         Example:
             >>> from kwcoco.cli.coco_validate import *  # NOQA
             >>> kw = {'src': 'special:shapes8'}
-            >>> cmdline = False
+            >>> argv = False
             >>> cls = CocoValidateCLI
-            >>> cls.main(cmdline, **kw)
+            >>> cls.main(argv, **kw)
         """
         import kwcoco
 
-        config = cls.cli(data=kw, cmdline=cmdline, strict=True)
+        config = cls.cli(data=kw, argv=argv, strict=True)
         print('config = {}'.format(ub.urepr(config, nl=1)))
 
         if config['src'] is None:

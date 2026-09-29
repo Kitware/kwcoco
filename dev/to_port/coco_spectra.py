@@ -26,60 +26,61 @@ CommandLine:
 """
 
 import ubelt as ub
-import scriptconfig as scfg
+import kwconf
 import math
 
 
-class CocoSpectraConfig(scfg.DataConfig):
+class CocoSpectraConfig(kwconf.Config):
+    __special_options__ = True
     """
     Plot the spectrum of band intensities in a kwcoco file.
     """
 
     __default__ = {
-        'src': scfg.Value('data.kwcoco.json', help='input coco dataset', position=1),
-        'dst': scfg.Value(
+        'src': kwconf.Value('data.kwcoco.json', help='input coco dataset', position=1),
+        'dst': kwconf.Value(
             None,
             help='if specified dump the figure to disk at this file path (e.g. with a jpg or png suffix)',
         ),
-        'cache_dpath': scfg.Value(
+        'cache_dpath': kwconf.Value(
             None,
             help='if specified, read/write cached stats files from here instead of as sidecar files',
         ),
-        'show': scfg.Value(False, isflag=True, help='if True, do a plt.show()'),
-        'draw': scfg.Value(
+        'show': kwconf.Value(False, isflag=True, help='if True, do a plt.show()'),
+        'draw': kwconf.Value(
             True,
             isflag=True,
             help='if False disables all visualization and just print tables',
         ),
-        'workers': scfg.Value(0, help='number of io workers'),
-        'mode': scfg.Value('process', help='type of parallelism'),
-        'include_channels': scfg.Value(
+        'workers': kwconf.Value(0, help='number of io workers'),
+        'mode': kwconf.Value('process', help='type of parallelism'),
+        'include_channels': kwconf.Value(
             None,
             help='if specified can be | separated valid channels',
             alias=['channels'],
         ),
-        'exclude_channels': scfg.Value(
+        'exclude_channels': kwconf.Value(
             None, help='if specified can be | separated invalid channels'
         ),
-        'include_sensors': scfg.Value(
+        'include_sensors': kwconf.Value(
             None, help='if specified can be comma separated valid sensors'
         ),
-        'exclude_sensors': scfg.Value(
+        'exclude_sensors': kwconf.Value(
             None, help='if specified can be comma separated invalid sensors'
         ),
-        'valid_range': scfg.Value(
+        'valid_range': kwconf.Value(
             None,
             help='Only include values within this range; specified as <min_val>:<max_val> e.g. (0:10000)',
         ),
-        'title': scfg.Value(None, help='Provide a title for the histogram figure'),
-        'max_images': scfg.Value(
+        'title': kwconf.Value(None, help='Provide a title for the histogram figure'),
+        'max_images': kwconf.Value(
             None,
             help='if given only sample this many images when computing statistics',
             group='subset',
         ),
-        'select_images': scfg.Value(
+        'select_images': kwconf.Value(
             None,
-            type=str,
+            parser=str,
             help=ub.paragraph(
                 """
                 A json query (via the jq spec) that specifies which images
@@ -105,7 +106,7 @@ class CocoSpectraConfig(scfg.DataConfig):
             ),
             group='subset',
         ),
-        'select_videos': scfg.Value(
+        'select_videos': kwconf.Value(
             None,
             help=ub.paragraph(
                 """
@@ -126,41 +127,41 @@ class CocoSpectraConfig(scfg.DataConfig):
             group='subset',
         ),
         # Histogram modifiers
-        'kde': scfg.Value(
+        'kde': kwconf.Value(
             True,
             group='histplot',
             help='if True compute a kernel density estimate to smooth the distribution',
         ),
-        'cumulative': scfg.Value(
+        'cumulative': kwconf.Value(
             False,
             group='histplot',
             help='If True, plot the cumulative counts as bins increase.',
         ),
-        # 'bins': scfg.Value(256, help='Generic bin parameter that can be the name of a reference rule or the number of bins.'),
-        'bins': scfg.Value(
+        # 'bins': kwconf.Value(256, help='Generic bin parameter that can be the name of a reference rule or the number of bins.'),
+        'bins': kwconf.Value(
             'auto',
             group='histplot',
             help='Generic bin parameter that can be the name of a reference rule or the number of bins.',
         ),
-        'fill': scfg.Value(
+        'fill': kwconf.Value(
             True,
             isflag=True,
             group='histplot',
             help='If True, fill in the space under the histogram.',
         ),
-        'element': scfg.Value(
+        'element': kwconf.Value(
             'step',
             help='Visual representation of the histogram statistic.',
             group='histplot',
             choices=['bars', 'step', 'poly'],
         ),
-        'multiple': scfg.Value(
+        'multiple': kwconf.Value(
             'layer',
             choices=['layer', 'dodge', 'stack', 'fill'],
             group='histplot',
             help='Approach to resolving multiple elements when semantic mapping creates subsets.',
         ),
-        'stat': scfg.Value(
+        'stat': kwconf.Value(
             'probability',
             choices={'count', 'frequency', 'density', 'probability'},
             group='histplot',
@@ -232,7 +233,7 @@ class HistAccum:
         return full_df
 
 
-def main(cmdline=True, **kwargs):
+def main(argv=True, **kwargs):
     r"""
     CommandLine:
         XDEV_PROFILE=1 xdoctest -m geowatch.cli.coco_spectra main
@@ -250,7 +251,7 @@ def main(cmdline=True, **kwargs):
         >>> kwargs['workers'] = 'avail'
         >>> kwargs['show'] = False
         >>> kwargs['draw'] = False
-        >>> main(cmdline=False, **kwargs)
+        >>> main(argv=False, **kwargs)
 
     Example:
         >>> # xdoctest: +REQUIRES(--slow)
@@ -269,7 +270,7 @@ def main(cmdline=True, **kwargs):
         >>> }
         >>> kwargs['multiple'] = 'layer'
         >>> kwargs['element'] = 'step'
-        >>> main(cmdline=False, **kwargs)
+        >>> main(argv=False, **kwargs)
     """
     from geowatch.utils import kwcoco_extensions
     from kwutil import util_parallel
@@ -277,7 +278,7 @@ def main(cmdline=True, **kwargs):
     import kwcoco
     import numpy as np
 
-    config = CocoSpectraConfig.cli(data=kwargs, cmdline=cmdline)
+    config = CocoSpectraConfig.cli(data=kwargs, argv=argv)
     print('config = {}'.format(ub.urepr(config.to_dict(), nl=1)))
 
     # coco_dset = kwcoco.CocoDataset.coerce(config['src'])

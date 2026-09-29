@@ -4,8 +4,10 @@ from __future__ import annotations
 """
 Wraps the logic in kwcoco/coco_evaluator.py with a command line script
 """
+from typing import Any, cast
+
 from kwcoco import coco_evaluator
-import scriptconfig as scfg
+import kwconf
 import ubelt as ub
 
 
@@ -22,14 +24,16 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     __alias__ = ['eval_detections', 'evaluate_detections']
 
     # These should go into the CLI args, not the class config args
-    expt_title = scfg.Value('', type=str, help='title for plots', tags=['perf_param'])
-    draw = scfg.Value(True, isflag=1, help='draw metric plots', tags=['perf_param'])  # type: ignore
-    out_dpath = scfg.Value(
-        './coco_metrics', type=str, help='where to dump results', tags=['out_path']
+    expt_title = kwconf.Value('', parser=str, help='title for plots', tags=['perf_param'])
+    draw = kwconf.Value(
+        True, isflag=True, help='draw metric plots', tags=['perf_param']
     )
-    out_fpath = scfg.Value(
+    out_dpath = kwconf.Value(
+        './coco_metrics', parser=str, help='where to dump results', tags=['out_path']
+    )
+    out_fpath = kwconf.Value(
         'auto',
-        type=str,
+        parser=str,
         help=ub.paragraph(
             """
         Where to dump the json file containing result. If "auto",
@@ -39,7 +43,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
         tags=['out_path', 'primary'],
     )
 
-    confusion_fpath = scfg.Value(
+    confusion_fpath = kwconf.Value(
         None,
         help=ub.paragraph(
             """
@@ -53,7 +57,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     )
 
     @classmethod
-    def main(cls, cmdline=True, **kw):
+    def main(cls, argv=True, **kw):
         """
 
         Example:
@@ -65,10 +69,10 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
             >>> dpath = ub.Path.appdir('kwcoco/tests/eval').ensuredir()
             >>> true_dset = kwcoco.CocoDataset.demo('shapes8')
             >>> kwargs = {
-            >>>     'box_noise': 0.5,
-            >>>     'n_fp': (0, 10),
-            >>>     'n_fn': (0, 10),
-            >>> }
+            ...     'box_noise': 0.5,
+            ...     'n_fp': (0, 10),
+            ...     'n_fn': (0, 10),
+            ... }
             >>> pred_dset = perterb_coco(true_dset, **kwargs)
             >>> true_dset.fpath = dpath / 'true.mscoco.json'
             >>> pred_dset.fpath = dpath / 'pred.mscoco.json'
@@ -77,27 +81,27 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
             >>> pred_dset.dump(pred_dset.fpath)
             >>> draw = False  # set to false for faster tests
             >>> kw = dict(
-            >>>     true_dataset=true_dset.fpath,
-            >>>     pred_dataset=pred_dset.fpath,
-            >>>     confusion_fpath=confusion_fpath,
-            >>>     draw=draw,
-            >>>     out_dpath=dpath
-            >>> )
-            >>> cmdline = False
-            >>> CocoEvalCLI.main(cmdline=cmdline, **kw)
+            ...     true_dataset=true_dset.fpath,
+            ...     pred_dataset=pred_dset.fpath,
+            ...     confusion_fpath=confusion_fpath,
+            ...     draw=draw,
+            ...     out_dpath=dpath
+            ... )
+            >>> argv = False
+            >>> CocoEvalCLI.main(argv=argv, **kw)
 
         Ignore:
             geowatch visualize ~/.cache/kwcoco/tests/eval/confusion.kwcoco.json --smart --animate=False --role_order="true,pred"
             geowatch visualize ~/.cache/kwcoco/tests/eval/confusion.kwcoco.json --smart --animate=False --channels="r|g|b,r|g|b" --role_order="true,pred"
 
         """
-        main(cmdline=cmdline, **kw)
+        main(argv=argv, **kw)
 
 
 __cli__ = CocoEvalCLI
 
 
-def main(cmdline=True, **kw):
+def main(argv=True, **kw):
     r"""
     TODO:
         - [X] should live in kwcoco.cli.coco_eval
@@ -119,10 +123,10 @@ def main(cmdline=True, **kw):
     import kwimage
     import kwarray
 
-    cli_config = CocoEvalCLI.cli(cmdline=cmdline, data=kw)
+    cli_config = CocoEvalCLI.cli(argv=argv, data=kw)
     print('cli_config = {}'.format(ub.urepr(cli_config, nl=1)))
 
-    eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__) # type: ignore
+    eval_config = ub.dict_subset(cli_config, coco_evaluator.CocoEvalConfig.__default__)  # type: ignore
 
     coco_eval = coco_evaluator.CocoEvaluator(eval_config)
     coco_eval._init()
@@ -232,16 +236,17 @@ def main(cmdline=True, **kw):
     if truth_dset is not None and result_cfsn_vecs is not None:
         # Use the first result with confusion vectors for the example ranking.
         print('Attempting to draw examples')
-        gid_to_stats = {}
+        gid_to_stats: dict[int, dict[str, Any]] = {}
         gids, groupxs = kwarray.group_indices(result_cfsn_vecs.data['gid'])
         for gid, groupx in zip(gids, groupxs):
+            gid = cast(int, gid)
             true_vec = result_cfsn_vecs.data['true'][groupx]
             pred_vec = result_cfsn_vecs.data['pred'][groupx]
             is_true = true_vec > 0
             is_pred = pred_vec > 0
             has_pred = is_true & is_pred
 
-            stats = {
+            stats: dict[str, Any] = {
                 'num_assigned_pred': has_pred.sum(),
                 'num_true': is_true.sum(),
                 'num_pred': is_pred.sum(),
@@ -249,8 +254,12 @@ def main(cmdline=True, **kw):
             stats['frac_assigned'] = stats['num_assigned_pred'] / stats['num_true']
             gid_to_stats[gid] = stats
 
-        set([stats['frac_assigned'] for stast in gid_to_stats.values()])
-        gid = ub.argmax(gid_to_stats, key=lambda x: x['num_pred'] * x['num_true'])
+        gid = max(
+            gid_to_stats,
+            key=lambda gid: (
+                gid_to_stats[gid]['num_pred'] * gid_to_stats[gid]['num_true']
+            ),
+        )
         stat_gids = [gid]
 
         rng = kwarray.ensure_rng(None)
@@ -314,11 +323,11 @@ def build_confusion_datasets(coco_eval, results):
 
         # Ensure true and pred categories exist in the cfsn dataset
         for cat in true_dset.categories().objs:
-            new_cat = ub.udict(cat) - {'id'} # type: ignore
+            new_cat = ub.udict(cat) - {'id'}  # type: ignore
             cfsn_dset.ensure_category(**new_cat)
 
         # Mark the predicted annotations in the confusion dataset
-        for ann in cfsn_dset.annots().objs_iter():
+        for ann in cfsn_dset.annots().objs:
             ann.update(
                 {
                     'role': 'pred',

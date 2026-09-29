@@ -220,7 +220,13 @@
                         "maxItems": 4
                     },
                     "area": {"type": "number", "description": "The optional MS-COCO annotation area"},
-                    "category_id": {"type": "integer", "description": "The category id of this annotation"},
+                    "category_id": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"type": "null"}
+                        ],
+                        "description": "The category id of this annotation. None is allowed for uncategorized annotations."
+                    },
                     "track_id": {
                         "anyOf": [
                             {"type": "integer"},
@@ -233,36 +239,6 @@
                         "anyOf": [
                             {
                                 "anyOf": [
-                                    {
-                                        "type": "object",
-                                        "properties": {
-                                            "exterior": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "array",
-                                                    "items": {"type": "number"},
-                                                    "minItems": 2,
-                                                    "maxItems": 2
-                                                },
-                                                "description": "counter-clockwise xy exterior points"
-                                            },
-                                            "interiors": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "array",
-                                                        "items": {"type": "number"},
-                                                        "minItems": 2,
-                                                        "maxItems": 2
-                                                    },
-                                                    "description": "clockwise xy hole"
-                                                }
-                                            }
-                                        },
-                                        "title": "KWCOCO_POLYGON",
-                                        "description": "A new-style polygon format that supports holes"
-                                    },
                                     {
                                         "type": "array",
                                         "items": {
@@ -298,18 +274,48 @@
                                     },
                                     {
                                         "type": "array",
-                                        "items": {"type": "number"},
-                                        "description": "an old-style polygon [x1,y1,v1,...,xk,yk,vk]",
-                                        "title": "MSCOCO_POLYGON"
-                                    },
-                                    {
-                                        "type": "array",
                                         "items": {
                                             "type": "array",
                                             "items": {"type": "number"},
                                             "description": "an old-style polygon [x1,y1,v1,...,xk,yk,vk]",
                                             "title": "MSCOCO_POLYGON"
                                         }
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "exterior": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {"type": "number"},
+                                                    "minItems": 2,
+                                                    "maxItems": 2
+                                                },
+                                                "description": "counter-clockwise xy exterior points"
+                                            },
+                                            "interiors": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "array",
+                                                        "items": {"type": "number"},
+                                                        "minItems": 2,
+                                                        "maxItems": 2
+                                                    },
+                                                    "description": "clockwise xy hole"
+                                                }
+                                            }
+                                        },
+                                        "title": "KWCOCO_POLYGON",
+                                        "description": "A new-style polygon format that supports holes"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {"type": "number"},
+                                        "description": "an old-style polygon [x1,y1,v1,...,xk,yk,vk]",
+                                        "title": "MSCOCO_POLYGON"
                                     }
                                 ]
                             },

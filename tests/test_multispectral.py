@@ -117,3 +117,22 @@ def test_multispectral_sql():
     img2 = dset2.load_image(1, channels='B1')
 
     assert np.all(img1 == img2)
+
+
+def test_load_image_does_not_swallow_imread_errors(monkeypatch):
+    import kwcoco
+    import kwimage
+    import pytest
+
+    class ExpectedReadError(Exception):
+        pass
+
+    dset = kwcoco.CocoDataset()
+    gid = dset.add_image(file_name='image-that-does-not-need-to-exist.png')
+
+    def fail_imread(*args, **kwargs):
+        raise ExpectedReadError
+
+    monkeypatch.setattr(kwimage, 'imread', fail_imread)
+    with pytest.raises(ExpectedReadError):
+        dset.load_image(gid)

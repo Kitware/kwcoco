@@ -3,7 +3,8 @@
 from __future__ import annotations
 import os
 import sys
-import scriptconfig as scfg
+import kwconf
+from kwcoco.cli._base import KWCocoConfig
 import ubelt as ub
 
 
@@ -14,7 +15,7 @@ SeeAlso:
 """
 
 
-class FinishInstallCLI(scfg.DataConfig):
+class FinishInstallCLI(KWCocoConfig):
     """
     Finish the install of kwcoco.
 
@@ -24,35 +25,35 @@ class FinishInstallCLI(scfg.DataConfig):
 
     __command__ = 'finish_install'
 
-    with_gdal = scfg.Value(
+    with_gdal = kwconf.Value(
         True, isflag=True, help='if True, ensure osgeo / gdal is installed'
     )
-    with_cv2_headless = scfg.Value(
+    with_cv2_headless = kwconf.Value(
         True, isflag=True, help='if True, ensure cv2 is installed'
     )
 
-    strict = scfg.Value(False, isflag=True, help='if True, use strict versions')
-    prefer_uv = scfg.Value(
+    strict = kwconf.Value(False, isflag=True, help='if True, use strict versions')
+    prefer_uv = kwconf.Value(
         True, isflag=True, help='if True, use uv if it is available'
     )
-    isolated_installer = scfg.Value(
+    isolated_installer = kwconf.Value(
         False, isflag=True,
         help='if True, ignore ambient installer environment/config'
     )
 
     @classmethod
-    def main(FinishInstallCLI, cmdline=1, **kwargs):
+    def main(FinishInstallCLI, argv=True, **kwargs):
         """
         Example:
             >>> # xdoctest: +SKIP
             >>> from kwcoco.cli.finish_install import *  # NOQA
-            >>> cmdline = 0
+            >>> argv = False
             >>> kwargs = dict()
-            >>> main(cmdline=cmdline, **kwargs)
+            >>> main(argv=argv, **kwargs)
         """
         import rich
 
-        config = FinishInstallCLI.cli(cmdline=cmdline, data=kwargs, strict=True)  # type: ignore
+        config = FinishInstallCLI.cli(argv=argv, data=kwargs, strict=True)  # type: ignore
         rich.print('config = ' + ub.urepr(config, nl=1))  # type: ignore
 
         if config.with_gdal:

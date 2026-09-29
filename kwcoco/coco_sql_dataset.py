@@ -2286,7 +2286,7 @@ class CocoSqlDatabase(
 
     @data_fpath.setter
     def data_fpath(self, value: str) -> None:
-        self.fpath = value  # type: ignore
+        self.uri = value
 
     def _orig_coco_fpath(self):
         """
