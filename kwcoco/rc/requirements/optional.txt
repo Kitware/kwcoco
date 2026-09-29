@@ -1,7 +1,7 @@
 affine>=2.3.0
 colormath>=3.0.0
 
-kwimage_ext>=0.3.2 ; python_version >= '3.10'
+kwimage_ext>=0.4.1 ; python_version >= '3.10'
 
 kwplot>=0.5.2
 lark>=1.1.2
