@@ -690,6 +690,61 @@ expensive.  The measured full corpus currently attributes a small median
 fraction of native runtime to candidate construction; confirm a workload where
 that changes before complicating the overlap backend.
 
+## Historical release-to-release compatibility and speed
+
+The release benchmark above answers whether the **current** strict native COCO
+implementation matches and outperforms the current official pycocotools
+reference.  It does not answer a different release-engineering question:
+whether upgrading KWCoco changes the long-standing
+``CocoEvaluator.evaluate()`` result or its runtime.
+
+Use ``run_version_timeline.py`` for that question.  The default run compares
+the released ``v0.9.0`` tag with the current worktree.  It generates one
+version-independent bbox truth/prediction pair using only the Python standard
+library, exports historical refs directly from git, and executes each KWCoco
+source tree in a fresh subprocess with the **same Python executable and shared
+dependency environment**.  Only the KWCoco source path changes.
+
+```bash
+# v0.9.0 imports scriptconfig in CocoEvaluator, while the current worktree uses
+# kwconf.  Keep both available in the common benchmark environment.
+python -m pip install scriptconfig
+
+python dev/pycocotools_metrics_compare/run_version_timeline.py \
+    --refs=v0.9.0,current \
+    --baseline=v0.9.0 \
+    --warmup=2 --repeat=7 \
+    --output-dpath=_metric_version_timeline_090_to_091
+```
+
+The generated report includes:
+
+* repeated prepared-evaluator and end-to-end wall time for the historical public evaluator;
+* speedup / slowdown relative to the chosen baseline;
+* a recursive comparison of the complete serialized ``nocls_measures`` and
+  ``ovr_measures`` trees, including curves, thresholds, and counts rather than
+  only one AP scalar;
+* exact dependency versions and the imported KWCoco source path for every run;
+* a capability matrix showing when named official COCO statistics, segmentation
+  COCO scoring, full evaluation tensors, native COCO scoring, and compiled
+  assignment backends became available.
+
+More releases can be included in one run, for example
+``--refs=v0.8.9,v0.9.0,current``.  A historical source that cannot run in the
+common dependency environment is reported as an error instead of silently
+switching environments.  This is intentional: dependency drift would confound
+a source-code runtime comparison.  If a historical environment genuinely
+requires different dependencies, retain that as a separate compatibility run
+and do not present its timing ratio as a controlled source-only speedup.
+
+The historical runner and the current release benchmark are complementary:
+
+* ``run_version_timeline.py``: old KWCoco versus new KWCoco, historical public
+  contract, frozen bbox workload, same dependencies;
+* ``run_release_benchmark.py``: current official pycocotools versus current
+  native Python/Rust, bbox + segmentation, full tensor parity, memory, and
+  scaling / real-dataset evidence.
+
 ## Release-scale timing, memory, and publication evidence
 
 Once Phase-3 tensor conformance is green, use `run_release_benchmark.py` for

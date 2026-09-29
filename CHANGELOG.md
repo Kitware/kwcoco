@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 
 ### Added
+* Add a cross-version metric timeline harness that benchmarks the historical `CocoEvaluator.evaluate()` contract on one frozen workload, compares complete serialized metric curves/counts against older git refs, records source-only runtime ratios under one dependency environment, and reports metric capability evolution across releases.
 * Add a release-scale native COCO evidence harness that benchmarks isolated-process wall time, peak RSS, optional Python allocations, throughput, full tensor parity, and public-evaluator/core scopes against official pycocotools; emit raw JSONL, CSV/JSON summaries, a publication-oriented Markdown report, and an uploadable evidence bundle.
 * Add a dedicated ``metrics`` optional dependency extra for installing both the official pycocotools reference and the optional ``kwimage_ext`` acceleration backend, including modern Python 3.12+ kwimage_ext installation support.
 * Add a declarative xcookie CI source check that runs quick Python/Rust COCO tensor conformance plus an isolated-process release-benchmark smoke test.

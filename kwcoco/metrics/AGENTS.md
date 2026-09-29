@@ -180,6 +180,16 @@ tensor dimensions in either the native or official wrapper. COCO's explicit
 IoU threshold 1.0 uses the reference comparison cap ``1 - 1e-10``.
 
 
+### Historical release comparison gate
+
+Use ``dev/pycocotools_metrics_compare/run_version_timeline.py`` when making
+claims about upgrade compatibility or speed relative to an older KWCoco
+release.  It is intentionally separate from native-versus-pycocotools release
+benchmarking: freeze the input JSON once, change only the KWCoco source tree,
+and compare the complete serialized historical evaluator metric state.  Do not
+infer a v0.9.0-to-v0.9.1 speedup from the current native-versus-official
+benchmark because the older release did not expose the same native COCO path.
+
 ### Release evidence and large-scale benchmarking
 
 After semantic/tensor conformance is green, use
