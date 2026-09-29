@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import logging
-from typing import Any, TypeVar
+from typing import Any, TYPE_CHECKING, TypeVar
 import warnings
 
 import ubelt as ub
@@ -120,6 +120,14 @@ class MixinCocoSchema:
     # Supplied by CocoDataset, the concrete class that owns this mixin.
     dataset: dict[str, Any]
 
+    if TYPE_CHECKING:
+        # Supplied by MixinCocoExtras on the concrete CocoDataset. Keep this
+        # declaration type-checker-only so it does not alter mixin MRO lookup.
+        def _ensure_imgsize(
+            self, workers: int = 0, verbose: int = 0, fail: bool = False
+        ) -> dict[str, Any]:
+            ...
+
     def conform(self: MixinCocoSchemaT, **config: Any) -> MixinCocoSchemaT:
         """
         Make the COCO file conform a stricter spec, infers attributes where
@@ -162,7 +170,7 @@ class MixinCocoSchema:
         if config.get('ensure_imgsize', True):
             self._ensure_imgsize(
                 workers=config.get('workers', 8), verbose=verbose
-            )  # type: ignore
+            )
 
             for vidid, gids in self.index.vidid_to_gids.items():  # type: ignore
                 if len(gids):

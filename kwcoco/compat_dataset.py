@@ -75,8 +75,8 @@ class COCO(CocoDataset):
             def __init__(self, parent: COCO) -> None:
                 self.parent = parent
 
-            def __getitem__(self, gid: int) -> list[dict[str, Any]]:
-                aids = self.parent.index.gid_to_aids[gid]
+            def __getitem__(self, key: int) -> list[dict[str, Any]]:
+                aids = self.parent.index.gid_to_aids[key]
                 anns = list(ub.take(self.parent.index.anns, aids))
                 return anns
 

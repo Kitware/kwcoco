@@ -26,7 +26,7 @@ class CocoEvalCLI(coco_evaluator.CocoEvalConfig):
     # These should go into the CLI args, not the class config args
     expt_title = kwconf.Value('', parser=str, help='title for plots', tags=['perf_param'])
     draw = kwconf.Value(
-        True, isflag=1, help='draw metric plots', tags=['perf_param']
+        True, isflag=True, help='draw metric plots', tags=['perf_param']
     )
     out_dpath = kwconf.Value(
         './coco_metrics', parser=str, help='where to dump results', tags=['out_path']

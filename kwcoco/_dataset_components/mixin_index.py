@@ -178,8 +178,8 @@ class CocoIndex:
             def __init__(self, index):
                 self.index = index
 
-            def __getitem__(self, cid: Any) -> Any:
-                aids = self.index.cid_to_aids[cid]
+            def __getitem__(self, key: Any) -> Any:
+                aids = self.index.cid_to_aids[key]
                 gids = {self.index.anns[aid]['image_id'] for aid in aids}
                 return gids
 

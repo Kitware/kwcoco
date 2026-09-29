@@ -178,6 +178,8 @@ python-dateutil==2.9.0.post0 ; python_full_version < '4'
     # via pandas
 pytz==2026.4 ; python_full_version < '3.11'
     # via pandas
+pyyaml==6.0.3
+    # via kwcoco
 referencing==0.37.0
     # via
     #   jsonschema

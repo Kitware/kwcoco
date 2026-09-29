@@ -1650,6 +1650,7 @@ postgresql = [
 tests = [
     { name = "coverage" },
     { name = "fastjsonschema" },
+    { name = "pyyaml" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "timerit" },
@@ -1813,6 +1814,7 @@ requires-dist = [
     { name = "pycocotools", marker = "extra == 'all'", specifier = ">=2.0.11" },
     { name = "pycocotools", marker = "extra == 'metrics'", specifier = ">=2.0.11" },
     { name = "pygments", marker = "extra == 'docs'", specifier = ">=2.9.0" },
+    { name = "pyyaml", marker = "extra == 'tests'", specifier = ">=6.0" },
     { name = "pytest", marker = "extra == 'docs'", specifier = ">=6.2.4" },
     { name = "pytest", marker = "extra == 'tests'", specifier = ">=6.2.4" },
     { name = "pytest-cov", marker = "extra == 'docs'", specifier = ">=2.12.1" },
