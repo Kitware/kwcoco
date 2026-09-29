@@ -390,13 +390,26 @@ def _write_eval_npz(path, result):
     eval_record = result.get('eval')
     if eval_record is None:
         raise AssertionError('parity phase requires with_eval=True')
-    np.savez_compressed(
-        path,
-        precision=np.asarray(eval_record['precision']),
-        recall=np.asarray(eval_record['recall']),
-        scores=np.asarray(eval_record['scores']),
-        realpos_total=np.asarray(eval_record.get('realpos_total')),
-    )
+    arrays = {
+        'precision': np.asarray(eval_record['precision']),
+        'recall': np.asarray(eval_record['recall']),
+        'scores': np.asarray(eval_record['scores']),
+    }
+    # ``realpos_total`` is a native kwcoco diagnostic tensor, not part of the
+    # official COCOeval tensor snapshot.  Preserve it when it genuinely exists,
+    # but never serialize ``None`` because ``np.asarray(None)`` creates an
+    # object-dtype array that cannot be loaded with NumPy's safe default
+    # ``allow_pickle=False``.
+    realpos_total = eval_record.get('realpos_total', None)
+    if realpos_total is not None:
+        arrays['realpos_total'] = np.asarray(realpos_total)
+    object_keys = [key for key, arr in arrays.items() if arr.dtype.hasobject]
+    if object_keys:
+        raise TypeError(
+            'release benchmark parity artifacts must contain only numeric '
+            f'arrays; object dtype found for {object_keys!r}'
+        )
+    np.savez_compressed(path, **arrays)
 
 
 def main(argv=None):

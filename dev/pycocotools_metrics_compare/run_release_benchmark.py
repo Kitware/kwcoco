@@ -280,7 +280,13 @@ def _tensor_diff(native_npz, official_npz, atol):
         official_precision = np.asarray(odata['precision'])
         precision_absent_native = native_precision < 0
         precision_absent_official = official_precision < 0
-        for key in ['precision', 'recall', 'scores', 'realpos_total']:
+        # These are the three tensors defined by official COCOeval.eval and
+        # therefore the tensors that can be compared across implementations.
+        # Native kwcoco also exposes ``realpos_total`` as a useful diagnostic,
+        # but pycocotools does not.  Older benchmark artifacts accidentally
+        # serialized the missing official value as an object array; ignoring
+        # that non-COCO key also lets --resume consume those artifacts safely.
+        for key in ['precision', 'recall', 'scores']:
             a = np.asarray(ndata[key])
             b = np.asarray(odata[key])
             info = {
@@ -293,37 +299,95 @@ def _tensor_diff(native_npz, official_npz, atol):
                 result['ok'] = False
                 result['keys'][key] = info
                 continue
-            if key == 'realpos_total':
-                equal = np.array_equal(a, b)
-                info.update(ok=bool(equal), num_mismatch=int(np.count_nonzero(a != b)))
+            if key == 'scores':
+                # Detection scores may legitimately be negative. COCO's
+                # sampled score tensor uses -1 as an absent sentinel, so
+                # derive score-cell validity from the aligned precision
+                # tensor instead of testing score values themselves.
+                absent_a = precision_absent_native
+                absent_b = precision_absent_official
             else:
-                if key == 'scores':
-                    # Detection scores may legitimately be negative. COCO's
-                    # sampled score tensor uses -1 as an absent sentinel, so
-                    # derive score-cell validity from the aligned precision
-                    # tensor instead of testing score values themselves.
-                    absent_a = precision_absent_native
-                    absent_b = precision_absent_official
-                else:
-                    absent_a = a < 0
-                    absent_b = b < 0
-                absent_match = np.array_equal(absent_a, absent_b)
-                valid = ~(absent_a | absent_b)
-                if np.any(valid):
-                    max_abs = float(np.max(np.abs(a[valid] - b[valid])))
-                else:
-                    max_abs = 0.0
-                equal = absent_match and max_abs <= atol
-                info.update(
-                    ok=bool(equal),
-                    absent_mask_match=bool(absent_match),
-                    max_abs_delta=max_abs,
-                    populated_cells=int(np.count_nonzero(valid)),
-                )
+                absent_a = a < 0
+                absent_b = b < 0
+            absent_match = np.array_equal(absent_a, absent_b)
+            valid = ~(absent_a | absent_b)
+            if np.any(valid):
+                max_abs = float(np.max(np.abs(a[valid] - b[valid])))
+            else:
+                max_abs = 0.0
+            equal = absent_match and max_abs <= atol
+            info.update(
+                ok=bool(equal),
+                absent_mask_match=bool(absent_match),
+                max_abs_delta=max_abs,
+                populated_cells=int(np.count_nonzero(valid)),
+            )
             if not info['ok']:
                 result['ok'] = False
             result['keys'][key] = info
     return result
+
+
+def _load_reusable_worker_record(
+    path, *, spec, backend, iou_type, scope, eval_mode, phase,
+    warmup=None, repeat=None, memory_sample_interval=None,
+    python_allocations=None,
+):
+    """Load one completed worker record, rejecting incompatible resume data."""
+    path = Path(path)
+    if not path.exists():
+        return None
+    record = json.loads(path.read_text())
+    expected = {
+        'schema': 'kwcoco_release_benchmark_worker_v1',
+        'spec': spec,
+        'backend_label': backend,
+        'iou_type': iou_type,
+        'scope': scope,
+        'eval_mode': eval_mode,
+        'phase': phase,
+    }
+    mismatches = {
+        key: {'expected': value, 'found': record.get(key, None)}
+        for key, value in expected.items()
+        if record.get(key, None) != value
+    }
+    measurement = record.get('measurement', {})
+    if phase == 'timing':
+        if warmup is not None and measurement.get('warmup') != int(warmup):
+            mismatches['warmup'] = {
+                'expected': int(warmup), 'found': measurement.get('warmup')}
+        if repeat is not None and measurement.get('repeat') != int(repeat):
+            mismatches['repeat'] = {
+                'expected': int(repeat), 'found': measurement.get('repeat')}
+    elif phase == 'memory':
+        if memory_sample_interval is not None:
+            found_interval = measurement.get('sample_interval_seconds', None)
+            if (
+                found_interval is None
+                or not math.isclose(
+                    float(found_interval), float(memory_sample_interval),
+                    rel_tol=0.0, abs_tol=1e-15)
+            ):
+                mismatches['memory_sample_interval'] = {
+                    'expected': float(memory_sample_interval),
+                    'found': found_interval,
+                }
+        if python_allocations is not None:
+            found_python_allocations = (
+                measurement.get('python_peak_tracemalloc_bytes', None) is not None
+            )
+            if found_python_allocations != bool(python_allocations):
+                mismatches['python_allocations'] = {
+                    'expected': bool(python_allocations),
+                    'found': found_python_allocations,
+                }
+    if mismatches:
+        raise RuntimeError(
+            f'cannot resume from incompatible worker record {path}: '
+            f'{json.dumps(mismatches, sort_keys=True)}'
+        )
+    return record
 
 
 def _summary_diff(native_record, official_record, atol):
@@ -792,6 +856,9 @@ def main(argv=None):
         '--conformance-mode', choices=['none', 'quick', 'full', 'stress'],
         default='none')
     parser.add_argument('--output-dpath', type=Path, default=Path('_metric_release_benchmark'))
+    parser.add_argument(
+        '--resume', action=argparse.BooleanOptionalAction, default=False,
+        help='reuse compatible completed worker records in output-dpath')
     args = parser.parse_args(argv)
 
     output_dpath = args.output_dpath.resolve()
@@ -845,7 +912,7 @@ def main(argv=None):
     timing_records = []
     memory_records = []
     raw_jsonl = output_dpath / 'raw_records.jsonl'
-    raw_file = raw_jsonl.open('w')
+    raw_file = raw_jsonl.open('a' if args.resume else 'w')
     try:
         total_jobs = (
             len(scenarios) * len(iou_types) * len(scopes) *
@@ -858,38 +925,74 @@ def main(argv=None):
                         for backend in backends:
                             job_index += 1
                             stem = f"{spec['name']}__{iou_type}__{scope}__{eval_mode}__{backend}"
-                            print(f'[{job_index}/{total_jobs}] timing {stem}', flush=True)
                             timing_path = records_dpath / f'{stem}__timing.json'
-                            timing_record = _run_worker(
-                                spec_path=spec_paths[spec['name']],
-                                backend=backend, iou_type=iou_type,
-                                scope=scope, eval_mode=eval_mode, phase='timing',
-                                output_json=timing_path,
-                                warmup=args.warmup, repeat=args.repeat,
-                            )
+                            timing_record = None
+                            if args.resume:
+                                timing_record = _load_reusable_worker_record(
+                                    timing_path,
+                                    spec=spec, backend=backend, iou_type=iou_type,
+                                    scope=scope, eval_mode=eval_mode, phase='timing',
+                                    warmup=args.warmup, repeat=args.repeat,
+                                )
+                            if timing_record is None:
+                                print(
+                                    f'[{job_index}/{total_jobs}] timing {stem}',
+                                    flush=True)
+                                timing_record = _run_worker(
+                                    spec_path=spec_paths[spec['name']],
+                                    backend=backend, iou_type=iou_type,
+                                    scope=scope, eval_mode=eval_mode, phase='timing',
+                                    output_json=timing_path,
+                                    warmup=args.warmup, repeat=args.repeat,
+                                )
+                                raw_file.write(json.dumps(timing_record) + '\n')
+                                raw_file.flush()
+                            else:
+                                print(
+                                    f'[{job_index}/{total_jobs}] reuse timing {stem}',
+                                    flush=True)
                             timing_records.append(timing_record)
-                            raw_file.write(json.dumps(timing_record) + '\n')
-                            raw_file.flush()
                             if args.memory:
                                 for memory_idx in range(args.memory_repeat):
-                                    print(
-                                        f'[{job_index}/{total_jobs}] memory {stem} '
-                                        f'({memory_idx + 1}/{args.memory_repeat})',
-                                        flush=True)
                                     memory_path = records_dpath / (
                                         f'{stem}__memory_{memory_idx:02d}.json')
-                                    memory_record = _run_worker(
-                                        spec_path=spec_paths[spec['name']],
-                                        backend=backend, iou_type=iou_type,
-                                        scope=scope, eval_mode=eval_mode, phase='memory',
-                                        output_json=memory_path,
-                                        memory_sample_interval=args.memory_sample_interval,
-                                        python_allocations=args.python_allocations,
-                                    )
+                                    memory_record = None
+                                    if args.resume:
+                                        memory_record = _load_reusable_worker_record(
+                                            memory_path,
+                                            spec=spec, backend=backend,
+                                            iou_type=iou_type, scope=scope,
+                                            eval_mode=eval_mode, phase='memory',
+                                            memory_sample_interval=(
+                                                args.memory_sample_interval),
+                                            python_allocations=(
+                                                args.python_allocations),
+                                        )
+                                    if memory_record is None:
+                                        print(
+                                            f'[{job_index}/{total_jobs}] memory {stem} '
+                                            f'({memory_idx + 1}/{args.memory_repeat})',
+                                            flush=True)
+                                        memory_record = _run_worker(
+                                            spec_path=spec_paths[spec['name']],
+                                            backend=backend, iou_type=iou_type,
+                                            scope=scope, eval_mode=eval_mode,
+                                            phase='memory', output_json=memory_path,
+                                            memory_sample_interval=(
+                                                args.memory_sample_interval),
+                                            python_allocations=(
+                                                args.python_allocations),
+                                        )
+                                        raw_file.write(
+                                            json.dumps(memory_record) + '\n')
+                                        raw_file.flush()
+                                    else:
+                                        print(
+                                            f'[{job_index}/{total_jobs}] reuse memory '
+                                            f'{stem} ({memory_idx + 1}/'
+                                            f'{args.memory_repeat})', flush=True)
                                     memory_record['memory_iteration'] = memory_idx
                                     memory_records.append(memory_record)
-                                    raw_file.write(json.dumps(memory_record) + '\n')
-                                    raw_file.flush()
     finally:
         raw_file.close()
 
@@ -900,19 +1003,42 @@ def main(argv=None):
                 print(f'parity {spec["name"]} {iou_type}', flush=True)
                 ref_json = parity_dpath / f"{spec['name']}__{iou_type}__official.json"
                 ref_npz = parity_dpath / f"{spec['name']}__{iou_type}__official.npz"
-                official = _run_worker(
-                    spec_path=spec_paths[spec['name']], backend='official',
-                    iou_type=iou_type, scope='core', eval_mode='tensor', phase='parity',
-                    output_json=ref_json, output_npz=ref_npz,
-                )
+                official = None
+                if args.resume and ref_npz.exists():
+                    official = _load_reusable_worker_record(
+                        ref_json, spec=spec, backend='official',
+                        iou_type=iou_type, scope='core', eval_mode='tensor',
+                        phase='parity')
+                if official is None:
+                    official = _run_worker(
+                        spec_path=spec_paths[spec['name']], backend='official',
+                        iou_type=iou_type, scope='core', eval_mode='tensor',
+                        phase='parity', output_json=ref_json, output_npz=ref_npz,
+                    )
+                else:
+                    print(
+                        f'reuse parity worker {spec["name"]} {iou_type} official',
+                        flush=True)
                 for backend in parity_backends:
                     native_json = parity_dpath / f"{spec['name']}__{iou_type}__{backend}.json"
                     native_npz = parity_dpath / f"{spec['name']}__{iou_type}__{backend}.npz"
-                    native = _run_worker(
-                        spec_path=spec_paths[spec['name']], backend=backend,
-                        iou_type=iou_type, scope='core', eval_mode='tensor', phase='parity',
-                        output_json=native_json, output_npz=native_npz,
-                    )
+                    native = None
+                    if args.resume and native_npz.exists():
+                        native = _load_reusable_worker_record(
+                            native_json, spec=spec, backend=backend,
+                            iou_type=iou_type, scope='core', eval_mode='tensor',
+                            phase='parity')
+                    if native is None:
+                        native = _run_worker(
+                            spec_path=spec_paths[spec['name']], backend=backend,
+                            iou_type=iou_type, scope='core', eval_mode='tensor',
+                            phase='parity', output_json=native_json,
+                            output_npz=native_npz,
+                        )
+                    else:
+                        print(
+                            f'reuse parity worker {spec["name"]} {iou_type} '
+                            f'{backend}', flush=True)
                     summary = _summary_diff(native, official, args.parity_atol)
                     tensor = _tensor_diff(native_npz, ref_npz, args.parity_atol)
                     max_abs = max(
@@ -932,17 +1058,34 @@ def main(argv=None):
                         'tensor': tensor,
                     }
                     parity_records.append(item)
-        (output_dpath / 'parity_results.json').write_text(
-            json.dumps(parity_records, indent=2) + '\n')
+                    # Persist after every comparison so a later interruption
+                    # never discards already-computed parity evidence.
+                    (output_dpath / 'parity_results.json').write_text(
+                        json.dumps(parity_records, indent=2) + '\n')
 
     conformance_records = []
+    conformance_path = output_dpath / 'conformance_results.json'
+    reusable_conformance = {}
+    if args.resume and conformance_path.exists():
+        for item in json.loads(conformance_path.read_text()):
+            key = (item.get('backend'), item.get('mode'))
+            if item.get('returncode') == 0:
+                reusable_conformance[key] = item
     if args.conformance_mode != 'none':
         for backend in ['python', 'kwimage_ext']:
-            print(f'conformance {backend} {args.conformance_mode}', flush=True)
-            conformance_records.append(
-                _run_conformance(output_dpath, args.conformance_mode, backend))
-        (output_dpath / 'conformance_results.json').write_text(
-            json.dumps(conformance_records, indent=2) + '\n')
+            key = (backend, args.conformance_mode)
+            item = reusable_conformance.get(key, None)
+            if item is None:
+                print(f'conformance {backend} {args.conformance_mode}', flush=True)
+                item = _run_conformance(
+                    output_dpath, args.conformance_mode, backend)
+            else:
+                print(
+                    f'reuse conformance {backend} {args.conformance_mode}',
+                    flush=True)
+            conformance_records.append(item)
+            conformance_path.write_text(
+                json.dumps(conformance_records, indent=2) + '\n')
 
     rows = _summarize_records(timing_records, memory_records, parity_records)
     (output_dpath / 'summary.json').write_text(json.dumps(rows, indent=2) + '\n')
