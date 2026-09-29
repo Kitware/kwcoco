@@ -1045,7 +1045,10 @@ def _draw_channel_group(
             # the API boundary.
             draw_colors = dets.data.get('colors', 'blue')
             if not isinstance(draw_colors, str):
-                draw_colors = draw_colors.tolist()
+                # Keep each RGB(A) vector atomic at the kwimage API boundary.
+                # Older kwimage versions interpret a list-valued RGB color as
+                # a per-point color list when drawing detection keypoints.
+                draw_colors = [tuple(map(float, color)) for color in draw_colors]
             ann_canvas = dets.draw_on(
                 ann_canvas,
                 color=draw_colors,

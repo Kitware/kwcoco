@@ -76,6 +76,7 @@ def test_visualize_respects_annotation_colors_and_bboxless_annots(tmp_path):
             image_id=gid,
             category_id=catid,
             bbox=[x, 20, 20, 20],
+            keypoints=[x + 10, 30, 2],
             color=color,
         )
 
